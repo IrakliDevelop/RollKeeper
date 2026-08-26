@@ -1,6 +1,7 @@
 import { captureDeviceBackup } from '../deviceRecovery';
 import {
   commitCharacterCutover,
+  type CharacterActivationEvidenceInput,
   type CharacterCutoverGates,
 } from './characterAuthority';
 import { isCharacterFamilyKey } from './characterFamily';
@@ -25,6 +26,8 @@ interface InspectionOptions {
   recoveryCreatedAt: string;
   appVersion: string;
   recoveryGate: { hasDownloadReceipt(hash: string): Promise<boolean> };
+  verifyProtectedSource?: () => Promise<boolean>;
+  activationEvidence?: CharacterActivationEvidenceInput;
 }
 
 export interface CharacterCutoverInspection {
@@ -108,17 +111,20 @@ export async function inspectCharacterCutoverReadiness(
     } catch {
       captureVerifiedAfterReopen = false;
     }
-    const current = await captureDeviceBackup(options.storage, {
-      appVersion: options.appVersion,
-      runId: options.recoveryRunId,
-      timestamp: options.recoveryCreatedAt,
-    });
+    const current = options.verifyProtectedSource
+      ? null
+      : await captureDeviceBackup(options.storage, {
+          appVersion: options.appVersion,
+          runId: options.recoveryRunId,
+          timestamp: options.recoveryCreatedAt,
+        });
     const gates: CharacterCutoverGates = {
       recoveryReceipt: await options.recoveryGate.hasDownloadReceipt(
         options.recoveryManifestHash
       ),
-      sourceManifestUnchanged:
-        current.manifestHash === options.recoveryManifestHash,
+      sourceManifestUnchanged: options.verifyProtectedSource
+        ? await options.verifyProtectedSource()
+        : current!.manifestHash === options.recoveryManifestHash,
       captureVerifiedAfterReopen,
       noQuarantine: quarantineCount === 0,
       parity,
@@ -155,6 +161,7 @@ export async function activatePreparedCharacterCutover(
         generation: inspection.generation,
         confirmed: true,
         gates: inspection.gates,
+        activationEvidence: options.activationEvidence,
         now: options.now,
       });
       setCharacterRuntimeAuthority(authority);

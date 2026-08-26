@@ -3,6 +3,14 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
+import {
+  type ActiveRunPointer,
+  type PlayerBackupRunV1,
+  PlayerBackupRunReplacedError,
+  assertValidPlayerBackupRun,
+  playerBackupActiveRunKey,
+  playerBackupRunKey,
+} from '@/lib/playerBackup/playerBackupRunRepository';
 
 export interface EligibleCharacter {
   id: string;
@@ -34,8 +42,9 @@ interface PreferenceOptions {
 interface AccountDefaultRecord {
   key: string;
   namespace: `user:${string}`;
-  futureDefault: 'on';
+  futureDefault: 'on' | 'off';
   enabledAt: string;
+  confirmedAt?: string;
 }
 
 interface CharacterPreferenceRecord {
@@ -46,11 +55,16 @@ interface CharacterPreferenceRecord {
   explicit: true;
 }
 
-function accountKey(namespace: `user:${string}`): string {
+export function automaticCharacterSyncAccountKey(
+  namespace: `user:${string}`
+): string {
   return `automatic-character-sync:account:${namespace}`;
 }
 
-function characterKey(namespace: `user:${string}`, legacyId: string): string {
+export function automaticCharacterSyncCharacterKey(
+  namespace: `user:${string}`,
+  legacyId: string
+): string {
   return `automatic-character-sync:character:${namespace}:${legacyId}`;
 }
 
@@ -82,11 +96,13 @@ export class AutomaticCharacterSyncPreferences {
     const meta = transaction.objectStore('meta');
     const [characterPreference, accountDefault] = await Promise.all([
       requestResult(
-        meta.get(characterKey(userNamespace, character.id))
+        meta.get(
+          automaticCharacterSyncCharacterKey(userNamespace, character.id)
+        )
       ) as Promise<CharacterPreferenceRecord | undefined>,
-      requestResult(meta.get(accountKey(userNamespace))) as Promise<
-        AccountDefaultRecord | undefined
-      >,
+      requestResult(
+        meta.get(automaticCharacterSyncAccountKey(userNamespace))
+      ) as Promise<AccountDefaultRecord | undefined>,
     ]);
     await transactionComplete(transaction);
     if (characterPreference?.policy === 'on') {
@@ -112,7 +128,7 @@ export class AutomaticCharacterSyncPreferences {
     const userNamespace = accountNamespace(namespace);
     const transaction = this.database.transaction('meta', 'readwrite');
     transaction.objectStore('meta').put({
-      key: characterKey(userNamespace, legacyId),
+      key: automaticCharacterSyncCharacterKey(userNamespace, legacyId),
       namespace: userNamespace,
       legacyId,
       policy: enabled ? 'on' : 'off',
@@ -142,7 +158,10 @@ export class AutomaticCharacterSyncPreferences {
     const transaction = this.database.transaction('meta', 'readwrite');
     const meta = transaction.objectStore('meta');
     for (const character of preview.eligible) {
-      const key = characterKey(preview.namespace, character.id);
+      const key = automaticCharacterSyncCharacterKey(
+        preview.namespace,
+        character.id
+      );
       const existing = (await requestResult(meta.get(key))) as
         | CharacterPreferenceRecord
         | undefined;
@@ -156,11 +175,130 @@ export class AutomaticCharacterSyncPreferences {
       } satisfies CharacterPreferenceRecord);
     }
     meta.put({
-      key: accountKey(preview.namespace),
+      key: automaticCharacterSyncAccountKey(preview.namespace),
       namespace: preview.namespace,
       futureDefault: 'on',
       enabledAt: preview.createdAt,
     } satisfies AccountDefaultRecord);
     await transactionComplete(transaction);
+  }
+
+  async applyConfirmedSelection(options: {
+    expectedActiveRunId: string | null;
+    run: PlayerBackupRunV1;
+    confirmed: boolean;
+    testHooks?: { abortTransaction?: boolean };
+  }): Promise<void> {
+    if (!options.confirmed) {
+      throw new Error('Player backup selection requires confirmation');
+    }
+    assertValidPlayerBackupRun(options.run);
+    if (options.run.stage !== 'confirmed') {
+      throw new Error('Player backup consent must start at confirmed');
+    }
+
+    const transaction = this.database.transaction('meta', 'readwrite');
+    const completion = transactionComplete(transaction);
+    const meta = transaction.objectStore('meta');
+    const pointerKey = playerBackupActiveRunKey(options.run.accountId);
+    const current = (await requestResult(meta.get(pointerKey))) as
+      | ActiveRunPointer
+      | undefined;
+    const observedRunId =
+      current?.accountId === options.run.accountId ? current.runId : null;
+    if (observedRunId !== options.expectedActiveRunId) {
+      transaction.abort();
+      await completion.catch(() => undefined);
+      throw new PlayerBackupRunReplacedError();
+    }
+
+    meta.put({
+      ...structuredClone(options.run),
+      key: playerBackupRunKey(options.run.runId),
+    });
+    meta.put({
+      key: pointerKey,
+      runId: options.run.runId,
+      accountId: options.run.accountId,
+    } satisfies ActiveRunPointer);
+    const selectedPolicy = options.run.mode === 'ongoing' ? 'on' : 'off';
+    for (const legacyId of options.run.selectedCharacterIds) {
+      meta.put({
+        key: automaticCharacterSyncCharacterKey(
+          options.run.namespace,
+          legacyId
+        ),
+        namespace: options.run.namespace,
+        legacyId,
+        policy: selectedPolicy,
+        explicit: true,
+      } satisfies CharacterPreferenceRecord);
+    }
+    for (const legacyId of options.run.clearedCharacterIds) {
+      meta.put({
+        key: automaticCharacterSyncCharacterKey(
+          options.run.namespace,
+          legacyId
+        ),
+        namespace: options.run.namespace,
+        legacyId,
+        policy: 'off',
+        explicit: true,
+      } satisfies CharacterPreferenceRecord);
+    }
+    meta.put({
+      key: automaticCharacterSyncAccountKey(options.run.namespace),
+      namespace: options.run.namespace,
+      futureDefault: options.run.futureDefault,
+      enabledAt: options.run.confirmedAt,
+      confirmedAt: options.run.confirmedAt,
+    } satisfies AccountDefaultRecord);
+
+    if (options.testHooks?.abortTransaction) {
+      transaction.abort();
+      await completion.catch(() => {
+        throw new Error('Atomic consent transaction aborted');
+      });
+      return;
+    }
+    await completion;
+  }
+
+  async readConfirmedSelection(
+    namespace: StorageNamespace,
+    eligibleCharacterIds: readonly string[]
+  ): Promise<{
+    characterPolicies: Record<string, 'on' | 'off'>;
+    futureDefault: 'on' | 'off' | null;
+    confirmedAt: string | null;
+  }> {
+    const userNamespace = accountNamespace(namespace);
+    const transaction = this.database.transaction('meta', 'readonly');
+    const meta = transaction.objectStore('meta');
+    const records = await Promise.all(
+      eligibleCharacterIds.map(
+        legacyId =>
+          requestResult(
+            meta.get(
+              automaticCharacterSyncCharacterKey(userNamespace, legacyId)
+            )
+          ) as Promise<CharacterPreferenceRecord | undefined>
+      )
+    );
+    const account = (await requestResult(
+      meta.get(automaticCharacterSyncAccountKey(userNamespace))
+    )) as AccountDefaultRecord | undefined;
+    await transactionComplete(transaction);
+    const characterPolicies: Record<string, 'on' | 'off'> = {};
+    records.forEach(record => {
+      if (record?.policy === 'on' || record?.policy === 'off') {
+        characterPolicies[record.legacyId] = record.policy;
+      }
+    });
+    return {
+      characterPolicies,
+      futureDefault: account?.futureDefault ?? null,
+      confirmedAt: account?.confirmedAt ?? null,
+    };
   }
 }

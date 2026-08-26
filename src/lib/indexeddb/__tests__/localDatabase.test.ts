@@ -39,9 +39,7 @@ describe('rollkeeper-local schema', () => {
   it('opens an existing compatible database without upgrading it', async () => {
     const created = await openRollkeeperDatabase({ factory: indexedDB });
     created.close();
-    const existing = await openExistingRollkeeperDatabase({
-      factory: indexedDB,
-    });
+    const existing = await openExistingRollkeeperDatabase();
     expect(existing?.version).toBe(DATABASE_VERSION);
     expect([...(existing?.objectStoreNames ?? [])]).toEqual([
       ...OBJECT_STORE_NAMES,
@@ -69,6 +67,28 @@ describe('rollkeeper-local schema', () => {
     expect(unchanged.version).toBe(DATABASE_VERSION + 1);
     expect([...unchanged.objectStoreNames]).toEqual(['future-only']);
     unchanged.close();
+  });
+
+  it('closes an existing probe on versionchange', async () => {
+    const created = await openRollkeeperDatabase({ factory: indexedDB });
+    created.close();
+    const onVersionChange = vi.fn();
+    await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+      onVersionChange,
+    });
+
+    const upgrade = indexedDB.open(DATABASE_NAME, DATABASE_VERSION + 1);
+    await new Promise<void>((resolve, reject) => {
+      upgrade.onupgradeneeded = () => undefined;
+      upgrade.onsuccess = () => {
+        upgrade.result.close();
+        resolve();
+      };
+      upgrade.onerror = () => reject(upgrade.error);
+    });
+
+    expect(onVersionChange).toHaveBeenCalledOnce();
   });
 
   it('closes on versionchange so a later schema can reopen safely', async () => {
@@ -133,5 +153,38 @@ describe('rollkeeper-local schema', () => {
       new Event('error')
     );
     await expect(failedOpen).rejects.toThrow('open failed');
+  });
+
+  it('rejects unavailable, failed, and blocked existing database probes', async () => {
+    await expect(
+      openExistingRollkeeperDatabase({ factory: null })
+    ).rejects.toThrow('unavailable');
+
+    const errorRequest: Partial<IDBOpenDBRequest> = { error: null };
+    const errorFactory = { open: () => errorRequest } as unknown as IDBFactory;
+    const failedOpen = openExistingRollkeeperDatabase({
+      factory: errorFactory,
+    });
+    errorRequest.onerror?.call(
+      errorRequest as IDBOpenDBRequest,
+      new Event('error')
+    );
+    await expect(failedOpen).rejects.toThrow('open failed');
+
+    const onBlocked = vi.fn();
+    const blockedRequest: Partial<IDBOpenDBRequest> = { error: null };
+    const blockedFactory = {
+      open: () => blockedRequest,
+    } as unknown as IDBFactory;
+    const blockedOpen = openExistingRollkeeperDatabase({
+      factory: blockedFactory,
+      onBlocked,
+    });
+    blockedRequest.onblocked?.call(
+      blockedRequest as IDBOpenDBRequest,
+      new Event('blocked') as IDBVersionChangeEvent
+    );
+    await expect(blockedOpen).rejects.toThrow('blocked');
+    expect(onBlocked).toHaveBeenCalledOnce();
   });
 });

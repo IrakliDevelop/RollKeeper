@@ -149,8 +149,26 @@ describe('read-only player backup cloud preview', () => {
       accountId: 'account-a',
       namespace: 'user:account-a',
       mode: 'one-time',
+      eligibleCharacterIds: ['hero-1'],
+      selectedCharacterIds: ['hero-1'],
+      clearedCharacterIds: [],
+      futureDefault: 'off',
+      broadSafetyReceipt: {
+        runId: 'safety-a',
+        manifestHash: 'manifest-a',
+        createdAt: '2026-08-26T00:00:00.000Z',
+        protectedEntryDigest: 'protected-a',
+      },
+      authority: {
+        kind: 'legacy',
+        namespace: 'guest',
+        family: 'character',
+      },
       stage: 'confirmed',
       confirmedAt: '2026-08-26T00:00:00.000Z',
+      characterCheckpoints: {
+        'hero-1': { localPreparation: 'pending' },
+      },
     });
     await transactionComplete(write);
     database.close();

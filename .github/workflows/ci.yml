@@ -49,7 +49,7 @@ jobs:
 
       - name: IndexedDB migration coverage contract
         run: >-
-          npm test -- src/lib/indexeddb
+          npm test -- src/lib/indexeddb src/lib/playerBackup
           --coverage.enabled=true
           --coverage.provider=v8
           --coverage.reporter=text
