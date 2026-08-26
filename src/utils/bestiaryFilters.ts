@@ -161,3 +161,49 @@ export function filterMonsters(
     return true;
   });
 }
+
+/**
+ * Escape regex-special characters so a user query can be embedded in a RegExp.
+ */
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Relevance tier for a monster name against a search query (lower = better):
+ * 0 exact name match, 1 name prefix, 2 query at a word boundary in the name,
+ * 3 substring anywhere in the name, 4 no name match (matched via other fields).
+ */
+function relevanceTier(
+  name: string,
+  queryLower: string,
+  wordBoundary: RegExp
+): number {
+  const nameLower = name.toLowerCase();
+  if (nameLower === queryLower) return 0;
+  if (nameLower.startsWith(queryLower)) return 1;
+  if (wordBoundary.test(nameLower)) return 2;
+  if (nameLower.includes(queryLower)) return 3;
+  return 4;
+}
+
+/**
+ * Order monsters by name-match relevance to the query. Stable: monsters in
+ * the same tier keep their input (alphabetical) order. Returns a new array.
+ */
+export function rankMonstersByRelevance(
+  monsters: ProcessedMonster[],
+  query: string
+): ProcessedMonster[] {
+  const queryLower = query.trim().toLowerCase();
+  if (!queryLower) return [...monsters];
+
+  const wordBoundary = new RegExp(`\\b${escapeRegExp(queryLower)}`);
+  return monsters
+    .map(monster => ({
+      monster,
+      tier: relevanceTier(monster.name, queryLower, wordBoundary),
+    }))
+    .sort((a, b) => a.tier - b.tier)
+    .map(entry => entry.monster);
+}

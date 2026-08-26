@@ -9,24 +9,25 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
-import type { CalendarConfig, CalendarEvent } from '@/types/calendar';
+import type {
+  CalendarConfig,
+  CalendarEvent,
+  CalendarEventInput,
+} from '@/types/calendar';
 import type { SelectedDay } from './CalendarGrid';
+import { MarkerField, type MarkerMode } from './MarkerField';
+import { DEFAULT_EVENT_COLOR, isValidHexColor } from './EventMarker';
 
 interface EventDialogProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => void;
+  onSave: (data: CalendarEventInput) => void;
   onDelete?: () => void;
   event?: CalendarEvent;
   config: CalendarConfig;
@@ -48,6 +49,12 @@ export function EventDialog({
   const [month, setMonth] = useState(0);
   const [day, setDay] = useState(0);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [markerMode, setMarkerMode] = useState<MarkerMode>('dot');
+  const [markerColor, setMarkerColor] = useState(DEFAULT_EVENT_COLOR);
+  const [markerEmoji, setMarkerEmoji] = useState<string | null>(null);
+  const [visibility, setVisibility] = useState<
+    'private' | 'public' | 'discovered'
+  >('private');
 
   const isEdit = !!event;
 
@@ -67,6 +74,20 @@ export function EventDialog({
         setDay(defaultDate.day);
       }
       setConfirmDelete(false);
+      setVisibility(event?.visibility ?? 'private');
+
+      if (event?.emoji) {
+        setMarkerMode('emoji');
+        setMarkerEmoji(event.emoji);
+        setMarkerColor(DEFAULT_EVENT_COLOR);
+      } else {
+        const eventColor = event?.color;
+        setMarkerMode('dot');
+        setMarkerEmoji(null);
+        setMarkerColor(
+          isValidHexColor(eventColor) ? eventColor : DEFAULT_EVENT_COLOR
+        );
+      }
     }
   }, [open, event, defaultDate]);
 
@@ -78,9 +99,22 @@ export function EventDialog({
     }
   }, [month, daysInSelectedMonth, day]);
 
+  const saveDisabled =
+    !title.trim() || (markerMode === 'emoji' && !markerEmoji);
+
   const handleSave = () => {
-    if (!title.trim()) return;
-    onSave({ title: title.trim(), description, year, month, day });
+    if (saveDisabled) return;
+    onSave({
+      title: title.trim(),
+      description,
+      year,
+      month,
+      day,
+      visibility,
+      ...(markerMode === 'emoji'
+        ? { emoji: markerEmoji ?? undefined, color: undefined }
+        : { color: markerColor, emoji: undefined }),
+    });
     onClose();
   };
 
@@ -114,11 +148,7 @@ export function EventDialog({
               <label className="text-body mb-1 block text-sm font-medium">
                 Year
               </label>
-              <Input
-                type="number"
-                value={year}
-                onChange={e => setYear(Number(e.target.value))}
-              />
+              <NumberInput value={year} onChange={v => setYear(v ?? 0)} />
             </div>
             <SelectField
               label="Month"
@@ -143,6 +173,27 @@ export function EventDialog({
               ))}
             </SelectField>
           </div>
+
+          <MarkerField
+            mode={markerMode}
+            color={markerColor}
+            emoji={markerEmoji}
+            onModeChange={setMarkerMode}
+            onColorChange={setMarkerColor}
+            onEmojiChange={setMarkerEmoji}
+          />
+
+          <SelectField
+            label="Player visibility"
+            value={visibility}
+            onValueChange={value =>
+              setVisibility(value as 'private' | 'public' | 'discovered')
+            }
+          >
+            <SelectItem value="private">Private (DM only)</SelectItem>
+            <SelectItem value="public">Public</SelectItem>
+            <SelectItem value="discovered">Discovered</SelectItem>
+          </SelectField>
 
           <div>
             <label className="text-body mb-1 block text-sm font-medium">
@@ -176,7 +227,7 @@ export function EventDialog({
             variant="primary"
             size="sm"
             onClick={handleSave}
-            disabled={!title.trim()}
+            disabled={saveDisabled}
           >
             {isEdit ? 'Save Changes' : 'Create Event'}
           </Button>

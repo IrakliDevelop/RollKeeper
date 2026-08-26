@@ -64,6 +64,7 @@ export function createDefaultCalendar(): CalendarConfig {
     eras: [{ name: 'Common Era', abbreviation: 'CE', startYear: 1 }],
     yearOffset: 1,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 1,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -146,6 +147,7 @@ export function createHarptosCalendar(): CalendarConfig {
     eras: [{ name: 'Dalereckoning', abbreviation: 'DR', startYear: 1 }],
     yearOffset: 1490,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -227,6 +229,7 @@ export function createGreyhawkCalendar(): CalendarConfig {
     eras: [{ name: 'Common Year', abbreviation: 'CY', startYear: 1 }],
     yearOffset: 591,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,
@@ -271,30 +274,37 @@ export function createBarovianCalendar(): CalendarConfig {
       {
         name: 'Winter',
         startDay: 0,
-        endDay: 83,
+        endDay: 55,
         sunriseHour: 8,
         sunsetHour: 16,
       },
       {
         name: 'Spring',
-        startDay: 84,
-        endDay: 167,
+        startDay: 56,
+        endDay: 139,
         sunriseHour: 7,
         sunsetHour: 18,
       },
       {
         name: 'Summer',
-        startDay: 168,
-        endDay: 251,
+        startDay: 140,
+        endDay: 223,
         sunriseHour: 6,
         sunsetHour: 19,
       },
       {
         name: 'Autumn',
-        startDay: 252,
-        endDay: 335,
+        startDay: 224,
+        endDay: 307,
         sunriseHour: 7,
         sunsetHour: 17,
+      },
+      {
+        name: 'Winter',
+        startDay: 308,
+        endDay: 335,
+        sunriseHour: 8,
+        sunsetHour: 16,
       },
     ],
     moons: [{ name: 'Moon', color: '#B0B0B0', phaseOffset: 0, period: 28 }],
@@ -302,6 +312,7 @@ export function createBarovianCalendar(): CalendarConfig {
     eras: [{ name: 'AC', abbreviation: 'AC', startYear: 1 }], // homebrew era
     yearOffset: 1,
     yearStartWeekdayOffset: 0,
+    weekStartsOn: 0,
     mechanics: {
       hoursPerLongRest: 8,
       minutesPerShortRest: 60,

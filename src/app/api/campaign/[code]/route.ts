@@ -9,12 +9,63 @@ import {
 } from '@/lib/redis';
 import { CampaignData } from '@/types/campaign';
 
+import {
+  guestDeniedResponse,
+  rejectHybridGuestPrivilegeEscalation,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+
+async function authorizeCampaignCoreMutation(
+  request: NextRequest,
+  code: string
+): Promise<NextResponse | null> {
+  const membership = await authorizeCampaignMembershipRoute(code, true);
+  if (membership.mode === 'denied') {
+    return NextResponse.json(
+      { error: 'Account membership is required' },
+      { status: membership.status }
+    );
+  }
+  if (membership.mode !== 'account') return null;
+  const security = validateCampaignMembershipMutation(request);
+  if (!security.ok) {
+    return NextResponse.json(
+      { error: security.error },
+      { status: security.status }
+    );
+  }
+  if (
+    membership.principal.role !== 'owner' &&
+    membership.principal.role !== 'dm'
+  ) {
+    return NextResponse.json(
+      { error: 'Campaign owner authorization is required' },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { code } = await params;
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'campaign:read')
+        : ({ mode: 'legacy' } as const);
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
 
     const data = await redis.get<string>(campaignKey(code));
@@ -30,7 +81,16 @@ export async function GET(
 
     await refreshCampaignTTL(redis, code);
 
-    return NextResponse.json({ code, campaign });
+    return NextResponse.json({
+      code,
+      campaign:
+        guest.mode === 'guest' || membership.mode === 'account'
+          ? {
+              campaignName: campaign.campaignName,
+              createdAt: campaign.createdAt,
+            }
+          : campaign,
+    });
   } catch (error) {
     console.error('Error fetching campaign:', error);
     return NextResponse.json(
@@ -44,8 +104,12 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
+    const membershipDenied = await authorizeCampaignCoreMutation(request, code);
+    if (membershipDenied) return membershipDenied;
     const body = await request.json();
     const { dmId, campaignName, createdAt } = body;
 
@@ -57,6 +121,20 @@ export async function PUT(
     }
 
     const redis = getRedis();
+
+    // Only create when absent (true expiry restore). If a record exists,
+    // the caller must already be its DM — PUT must not transfer ownership.
+    const existingRaw = await redis.get<string>(campaignKey(code));
+    if (existingRaw) {
+      const existing: CampaignData =
+        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      if (existing.dmId !== dmId) {
+        return NextResponse.json(
+          { error: 'dmId does not match campaign owner' },
+          { status: 403 }
+        );
+      }
+    }
 
     const campaignData: CampaignData = {
       dmId,
@@ -83,11 +161,15 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
   try {
     const { code } = await params;
+    const membershipDenied = await authorizeCampaignCoreMutation(request, code);
+    if (membershipDenied) return membershipDenied;
     const redis = getRedis();
 
     const exists = await redis.exists(campaignKey(code));

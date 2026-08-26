@@ -1,0 +1,184 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getRedis,
+  campaignBattleMapsKey,
+  campaignBattleMapKey,
+  campaignSharedKey,
+  refreshCampaignTTL,
+  SLIDING_TTL_SECONDS,
+} from '@/lib/redis';
+import { verifyDmAuthority } from '@/lib/dmAuth';
+import { shouldClearActiveBattleMap } from '@/lib/activeBattleMap';
+import type { BattleMapMetadata, SyncedBattleMap } from '@/types/battlemap';
+import type { SharedBattleMapState } from '@/types/sharedState';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
+import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; id: string }> }
+) {
+  try {
+    if (
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest battle-map access is not enabled' },
+        { status: 403 }
+      );
+    }
+    const { code, id } = await params;
+    const redis = getRedis();
+    const raw = await redis.get<SyncedBattleMap>(
+      campaignBattleMapKey(code, id)
+    );
+    await refreshCampaignTTL(redis, code);
+    if (!raw) {
+      return NextResponse.json(
+        { error: 'Battle map not found' },
+        { status: 404 }
+      );
+    }
+    return NextResponse.json({ battleMap: raw });
+  } catch (error) {
+    console.error('Failed to fetch battle map:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch battle map' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; id: string }> }
+) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
+  try {
+    const { code, id } = await params;
+    const body = await request.json();
+    const { dmId, battleMap } = body as {
+      dmId: string;
+      battleMap: SyncedBattleMap;
+    };
+
+    if (!dmId || !battleMap) {
+      return NextResponse.json(
+        { error: 'dmId and battleMap are required' },
+        { status: 400 }
+      );
+    }
+
+    const redis = getRedis();
+    const dmAuth = await verifyDmAuthority(redis, code, dmId);
+    if (dmAuth !== 'ok') {
+      return NextResponse.json(
+        { error: 'dmId is not authorized for this campaign' },
+        { status: 403 }
+      );
+    }
+    await redis.set(campaignBattleMapKey(code, id), battleMap, {
+      ex: SLIDING_TTL_SECONDS,
+    });
+
+    const existingRaw = await redis.get<BattleMapMetadata[]>(
+      campaignBattleMapsKey(code)
+    );
+    const existing: BattleMapMetadata[] = existingRaw
+      ? Array.isArray(existingRaw)
+        ? existingRaw
+        : (JSON.parse(existingRaw as unknown as string) as BattleMapMetadata[])
+      : [];
+
+    const metadata: BattleMapMetadata = {
+      id: battleMap.id,
+      name: battleMap.name,
+      mapImageUrl: battleMap.mapImageUrl,
+      updatedAt: battleMap.updatedAt,
+    };
+
+    const updated = existing.filter(l => l.id !== id);
+    updated.push(metadata);
+
+    await redis.set(campaignBattleMapsKey(code), updated, {
+      ex: SLIDING_TTL_SECONDS,
+    });
+    await refreshCampaignTTL(redis, code);
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Failed to save battle map:', error);
+    return NextResponse.json(
+      { error: 'Failed to save battle map' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; id: string }> }
+) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
+  try {
+    const { code, id } = await params;
+    const body = await request.json();
+    const { dmId } = body as { dmId: string };
+
+    if (!dmId) {
+      return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
+    }
+
+    const redis = getRedis();
+    const dmAuth = await verifyDmAuthority(redis, code, dmId);
+    if (dmAuth !== 'ok') {
+      return NextResponse.json(
+        { error: 'dmId is not authorized for this campaign' },
+        { status: 403 }
+      );
+    }
+    await redis.del(campaignBattleMapKey(code, id));
+
+    // The shared "live map" pointer is sticky — never cleared by a relink or
+    // delete. If it still references the map being deleted, clear it so players
+    // don't get stranded opening a dead map (they'd see the old/removed one).
+    const sharedRaw = await redis.get<string | SharedBattleMapState>(
+      campaignSharedKey(code, 'battlemap')
+    );
+    if (shouldClearActiveBattleMap(sharedRaw, id)) {
+      await redis.del(campaignSharedKey(code, 'battlemap'));
+    }
+
+    const existingRaw = await redis.get<BattleMapMetadata[]>(
+      campaignBattleMapsKey(code)
+    );
+    if (existingRaw) {
+      const existing: BattleMapMetadata[] = Array.isArray(existingRaw)
+        ? existingRaw
+        : (JSON.parse(existingRaw as unknown as string) as BattleMapMetadata[]);
+      const filtered = existing.filter(l => l.id !== id);
+      if (filtered.length === 0) {
+        await redis.del(campaignBattleMapsKey(code));
+      } else {
+        await redis.set(campaignBattleMapsKey(code), filtered, {
+          ex: SLIDING_TTL_SECONDS,
+        });
+      }
+    }
+
+    await refreshCampaignTTL(redis, code);
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Failed to delete battle map:', error);
+    return NextResponse.json(
+      { error: 'Failed to delete battle map' },
+      { status: 500 }
+    );
+  }
+}

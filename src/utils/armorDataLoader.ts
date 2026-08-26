@@ -38,6 +38,7 @@ interface RawArmorItem {
   type?: string;
   rarity?: string;
   weight?: number;
+  value?: number;
   reqAttune?: boolean | string;
   ac?: number;
   bonusAc?: string | number;
@@ -76,6 +77,7 @@ function processArmor(raw: RawArmorItem): ProcessedArmor {
     category,
     rarity: raw.rarity || 'none',
     weight: raw.weight,
+    value: raw.value,
     description,
     requiresAttunement,
     attunementRequirement,
@@ -89,43 +91,64 @@ function processArmor(raw: RawArmorItem): ProcessedArmor {
   };
 }
 
+function addArmorToResults(
+  rawItem: RawArmorItem,
+  seen: Map<string, { source: string; index: number }>,
+  results: ProcessedArmor[]
+) {
+  const baseType = rawItem.type ? getBaseType(rawItem.type) : '';
+  if (!TYPE_TO_CATEGORY[baseType]) return;
+
+  const key = rawItem.name.toLowerCase();
+  const existing = seen.get(key);
+
+  if (existing) {
+    const existingPreferred = PREFERRED_SOURCES.has(existing.source);
+    const newPreferred = PREFERRED_SOURCES.has(rawItem.source);
+
+    if (newPreferred && !existingPreferred) {
+      results[existing.index] = processArmor(rawItem);
+      seen.set(key, { source: rawItem.source, index: existing.index });
+    }
+    return;
+  }
+
+  const index = results.length;
+  results.push(processArmor(rawItem));
+  seen.set(key, { source: rawItem.source, index });
+}
+
 export async function loadAllArmors(): Promise<ProcessedArmor[]> {
   if (cachedArmors) return cachedArmors;
 
   try {
+    const seen = new Map<string, { source: string; index: number }>();
+    const results: ProcessedArmor[] = [];
+
+    // Load base/mundane armor from items-base.json first
+    const baseFilePath = path.join(process.cwd(), 'json', 'items-base.json');
+    try {
+      const baseRaw = await fs.readFile(baseFilePath, 'utf-8');
+      const baseData = JSON.parse(baseRaw);
+      if (baseData.baseitem && Array.isArray(baseData.baseitem)) {
+        for (const rawItem of baseData.baseitem as RawArmorItem[]) {
+          if (!rawItem.armor) continue;
+          addArmorToResults(rawItem, seen, results);
+        }
+      }
+    } catch {
+      console.warn('Could not load items-base.json for armor');
+    }
+
+    // Load magic/special armor from items.json (overrides base items)
     const filePath = path.join(process.cwd(), 'json', 'items.json');
     const raw = await fs.readFile(filePath, 'utf-8');
     const data = JSON.parse(raw);
 
-    if (!data.item || !Array.isArray(data.item)) {
-      console.error('Invalid items.json structure');
-      return [];
-    }
-
-    const seen = new Map<string, { source: string; index: number }>();
-    const results: ProcessedArmor[] = [];
-
-    for (const rawItem of data.item as RawArmorItem[]) {
-      const baseType = rawItem.type ? getBaseType(rawItem.type) : '';
-      if (!TYPE_TO_CATEGORY[baseType]) continue;
-
-      const key = rawItem.name.toLowerCase();
-      const existing = seen.get(key);
-
-      if (existing) {
-        const existingPreferred = PREFERRED_SOURCES.has(existing.source);
-        const newPreferred = PREFERRED_SOURCES.has(rawItem.source);
-
-        if (newPreferred && !existingPreferred) {
-          results[existing.index] = processArmor(rawItem);
-          seen.set(key, { source: rawItem.source, index: existing.index });
-        }
-        continue;
+    if (data.item && Array.isArray(data.item)) {
+      for (const rawItem of data.item as RawArmorItem[]) {
+        addArmorToResults(rawItem, seen, results);
       }
-
-      const index = results.length;
-      results.push(processArmor(rawItem));
-      seen.set(key, { source: rawItem.source, index });
     }
 
     cachedArmors = results.sort((a, b) => a.name.localeCompare(b.name));

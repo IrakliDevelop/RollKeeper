@@ -5,6 +5,7 @@
  */
 
 import featsData from '../../json/feats.json';
+import { processAndFormatDndText } from './textFormatting';
 
 // Raw feat data from JSON
 interface RawFeatData {
@@ -48,6 +49,7 @@ export interface ProcessedFeat {
   page?: number;
   description: string; // Parsed and formatted description
   prerequisites: string[]; // Human-readable prerequisites
+  levelRequirement?: number; // Minimum character level required
   abilityIncreases: string; // Description of ability score increases
   category?: string;
   repeatable: boolean;
@@ -236,10 +238,25 @@ function grantsSpells(feat: RawFeatData): boolean {
 /**
  * Process raw feat data into our application format
  */
+function extractLevelRequirement(
+  prerequisite?: RawFeatData['prerequisite']
+): number | undefined {
+  if (!prerequisite) return undefined;
+  for (const prereq of prerequisite) {
+    if (prereq.level) return prereq.level;
+  }
+  return undefined;
+}
+
 function processFeat(rawFeat: RawFeatData): ProcessedFeat {
   const id = generateFeatId(rawFeat.name, rawFeat.source);
-  const description = parseFeatEntries(rawFeat.entries);
+  const rawDescription = parseFeatEntries(rawFeat.entries);
+  const description = processAndFormatDndText(rawDescription).replace(
+    /\n\n/g,
+    '<br/>'
+  );
   const prerequisites = parsePrerequisites(rawFeat.prerequisite);
+  const levelRequirement = extractLevelRequirement(rawFeat.prerequisite);
   const abilityIncreases = parseAbilityIncreases(rawFeat.ability);
 
   return {
@@ -249,6 +266,7 @@ function processFeat(rawFeat: RawFeatData): ProcessedFeat {
     page: rawFeat.page,
     description,
     prerequisites,
+    levelRequirement,
     abilityIncreases,
     category: rawFeat.category,
     repeatable: rawFeat.repeatable || false,

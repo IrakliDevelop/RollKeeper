@@ -1,0 +1,164 @@
+/**
+ * Cantrip damage scaling (5e character-level thresholds 1/5/11/17).
+ *
+ * `Spell.damageScaling` tri-state contract (mirrors `Spell.aoe`):
+ *   undefined = never enriched from spell data (backfill candidate)
+ *   null      = user-customized damage; scaling permanently off
+ *   object    = character-level threshold → dice
+ */
+
+import type { Spell } from '@/types/character';
+import type { ProcessedSpell, SpellScalingLevelDice } from '@/types/spells';
+
+export type CantripDamageScaling = Record<number, string>;
+
+export interface CantripUpgrade {
+  name: string;
+  from: string;
+  to: string;
+}
+
+/** Plain rollable dice, e.g. "1d8", "2d6" — rejects {{spellcasting_mod}} templates. */
+const DICE_PATTERN = /^\d+d\d+$/;
+
+function cleanTrack(
+  track: SpellScalingLevelDice
+): CantripDamageScaling | undefined {
+  const table: CantripDamageScaling = {};
+  for (const [threshold, dice] of Object.entries(track.scaling ?? {})) {
+    const level = Number(threshold);
+    if (!Number.isInteger(level) || level < 1) continue;
+    if (typeof dice !== 'string' || !DICE_PATTERN.test(dice)) continue;
+    table[level] = dice;
+  }
+  return Object.keys(table).length > 0 ? table : undefined;
+}
+
+function lowestThresholdDie(table: CantripDamageScaling): string {
+  const lowest = Math.min(...Object.keys(table).map(Number));
+  return table[lowest]!;
+}
+
+/**
+ * Normalize raw 5etools `scalingLevelDice` into a numeric threshold → dice
+ * table. Multi-track cantrips (Toll the Dead, Booming Blade) store an array:
+ * pick the track whose lowest-threshold die matches the already-extracted
+ * base damage, falling back to the first usable track. Tracks made of
+ * formula placeholders (Green-Flame Blade's "{{spellcasting_mod}}") are
+ * dropped entirely.
+ */
+export function extractCantripScaling(
+  scalingLevelDice: SpellScalingLevelDice | SpellScalingLevelDice[] | undefined,
+  baseDamage?: string
+): CantripDamageScaling | undefined {
+  if (!scalingLevelDice) return undefined;
+  const rawTracks = Array.isArray(scalingLevelDice)
+    ? scalingLevelDice
+    : [scalingLevelDice];
+  const tracks = rawTracks
+    .map(cleanTrack)
+    .filter((t): t is CantripDamageScaling => t !== undefined);
+  if (tracks.length === 0) return undefined;
+
+  return (
+    (baseDamage && tracks.find(t => lowestThresholdDie(t) === baseDamage)) ||
+    tracks[0]
+  );
+}
+
+/**
+ * Effective damage dice for a spell at the given TOTAL character level
+ * (multiclass sum). Non-cantrips, null/absent scaling, and levels below the
+ * lowest threshold all fall back to the stored base damage.
+ */
+export function getScaledSpellDamage(
+  spell: Pick<Spell, 'level' | 'damage' | 'damageScaling'>,
+  characterLevel: number
+): string | undefined {
+  if (spell.level !== 0 || !spell.damageScaling) return spell.damage;
+  let best: number | undefined;
+  for (const key of Object.keys(spell.damageScaling)) {
+    const threshold = Number(key);
+    if (
+      threshold <= characterLevel &&
+      (best === undefined || threshold > best)
+    ) {
+      best = threshold;
+    }
+  }
+  return best !== undefined ? spell.damageScaling[best] : spell.damage;
+}
+
+/**
+ * Cantrips whose dice change between two character levels — level-up wizard
+ * summary data.
+ */
+export function getCantripUpgrades(
+  spells: Spell[],
+  oldLevel: number,
+  newLevel: number
+): CantripUpgrade[] {
+  const upgrades: CantripUpgrade[] = [];
+  for (const spell of spells) {
+    if (spell.level !== 0 || !spell.damageScaling) continue;
+    const from = getScaledSpellDamage(spell, oldLevel);
+    const to = getScaledSpellDamage(spell, newLevel);
+    if (from && to && from !== to) {
+      upgrades.push({ name: spell.name, from, to });
+    }
+  }
+  return upgrades;
+}
+
+/**
+ * Best spell-data candidate for backfilling a stored cantrip: same source
+ * first, then 2024 rules (PHB2024), then any entry carrying scaling data.
+ */
+export function findScalingSpellMatch(
+  processed: ProcessedSpell[],
+  name: string,
+  source?: string
+): ProcessedSpell | undefined {
+  const nameLower = name.toLowerCase();
+  const candidates = processed.filter(
+    p => p.isCantrip && p.scalingLevelDice && p.name.toLowerCase() === nameLower
+  );
+  if (candidates.length === 0) return undefined;
+  return (
+    (source && candidates.find(c => c.source === source)) ||
+    candidates.find(c => c.source === 'PHB2024') ||
+    candidates[0]
+  );
+}
+
+/**
+ * Guards `findScalingSpellMatch` results against cross-edition name
+ * collisions before a backfill is applied. Same-named spells sometimes
+ * exist in both 2014 and 2024 sourcebooks with different mechanics (e.g.
+ * 2014 True Strike has no damage; 2024 True Strike is a scaling cantrip). If
+ * the stored spell has no base damage of its own AND the match came from a
+ * different source, the match is likely that other edition's spell rather
+ * than the same one re-keyed — attaching its table would fabricate damage
+ * that the stored spell never had. Damage-bearing spells are always safe to
+ * enrich via the PHB2024 fallback, since a real dice value confirms the
+ * stored spell already deals damage.
+ */
+export function isSafeScalingBackfillMatch(
+  spell: Pick<Spell, 'damage' | 'source'>,
+  match: Pick<ProcessedSpell, 'source'>
+): boolean {
+  if (spell.damage) return true;
+  return !spell.source || match.source === spell.source;
+}
+
+/**
+ * damageScaling value after a spell-editor save: a manual damage change on a
+ * scaling cantrip turns scaling off (null); otherwise the prior state is kept.
+ */
+export function resolveDamageScalingOnEdit(
+  original: Pick<Spell, 'damage' | 'damageScaling'>,
+  newDamage: string | undefined
+): CantripDamageScaling | null | undefined {
+  if (original.damageScaling && newDamage !== original.damage) return null;
+  return original.damageScaling;
+}

@@ -1,6 +1,6 @@
 /**
  * Design System Showcase
- * 
+ *
  * A comprehensive demo page displaying all the new unified design system components.
  * This serves as both documentation and a visual testing ground.
  */
@@ -8,15 +8,36 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Save, Download, Upload, Mail, User, Search, CheckCircle, AlertCircle, Info, Star } from 'lucide-react';
+import {
+  Save,
+  Download,
+  Upload,
+  Mail,
+  User,
+  Search,
+  CheckCircle,
+  AlertCircle,
+  Info,
+  Star,
+} from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Switch } from '@/components/ui/forms/switch';
-import { RadioGroupItem, RadioGroupField } from '@/components/ui/forms/radio-group';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
+import {
+  RadioGroupItem,
+  RadioGroupField,
+} from '@/components/ui/forms/radio-group';
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
 import {
   Dialog,
@@ -27,8 +48,11 @@ import {
   DialogBody,
   DialogFooter,
   DialogTrigger,
-} from '@/components/ui/feedback/dialog-new';
-import { Autocomplete, AutocompleteOption } from '@/components/ui/forms/Autocomplete';
+} from '@/components/ui/feedback/dialog';
+import {
+  Autocomplete,
+  AutocompleteOption,
+} from '@/components/ui/forms/Autocomplete';
 
 export default function DesignSystemShowcase() {
   const [inputValue, setInputValue] = useState('');
@@ -67,11 +91,13 @@ export default function DesignSystemShowcase() {
         {/* Buttons */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Buttons</h2>
-          
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Variants</CardTitle>
-              <CardDescription>Different button styles for various actions</CardDescription>
+              <CardDescription>
+                Different button styles for various actions
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
@@ -106,22 +132,30 @@ export default function DesignSystemShowcase() {
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>With Icons & States</CardTitle>
-              <CardDescription>Buttons with icons and loading states</CardDescription>
+              <CardDescription>
+                Buttons with icons and loading states
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
-                <Button leftIcon={<Save className="h-4 w-4" />}>
-                  Save
-                </Button>
-                <Button leftIcon={<Download className="h-4 w-4" />} variant="secondary">
+                <Button leftIcon={<Save className="h-4 w-4" />}>Save</Button>
+                <Button
+                  leftIcon={<Download className="h-4 w-4" />}
+                  variant="secondary"
+                >
                   Download
                 </Button>
-                <Button rightIcon={<Upload className="h-4 w-4" />} variant="outline">
+                <Button
+                  rightIcon={<Upload className="h-4 w-4" />}
+                  variant="outline"
+                >
                   Upload
                 </Button>
                 <Button loading>Loading...</Button>
                 <Button disabled>Disabled</Button>
-                <Button fullWidth variant="success">Full Width Button</Button>
+                <Button fullWidth variant="success">
+                  Full Width Button
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -130,11 +164,13 @@ export default function DesignSystemShowcase() {
         {/* Inputs */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Inputs</h2>
-          
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Input Variations</CardTitle>
-              <CardDescription>Text inputs with labels, icons, and states</CardDescription>
+              <CardDescription>
+                Text inputs with labels, icons, and states
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -144,30 +180,30 @@ export default function DesignSystemShowcase() {
                   type="email"
                   required
                 />
-                
+
                 <Input
                   label="Username"
                   placeholder="Choose a username"
                   leftIcon={<User className="h-4 w-4" />}
                   helperText="This will be your public display name"
                 />
-                
+
                 <Input
                   label="Search"
                   placeholder="Search..."
                   leftIcon={<Search className="h-4 w-4" />}
                   value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
+                  onChange={e => setInputValue(e.target.value)}
                   clearable
                   onClear={() => setInputValue('')}
                 />
-                
+
                 <Input
                   label="Error State"
                   placeholder="Invalid input"
                   error="This field is required"
                 />
-                
+
                 <Input
                   label="Success State"
                   placeholder="Valid input"
@@ -187,12 +223,16 @@ export default function DesignSystemShowcase() {
 
         {/* Textarea */}
         <section>
-          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Textarea</h2>
-          
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">
+            Textarea
+          </h2>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Textarea Variations</CardTitle>
-              <CardDescription>Multi-line text inputs with features</CardDescription>
+              <CardDescription>
+                Multi-line text inputs with features
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -201,16 +241,16 @@ export default function DesignSystemShowcase() {
                   placeholder="Enter a detailed description..."
                   helperText="Provide as much detail as possible"
                 />
-                
+
                 <Textarea
                   label="Auto-resize Textarea"
                   placeholder="This textarea grows with content..."
                   autoResize
                   maxHeight={200}
                   value={textareaValue}
-                  onChange={(e) => setTextareaValue(e.target.value)}
+                  onChange={e => setTextareaValue(e.target.value)}
                 />
-                
+
                 <Textarea
                   label="With Character Count"
                   placeholder="Limited to 200 characters"
@@ -225,7 +265,7 @@ export default function DesignSystemShowcase() {
         {/* Select */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Select</h2>
-          
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Select Dropdowns</CardTitle>
@@ -244,27 +284,27 @@ export default function DesignSystemShowcase() {
                   <SelectItem value="option2">Option 2</SelectItem>
                   <SelectItem value="option3">Option 3</SelectItem>
                 </SelectField>
-                
+
                 <SelectField
                   label="With Icons & Descriptions"
                   value={selectValue}
                   onValueChange={setSelectValue}
                 >
-                  <SelectItem 
+                  <SelectItem
                     value="mail"
                     icon={<Mail className="h-4 w-4" />}
                     description="Send via email"
                   >
                     Email
                   </SelectItem>
-                  <SelectItem 
+                  <SelectItem
                     value="save"
                     icon={<Save className="h-4 w-4" />}
                     description="Save to local storage"
                   >
                     Save
                   </SelectItem>
-                  <SelectItem 
+                  <SelectItem
                     value="download"
                     icon={<Download className="h-4 w-4" />}
                     description="Download as file"
@@ -279,12 +319,16 @@ export default function DesignSystemShowcase() {
 
         {/* Autocomplete */}
         <section>
-          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Autocomplete</h2>
-          
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">
+            Autocomplete
+          </h2>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Searchable Dropdowns</CardTitle>
-              <CardDescription>Autocomplete inputs for large option lists</CardDescription>
+              <CardDescription>
+                Autocomplete inputs for large option lists
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -300,11 +344,12 @@ export default function DesignSystemShowcase() {
                   />
                   {autocompleteValue && (
                     <p className="mt-2 text-sm text-gray-600">
-                      Selected: <span className="font-medium">{autocompleteValue}</span>
+                      Selected:{' '}
+                      <span className="font-medium">{autocompleteValue}</span>
                     </p>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
                     Disabled State
@@ -324,12 +369,16 @@ export default function DesignSystemShowcase() {
 
         {/* Checkbox */}
         <section>
-          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Checkbox</h2>
-          
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">
+            Checkbox
+          </h2>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Checkbox Variations</CardTitle>
-              <CardDescription>Checkboxes with labels and descriptions</CardDescription>
+              <CardDescription>
+                Checkboxes with labels and descriptions
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -338,12 +387,12 @@ export default function DesignSystemShowcase() {
                   onCheckedChange={setCheckboxState}
                   label="Accept terms and conditions"
                 />
-                
+
                 <Checkbox
                   label="With Description"
                   description="This checkbox has additional explanatory text below the label"
                 />
-                
+
                 <Checkbox
                   label="With Icon"
                   icon={<Star className="h-4 w-4" />}
@@ -371,7 +420,7 @@ export default function DesignSystemShowcase() {
         {/* Switch */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Switch</h2>
-          
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Toggle Switches</CardTitle>
@@ -385,11 +434,8 @@ export default function DesignSystemShowcase() {
                   label="Enable notifications"
                   description="Receive email notifications about updates"
                 />
-                
-                <Switch
-                  label="Dark mode"
-                  description="Enable dark theme"
-                />
+
+                <Switch label="Dark mode" description="Enable dark theme" />
 
                 <div className="flex gap-6">
                   <Switch label="Small" size="sm" />
@@ -409,12 +455,16 @@ export default function DesignSystemShowcase() {
 
         {/* Radio Group */}
         <section>
-          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Radio Group</h2>
-          
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">
+            Radio Group
+          </h2>
+
           <Card className="mb-6">
             <CardHeader>
               <CardTitle>Radio Button Groups</CardTitle>
-              <CardDescription>Single selection from multiple options</CardDescription>
+              <CardDescription>
+                Single selection from multiple options
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-6">
@@ -424,9 +474,21 @@ export default function DesignSystemShowcase() {
                   onValueChange={setRadioValue}
                   required
                 >
-                  <RadioGroupItem value="option1" label="Free Plan" description="Basic features" />
-                  <RadioGroupItem value="option2" label="Pro Plan" description="All features included" />
-                  <RadioGroupItem value="option3" label="Enterprise" description="Custom solutions" />
+                  <RadioGroupItem
+                    value="option1"
+                    label="Free Plan"
+                    description="Basic features"
+                  />
+                  <RadioGroupItem
+                    value="option2"
+                    label="Pro Plan"
+                    description="All features included"
+                  />
+                  <RadioGroupItem
+                    value="option3"
+                    label="Enterprise"
+                    description="Custom solutions"
+                  />
                 </RadioGroupField>
 
                 <RadioGroupField
@@ -434,16 +496,16 @@ export default function DesignSystemShowcase() {
                   value={radioValue}
                   onValueChange={setRadioValue}
                 >
-                  <RadioGroupItem 
-                    value="card1" 
-                    label="Card Option 1" 
+                  <RadioGroupItem
+                    value="card1"
+                    label="Card Option 1"
                     description="This is a card-style radio option"
                     variant="card"
                     icon={<CheckCircle className="h-5 w-5" />}
                   />
-                  <RadioGroupItem 
-                    value="card2" 
-                    label="Card Option 2" 
+                  <RadioGroupItem
+                    value="card2"
+                    label="Card Option 2"
                     description="Another card-style option"
                     variant="card"
                     icon={<Info className="h-5 w-5" />}
@@ -457,7 +519,7 @@ export default function DesignSystemShowcase() {
         {/* Cards */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Cards</h2>
-          
+
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             <Card variant="default">
               <CardHeader>
@@ -518,7 +580,9 @@ export default function DesignSystemShowcase() {
                 </p>
               </CardContent>
               <CardFooter>
-                <Button size="sm" variant="outline">Cancel</Button>
+                <Button size="sm" variant="outline">
+                  Cancel
+                </Button>
                 <Button size="sm">Confirm</Button>
               </CardFooter>
             </Card>
@@ -528,11 +592,13 @@ export default function DesignSystemShowcase() {
         {/* Badges */}
         <section>
           <h2 className="mb-6 text-2xl font-semibold text-gray-900">Badges</h2>
-          
+
           <Card>
             <CardHeader>
               <CardTitle>Badge Variations</CardTitle>
-              <CardDescription>Labels for status, categories, and tags</CardDescription>
+              <CardDescription>
+                Labels for status, categories, and tags
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
@@ -554,13 +620,22 @@ export default function DesignSystemShowcase() {
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <Badge leftIcon={<CheckCircle className="h-3 w-3" />} variant="success">
+                  <Badge
+                    leftIcon={<CheckCircle className="h-3 w-3" />}
+                    variant="success"
+                  >
                     Completed
                   </Badge>
-                  <Badge leftIcon={<AlertCircle className="h-3 w-3" />} variant="warning">
+                  <Badge
+                    leftIcon={<AlertCircle className="h-3 w-3" />}
+                    variant="warning"
+                  >
                     Warning
                   </Badge>
-                  <Badge rightIcon={<Star className="h-3 w-3" />} variant="primary">
+                  <Badge
+                    rightIcon={<Star className="h-3 w-3" />}
+                    variant="primary"
+                  >
                     Featured
                   </Badge>
                 </div>
@@ -571,12 +646,16 @@ export default function DesignSystemShowcase() {
 
         {/* Dialog/Modal */}
         <section>
-          <h2 className="mb-6 text-2xl font-semibold text-gray-900">Dialog/Modal</h2>
-          
+          <h2 className="mb-6 text-2xl font-semibold text-gray-900">
+            Dialog/Modal
+          </h2>
+
           <Card>
             <CardHeader>
               <CardTitle>Dialog Examples</CardTitle>
-              <CardDescription>Modal dialogs for user interactions</CardDescription>
+              <CardDescription>
+                Modal dialogs for user interactions
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-3">
@@ -619,8 +698,15 @@ export default function DesignSystemShowcase() {
                     <DialogBody>
                       <div className="space-y-4">
                         <Input label="Name" placeholder="Enter your name" />
-                        <Input label="Email" type="email" placeholder="Enter your email" />
-                        <Textarea label="Message" placeholder="Enter your message" />
+                        <Input
+                          label="Email"
+                          type="email"
+                          placeholder="Enter your email"
+                        />
+                        <Textarea
+                          label="Message"
+                          placeholder="Enter your message"
+                        />
                       </div>
                     </DialogBody>
                     <DialogFooter>
@@ -639,11 +725,11 @@ export default function DesignSystemShowcase() {
         {/* Footer */}
         <div className="border-t border-gray-200 pt-8 text-center">
           <p className="text-sm text-gray-600">
-            RollKeeper Design System • Built with Radix UI, Tailwind CSS, and Framer Motion
+            RollKeeper Design System • Built with Radix UI, Tailwind CSS, and
+            Framer Motion
           </p>
         </div>
       </div>
     </div>
   );
 }
-

@@ -12,7 +12,8 @@ import {
 import { CharacterState } from '@/types/character';
 import { validateMulticlassRequirements } from '@/utils/multiclass';
 import { COMMON_CLASSES } from '@/utils/constants';
-import { Button, Input, SelectField, SelectItem } from '@/components/ui/forms';
+import { Button, SelectField, SelectItem } from '@/components/ui/forms';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Badge } from '@/components/ui/layout';
 import { useClassData } from '@/hooks/useClassData';
 
@@ -204,17 +205,11 @@ export default function MulticlassManager({
             <div className="flex items-center gap-2">
               <div className="flex items-center gap-2">
                 <label className="text-muted text-sm font-medium">Level:</label>
-                <Input
-                  type="number"
+                <NumberInput
                   min="1"
                   max="20"
-                  value={classInfo.level.toString()}
-                  onChange={e =>
-                    handleLevelChange(
-                      classInfo.className,
-                      parseInt(e.target.value) || 1
-                    )
-                  }
+                  value={classInfo.level}
+                  onChange={v => handleLevelChange(classInfo.className, v ?? 1)}
                   className="w-16 text-center"
                   size="sm"
                 />

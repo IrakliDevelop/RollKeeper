@@ -1,0 +1,158 @@
+'use client';
+
+import { useMemo } from 'react';
+import { ChevronRight } from 'lucide-react';
+
+import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
+import type { ToastData } from '@/components/ui/feedback/Toast';
+import { useCharacterStore } from '@/store/characterStore';
+import { getActiveClassResources } from '@/utils/classResources';
+import type { SpellAoe } from '@/types/spellAoe';
+
+import { DockBuffs } from './DockBuffs';
+import { DockResources } from './DockResources';
+import { DockSpells } from './DockSpells';
+import { DockVitals } from './DockVitals';
+
+export interface CharacterDockProps {
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
+  addToast: (toast: Omit<ToastData, 'id'>) => void;
+  onCastPlacement: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
+  connectionLive: boolean;
+  hasPendingPlacement: boolean;
+  onCancelPlacement: () => void;
+}
+
+/**
+ * Right-edge player VTT panel: avatar/name header + `DockVitals` (HP editor,
+ * AC/Init, heroic inspiration) + `DockSpells` (search, cast flow, slot pips).
+ */
+export function CharacterDock({
+  collapsed,
+  onToggleCollapsed,
+  addToast,
+  onCastPlacement,
+  connectionLive,
+  hasPendingPlacement,
+  onCancelPlacement,
+}: CharacterDockProps) {
+  const character = useCharacterStore(state => state.character);
+  const toggleBuff = useCharacterStore(state => state.toggleBuff);
+  const expendClassResource = useCharacterStore(
+    state => state.useClassResource
+  );
+  const restoreClassResource = useCharacterStore(
+    state => state.restoreClassResource
+  );
+
+  const resources = useMemo(
+    () => getActiveClassResources(character),
+    [character]
+  );
+
+  if (collapsed) {
+    return (
+      <button
+        onClick={onToggleCollapsed}
+        title="Expand character dock"
+        className="bg-surface-raised border-divider text-heading pointer-events-auto fixed top-[78px] right-4 flex min-h-[44px] items-center gap-1.5 rounded-2xl border px-3 text-xs font-bold tracking-wider shadow-xl"
+      >
+        <AppIcon name="character" className="h-4 w-4" /> CHAR
+      </button>
+    );
+  }
+
+  const handleToggleBuff = (id: string) => {
+    const buff = (character.temporaryBuffs || []).find(b => b.id === id);
+    toggleBuff(id);
+    if (buff) {
+      addToast({
+        type: 'info',
+        title: `${buff.name} ${buff.isActive ? 'off' : 'on'}`,
+        message: '',
+      });
+    }
+  };
+
+  const handleSpendResource = (id: string) => {
+    expendClassResource(id, 1);
+    const after = getActiveClassResources(
+      useCharacterStore.getState().character
+    ).find(r => r.definition.id === id);
+    if (after) {
+      addToast({
+        type: 'info',
+        title: `${after.definition.name}: ${after.usesRemaining}/${after.maxUses} left`,
+        message: '',
+      });
+    }
+  };
+
+  const handleRestoreResource = (id: string) => {
+    restoreClassResource(id, 1);
+  };
+
+  const level = character.totalLevel || character.level;
+  const className = character.class?.name || 'Unknown Class';
+  const initial = character.name?.charAt(0)?.toUpperCase() || '?';
+
+  return (
+    <div className="bg-surface-raised border-divider pointer-events-auto fixed top-[78px] right-4 bottom-6 flex w-[338px] flex-col overflow-hidden rounded-2xl border shadow-xl">
+      <div className="border-divider flex shrink-0 items-center gap-3 border-b px-3 py-2.5">
+        {character.avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={character.avatar}
+            alt={character.name}
+            className="h-10 w-10 shrink-0 rounded-full object-cover"
+          />
+        ) : (
+          <div className="bg-surface-secondary text-heading flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-bold">
+            {initial}
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-heading truncate text-sm font-semibold">
+            {character.name}
+          </div>
+          <div className="text-faint truncate text-xs">
+            {character.race} · {className} {level}
+          </div>
+        </div>
+        <Button
+          variant="ghost"
+          size="lg"
+          onClick={onToggleCollapsed}
+          aria-label="Collapse character dock"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </Button>
+      </div>
+
+      <div className="flex-1 space-y-3 overflow-x-hidden overflow-y-auto px-3 py-3">
+        <DockVitals addToast={addToast} />
+
+        <DockBuffs
+          buffs={character.temporaryBuffs || []}
+          onToggleBuff={handleToggleBuff}
+        />
+
+        <DockResources
+          resources={resources}
+          onSpend={handleSpendResource}
+          onRestore={handleRestoreResource}
+        />
+
+        <DockSpells
+          addToast={addToast}
+          onCastPlacement={onCastPlacement}
+          connectionLive={connectionLive}
+          hasPendingPlacement={hasPendingPlacement}
+          onCancelPlacement={onCancelPlacement}
+        />
+      </div>
+    </div>
+  );
+}

@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import {
@@ -14,25 +20,75 @@ import {
   Angry,
   CalendarDays,
   MessageSquare,
+  Map,
+  MapPinned,
+  ChevronDown,
+  ChevronRight,
+  ScrollText,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { Switch } from '@/components/ui/forms/switch';
 import { Badge } from '@/components/ui/layout/badge';
+import {
+  Card,
+  CardHeader,
+  CardDescription,
+  CardContent,
+} from '@/components/ui/layout/card';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
+import { AwardXpDialog } from '@/components/ui/campaign/AwardXpDialog';
 import { NPCSection } from '@/components/ui/campaign/NPCSection';
+import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
+import { useDmCounterSync } from '@/hooks/useDmCounterSync';
+import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
 import { useDmStore } from '@/store/dmStore';
+import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { CampaignPlayerData } from '@/types/campaign';
+import {
+  SendItemDialog,
+  SendItemTarget,
+} from '@/components/ui/campaign/SendItemDialog';
+import type { ItemTransfer } from '@/types/sharedState';
+import type { InventoryItem, MagicItem } from '@/types/character';
+import type { NPCInventoryItem } from '@/types/encounter';
+
+function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
+  return {
+    id: npcItem.id,
+    name: npcItem.name,
+    quantity: npcItem.quantity,
+    category: npcItem.category || 'misc',
+    description: npcItem.description,
+    weight: npcItem.weight,
+    value: npcItem.value,
+    rarity: npcItem.rarity as InventoryItem['rarity'],
+    type: npcItem.type as InventoryItem['type'],
+    location: 'Backpack',
+    tags: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+}
 
 export default function CampaignViewPage() {
   const params = useParams();
   const code = params.code as string;
 
-  const { dmId, getCampaign, setCustomCounterLabel, adjustPlayerCounter } =
-    useDmStore();
+  const {
+    dmId,
+    getCampaign,
+    setCustomCounterLabel,
+    adjustPlayerCounter,
+    updateCampaign,
+    setDmDashboardUi,
+  } = useDmStore();
   const localCampaign = getCampaign(code);
 
   const { players, campaignName, loading, error, lastFetched, refresh } =
@@ -44,19 +100,51 @@ export default function CampaignViewPage() {
       interval: 10000,
     });
 
+  useDmCounterSync(code, dmId);
+  useDmSettingsSync(code, dmId);
+
   const [copied, setCopied] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedPlayer, setSelectedPlayer] =
     useState<CampaignPlayerData | null>(null);
+  const currentSelectedPlayer = selectedPlayer
+    ? (players.find(player => player.playerId === selectedPlayer.playerId) ??
+      selectedPlayer)
+    : null;
   const [editingCounterLabel, setEditingCounterLabel] = useState(false);
   const [counterLabelInput, setCounterLabelInput] = useState('');
   const [messageTarget, setMessageTarget] = useState<
     CampaignPlayerData | null | 'all'
   >(null);
+  const [playerToRemove, setPlayerToRemove] =
+    useState<CampaignPlayerData | null>(null);
   const { toasts, addToast, dismissToast } = useToast();
   const knownPlayerIdsRef = useRef<Set<string>>(new Set());
 
+  const [npcSendingItem, setNpcSendingItem] = useState<NPCInventoryItem | null>(
+    null
+  );
+  const [npcSendingNpcName, setNpcSendingNpcName] = useState<string | null>(
+    null
+  );
+  const [npcSendDialogOpen, setNpcSendDialogOpen] = useState(false);
+  const [isNpcSendingItem, setIsNpcSendingItem] = useState(false);
+  const [awardXpOpen, setAwardXpOpen] = useState(false);
+
+  const playersSectionOpen =
+    localCampaign?.dmDashboardUi?.playersSectionOpen ?? true;
+  const houseRulesSectionOpen =
+    localCampaign?.dmDashboardUi?.houseRulesSectionOpen ?? false;
+
   const customCounterLabel = localCampaign?.customCounterLabel;
+  const stackableInspiration = localCampaign?.stackableInspiration ?? false;
+
+  const handleToggleStackableInspiration = useCallback(
+    (enabled: boolean) => {
+      updateCampaign(code, { stackableInspiration: enabled });
+    },
+    [updateCampaign, code]
+  );
 
   useEffect(() => {
     if (loading) return;
@@ -79,6 +167,134 @@ export default function CampaignViewPage() {
 
     knownPlayerIdsRef.current = currentIds;
   }, [players, loading, addToast]);
+
+  const npcSendTargets: SendItemTarget[] = useMemo(
+    () =>
+      players.map(p => ({
+        playerId: p.playerId,
+        playerName: p.playerName,
+        characterName: p.characterName,
+        characterId: p.characterId,
+      })),
+    [players]
+  );
+
+  const handleNpcSendItem = useCallback(
+    async (item: InventoryItem, target: SendItemTarget) => {
+      setIsNpcSendingItem(true);
+      try {
+        const transfer: ItemTransfer = {
+          id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          item,
+          fromPlayerName: 'DM',
+          fromCharacterName: npcSendingNpcName ?? 'NPC',
+          fromType: 'npc',
+          sentAt: new Date().toISOString(),
+        };
+
+        const res = await fetch(`/api/campaign/${code}/shared`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feature: 'item_transfer',
+            data: { transfer, playerId: target.playerId },
+            dmId,
+          }),
+        });
+
+        if (!res.ok) throw new Error('Failed to send item');
+
+        addToast({
+          type: 'success',
+          title: 'Item Sent',
+          message: `${item.name} sent to ${target.characterName}`,
+        });
+      } catch (err) {
+        console.error('Failed to send item:', err);
+        addToast({
+          type: 'error',
+          title: 'Failed',
+          message: 'Could not send item',
+        });
+      } finally {
+        setIsNpcSendingItem(false);
+      }
+    },
+    [code, dmId, npcSendingNpcName, addToast]
+  );
+
+  const handleGiveLibraryMagicItem = useCallback(
+    async (item: MagicItem, target: SendItemTarget) => {
+      const transfer: ItemTransfer = {
+        id: `transfer-${crypto.randomUUID()}`,
+        item,
+        itemKind: 'magic',
+        fromPlayerName: 'DM',
+        fromCharacterName: 'Magic Item Library',
+        fromType: 'dm',
+        sentAt: new Date().toISOString(),
+      };
+      try {
+        const response = await fetch(`/api/campaign/${code}/shared`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            feature: 'item_transfer',
+            data: { transfer, playerId: target.playerId },
+            dmId,
+          }),
+        });
+        if (!response.ok) throw new Error('Failed to give magic item');
+        addToast({
+          type: 'success',
+          title: 'Magic Item Given',
+          message: `${item.name} sent to ${target.characterName}. The library copy was kept.`,
+        });
+      } catch (error) {
+        console.error('Failed to give magic item:', error);
+        addToast({
+          type: 'error',
+          title: 'Magic Item Not Sent',
+          message: `Could not send ${item.name} to ${target.characterName}.`,
+        });
+      }
+    },
+    [addToast, code, dmId]
+  );
+
+  const handleRemovePlayer = useCallback(async () => {
+    if (!playerToRemove) return;
+    const target = playerToRemove;
+    try {
+      const res = await fetch(
+        `/api/campaign/${code}/players/${target.playerId}`,
+        {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dmId }),
+        }
+      );
+      if (!res.ok) throw new Error('Failed to remove player');
+
+      // Prevent a "Player Joined" toast if they later rejoin legitimately,
+      // and keep the known-set consistent with the refreshed list.
+      knownPlayerIdsRef.current.delete(target.playerId);
+
+      addToast({
+        type: 'success',
+        title: 'Player Removed',
+        message: `${target.characterName} was removed from the campaign.`,
+      });
+      await refresh();
+    } catch (err) {
+      console.error('Failed to remove player:', err);
+      addToast({
+        type: 'error',
+        title: 'Failed',
+        message: 'Could not remove player. Try again.',
+      });
+    }
+  }, [playerToRemove, code, dmId, addToast, refresh]);
 
   const displayName = campaignName || localCampaign?.name || 'Campaign';
 
@@ -104,8 +320,8 @@ export default function CampaignViewPage() {
     <div className="bg-surface min-h-screen">
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
+          <div className="flex h-16 min-w-0 items-center gap-3">
+            <div className="flex min-w-0 shrink-0 items-center">
               <Link href="/dm">
                 <Button
                   variant="ghost"
@@ -115,7 +331,7 @@ export default function CampaignViewPage() {
                   Back to Dashboard
                 </Button>
               </Link>
-              <div className="ml-6 flex items-center gap-3">
+              <div className="ml-6 hidden min-w-0 items-center gap-3 sm:flex">
                 <Crown className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 <h1 className="text-heading text-xl font-bold">
                   {displayName}
@@ -136,8 +352,23 @@ export default function CampaignViewPage() {
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <Link href={`/dm/campaign/${code}/calendar`}>
+            <div className="ml-auto flex min-w-0 flex-1 items-center gap-3 overflow-x-auto">
+              <Link
+                href={`/dm/campaign/${code}/locations`}
+                className="lg:hidden"
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<MapPinned size={16} />}
+                >
+                  Locations
+                </Button>
+              </Link>
+              <Link
+                href={`/dm/campaign/${code}/calendar`}
+                className="lg:hidden"
+              >
                 <Button
                   variant="secondary"
                   size="sm"
@@ -146,13 +377,28 @@ export default function CampaignViewPage() {
                   Calendar
                 </Button>
               </Link>
-              <Link href={`/dm/campaign/${code}/encounters`}>
+              <Link
+                href={`/dm/campaign/${code}/encounters`}
+                className="lg:hidden"
+              >
                 <Button
                   variant="secondary"
                   size="sm"
                   leftIcon={<Swords size={16} />}
                 >
                   Encounters
+                </Button>
+              </Link>
+              <Link
+                href={`/dm/campaign/${code}/battlemaps`}
+                className="lg:hidden"
+              >
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  leftIcon={<Map size={16} />}
+                >
+                  Battle Maps
                 </Button>
               </Link>
               <ThemeToggle showSystemOption />
@@ -192,7 +438,137 @@ export default function CampaignViewPage() {
         </div>
       </div>
 
+      {/* Campaign Banner with Side Panels */}
+      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+        <div className="flex items-stretch gap-4">
+          {/* Locations + Battle Maps (stacked) */}
+          <div className="hidden flex-col gap-2 lg:flex lg:w-44">
+            <Link
+              href={`/dm/campaign/${code}/locations`}
+              className="border-accent-emerald-border bg-accent-emerald-bg hover:bg-accent-emerald-bg-strong flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border-2 px-4 py-2 transition-colors"
+            >
+              <MapPinned size={22} className="text-accent-emerald-text-muted" />
+              <div className="text-accent-emerald-text text-sm font-semibold">
+                Locations
+              </div>
+            </Link>
+            <Link
+              href={`/dm/campaign/${code}/battlemaps`}
+              className="border-accent-orange-border bg-accent-orange-bg flex flex-1 flex-col items-center justify-center gap-1.5 rounded-lg border-2 px-4 py-2 transition-colors hover:shadow-md"
+            >
+              <Map size={22} className="text-accent-orange-text-muted" />
+              <div className="text-accent-orange-text text-sm font-semibold">
+                Battle Maps
+              </div>
+            </Link>
+          </div>
+
+          {/* Banner */}
+          <div className="min-w-0 flex-1 lg:max-w-2xl">
+            <BannerUpload
+              bannerUrl={localCampaign?.bannerUrl}
+              campaignCode={code}
+              onBannerChange={url => updateCampaign(code, { bannerUrl: url })}
+              variant="hero"
+            />
+          </div>
+
+          {/* Calendar */}
+          <Link
+            href={`/dm/campaign/${code}/calendar`}
+            className="border-accent-amber-border bg-accent-amber-bg hover:bg-accent-amber-bg-strong hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors lg:flex lg:w-44"
+          >
+            <CalendarDays size={28} className="text-accent-amber-text-muted" />
+            <div className="text-accent-amber-text text-sm font-semibold">
+              Calendar
+            </div>
+          </Link>
+
+          {/* Encounters */}
+          <Link
+            href={`/dm/campaign/${code}/encounters`}
+            className="border-accent-red-border bg-accent-red-bg hover:bg-accent-red-bg-strong hidden flex-col items-center justify-center gap-2 rounded-lg border-2 px-4 py-4 transition-colors lg:flex lg:w-44"
+          >
+            <Swords size={28} className="text-accent-red-text-muted" />
+            <div className="text-accent-red-text text-sm font-semibold">
+              Encounters
+            </div>
+          </Link>
+        </div>
+      </div>
+
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        {localCampaign && (
+          <CampaignSettingsSyncControls campaign={localCampaign} />
+        )}
+        {/* House Rules */}
+        {!loading && !error && (
+          <div>
+            <div className="mb-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() =>
+                  setDmDashboardUi(code, {
+                    houseRulesSectionOpen: !houseRulesSectionOpen,
+                  })
+                }
+                className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+                aria-expanded={houseRulesSectionOpen}
+                aria-controls="dm-campaign-house-rules-section"
+                title={
+                  houseRulesSectionOpen
+                    ? 'Collapse house rules'
+                    : 'Expand house rules'
+                }
+              >
+                {houseRulesSectionOpen ? (
+                  <ChevronDown size={20} />
+                ) : (
+                  <ChevronRight size={20} />
+                )}
+              </button>
+              <div className="flex min-w-0 items-center gap-2">
+                <ScrollText size={20} className="text-muted shrink-0" />
+                <h2 className="text-heading text-lg font-semibold">
+                  House Rules
+                </h2>
+              </div>
+            </div>
+
+            {houseRulesSectionOpen && (
+              <Card id="dm-campaign-house-rules-section">
+                <CardHeader>
+                  <CardDescription>
+                    Rules that apply to every player in this campaign.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p
+                        id="stackable-inspiration-label"
+                        className="text-heading font-medium"
+                      >
+                        Stackable heroic inspiration
+                      </p>
+                      <p className="text-muted text-sm">
+                        When on, players can hold more than one Heroic
+                        Inspiration. When off, they follow classic rules (at
+                        most one).
+                      </p>
+                    </div>
+                    <Switch
+                      checked={stackableInspiration}
+                      onCheckedChange={handleToggleStackableInspiration}
+                      aria-labelledby="stackable-inspiration-label"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="text-muted animate-pulse text-lg">
@@ -245,21 +621,51 @@ export default function CampaignViewPage() {
           <>
             {/* Players header + custom counter config */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <Users size={20} className="text-muted" />
-                  <h2 className="text-heading text-lg font-semibold">
-                    Players ({players.length})
-                  </h2>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<MessageSquare size={14} />}
-                  onClick={() => setMessageTarget('all')}
+              <div className="flex min-w-0 flex-1 items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDmDashboardUi(code, {
+                      playersSectionOpen: !playersSectionOpen,
+                    })
+                  }
+                  className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
+                  aria-expanded={playersSectionOpen}
+                  aria-controls="dm-campaign-players-section"
+                  title={
+                    playersSectionOpen ? 'Collapse players' : 'Expand players'
+                  }
                 >
-                  Message All
-                </Button>
+                  {playersSectionOpen ? (
+                    <ChevronDown size={20} />
+                  ) : (
+                    <ChevronRight size={20} />
+                  )}
+                </button>
+                <div className="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
+                  <div className="flex items-center gap-2">
+                    <Users size={20} className="text-muted shrink-0" />
+                    <h2 className="text-heading text-lg font-semibold">
+                      Players ({players.length})
+                    </h2>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<MessageSquare size={14} />}
+                    onClick={() => setMessageTarget('all')}
+                  >
+                    Message All
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    leftIcon={<TrendingUp size={14} />}
+                    onClick={() => setAwardXpOpen(true)}
+                  >
+                    Award XP
+                  </Button>
+                </div>
               </div>
 
               {/* Custom counter label config */}
@@ -314,56 +720,92 @@ export default function CampaignViewPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {players.map(player => (
-                <PlayerSummaryCard
-                  key={player.playerId}
-                  player={player}
-                  customCounterLabel={customCounterLabel}
-                  counterValue={
-                    localCampaign?.playerCounters?.[player.playerId] ?? 0
-                  }
-                  onAdjustCounter={
-                    customCounterLabel
-                      ? delta =>
-                          adjustPlayerCounter(code, player.playerId, delta)
-                      : undefined
-                  }
-                  onClick={() => setSelectedPlayer(player)}
-                />
-              ))}
-            </div>
+            {playersSectionOpen && (
+              <div
+                id="dm-campaign-players-section"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"
+              >
+                {players.map(player => (
+                  <PlayerSummaryCard
+                    key={player.playerId}
+                    player={player}
+                    customCounterLabel={customCounterLabel}
+                    counterValue={
+                      localCampaign?.playerCounters?.[player.playerId] ?? 0
+                    }
+                    onAdjustCounter={
+                      customCounterLabel
+                        ? delta =>
+                            adjustPlayerCounter(code, player.playerId, delta)
+                        : undefined
+                    }
+                    onClick={() => setSelectedPlayer(player)}
+                    onRemove={() => setPlayerToRemove(player)}
+                  />
+                ))}
+              </div>
+            )}
           </>
         )}
 
-        {/* NPC Management — always visible */}
-        {!loading && !error && <NPCSection />}
+        {/* NPC Management */}
+        {!loading && !error && (
+          <NPCSection
+            campaignCode={code}
+            players={npcSendTargets}
+            onGiveMagicItemToPlayer={handleGiveLibraryMagicItem}
+            onSendItemToPlayer={(item, npcName) => {
+              setNpcSendingItem(item);
+              setNpcSendingNpcName(npcName);
+              setNpcSendDialogOpen(true);
+            }}
+          />
+        )}
       </main>
 
       {/* Player Detail Dialog */}
-      {selectedPlayer && (
+      {currentSelectedPlayer && (
         <PlayerDetailDialog
-          open={!!selectedPlayer}
+          open={!!currentSelectedPlayer}
           onOpenChange={open => {
             if (!open) setSelectedPlayer(null);
           }}
-          player={selectedPlayer}
+          player={currentSelectedPlayer}
           customCounterLabel={customCounterLabel}
           counterValue={
-            localCampaign?.playerCounters?.[selectedPlayer.playerId] ?? 0
+            localCampaign?.playerCounters?.[currentSelectedPlayer.playerId] ?? 0
           }
           onAdjustCounter={
             customCounterLabel
               ? delta =>
-                  adjustPlayerCounter(code, selectedPlayer.playerId, delta)
+                  adjustPlayerCounter(
+                    code,
+                    currentSelectedPlayer.playerId,
+                    delta
+                  )
               : undefined
           }
           onSendMessage={() => {
-            setMessageTarget(selectedPlayer);
+            setMessageTarget(currentSelectedPlayer);
             setSelectedPlayer(null);
           }}
+          campaignCode={code}
+          dmId={dmId}
         />
       )}
+
+      <SendItemDialog
+        open={npcSendDialogOpen}
+        onClose={() => {
+          setNpcSendDialogOpen(false);
+          setNpcSendingItem(null);
+          setNpcSendingNpcName(null);
+        }}
+        item={npcSendingItem ? npcItemToInventoryItem(npcSendingItem) : null}
+        targets={npcSendTargets}
+        onSend={handleNpcSendItem}
+        sending={isNpcSendingItem}
+      />
 
       <SendMessageDialog
         open={messageTarget !== null}
@@ -372,6 +814,24 @@ export default function CampaignViewPage() {
         targetPlayer={messageTarget === 'all' ? null : messageTarget}
         campaignCode={code}
         dmId={dmId}
+      />
+
+      <AwardXpDialog
+        open={awardXpOpen}
+        onClose={() => setAwardXpOpen(false)}
+        players={players}
+        campaignCode={code}
+        dmId={dmId}
+      />
+
+      <ConfirmationModal
+        isOpen={playerToRemove !== null}
+        onClose={() => setPlayerToRemove(null)}
+        onConfirm={handleRemovePlayer}
+        title="Remove Player"
+        message={`Remove ${playerToRemove?.characterName ?? 'this player'} from the campaign? Their synced data will be deleted. They can rejoin with the campaign code.`}
+        confirmText="Remove"
+        type="danger"
       />
 
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />

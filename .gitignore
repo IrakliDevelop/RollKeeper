@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
 
 # next.js
 /.next/
@@ -104,3 +106,4 @@ storybook-static
 /electron-dist
 /dist-electron
 /.electron-cache
+.superpowers/

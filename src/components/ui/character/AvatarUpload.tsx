@@ -55,28 +55,28 @@ export function AvatarUpload({
     event: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = event.target.files?.[0];
-    console.log('🔍 File selected:', file);
+    console.log('File selected:', file);
 
     if (!file) {
-      console.log('❌ No file selected');
+      console.log('No file selected');
       return;
     }
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      console.log('❌ Invalid file type:', file.type);
+      console.log('Invalid file type:', file.type);
       setError('Please select an image file');
       return;
     }
 
     // Validate file size
     if (file.size > MAX_AVATAR_SIZE_BYTES) {
-      console.log('❌ File too large:', file.size, 'bytes');
+      console.log('File too large:', file.size, 'bytes');
       setError(`Image must be smaller than ${MAX_AVATAR_SIZE_MB}MB`);
       return;
     }
 
-    console.log('✅ File validation passed, uploading to S3...');
+    console.log('File validation passed, uploading to S3...');
     setIsLoading(true);
     setError(null);
 
@@ -98,11 +98,11 @@ export function AvatarUpload({
       }
 
       const { url } = await response.json();
-      console.log('✅ Upload successful! URL:', url);
+      console.log('Upload successful! URL:', url);
 
       // Delete old avatar from S3 if it exists and is an S3 URL
       if (avatar && avatar.includes('s3.amazonaws.com')) {
-        console.log('🗑️ Deleting old avatar from S3...');
+        console.log('Deleting old avatar from S3...');
         await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
           method: 'DELETE',
         });
@@ -111,7 +111,7 @@ export function AvatarUpload({
       onAvatarChange(url);
       setIsLoading(false);
     } catch (err) {
-      console.log('❌ Upload error:', err);
+      console.log('Upload error:', err);
       setError(err instanceof Error ? err.message : 'Failed to upload avatar');
       setIsLoading(false);
     }
@@ -123,14 +123,14 @@ export function AvatarUpload({
   const handleRemoveAvatar = async () => {
     // Delete from S3 if it's an S3 URL
     if (avatar && avatar.includes('s3.amazonaws.com')) {
-      console.log('🗑️ Deleting avatar from S3...');
+      console.log('Deleting avatar from S3...');
       try {
         await fetch(`/api/avatar/delete?url=${encodeURIComponent(avatar)}`, {
           method: 'DELETE',
         });
-        console.log('✅ Avatar deleted from S3');
+        console.log('Avatar deleted from S3');
       } catch (err) {
-        console.log('⚠️ Failed to delete from S3:', err);
+        console.log('Failed to delete from S3:', err);
       }
     }
 

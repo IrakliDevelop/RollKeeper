@@ -1,9 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import { CharacterState } from '@/types/character';
+import { CampaignPlayerData } from '@/types/campaign';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { useCharacterStore } from '@/store/characterStore';
 
 interface UsePlayerSyncOptions {
   characterId: string;
+  onRemovedFromCampaign?: () => void;
 }
 
 interface UsePlayerSyncResult {
@@ -20,6 +23,7 @@ interface UsePlayerSyncResult {
 
 export function usePlayerSync({
   characterId,
+  onRemovedFromCampaign,
 }: UsePlayerSyncOptions): UsePlayerSyncResult {
   const { getCharacterById, updateCharacter } = usePlayerStore();
   const character = getCharacterById(characterId);
@@ -28,6 +32,7 @@ export function usePlayerSync({
     'idle' | 'syncing' | 'synced' | 'error'
   >('idle');
   const syncInFlight = useRef(false);
+  const pendingSyncData = useRef<CharacterState | null>(null);
 
   const campaignCode = character?.campaignCode ?? null;
   const campaignName = character?.campaignName ?? null;
@@ -37,6 +42,33 @@ export function usePlayerSync({
 
   const rejoinInFlight = useRef(false);
 
+  const clearCampaignLink = useCallback(() => {
+    updateCharacter(characterId, {
+      campaignCode: undefined,
+      campaignName: undefined,
+      syncEnabled: undefined,
+      autoSync: undefined,
+      lastSyncedAt: undefined,
+    } as Partial<PlayerCharacter>);
+    setSyncStatus('idle');
+  }, [characterId, updateCharacter]);
+
+  const leaveCampaign = useCallback(() => {
+    if (campaignCode) {
+      // Best-effort server-side cleanup so the DM's list doesn't keep a
+      // stale entry for 60 days; local unlink proceeds regardless.
+      fetch(`/api/campaign/${campaignCode}/players/${characterId}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+        body: JSON.stringify({ playerId: characterId }),
+      }).catch(() => {});
+    }
+    clearCampaignLink();
+  }, [campaignCode, characterId, clearCampaignLink]);
+
   const attemptRejoin = useCallback(
     async (characterData: CharacterState) => {
       if (rejoinInFlight.current || !campaignCode) return false;
@@ -44,7 +76,10 @@ export function usePlayerSync({
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/join`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             playerId: characterId,
             playerName: characterData.playerName || characterData.name,
@@ -65,7 +100,12 @@ export function usePlayerSync({
 
   const syncNow = useCallback(
     async (characterData: CharacterState) => {
-      if (!campaignCode || !syncEnabled || syncInFlight.current) return;
+      if (!campaignCode || !syncEnabled) return;
+
+      if (syncInFlight.current) {
+        pendingSyncData.current = characterData;
+        return;
+      }
 
       syncInFlight.current = true;
       setSyncStatus('syncing');
@@ -73,7 +113,10 @@ export function usePlayerSync({
       try {
         const res = await fetch(`/api/campaign/${campaignCode}/sync`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({
             playerId: characterId,
             playerName: characterData.playerName || characterData.name,
@@ -82,6 +125,42 @@ export function usePlayerSync({
             characterData,
           }),
         });
+
+        if (res.status === 410) {
+          // DM removed this player. Do not rejoin; clean up server side
+          // (closes the kick-vs-sync race that can resurrect our entry)
+          // and unlink locally.
+          pendingSyncData.current = null;
+          leaveCampaign();
+          onRemovedFromCampaign?.();
+          return;
+        }
+
+        if (res.status === 409) {
+          // Our copy was stale (another tab pushed newer). Adopt the
+          // server's blob instead of clobbering — revision-gated, and via
+          // loadCharacterState so no bump/echo. Never rejoin on 409:
+          // rejoin would overwrite the newer blob with the stale one.
+          pendingSyncData.current = null;
+          const body = (await res.json().catch(() => null)) as {
+            current?: CampaignPlayerData;
+          } | null;
+          const serverCharacter = body?.current?.characterData;
+          const { character: localCharacter, loadCharacterState } =
+            useCharacterStore.getState();
+          if (
+            serverCharacter &&
+            serverCharacter.id === localCharacter.id &&
+            (serverCharacter.revision ?? 0) > (localCharacter.revision ?? 0)
+          ) {
+            loadCharacterState(serverCharacter);
+          }
+          updateCharacter(characterId, {
+            lastSyncedAt: new Date().toISOString(),
+          });
+          setSyncStatus('synced');
+          return;
+        }
 
         if (!res.ok) {
           const rejoined = await attemptRejoin(characterData);
@@ -100,26 +179,29 @@ export function usePlayerSync({
         setSyncStatus('error');
       } finally {
         syncInFlight.current = false;
+
+        const pending = pendingSyncData.current;
+        if (pending) {
+          pendingSyncData.current = null;
+          syncNow(pending);
+        }
       }
     },
-    [campaignCode, syncEnabled, characterId, updateCharacter, attemptRejoin]
+    [
+      campaignCode,
+      syncEnabled,
+      characterId,
+      updateCharacter,
+      attemptRejoin,
+      leaveCampaign,
+      onRemovedFromCampaign,
+    ]
   );
 
   const toggleAutoSync = useCallback(() => {
     if (!character) return;
     updateCharacter(characterId, { autoSync: !autoSync });
   }, [character, characterId, autoSync, updateCharacter]);
-
-  const leaveCampaign = useCallback(() => {
-    updateCharacter(characterId, {
-      campaignCode: undefined,
-      campaignName: undefined,
-      syncEnabled: undefined,
-      autoSync: undefined,
-      lastSyncedAt: undefined,
-    } as Partial<PlayerCharacter>);
-    setSyncStatus('idle');
-  }, [characterId, updateCharacter]);
 
   return {
     syncStatus,

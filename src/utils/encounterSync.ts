@@ -6,6 +6,7 @@ import {
 import type { Summon } from '@/types/summon';
 import { CampaignPlayerData } from '@/types/campaign';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
+import { useEncounterStore } from '@/store/encounterStore';
 
 /**
  * Merge live player data from campaign sync into an encounter entity.
@@ -42,25 +43,58 @@ export function mergePlayerSyncData(
       }
     : undefined;
 
-  // Build player-synced conditions from character data
+  // Build player-synced conditions from character data,
+  // filtering out any the DM has explicitly suppressed (removed).
+  const suppressed = new Set(entity.suppressedConditions ?? []);
+
   const playerConditions: EncounterCondition[] = (
     char.conditionsAndDiseases?.activeConditions ?? []
-  ).map(c => ({
-    id: `psync-${c.name.toLowerCase().replace(/\s+/g, '-')}`,
-    name: c.name,
-    description: c.description,
-    source: 'player-sync' as const,
-  }));
+  )
+    .filter(c => !suppressed.has(c.name))
+    .map(c => ({
+      id: `psync-${c.name.toLowerCase().replace(/\s+/g, '-')}`,
+      name: c.name,
+      description: c.description,
+      source: 'player-sync' as const,
+    }));
+
+  // Clean up stale suppressions: if the player no longer has a condition,
+  // no need to keep suppressing it.
+  const playerConditionNames = new Set(
+    (char.conditionsAndDiseases?.activeConditions ?? []).map(c => c.name)
+  );
+  const updatedSuppressed = [...suppressed].filter(name =>
+    playerConditionNames.has(name)
+  );
 
   // Preserve DM-added conditions
   const dmConditions = entity.conditions.filter(c => c.source === 'dm');
 
   // Merge: DM conditions + player-synced conditions (deduplicated by name)
-  const playerConditionNames = new Set(playerConditions.map(c => c.name));
+  const mergedPlayerNames = new Set(playerConditions.map(c => c.name));
   const uniqueDmConditions = dmConditions.filter(
-    c => !playerConditionNames.has(c.name)
+    c => !mergedPlayerNames.has(c.name)
   );
   const mergedConditions = [...uniqueDmConditions, ...playerConditions];
+
+  const damageResistances = char.damageResistances ?? [];
+  const damageImmunities = char.damageImmunities ?? [];
+  const conditionImmunities = char.conditionImmunities ?? [];
+  const senses = (char.senses ?? []).map(s => ({
+    name: s.name,
+    range: s.range,
+    source: s.source,
+  }));
+
+  // Only http(s) avatars — a base64 data-URL must never reach a synced
+  // ImageElement src (it would ride every sync upsert). Same guard as
+  // tokenAvatarUrl; kept inline to keep this util canvas-agnostic.
+  // Precedence consequence: a player's own http(s) avatar wins over a
+  // DM-set portrait on the next poll; base64/absent avatars omit the key
+  // so DM-set portraits survive. Sync updates never restamp already-placed
+  // tokens — only studio edits do.
+  const avatarUrl =
+    char.avatar && /^https?:\/\//.test(char.avatar) ? char.avatar : undefined;
 
   return {
     currentHp,
@@ -72,7 +106,17 @@ export function mergePlayerSyncData(
     inspirationCount,
     hasUsedReaction,
     deathSaves,
+    ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     conditions: mergedConditions,
+    suppressedConditions:
+      updatedSuppressed.length > 0 ? updatedSuppressed : undefined,
+    damageResistances:
+      damageResistances.length > 0 ? damageResistances : undefined,
+    damageImmunities:
+      damageImmunities.length > 0 ? damageImmunities : undefined,
+    conditionImmunities:
+      conditionImmunities.length > 0 ? conditionImmunities : undefined,
+    senses: senses.length > 0 ? senses : undefined,
   };
 }
 
@@ -95,6 +139,8 @@ export function hasPlayerDataChanged(
   if (updates.concentrationSpell !== entity.concentrationSpell) return true;
   if (updates.inspirationCount !== entity.inspirationCount) return true;
   if (updates.hasUsedReaction !== entity.hasUsedReaction) return true;
+  if (updates.avatarUrl !== undefined && updates.avatarUrl !== entity.avatarUrl)
+    return true;
 
   // Compare death saves
   if (updates.deathSaves !== undefined || entity.deathSaves !== undefined) {
@@ -120,6 +166,27 @@ export function hasPlayerDataChanged(
       .join(',');
     if (currentNames !== updateNames) return true;
   }
+
+  // Compare defenses & senses
+  const arraysEqual = (a?: string[], b?: string[]) =>
+    (a ?? []).sort().join(',') !== (b ?? []).sort().join(',');
+  if (arraysEqual(updates.damageResistances, entity.damageResistances))
+    return true;
+  if (arraysEqual(updates.damageImmunities, entity.damageImmunities))
+    return true;
+  if (arraysEqual(updates.conditionImmunities, entity.conditionImmunities))
+    return true;
+  if (
+    (updates.senses ?? [])
+      .map(s => `${s.name}:${s.range}`)
+      .sort()
+      .join(',') !==
+    (entity.senses ?? [])
+      .map(s => `${s.name}:${s.range}`)
+      .sort()
+      .join(',')
+  )
+    return true;
 
   return false;
 }
@@ -278,6 +345,52 @@ export function syncSummonsToEncounter(
   for (const entity of existingSummonEntities) {
     if (entity.summonId && !activeSummonIds.has(entity.summonId)) {
       removeEntity(encounter.id, entity.id);
+    }
+  }
+}
+
+/**
+ * Merge live campaign player data into an encounter's player-linked entities
+ * and their summons. Reads/writes `useEncounterStore.getState()` directly so
+ * it is callable outside React (e.g. from a poke-driven refresh hook) as well
+ * as from a component effect. No-ops silently for an unknown encounter id or
+ * an empty player list. Extracted verbatim from `EncounterView`'s player-sync
+ * effect — see `applyPlayersToEncounter`'s callers for the two use sites.
+ */
+export function applyPlayersToEncounter(
+  encounterId: string,
+  players: CampaignPlayerData[]
+): void {
+  const { encounters, addEntity, updateEntity, removeEntity } =
+    useEncounterStore.getState();
+  const encounter = encounters.find(e => e.id === encounterId);
+  if (!encounter) return;
+
+  for (const entity of encounter.entities) {
+    if (entity.type === 'player' && entity.playerCharacterId) {
+      // Matches on playerId === playerCharacterId; this is only correct
+      // because usePlayerSync sends `playerId: characterId` — the player-VTT
+      // overlay keys by characterId, so the two are coupled by convention.
+      const playerData = players.find(
+        p => p.playerId === entity.playerCharacterId
+      );
+      if (playerData) {
+        // Sync player HP/AC/conditions
+        const updates = mergePlayerSyncData(entity, playerData);
+        if (updates && hasPlayerDataChanged(entity, updates)) {
+          updateEntity(encounterId, entity.id, updates);
+        }
+        // Sync player's summons into encounter
+        const playerSummons = playerData.characterData?.summons ?? [];
+        syncSummonsToEncounter(
+          encounter,
+          entity,
+          playerSummons,
+          addEntity,
+          updateEntity,
+          removeEntity
+        );
+      }
     }
   }
 }

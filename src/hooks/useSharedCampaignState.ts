@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { SharedCampaignState } from '@/types/sharedState';
+import type { SharedCampaignState, ItemTransfer } from '@/types/sharedState';
 
-const POLL_INTERVAL_MS = 15000; // 15 seconds
+const POLL_INTERVAL_MS = 15000; // 15 seconds (idle / out of combat)
+const COMBAT_POLL_INTERVAL_MS = 5000; // 5 seconds while combat is active
 const IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const ACTIVITY_EVENTS = [
   'mousemove',
@@ -17,6 +18,17 @@ interface UseSharedCampaignStateResult {
   error: string | null;
   lastFetched: Date | null;
   acknowledgeMessage: (messageId: string) => Promise<void>;
+  acknowledgeDmEffects: () => Promise<void>;
+  acknowledgeTransfers: () => Promise<void>;
+  /**
+   * Acknowledge one XP award by receipt. THROWS on failure (unlike the other
+   * acknowledge helpers) — the award processor must stop, not continue.
+   */
+  acknowledgeXpAward: (receipt: string) => Promise<void>;
+  pendingTransfers: ItemTransfer[];
+  clearPendingTransfer: (transferId: string) => void;
+  /** Immediate refetch (e.g. on a relay poke). Debounced: at most one per second. */
+  refetchNow: () => void;
 }
 
 export function useSharedCampaignState(
@@ -29,9 +41,20 @@ export function useSharedCampaignState(
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
+  const [pendingTransfers, setPendingTransfers] = useState<ItemTransfer[]>([]);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isPausedRef = useRef(false);
+  const currentIntervalRef = useRef(POLL_INTERVAL_MS);
+  // Stable ref so fetchSharedState can call startPolling without a circular dep.
+  const startPollingRef = useRef<() => void>(() => {});
+
+  const stopPolling = useCallback(() => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, []);
 
   const fetchSharedState = useCallback(async () => {
     if (!campaignCode) return;
@@ -46,6 +69,23 @@ export function useSharedCampaignState(
       setSharedState(data);
       setError(null);
       setLastFetched(new Date());
+      // Adaptive poll: 5s while combat is active, 15s otherwise.
+      const desired = data.initiative?.isActive
+        ? COMBAT_POLL_INTERVAL_MS
+        : POLL_INTERVAL_MS;
+      if (desired !== currentIntervalRef.current && !isPausedRef.current) {
+        currentIntervalRef.current = desired;
+        startPollingRef.current();
+      }
+      if (data.transfers && data.transfers.length > 0) {
+        setPendingTransfers(prev => {
+          const existingIds = new Set(prev.map(t => t.id));
+          const newTransfers = data.transfers.filter(
+            t => !existingIds.has(t.id)
+          );
+          return newTransfers.length > 0 ? [...prev, ...newTransfers] : prev;
+        });
+      }
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to fetch shared state'
@@ -55,17 +95,25 @@ export function useSharedCampaignState(
     }
   }, [campaignCode, playerId]);
 
-  const stopPolling = useCallback(() => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-  }, []);
+  const REFETCH_DEBOUNCE_MS = 1000;
+  const lastRefetchNowRef = useRef(0);
+  const refetchNow = useCallback(() => {
+    const now = Date.now();
+    if (now - lastRefetchNowRef.current < REFETCH_DEBOUNCE_MS) return;
+    lastRefetchNowRef.current = now;
+    fetchSharedState();
+  }, [fetchSharedState]);
 
   const startPolling = useCallback(() => {
     stopPolling();
-    intervalRef.current = setInterval(fetchSharedState, POLL_INTERVAL_MS);
+    intervalRef.current = setInterval(
+      fetchSharedState,
+      currentIntervalRef.current
+    );
   }, [fetchSharedState, stopPolling]);
+
+  // Keep the ref in sync with the latest startPolling callback.
+  startPollingRef.current = startPolling;
 
   const pausePolling = useCallback(() => {
     if (isPausedRef.current) return;
@@ -152,7 +200,10 @@ export function useSharedCampaignState(
       try {
         await fetch(`/api/campaign/${campaignCode}/shared`, {
           method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
           body: JSON.stringify({ playerId, messageId }),
         });
         // Optimistically remove from local state
@@ -170,5 +221,88 @@ export function useSharedCampaignState(
     [campaignCode, playerId]
   );
 
-  return { sharedState, loading, error, lastFetched, acknowledgeMessage };
+  const acknowledgeDmEffects = useCallback(async () => {
+    if (!campaignCode || !playerId) return;
+    try {
+      await fetch(`/api/campaign/${campaignCode}/shared`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+        body: JSON.stringify({ playerId, type: 'effects' }),
+      });
+      setSharedState(prev => {
+        if (!prev) return prev;
+        return { ...prev, dmEffects: [] };
+      });
+    } catch (err) {
+      console.error('Failed to acknowledge DM effects:', err);
+    }
+  }, [campaignCode, playerId]);
+
+  const acknowledgeTransfers = useCallback(async () => {
+    if (!campaignCode || !playerId) return;
+    try {
+      await fetch(`/api/campaign/${campaignCode}/shared`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+        body: JSON.stringify({ playerId, type: 'transfers' }),
+      });
+      setSharedState(prev => {
+        if (!prev) return prev;
+        return { ...prev, transfers: [] };
+      });
+    } catch (err) {
+      console.error('Failed to acknowledge transfers:', err);
+    }
+  }, [campaignCode, playerId]);
+
+  const acknowledgeXpAward = useCallback(
+    async (receipt: string) => {
+      if (!campaignCode || !playerId) {
+        throw new Error('Cannot acknowledge XP award outside a campaign');
+      }
+      const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+        body: JSON.stringify({ playerId, type: 'xp', receipt }),
+      });
+      if (!res.ok) {
+        throw new Error(`Failed to acknowledge XP award (${res.status})`);
+      }
+      setSharedState(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          xpAwards: (prev.xpAwards ?? []).filter(e => e.receipt !== receipt),
+        };
+      });
+    },
+    [campaignCode, playerId]
+  );
+
+  const clearPendingTransfer = useCallback((transferId: string) => {
+    setPendingTransfers(prev => prev.filter(t => t.id !== transferId));
+  }, []);
+
+  return {
+    sharedState,
+    loading,
+    error,
+    lastFetched,
+    acknowledgeMessage,
+    acknowledgeDmEffects,
+    acknowledgeTransfers,
+    acknowledgeXpAward,
+    pendingTransfers,
+    clearPendingTransfer,
+    refetchNow,
+  };
 }

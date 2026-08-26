@@ -1408,6 +1408,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1446,6 +1447,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1477,7 +1479,8 @@
 				"Mantle of Majesty|Bard||Glamour|XGE|6",
 				"Unbreakable Majesty|Bard||Glamour|XGE|14"
 			],
-			"hasFluff": true
+			"hasFluff": true,
+			"hasFluffImages": true
 		},
 		{
 			"name": "College of Glamour",
@@ -1494,6 +1497,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1541,6 +1545,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1587,6 +1592,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1632,6 +1638,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1684,6 +1691,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1706,6 +1714,9 @@
 			"className": "Bard",
 			"classSource": "PHB",
 			"page": 28,
+			"reprintedAs": [
+				"Spirits|Bard|XPHB|RHW"
+			],
 			"edition": "classic",
 			"additionalSpells": [
 				{
@@ -1729,6 +1740,9 @@
 			"source": "VRGR",
 			"className": "Bard",
 			"classSource": "XPHB",
+			"reprintedAs": [
+				"Spirits|Bard|XPHB|RHW"
+			],
 			"_copy": {
 				"name": "College of Spirits",
 				"source": "VRGR",
@@ -1738,6 +1752,7 @@
 				"_preserve": {
 					"page": true,
 					"otherSources": true,
+					"referenceSources": true,
 					"srd": true,
 					"basicRules": true,
 					"reprintedAs": true
@@ -1748,53 +1763,6 @@
 					"name": "College of Spirits",
 					"source": "VRGR",
 					"shortName": "Spirits",
-					"className": "Bard",
-					"classSource": "PHB"
-				}
-			}
-		},
-		{
-			"name": "College of Tragedy",
-			"shortName": "Tragedy",
-			"source": "TDCSR",
-			"className": "Bard",
-			"classSource": "PHB",
-			"page": 167,
-			"edition": "classic",
-			"subclassFeatures": [
-				"College of Tragedy|Bard|PHB|Tragedy|TDCSR|3",
-				"Tale of Hubris|Bard|PHB|Tragedy|TDCSR|6",
-				"Impending Misfortune|Bard|PHB|Tragedy|TDCSR|6",
-				"Tale of Hubris (14th Level)|Bard|PHB|Tragedy|TDCSR|14",
-				"Nimbus of Pathos|Bard|PHB|Tragedy|TDCSR|14"
-			],
-			"hasFluffImages": true
-		},
-		{
-			"name": "College of Tragedy",
-			"shortName": "Tragedy",
-			"source": "TDCSR",
-			"className": "Bard",
-			"classSource": "XPHB",
-			"_copy": {
-				"name": "College of Tragedy",
-				"source": "TDCSR",
-				"shortName": "Tragedy",
-				"className": "Bard",
-				"classSource": "PHB",
-				"_preserve": {
-					"page": true,
-					"otherSources": true,
-					"srd": true,
-					"basicRules": true,
-					"reprintedAs": true
-				}
-			},
-			"fluff": {
-				"_subclassFluff": {
-					"name": "College of Tragedy",
-					"source": "TDCSR",
-					"shortName": "Tragedy",
 					"className": "Bard",
 					"classSource": "PHB"
 				}
@@ -1892,6 +1860,69 @@
 				"College of Valor|Bard|XPHB|Valor|XPHB|3",
 				"Extra Attack|Bard|XPHB|Valor|XPHB|6",
 				"Battle Magic|Bard|XPHB|Valor|XPHB|14"
+			],
+			"hasFluffImages": true
+		},
+		{
+			"name": "College of the Moon",
+			"shortName": "Moon",
+			"source": "FRHoF",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"page": 16,
+			"edition": "one",
+			"additionalSpells": [
+				{
+					"innate": {
+						"3": [
+							{
+								"choose": "level=0|class=druid",
+								"count": 1
+							}
+						]
+					},
+					"prepared": {
+						"6": {
+							"daily": {
+								"1e": [
+									"moonbeam|xphb"
+								]
+							}
+						}
+					}
+				}
+			],
+			"subclassFeatures": [
+				"College of the Moon|Bard|XPHB|Moon|FRHoF|3|FRHoF",
+				"Blessing of Moonlight|Bard|XPHB|Moon|FRHoF|6|FRHoF",
+				"Eventide's Splendor|Bard|XPHB|Moon|FRHoF|14|FRHoF"
+			],
+			"hasFluffImages": true
+		},
+		{
+			"name": "College of Spirits",
+			"shortName": "Spirits",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"edition": "one",
+			"additionalSpells": [
+				{
+					"prepared": {
+						"6": {
+							"daily": {
+								"1e": [
+									"spirit guardians|xphb"
+								]
+							}
+						}
+					}
+				}
+			],
+			"subclassFeatures": [
+				"College of Spirits|Bard|XPHB|Spirits|RHW|3|RHW",
+				"Empowered Channeling|Bard|XPHB|Spirits|RHW|6|RHW",
+				"Mystical Connection|Bard|XPHB|Spirits|RHW|14|RHW"
 			],
 			"hasFluffImages": true
 		}
@@ -2557,7 +2588,7 @@
 			"classSource": "XPHB",
 			"level": 10,
 			"entries": [
-				"You've learned secrets from various magical traditions. Whenever you reach a Bard level (including this level) and the Prepared Spells number in the Bard Features table increases, you can choose any of your new prepared spells from the {@filter Bard|spells|class=Bard}, {@filter Cleric|spells|class=Cleric}, {@filter Druid|spells|class=Druid}, and {@filter Wizard spell list|spells|class=Wizard}s, and the chosen spells count as Bard spells for you (see a class's section for its spell list). In addition, whenever you replace a spell prepared for this class, you can replace it with a spell from those lists."
+				"You've learned secrets from various magical traditions. Whenever you reach a Bard level (including this level) and the Prepared Spells number in the Bard Features table increases, you can choose any of your new prepared spells from the {@filter Bard|spells|class=Bard}, {@filter Cleric|spells|class=Cleric}, {@filter Druid|spells|class=Druid}, and {@filter Wizard|spells|class=Wizard} {@filter spell lists|spells|class=Bard;Cleric;Druid;Wizard}, and the chosen spells count as Bard spells for you (see a class's section for its spell list). In addition, whenever you replace a spell prepared for this class, you can replace it with a spell from those lists."
 			]
 		},
 		{
@@ -2811,7 +2842,7 @@
 			"subclassSource": "TCE",
 			"level": 3,
 			"entries": [
-				"Bards believe the cosmos is a work of art-the creation of the first dragons and gods. That creative work included harmonies that continue to resound through existence today, a power known as the Song of Creation. The bards of the College of Creation draw on that primeval song through dance, music, and poetry, and their teachers share this lesson:",
+				"Bards believe the cosmos is a work of art\u2014the creation of the first dragons and gods. That creative work included harmonies that continue to resound through existence today, a power known as the Song of Creation. The bards of the College of Creation draw on that primeval song through dance, music, and poetry, and their teachers share this lesson:",
 				"\"Before the sun and the moon, there was the Song, and its music awoke the first dawn. Its melodies so delighted the stones and trees that some of them gained a voice of their own. And now they sing too. Learn the Song, students, and you too can teach the mountains to sing and dance.\"",
 				"Dwarves and gnomes often encourage their bards to become students of the Song of Creation. And among dragonborn, the Song of Creation is revered, for legends portray Bahamut and Tiamat-the greatest of dragons-as two of the song's first singers.",
 				{
@@ -3008,124 +3039,6 @@
 				"{@i 14th-level College of Eloquence feature}",
 				"When you successfully inspire someone, the power of your eloquence can now spread to someone else. When a creature within 60 feet of you adds one of your Bardic Inspiration dice to its ability check, attack roll, or saving throw and the roll succeeds, you can use your reaction to encourage a different creature (other than yourself) that can hear you within 60 feet of you, giving it a Bardic Inspiration die without expending any of your Bardic Inspiration uses.",
 				"You can use this reaction a number of times equal to your Charisma modifier (minimum of once), and you regain all expended uses when you finish a long rest."
-			]
-		},
-		{
-			"name": "College of Tragedy",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 3,
-			"entries": [
-				"Not all grand stories conclude in triumphant victory. Many tales end with death and despair, and bards of the College of Tragedy know that sorrow and pathos are emotions just as potent as joy and delight. These bards specialize in the power of tragic storytelling, weaving words and spells together to dramatic and devastating effect.",
-				{
-					"type": "refSubclassFeature",
-					"subclassFeature": "Poetry in Misery|Bard|PHB|Tragedy|TDCSR|3"
-				},
-				{
-					"type": "refSubclassFeature",
-					"subclassFeature": "Sorrowful Fate|Bard|PHB|Tragedy|TDCSR|3"
-				}
-			]
-		},
-		{
-			"name": "Poetry in Misery",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 3,
-			"header": 1,
-			"entries": [
-				"When you join the College of Tragedy at 3rd level, you learn to harness the beauty in failure, finding inspiration in even the direst twists of fate. Whenever you or an ally within 30 feet of you rolls a 1 on the {@dice d20} for an attack roll, an ability check, or a {@quickref saving throws|PHB|2|1|saving throw}, you can use your reaction to soliloquize and regain one expended use of your Bardic Inspiration feature."
-			]
-		},
-		{
-			"name": "Sorrowful Fate",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 3,
-			"header": 1,
-			"entries": [
-				"Starting at 3rd level, you exploit a foe's peril to instill deep feelings of sorrow and doom. When you or an ally you can see forces a creature to make a {@quickref saving throws|PHB|2|1|saving throw}, you can expend one use of your Bardic Inspiration to change the type of {@quickref saving throws|PHB|2|1|saving throw} to a Charisma save instead.",
-				"If the target fails this save, roll a Bardic Inspiration die. The target takes psychic damage equal to the result, and is plagued with regret for 1 minute. If the target is reduced to 0 hit points during this time and can speak, they are magically compelled to utter darkly poetic final words before succumbing to their injuries.",
-				"Once you use this feature, you can't use it again until you finish a {@quickref resting|PHB|2|0|short or long rest}."
-			]
-		},
-		{
-			"name": "Impending Misfortune",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 6,
-			"header": 2,
-			"entries": [
-				"Also at 6th level, your words can twist the power of fate to create triumph from the promise of future despair. When you make an attack roll or a {@quickref saving throws|PHB|2|1|saving throw}, you can gain a +10 bonus to the roll, but the next attack roll or {@quickref saving throws|PHB|2|1|saving throw} you make takes a \u221210 penalty. If not used, this penalty disappears when you finish a {@quickref resting|PHB|2|0|short or long rest}.",
-				"You can't use this feature again until you finish a {@quickref resting|PHB|2|0|short or long rest}, or until you are reduced to 0 hit points."
-			]
-		},
-		{
-			"name": "Tale of Hubris",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 6,
-			"header": 2,
-			"entries": [
-				"At 6th level, you learn to weave a magical narrative that draws out the fatal arrogance of your foes. When a creature scores a critical hit against you or an ally within 60 feet of you that you can see, you can use your reaction and expend one use of your Bardic Inspiration to target the attacking creature and evoke the story of their downfall. For 1 minute or until the target suffers a critical hit, any weapon attack against the target scores a critical hit on a roll of 18\u201320."
-			]
-		},
-		{
-			"name": "Nimbus of Pathos",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 14,
-			"header": 2,
-			"entries": [
-				"Upon reaching 14th level, you can touch a willing creature as an action and empower it with tragic heroism. For 1 minute, the creature is surrounded by mournful music and ghostly singing, granting it the following benefits and drawbacks:",
-				{
-					"type": "list",
-					"items": [
-						"The creature has a +4 bonus to AC.",
-						"It has {@quickref Advantage and Disadvantage|PHB|2|0|advantage} on attack rolls and {@quickref saving throws|PHB|2|1}.",
-						"When the creature hits a target with a weapon attack or spell attack, that target takes an extra {@damage 1d10} radiant damage.",
-						"Any weapon attack against the creature scores a critical hit on a roll of 18\u201320."
-					]
-				},
-				"When this effect ends, the creature immediately drops to 0 hit points and is dying. Once you use this feature, you can't use it again until you finish a {@quickref resting|PHB|2|0|long rest}."
-			]
-		},
-		{
-			"name": "Tale of Hubris (14th Level)",
-			"source": "TDCSR",
-			"page": 167,
-			"className": "Bard",
-			"classSource": "PHB",
-			"subclassShortName": "Tragedy",
-			"subclassSource": "TDCSR",
-			"level": 14,
-			"header": 2,
-			"entries": [
-				"At 14th level, the critical hit range of this feature increases to 17\u201320."
 			]
 		},
 		{
@@ -3654,6 +3567,289 @@
 				"The {@condition charmed} creature obeys your commands for fear that you will reveal its secret. It won't risk its life for you or fight for you, unless it was already inclined to do so. It grants you favors and gifts it would offer to a close friend.",
 				"When the effect ends, the creature has no understanding of why it held you in such fear.",
 				"Once you use this feature, you can't use it again until you finish a long rest."
+			]
+		},
+		{
+			"name": "College of the Moon",
+			"source": "FRHoF",
+			"page": 16,
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Moon",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"{@i Inspire Allies with Primal Tales}",
+				"The College of the Moon traces its origins to the ancient druidic circles of the Moonshae Isles, who entrusted the first Bards of this tradition with chronicling the stories of the islands and their people. Bards of this college draw from the isles' fey magic and the primal power of the moonwells to bolster their allies, protect the natural world, and inspire their bardic works.",
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Moon's Inspiration|Bard|XPHB|Moon|FRHoF|3|FRHoF"
+				},
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Primal Lore|Bard|XPHB|Moon|FRHoF|3|FRHoF"
+				}
+			]
+		},
+		{
+			"name": "Moon's Inspiration",
+			"source": "FRHoF",
+			"page": 17,
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Moon",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"The primal and ever-changing power of the moon flows through you, granting you the following benefits.",
+				{
+					"type": "entries",
+					"name": "Inspired Eclipse",
+					"entries": [
+						"When you take a {@variantrule Bonus Action|XPHB} to give a creature a Bardic Inspiration die, you can have the {@condition Invisible|XPHB} condition and teleport up to 30 feet to an unoccupied space you can see as part of that {@variantrule Bonus Action|XPHB}. This invisibility lasts until the start of your next turn and ends early immediately after you make an attack roll, deal damage, or cast a spell."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Lunar Vitality",
+					"entries": [
+						"Once per turn when you restore {@variantrule Hit Points|XPHB} to a creature with a spell, you can expend a Bardic Inspiration die and increase the amount of {@variantrule Hit Points|XPHB} restored by a number equal to a roll of the Bardic Inspiration die. The creature's {@variantrule Speed|XPHB} also increases by 10 feet until the end of its next turn."
+					]
+				}
+			]
+		},
+		{
+			"name": "Primal Lore",
+			"source": "FRHoF",
+			"page": 17,
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Moon",
+			"subclassSource": "FRHoF",
+			"level": 3,
+			"entries": [
+				"You learn Druidic and one cantrip from the Druid spell list. It counts as a Bard spell for you but doesn't count against the number of cantrips you know. Whenever you gain a Bard level, you can replace this cantrip with another cantrip of your choice from the Druid spell list.",
+				"Additionally, choose one of the following skills: {@skill Animal Handling|XPHB}, {@skill Insight|XPHB}, {@skill Medicine|XPHB}, {@skill Nature|XPHB}, {@skill Perception|XPHB}, or {@skill Survival|XPHB}. You have proficiency in that skill."
+			]
+		},
+		{
+			"name": "Blessing of Moonlight",
+			"source": "FRHoF",
+			"page": 17,
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Moon",
+			"subclassSource": "FRHoF",
+			"level": 6,
+			"header": 2,
+			"entries": [
+				"You always have the {@spell Moonbeam|XPHB} spell prepared.",
+				"When you cast {@spell Moonbeam|XPHB}, you can modify the spell so that you glow faintly while the spell is active. While glowing, you shed {@variantrule Dim Light|XPHB} out to 5 feet, and whenever a creature fails its saving throw against the effects of this Moonbeam, another creature of your choice that you can see within 60 feet of yourself regains {@dice 2d4} {@variantrule Hit Points|XPHB}.",
+				"Once you use this feature to modify a casting of Moonbeam, you can't use it again until you finish a {@variantrule Long Rest|XPHB}."
+			]
+		},
+		{
+			"name": "Eventide's Splendor",
+			"source": "FRHoF",
+			"page": 17,
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Moon",
+			"subclassSource": "FRHoF",
+			"level": 14,
+			"header": 2,
+			"entries": [
+				"You become suffused with the might of the moon, improving your Moon's Inspiration in the following ways.",
+				{
+					"type": "entries",
+					"name": "Shadow of the New Moon",
+					"entries": [
+						"When you use Inspired Eclipse, the creature who received the Bardic Inspiration die can also have the {@condition Invisible|XPHB} condition and immediately take a {@variantrule Reaction|XPHB} to teleport up to 30 feet to an unoccupied space it can see. The creature remains {@condition Invisible|XPHB} until the start of its next turn."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Vibrance of the Full Moon",
+					"entries": [
+						"When you use Lunar Vitality, you can roll {@dice 1d6} and use the number rolled in place of expending a Bardic Inspiration die."
+					]
+				}
+			]
+		},
+		{
+			"name": "Channeler",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Spirits",
+			"subclassSource": "RHW",
+			"level": 3,
+			"entries": [
+				"You learn how to contact spirits beyond the grave, letting their power and knowledge flow through you. You gain the following benefits.",
+				{
+					"type": "entries",
+					"name": "Guiding Whispers",
+					"entries": [
+						"You know the {@spell Guidance|XPHB} cantrip. It has a range of 60 feet when you cast it."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Spiritual Focus",
+					"entries": [
+						"You employ tools that aid you in channeling spirits. You gain a Gaming Set ({@item playing cards|XPHB}). You have proficiency with this Gaming Set, and you can use it or one of the following items as a {@variantrule Spellcasting Focus|XPHB} for your Bard spells: {@item Arcane Focus|XPHB} ({@item crystal|XPHB} or {@item orb|XPHB}), {@item Candle|XPHB}, or {@item Ink Pen|XPHB}."
+					]
+				}
+			]
+		},
+		{
+			"name": "College of Spirits",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Spirits",
+			"subclassSource": "RHW",
+			"level": 3,
+			"entries": [
+				"{@i Call Forth Spirits from Beyond the Grave}",
+				"Bards of the College of Spirits conjure legendary spirits to change the world. But such entities are capricious, and what a Bard summons isn't always entirely under their control.",
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Channeler|Bard|XPHB|Spirits|RHW|3|RHW"
+				},
+				{
+					"type": "refSubclassFeature",
+					"subclassFeature": "Spirits from Beyond|Bard|XPHB|Spirits|RHW|3|RHW"
+				}
+			]
+		},
+		{
+			"name": "Spirits from Beyond",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Spirits",
+			"subclassSource": "RHW",
+			"level": 3,
+			"entries": [
+				"You can call forth spirits of the dead to empower you and your allies. When you take a {@variantrule Bonus Action|XPHB} to give a creature a Bardic Inspiration die, you can call forth the powers of a random spirit. To determine the spirit you channel, roll the Bardic Inspiration die and refer to the Spirits from Beyond table. The spirit remains channeled until you unleash it or until you finish a {@variantrule Short Rest|XPHB|Short} or {@variantrule Long Rest|XPHB}.",
+				{
+					"type": "entries",
+					"name": "Controlled Channeling",
+					"entries": [
+						"As a {@variantrule Bonus Action|XPHB}, you can expend a use of your Bardic Inspiration and channel a specific spirit. When you do so, choose the spirit from the Spirits from Beyond table rather than rolling. The chosen spirit's corresponding number must be less than or equal to the highest number on your Bardic Inspiration die; for example, if your Bardic Inspiration die is a {@dice d8}, you can choose to channel any spirit up to (and including) the Shade."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Unleashing a Spirit",
+					"entries": [
+						"As a {@action Magic|XPHB} action, you can unleash one of your channeled spirits. Choose one creature you can see within 30 feet of yourself as the spirit's target. The spirit then takes effect; if a spirit's effect requires a saving throw, the DC equals your Bard spell save DC.",
+						{
+							"type": "table",
+							"caption": "Spirits from Beyond",
+							"colLabels": [
+								"Bardic Insp. Die",
+								"Spirit and Unleash Effect"
+							],
+							"colStyles": [
+								"col-2 text-center",
+								"col-10"
+							],
+							"rows": [
+								[
+									"1",
+									"Beloved. The target regains {@variantrule Hit Points|XPHB} equal to a roll of your Bardic Inspiration die plus your Charisma modifier."
+								],
+								[
+									"2",
+									"Sharpshooter. The target takes Force damage equal to a roll of your Bardic Inspiration die plus your Charisma modifier."
+								],
+								[
+									"3",
+									"Avenger. Until the end of your next turn, any creature that hits the target with a melee attack roll takes Force damage equal to a roll of your Bardic Inspiration die."
+								],
+								[
+									"4",
+									"Renegade. The target can immediately take a {@variantrule Reaction|XPHB} to teleport up to 30 feet to an unoccupied space it can see."
+								],
+								[
+									"5",
+									"Fortune Teller. The target has {@variantrule Advantage|XPHB} on {@variantrule D20 Test|XPHB|D20 Tests} until the start of your next turn."
+								],
+								[
+									"6",
+									"Wayfarer. The target gains {@variantrule Temporary Hit Points|XPHB} equal to a roll of your Bardic Inspiration die plus your Bard level. While the target has these Temporary Hit Points, its {@variantrule Speed|XPHB} increases by 10 feet."
+								],
+								[
+									"7",
+									"Trickster. The target makes a Wisdom saving throw. On a failed save, the target takes Psychic damage equal to two rolls of your Bardic Inspiration die and has the {@condition Charmed|XPHB} condition until the start of your next turn. On a successful save, the target takes half as much damage only."
+								],
+								[
+									"8",
+									"Shade. The target has the {@condition Invisible|XPHB} condition until the end of its next turn or until the target makes an attack roll, deals damage, or casts a spell. When the invisibility ends, each creature in a 5-foot {@variantrule Emanation [Area of Effect]|XPHB|Emanation} originating from the target must succeed on a Constitution saving throw or take Necrotic damage equal to two rolls of your Bardic Inspiration die."
+								],
+								[
+									"9",
+									"Arsonist. The target makes a Dexterity saving throw, taking Fire damage equal to four rolls of your Bardic Inspiration die on a failed save or half as much damage on a successful one."
+								],
+								[
+									"10",
+									"Coward. The target and each creature of your choice in a 30-foot {@variantrule Emanation [Area of Effect]|XPHB|Emanation} originating from the target must succeed on a Wisdom saving throw or have the {@condition Frightened|XPHB} condition until the start of your next turn. While a creature is Frightened, its {@variantrule Speed|XPHB} is halved (round down), and it can take either an action or a {@variantrule Bonus Action|XPHB}, not both."
+								],
+								[
+									"11",
+									"Brute. Each creature of your choice in a 30-foot {@variantrule Emanation [Area of Effect]|XPHB|Emanation} originating from the target makes a Strength saving throw. On a failed save, a creature takes Thunder damage equal to three rolls of your Bardic Inspiration die and has the {@condition Prone|XPHB} condition. On a successful save, a creature takes half as much damage only."
+								],
+								[
+									"12",
+									"Priest. The target regains {@variantrule Hit Points|XPHB} equal to two rolls of your Bardic Inspiration die, and one of the following conditions of your choice ends on the target: {@condition Blinded|XPHB}, {@condition Charmed|XPHB}, {@condition Deafened|XPHB}, {@condition Paralyzed|XPHB}, {@condition Poisoned|XPHB}, or {@condition Stunned|XPHB}."
+								]
+							]
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Empowered Channeling",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Spirits",
+			"subclassSource": "RHW",
+			"level": 6,
+			"header": 2,
+			"entries": [
+				"Your ability to channel spirits improves. You gain the following benefits.",
+				{
+					"type": "entries",
+					"name": "Power from Beyond",
+					"entries": [
+						"Once per turn, when you cast a Bard spell with a spell slot that deals damage or restores {@variantrule Hit Points|XPHB}, roll {@dice 1d6}. You gain a bonus equal to the number rolled to one of the spell's damage rolls or to the total {@variantrule Hit Points|XPHB} the spell restores."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Spiritual Manifestation",
+					"entries": [
+						"You always have the {@spell Spirit Guardians|XPHB} spell prepared. You can cast the spell once without a spell slot, and you regain the ability to cast it in this way when you finish a Long Rest.",
+						"Whenever you cast the spell, you can modify it so the spirits also guard against worldly threats. When you cast the spell in this way, you and allies within the spell's {@variantrule Emanation [Area of Effect]|XPHB|Emanation} have {@table Cover|XPHB|Half Cover}. Once you modify the spell in this way, you can't do so again until you finish a {@variantrule Short Rest|XPHB|Short} or {@variantrule Long Rest|XPHB}."
+					]
+				}
+			]
+		},
+		{
+			"name": "Mystical Connection",
+			"source": "RHW",
+			"className": "Bard",
+			"classSource": "XPHB",
+			"subclassShortName": "Spirits",
+			"subclassSource": "RHW",
+			"level": 14,
+			"header": 2,
+			"entries": [
+				"You gain mastery over the spirits you call forth. Whenever you roll on the {@book Spirits from Beyond table|RHW|1|Spirits from Beyond}, you can roll the die twice and choose which of the two effects to bestow. If you roll the same number on both dice, you can instead choose any effect on the table."
 			]
 		},
 		{

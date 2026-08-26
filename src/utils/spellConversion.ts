@@ -5,7 +5,21 @@
 
 import { ProcessedSpell } from '@/types/spells';
 import { Spell, SpellActionType } from '@/types/character';
+import type { SpellAoe } from '@/types/spellAoe';
+import { detectSpellAoe } from './spellAoeDetection';
 import { formatSpellDescriptionForEditor } from './referenceParser';
+import { extractCantripScaling, CantripDamageScaling } from './cantripScaling';
+
+/**
+ * A spell counts as prepared if it is explicitly prepared OR always prepared
+ * (e.g. domain/patron spells). Always-prepared spells cannot be unprepared, so
+ * every "is this spell prepared?" check must treat them as prepared.
+ */
+export function isSpellPrepared(
+  spell: Pick<Spell, 'isPrepared' | 'isAlwaysPrepared'>
+): boolean {
+  return !!spell.isPrepared || !!spell.isAlwaysPrepared;
+}
 
 /**
  * Convert ProcessedSpell (from spellbook) to SpellFormData (for character sheet)
@@ -39,6 +53,10 @@ export interface SpellFormData {
   castingSource: string;
   freeCastMode: FreeCastMode;
   freeCastMax: number;
+  /** AoE template geometry. Always a value or explicit null in the form — never undefined. */
+  aoe: SpellAoe | null;
+  /** Cantrip scaling table. undefined = none/never enriched; null = user-custom (scaling off). */
+  damageScaling?: CantripDamageScaling | null;
 }
 
 /**
@@ -166,6 +184,11 @@ export function convertProcessedSpellToFormData(
     ? formatSpellDescriptionForEditor(spell.higherLevelDescription)
     : '';
 
+  const damageScaling =
+    spell.level === 0
+      ? extractCantripScaling(spell.scalingLevelDice, extractedDamage)
+      : undefined;
+
   return {
     name: spell.name,
     level: spell.level,
@@ -193,6 +216,8 @@ export function convertProcessedSpellToFormData(
     castingSource: '',
     freeCastMode: 'normal',
     freeCastMax: 1,
+    aoe: detectSpellAoe(spell.description, spell.range),
+    damageScaling,
   };
 }
 
@@ -240,6 +265,8 @@ export function convertFormDataToSpell(
           ? formData.freeCastMax
           : undefined,
     freeCastsUsed: formData.freeCastMode !== 'normal' ? 0 : undefined,
+    aoe: formData.aoe,
+    damageScaling: formData.damageScaling,
     createdAt: now,
     updatedAt: now,
   };
@@ -289,4 +316,88 @@ export function searchSpells(
       // Then sort alphabetically
       return aName.localeCompare(bName);
     });
+}
+
+/**
+ * Default empty SpellFormData — shared starting point for add dialogs.
+ */
+export function createInitialSpellFormData(): SpellFormData {
+  return {
+    name: '',
+    level: 0,
+    school: 'Evocation',
+    castingTime: '1 action',
+    range: 'Touch',
+    components: {
+      verbal: false,
+      somatic: false,
+      material: false,
+      materialDescription: '',
+    },
+    duration: 'Instantaneous',
+    description: '',
+    higherLevel: '',
+    ritual: false,
+    concentration: false,
+    isPrepared: false,
+    isAlwaysPrepared: false,
+    actionType: '',
+    savingThrow: '',
+    damage: '',
+    damageType: '',
+    source: 'PHB',
+    castingSource: '',
+    freeCastMode: 'normal',
+    freeCastMax: 1,
+    aoe: null,
+  };
+}
+
+/**
+ * Convert a stored Spell back to SpellFormData for editing.
+ * Missing optional fields default to empty strings / false.
+ * Backwards compatible: old NPC spells with only name+level+bare bones load safely.
+ */
+export function spellToFormData(spell: Spell): SpellFormData {
+  let freeCastMode: FreeCastMode = 'normal';
+  let freeCastMax = 1;
+  if (spell.freeCastMax !== undefined) {
+    if (spell.freeCastMax === 0) {
+      freeCastMode = 'at_will';
+    } else {
+      freeCastMode = 'innate';
+      freeCastMax = spell.freeCastMax;
+    }
+  }
+
+  return {
+    name: spell.name,
+    level: spell.level,
+    school: spell.school || 'Evocation',
+    castingTime: spell.castingTime || '1 action',
+    range: spell.range || 'Touch',
+    components: {
+      verbal: spell.components?.verbal ?? false,
+      somatic: spell.components?.somatic ?? false,
+      material: spell.components?.material ?? false,
+      materialDescription: spell.components?.materialDescription || '',
+    },
+    duration: spell.duration || 'Instantaneous',
+    description: spell.description || '',
+    higherLevel: spell.higherLevel || '',
+    ritual: spell.ritual || false,
+    concentration: spell.concentration || false,
+    isPrepared: spell.isPrepared || false,
+    isAlwaysPrepared: spell.isAlwaysPrepared || false,
+    actionType: spell.actionType || '',
+    savingThrow: spell.savingThrow || '',
+    damage: spell.damage || '',
+    damageType: spell.damageType || '',
+    source: spell.source || 'PHB',
+    castingSource: spell.castingSource || '',
+    freeCastMode,
+    freeCastMax,
+    aoe: spell.aoe ?? null,
+    damageScaling: spell.damageScaling,
+  };
 }

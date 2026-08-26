@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
   Activity,
+  X,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -27,6 +28,7 @@ import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
 import ConditionDetailsModal from './ConditionDetailsModal';
 import { ConditionCard, DiseaseCard } from './conditions';
 import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -295,9 +297,13 @@ export default function ConditionsDiseasesManager() {
               size="md"
               className="mt-3"
             >
-              {exhaustionLevel === 6
-                ? '☠️ Death!'
-                : `Level ${exhaustionLevel} Effects Active`}
+              {exhaustionLevel === 6 ? (
+                <span className="flex items-center gap-1">
+                  <AppIcon name="monster" className="h-3.5 w-3.5" /> Death!
+                </span>
+              ) : (
+                `Level ${exhaustionLevel} Effects Active`
+              )}
             </Badge>
           )}
         </div>
@@ -374,7 +380,13 @@ export default function ConditionsDiseasesManager() {
                   onClick={() => setShowAddPanel(!showAddPanel)}
                   variant={showAddPanel ? 'outline' : 'primary'}
                   size="sm"
-                  leftIcon={<Plus className="h-4 w-4" />}
+                  leftIcon={
+                    showAddPanel ? (
+                      <X className="h-4 w-4" />
+                    ) : (
+                      <Plus className="h-4 w-4" />
+                    )
+                  }
                   className={
                     showAddPanel
                       ? ''

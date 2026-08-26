@@ -1,6 +1,10 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { AUTOSAVE_DELAY } from '@/utils/constants';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { recordAutomaticCharacterEdit } from '@/lib/supabase/automaticCharacterSyncRuntime';
+import { usePlayerStore } from '@/store/playerStore';
 
 interface UseAutoSaveOptions {
   delay?: number;
@@ -12,6 +16,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
   const { delay = AUTOSAVE_DELAY, enabled = true, onAfterSave } = options;
 
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const localPersistenceFailureRef = useRef(false);
   const isInitialMount = useRef(true);
   const onAfterSaveRef = useRef(onAfterSave);
   onAfterSaveRef.current = onAfterSave;
@@ -24,7 +29,54 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     markSaved,
   } = useCharacterStore();
 
+  const finalizeIndexedDbSave = useCallback(
+    async (
+      result: Awaited<ReturnType<typeof awaitCharacterPersistenceResult>>
+    ) => {
+      if (!result.saved) {
+        localPersistenceFailureRef.current = true;
+        useCharacterStore.setState({ hasUnsavedChanges: true });
+        setSaveStatus('error');
+        return;
+      }
+      const playerStore = usePlayerStore.getState();
+      const liveCharacter = structuredClone(
+        useCharacterStore.getState().character
+      );
+      const activeBeforeRosterCommit = playerStore.getActiveCharacter();
+      let rosterResult = result;
+      if (
+        activeBeforeRosterCommit &&
+        activeBeforeRosterCommit.id === liveCharacter.id
+      ) {
+        playerStore.updateCharacterData(
+          activeBeforeRosterCommit.id,
+          liveCharacter
+        );
+        rosterResult = await awaitCharacterPersistenceResult();
+        if (!rosterResult.saved) {
+          localPersistenceFailureRef.current = true;
+          useCharacterStore.setState({ hasUnsavedChanges: true });
+          setSaveStatus('error');
+          return;
+        }
+      }
+      const activeCharacter = usePlayerStore.getState().getActiveCharacter();
+      if (activeCharacter) await recordAutomaticCharacterEdit(activeCharacter);
+      localPersistenceFailureRef.current = false;
+      markSaved();
+      setSaveStatus(
+        result.mirrorPending || rosterResult.mirrorPending
+          ? 'saved-local-mirror-pending'
+          : 'saved-local'
+      );
+      onAfterSaveRef.current?.();
+    },
+    [markSaved, setSaveStatus]
+  );
+
   const debouncedSave = useCallback(() => {
+    if (localPersistenceFailureRef.current) return;
     if (saveTimeoutRef.current) {
       clearTimeout(saveTimeoutRef.current);
     }
@@ -38,11 +90,22 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     saveTimeoutRef.current = setTimeout(() => {
       try {
         saveCharacter();
+        if (isBrowserCharacterCutoverParticipant()) {
+          void awaitCharacterPersistenceResult()
+            .then(finalizeIndexedDbSave)
+            .catch(() => {
+              localPersistenceFailureRef.current = true;
+              useCharacterStore.setState({ hasUnsavedChanges: true });
+              setSaveStatus('error');
+            });
+          return;
+        }
         setSaveStatus('saved');
         markSaved();
         onAfterSaveRef.current?.();
       } catch (error) {
         console.error('Auto-save failed:', error);
+        localPersistenceFailureRef.current = true;
         setSaveStatus('error');
       }
     }, delay);
@@ -53,6 +116,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     saveCharacter,
     setSaveStatus,
     markSaved,
+    finalizeIndexedDbSave,
   ]);
 
   const manualSave = useCallback(() => {
@@ -64,18 +128,36 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
       return;
     }
 
+    localPersistenceFailureRef.current = false;
     setSaveStatus('saving');
 
     try {
       saveCharacter();
+      if (isBrowserCharacterCutoverParticipant()) {
+        void awaitCharacterPersistenceResult()
+          .then(finalizeIndexedDbSave)
+          .catch(() => {
+            localPersistenceFailureRef.current = true;
+            useCharacterStore.setState({ hasUnsavedChanges: true });
+            setSaveStatus('error');
+          });
+        return;
+      }
       setSaveStatus('saved');
       markSaved();
       onAfterSaveRef.current?.();
     } catch (error) {
       console.error('Manual save failed:', error);
+      localPersistenceFailureRef.current = true;
       setSaveStatus('error');
     }
-  }, [hasUnsavedChanges, saveCharacter, setSaveStatus, markSaved]);
+  }, [
+    hasUnsavedChanges,
+    saveCharacter,
+    setSaveStatus,
+    markSaved,
+    finalizeIndexedDbSave,
+  ]);
 
   // Effect to trigger auto-save when data changes
   useEffect(() => {
@@ -148,6 +230,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden' && hasUnsavedChanges) {
+        if (localPersistenceFailureRef.current) return;
         // Cancel pending auto-save and save immediately
         if (saveTimeoutRef.current) {
           clearTimeout(saveTimeoutRef.current);
@@ -155,9 +238,20 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
 
         try {
           saveCharacter();
-          markSaved();
+          if (isBrowserCharacterCutoverParticipant()) {
+            void awaitCharacterPersistenceResult()
+              .then(finalizeIndexedDbSave)
+              .catch(() => {
+                localPersistenceFailureRef.current = true;
+                useCharacterStore.setState({ hasUnsavedChanges: true });
+                useCharacterStore.getState().setSaveStatus('error');
+              });
+          } else {
+            markSaved();
+          }
         } catch (error) {
           console.error('Failed to save on visibility change:', error);
+          localPersistenceFailureRef.current = true;
         }
       }
     };
@@ -167,7 +261,7 @@ export const useAutoSave = (options: UseAutoSaveOptions = {}) => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [hasUnsavedChanges, saveCharacter, markSaved]);
+  }, [hasUnsavedChanges, saveCharacter, markSaved, finalizeIndexedDbSave]);
 
   return {
     saveStatus,

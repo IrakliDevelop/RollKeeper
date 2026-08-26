@@ -1,3 +1,6 @@
+import { NextRequest } from 'next/server';
+import { expect } from 'vitest';
+
 import {
   CampaignData,
   CampaignPlayerData,
@@ -130,6 +133,24 @@ export function createRouteParams<T extends Record<string, string>>(params: T) {
   return { params: Promise.resolve(params) };
 }
 
+export function createGetRequest(url: string) {
+  const req = createNextRequest(url);
+  const urlObj = new URL(req.url);
+
+  // Manually add nextUrl property that NextRequest would have
+  Object.defineProperty(req, 'nextUrl', {
+    value: {
+      searchParams: urlObj.searchParams,
+      pathname: urlObj.pathname,
+      href: urlObj.href,
+    },
+    writable: true,
+    configurable: true,
+  });
+
+  return req as NextRequest;
+}
+
 export function createMockProcessedMonster(
   overrides: Partial<ProcessedMonster> = {}
 ): ProcessedMonster {
@@ -240,4 +261,166 @@ export function createMockCondition(
     source: 'dm',
     ...overrides,
   };
+}
+
+/**
+ * Literal strings that are deliberately allowed to contain the words this
+ * assertion forbids: internal storage-format/identifier names, never product
+ * copy (spec R17). Stripped out before matching so their presence in test
+ * fixtures, hidden inputs, or debug attributes cannot fail the assertion.
+ *
+ * `deviceId` and `DeviceBackupV1` are deliberately NOT listed here: the
+ * forbidden-word regex below requires a word boundary immediately after
+ * "device"/"Device" (`\bdevice(?:s|'s|-only)?\b`), and there is none
+ * between "device"/"Device" and the following "Id"/"Backup" -- both are
+ * word characters, so the regex already cannot match either identifier.
+ * An earlier version listed them anyway and asserted the guard "does not
+ * fire" on them; that assertion never had anything to disprove (coordinator
+ * review round 1, Minor 3) -- see `expectCloudProductVocabulary.test.ts`'s
+ * `never needs an allowlist entry for deviceId or DeviceBackupV1` test for
+ * the discriminating version of that check. `rollkeeper-device-backup` is
+ * the one entry that is load-bearing: "device" there IS bounded by hyphens.
+ */
+const ALLOWED_INTERNAL_VOCABULARY_LITERALS = ['rollkeeper-device-backup'];
+
+/**
+ * Collects every individual text node under `root` as its own array entry
+ * (rather than one flattened `.textContent` string). This matters: DOM
+ * `textContent` concatenates sibling text nodes with NO separator, so two
+ * adjacent elements like `<p>...Data family</p><h3>Campaign settings</h3>`
+ * flatten to `...Data familyCampaign settings` — the word "family" is fused
+ * directly to "Campaign" with no whitespace between them, so a `\bfamily\b`
+ * word-boundary regex silently fails to match (`y` and `C` are both word
+ * characters, so there is no boundary). Keeping nodes separate and joining
+ * them with an explicit separator avoids that false negative.
+ */
+function collectTextNodes(root: Node): string[] {
+  const doc =
+    (root as Node & { ownerDocument?: Document }).ownerDocument ??
+    (root instanceof Document ? root : document);
+  const walker = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const chunks: string[] = [];
+  let node: Node | null = walker.nextNode();
+  while (node) {
+    chunks.push(node.textContent ?? '');
+    node = walker.nextNode();
+  }
+  return chunks;
+}
+
+/**
+ * Render-time guard for spec R17's cloud-sync/recovery product vocabulary:
+ * "this browser"/"another browser" (never device), "campaign data"/"data
+ * category" (never family), no "whole-device" migration language, and (for
+ * the migration wizard specifically) no "deliveries"/"player inbox" — Player
+ * inbox is a Slice 13 concept that must not leak into this slice's surfaces.
+ *
+ * Unlike a plain `container.textContent` scan, this also reads every
+ * accessible-name-bearing attribute (`aria-label`, `aria-labelledby` via its
+ * referenced element's text, `title`, `placeholder`, `alt`) so a violation
+ * that is announced to screen readers but never painted as visible text
+ * (e.g. an icon-only button's `aria-label`) still fails the assertion. It
+ * also keeps each text node distinct (see `collectTextNodes`) instead of
+ * flattening via `.textContent`, so a forbidden word fused to adjacent
+ * markup with no rendered whitespace between them still matches.
+ *
+ * Call this after expanding every conditional state the surface can render
+ * (untouched, local-only, cloud-active, offline, conflict, enrollment
+ * preview, removal warning, rollback, report, ...) — it only inspects
+ * whatever is currently in `container`.
+ */
+const ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR =
+  '[aria-label], [aria-labelledby], [title], [placeholder], [alt]';
+
+/** Pushes one element's own accessible-name-bearing attribute values onto `texts`. */
+function collectAccessibleNameAttributes(
+  element: HTMLElement,
+  doc: Document,
+  texts: string[]
+): void {
+  const ariaLabel = element.getAttribute('aria-label');
+  if (ariaLabel) texts.push(ariaLabel);
+
+  const labelledBy = element.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    labelledBy
+      .split(/\s+/)
+      .filter(Boolean)
+      .forEach(id => {
+        const referenced = doc.getElementById(id);
+        if (referenced) texts.push(referenced.textContent ?? '');
+      });
+  }
+
+  const title = element.getAttribute('title');
+  if (title) texts.push(title);
+
+  const placeholder = element.getAttribute('placeholder');
+  if (placeholder) texts.push(placeholder);
+
+  const alt = element.getAttribute('alt');
+  if (alt) texts.push(alt);
+}
+
+export function expectCloudProductVocabulary(container: HTMLElement) {
+  const texts: string[] = collectTextNodes(container);
+
+  const doc = container.ownerDocument ?? document;
+
+  // Coordinator review round 1, Minor 6: `querySelectorAll` only returns
+  // DESCENDANTS -- it never includes `container` itself, so an accessible
+  // name on the container element (not merely somewhere inside it) was
+  // silently unscanned. Checked separately, then every matching descendant.
+  if (container.matches(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)) {
+    collectAccessibleNameAttributes(container, doc, texts);
+  }
+  container
+    .querySelectorAll<HTMLElement>(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)
+    .forEach(element => collectAccessibleNameAttributes(element, doc, texts));
+
+  // Coordinator review round 1, Minor 6: joining with a fixed ' \n ' made a
+  // real multi-word phrase (e.g. "player inbox") unmatchable whenever it was
+  // naturally split across two sibling text nodes with ordinary single-space
+  // markup between them (`<span>player</span> <span>inbox</span>` walks as
+  // THREE text nodes: "player", " ", "inbox" -- joining each boundary with
+  // ' \n ' turned the one real space into several, and `/player inbox/i`'s
+  // literal single space no longer matched). Joining with a single space
+  // still guarantees a boundary exists between any two chunks (fixing the
+  // original word-fusion bug `collectTextNodes` exists for), and collapsing
+  // repeated whitespace afterward restores exact single-space phrase
+  // matching regardless of how many real or inserted separators landed
+  // between two words.
+  const joined = texts.join(' ').replace(/\s+/g, ' ');
+  const scrubbed = ALLOWED_INTERNAL_VOCABULARY_LITERALS.reduce(
+    (text, literal) => text.split(literal).join(' '),
+    joined
+  );
+
+  expect(scrubbed).not.toMatch(/\bdevice(?:s|'s|-only)?\b/i);
+  expect(scrubbed).not.toMatch(/\bfamil(?:y|ies)\b/i);
+  expect(scrubbed).not.toMatch(/\bwhole-device\b/i);
+  expect(scrubbed).not.toMatch(/\bdeliveries\b/i);
+  expect(scrubbed).not.toMatch(/player inbox/i);
+}
+
+const PLAYER_BACKUP_FORBIDDEN_VOCABULARY =
+  /\b(?:indexeddb|localstorage|manifest|schema|authority|epoch|cutover|migration|namespace|mutation|outbox|tombstone|quarantine|cas|device|workflow|canary|workspace|sync|synchronization|synchronized)\b/i;
+
+/** Strict rendered-copy guard for the player backup subtree. */
+export function expectPlayerBackupVocabulary(container: HTMLElement) {
+  const texts = collectTextNodes(container);
+  const doc = container.ownerDocument ?? document;
+  if (container.matches(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)) {
+    collectAccessibleNameAttributes(container, doc, texts);
+  }
+  container
+    .querySelectorAll<HTMLElement>(ACCESSIBLE_NAME_ATTRIBUTE_SELECTOR)
+    .forEach(element => collectAccessibleNameAttributes(element, doc, texts));
+
+  const joined = texts.join(' ').replace(/\s+/g, ' ');
+  expect(joined).not.toMatch(PLAYER_BACKUP_FORBIDDEN_VOCABULARY);
+  expect(joined).not.toContain('\u2014');
+  // Catch the only camel-cased forbidden term when markup splits its two
+  // halves across descendants.
+  expect(joined.replace(/\s+/g, '')).not.toMatch(/localstorage/i);
 }

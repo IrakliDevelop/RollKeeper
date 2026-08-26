@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDiceRoller, UseDiceRollerOptions } from '@/hooks/useDiceRoller';
 import { DiceResultDisplay } from './DiceResultDisplay';
 import { RollSummary } from '@/types/dice';
+import { AppIcon } from '@/components/ui/icons';
 
 export interface DiceRollerProps
   extends Omit<UseDiceRollerOptions, 'containerId'> {
@@ -151,7 +152,9 @@ export function DiceRoller({
               disabled={!isInitialized}
               className="rounded bg-red-500 px-4 py-2 text-white transition-colors hover:bg-red-600 disabled:bg-gray-300"
             >
-              🧹 Clear Dice
+              <span className="flex items-center gap-1.5">
+                <AppIcon name="delete" className="h-4 w-4" /> Clear Dice
+              </span>
             </button>
             {showHistory && (
               <button

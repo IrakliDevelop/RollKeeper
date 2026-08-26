@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   Pencil,
   Eye,
+  Share2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
@@ -15,10 +16,12 @@ import { Badge } from '@/components/ui/layout/badge';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
+import type { SaveStatus } from '@/types/character';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
+import { QRShareDialog } from './QRShareDialog';
 
 interface CharacterSheetHeaderProps {
   characterId: string;
@@ -28,7 +31,7 @@ interface CharacterSheetHeaderProps {
   characterLevel: number;
   characterAlignment: string;
   characterCreatureType: string;
-  saveStatus: 'saving' | 'saved' | 'error';
+  saveStatus: SaveStatus;
   lastSaved: Date | string | null;
   hasUnsavedChanges: boolean;
   onManualSave: () => void;
@@ -61,7 +64,7 @@ export default function CharacterSheetHeader({
   onAddToast,
   extraHeaderContent,
 }: CharacterSheetHeaderProps) {
-  const { exportCharacter } = useCharacterStore();
+  const { exportCharacter, updateCharacter } = useCharacterStore();
   const { getCharacterById, updateCharacterData } = usePlayerStore();
 
   // Get character data for avatar
@@ -69,12 +72,18 @@ export default function CharacterSheetHeader({
 
   // Handle avatar change
   const handleAvatarChange = (newAvatar: string | undefined) => {
+    // Update the live character store first — it is the source of truth that
+    // useCharacterRosterSync writes back to the roster. Without this, the roster
+    // write-back would overwrite (clobber) the uploaded avatar on the next edit
+    // or reload.
+    updateCharacter({ avatar: newAvatar });
+
+    // Also update the roster blob directly for immediate display feedback.
     if (playerCharacter?.characterData) {
       updateCharacterData(characterId, {
         ...playerCharacter.characterData,
         avatar: newAvatar,
       });
-    } else {
     }
   };
 
@@ -84,6 +93,7 @@ export default function CharacterSheetHeader({
   const [isHovering, setIsHovering] = useState(false);
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -180,6 +190,16 @@ export default function CharacterSheetHeader({
                   title="Export Character"
                 >
                   Export
+                </Button>
+
+                <Button
+                  onClick={() => setShareOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Share2 size={16} />}
+                  title="Share Character via QR"
+                >
+                  Share
                 </Button>
 
                 <Button asChild variant="outline" size="sm">
@@ -355,6 +375,17 @@ export default function CharacterSheetHeader({
                 </Button>
 
                 <Button
+                  onClick={() => setShareOpen(true)}
+                  variant="outline"
+                  size="sm"
+                  leftIcon={<Share2 size={16} />}
+                  className="shadow-sm"
+                  title="Share character via QR code"
+                >
+                  Share
+                </Button>
+
+                <Button
                   asChild
                   variant="secondary"
                   size="sm"
@@ -382,6 +413,13 @@ export default function CharacterSheetHeader({
           </div>
         </div>
       </header>
+
+      <QRShareDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        characterId={characterId}
+        getExportData={exportCharacter}
+      />
     </>
   );
 }

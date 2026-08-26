@@ -27,6 +27,7 @@ import {
   type InventoryFormData,
 } from '../../ui/game/inventory';
 import { useItemsData } from '@/hooks/useItemsData';
+import { useMagicItemsData } from '@/hooks/useMagicItemsData';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -58,6 +59,11 @@ interface InventoryManagerProps {
   onDeleteItem?: (id: string) => void;
   onQuantityChange?: (id: string, quantity: number) => void;
   onReorderItems?: (sourceIndex: number, destinationIndex: number) => void;
+  onSendItem?: (item: InventoryItem) => void;
+
+  // When provided, overrides internal weight/value calculation in Quick Stats
+  overrideTotalWeight?: number;
+  overrideTotalValue?: number;
 
   // Display options
   readonly?: boolean;
@@ -78,6 +84,9 @@ export function InventoryManager({
   onDeleteItem,
   onQuantityChange,
   onReorderItems,
+  onSendItem,
+  overrideTotalWeight,
+  overrideTotalValue,
   readonly = false,
   compact = false,
   hideAddButton = false,
@@ -88,6 +97,7 @@ export function InventoryManager({
   className = '',
 }: InventoryManagerProps) {
   const { items: databaseItems, loading: itemsLoading } = useItemsData();
+  const { items: databaseMagicItems } = useMagicItemsData();
   const [showItemForm, setShowItemForm] = useState(false);
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
   const [viewingItem, setViewingItem] = useState<InventoryItem | null>(null);
@@ -185,17 +195,21 @@ export function InventoryManager({
       (sum, item) => sum + item.quantity,
       0
     );
-    const totalWeight = filteredItems.reduce(
-      (sum, item) => sum + (item.weight || 0) * item.quantity,
-      0
-    );
-    const totalValue = filteredItems.reduce(
-      (sum, item) => sum + (item.value || 0) * item.quantity,
-      0
-    );
+    const totalWeight =
+      overrideTotalWeight ??
+      filteredItems.reduce(
+        (sum, item) => sum + (item.weight || 0) * item.quantity,
+        0
+      );
+    const totalValue =
+      overrideTotalValue ??
+      filteredItems.reduce(
+        (sum, item) => sum + (item.value || 0) * item.quantity,
+        0
+      );
 
     return { totalItems, totalWeight, totalValue };
-  }, [filteredItems]);
+  }, [filteredItems, overrideTotalWeight, overrideTotalValue]);
 
   const handleEditItem = (item: InventoryItem) => {
     setViewingItem(null);
@@ -260,6 +274,7 @@ export function InventoryManager({
           ? undefined
           : (quantity: number) => onQuantityChange(item.id, quantity)
       }
+      onSend={onSendItem}
       onUse={
         readonly || !onQuantityChange || item.category !== 'consumable'
           ? undefined
@@ -531,6 +546,7 @@ export function InventoryManager({
         availableLocations={allLocations}
         isEditing={!!editingItem}
         databaseItems={databaseItems}
+        databaseMagicItems={databaseMagicItems}
         itemsLoading={itemsLoading}
       />
 

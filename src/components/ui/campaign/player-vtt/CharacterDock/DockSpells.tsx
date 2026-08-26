@@ -1,0 +1,172 @@
+'use client';
+
+import { useMemo, useState } from 'react';
+
+import { Input } from '@/components/ui/forms/input';
+import { AppIcon } from '@/components/ui/icons';
+import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
+import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
+import type { ToastData } from '@/components/ui/feedback/Toast';
+import { useCharacterStore } from '@/store/characterStore';
+import {
+  calculateSpellAttackBonus,
+  calculateSpellSaveDC,
+  getCharacterSpellcastingAbility,
+} from '@/utils/calculations';
+import { getTotalLevel } from '@/utils/multiclass';
+import type { SpellSlots } from '@/types/character';
+import type { SpellAoe } from '@/types/spellAoe';
+
+import { useDockSpellCasting } from './DockSpells.hooks';
+import { groupSpellsByLevel } from './DockSpells.utils';
+import { SpellLevelGroup } from './SpellLevelGroup';
+import { SpellcastingStatsRow } from './SpellcastingStatsRow';
+
+export interface DockSpellsProps {
+  addToast: (toast: Omit<ToastData, 'id'>) => void;
+  /** Ask the screen to arm template placement (only called when spell.aoe && connectionLive). */
+  onCastPlacement: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
+  connectionLive: boolean;
+  hasPendingPlacement: boolean;
+  onCancelPlacement: () => void;
+}
+
+/** Dock's Spells section: search, per-level groups with slot pips, and the cast flow. */
+export function DockSpells(props: DockSpellsProps) {
+  const { character } = useCharacterStore();
+  const {
+    castingSpell,
+    viewingSpell,
+    setViewingSpell,
+    handleCastClick,
+    handleModalCast,
+    closeCastModal,
+    closeDetailsModal,
+  } = useDockSpellCasting(props);
+
+  const [search, setSearch] = useState('');
+  const [collapsedLevels, setCollapsedLevels] = useState<Set<number>>(
+    new Set()
+  );
+
+  const spellcastingAbility = getCharacterSpellcastingAbility(character);
+  const spellAttackBonus = calculateSpellAttackBonus(character);
+  const spellSaveDC = calculateSpellSaveDC(character);
+
+  // Only show castable spells (prepared or always-prepared)
+  const castableSpells = useMemo(
+    () =>
+      character.spells.filter(
+        spell =>
+          (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
+          (spell.level > 0 && spell.isPrepared) || // Prepared spells
+          spell.isAlwaysPrepared // Always prepared spells
+      ),
+    [character.spells]
+  );
+
+  const filteredSpells = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return castableSpells;
+    return castableSpells.filter(spell =>
+      spell.name.toLowerCase().includes(query)
+    );
+  }, [castableSpells, search]);
+
+  const groups = useMemo(
+    () => groupSpellsByLevel(filteredSpells),
+    [filteredSpells]
+  );
+
+  if (spellcastingAbility === null || character.spells.length === 0) {
+    return null;
+  }
+
+  if (castableSpells.length === 0) {
+    return (
+      <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
+        <AppIcon name="spell" className="text-muted mx-auto mb-3 h-12 w-12" />
+        <p className="text-heading text-lg font-semibold">No spells prepared</p>
+        <p className="text-muted mt-2 text-sm">
+          Prepare spells in the Spellcasting tab to see them here.
+        </p>
+      </div>
+    );
+  }
+
+  const toggleLevel = (level: number) => {
+    setCollapsedLevels(prev => {
+      const next = new Set(prev);
+      if (next.has(level)) next.delete(level);
+      else next.add(level);
+      return next;
+    });
+  };
+
+  return (
+    <div className="space-y-2">
+      <SpellcastingStatsRow
+        spellAttackBonus={spellAttackBonus}
+        spellSaveDC={spellSaveDC}
+        abilityLabel={spellcastingAbility.slice(0, 3).toUpperCase()}
+      />
+
+      <Input
+        aria-label="Search spells"
+        placeholder="Search spells…"
+        value={search}
+        onChange={e => setSearch(e.target.value)}
+      />
+
+      <div className="space-y-2">
+        {groups.map(([level, spells]) => (
+          <SpellLevelGroup
+            key={level}
+            level={level}
+            spells={spells}
+            slot={
+              level > 0 ? character.spellSlots[level as keyof SpellSlots] : null
+            }
+            collapsed={collapsedLevels.has(level)}
+            onToggle={() => toggleLevel(level)}
+            onView={setViewingSpell}
+            onCast={handleCastClick}
+          />
+        ))}
+      </div>
+
+      {castingSpell && (
+        <SpellCastModal
+          isOpen
+          onClose={closeCastModal}
+          spell={castingSpell}
+          spellSlots={character.spellSlots}
+          concentration={character.concentration}
+          pactMagic={character.pactMagic}
+          hasUsedReaction={character.reaction?.hasUsedReaction}
+          onCastSpell={handleModalCast}
+          onReactionSpellCast={() => {
+            // Toast only. Reaction state is owned by useCastSpell (invoked via
+            // handleModalCast), which already marks reaction spells used —
+            // toggling here too would flip it straight back to available.
+            props.addToast({
+              type: 'info',
+              title: `Reaction used — ${castingSpell.name}`,
+              message: '',
+            });
+          }}
+        />
+      )}
+
+      {viewingSpell && (
+        <SpellDetailsModal
+          spell={viewingSpell}
+          isOpen
+          onClose={closeDetailsModal}
+          onCast={() => handleCastClick(viewingSpell)}
+          characterLevel={getTotalLevel(character)}
+        />
+      )}
+    </div>
+  );
+}

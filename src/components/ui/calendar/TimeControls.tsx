@@ -8,12 +8,10 @@ import {
   Moon as MoonIcon,
   CalendarDays,
   CalendarRange,
-  Undo2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import type { CalendarConfig } from '@/types/calendar';
 import {
-  addTime,
   getShortRestMs,
   getLongRestMs,
   getMsPerDay,
@@ -39,73 +37,107 @@ export function TimeControls({
   const dayMs = getMsPerDay(config);
   const weekMs = dayMs * config.weekDays.length;
 
-  const buttons = [
-    {
-      label: '+Round',
-      icon: <RotateCcw size={14} />,
-      delta: roundMs,
-      variant: 'ghost' as const,
-    },
-    {
-      label: '+Min',
-      icon: <Timer size={14} />,
-      delta: minuteMs,
-      variant: 'ghost' as const,
-    },
-    {
-      label: '+Hour',
-      icon: <Clock size={14} />,
-      delta: hourMs,
-      variant: 'ghost' as const,
-    },
-    {
-      label: 'Short Rest',
-      icon: <Sun size={14} />,
-      delta: shortRestMs,
-      variant: 'outline' as const,
-    },
-    {
-      label: 'Long Rest',
-      icon: <MoonIcon size={14} />,
-      delta: longRestMs,
-      variant: 'outline' as const,
-    },
-    {
-      label: '+Day',
-      icon: <CalendarDays size={14} />,
-      delta: dayMs,
-      variant: 'ghost' as const,
-    },
-    {
-      label: '+Week',
-      icon: <CalendarRange size={14} />,
-      delta: weekMs,
-      variant: 'ghost' as const,
-    },
-  ];
-
   return (
-    <div className="flex flex-wrap gap-2">
-      <Button
-        variant="ghost"
-        size="sm"
-        leftIcon={<Undo2 size={14} />}
-        onClick={() => onAdvance(-dayMs)}
-        title="Go back one day"
-      >
-        -Day
-      </Button>
-      {buttons.map(btn => (
+    <div className="space-y-3">
+      {/* Rewind / Advance row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted mr-1 text-xs font-medium tracking-wider uppercase">
+          Rewind
+        </span>
         <Button
-          key={btn.label}
-          variant={btn.variant}
+          variant="ghost"
           size="sm"
-          leftIcon={btn.icon}
-          onClick={() => onAdvance(btn.delta)}
+          leftIcon={<CalendarDays size={14} />}
+          onClick={() => onAdvance(-dayMs)}
         >
-          {btn.label}
+          −Day
         </Button>
-      ))}
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Clock size={14} />}
+          onClick={() => onAdvance(-hourMs)}
+        >
+          −Hour
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Timer size={14} />}
+          onClick={() => onAdvance(-minuteMs)}
+        >
+          −Min
+        </Button>
+
+        <div className="border-divider mx-1.5 hidden h-6 border-l sm:block" />
+
+        <span className="text-muted mr-1 text-xs font-medium tracking-wider uppercase">
+          Advance
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<RotateCcw size={14} />}
+          onClick={() => onAdvance(roundMs)}
+        >
+          +Round
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Timer size={14} />}
+          onClick={() => onAdvance(minuteMs)}
+        >
+          +Min
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<Clock size={14} />}
+          onClick={() => onAdvance(hourMs)}
+        >
+          +Hour
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<CalendarDays size={14} />}
+          onClick={() => onAdvance(dayMs)}
+        >
+          +Day
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          leftIcon={<CalendarRange size={14} />}
+          onClick={() => onAdvance(weekMs)}
+        >
+          +Week
+        </Button>
+      </div>
+
+      {/* Rests row */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-muted mr-1 text-xs font-medium tracking-wider uppercase">
+          Rests
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={<Sun size={14} />}
+          onClick={() => onAdvance(shortRestMs)}
+        >
+          Short Rest
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={<MoonIcon size={14} />}
+          onClick={() => onAdvance(longRestMs)}
+        >
+          Long Rest
+        </Button>
+      </div>
     </div>
   );
 }

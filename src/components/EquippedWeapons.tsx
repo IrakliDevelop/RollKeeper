@@ -27,7 +27,14 @@ import {
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
-import { Modal } from '@/components/ui/feedback/Modal';
+import { AppIcon } from '@/components/ui/icons';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 
 interface EquippedWeaponsProps {
   showAttackRoll: (
@@ -275,7 +282,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
   if (equippedWeapons.length === 0) {
     return (
       <div className="border-divider bg-surface-raised rounded-lg border p-6 text-center">
-        <div className="mb-3 text-5xl">🗡️</div>
+        <AppIcon name="weapon" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading font-semibold">No weapons equipped</p>
         <p className="text-muted mt-1 text-sm">
           Equip weapons in the Equipment section to see them here.
@@ -347,13 +354,17 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 {/* Attack and Damage stats */}
                 <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-muted">🎯 Attack:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="attack" className="h-3.5 w-3.5" /> Attack:
+                    </span>
                     <span className="text-accent-red-text-muted font-bold">
                       {attackString}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="text-muted">⚔️ Damage:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="damage" className="h-3.5 w-3.5" /> Damage:
+                    </span>
                     <span className="text-accent-blue-text-muted font-bold">
                       {damageString}
                     </span>
@@ -362,7 +373,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
                 {versatileDamageString && (
                   <div className="mb-3 flex items-center gap-1.5 text-sm">
-                    <span className="text-muted">🗡️ Versatile:</span>
+                    <span className="text-muted flex items-center gap-1">
+                      <AppIcon name="weapon" className="h-3.5 w-3.5" />{' '}
+                      Versatile:
+                    </span>
                     <span className="text-accent-purple-text-muted font-bold">
                       {versatileDamageString}
                     </span>
@@ -549,8 +563,10 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
       <div className="border-accent-blue-border bg-accent-blue-bg mt-4 rounded-lg border p-3">
         <p className="text-accent-blue-text text-center text-sm">
-          <strong>💡 Quick Reference:</strong> Manage your full weapon inventory
-          in the{' '}
+          <strong className="inline-flex items-center gap-1">
+            <AppIcon name="tip" className="h-3.5 w-3.5" /> Quick Reference:
+          </strong>{' '}
+          Manage your full weapon inventory in the{' '}
           <button
             onClick={() => switchToTab('equipment')}
             className="text-accent-blue-text-muted hover:text-accent-blue-text font-semibold underline transition-colors hover:no-underline"
@@ -562,187 +578,203 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
       </div>
 
       {/* Charge Detail Modal */}
-      {selectedCharge && (
-        <Modal
-          isOpen={true}
-          onClose={() => setSelectedCharge(null)}
-          title={selectedCharge.charge.name || 'Charge Ability'}
-          size="sm"
-        >
-          <div className="space-y-4">
-            {/* Weapon name */}
-            <div className="text-muted text-sm">
-              From:{' '}
-              <span className="text-body font-medium">
-                {selectedCharge.weaponName}
-              </span>
-            </div>
+      <Dialog
+        open={!!selectedCharge}
+        onOpenChange={open => {
+          if (!open) setSelectedCharge(null);
+        }}
+      >
+        <DialogContent size="sm">
+          {selectedCharge && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {selectedCharge.charge.name || 'Charge Ability'}
+                </DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                <div className="space-y-4">
+                  {/* Weapon name */}
+                  <div className="text-muted text-sm">
+                    From:{' '}
+                    <span className="text-body font-medium">
+                      {selectedCharge.weaponName}
+                    </span>
+                  </div>
 
-            {/* Description */}
-            {selectedCharge.charge.description ? (
-              <div className="prose prose-sm max-w-none">
-                <div
-                  dangerouslySetInnerHTML={{
-                    __html: selectedCharge.charge.description,
-                  }}
-                  className="text-body"
-                />
-              </div>
-            ) : (
-              <p className="text-muted text-sm italic">
-                No description provided.
-              </p>
-            )}
+                  {/* Description */}
+                  {selectedCharge.charge.description ? (
+                    <div className="prose prose-sm max-w-none">
+                      <div
+                        dangerouslySetInnerHTML={{
+                          __html: selectedCharge.charge.description,
+                        }}
+                        className="text-body"
+                      />
+                    </div>
+                  ) : (
+                    <p className="text-muted text-sm italic">
+                      No description provided.
+                    </p>
+                  )}
 
-            {/* Charges info */}
-            <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-3">
-              <div className="mb-2 flex items-center justify-between">
-                <span className="text-body text-sm font-medium">Charges</span>
-                <div className="text-muted flex items-center gap-1 text-xs">
-                  <Clock size={12} />
-                  <span className="capitalize">
-                    Recharges on {selectedCharge.charge.restType} rest
-                  </span>
-                </div>
-              </div>
-
-              {/* Charge adjustment controls */}
-              {(() => {
-                const maxCharges = calculateWeaponChargeMax(
-                  selectedCharge.charge,
-                  character.level
-                );
-                const usedCharges = selectedCharge.charge.usedCharges || 0;
-                const chargesRemaining = maxCharges - usedCharges;
-                const isExhausted = chargesRemaining <= 0;
-                const isFull = usedCharges <= 0;
-
-                return (
-                  <div className="flex items-center justify-center gap-3">
-                    <Button
-                      onClick={() => {
-                        restoreWeaponCharge(
-                          selectedCharge.weaponId,
-                          selectedCharge.charge.id
-                        );
-                        // Update the selected charge state with new used value
-                        setSelectedCharge(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                charge: {
-                                  ...prev.charge,
-                                  usedCharges: Math.max(
-                                    0,
-                                    (prev.charge.usedCharges || 0) - 1
-                                  ),
-                                },
-                              }
-                            : null
-                        );
-                      }}
-                      variant="outline"
-                      size="sm"
-                      disabled={isFull}
-                      leftIcon={<Plus size={14} />}
-                      className="border-accent-green-border text-accent-green-text hover:bg-accent-green-bg"
-                    >
-                      Restore
-                    </Button>
-
-                    <div className="text-center">
-                      <span
-                        className={`text-2xl font-bold ${
-                          isExhausted
-                            ? 'text-accent-red-text-muted'
-                            : chargesRemaining <= 1
-                              ? 'text-accent-orange-text'
-                              : 'text-accent-indigo-text'
-                        }`}
-                      >
-                        {chargesRemaining}
+                  {/* Charges info */}
+                  <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-3">
+                    <div className="mb-2 flex items-center justify-between">
+                      <span className="text-body text-sm font-medium">
+                        Charges
                       </span>
-                      <span className="text-muted text-lg">/{maxCharges}</span>
+                      <div className="text-muted flex items-center gap-1 text-xs">
+                        <Clock size={12} />
+                        <span className="capitalize">
+                          Recharges on {selectedCharge.charge.restType} rest
+                        </span>
+                      </div>
                     </div>
 
-                    <Button
-                      onClick={() => {
-                        expendWeaponCharge(
-                          selectedCharge.weaponId,
-                          selectedCharge.charge.id
-                        );
-                        // Update the selected charge state with new used value
-                        const max = calculateWeaponChargeMax(
-                          selectedCharge.charge,
-                          character.level
-                        );
-                        setSelectedCharge(prev =>
-                          prev
-                            ? {
-                                ...prev,
-                                charge: {
-                                  ...prev.charge,
-                                  usedCharges: Math.min(
-                                    max,
-                                    (prev.charge.usedCharges || 0) + 1
-                                  ),
-                                },
-                              }
-                            : null
-                        );
-                      }}
-                      variant="outline"
-                      size="sm"
-                      disabled={isExhausted}
-                      leftIcon={<Minus size={14} />}
-                      className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
-                    >
-                      Use
-                    </Button>
+                    {/* Charge adjustment controls */}
+                    {(() => {
+                      const maxCharges = calculateWeaponChargeMax(
+                        selectedCharge.charge,
+                        character.level
+                      );
+                      const usedCharges =
+                        selectedCharge.charge.usedCharges || 0;
+                      const chargesRemaining = maxCharges - usedCharges;
+                      const isExhausted = chargesRemaining <= 0;
+                      const isFull = usedCharges <= 0;
+
+                      return (
+                        <div className="flex items-center justify-center gap-3">
+                          <Button
+                            onClick={() => {
+                              restoreWeaponCharge(
+                                selectedCharge.weaponId,
+                                selectedCharge.charge.id
+                              );
+                              // Update the selected charge state with new used value
+                              setSelectedCharge(prev =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      charge: {
+                                        ...prev.charge,
+                                        usedCharges: Math.max(
+                                          0,
+                                          (prev.charge.usedCharges || 0) - 1
+                                        ),
+                                      },
+                                    }
+                                  : null
+                              );
+                            }}
+                            variant="outline"
+                            size="sm"
+                            disabled={isFull}
+                            leftIcon={<Plus size={14} />}
+                            className="border-accent-green-border text-accent-green-text hover:bg-accent-green-bg"
+                          >
+                            Restore
+                          </Button>
+
+                          <div className="text-center">
+                            <span
+                              className={`text-2xl font-bold ${
+                                isExhausted
+                                  ? 'text-accent-red-text-muted'
+                                  : chargesRemaining <= 1
+                                    ? 'text-accent-orange-text'
+                                    : 'text-accent-indigo-text'
+                              }`}
+                            >
+                              {chargesRemaining}
+                            </span>
+                            <span className="text-muted text-lg">
+                              /{maxCharges}
+                            </span>
+                          </div>
+
+                          <Button
+                            onClick={() => {
+                              expendWeaponCharge(
+                                selectedCharge.weaponId,
+                                selectedCharge.charge.id
+                              );
+                              // Update the selected charge state with new used value
+                              const max = calculateWeaponChargeMax(
+                                selectedCharge.charge,
+                                character.level
+                              );
+                              setSelectedCharge(prev =>
+                                prev
+                                  ? {
+                                      ...prev,
+                                      charge: {
+                                        ...prev.charge,
+                                        usedCharges: Math.min(
+                                          max,
+                                          (prev.charge.usedCharges || 0) + 1
+                                        ),
+                                      },
+                                    }
+                                  : null
+                              );
+                            }}
+                            variant="outline"
+                            size="sm"
+                            disabled={isExhausted}
+                            leftIcon={<Minus size={14} />}
+                            className="border-accent-red-border text-accent-red-text-muted hover:bg-accent-red-bg"
+                          >
+                            Use
+                          </Button>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Progress bar */}
+                    {(() => {
+                      const maxCharges = calculateWeaponChargeMax(
+                        selectedCharge.charge,
+                        character.level
+                      );
+                      const chargesRemaining =
+                        maxCharges - (selectedCharge.charge.usedCharges || 0);
+                      const isExhausted = chargesRemaining <= 0;
+
+                      return maxCharges > 1 ? (
+                        <div className="bg-surface-inset mt-3 h-2 w-full rounded-full">
+                          <div
+                            className={`h-2 rounded-full transition-all duration-300 ${
+                              isExhausted
+                                ? 'bg-red-500'
+                                : chargesRemaining <= 1
+                                  ? 'bg-orange-500'
+                                  : 'bg-indigo-500'
+                            }`}
+                            style={{
+                              width: `${(chargesRemaining / maxCharges) * 100}%`,
+                            }}
+                          />
+                        </div>
+                      ) : null;
+                    })()}
                   </div>
-                );
-              })()}
 
-              {/* Progress bar */}
-              {(() => {
-                const maxCharges = calculateWeaponChargeMax(
-                  selectedCharge.charge,
-                  character.level
-                );
-                const chargesRemaining =
-                  maxCharges - (selectedCharge.charge.usedCharges || 0);
-                const isExhausted = chargesRemaining <= 0;
-
-                return maxCharges > 1 ? (
-                  <div className="bg-surface-inset mt-3 h-2 w-full rounded-full">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-300 ${
-                        isExhausted
-                          ? 'bg-red-500'
-                          : chargesRemaining <= 1
-                            ? 'bg-orange-500'
-                            : 'bg-indigo-500'
-                      }`}
-                      style={{
-                        width: `${(chargesRemaining / maxCharges) * 100}%`,
-                      }}
-                    />
-                  </div>
-                ) : null;
-              })()}
-            </div>
-
-            {/* Proficiency scaling info */}
-            {selectedCharge.charge.scaleWithProficiency && (
-              <p className="text-muted text-xs">
-                <Info size={12} className="mr-1 inline" />
-                Scales with proficiency bonus (×
-                {selectedCharge.charge.proficiencyMultiplier || 1})
-              </p>
-            )}
-          </div>
-        </Modal>
-      )}
+                  {/* Proficiency scaling info */}
+                  {selectedCharge.charge.scaleWithProficiency && (
+                    <p className="text-muted text-xs">
+                      <Info size={12} className="mr-1 inline" />
+                      Scales with proficiency bonus (×
+                      {selectedCharge.charge.proficiencyMultiplier || 1})
+                    </p>
+                  )}
+                </div>
+              </DialogBody>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -1,4 +1,54 @@
-import { CharacterExport } from '@/types/character';
+import { CharacterExport, CharacterState } from '@/types/character';
+import type { PlayerCharacter } from '@/store/playerStore';
+import { APP_VERSION } from '@/utils/constants';
+
+/** A full-roster backup bundle (every character in one file). */
+export interface CharacterBackup {
+  type: 'rollkeeper-backup';
+  version: number;
+  exportedAt: string;
+  characters: PlayerCharacter[];
+}
+
+function downloadJson(data: unknown, filename: string): void {
+  const dataStr = JSON.stringify(data, null, 2);
+  const dataUri =
+    'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+  const linkElement = document.createElement('a');
+  linkElement.setAttribute('href', dataUri);
+  linkElement.setAttribute('download', filename);
+  linkElement.style.display = 'none';
+  document.body.appendChild(linkElement);
+  linkElement.click();
+  document.body.removeChild(linkElement);
+}
+
+/**
+ * Export every character as a single backup file the user can re-import. This is
+ * the primary safeguard against the localStorage-only data model.
+ */
+export const exportAllCharactersToFile = (
+  characters: PlayerCharacter[]
+): void => {
+  const timestamp = new Date().toISOString().split('T')[0];
+  const backup: CharacterBackup = {
+    type: 'rollkeeper-backup',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    characters,
+  };
+  downloadJson(backup, `rollkeeper_backup_${timestamp}.json`);
+};
+
+/** True if a parsed JSON file is a full-roster backup bundle. */
+export const isCharacterBackup = (data: unknown): data is CharacterBackup => {
+  return (
+    typeof data === 'object' &&
+    data !== null &&
+    (data as CharacterBackup).type === 'rollkeeper-backup' &&
+    Array.isArray((data as CharacterBackup).characters)
+  );
+};
 
 /**
  * Export character data as a JSON file download
@@ -20,6 +70,19 @@ export const exportCharacterToFile = (exportData: CharacterExport): void => {
   document.body.appendChild(linkElement);
   linkElement.click();
   document.body.removeChild(linkElement);
+};
+
+/**
+ * Export a character snapshot received from campaign sync. This deliberately
+ * uses the same wrapper as the player-side export so the downloaded file can
+ * be imported without any recovery-specific conversion.
+ */
+export const exportCharacterStateToFile = (character: CharacterState): void => {
+  exportCharacterToFile({
+    version: APP_VERSION,
+    exportDate: new Date().toISOString(),
+    character,
+  });
 };
 
 /**

@@ -12,14 +12,17 @@ import {
   X,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import type {
   CalendarDate,
   MoonPhaseInfo,
   CalendarConfig,
   Era,
+  WeatherType,
 } from '@/types/calendar';
-import { MOON_PHASE_LABELS } from '@/types/calendar';
+import { MOON_PHASE_LABELS, WEATHER_OPTIONS } from '@/types/calendar';
+import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 import { formatDate, formatTime } from '@/utils/calendarCalculations';
 
 interface TimeDisplayProps {
@@ -27,6 +30,7 @@ interface TimeDisplayProps {
   config: CalendarConfig;
   moonPhases: MoonPhaseInfo[];
   dayPeriod: string;
+  weather?: WeatherType;
   /** When provided, the time becomes editable. Called with (hour, minute). */
   onTimeEdit?: (hour: number, minute: number) => void;
 }
@@ -55,8 +59,12 @@ export function TimeDisplay({
   config,
   moonPhases,
   dayPeriod,
+  weather,
   onTimeEdit,
 }: TimeDisplayProps) {
+  const weatherInfo = weather
+    ? WEATHER_OPTIONS.find(w => w.type === weather)
+    : null;
   const weekDayName = config.weekDays[date.dayOfWeek]?.name ?? '';
   const eraStr = getEraDisplay(date.era);
 
@@ -91,12 +99,9 @@ export function TimeDisplay({
         <div className="flex items-center gap-3">
           {editing ? (
             <div className="flex items-center gap-1.5">
-              <input
-                type="number"
+              <NumberField
                 value={editHour}
-                onChange={e =>
-                  setEditHour(clamp(parseInt(e.target.value) || 0, maxHour))
-                }
+                onChange={v => setEditHour(clamp(v ?? 0, maxHour))}
                 min={0}
                 max={maxHour}
                 autoFocus
@@ -105,12 +110,9 @@ export function TimeDisplay({
               <span className="text-heading font-mono text-3xl font-bold">
                 :
               </span>
-              <input
-                type="number"
+              <NumberField
                 value={editMinute}
-                onChange={e =>
-                  setEditMinute(clamp(parseInt(e.target.value) || 0, maxMinute))
-                }
+                onChange={v => setEditMinute(clamp(v ?? 0, maxMinute))}
                 min={0}
                 max={maxMinute}
                 className="text-heading border-divider focus:border-divider-strong w-20 rounded-md border bg-transparent px-3 py-2 text-center font-mono text-3xl font-bold focus:outline-none"
@@ -167,11 +169,24 @@ export function TimeDisplay({
         )}
       </div>
 
-      {/* Season + Moons */}
+      {/* Season + Weather + Moons */}
       <div className="flex flex-wrap items-center gap-3">
         {date.season && (
           <Badge variant="neutral" className="text-xs">
             {date.season.name}
+          </Badge>
+        )}
+        {weatherInfo && (
+          <Badge variant="info" className="text-xs">
+            <AppIcon
+              name={getIconName(
+                WEATHER_ICONS,
+                weatherInfo.type,
+                'weatherClear'
+              )}
+              className="h-3.5 w-3.5"
+            />{' '}
+            {weatherInfo.label}
           </Badge>
         )}
         {moonPhases.map(mp => (

@@ -4,16 +4,55 @@ import {
   campaignKey,
   campaignPlayersKey,
   campaignPlayerKey,
+  campaignXpKey,
+  getRawRedis,
   refreshCampaignTTL,
 } from '@/lib/redis';
+import {
+  countUniqueXpAwards,
+  projectXpFromAwards,
+  readXpAwards,
+} from '@/lib/xpAwardQueue';
 import { CampaignData, CampaignPlayerData } from '@/types/campaign';
+import {
+  GUEST_SESSION_COOKIE,
+  isHybridGuestServerEnabled,
+} from '@/lib/guestSessionSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
   try {
     const { code } = await params;
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    if (
+      membership.mode === 'account' &&
+      membership.principal.role !== 'owner' &&
+      membership.principal.role !== 'dm'
+    ) {
+      return NextResponse.json(
+        { error: 'Private roster access is denied' },
+        { status: 403 }
+      );
+    }
+    if (
+      membership.mode === 'legacy' &&
+      isHybridGuestServerEnabled() &&
+      request.cookies.has(GUEST_SESSION_COOKIE)
+    ) {
+      return NextResponse.json(
+        { error: 'Guest sessions cannot read the private roster' },
+        { status: 403 }
+      );
+    }
     const redis = getRedis();
 
     const campaignRaw = await redis.get<string>(campaignKey(code));
@@ -50,6 +89,23 @@ export async function GET(
           players.push(parsed);
         }
       }
+
+      await Promise.all(
+        players.map(async player => {
+          const pending = await readXpAwards(
+            getRawRedis(),
+            campaignXpKey(code, player.playerId)
+          );
+          const awards = pending.map(entry => entry.award);
+          player.projectedExperience = projectXpFromAwards(
+            player.characterData.experience ?? 0,
+            awards
+          );
+          player.pendingXpAwardCount = countUniqueXpAwards(awards);
+        })
+      );
+
+      players.sort((a, b) => a.playerId.localeCompare(b.playerId));
     }
 
     if (campaignRaw) {

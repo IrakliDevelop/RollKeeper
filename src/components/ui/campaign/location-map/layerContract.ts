@@ -1,0 +1,240 @@
+import type { ElementStore, LayerManager } from '@fieldnotes/core';
+
+/**
+ * Canonical layer bands shared by ALL battlemap canvases (DM setup editor,
+ * DM play canvas, player canvas). The FieldNotes SDK paints elements sorted
+ * by (layerOrder, zIndex) with zIndex compared only WITHIN a layer — so
+ * stacking is only deterministic if every canvas assigns the same order band
+ * to the same layer id. Custom and player layer definitions now sync between
+ * clients (`layerSync.ts` over `@fieldnotes/sync` layer records); the bands
+ * below remain RollKeeper policy, re-pinned locally on every layer change:
+ *
+ *   layer-map (0, locked)            map images + grid
+ *   layer-annotations (100)          DM annotations + combatant tokens
+ *   custom DM layers (200+)          extra layers from the layers panel
+ *   player-<characterId> (500+)      each player's token + drawings
+ *
+ * The player band sits above everything a DM can draw on, so a DM-added
+ * image can never cover a player token (the bug this module exists to fix).
+ */
+export const MAP_LAYER_ID = 'layer-map';
+export const ANNOTATIONS_LAYER_ID = 'layer-annotations';
+export const MAP_LAYER_ORDER = 0;
+export const ANNOTATIONS_LAYER_ORDER = 100;
+export const CUSTOM_BAND_ORDER = 200;
+export const PLAYER_BAND_ORDER = 500;
+export const PLAYER_LAYER_PREFIX = 'player-';
+
+export type CanvasRole = 'dm' | 'player';
+
+/** Structural subset of Viewport so tests run on real SDK stores headless. */
+export interface ViewportLike {
+  store: ElementStore;
+  layerManager: LayerManager;
+}
+
+const LEGACY_MAP_NAME = 'Map Background';
+const LEGACY_ANNOTATIONS_NAME = 'Annotations';
+const AUTO_LAYER_NAME = /^Layer \d+$/;
+
+/**
+ * Create the canonical layers if missing and pin the bands. Annotations is
+ * locked for players (their hit-testing must skip DM content — the relay
+ * would reject their writes anyway). Also guards the active layer off the
+ * locked map layer (loadJSON resets active to the lowest-order layer).
+ */
+export function ensureCanonicalLayers(
+  vp: ViewportLike,
+  role: CanvasRole
+): void {
+  const lm = vp.layerManager;
+  if (!lm.getLayer(MAP_LAYER_ID)) {
+    lm.addLayerDirect({
+      id: MAP_LAYER_ID,
+      name: 'Map',
+      visible: true,
+      locked: true,
+      order: MAP_LAYER_ORDER,
+      opacity: 1,
+    });
+  }
+  if (!lm.getLayer(ANNOTATIONS_LAYER_ID)) {
+    lm.addLayerDirect({
+      id: ANNOTATIONS_LAYER_ID,
+      name: 'Annotations',
+      visible: true,
+      locked: role === 'player',
+      order: ANNOTATIONS_LAYER_ORDER,
+      opacity: 1,
+    });
+  }
+  pinCanonicalLayers(vp, { annotationsLocked: role === 'player' });
+  if (lm.activeLayerId === MAP_LAYER_ID || !lm.getLayer(lm.activeLayerId)) {
+    lm.setActiveLayer(ANNOTATIONS_LAYER_ID);
+  }
+}
+
+/**
+ * Re-assert band invariants. The map lock is always pinned (only arrange-maps
+ * mode relaxes it via opts.mapUnlocked). The annotations lock is pinned only
+ * when opts.annotationsLocked is supplied — DMs pin it OPEN (a DM must never
+ * be trapped on a locked annotations layer, e.g. one persisted mid-arrange),
+ * players pin it CLOSED, and setup arrange-maps pins it closed for the
+ * duration. Omitted → left user-controlled. Custom/player lock state is never
+ * pinned.
+ */
+export function pinCanonicalLayers(
+  vp: ViewportLike,
+  opts?: { mapUnlocked?: boolean; annotationsLocked?: boolean }
+): void {
+  const lm = vp.layerManager;
+  const map = lm.getLayer(MAP_LAYER_ID);
+  if (map) {
+    const wantLocked = !opts?.mapUnlocked;
+    if (map.order !== MAP_LAYER_ORDER || map.locked !== wantLocked) {
+      lm.updateLayerDirect(MAP_LAYER_ID, {
+        order: MAP_LAYER_ORDER,
+        locked: wantLocked,
+      });
+    }
+  }
+  // The annotations lock is pinned only when a lock intent is supplied
+  // (dm → unlocked, player → locked, setup arrange-maps → locked for the
+  // duration). Omitting annotationsLocked leaves it user-controlled — the
+  // caller has no stake in the lock, only the band order.
+  const annotations = lm.getLayer(ANNOTATIONS_LAYER_ID);
+  if (annotations) {
+    const patch: { order?: number; locked?: boolean } = {};
+    if (annotations.order !== ANNOTATIONS_LAYER_ORDER) {
+      patch.order = ANNOTATIONS_LAYER_ORDER;
+    }
+    if (
+      opts?.annotationsLocked !== undefined &&
+      annotations.locked !== opts.annotationsLocked
+    ) {
+      patch.locked = opts.annotationsLocked;
+    }
+    if (patch.order !== undefined || patch.locked !== undefined) {
+      lm.updateLayerDirect(ANNOTATIONS_LAYER_ID, patch);
+    }
+  }
+  // getLayers() is order-sorted (stable), so renumbering by enumeration
+  // index preserves each band's relative order.
+  const others = lm
+    .getLayers()
+    .filter(l => l.id !== MAP_LAYER_ID && l.id !== ANNOTATIONS_LAYER_ID);
+  const customs = others.filter(l => !l.id.startsWith(PLAYER_LAYER_PREFIX));
+  const players = others.filter(l => l.id.startsWith(PLAYER_LAYER_PREFIX));
+  customs.forEach((l, i) => {
+    if (l.order !== CUSTOM_BAND_ORDER + i) {
+      lm.updateLayerDirect(l.id, { order: CUSTOM_BAND_ORDER + i });
+    }
+  });
+  players.forEach((l, i) => {
+    if (l.order !== PLAYER_BAND_ORDER + i) {
+      lm.updateLayerDirect(l.id, { order: PLAYER_BAND_ORDER + i });
+    }
+  });
+}
+
+/**
+ * Keep bands pinned as layers come and go. updateLayerDirect emits 'change'
+ * synchronously, so the guard prevents self-recursion; the pin is
+ * idempotent, so the one re-entrant emit converges immediately.
+ */
+export function subscribePinCanonicalLayers(
+  vp: ViewportLike,
+  getOpts?: () => { mapUnlocked?: boolean; annotationsLocked?: boolean }
+): () => void {
+  let pinning = false;
+  return vp.layerManager.on('change', () => {
+    if (pinning) return;
+    pinning = true;
+    try {
+      pinCanonicalLayers(vp, getOpts?.());
+    } finally {
+      pinning = false;
+    }
+  });
+}
+
+/**
+ * Lazy per-load migration of pre-contract canvases: legacy name-matched
+ * layers are absorbed into the canonical ids (elements moved — the element
+ * updates flow through the relay, which is what teaches OTHER canvases the
+ * canonical ids), and empty auto-named leftovers (the SDK default "Layer 1")
+ * are dropped. Returns true when anything changed so the caller can persist.
+ */
+export function migrateCanvasToContract(
+  vp: ViewportLike,
+  role: CanvasRole
+): boolean {
+  const lm = vp.layerManager;
+  // Capture the annotations lock before ensureCanonicalLayers heals it, so a
+  // canvasState persisted with a locked annotations layer (the mid-arrange
+  // save that trapped every DM token/note) is reported as changed and the
+  // caller re-persists the repaired state.
+  const annotationsLockedBefore = lm.getLayer(ANNOTATIONS_LAYER_ID)?.locked;
+  ensureCanonicalLayers(vp, role);
+  let changed =
+    annotationsLockedBefore !== undefined &&
+    annotationsLockedBefore !== lm.getLayer(ANNOTATIONS_LAYER_ID)?.locked;
+
+  for (const legacy of lm.getLayers()) {
+    if (legacy.id === MAP_LAYER_ID || legacy.id === ANNOTATIONS_LAYER_ID) {
+      continue;
+    }
+    const target =
+      legacy.name === LEGACY_MAP_NAME
+        ? MAP_LAYER_ID
+        : legacy.name === LEGACY_ANNOTATIONS_NAME
+          ? ANNOTATIONS_LAYER_ID
+          : null;
+    if (!target) continue;
+    for (const el of vp.store.getAll()) {
+      if (el.layerId === legacy.id) {
+        vp.store.update(el.id, { layerId: target });
+      }
+    }
+    lm.removeLayerDirect(legacy.id);
+    changed = true;
+  }
+
+  for (const leftover of lm.getLayers()) {
+    if (leftover.id === MAP_LAYER_ID || leftover.id === ANNOTATIONS_LAYER_ID) {
+      continue;
+    }
+    if (!AUTO_LAYER_NAME.test(leftover.name)) continue;
+    const empty = !vp.store.getAll().some(el => el.layerId === leftover.id);
+    if (empty) {
+      lm.removeLayerDirect(leftover.id);
+      changed = true;
+    }
+  }
+
+  // Pre-contract canvases can carry background images whose layerId is ''
+  // or a long-deleted layer id — invisible to the name-based absorption
+  // above AND to arrange-mode's layer-scoped unlock, leaving them
+  // permanently element-locked. A locked image is background-class by
+  // construction (nothing else element-locks images), so adopt it. The
+  // legacy init's moveElementToLayer could silently no-op (StrictMode-
+  // destroyed viewport), stranding the locked background on the annotations
+  // layer; locked images on annotations or unknown layers are adopted,
+  // custom layers left alone. Accepted caveat — the SDK context menu can
+  // element-lock images, such an image on annotations would be adopted too.
+  for (const el of vp.store.getAll()) {
+    if (el.type !== 'image' || !el.locked) continue;
+    const onKnownLayer = Boolean(el.layerId && lm.getLayer(el.layerId));
+    if (onKnownLayer && el.layerId !== ANNOTATIONS_LAYER_ID) continue;
+    if (el.layerId === MAP_LAYER_ID) continue;
+    vp.store.update(el.id, { layerId: MAP_LAYER_ID });
+    changed = true;
+  }
+
+  // removeLayerDirect doesn't repair a dangling active layer.
+  if (!lm.getLayer(lm.activeLayerId)) {
+    lm.setActiveLayer(ANNOTATIONS_LAYER_ID);
+  }
+  if (changed) pinCanonicalLayers(vp);
+  return changed;
+}

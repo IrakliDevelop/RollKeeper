@@ -29,6 +29,8 @@ interface ExtendedFeaturesSectionProps {
     sourceType?: string
   ) => void;
   onAddSpells?: (spells: Spell[]) => void;
+  favoriteFeatureIds?: string[];
+  onToggleFavoriteFeature?: (id: string) => void;
   readonly?: boolean;
   className?: string;
 }
@@ -43,6 +45,8 @@ export default function ExtendedFeaturesSection({
   onResetFeatures,
   onReorderFeatures,
   onAddSpells,
+  favoriteFeatureIds = [],
+  onToggleFavoriteFeature,
   readonly = false,
   className = '',
 }: ExtendedFeaturesSectionProps) {
@@ -169,6 +173,8 @@ export default function ExtendedFeaturesSection({
                       category.sourceType
                     )
                   }
+                  favoriteFeatureIds={favoriteFeatureIds}
+                  onToggleFavoriteFeature={onToggleFavoriteFeature}
                   readonly={readonly}
                 />
               ))}

@@ -1,7 +1,8 @@
 {
 	"_meta": {
 		"internalCopies": [
-			"race"
+			"race",
+			"subrace"
 		]
 	},
 	"race": [
@@ -31,6 +32,10 @@
 					"auran": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/aarakocra.opus"
+			},
 			"entries": [
 				{
 					"name": "Dive Attack",
@@ -97,7 +102,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/aarakocra.mp3"
+				"path": "races/aarakocra.opus"
 			},
 			"entries": [
 				{
@@ -161,6 +166,10 @@
 			"traitTags": [
 				"Natural Weapon"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/aarakocra.opus"
+			},
 			"additionalSpells": [
 				{
 					"innate": {
@@ -238,7 +247,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/aasimar.mp3"
+				"path": "races/aasimar.opus"
 			},
 			"additionalSpells": [
 				{
@@ -332,6 +341,10 @@
 				"necrotic",
 				"radiant"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/aasimar.opus"
+			},
 			"additionalSpells": [
 				{
 					"ability": {
@@ -518,7 +531,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/aasimar.mp3"
+				"path": "races/aasimar.opus"
 			},
 			"additionalSpells": [
 				{
@@ -602,6 +615,10 @@
 				"necrotic",
 				"radiant"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/aasimar.opus"
+			},
 			"additionalSpells": [
 				{
 					"ability": "cha",
@@ -749,7 +766,7 @@
 					"type": "entries",
 					"name": "Size",
 					"entries": [
-						"Aetherborn are about the same size as humans, ranging from 5 to 6 feet tall. They are quite light\u2014only about 100 pounds\u2014and their weight diminishes as they age and more and more of their substance returns to the aethersphere. Your size is Medium."
+						"Aetherborn are about the same size as humans, ranging from 5 to 6 feet tall. They are quite light—only about 100 pounds—and their weight diminishes as they age and more and more of their substance returns to the aethersphere. Your size is Medium."
 					]
 				},
 				{
@@ -784,7 +801,7 @@
 					"type": "inset",
 					"name": "Gift of the Aetherborn",
 					"entries": [
-						"An unknown aetherborn, desperately seeking a means to extend their short life, discovered a process of transformation that prolonged their existence\u2014by giving them the ability to feed on the life essence of other beings. Since then, other aetherborn have learned and carried out this monstrous transformation, and aetherborn with this \"gift\" have become a small minority among an already small population.",
+						"An unknown aetherborn, desperately seeking a means to extend their short life, discovered a process of transformation that prolonged their existence—by giving them the ability to feed on the life essence of other beings. Since then, other aetherborn have learned and carried out this monstrous transformation, and aetherborn with this \"gift\" have become a small minority among an already small population.",
 						"A gifted aetherborn has the ability to drain the life essence of other beings. Similar to the way heat is transferred from a warm object to a cold one, a gifted aetherborn need only touch another living being with a clawed hand to draw life essence out, fueling their own continued existence while draining strength and vitality from their victim.",
 						"For many aetherborn, living as they do for indulgence and instant gratification, the concepts of \"want\" and \"need\" are virtually synonymous. But Aetherborn with this gift understand what it is to truly need, for they develop a hunger for life essence that far exceeds any desires they might have felt before their transformation. A gifted aetherborn who abstains from this feeding deteriorates even more rapidly than other aetherborn, while enduring unspeakable agony caused by the deprivation of life energy.",
 						"At the DM's option, an aetherborn character can research methods of achieving this dark \"gift.\" The process is similar to inventing and manufacturing a rare magic item (see \"{@book Inventing and Manufacturing Devices|PS-K|1|Inventing and Manufacturing Devices}\" earlier in this document). But rather than aether, the process requires a variety of rare unguents and unusual ingredients that make up the cost of researching and undergoing the transformation.",
@@ -1172,6 +1189,17 @@
 			"hasFluffImages": true
 		},
 		{
+			"name": "Boggart",
+			"source": "LFL",
+			"_copy": {
+				"name": "Goblin",
+				"source": "MPMM"
+			},
+			"lineage": null,
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
 			"name": "Bugbear",
 			"source": "ERLW",
 			"page": 25,
@@ -1214,6 +1242,10 @@
 					"goblin": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/bugbear.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -1305,6 +1337,10 @@
 					"stealth": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/bugbear.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -1408,6 +1444,10 @@
 					"goblin": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/bugbear.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -1495,6 +1535,10 @@
 					"other": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/bullywug.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -1585,6 +1629,10 @@
 					"sylvan": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/centaur.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -1702,6 +1750,10 @@
 					]
 				}
 			},
+			"soundClip": {
+				"type": "internal",
+				"path": "races/centaur.opus"
+			},
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -1733,6 +1785,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/centaur.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -1776,10 +1832,65 @@
 		},
 		{
 			"name": "Changeling",
+			"source": "EFA",
+			"page": 34,
+			"edition": "one",
+			"creatureTypes": [
+				"fey"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"skillProficiencies": [
+				{
+					"choose": {
+						"from": [
+							"deception",
+							"insight",
+							"intimidation",
+							"persuasion"
+						],
+						"count": 2
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Changeling Instincts",
+					"entries": [
+						"Thanks to your connection to the fey realm, you gain proficiency in two of the following skills of your choice: {@skill Deception|XPHB}, {@skill Insight|XPHB}, {@skill Intimidation|XPHB}, {@skill Performance|XPHB}, or {@skill Persuasion|XPHB}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Shape-Shifter",
+					"entries": [
+						"As an action, you can shape-shift to change your appearance and your voice. You determine the specifics of the changes, including your coloration, hair length, and sex. You can also adjust your height and weight and can change your size between Medium and Small. You can make yourself appear as a member of another playable species, though none of your game statistics change. You can't duplicate the appearance of an individual you've never seen, and you must adopt a form that has the same basic arrangement of limbs that you have. This trait doesn't change your clothing and equipment.",
+						"While shape-shifted with this trait, you have {@variantrule Advantage|XPHB} on Charisma checks.",
+						"You stay in the new form until you take an action to revert to your true form."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Changeling",
 			"source": "ERLW",
 			"page": 17,
 			"reprintedAs": [
-				"Changeling|MPMM"
+				"Changeling|MPMM",
+				"Changeling|EFA"
 			],
 			"size": [
 				"M"
@@ -1833,7 +1944,7 @@
 				{
 					"name": "Age",
 					"entries": [
-						"Changelings mature slightly faster than humans but share a similar lifespan\u2014typically a century or less. While a changeling can transform to conceal their age, the effects of aging affect them similarly to humans."
+						"Changelings mature slightly faster than humans but share a similar lifespan—typically a century or less. While a changeling can transform to conceal their age, the effects of aging affect them similarly to humans."
 					],
 					"type": "entries"
 				},
@@ -1881,6 +1992,9 @@
 			"name": "Changeling",
 			"source": "MPMM",
 			"page": 10,
+			"reprintedAs": [
+				"Changeling|EFA"
+			],
 			"lineage": "VRGR",
 			"creatureTypes": [
 				"fey"
@@ -2150,8 +2264,97 @@
 		},
 		{
 			"name": "Dhampir",
+			"source": "RHW",
+			"otherSources": [
+				{
+					"source": "ABH",
+					"page": 7
+				}
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": {
+				"walk": 35,
+				"climb": true
+			},
+			"darkvision": 60,
+			"traitTags": [
+				"Natural Weapon"
+			],
+			"resist": [
+				"necrotic"
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Spider Climb",
+					"entries": [
+						"You have a {@variantrule Climb Speed|XPHB} equal to your {@variantrule Speed|XPHB}. When you reach character level 3, you can move up, down, and across vertical surfaces and along ceilings while leaving your hands free."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Trace of Undeath",
+					"entries": [
+						"You have {@variantrule Resistance|XPHB} to Necrotic damage."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Vampiric Bite",
+					"entries": [
+						"When you use your {@variantrule Unarmed Strike|XPHB} and deal damage, you can choose to bite with your fangs. You deal Piercing damage equal to {@damage 1d4} plus your Constitution modifier instead of the normal damage of an {@variantrule Unarmed Strike|XPHB}.",
+						"In addition, when you deal this damage to a creature that isn't a Construct or an Undead, you can empower yourself in one of the following ways:",
+						{
+							"type": "list",
+							"style": "list-hang-notitle",
+							"items": [
+								{
+									"type": "item",
+									"name": "Drain",
+									"entries": [
+										"You regain {@variantrule Hit Points|XPHB} equal to the Piercing damage dealt."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Strengthen",
+									"entries": [
+										"You gain a bonus to the next ability check or attack roll you make within the next minute; the bonus is equal to the Piercing damage dealt."
+									]
+								}
+							]
+						},
+						"You can empower yourself with this trait a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Dhampir",
 			"source": "VRGR",
 			"page": 16,
+			"reprintedAs": [
+				"Dhampir|RHW"
+			],
 			"lineage": "VRGR",
 			"size": [
 				"S",
@@ -2274,7 +2477,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/dragonborn.mp3"
+				"path": "races/dragonborn.opus"
 			},
 			"entries": [
 				{
@@ -2406,6 +2609,23 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"resist": [
+				{
+					"choose": {
+						"from": [
+							"acid",
+							"lightning",
+							"fire",
+							"poison",
+							"cold"
+						]
+					}
+				}
+			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dragonborn.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -2664,6 +2884,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dragonborn.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -2840,6 +3064,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dragonborn.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -3025,6 +3253,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dragonborn.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -3222,6 +3454,10 @@
 			"resist": [
 				"poison"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/duergar.opus"
+			},
 			"additionalSpells": [
 				{
 					"innate": {
@@ -3343,7 +3579,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/dwarf.mp3"
+				"path": "races/dwarf.opus"
 			},
 			"entries": [
 				{
@@ -3391,7 +3627,7 @@
 				{
 					"name": "Tool Proficiency",
 					"entries": [
-						"You gain proficiency with the artisan's tools of your choice: {@item Smith's tools|phb}, {@item brewer's supplies|phb}, or {@item mason's tools|phb}."
+						"You gain proficiency with the {@item artisan's tools|PHB} of your choice: {@item Smith's tools|phb}, {@item brewer's supplies|phb}, or {@item mason's tools|phb}."
 					],
 					"type": "entries"
 				},
@@ -3431,6 +3667,10 @@
 			"resist": [
 				"poison"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dwarf.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -3505,6 +3745,10 @@
 			"resist": [
 				"poison"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/dwarf.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -3680,6 +3924,238 @@
 		},
 		{
 			"name": "Elf",
+			"source": "LFL",
+			"_copy": {
+				"name": "Elf",
+				"source": "XPHB",
+				"_mod": {
+					"entries": {
+						"mode": "replaceArr",
+						"replace": "Elven Lineage",
+						"items": {
+							"type": "entries",
+							"name": "Elven Lineage",
+							"entries": [
+								"You are part of a lineage that grants you supernatural abilities. Choose a lineage from the Elven Lineages table. You gain the level 1 benefit of that lineage.",
+								"When you reach character levels 3 and 5, you learn a higher-level spell, as shown on the table. You always have that spell prepared. You can cast it once without a spell slot, and you regain the ability to cast it in that way when you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
+								"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage).",
+								{
+									"type": "table",
+									"caption": "Elven Lineages",
+									"colLabels": [
+										"Lineage",
+										"Level 1",
+										"Level 3",
+										"Level 5"
+									],
+									"colStyles": [
+										"col-2",
+										"col-6",
+										"col-2",
+										"col-2"
+									],
+									"rows": [
+										[
+											"Lorwyn",
+											"You know the {@spell Thorn Whip|XPHB} cantrip. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace that cantrip with a different cantrip from the {@filter Druid spell list|spells|class=druid}.",
+											"{@spell Command|XPHB}",
+											"{@spell Silence|XPHB}"
+										],
+										[
+											"Shadowmoor",
+											"The range of your {@sense Darkvision|XPHB} increases to 120 feet. You also know the {@spell Starry Wisp|XPHB} cantrip.",
+											"{@spell Heroism|XPHB}",
+											"{@spell Gentle Repose|XPHB}"
+										]
+									]
+								}
+							]
+						}
+					}
+				}
+			},
+			"additionalSpells": [
+				{
+					"name": "Lorwyn",
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"command|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"silence|xphb"
+								]
+							}
+						}
+					},
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": {
+							"_": [
+								{
+									"choose": "level=0|class=Druid"
+								}
+							]
+						}
+					}
+				},
+				{
+					"name": "Shadowmoor",
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"heroism|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"gentle repose|xphb"
+								]
+							}
+						}
+					},
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": [
+							"starry wisp|xphb#c"
+						]
+					}
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true,
+			"_versions": [
+				{
+					"name": "Elf; Lorwyn Lineage",
+					"source": "LFL",
+					"_mod": {
+						"entries": {
+							"mode": "replaceArr",
+							"replace": "Elven Lineage",
+							"items": {
+								"name": "Elven Lineage (Lorwyn)",
+								"type": "entries",
+								"entries": [
+									"You are part of a lineage that grants you supernatural abilities. You know the {@spell Thorn Whip|XPHB} cantrip. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace that cantrip with a different cantrip from the {@filter Druid spell list|spells|class=druid}.",
+									"When you reach character level 3, you learn the {@spell Command|XPHB} spell. When you reach character level 5, you also learn the {@spell Silence|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
+									"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
+								]
+							}
+						}
+					},
+					"additionalSpells": [
+						{
+							"innate": {
+								"3": {
+									"daily": {
+										"1": [
+											"command|xphb"
+										]
+									}
+								},
+								"5": {
+									"daily": {
+										"1": [
+											"silence|xphb"
+										]
+									}
+								}
+							},
+							"ability": {
+								"choose": [
+									"int",
+									"wis",
+									"cha"
+								]
+							},
+							"known": {
+								"1": {
+									"_": [
+										{
+											"choose": "level=0|class=Druid"
+										}
+									]
+								}
+							}
+						}
+					]
+				},
+				{
+					"name": "Elf; Shadowmoor Lineage",
+					"source": "LFL",
+					"_mod": {
+						"entries": {
+							"mode": "replaceArr",
+							"replace": "Elven Lineage",
+							"items": {
+								"name": "Elven Lineage (Shadowmoor)",
+								"type": "entries",
+								"entries": [
+									"You are part of a lineage that grants you supernatural abilities. The range of your {@sense Darkvision|XPHB} increases to 120 feet. You also know the {@spell Starry Wisp|XPHB} cantrip.",
+									"When you reach character level 3, you learn the {@spell Heroism|XPHB} spell. When you reach character level 5, you also learn the {@spell Gentle Repose|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
+									"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
+								]
+							}
+						}
+					},
+					"darkvision": 120,
+					"additionalSpells": [
+						{
+							"innate": {
+								"3": {
+									"daily": {
+										"1": [
+											"heroism|xphb"
+										]
+									}
+								},
+								"5": {
+									"daily": {
+										"1": [
+											"gentle repose|xphb"
+										]
+									}
+								}
+							},
+							"ability": {
+								"choose": [
+									"int",
+									"wis",
+									"cha"
+								]
+							},
+							"known": {
+								"1": [
+									"starry wisp|xphb#c"
+								]
+							}
+						}
+					]
+				}
+			]
+		},
+		{
+			"name": "Elf",
 			"source": "PHB",
 			"page": 21,
 			"srd": true,
@@ -3717,7 +4193,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/elf.mp3"
+				"path": "races/elf.opus"
 			},
 			"entries": [
 				{
@@ -3789,6 +4265,9 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"traitTags": [
+				"Improved Resting"
+			],
 			"skillProficiencies": [
 				{
 					"choose": {
@@ -3800,6 +4279,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/elf.opus"
+			},
 			"additionalSpells": [
 				{
 					"name": "Drow",
@@ -3939,19 +4422,19 @@
 							"rows": [
 								[
 									"Drow",
-									"The range of your Darkvision increases to 120 feet. You also know the {@spell Dancing Lights|XPHB} cantrip.",
+									"The range of your {@sense Darkvision|XPHB} increases to 120 feet. You also know the {@spell Dancing Lights|XPHB} cantrip.",
 									"{@spell Faerie Fire|XPHB}",
 									"{@spell Darkness|XPHB}"
 								],
 								[
 									"High Elf",
-									"You know the {@spell Prestidigitation|XPHB} cantrip. Whenever you finish a Long Rest, you can replace that cantrip with a different {@filter cantrip from the Wizard spell list|spells|level=0|class=Wizard}.",
+									"You know the {@spell Prestidigitation|XPHB} cantrip. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace that cantrip with a different {@filter cantrip from the Wizard spell list|spells|level=0|class=Wizard}.",
 									"{@spell Detect Magic|XPHB}",
 									"{@spell Misty Step|XPHB}"
 								],
 								[
 									"Wood Elf",
-									"Your Speed increases to 35 feet. You also know the {@spell Druidcraft|XPHB} cantrip.",
+									"Your {@variantrule Speed|XPHB} increases to 35 feet. You also know the {@spell Druidcraft|XPHB} cantrip.",
 									"{@spell Longstrider|XPHB}",
 									"{@spell Pass without Trace|XPHB}"
 								]
@@ -3988,19 +4471,32 @@
 					"name": "Elf; Drow Lineage",
 					"source": "XPHB",
 					"_mod": {
-						"entries": {
-							"mode": "replaceArr",
-							"replace": "Elven Lineage",
-							"items": {
-								"name": "Elven Lineage (Drow)",
-								"type": "entries",
-								"entries": [
-									"You are part of a lineage that grants you supernatural abilities. The range of your Darkvision increases to 120 feet. You also know the {@spell Dancing Lights|XPHB} cantrip.",
-									"When you reach character level 3, you learn the {@spell Faerie Fire|XPHB} spell. When you reach character level 5, you also learn the {@spell Darkness|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
-									"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
-								]
+						"entries": [
+							{
+								"mode": "replaceArr",
+								"replace": "Elven Lineage",
+								"items": {
+									"name": "Elven Lineage (Drow)",
+									"type": "entries",
+									"entries": [
+										"You are part of a lineage that grants you supernatural abilities. The range of your {@sense Darkvision|XPHB} increases to 120 feet. You also know the {@spell Dancing Lights|XPHB} cantrip.",
+										"When you reach character level 3, you learn the {@spell Faerie Fire|XPHB} spell. When you reach character level 5, you also learn the {@spell Darkness|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
+										"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
+									]
+								}
+							},
+							{
+								"mode": "replaceArr",
+								"replace": "Darkvision",
+								"items": {
+									"name": "Darkvision",
+									"type": "entries",
+									"entries": [
+										"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+									]
+								}
 							}
-						}
+						]
 					},
 					"darkvision": 120,
 					"additionalSpells": [
@@ -4047,7 +4543,7 @@
 								"name": "Elven Lineage (High Elf)",
 								"type": "entries",
 								"entries": [
-									"You are part of a lineage that grants you supernatural abilities. You know the {@spell Prestidigitation|XPHB} cantrip. Whenever you finish a Long Rest, you can replace that cantrip with a different {@filter cantrip from the Wizard spell list|spells|level=0|class=Wizard}.",
+									"You are part of a lineage that grants you supernatural abilities. You know the {@spell Prestidigitation|XPHB} cantrip. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace that cantrip with a different {@filter cantrip from the Wizard spell list|spells|level=0|class=Wizard}.",
 									"When you reach character level 3, you learn the {@spell Detect Magic|XPHB} spell. When you reach character level 5, you also learn the {@spell Misty Step|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
 									"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
 								]
@@ -4102,7 +4598,7 @@
 								"name": "Elven Lineage (Wood Elf)",
 								"type": "entries",
 								"entries": [
-									"You are part of a lineage that grants you supernatural abilities. Your Speed increases to 35 feet. You also know the {@spell Druidcraft|XPHB} cantrip.",
+									"You are part of a lineage that grants you supernatural abilities. Your {@variantrule Speed|XPHB} increases to 35 feet. You also know the {@spell Druidcraft|XPHB} cantrip.",
 									"When you reach character level 3, you learn the {@spell Longstrider|XPHB} spell. When you reach character level 5, you also learn the {@spell Pass without Trace|XPHB} spell. You always have these spells prepared, and you can cast each spell once without a spell slot. Once you cast either of these spells with this trait, you can't cast that spell with it again until you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level.",
 									"Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select the lineage)."
 								]
@@ -4186,6 +4682,10 @@
 					"longbow|phb": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/elf.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -4254,7 +4754,7 @@
 				{
 					"name": "Elf Culture",
 					"entries": [
-						"The elves of Kaladesh don't organize themselves into nations or tribes. Still, they recognize three distinct cultural groups among their kind\u2014though in truth these groupings are more like attitudes or alignments with regard to the rest of society and the use of technology. Choose one of these cultures."
+						"The elves of Kaladesh don't organize themselves into nations or tribes. Still, they recognize three distinct cultural groups among their kind—though in truth these groupings are more like attitudes or alignments with regard to the rest of society and the use of technology. Choose one of these cultures."
 					],
 					"type": "entries"
 				}
@@ -4291,6 +4791,10 @@
 					"elvish": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/elf.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -4344,6 +4848,86 @@
 			],
 			"hasFluff": true,
 			"hasFluffImages": true
+		},
+		{
+			"name": "Faerie",
+			"source": "LFL",
+			"_copy": {
+				"name": "Fairy",
+				"source": "MPMM",
+				"_mod": {
+					"entries": {
+						"mode": "appendArr",
+						"items": {
+							"type": "entries",
+							"name": "Faerie Lineage",
+							"entries": [
+								"As a native of either Lorwyn and Shadowmoor, you may gain additional traits.",
+								{
+									"type": "list",
+									"style": "list-hang-notitle",
+									"items": [
+										{
+											"type": "item",
+											"name": "Lorwyn",
+											"entries": [
+												"You do not gain any additional traits."
+											]
+										},
+										{
+											"type": "item",
+											"name": "Shadowmoor",
+											"entries": [
+												"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+											]
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			},
+			"lineage": null,
+			"hasFluff": true,
+			"hasFluffImages": true,
+			"_versions": [
+				{
+					"name": "Faerie; Lorwyn",
+					"source": "LFL",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "removeArr",
+								"names": "Faerie Lineage"
+							}
+						]
+					}
+				},
+				{
+					"name": "Faerie; Shadowmoor",
+					"source": "LFL",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "prependArr",
+								"items": {
+									"type": "entries",
+									"name": "Darkvision",
+									"entries": [
+										"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+									]
+								}
+							},
+							{
+								"mode": "removeArr",
+								"names": "Faerie Lineage"
+							}
+						]
+					},
+					"darkvision": 120
+				}
+			]
 		},
 		{
 			"name": "Fairy",
@@ -4512,6 +5096,10 @@
 			"traitTags": [
 				"Powerful Build"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/firbolg.opus"
+			},
 			"additionalSpells": [
 				{
 					"ability": {
@@ -4608,7 +5196,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/firbolg.mp3"
+				"path": "races/firbolg.opus"
 			},
 			"additionalSpells": [
 				{
@@ -4680,6 +5268,74 @@
 			"hasFluffImages": true
 		},
 		{
+			"name": "Flamekin",
+			"source": "LFL",
+			"_copy": {
+				"name": "Genasi",
+				"source": "MPMM",
+				"_mod": {
+					"entries": {
+						"mode": "appendArr",
+						"items": [
+							{
+								"type": "entries",
+								"name": "Fire Resistance",
+								"entries": [
+									"You have resistance to fire damage."
+								]
+							},
+							{
+								"type": "entries",
+								"name": "Reach to the Blaze",
+								"entries": [
+									"You know the {@spell produce flame|XPHB} cantrip. Starting at 3rd level, you can cast the {@spell burning hands|XPHB} spell with this trait. Starting at 5th level, you can also cast the {@spell flame blade|XPHB} spell with this trait, without a material component. Once you cast {@spell burning hands|XPHB} or {@spell flame blade|XPHB} with this trait, you can't cast that spell with it again until you finish a long rest. You can also cast either of those spells using any spell slots you have of the appropriate level.",
+									"Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells when you cast them with this trait (choose when you select this race)."
+								]
+							}
+						]
+					}
+				}
+			},
+			"lineage": null,
+			"resist": [
+				"fire"
+			],
+			"additionalSpells": [
+				{
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"burning hands|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"flame blade|xphb"
+								]
+							}
+						}
+					},
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": [
+							"produce flame|xphb#c"
+						]
+					}
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
 			"name": "Genasi",
 			"source": "EEPC",
 			"page": 9,
@@ -4725,7 +5381,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/genasi.mp3"
+				"path": "races/genasi.opus"
 			},
 			"entries": [
 				{
@@ -4774,6 +5430,10 @@
 				"max": 120
 			},
 			"darkvision": 60,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/genasi.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -4813,6 +5473,10 @@
 					"firearms": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/giff.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -4826,7 +5490,7 @@
 					"type": "entries",
 					"name": "Firearms Mastery",
 					"entries": [
-						"You have a mystical connection to firearms that traces back to the gods of the giff, who delighted in such weapons. You have proficiency with all firearms and ignore the loading property of any firearm. In addition, attacking at long range with a firearm doesn't impose disadvantage on your attack roll."
+						"You have a mystical connection to firearms that traces back to the gods of the giff, who delighted in such weapons. You have proficiency with all firearms and ignore the {@itemProperty LD||loading} property of any firearm. In addition, attacking at long range with a firearm doesn't impose disadvantage on your attack roll."
 					]
 				},
 				{
@@ -5068,6 +5732,10 @@
 				"Natural Weapon",
 				"NPC Race"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/gnoll.opus"
+			},
 			"entries": [
 				{
 					"name": "Bite",
@@ -5130,7 +5798,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/gnome.mp3"
+				"path": "races/gnome.opus"
 			},
 			"entries": [
 				{
@@ -5187,6 +5855,10 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/gnome.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -5343,6 +6015,10 @@
 					"undercommon": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/gnome.opus"
+			},
 			"additionalSpells": [
 				{
 					"ability": "int",
@@ -5438,6 +6114,10 @@
 					"goblin": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"entries": [
 				{
 					"name": "Nimble Escape",
@@ -5502,6 +6182,10 @@
 				"S"
 			],
 			"traitTags": null,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"hasFluffImages": true
 		},
 		{
@@ -5552,6 +6236,10 @@
 				}
 			},
 			"traitTags": null,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"hasFluff": true
 		},
 		{
@@ -5570,6 +6258,10 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -5643,6 +6335,10 @@
 				"fire",
 				"psychic"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -5676,6 +6372,13 @@
 					"name": "Languages",
 					"entries": [
 						"You can speak, read, and write Common and Goblin."
+					],
+					"type": "entries"
+				},
+				{
+					"name": "Grit",
+					"entries": [
+						"You have resistance to fire damage and psychic damage. In addition, when you are wearing no armor, your AC is equal to 11 + your Dexterity modifier."
 					],
 					"type": "entries"
 				}
@@ -5725,6 +6428,10 @@
 					"goblin": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -5782,6 +6489,12 @@
 				"_mod": {
 					"entries": [
 						{
+							"mode": "replaceTxt",
+							"replace": "Goblins",
+							"with": "Dankwood goblins",
+							"flags": "i"
+						},
+						{
 							"mode": "appendArr",
 							"items": {
 								"name": "Alignment",
@@ -5815,6 +6528,10 @@
 				}
 			],
 			"heightAndWeight": null,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goblin.opus"
+			},
 			"hasFluff": true
 		},
 		{
@@ -5840,6 +6557,10 @@
 			"resist": [
 				"cold"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goliath.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -5927,7 +6648,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/goliath.mp3"
+				"path": "races/goliath.opus"
 			},
 			"entries": [
 				{
@@ -5987,6 +6708,7 @@
 			"name": "Goliath",
 			"source": "XPHB",
 			"page": 192,
+			"srd52": true,
 			"basicRules2024": true,
 			"edition": "one",
 			"creatureTypes": [
@@ -5999,6 +6721,10 @@
 			"traitTags": [
 				"Powerful Build"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/goliath.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -6011,7 +6737,7 @@
 					"type": "entries",
 					"name": "Giant Ancestry",
 					"entries": [
-						"You are descended from Giants. Choose one of the following benefits\u2014a supernatural boon from your ancestry; you can use the chosen benefit a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}:",
+						"You are descended from Giants. Choose one of the following benefits—a supernatural boon from your ancestry; you can use the chosen benefit a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}:",
 						{
 							"type": "list",
 							"style": "list-hang-notitle",
@@ -6285,6 +7011,10 @@
 					"undercommon": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/grimlock.opus"
+			},
 			"entries": [
 				{
 					"name": "Blindsight",
@@ -6356,6 +7086,10 @@
 			"conditionImmune": [
 				"poisoned"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/grung.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -6428,7 +7162,8 @@
 						"You can speak, read, and write Grung."
 					]
 				}
-			]
+			],
+			"hasFluffImages": true
 		},
 		{
 			"name": "Hadozee",
@@ -6482,6 +7217,9 @@
 			"source": "PHB",
 			"page": 38,
 			"srd": true,
+			"reprintedAs": [
+				"Khoravar|EFA"
+			],
 			"size": [
 				"M"
 			],
@@ -6529,7 +7267,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/half-elf.mp3"
+				"path": "races/half-elf.opus"
 			},
 			"entries": [
 				{
@@ -6620,7 +7358,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/half-orc.mp3"
+				"path": "races/half-orc.opus"
 			},
 			"entries": [
 				{
@@ -6711,7 +7449,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/halfling.mp3"
+				"path": "races/halfling.opus"
 			},
 			"entries": [
 				{
@@ -6764,6 +7502,7 @@
 			"name": "Halfling",
 			"source": "XPHB",
 			"page": 193,
+			"srd52": true,
 			"basicRules2024": true,
 			"edition": "one",
 			"creatureTypes": [
@@ -6773,6 +7512,10 @@
 				"S"
 			],
 			"speed": 30,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/halfling.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -6928,8 +7671,99 @@
 		},
 		{
 			"name": "Hexblood",
+			"source": "RHW",
+			"edition": "one",
+			"creatureTypes": [
+				"fey"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 60,
+			"additionalSpells": [
+				{
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"prepared": {
+						"_": {
+							"daily": {
+								"1e": [
+									"disguise self|xphb",
+									"hex|xphb"
+								]
+							}
+						}
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Eerie Token",
+					"entries": [
+						"As a {@variantrule Bonus Action|XPHB}, you can create a magical token by harmlessly removing a lock of hair, detaching a nail, or using some other method. While the token exists, you gain the following benefits:",
+						{
+							"type": "list",
+							"style": "list-hang-notitle",
+							"items": [
+								{
+									"type": "item",
+									"name": "Distant Message",
+									"entries": [
+										"As a {@action Magic|XPHB} action, you can send a telepathic message of 25 words or fewer to a creature holding or carrying the token, as long as you are within 10 miles of it."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Remote Viewing",
+									"entries": [
+										"If you are within 10 miles of the token, you can take a {@action Magic|XPHB} action to extend your senses through the token for 1 minute, until you have the Incapacitated condition, or until you end this state (no action required). During this state, you can see and hear from the token as if you were located where it is. When this state ends, the token is harmlessly destroyed.",
+										"Unless the token is destroyed early, it lasts until you finish a {@variantrule Long Rest|XPHB}. Once you create a token using this feature, you can't do so again until you finish a {@variantrule Long Rest|XPHB}."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Hex Magic",
+									"entries": [
+										"You always have the {@spell Disguise Self|XPHB} and {@spell Hex|XPHB} spells prepared. You can cast each spell once without a spell slot, and you regain the ability to cast it in that way when you finish a {@variantrule Long Rest|XPHB}. You can also cast the spell using any spell slots you have of the appropriate level. Intelligence, Wisdom, or Charisma is your spellcasting ability for the spells you cast with this trait (choose the ability when you select this species)."
+									]
+								}
+							]
+						}
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Hexblood",
 			"source": "VRGR",
 			"page": 18,
+			"reprintedAs": [
+				"Hexblood|RHW"
+			],
 			"lineage": "VRGR",
 			"creatureTypes": [
 				"fey"
@@ -7026,7 +7860,7 @@
 							"type": "inset",
 							"name": "Becoming a Hag",
 							"entries": [
-								"Hags can undertake a ritual to irreversibly transform a hexblood they created into a new hag, either one of their own kind or that embodies the hexblood's nature. This requires that both the hag and hexblood be in the same place and consent to the lengthy ritual\u2014circumstances most hexbloods shun but might come to accept over the course of centuries. Once a hexblood undergoes this irreversible ritual, they emerge as a hag NPC no longer under the control of the hexblood's player, unless the DM rules otherwise."
+								"Hags can undertake a ritual to irreversibly transform a hexblood they created into a new hag, either one of their own kind or that embodies the hexblood's nature. This requires that both the hag and hexblood be in the same place and consent to the lengthy ritual—circumstances most hexbloods shun but might come to accept over the course of centuries. Once a hexblood undergoes this irreversible ritual, they emerge as a hag NPC no longer under the control of the hexblood's player, unless the DM rules otherwise."
 							]
 						}
 					]
@@ -7053,6 +7887,10 @@
 					"goblin": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/hobgoblin.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -7113,6 +7951,10 @@
 					"reprintedAs": true
 				}
 			},
+			"soundClip": {
+				"type": "internal",
+				"path": "races/hobgoblin.opus"
+			},
 			"hasFluffImages": true
 		},
 		{
@@ -7131,6 +7973,10 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/hobgoblin.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -7249,6 +8095,10 @@
 					"light": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/hobgoblin.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -7327,7 +8177,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/human.mp3"
+				"path": "races/human.opus"
 			},
 			"entries": [
 				{
@@ -7385,6 +8235,10 @@
 					"any": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/human.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -7419,96 +8273,6 @@
 			"hasFluffImages": true
 		},
 		{
-			"name": "Human (Amonkhet)",
-			"source": "PSA",
-			"page": 14,
-			"size": [
-				"M"
-			],
-			"speed": 30,
-			"ability": [
-				{
-					"choose": {
-						"from": [
-							"str",
-							"dex",
-							"con",
-							"int",
-							"wis",
-							"cha"
-						],
-						"count": 2
-					}
-				}
-			],
-			"age": {
-				"mature": 20,
-				"max": 100
-			},
-			"feats": [
-				{
-					"any": 1
-				}
-			],
-			"skillProficiencies": [
-				{
-					"any": 1
-				}
-			],
-			"languageProficiencies": [
-				{
-					"common": true,
-					"anyStandard": 1
-				}
-			],
-			"entries": [
-				{
-					"name": "Age",
-					"type": "entries",
-					"entries": [
-						"Humans reach adulthood in their late teens. Most human initiates have completed the trials and found a glorious or inglorious death before they turn 30. Viziers can enjoy longer service to their gods, in theory living up to a century."
-					]
-				},
-				{
-					"name": "Alignment",
-					"type": "entries",
-					"entries": [
-						"Humans tend toward no particular alignment. The best and the worst are found among them."
-					]
-				},
-				{
-					"type": "entries",
-					"name": "Size",
-					"entries": [
-						"Humans vary widely in height and build, from barely 5 feet to well over 6 feet tall. Regardless of your position in that range, your size is Medium"
-					]
-				},
-				{
-					"name": "Skills",
-					"entries": [
-						"You gain proficiency in one skill of your choice."
-					],
-					"type": "entries"
-				},
-				{
-					"name": "Feat",
-					"entries": [
-						"You gain one {@5etools feat|feats.html} of your choice."
-					],
-					"type": "entries"
-				},
-				{
-					"name": "Languages",
-					"entries": [
-						"You can speak, read, and write Common and one extra language of your choice."
-					],
-					"type": "entries"
-				}
-			],
-			"hasFluff": true,
-			"hasFluffImages": true
-		},
-		{
 			"name": "Human (Innistrad)",
 			"source": "PSI",
 			"page": 8,
@@ -7526,6 +8290,10 @@
 					"anyStandard": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/human.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -7623,6 +8391,10 @@
 					"anyStandard": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/human.opus"
+			},
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -7679,6 +8451,10 @@
 					"cha": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/human.opus"
+			},
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -7713,6 +8489,68 @@
 					"cha": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/human.opus"
+			},
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Kalashtar",
+			"source": "EFA",
+			"page": 35,
+			"edition": "one",
+			"creatureTypes": [
+				"aberration"
+			],
+			"size": [
+				"M"
+			],
+			"speed": 30,
+			"traitTags": [
+				"Skill Proficiency"
+			],
+			"resist": [
+				"psychic"
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 6–7 feet tall)"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Dual Mind",
+					"entries": [
+						"You have {@variantrule Advantage|XPHB} on Wisdom and Charisma saving throws."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Mental Discipline",
+					"entries": [
+						"You have {@variantrule Resistance|XPHB} to Psychic damage."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Mind Link",
+					"entries": [
+						"You have telepathy with a range in feet equal to 10 times your level. When you're using this trait to speak telepathically to a creature, you can take a {@action Magic|XPHB} action to give that creature the ability to speak telepathically with you for 1 hour or until you take another {@action Magic|XPHB} action to end this effect."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Severed from Dreams",
+					"entries": [
+						"You can't be the target of the {@spell Dream|XPHB} spell. In addition, when you finish a {@variantrule Long Rest|XPHB}, you gain proficiency in one skill of your choice. This proficiency lasts until you finish another {@variantrule Long Rest|XPHB}."
+					]
+				}
+			],
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -7720,6 +8558,9 @@
 			"name": "Kalashtar",
 			"source": "ERLW",
 			"page": 29,
+			"reprintedAs": [
+				"Kalashtar|EFA"
+			],
 			"size": [
 				"M"
 			],
@@ -7886,7 +8727,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/kenku.mp3"
+				"path": "races/kenku.opus"
 			},
 			"entries": [
 				{
@@ -7927,6 +8768,10 @@
 					"any": 2
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/kenku.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -8015,7 +8860,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/kenku.mp3"
+				"path": "races/kenku.opus"
 			},
 			"entries": [
 				{
@@ -8143,6 +8988,174 @@
 			"hasFluffImages": true
 		},
 		{
+			"name": "Khoravar",
+			"alias": [
+				"Half-Elf"
+			],
+			"source": "EFA",
+			"page": 36,
+			"edition": "one",
+			"creatureTypes": [
+				"humanoid"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 60,
+			"traitTags": [
+				"Skill Proficiency",
+				"Tool Proficiency"
+			],
+			"additionalSpells": [
+				{
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": {
+							"_": [
+								{
+									"choose": "level=0|class=Cleric;Druid;Wizard"
+								}
+							]
+						}
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-6 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Fey Ancestry",
+					"entries": [
+						"You have {@variantrule Advantage|XPHB} on saving throws you make to avoid or end the {@condition Charmed|XPHB} condition."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Fey Gift",
+					"entries": [
+						"You know the {@spell Friends|XPHB} cantrip. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace that cantrip with a different cantrip from the Cleric, Druid, or Wizard spell list. Intelligence, Wisdom, or Charisma is your spellcasting ability for it (choose the ability when you select this species)."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Lethargy Resilience",
+					"entries": [
+						"When you fail a saving throw to avoid or end the {@condition Unconscious|XPHB} condition, you can succeed instead. Once you use this trait, you can't do so again until you finish {@dice 1d4} {@variantrule Long Rest|XPHB|Long Rests}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Skill Versatility",
+					"entries": [
+						"You gain proficiency in one skill or with one tool of your choice. Whenever you finish a {@variantrule Long Rest|XPHB}, you can replace it with another skill or tool proficiency."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Kithkin",
+			"source": "LFL",
+			"_copy": {
+				"name": "Halfling",
+				"source": "XPHB",
+				"_mod": {
+					"entries": {
+						"mode": "appendArr",
+						"items": {
+							"type": "entries",
+							"name": "Kithkin Lineage",
+							"entries": [
+								"As a native of either Lorwyn and Shadowmoor, you may gain additional traits.",
+								{
+									"type": "list",
+									"style": "list-hang-notitle",
+									"items": [
+										{
+											"type": "item",
+											"name": "Lorwyn",
+											"entries": [
+												"You do not gain any additional traits."
+											]
+										},
+										{
+											"type": "item",
+											"name": "Shadowmoor",
+											"entries": [
+												"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+											]
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			},
+			"darkvision": 120,
+			"hasFluff": true,
+			"hasFluffImages": true,
+			"_versions": [
+				{
+					"name": "Kithkin; Lorwyn",
+					"source": "LFL",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "removeArr",
+								"names": "Kithkin Lineage"
+							}
+						]
+					}
+				},
+				{
+					"name": "Kithkin; Shadowmoor",
+					"source": "LFL",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "prependArr",
+								"items": {
+									"type": "entries",
+									"name": "Darkvision",
+									"entries": [
+										"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+									]
+								}
+							},
+							{
+								"mode": "removeArr",
+								"names": "Kithkin Lineage"
+							}
+						]
+					},
+					"darkvision": 120
+				}
+			]
+		},
+		{
 			"name": "Kobold",
 			"source": "DMG",
 			"page": 282,
@@ -8167,6 +9180,10 @@
 					"draconic": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/kobold.opus"
+			},
 			"entries": [
 				{
 					"name": "Pack Tactics",
@@ -8221,6 +9238,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/kobold.opus"
+			},
 			"additionalSpells": [
 				{
 					"ability": {
@@ -8380,6 +9401,10 @@
 					"draconic": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/kobold.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -8550,6 +9575,10 @@
 					"undercommon": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/kuo-toa.opus"
+			},
 			"entries": [
 				{
 					"name": "Amphibious",
@@ -8728,6 +9757,10 @@
 					"draconic": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/lizardfolk.opus"
+			},
 			"entries": [
 				{
 					"name": "Hold Breath",
@@ -8783,6 +9816,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/lizardfolk.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -8884,6 +9921,10 @@
 					"draconic": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/lizardfolk.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -9058,6 +10099,68 @@
 			"hasFluffImages": true
 		},
 		{
+			"name": "Lorwyn Changeling",
+			"source": "LFL",
+			"creatureTypes": [
+				"fey"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 120,
+			"skillProficiencies": [
+				{
+					"choose": {
+						"from": [
+							"deception",
+							"performance"
+						]
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Shape Self",
+					"entries": [
+						"As an action, you can reshape your body to a two-legged Humanoid shape or to a four-legged Beast shape. While you have a Humanoid shape, you can wear clothing and armor made for a Humanoid of your size."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 120 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Delightful Imitator",
+					"entries": [
+						"You have proficiency in the {@skill Deception|XPHB} or {@skill Performance|XPHB} skill."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Unpredictable Movement",
+					"entries": [
+						"When you roll {@variantrule Initiative|XPHB}, you can immediately move up to half your {@variantrule Speed|XPHB}, provided you don't have {@variantrule Disadvantage|XPHB} on the {@variantrule Initiative|XPHB} roll."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
 			"name": "Loxodon",
 			"source": "GGR",
 			"page": 17,
@@ -9168,6 +10271,74 @@
 			"hasFluffImages": true
 		},
 		{
+			"name": "Lupin",
+			"source": "RHW",
+			"edition": "one",
+			"creatureTypes": [
+				"humanoid"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 60,
+			"traitTags": [
+				"Natural Weapon"
+			],
+			"skillProficiencies": [
+				{
+					"choose": {
+						"from": [
+							"perception",
+							"stealth",
+							"survival"
+						]
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Feral Pounce",
+					"entries": [
+						"Your {@variantrule Unarmed Strike|XPHB|Unarmed Strikes} deal Slashing damage instead of Bludgeoning damage. In addition, when you hit a creature with an {@variantrule Unarmed Strike|XPHB} as part of the {@action Attack|XPHB} action on your turn, you can use both the {@variantrule Damage|XPHB} and the Shove options. You can use this benefit only once per turn."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Howl",
+					"entries": [
+						"As a {@variantrule Bonus Action|XPHB}, you let out an unearthly howl. Each creature of your choice within 15 feet of you must succeed on a Wisdom saving throw (DC 8 plus your Constitution modifier and {@variantrule Proficiency|XPHB|Proficiency Bonus}) or have {@variantrule Disadvantage|XPHB} on attack rolls and saving throws until the start of your next turn.",
+						"You can use this trait a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Werewolf Instincts",
+					"entries": [
+						"You have proficiency in the {@skill Perception|XPHB}, {@skill Stealth|XPHB}, or {@skill Survival|XPHB} skill."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
 			"name": "Merfolk",
 			"source": "DMG",
 			"page": 282,
@@ -9188,6 +10359,10 @@
 					"aquan": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/merfolk.opus"
+			},
 			"entries": [
 				{
 					"name": "Amphibious",
@@ -9241,6 +10416,10 @@
 					"anyStandard": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/merfolk.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -9334,6 +10513,10 @@
 					"other": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/minotaur.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -9438,6 +10621,10 @@
 					]
 				}
 			},
+			"soundClip": {
+				"type": "internal",
+				"path": "races/minotaur.opus"
+			},
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -9453,6 +10640,10 @@
 			"traitTags": [
 				"Natural Weapon"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/minotaur.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -9518,6 +10709,10 @@
 					"other": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/minotaur.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -9708,6 +10903,10 @@
 					"orc": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"entries": [
 				{
 					"name": "Aggressive",
@@ -9809,7 +11008,11 @@
 						"count": 2
 					}
 				}
-			]
+			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			}
 		},
 		{
 			"name": "Orc",
@@ -9865,6 +11068,10 @@
 					"orc": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -9940,6 +11147,10 @@
 			"traitTags": [
 				"Powerful Build"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -10029,6 +11240,10 @@
 					"orc": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -10087,6 +11302,7 @@
 			"name": "Orc",
 			"source": "XPHB",
 			"page": 195,
+			"srd52": true,
 			"basicRules2024": true,
 			"edition": "one",
 			"creatureTypes": [
@@ -10097,6 +11313,10 @@
 			],
 			"speed": 30,
 			"darkvision": 120,
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"sizeEntry": {
 				"type": "item",
 				"name": "Size:",
@@ -10161,6 +11381,10 @@
 					"orc": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/orc.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -10349,8 +11573,80 @@
 		},
 		{
 			"name": "Reborn",
+			"source": "RHW",
+			"edition": "one",
+			"creatureTypes": [
+				"humanoid"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"skillProficiencies": [
+				{
+					"any": 1
+				}
+			],
+			"resist": [
+				{
+					"choose": {
+						"from": [
+							"cold",
+							"necrotic",
+							"poison"
+						]
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Escaped Death",
+					"entries": [
+						"You have {@variantrule Advantage|XPHB} on {@variantrule Death Saving Throw|XPHB|Death Saving Throws}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Everlasting",
+					"entries": [
+						"You don't gain {@condition Exhaustion|XPHB} levels from dehydration, malnutrition, or suffocation. You don't need to sleep, and magic can't put you to sleep. You can finish a {@variantrule Long Rest|XPHB} in 4 hours if you spend those hours in an inactive, motionless state, during which you retain consciousness."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Knowledge from a Past Life",
+					"entries": [
+						"You gain proficiency in one skill of your choice.",
+						"In addition, you can temporarily peer into the past to aid you in the present. When you fail an ability check, you can roll {@dice 1d6} and add the number rolled to the {@dice d20}, potentially turning the failure into a success. You can do this a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Strange Endurance",
+					"entries": [
+						"You have {@variantrule Resistance|XPHB} to one of the following damage types of your choice: Cold, Necrotic, or Poison."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Reborn",
 			"source": "VRGR",
 			"page": 20,
+			"reprintedAs": [
+				"Reborn|RHW"
+			],
 			"lineage": "VRGR",
 			"size": [
 				"S",
@@ -10400,6 +11696,87 @@
 					"name": "Knowledge from a Past Life",
 					"entries": [
 						"You temporarily remember glimpses of the past, perhaps faded memories from ages ago or a previous life. When you make an ability check that uses a skill, you can roll a {@dice d6} immediately after seeing the number on the {@dice d20} and add the number on the {@dice d6} to the check. You can use this feature a number of times equal to your proficiency bonus, and you regain all expended uses when you finish a long rest."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Rimekin",
+			"source": "LFL",
+			"creatureTypes": [
+				"humanoid"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 60,
+			"resist": [
+				"cold"
+			],
+			"additionalSpells": [
+				{
+					"known": {
+						"1": [
+							"ray of frost|xphb#c"
+						]
+					},
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"ice knife|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"flame blade|xphb"
+								]
+							}
+						}
+					},
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Cold Fire Magic",
+					"entries": [
+						"You know the {@spell Ray of Frost|XPHB} cantrip. When you reach character levels 3 and 5, you learn the {@spell Ice Knife|XPHB} spell and the {@spell Flame Blade|XPHB} spell, respectively. You always have those spells prepared. You can cast each once without a spell slot, and you regain the ability to cast these spells in this way when you finish a {@variantrule Long Rest|XPHB}. You can also cast the spells using any spell slots you have of the appropriate level. When you cast {@spell Flame Blade|XPHB} using this trait, the spell deals Cold damage instead of Fire damage.",
+						"Intelligence, Wisdom, or Charisma is your spellcasting ability for these spells (choose the ability when you select this species)."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Cold Resistance",
+					"entries": [
+						"You have {@variantrule Resistance|XPHB} to Cold damage."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
 					]
 				}
 			],
@@ -10457,6 +11834,10 @@
 					"anyMusicalInstrument": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/satyr.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -10552,6 +11933,10 @@
 					"anyMusicalInstrument": 1
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/satyr.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -10780,10 +12165,187 @@
 		},
 		{
 			"name": "Shifter",
+			"source": "EFA",
+			"page": 37,
+			"edition": "one",
+			"creatureTypes": [
+				"humanoid"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"darkvision": 60,
+			"skillProficiencies": [
+				{
+					"choose": {
+						"from": [
+							"acrobatics",
+							"athletics",
+							"intimidation",
+							"survival"
+						]
+					}
+				}
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 4-7 feet tall) or Small (about 2-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Bestial Instincts",
+					"entries": [
+						"Channeling the beast within, you gain proficiency in one of the following skills of your choice: {@skill Acrobatics|XPHB}, {@skill Athletics|XPHB}, {@skill Intimidation|XPHB}, or {@skill Survival|XPHB}."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Darkvision",
+					"entries": [
+						"You have {@sense Darkvision|XPHB} with a range of 60 feet."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Shifting",
+					"entries": [
+						"As a {@variantrule Bonus Action|XPHB}, you can shape-shift to assume a more bestial appearance. This transformation lasts for 1 minute or until you revert to your normal appearance as a {@variantrule Bonus Action|XPHB}. When you shift, you gain {@variantrule Temporary Hit Points|XPHB} equal to 2 times your {@variantrule Proficiency|XPHB|Proficiency Bonus}. You can shift a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}.",
+						"Whenever you shift, you gain the benefit of one of the following options (choose when you select this species)",
+						{
+							"type": "list",
+							"style": "list-hang-notitle",
+							"items": [
+								{
+									"type": "item",
+									"name": "Beasthide",
+									"entries": [
+										"You gain {@dice 1d6} additional {@variantrule Temporary Hit Points|XPHB}. While shifted, you have a +1 bonus to your {@variantrule Armor Class|XPHB}."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Longtooth",
+									"entries": [
+										"When you shift and as a {@variantrule Bonus Action|XPHB} on your other turns while shifted, you can use your elongated fangs to make an {@variantrule Unarmed Strike|XPHB}. If you hit with this {@variantrule Unarmed Strike|XPHB} and deal damage, you can deal Piercing damage equal to {@dice 1d6} plus your Strength modifier, instead of the normal damage of an {@variantrule Unarmed Strike|XPHB}."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Swiftstride",
+									"entries": [
+										"While you are shifted, your {@variantrule Speed|XPHB} increases by 10 feet. Additionally, you can move up to 10 feet as a {@variantrule Reaction|XPHB} when a creature ends its turn within 5 feet of you. This reactive movement doesn't provoke {@action Opportunity Attack|XPHB|Opportunity Attacks}."
+									]
+								},
+								{
+									"type": "item",
+									"name": "Wildhunt",
+									"entries": [
+										"While shifted, you have {@variantrule Advantage|XPHB} on Wisdom checks. Additionally, no creature within 30 feet of you can have {@variantrule Advantage|XPHB} on an attack roll against you unless you have the {@condition Incapacitated|XPHB} condition."
+									]
+								}
+							]
+						}
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true,
+			"_versions": [
+				{
+					"name": "Shifter; Beasthide",
+					"source": "EFA",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "replaceArr",
+								"replace": "Shifting",
+								"items": {
+									"name": "Shifting (Beasthide)",
+									"type": "entries",
+									"entries": [
+										"As a {@variantrule Bonus Action|XPHB}, you can shape-shift to assume a more bestial appearance. This transformation lasts for 1 minute or until you revert to your normal appearance as a {@variantrule Bonus Action|XPHB}. When you shift, you gain {@variantrule Temporary Hit Points|XPHB} equal to 2 times your {@variantrule Proficiency|XPHB|Proficiency Bonus}. You can shift a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}.",
+										"Whenever you shift, you gain {@dice 1d6} additional {@variantrule Temporary Hit Points|XPHB}. While shifted, you have a +1 bonus to your {@variantrule Armor Class|XPHB}."
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"name": "Shifter; Longtooth",
+					"source": "EFA",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "replaceArr",
+								"replace": "Shifting",
+								"items": {
+									"name": "Shifting (Longtooth)",
+									"type": "entries",
+									"entries": [
+										"As a {@variantrule Bonus Action|XPHB}, you can shape-shift to assume a more bestial appearance. This transformation lasts for 1 minute or until you revert to your normal appearance as a {@variantrule Bonus Action|XPHB}. When you shift, you gain {@variantrule Temporary Hit Points|XPHB} equal to 2 times your {@variantrule Proficiency|XPHB|Proficiency Bonus}. You can shift a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}.",
+										"When you shift and as a {@variantrule Bonus Action|XPHB} on your other turns while shifted, you can use your elongated fangs to make an {@variantrule Unarmed Strike|XPHB}. If you hit with this {@variantrule Unarmed Strike|XPHB} and deal damage, you can deal Piercing damage equal to {@dice 1d6} plus your Strength modifier, instead of the normal damage of an {@variantrule Unarmed Strike|XPHB}."
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"name": "Shifter; Swiftstride",
+					"source": "EFA",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "replaceArr",
+								"replace": "Shifting",
+								"items": {
+									"name": "Shifting (Swiftstride)",
+									"type": "entries",
+									"entries": [
+										"As a {@variantrule Bonus Action|XPHB}, you can shape-shift to assume a more bestial appearance. This transformation lasts for 1 minute or until you revert to your normal appearance as a {@variantrule Bonus Action|XPHB}. When you shift, you gain {@variantrule Temporary Hit Points|XPHB} equal to 2 times your {@variantrule Proficiency|XPHB|Proficiency Bonus}. You can shift a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}.",
+										"While you are shifted, your {@variantrule Speed|XPHB} increases by 10 feet. Additionally, you can move up to 10 feet as a {@variantrule Reaction|XPHB} when a creature ends its turn within 5 feet of you. This reactive movement doesn't provoke {@action Opportunity Attack|XPHB|Opportunity Attacks}."
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"name": "Shifter; Wildhunt",
+					"source": "EFA",
+					"_mod": {
+						"entries": [
+							{
+								"mode": "replaceArr",
+								"replace": "Shifting",
+								"items": {
+									"name": "Shifting (Wildhunt)",
+									"type": "entries",
+									"entries": [
+										"As a {@variantrule Bonus Action|XPHB}, you can shape-shift to assume a more bestial appearance. This transformation lasts for 1 minute or until you revert to your normal appearance as a {@variantrule Bonus Action|XPHB}. When you shift, you gain {@variantrule Temporary Hit Points|XPHB} equal to 2 times your {@variantrule Proficiency|XPHB|Proficiency Bonus}. You can shift a number of times equal to your {@variantrule Proficiency|XPHB|Proficiency Bonus}, and you regain all expended uses when you finish a {@variantrule Long Rest|XPHB}.",
+										"While shifted, you have {@variantrule Advantage|XPHB} on Wisdom checks. Additionally, no creature within 30 feet of you can have {@variantrule Advantage|XPHB} on an attack roll against you unless you have the {@condition Incapacitated|XPHB} condition."
+									]
+								}
+							}
+						]
+					}
+				}
+			]
+		},
+		{
+			"name": "Shifter",
 			"source": "ERLW",
 			"page": 33,
 			"reprintedAs": [
-				"Shifter|MPMM"
+				"Shifter|MPMM",
+				"Shifter|EFA"
 			],
 			"size": [
 				"M"
@@ -10864,6 +12426,9 @@
 			"name": "Shifter",
 			"source": "MPMM",
 			"page": 32,
+			"reprintedAs": [
+				"Shifter|EFA"
+			],
 			"lineage": "VRGR",
 			"size": [
 				"M"
@@ -11247,6 +12812,10 @@
 				"exhaustion",
 				"poisoned"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/skeleton.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -11308,6 +12877,10 @@
 					"stealth": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/tabaxi.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -11409,7 +12982,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/tabaxi.mp3"
+				"path": "races/tabaxi.opus"
 			},
 			"entries": [
 				{
@@ -11483,6 +13056,10 @@
 				"Improved Resting",
 				"Natural Armor"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/thri-kreen.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -11517,7 +13094,7 @@
 					"type": "entries",
 					"name": "Secondary Arms",
 					"entries": [
-						"You have two slightly smaller secondary arms below your primary pair of arms. The secondary arms can manipulate an object, open or close a door or container, pick up or set down a Tiny object, or wield a weapon that has the light property."
+						"You have two slightly smaller secondary arms below your primary pair of arms. The secondary arms can manipulate an object, open or close a door or container, pick up or set down a Tiny object, or wield a weapon that has the {@itemProperty L||light} property."
 					]
 				},
 				{
@@ -11581,7 +13158,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/tiefling.mp3"
+				"path": "races/tiefling.opus"
 			},
 			"additionalSpells": [
 				{
@@ -11672,8 +13249,24 @@
 			],
 			"speed": 30,
 			"darkvision": 60,
+			"resist": [
+				{
+					"choose": {
+						"from": [
+							"poison",
+							"necrotic",
+							"fire"
+						]
+					}
+				}
+			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/tiefling.opus"
+			},
 			"additionalSpells": [
 				{
+					"name": "Abyssal",
 					"ability": {
 						"choose": [
 							"int",
@@ -11683,8 +13276,89 @@
 					},
 					"known": {
 						"1": [
-							"thaumaturgy|xphb#c"
+							"thaumaturgy|xphb#c",
+							"poison spray|xphb#c"
 						]
+					},
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"ray of sickness|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"hold person|xphb"
+								]
+							}
+						}
+					}
+				},
+				{
+					"name": "Chthonic",
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": [
+							"thaumaturgy|xphb#c",
+							"chill touch|xphb#c"
+						]
+					},
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"false life|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"ray of enfeeblement|xphb"
+								]
+							}
+						}
+					}
+				},
+				{
+					"name": "Infernal",
+					"ability": {
+						"choose": [
+							"int",
+							"wis",
+							"cha"
+						]
+					},
+					"known": {
+						"1": [
+							"thaumaturgy|xphb#c",
+							"fire bolt|xphb#c"
+						]
+					},
+					"innate": {
+						"3": {
+							"daily": {
+								"1": [
+									"hellish rebuke|xphb"
+								]
+							}
+						},
+						"5": {
+							"daily": {
+								"1": [
+									"darkness|xphb"
+								]
+							}
+						}
 					}
 				}
 			],
@@ -11727,19 +13401,19 @@
 							"rows": [
 								[
 									"Abyssal",
-									"You have Resistance to Poison damage. You also know the {@spell Poison Spray|XPHB} cantrip.",
+									"You have {@variantrule Resistance|XPHB} to Poison damage. You also know the {@spell Poison Spray|XPHB} cantrip.",
 									"{@spell Ray of Sickness|XPHB}",
 									"{@spell Hold Person|XPHB}"
 								],
 								[
 									"Chthonic",
-									"You have Resistance to Necrotic damage. You also know the {@spell Chill Touch|XPHB} cantrip.",
+									"You have {@variantrule Resistance|XPHB} to Necrotic damage. You also know the {@spell Chill Touch|XPHB} cantrip.",
 									"{@spell False Life|XPHB}",
 									"{@spell Ray of Enfeeblement|XPHB}"
 								],
 								[
 									"Infernal",
-									"You have Resistance to Fire damage. You also know the {@spell Fire Bolt|XPHB} cantrip.",
+									"You have {@variantrule Resistance|XPHB} to Fire damage. You also know the {@spell Fire Bolt|XPHB} cantrip.",
 									"{@spell Hellish Rebuke|XPHB}",
 									"{@spell Darkness|XPHB}"
 								]
@@ -11954,6 +13628,10 @@
 					}
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/tortle.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -12043,6 +13721,10 @@
 					"common": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/tortle.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -12142,6 +13824,10 @@
 					"reprintedAs": true
 				}
 			},
+			"soundClip": {
+				"type": "internal",
+				"path": "races/triton.opus"
+			},
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -12164,6 +13850,10 @@
 			"resist": [
 				"cold"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/triton.opus"
+			},
 			"additionalSpells": [
 				{
 					"innate": {
@@ -12292,7 +13982,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/triton.mp3"
+				"path": "races/triton.opus"
 			},
 			"additionalSpells": [
 				{
@@ -12417,6 +14107,10 @@
 					"other": true
 				}
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/troglodyte.opus"
+			},
 			"entries": [
 				{
 					"name": "Chameleon Skin",
@@ -12491,6 +14185,10 @@
 			"resist": [
 				"necrotic"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/vampire.opus"
+			},
 			"entries": [
 				{
 					"name": "Age",
@@ -12818,8 +14516,88 @@
 		},
 		{
 			"name": "Warforged",
+			"source": "EFA",
+			"page": 38,
+			"edition": "one",
+			"creatureTypes": [
+				"construct"
+			],
+			"size": [
+				"S",
+				"M"
+			],
+			"speed": 30,
+			"traitTags": [
+				"Improved Resting",
+				"Natural Armor"
+			],
+			"skillProficiencies": [
+				{
+					"any": 1
+				}
+			],
+			"toolProficiencies": [
+				{
+					"any": 1
+				}
+			],
+			"resist": [
+				"poison"
+			],
+			"sizeEntry": {
+				"type": "item",
+				"name": "Size:",
+				"entries": [
+					"Medium (about 6-8 feet tall) or Small (about 3-4 feet tall), chosen when you select this species"
+				]
+			},
+			"entries": [
+				{
+					"type": "entries",
+					"name": "Construct Resilience",
+					"entries": [
+						"You have {@variantrule Resistance|XPHB} to Poison damage. You also have {@variantrule Advantage|XPHB} on saving throws to avoid or end the {@condition Poisoned|XPHB} condition."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Integrated Protection",
+					"entries": [
+						"You gain a +1 bonus to your {@variantrule Armor Class|XPHB}. In addition, armor you have donned can't be removed against your will while you're alive."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Sentry's Rest",
+					"entries": [
+						"You don't need to sleep, and magic can't put you to sleep. You can finish a {@variantrule Long Rest|XPHB} in 6 hours if you spend those hours in an inactive, motionless state. During this time, you appear inert but remain conscious."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Specialized Design",
+					"entries": [
+						"You gain one skill proficiency and one tool proficiency of your choice."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Tireless",
+					"entries": [
+						"You don't gain {@condition Exhaustion|XPHB} levels from dehydration, malnutrition, or suffocation."
+					]
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
+		{
+			"name": "Warforged",
 			"source": "ERLW",
 			"page": 35,
+			"reprintedAs": [
+				"Warforged|EFA"
+			],
 			"size": [
 				"M"
 			],
@@ -13084,6 +14862,10 @@
 			"conditionImmune": [
 				"poisoned"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/yuan-ti-pureblood.opus"
+			},
 			"additionalSpells": [
 				{
 					"innate": {
@@ -13191,6 +14973,10 @@
 			"conditionImmune": [
 				"poisoned"
 			],
+			"soundClip": {
+				"type": "internal",
+				"path": "races/zombie.opus"
+			},
 			"entries": [
 				{
 					"type": "entries",
@@ -13228,9 +15014,148 @@
 					"type": "entries"
 				}
 			]
+		},
+		{
+			"name": "Human (Amonkhet)",
+			"source": "PSA",
+			"page": 14,
+			"size": [
+				"M"
+			],
+			"speed": 30,
+			"ability": [
+				{
+					"choose": {
+						"from": [
+							"str",
+							"dex",
+							"con",
+							"int",
+							"wis",
+							"cha"
+						],
+						"count": 2
+					}
+				}
+			],
+			"age": {
+				"mature": 20,
+				"max": 100
+			},
+			"feats": [
+				{
+					"any": 1
+				}
+			],
+			"skillProficiencies": [
+				{
+					"any": 1
+				}
+			],
+			"languageProficiencies": [
+				{
+					"common": true,
+					"anyStandard": 1
+				}
+			],
+			"entries": [
+				{
+					"name": "Age",
+					"type": "entries",
+					"entries": [
+						"Humans reach adulthood in their late teens. Most human initiates have completed the trials and found a glorious or inglorious death before they turn 30. Viziers can enjoy longer service to their gods, in theory living up to a century."
+					]
+				},
+				{
+					"name": "Alignment",
+					"type": "entries",
+					"entries": [
+						"Humans tend toward no particular alignment. The best and the worst are found among them."
+					]
+				},
+				{
+					"type": "entries",
+					"name": "Size",
+					"entries": [
+						"Humans vary widely in height and build, from barely 5 feet to well over 6 feet tall. Regardless of your position in that range, your size is Medium"
+					]
+				},
+				{
+					"name": "Skills",
+					"entries": [
+						"You gain proficiency in one skill of your choice."
+					],
+					"type": "entries"
+				},
+				{
+					"name": "Feat",
+					"entries": [
+						"You gain one {@5etools feat|feats.html} of your choice."
+					],
+					"type": "entries"
+				},
+				{
+					"name": "Languages",
+					"entries": [
+						"You can speak, read, and write Common and one extra language of your choice."
+					],
+					"type": "entries"
+				}
+			],
+			"hasFluff": true,
+			"hasFluffImages": true
 		}
 	],
 	"subrace": [
+		{
+			"name": "Amonkhet",
+			"source": "PSA",
+			"page": 14,
+			"_copy": {
+				"name": "Variant",
+				"source": "PHB",
+				"raceName": "Human",
+				"raceSource": "PHB",
+				"_mod": {
+					"entries": [
+						{
+							"mode": "appendArr",
+							"items": [
+								{
+									"name": "Age",
+									"type": "entries",
+									"entries": [
+										"Humans reach adulthood in their late teens. Most human initiates have completed the trials and found a glorious or inglorious death before they turn 30. Viziers can enjoy longer service to their gods, in theory living up to a century."
+									],
+									"data": {
+										"overwrite": "Age"
+									}
+								},
+								{
+									"name": "Languages",
+									"entries": [
+										"You can speak, read, and write Common and one extra language of your choice."
+									],
+									"type": "entries",
+									"data": {
+										"overwrite": "Languages"
+									}
+								},
+								{
+									"name": "Alignment",
+									"type": "entries",
+									"entries": [
+										"Humans tend toward no particular alignment. The best and the worst are found among them."
+									]
+								}
+							]
+						}
+					]
+				}
+			},
+			"hasFluff": true,
+			"hasFluffImages": true
+		},
 		{
 			"name": "Fallen",
 			"source": "VGM",
@@ -14131,6 +16056,12 @@
 			"raceName": "Dwarf",
 			"raceSource": "PHB",
 			"page": 51,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Warding|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"int": 1
@@ -14562,6 +16493,12 @@
 			"raceName": "Elf",
 			"raceSource": "PHB",
 			"page": 49,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Shadow|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"cha": 1
@@ -16053,6 +17990,12 @@
 			"raceName": "Gnome",
 			"raceSource": "PHB",
 			"page": 47,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Scribing|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"cha": 1
@@ -16199,7 +18142,7 @@
 				{
 					"name": "Tinker",
 					"entries": [
-						"You have proficiency with artisan's tools ({@item tinker's tools|phb}). Using those tools, you can spend 1 hour and 10 gp worth of materials to construct a Tiny clockwork device (AC 5, 1 hp). The device ceases to function after 24 hours (unless you spend 1 hour repairing it to keep the device functioning), or when you use your action to dismantle it; at that time, you can reclaim the materials used to create it. You can have up to three such devices active at a time.",
+						"You have proficiency with {@item artisan's tools|PHB} ({@item tinker's tools|phb}). Using those tools, you can spend 1 hour and 10 gp worth of materials to construct a Tiny clockwork device (AC 5, 1 hp). The device ceases to function after 24 hours (unless you spend 1 hour repairing it to keep the device functioning), or when you use your action to dismantle it; at that time, you can reclaim the materials used to create it. You can have up to three such devices active at a time.",
 						"When you create a device, choose one of the following options:",
 						{
 							"type": "entries",
@@ -16241,6 +18184,7 @@
 					"dex": 2
 				}
 			],
+			"resist": null,
 			"entries": [
 				{
 					"name": "Alignment",
@@ -16292,13 +18236,6 @@
 			],
 			"entries": [
 				{
-					"name": "Grit",
-					"entries": [
-						"You have resistance to fire damage and psychic damage. In addition, when you are wearing no armor, your AC is equal to 11 + your Dexterity modifier."
-					],
-					"type": "entries"
-				},
-				{
 					"name": "Grotag Tamer",
 					"entries": [
 						"You have proficiency in the {@skill Animal Handling} skill."
@@ -16322,13 +18259,6 @@
 				}
 			],
 			"entries": [
-				{
-					"name": "Grit",
-					"entries": [
-						"You have resistance to fire damage and psychic damage. In addition, when you are wearing no armor, your AC is equal to 11 + your Dexterity modifier."
-					],
-					"type": "entries"
-				},
 				{
 					"name": "Lavastep Grit",
 					"entries": [
@@ -16359,13 +18289,6 @@
 			],
 			"entries": [
 				{
-					"name": "Grit",
-					"entries": [
-						"You have resistance to fire damage and psychic damage. In addition, when you are wearing no armor, your AC is equal to 11 + your Dexterity modifier."
-					],
-					"type": "entries"
-				},
-				{
 					"name": "Tuktuk Cunning",
 					"entries": [
 						"You have proficiency with {@item thieves' tools|phb}."
@@ -16382,6 +18305,9 @@
 			"raceSource": "PHB",
 			"page": 38,
 			"srd": true,
+			"reprintedAs": [
+				"Khoravar|EFA"
+			],
 			"hasFluff": true,
 			"hasFluffImages": true
 		},
@@ -16577,6 +18503,12 @@
 			"raceName": "Half-Elf",
 			"raceSource": "PHB",
 			"page": 40,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Detection|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"wis": 2,
@@ -16706,6 +18638,12 @@
 			"raceName": "Half-Elf",
 			"raceSource": "PHB",
 			"page": 50,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Storm|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"cha": 2,
@@ -17105,6 +19043,12 @@
 			"raceName": "Half-Orc",
 			"raceSource": "PHB",
 			"page": 41,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Finding|EFA",
+					"tag": "feat"
+				}
+			],
 			"traitTags": [
 				"Dragonmark",
 				"Skill Bonus Dice"
@@ -17118,7 +19062,7 @@
 			],
 			"soundClip": {
 				"type": "internal",
-				"path": "races/half-orc.mp3"
+				"path": "races/half-orc.opus"
 			},
 			"additionalSpells": [
 				{
@@ -17358,6 +19302,12 @@
 			"raceName": "Halfling",
 			"raceSource": "PHB",
 			"page": 43,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Healing|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"wis": 1
@@ -17470,6 +19420,12 @@
 			"raceName": "Halfling",
 			"raceSource": "PHB",
 			"page": 44,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Hospitality|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"cha": 1
@@ -17726,6 +19682,12 @@
 			"raceName": "Human",
 			"raceSource": "PHB",
 			"page": 42,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Handling|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"wis": 2,
@@ -17852,6 +19814,12 @@
 			"raceName": "Human",
 			"raceSource": "PHB",
 			"page": 45,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Making|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"int": 2,
@@ -17921,7 +19889,7 @@
 					"type": "entries",
 					"name": "Maker's Gift",
 					"entries": [
-						"You gain proficiency with one type of artisan's tools of your choice."
+						"You gain proficiency with one type of {@item artisan's tools|PHB} of your choice."
 					]
 				},
 				{
@@ -17980,6 +19948,12 @@
 			"raceName": "Human",
 			"raceSource": "PHB",
 			"page": 46,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Passage|EFA",
+					"tag": "feat"
+				}
+			],
 			"speed": 35,
 			"ability": [
 				{
@@ -18101,6 +20075,12 @@
 			"raceName": "Human",
 			"raceSource": "PHB",
 			"page": 48,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Sentinel|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"con": 2,
@@ -18265,6 +20245,12 @@
 			"raceName": "Human",
 			"raceSource": "PHB",
 			"page": 41,
+			"reprintedAs": [
+				{
+					"uid": "Mark of Finding|EFA",
+					"tag": "feat"
+				}
+			],
 			"ability": [
 				{
 					"con": 1,
@@ -18840,6 +20826,10 @@
 			"raceName": "Shifter",
 			"raceSource": "ERLW",
 			"page": 34,
+			"reprintedAs": [
+				"Shifter|MPMM",
+				"Shifter|EFA"
+			],
 			"ability": [
 				{
 					"con": 2,
@@ -18879,6 +20869,10 @@
 			"raceName": "Shifter",
 			"raceSource": "ERLW",
 			"page": 34,
+			"reprintedAs": [
+				"Shifter|MPMM",
+				"Shifter|EFA"
+			],
 			"ability": [
 				{
 					"str": 2,
@@ -18918,6 +20912,10 @@
 			"raceName": "Shifter",
 			"raceSource": "ERLW",
 			"page": 34,
+			"reprintedAs": [
+				"Shifter|MPMM",
+				"Shifter|EFA"
+			],
 			"ability": [
 				{
 					"dex": 2,
@@ -18954,6 +20952,10 @@
 			"raceName": "Shifter",
 			"raceSource": "ERLW",
 			"page": 34,
+			"reprintedAs": [
+				"Shifter|MPMM",
+				"Shifter|EFA"
+			],
 			"ability": [
 				{
 					"wis": 2,

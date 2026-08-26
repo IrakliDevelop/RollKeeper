@@ -1,0 +1,367 @@
+import { describe, it, expect } from 'vitest';
+import {
+  ElementStore,
+  LayerManager,
+  createImage,
+  type Layer,
+} from '@fieldnotes/core';
+import {
+  MAP_LAYER_ID,
+  ANNOTATIONS_LAYER_ID,
+  MAP_LAYER_ORDER,
+  ANNOTATIONS_LAYER_ORDER,
+  CUSTOM_BAND_ORDER,
+  PLAYER_BAND_ORDER,
+  ensureCanonicalLayers,
+  pinCanonicalLayers,
+  subscribePinCanonicalLayers,
+  migrateCanvasToContract,
+  type ViewportLike,
+} from '@/components/ui/campaign/location-map/layerContract';
+import { makeApplyRemoteLayer } from '@/components/ui/campaign/location-map/layerSync';
+
+function makeVp(): ViewportLike {
+  const store = new ElementStore();
+  const layerManager = new LayerManager(store);
+  return { store, layerManager };
+}
+
+/** Contract applied AND the SDK's empty default "Layer 1" dropped — use for
+ *  band-order assertions ("Layer 1" would otherwise occupy the first custom
+ *  slot and shift every expected order by one). */
+function makeCleanVp(role: 'dm' | 'player' = 'dm'): ViewportLike {
+  const vp = makeVp();
+  ensureCanonicalLayers(vp, role);
+  migrateCanvasToContract(vp, role);
+  return vp;
+}
+
+function addImageOn(vp: ViewportLike, layerId: string, zIndex = 0): string {
+  const el = createImage({
+    position: { x: 0, y: 0 },
+    size: { w: 10, h: 10 },
+    src: 'test.png',
+    layerId,
+    zIndex,
+  });
+  vp.store.add(el);
+  return el.id;
+}
+
+function layer(vp: ViewportLike, id: string): Layer {
+  const l = vp.layerManager.getLayer(id);
+  if (!l) throw new Error(`layer ${id} missing`);
+  return l;
+}
+
+describe('ensureCanonicalLayers', () => {
+  it('creates map + annotations with canonical ids, orders, and locks (dm)', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    expect(layer(vp, MAP_LAYER_ID).order).toBe(MAP_LAYER_ORDER);
+    expect(layer(vp, MAP_LAYER_ID).locked).toBe(true);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).order).toBe(ANNOTATIONS_LAYER_ORDER);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+  });
+
+  it('locks annotations for role player', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'player');
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('is idempotent — second call changes nothing', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    const before = vp.layerManager.getLayers();
+    ensureCanonicalLayers(vp, 'dm');
+    expect(vp.layerManager.getLayers()).toEqual(before);
+  });
+
+  it('moves the active layer off layer-map', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.setActiveLayer(MAP_LAYER_ID);
+    ensureCanonicalLayers(vp, 'dm');
+    expect(vp.layerManager.activeLayerId).toBe(ANNOTATIONS_LAYER_ID);
+  });
+});
+
+describe('pinCanonicalLayers', () => {
+  it('renumbers custom layers into the 200-band and player layers into the 500-band, preserving relative order', () => {
+    const vp = makeCleanVp();
+    const customA = vp.layerManager.createLayer('Traps'); // maxOrder+1 → above 100
+    const customB = vp.layerManager.createLayer('Notes');
+    vp.layerManager.addLayerDirect({
+      id: 'player-b',
+      name: 'x',
+      visible: true,
+      locked: false,
+      order: 3,
+      opacity: 1,
+    });
+    vp.layerManager.addLayerDirect({
+      id: 'player-a',
+      name: 'x',
+      visible: true,
+      locked: false,
+      order: 7,
+      opacity: 1,
+    });
+    pinCanonicalLayers(vp);
+    expect(layer(vp, customA.id).order).toBe(CUSTOM_BAND_ORDER);
+    expect(layer(vp, customB.id).order).toBe(CUSTOM_BAND_ORDER + 1);
+    expect(layer(vp, 'player-b').order).toBe(PLAYER_BAND_ORDER);
+    expect(layer(vp, 'player-a').order).toBe(PLAYER_BAND_ORDER + 1);
+  });
+
+  it('re-locks and re-orders layer-map, unless mapUnlocked', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(MAP_LAYER_ID, {
+      locked: false,
+      order: 50,
+    });
+    pinCanonicalLayers(vp, { mapUnlocked: true });
+    expect(layer(vp, MAP_LAYER_ID).locked).toBe(false);
+    expect(layer(vp, MAP_LAYER_ID).order).toBe(MAP_LAYER_ORDER);
+    pinCanonicalLayers(vp);
+    expect(layer(vp, MAP_LAYER_ID).locked).toBe(true);
+  });
+});
+
+describe('annotations lock invariant (dm can never be trapped on a locked annotations layer)', () => {
+  it('ensureCanonicalLayers unlocks an already-locked annotations layer for dm (self-heal of corrupt persisted state)', () => {
+    // Simulates loading a canvasState persisted mid-arrange, where the
+    // annotations layer was saved locked=true. A DM must never inherit that.
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    ensureCanonicalLayers(vp, 'dm');
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+  });
+
+  it('ensureCanonicalLayers keeps annotations locked for player', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'player');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: false });
+    ensureCanonicalLayers(vp, 'player');
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('migrateCanvasToContract reports change and unlocks annotations for dm when persisted locked (so the heal persists)', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    migrateCanvasToContract(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    const changed = migrateCanvasToContract(vp, 'dm');
+    expect(changed).toBe(true);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+  });
+
+  it('pinCanonicalLayers pins the annotations lock when annotationsLocked is given', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    pinCanonicalLayers(vp, { annotationsLocked: false });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+    pinCanonicalLayers(vp, { annotationsLocked: true });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('pinCanonicalLayers leaves the annotations lock untouched when annotationsLocked is omitted', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    pinCanonicalLayers(vp);
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(true);
+  });
+
+  it('subscribePinCanonicalLayers enforces annotationsLocked from getOpts on change', () => {
+    const vp = makeCleanVp();
+    const unsubscribe = subscribePinCanonicalLayers(vp, () => ({
+      annotationsLocked: false,
+    }));
+    vp.layerManager.updateLayerDirect(ANNOTATIONS_LAYER_ID, { locked: true });
+    expect(layer(vp, ANNOTATIONS_LAYER_ID).locked).toBe(false);
+    unsubscribe();
+  });
+});
+
+describe('subscribePinCanonicalLayers', () => {
+  it('pins on layer changes without infinite recursion', () => {
+    const vp = makeCleanVp();
+    const unsubscribe = subscribePinCanonicalLayers(vp);
+    const custom = vp.layerManager.createLayer('Overlay'); // fires 'change'
+    expect(layer(vp, custom.id).order).toBe(CUSTOM_BAND_ORDER);
+    // While subscribed, a rogue map reorder is snapped back.
+    vp.layerManager.updateLayerDirect(MAP_LAYER_ID, { order: 50 });
+    expect(layer(vp, MAP_LAYER_ID).order).toBe(MAP_LAYER_ORDER);
+    unsubscribe();
+    vp.layerManager.updateLayerDirect(MAP_LAYER_ID, { order: 50 });
+    expect(layer(vp, MAP_LAYER_ID).order).toBe(50); // no longer pinned
+  });
+});
+
+describe('migrateCanvasToContract', () => {
+  function legacyVp(): { vp: ViewportLike; bgId: string; annId: string } {
+    const vp = makeVp();
+    // Emulate the legacy editor: default layer renamed 'Map Background',
+    // a created 'Annotations' layer.
+    const bg = vp.layerManager.getLayers()[0];
+    vp.layerManager.renameLayer(bg.id, 'Map Background');
+    const ann = vp.layerManager.createLayer('Annotations');
+    return { vp, bgId: bg.id, annId: ann.id };
+  }
+
+  it('absorbs legacy layers into canonical ids, moving elements', () => {
+    const { vp, bgId, annId } = legacyVp();
+    const mapEl = addImageOn(vp, bgId);
+    const annEl = addImageOn(vp, annId);
+    const changed = migrateCanvasToContract(vp, 'dm');
+    expect(changed).toBe(true);
+    expect(vp.layerManager.getLayer(bgId)).toBeUndefined();
+    expect(vp.layerManager.getLayer(annId)).toBeUndefined();
+    expect(vp.store.getById(mapEl)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(annEl)?.layerId).toBe(ANNOTATIONS_LAYER_ID);
+  });
+
+  it('drops empty auto-named leftovers and keeps named custom + player layers', () => {
+    const vp = makeVp(); // default 'Layer 1' is empty
+    vp.layerManager.createLayer('Traps');
+    vp.layerManager.addLayerDirect({
+      id: 'player-x',
+      name: 'My elements',
+      visible: true,
+      locked: false,
+      order: 1,
+      opacity: 1,
+    });
+    migrateCanvasToContract(vp, 'dm');
+    const names = vp.layerManager.getLayers().map(l => l.name);
+    expect(names).not.toContain('Layer 1');
+    expect(names).toContain('Traps');
+    expect(vp.layerManager.getLayer('player-x')).toBeDefined();
+  });
+
+  it('repairs a dangling active layer and is change-false on second run', () => {
+    const { vp, annId } = legacyVp();
+    vp.layerManager.setActiveLayer(annId);
+    migrateCanvasToContract(vp, 'dm');
+    expect(
+      vp.layerManager.getLayer(vp.layerManager.activeLayerId)
+    ).toBeDefined();
+    expect(migrateCanvasToContract(vp, 'dm')).toBe(false);
+  });
+
+  it('adopts stray locked images with empty or dangling layerIds onto layer-map', () => {
+    const vp = makeVp();
+    const strayEmpty = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'bg.png',
+      layerId: '',
+      zIndex: 0,
+    });
+    vp.store.add(strayEmpty);
+    vp.store.update(strayEmpty.id, { locked: true });
+    const strayDangling = createImage({
+      position: { x: 20, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'bg2.png',
+      layerId: 'layer-deleted-legacy',
+      zIndex: 0,
+    });
+    vp.store.add(strayDangling);
+    vp.store.update(strayDangling.id, { locked: true });
+    // Unlocked stray image is NOT background-class — left untouched.
+    const unlockedStray = createImage({
+      position: { x: 40, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'note.png',
+      layerId: '',
+      zIndex: 0,
+    });
+    vp.store.add(unlockedStray);
+
+    const changed = migrateCanvasToContract(vp, 'dm');
+
+    expect(changed).toBe(true);
+    expect(vp.store.getById(strayEmpty.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(strayDangling.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(unlockedStray.id)?.layerId).toBe('');
+  });
+
+  it('adopts stranded locked background images from the annotations layer, not from custom layers', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    const strandedBg = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 100, h: 100 },
+      src: 'map.png',
+      layerId: ANNOTATIONS_LAYER_ID,
+      zIndex: 0,
+    });
+    vp.store.add(strandedBg);
+    vp.store.update(strandedBg.id, { locked: true });
+    const custom = vp.layerManager.createLayer('Traps');
+    const customLocked = createImage({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'trap.png',
+      layerId: custom.id,
+      zIndex: 0,
+    });
+    vp.store.add(customLocked);
+    vp.store.update(customLocked.id, { locked: true });
+    const plainAnnotation = createImage({
+      position: { x: 50, y: 0 },
+      size: { w: 10, h: 10 },
+      src: 'sketch.png',
+      layerId: ANNOTATIONS_LAYER_ID,
+      zIndex: 0,
+    });
+    vp.store.add(plainAnnotation);
+
+    const changed = migrateCanvasToContract(vp, 'dm');
+
+    expect(changed).toBe(true);
+    expect(vp.store.getById(strandedBg.id)?.layerId).toBe(MAP_LAYER_ID);
+    expect(vp.store.getById(customLocked.id)?.layerId).toBe(custom.id);
+    expect(vp.store.getById(plainAnnotation.id)?.layerId).toBe(
+      ANNOTATIONS_LAYER_ID
+    );
+  });
+});
+
+describe('bug regression: DM-added image vs player token', () => {
+  it('a remote player token paints above a DM annotations image', () => {
+    const vp = makeVp();
+    ensureCanonicalLayers(vp, 'dm');
+    const imageId = addImageOn(vp, ANNOTATIONS_LAYER_ID, 0);
+    // The player layer definition now arrives over layer sync before the
+    // token that references it (snapshots apply layers first).
+    makeApplyRemoteLayer(
+      vp,
+      'dm'
+    )({
+      source: 'op',
+      record: {
+        id: 'player-char1',
+        version: 1,
+        editor: 'char1',
+        definition: {
+          id: 'player-char1',
+          name: 'My elements',
+          visible: true,
+          locked: false,
+          order: PLAYER_BAND_ORDER,
+          opacity: 1,
+        },
+      },
+    });
+    const tokenId = addImageOn(vp, 'player-char1', 1000);
+    const order = vp.store.getAll().map(el => el.id);
+    expect(order.indexOf(tokenId)).toBeGreaterThan(order.indexOf(imageId));
+  });
+});

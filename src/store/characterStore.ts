@@ -1,5 +1,14 @@
-import { create } from 'zustand';
+import { create, StateCreator } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { TAB_ID } from '@/lib/tabIdentity';
+import {
+  armCanonicalPersistence,
+  createPerCharacterStorage,
+  mergeWatermarks,
+  type IntentWatermark,
+} from '@/lib/characterCanonicalStorage';
+import { getApplyingIntent } from '@/store/characterIntentContext';
 import {
   CharacterState,
   SaveStatus,
@@ -23,7 +32,9 @@ import {
   ToolProficiency,
   Language,
   AbilityName,
+  TemporaryBuff,
 } from '@/types/character';
+import type { DmXpAward } from '@/types/sharedState';
 import { ProcessedSpell } from '@/types/spells';
 import {
   DEFAULT_CHARACTER_STATE,
@@ -37,13 +48,14 @@ import {
   calculateCharacterSpellSlots,
   calculateCharacterPactMagic,
   getCharacterTotalLevel,
+  hasSpellcasting,
   updateSpellSlotsPreservingUsed,
   calculateModifier,
-  calculateLevelFromXP,
   getXPForLevel,
   calculateTraitMaxUses,
   calculateWeaponChargeMax,
   calculateMagicItemChargeMax,
+  shouldLevelUp,
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
@@ -54,9 +66,21 @@ import {
   resetDeathSaves,
   calculateMaxHP,
   getClassHitDie,
-  isDead,
 } from '@/utils/hpCalculations';
-import { usePlayerStore } from '@/store/playerStore';
+import { detectSpellAoe } from '@/utils/spellAoeDetection';
+import { getActiveClassResources } from '@/utils/classResources';
+import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
+import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
+import { CHARACTER_ACTION_CLASSIFICATION } from '@/store/characterActionClassification';
+import { withIntentContext } from '@/store/characterIntentContext';
+import {
+  CharacterIntentBus,
+  type CharacterIntent,
+} from '@/lib/characterIntentBus';
+import { characterWriterLock } from '@/lib/characterWriterLock';
+import { readCharacterEnvelope } from '@/lib/characterCanonicalStorage';
+import { isStrictlyFresher } from '@/lib/characterFreshness';
 
 // Function to migrate weapon damage from old format to new array format
 function migrateWeaponDamage(weapon: Record<string, unknown>): Weapon {
@@ -104,14 +128,18 @@ function migrateCharacterData(character: unknown): CharacterState {
     };
   }
 
-  const characterObj = character as Record<string, unknown>;
+  const characterObj = structuredClone(character) as Record<string, unknown>;
 
   // If it's already a new character with class object, return as-is
   if (characterObj.class && typeof characterObj.class === 'object') {
-    const result = character as CharacterState;
+    const result = characterObj as unknown as CharacterState;
     // Ensure spellSlots exist
     if (!result.spellSlots) {
       result.spellSlots = DEFAULT_CHARACTER_STATE.spellSlots;
+    }
+    // Ensure revision exists (pre-revision saves)
+    if (typeof result.revision !== 'number') {
+      result.revision = 0;
     }
     // Ensure features and traits are arrays
     if (!Array.isArray(result.features)) {
@@ -146,6 +174,14 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!Array.isArray(result.spells)) {
       result.spells = DEFAULT_CHARACTER_STATE.spells;
     }
+    // Back-fill AoE template metadata for spells saved before the aoe field
+    // existed. undefined = never detected → run detection once; null or a
+    // value = already decided (by detection or the user) → never touch.
+    for (const spell of result.spells) {
+      if (spell.aoe === undefined) {
+        spell.aoe = detectSpellAoe(spell.description, spell.range);
+      }
+    }
     // Ensure spellcasting stats exist
     if (
       !result.spellcastingStats ||
@@ -176,15 +212,43 @@ function migrateCharacterData(character: unknown): CharacterState {
       !result.heroicInspiration ||
       typeof result.heroicInspiration !== 'object'
     ) {
-      result.heroicInspiration = DEFAULT_CHARACTER_STATE.heroicInspiration;
+      // Copy, so the clamp below never mutates the shared default object.
+      result.heroicInspiration = {
+        ...DEFAULT_CHARACTER_STATE.heroicInspiration,
+      };
     }
-    // Ensure bardic inspiration exists (initialize for existing characters)
+    // House-rule: stackable inspiration defaults to off (classic rules).
+    if (typeof result.stackableInspiration !== 'boolean') {
+      result.stackableInspiration = false;
+    }
+    // Clamping here (rather than in loadCharacterState) also covers the
+    // persist-rehydration path, which never goes through loadCharacterState.
     if (
-      !result.bardicInspiration ||
-      typeof result.bardicInspiration !== 'object'
+      !result.stackableInspiration &&
+      typeof result.heroicInspiration?.count === 'number'
     ) {
-      result.bardicInspiration = DEFAULT_CHARACTER_STATE.bardicInspiration;
+      result.heroicInspiration.count = Math.min(
+        result.heroicInspiration.count,
+        1
+      );
     }
+    // Ensure classResources exists; migrate legacy bardicInspiration into it
+    if (!result.classResources || typeof result.classResources !== 'object') {
+      result.classResources = {};
+    }
+    const legacyBardic = (
+      result as { bardicInspiration?: { usesExpended?: number } }
+    ).bardicInspiration;
+    if (
+      legacyBardic &&
+      typeof legacyBardic.usesExpended === 'number' &&
+      result.classResources['bardic-inspiration'] === undefined
+    ) {
+      result.classResources['bardic-inspiration'] = {
+        usesExpended: legacyBardic.usesExpended,
+      };
+    }
+    delete (result as { bardicInspiration?: unknown }).bardicInspiration;
     // Ensure temporary AC field exists
     if (typeof result.tempArmorClass !== 'number') {
       result.tempArmorClass = DEFAULT_CHARACTER_STATE.tempArmorClass;
@@ -243,6 +307,27 @@ function migrateCharacterData(character: unknown): CharacterState {
     // Ensure summons array exists
     if (!Array.isArray(result.summons)) {
       result.summons = [];
+    }
+    if (!Array.isArray(result.favoriteFeatureIds)) {
+      result.favoriteFeatureIds = [];
+    }
+    // Ensure defenses arrays exist
+    if (!Array.isArray(result.damageImmunities)) {
+      result.damageImmunities = [];
+    }
+    if (!Array.isArray(result.damageResistances)) {
+      result.damageResistances = [];
+    }
+    if (!Array.isArray(result.conditionImmunities)) {
+      result.conditionImmunities = [];
+    }
+    // Ensure senses array exists
+    if (!Array.isArray(result.senses)) {
+      result.senses = [];
+    }
+    // Ensure temporary buffs array exists
+    if (!Array.isArray(result.temporaryBuffs)) {
+      result.temporaryBuffs = [];
     }
     return result;
   }
@@ -343,6 +428,11 @@ interface CharacterStore {
   lastSaved: Date | string | null; // Can be string when rehydrated from localStorage
   hasUnsavedChanges: boolean;
   hasHydrated: boolean;
+  /** Highest contiguously applied intent seq per sender tab — persisted
+   * atomically with the character so failover dedup survives leader death. */
+  intentWatermarks: Record<string, IntentWatermark>;
+  /** Watermark advance for intents whose action never called set. */
+  noteIntentApplied: (tabId: string, seq: number) => void;
   showDeathAnimation: boolean;
   showLevelUpAnimation: boolean;
   levelUpAnimationLevel: number;
@@ -386,16 +476,23 @@ interface CharacterStore {
   addHeroicInspiration: (amount?: number) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
+  setStackableInspiration: (enabled: boolean) => void;
 
-  // Bardic inspiration management
-  useBardicInspiration: () => void;
-  restoreBardicInspiration: () => void;
-  resetBardicInspiration: () => void;
+  // Generic class resource management
+  useClassResource: (id: string, amount?: number) => void;
+  restoreClassResource: (id: string, amount?: number) => void;
+  resetClassResource: (id: string) => void;
+  backfillCantripScaling: (
+    entries: Array<{ spellId: string; scaling: Record<number, string> }>
+  ) => void;
 
   // Armor Class management
   updateTempArmorClass: (tempAC: number) => void;
   toggleTempAC: () => void;
   toggleShield: () => void;
+  /** Idempotent target-state forms — forwarded-intent safe. */
+  setShieldEquipped: (equipped: boolean) => void;
+  setTempACActive: (active: boolean) => void;
   resetTempArmorClass: () => void;
   updateShieldBonus: (bonus: number) => void;
 
@@ -409,12 +506,20 @@ interface CharacterStore {
   recalculateMaxHP: () => void;
   clearDeathAnimation: () => void;
   clearLevelUpAnimation: () => void;
+  triggerDeathAnimation: () => void;
+  triggerLevelUpAnimation: (level: number) => void;
 
   // Class and spell management
   updateClass: (classInfo: ClassInfo) => void;
   updateLevel: (level: number) => void;
   updateSpellSlot: (level: keyof SpellSlots, used: number) => void;
   updatePactMagicSlot: (used: number) => void;
+  /** Delta forms — REQUIRED for forwarded intents (spec delta rule):
+   * concurrent casts from two tabs must both land. */
+  spendSpellSlot: (level: keyof SpellSlots, amount?: number) => void;
+  restoreSpellSlot: (level: keyof SpellSlots, amount?: number) => void;
+  spendPactMagicSlot: (amount?: number) => void;
+  restorePactMagicSlot: (amount?: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
 
@@ -477,6 +582,10 @@ interface CharacterStore {
   // XP management
   addExperience: (xpToAdd: number) => void;
   setExperience: (newXP: number) => void;
+  applyDmXpAward: (award: DmXpAward) => {
+    status: 'applied' | 'duplicate';
+    becamePending: boolean;
+  };
 
   // Rich text content management
   addFeature: (
@@ -521,6 +630,7 @@ interface CharacterStore {
     destinationIndex: number,
     sourceType?: string
   ) => void;
+  toggleFavoriteFeature: (id: string) => void;
   migrateTraitsToExtendedFeatures: () => void;
 
   // Language management
@@ -539,6 +649,36 @@ interface CharacterStore {
   ) => void;
   deleteToolProficiency: (id: string) => void;
 
+  // Damage immunities / resistances / condition immunities
+  addDamageImmunity: (type: string) => void;
+  removeDamageImmunity: (type: string) => void;
+  addDamageResistance: (type: string) => void;
+  removeDamageResistance: (type: string) => void;
+  addConditionImmunity: (condition: string) => void;
+  removeConditionImmunity: (condition: string) => void;
+
+  // Senses
+  addSense: (
+    sense: Omit<
+      import('@/types/character').CharacterSense,
+      'id' | 'createdAt' | 'updatedAt'
+    >
+  ) => void;
+  updateSense: (
+    id: string,
+    updates: Partial<import('@/types/character').CharacterSense>
+  ) => void;
+  removeSense: (id: string) => void;
+
+  // Temporary buffs management
+  addBuff: (
+    buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>
+  ) => void;
+  updateBuff: (id: string, updates: Partial<TemporaryBuff>) => void;
+  deleteBuff: (id: string) => void;
+  toggleBuff: (id: string) => void;
+  clearAllBuffs: () => void;
+
   // Rest management (centralized)
   takeShortRest: () => void; // Resets all short rest abilities, pact magic, reaction
   takeLongRest: () => void; // Resets everything: all abilities, all spell slots, hit dice, HP, etc.
@@ -546,6 +686,7 @@ interface CharacterStore {
   // Campaign tracking
   updateDaysSpent: (days: number) => void; // Set days spent directly
   incrementDaysSpent: (amount?: number) => void; // Add days (default: 1)
+  toggleShareHpWithParty: () => void; // Toggle HP sharing with party members
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -657,6 +798,14 @@ interface CharacterStore {
   removeConcentrationSummons: () => void;
   dismissFamiliar: () => void;
 
+  // Saved creature templates
+  addSavedCreature: (creature: import('@/types/summon').SavedCreature) => void;
+  updateSavedCreature: (
+    creatureId: string,
+    updates: Partial<import('@/types/summon').SavedCreature>
+  ) => void;
+  removeSavedCreature: (creatureId: string) => void;
+
   // Persistence actions
   saveCharacter: () => void;
   loadCharacter: (character: CharacterState) => void;
@@ -674,2148 +823,2105 @@ interface CharacterStore {
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substr(2);
 
+type CharacterStoreCreator = StateCreator<
+  CharacterStore,
+  [],
+  [],
+  CharacterStore
+>;
+
+const WATERMARK_MAX_TABS = 10;
+const WATERMARK_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function advanceWatermark(
+  current: Record<string, IntentWatermark>,
+  mark: { tabId: string; seq: number }
+): Record<string, IntentWatermark> {
+  const now = Date.now();
+  const next: Record<string, IntentWatermark> = {
+    ...current,
+    [mark.tabId]: { seq: mark.seq, lastSeen: now },
+  };
+  const entries = Object.entries(next).filter(
+    ([, wm]) => now - wm.lastSeen <= WATERMARK_MAX_AGE_MS
+  );
+  // The just-advanced mark must always survive GC — equal lastSeen values
+  // (same-ms inserts) would otherwise let the slice evict it.
+  entries.sort((a, b) =>
+    a[0] === mark.tabId
+      ? -1
+      : b[0] === mark.tabId
+        ? 1
+        : b[1].lastSeen - a[1].lastSeen
+  );
+  return Object.fromEntries(entries.slice(0, WATERMARK_MAX_TABS));
+}
+
+// Wraps the creator's `set` so every local mutation that changes
+// `state.character` gets, in ONE rawSet (and therefore one persist write):
+// revision bump by exactly 1, lastMutatedAt/lastMutatedBy stamps, and —
+// when executing a forwarded intent — the sender's watermark advance.
+// External applies (loadCharacterState, cross-tab) run under
+// withExternalApply and adopt the incoming values instead.
+function withCanonicalMutation(
+  creator: CharacterStoreCreator
+): CharacterStoreCreator {
+  return (rawSet, get, store) => {
+    const set = ((partial: unknown, replace?: boolean) => {
+      if (isApplyingExternal()) {
+        rawSet(
+          partial as Parameters<typeof rawSet>[0],
+          replace as Parameters<typeof rawSet>[1]
+        );
+        return;
+      }
+      rawSet(state => {
+        const patch =
+          typeof partial === 'function'
+            ? (partial as (s: CharacterStore) => Partial<CharacterStore>)(state)
+            : (partial as Partial<CharacterStore>);
+        const intentMark = getApplyingIntent();
+        const watermarkPatch = intentMark
+          ? {
+              intentWatermarks: advanceWatermark(
+                state.intentWatermarks,
+                intentMark
+              ),
+            }
+          : null;
+        const nextCharacter = patch.character;
+        const characterChanged =
+          !!nextCharacter &&
+          nextCharacter !== state.character &&
+          nextCharacter.revision === state.character.revision;
+        if (!characterChanged) {
+          return watermarkPatch ? { ...patch, ...watermarkPatch } : patch;
+        }
+        return {
+          ...patch,
+          ...(watermarkPatch ?? {}),
+          character: {
+            ...nextCharacter,
+            revision: (state.character.revision ?? 0) + 1,
+            lastMutatedAt: Date.now(),
+            lastMutatedBy: TAB_ID,
+          },
+        };
+      });
+    }) as typeof rawSet;
+    return creator(set, get, store);
+  };
+}
+
+// Follower tabs forward CANONICAL actions to the leader as intents instead
+// of executing them. Leader (and the no-Web-Locks fallback, where every tab
+// reports leader) executes directly — solo-tab behavior is unchanged.
+function withIntentForwarding(
+  creator: CharacterStoreCreator
+): CharacterStoreCreator {
+  return (set, get, store) => {
+    const actions = creator(set, get, store);
+    const wrapped: Record<string, unknown> = {
+      ...(actions as unknown as Record<string, unknown>),
+    };
+    for (const [name, klass] of Object.entries(
+      CHARACTER_ACTION_CLASSIFICATION
+    )) {
+      if (klass !== 'CANONICAL') continue;
+      const original = wrapped[name];
+      if (typeof original !== 'function') continue;
+      wrapped[name] = (...args: unknown[]) => {
+        const characterId = get().character.id;
+        if (characterWriterLock.isLeader(characterId)) {
+          return (original as (...a: unknown[]) => unknown)(...args);
+        }
+        characterIntentBus.send(characterId, name, args);
+      };
+    }
+    return wrapped as unknown as CharacterStore;
+  };
+}
+
 export const useCharacterStore = create<CharacterStore>()(
   persist(
-    (set, get) => ({
-      // Initial state
-      character: {
-        ...DEFAULT_CHARACTER_STATE,
-        id: generateId(),
-      },
-      saveStatus: 'saved',
-      lastSaved: null,
-      hasUnsavedChanges: false,
-      hasHydrated: false,
-      showDeathAnimation: false,
-      showLevelUpAnimation: false,
-      levelUpAnimationLevel: 1,
+    withIntentForwarding(
+      withCanonicalMutation((set, get) => ({
+        // Initial state
+        character: {
+          ...DEFAULT_CHARACTER_STATE,
+          id: generateId(),
+        },
+        saveStatus: 'saved',
+        lastSaved: null,
+        hasUnsavedChanges: false,
+        hasHydrated: false,
+        intentWatermarks: {},
+        showDeathAnimation: false,
+        showLevelUpAnimation: false,
+        levelUpAnimationLevel: 1,
 
-      // Character update actions
-      updateCharacter: updates => {
-        set(state => ({
-          character: { ...state.character, ...updates },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      loadCharacterState: characterState => {
-        const migratedCharacter = migrateCharacterData(characterState);
-        const multiclassCharacter = migrateToMulticlass(migratedCharacter);
-        set({
-          character: multiclassCharacter,
-          hasUnsavedChanges: false,
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-        });
-      },
-
-      updateAbilityScore: (ability, value) => {
-        set(state => {
-          const newAbilities = {
-            ...state.character.abilities,
-            [ability]: Math.max(1, Math.min(30, value)),
-          };
-
-          // Auto-update initiative if it's not overridden and dexterity changed
-          let initiative = state.character.initiative;
-          if (ability === 'dexterity' && !initiative.isOverridden) {
-            initiative = {
-              ...initiative,
-              value: calculateModifier(newAbilities.dexterity),
-            };
-          }
-
-          return {
-            character: {
-              ...state.character,
-              abilities: newAbilities,
-              initiative,
-            },
+        // Character update actions
+        updateCharacter: updates => {
+          set(state => ({
+            character: { ...state.character, ...updates },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      updateSkillProficiency: (skill, proficient) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            skills: {
-              ...state.character.skills,
-              [skill]: {
-                ...state.character.skills[skill],
-                proficient,
+        loadCharacterState: characterState => {
+          const migratedCharacter = migrateCharacterData(characterState);
+          armCanonicalPersistence(migratedCharacter.id);
+          const multiclassCharacter = migrateToMulticlass(migratedCharacter);
+
+          // Spell slots and pact magic are derived from class + level, but they are
+          // only computed on class/level changes. Recalculate them on load so that
+          // freshly-created casters (and any characters saved before this ran) get
+          // correct slots without having to toggle their level. Only recalculate
+          // for actual spellcasters: for non-casters the calculation yields empty
+          // slots / undefined pact magic, which would clobber slots that were set
+          // explicitly and stored on the character (e.g. a cross-tab spell-slot
+          // spend being adopted through this same load path).
+          let recalculatedSpellSlots = multiclassCharacter.spellSlots;
+          let recalculatedPactMagic = multiclassCharacter.pactMagic;
+
+          if (hasSpellcasting(multiclassCharacter)) {
+            recalculatedSpellSlots = updateSpellSlotsPreservingUsed(
+              calculateCharacterSpellSlots(multiclassCharacter),
+              multiclassCharacter.spellSlots
+            );
+
+            recalculatedPactMagic =
+              calculateCharacterPactMagic(multiclassCharacter);
+            if (multiclassCharacter.pactMagic && recalculatedPactMagic) {
+              recalculatedPactMagic.slots.used = Math.min(
+                multiclassCharacter.pactMagic.slots.used,
+                recalculatedPactMagic.slots.max
+              );
+            }
+          }
+
+          withExternalApply(() =>
+            set({
+              character: {
+                ...multiclassCharacter,
+                spellSlots: recalculatedSpellSlots,
+                pactMagic: recalculatedPactMagic,
               },
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+              hasUnsavedChanges: false,
+              saveStatus: 'saved',
+              lastSaved: new Date(),
+            })
+          );
+        },
 
-      updateSkillExpertise: (skill, expertise) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            skills: {
-              ...state.character.skills,
-              [skill]: {
-                ...state.character.skills[skill],
-                expertise,
+        updateAbilityScore: (ability, value) => {
+          set(state => {
+            const newAbilities = {
+              ...state.character.abilities,
+              [ability]: Math.max(1, Math.min(30, value)),
+            };
+
+            // Auto-update initiative if it's not overridden and dexterity changed
+            let initiative = state.character.initiative;
+            if (ability === 'dexterity' && !initiative.isOverridden) {
+              initiative = {
+                ...initiative,
+                value: calculateModifier(newAbilities.dexterity),
+              };
+            }
+
+            return {
+              character: {
+                ...state.character,
+                abilities: newAbilities,
+                initiative,
               },
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-      toggleSkillBonusAbility: (skill, ability) => {
-        set(state => {
-          const current = state.character.skills[skill].bonusAbilities || [];
-          const exists = current.includes(ability);
-          const bonusAbilities = exists
-            ? current.filter(a => a !== ability)
-            : [...current, ability];
-          return {
+        updateSkillProficiency: (skill, proficient) => {
+          set(state => ({
             character: {
               ...state.character,
               skills: {
                 ...state.character.skills,
                 [skill]: {
                   ...state.character.skills[skill],
-                  bonusAbilities:
-                    bonusAbilities.length > 0 ? bonusAbilities : undefined,
+                  proficient,
                 },
               },
             },
             hasUnsavedChanges: true,
-            saveStatus: 'saving' as SaveStatus,
-          };
-        });
-      },
+            saveStatus: 'saving',
+          }));
+        },
 
-      updateSavingThrowProficiency: (ability, proficient) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            savingThrows: {
-              ...state.character.savingThrows,
-              [ability]: {
-                ...state.character.savingThrows[ability],
-                proficient,
+        updateSkillExpertise: (skill, expertise) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              skills: {
+                ...state.character.skills,
+                [skill]: {
+                  ...state.character.skills[skill],
+                  expertise,
+                },
               },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      updateHitPoints: updates => {
-        set(state => ({
-          character: {
-            ...state.character,
-            hitPoints: {
-              ...state.character.hitPoints,
-              ...updates,
+        toggleSkillBonusAbility: (skill, ability) => {
+          set(state => {
+            const current = state.character.skills[skill].bonusAbilities || [];
+            const exists = current.includes(ability);
+            const bonusAbilities = exists
+              ? current.filter(a => a !== ability)
+              : [...current, ability];
+            return {
+              character: {
+                ...state.character,
+                skills: {
+                  ...state.character.skills,
+                  [skill]: {
+                    ...state.character.skills[skill],
+                    bonusAbilities:
+                      bonusAbilities.length > 0 ? bonusAbilities : undefined,
+                  },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as SaveStatus,
+            };
+          });
+        },
+
+        updateSavingThrowProficiency: (ability, proficient) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              savingThrows: {
+                ...state.character.savingThrows,
+                [ability]: {
+                  ...state.character.savingThrows[ability],
+                  proficient,
+                },
+              },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      updateInitiative: (value, isOverride) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            initiative: {
-              value,
-              isOverridden: isOverride,
+        updateHitPoints: updates => {
+          set(state => ({
+            character: {
+              ...state.character,
+              hitPoints: {
+                ...state.character.hitPoints,
+                ...updates,
+              },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      resetInitiativeToDefault: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            initiative: {
-              value: calculateModifier(state.character.abilities.dexterity),
-              isOverridden: false,
+        updateInitiative: (value, isOverride) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              initiative: {
+                value,
+                isOverridden: isOverride,
+              },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      // Reaction management actions
-      toggleReaction: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            reaction: {
-              hasUsedReaction: !state.character.reaction.hasUsedReaction,
+        resetInitiativeToDefault: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              initiative: {
+                value: calculateModifier(state.character.abilities.dexterity),
+                isOverridden: false,
+              },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      resetReaction: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            reaction: {
-              hasUsedReaction: false,
+        // Reaction management actions
+        toggleReaction: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              reaction: {
+                hasUsedReaction: !state.character.reaction.hasUsedReaction,
+              },
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      // Class Features actions
-      toggleJackOfAllTrades: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            jackOfAllTrades: !state.character.jackOfAllTrades,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        resetReaction: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              reaction: {
+                hasUsedReaction: false,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      // Heroic inspiration management actions
-      updateHeroicInspiration: updates => {
-        set(state => ({
-          character: {
-            ...state.character,
-            heroicInspiration: {
+        // Class Features actions
+        toggleJackOfAllTrades: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              jackOfAllTrades: !state.character.jackOfAllTrades,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Heroic inspiration management actions
+        updateHeroicInspiration: updates => {
+          set(state => {
+            const merged = {
               ...state.character.heroicInspiration,
               ...updates,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            };
+            const stackable = state.character.stackableInspiration ?? false;
+            if (!stackable) {
+              merged.count = Math.min(merged.count, 1);
+            }
+            return {
+              character: { ...state.character, heroicInspiration: merged },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-      addHeroicInspiration: (amount = 1) => {
-        set(state => {
-          const current = state.character.heroicInspiration.count;
-          const max = state.character.heroicInspiration.maxCount;
-          const newCount = max
-            ? Math.min(current + amount, max)
-            : current + amount;
+        addHeroicInspiration: (amount = 1) => {
+          set(state => {
+            const current = state.character.heroicInspiration.count;
+            const stackable = state.character.stackableInspiration ?? false;
+            const userMax = state.character.heroicInspiration.maxCount;
+            // Classic rules cap at 1; stacking respects the optional user max.
+            const hardMax = stackable ? userMax : 1;
+            const target = current + amount;
+            const newCount =
+              hardMax != null ? Math.min(target, hardMax) : target;
 
-          return {
+            return {
+              character: {
+                ...state.character,
+                heroicInspiration: {
+                  ...state.character.heroicInspiration,
+                  count: Math.max(0, newCount),
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setStackableInspiration: enabled => {
+          set(state => {
+            const insp = state.character.heroicInspiration;
+            const count = enabled ? insp.count : Math.min(insp.count, 1);
+            return {
+              character: {
+                ...state.character,
+                stackableInspiration: enabled,
+                heroicInspiration: { ...insp, count },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        useHeroicInspiration: () => {
+          set(state => ({
             character: {
               ...state.character,
               heroicInspiration: {
                 ...state.character.heroicInspiration,
-                count: Math.max(0, newCount),
+                count: Math.max(0, state.character.heroicInspiration.count - 1),
               },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      useHeroicInspiration: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            heroicInspiration: {
-              ...state.character.heroicInspiration,
-              count: Math.max(0, state.character.heroicInspiration.count - 1),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      resetHeroicInspiration: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            heroicInspiration: {
-              ...state.character.heroicInspiration,
-              count: 0,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Bardic inspiration management actions
-      useBardicInspiration: () => {
-        set(state => {
-          const current = state.character.bardicInspiration?.usesExpended ?? 0;
-          return {
+        resetHeroicInspiration: () => {
+          set(state => ({
             character: {
               ...state.character,
-              bardicInspiration: {
-                ...state.character.bardicInspiration,
-                usesExpended: current + 1,
+              heroicInspiration: {
+                ...state.character.heroicInspiration,
+                count: 0,
               },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      restoreBardicInspiration: () => {
-        set(state => {
-          const current = state.character.bardicInspiration?.usesExpended ?? 0;
-          return {
+        // Generic class resource management
+        useClassResource: (id, amount = 1) => {
+          set(state => {
+            const active = getActiveClassResources(state.character).find(
+              r => r.definition.id === id
+            );
+            if (!active) return state;
+            const current =
+              state.character.classResources?.[id]?.usesExpended ?? 0;
+            const next = Math.min(active.maxUses, current + amount);
+            if (next === current) return state;
+            return {
+              character: {
+                ...state.character,
+                classResources: {
+                  ...state.character.classResources,
+                  [id]: {
+                    ...state.character.classResources?.[id],
+                    usesExpended: next,
+                  },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        restoreClassResource: (id, amount = 1) => {
+          set(state => {
+            const current =
+              state.character.classResources?.[id]?.usesExpended ?? 0;
+            const next = Math.max(0, current - amount);
+            if (next === current) return state;
+            return {
+              character: {
+                ...state.character,
+                classResources: {
+                  ...state.character.classResources,
+                  [id]: {
+                    ...state.character.classResources?.[id],
+                    usesExpended: next,
+                  },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        resetClassResource: id => {
+          set(state => ({
             character: {
               ...state.character,
-              bardicInspiration: {
-                ...state.character.bardicInspiration,
-                usesExpended: Math.max(0, current - 1),
+              classResources: {
+                ...state.character.classResources,
+                [id]: {
+                  ...state.character.classResources?.[id],
+                  usesExpended: 0,
+                },
               },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      resetBardicInspiration: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            bardicInspiration: {
-              ...state.character.bardicInspiration,
-              usesExpended: 0,
+        backfillCantripScaling: entries => {
+          set(state => {
+            const tableById = new Map(entries.map(e => [e.spellId, e.scaling]));
+            let changed = false;
+            const spells = state.character.spells.map(spell => {
+              const scaling = tableById.get(spell.id);
+              if (
+                !scaling ||
+                spell.level !== 0 ||
+                spell.damageScaling !== undefined
+              ) {
+                return spell;
+              }
+              changed = true;
+              return { ...spell, damageScaling: scaling };
+            });
+            if (!changed) return state;
+            return {
+              character: { ...state.character, spells },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+
+        // Armor Class management
+        updateTempArmorClass: tempAC => {
+          set(state => ({
+            character: {
+              ...state.character,
+              tempArmorClass: tempAC,
             },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      // Armor Class management
-      updateTempArmorClass: tempAC => {
-        set(state => ({
-          character: {
-            ...state.character,
-            tempArmorClass: tempAC,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        toggleTempAC: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              isTempACActive: !state.character.isTempACActive,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      toggleTempAC: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            isTempACActive: !state.character.isTempACActive,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        toggleShield: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              isWearingShield: !state.character.isWearingShield,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      toggleShield: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            isWearingShield: !state.character.isWearingShield,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        setShieldEquipped: equipped =>
+          set(state => {
+            if (state.character.isWearingShield === equipped) return state;
+            return {
+              character: { ...state.character, isWearingShield: equipped },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-      resetTempArmorClass: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            tempArmorClass: 0,
-            isTempACActive: false,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        setTempACActive: active =>
+          set(state => {
+            if (state.character.isTempACActive === active) return state;
+            return {
+              character: { ...state.character, isTempACActive: active },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-      updateShieldBonus: bonus => {
-        set(state => ({
-          character: {
-            ...state.character,
-            shieldBonus: bonus,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        resetTempArmorClass: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              tempArmorClass: 0,
+              isTempACActive: false,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-      // HP management actions
-      applyDamageToCharacter: damage => {
-        const state = get();
-        const wasDeadBefore = isDead(state.character.hitPoints);
-        const newHitPoints = applyDamage(state.character.hitPoints, damage);
-        const isDeadAfter = isDead(newHitPoints);
+        updateShieldBonus: bonus => {
+          set(state => ({
+            character: {
+              ...state.character,
+              shieldBonus: bonus,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
 
-        // Check if death animation is enabled in player settings
-        const playerSettings = usePlayerStore.getState().settings;
-        const shouldShowDeathAnimation =
-          playerSettings.enableDeathAnimation && !wasDeadBefore && isDeadAfter;
+        // HP management actions
+        applyDamageToCharacter: damage => {
+          const state = get();
+          const newHitPoints = applyDamage(state.character.hitPoints, damage);
 
-        set({
-          character: {
-            ...state.character,
-            hitPoints: newHitPoints,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-          showDeathAnimation: shouldShowDeathAnimation
-            ? true
-            : state.showDeathAnimation,
-        });
+          set({
+            character: {
+              ...state.character,
+              hitPoints: newHitPoints,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          });
+        },
 
-        // Auto-clear the death animation after 8.5 seconds
-        if (shouldShowDeathAnimation) {
+        applyHealingToCharacter: healing => {
+          set(state => ({
+            character: {
+              ...state.character,
+              hitPoints: applyHealing(state.character.hitPoints, healing),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addTemporaryHPToCharacter: tempHP => {
+          set(state => ({
+            character: {
+              ...state.character,
+              hitPoints: addTemporaryHP(state.character.hitPoints, tempHP),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        makeDeathSavingThrow: (isSuccess, isCritical = false) => {
+          const state = get();
+          const newHitPoints = makeDeathSave(
+            state.character.hitPoints,
+            isSuccess,
+            isCritical
+          );
+
+          set({
+            character: {
+              ...state.character,
+              hitPoints: newHitPoints,
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          });
+        },
+
+        resetDeathSavingThrows: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              hitPoints: resetDeathSaves(state.character.hitPoints),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        clearDeathAnimation: () => {
+          set({ showDeathAnimation: false });
+        },
+
+        clearLevelUpAnimation: () => {
+          set({ showLevelUpAnimation: false });
+        },
+
+        triggerDeathAnimation: () => {
+          set({ showDeathAnimation: true });
           setTimeout(() => {
             set({ showDeathAnimation: false });
           }, 8500);
-        }
-      },
+        },
 
-      applyHealingToCharacter: healing => {
-        set(state => ({
-          character: {
-            ...state.character,
-            hitPoints: applyHealing(state.character.hitPoints, healing),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      addTemporaryHPToCharacter: tempHP => {
-        set(state => ({
-          character: {
-            ...state.character,
-            hitPoints: addTemporaryHP(state.character.hitPoints, tempHP),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      makeDeathSavingThrow: (isSuccess, isCritical = false) => {
-        const state = get();
-        const wasDeadBefore = isDead(state.character.hitPoints);
-        const newHitPoints = makeDeathSave(
-          state.character.hitPoints,
-          isSuccess,
-          isCritical
-        );
-        const isDeadAfter = isDead(newHitPoints);
-
-        // Check if death animation is enabled in player settings
-        const playerSettings = usePlayerStore.getState().settings;
-        const shouldShowDeathAnimation =
-          playerSettings.enableDeathAnimation && !wasDeadBefore && isDeadAfter;
-
-        set({
-          character: {
-            ...state.character,
-            hitPoints: newHitPoints,
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-          showDeathAnimation: shouldShowDeathAnimation
-            ? true
-            : state.showDeathAnimation,
-        });
-
-        if (shouldShowDeathAnimation) {
+        triggerLevelUpAnimation: level => {
+          set({ showLevelUpAnimation: true, levelUpAnimationLevel: level });
           setTimeout(() => {
-            set({ showDeathAnimation: false });
-          }, 8500);
-        }
-      },
+            set({ showLevelUpAnimation: false });
+          }, 6000);
+        },
 
-      resetDeathSavingThrows: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            hitPoints: resetDeathSaves(state.character.hitPoints),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        toggleHPCalculationMode: () => {
+          set(state => {
+            const newMode =
+              state.character.hitPoints.calculationMode === 'auto'
+                ? 'manual'
+                : 'auto';
+            let newMaxHP = state.character.hitPoints.max;
 
-      clearDeathAnimation: () => {
-        set({ showDeathAnimation: false });
-      },
+            // If switching to auto mode, recalculate max HP
+            if (newMode === 'auto') {
+              const hitDie = getClassHitDie(
+                state.character.class.name,
+                state.character.class.hitDie
+              );
+              newMaxHP = calculateMaxHP(
+                { ...state.character.class, hitDie },
+                state.character.level,
+                state.character.abilities.constitution
+              );
+            }
 
-      clearLevelUpAnimation: () => {
-        set({ showLevelUpAnimation: false });
-      },
+            return {
+              character: {
+                ...state.character,
+                hitPoints: {
+                  ...state.character.hitPoints,
+                  calculationMode: newMode,
+                  max: newMaxHP,
+                  manualMaxOverride:
+                    newMode === 'manual'
+                      ? state.character.hitPoints.max
+                      : undefined,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-      toggleHPCalculationMode: () => {
-        set(state => {
-          const newMode =
-            state.character.hitPoints.calculationMode === 'auto'
-              ? 'manual'
-              : 'auto';
-          let newMaxHP = state.character.hitPoints.max;
+        recalculateMaxHP: () => {
+          set(state => {
+            if (state.character.hitPoints.calculationMode === 'manual') {
+              return state; // Don't recalculate in manual mode
+            }
 
-          // If switching to auto mode, recalculate max HP
-          if (newMode === 'auto') {
             const hitDie = getClassHitDie(
               state.character.class.name,
               state.character.class.hitDie
             );
-            newMaxHP = calculateMaxHP(
+            const newMaxHP = calculateMaxHP(
               { ...state.character.class, hitDie },
               state.character.level,
               state.character.abilities.constitution
             );
-          }
 
-          return {
-            character: {
-              ...state.character,
-              hitPoints: {
-                ...state.character.hitPoints,
-                calculationMode: newMode,
-                max: newMaxHP,
-                manualMaxOverride:
-                  newMode === 'manual'
-                    ? state.character.hitPoints.max
-                    : undefined,
+            // No-op guard: recalculation runs unconditionally on every
+            // sheet mount, so when the recalculated max matches the current
+            // max, return the untouched state. Otherwise `withCanonicalMutation`
+            // sees a fresh (but content-identical) character object on every
+            // mount and mints a revision bump with zero real change, which
+            // degrades every revision-comparison site (roster merge,
+            // cross-tab apply, server 409 gate).
+            if (newMaxHP === state.character.hitPoints.max) {
+              return state;
+            }
+
+            return {
+              character: {
+                ...state.character,
+                hitPoints: {
+                  ...state.character.hitPoints,
+                  max: newMaxHP,
+                },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      recalculateMaxHP: () => {
-        set(state => {
-          if (state.character.hitPoints.calculationMode === 'manual') {
-            return state; // Don't recalculate in manual mode
-          }
-
-          const hitDie = getClassHitDie(
-            state.character.class.name,
-            state.character.class.hitDie
-          );
-          const newMaxHP = calculateMaxHP(
-            { ...state.character.class, hitDie },
-            state.character.level,
-            state.character.abilities.constitution
-          );
-
-          return {
-            character: {
-              ...state.character,
-              hitPoints: {
-                ...state.character.hitPoints,
-                max: newMaxHP,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Class and spell management
-      updateClass: classInfo => {
-        set(state => {
-          // Ensure character has multiclass structure
-          const migratedCharacter = migrateToMulticlass(state.character);
-
-          // Update the primary class (first class or create new one)
-          const updatedClasses = [...(migratedCharacter.classes || [])];
-          if (updatedClasses.length === 0) {
-            updatedClasses.push({
-              className: classInfo.name,
-              level: migratedCharacter.level || 1,
-              isCustom: classInfo.isCustom,
-              spellcaster: classInfo.spellcaster,
-              hitDie: classInfo.hitDie,
-            });
-          } else {
-            // Update the first (primary) class
-            updatedClasses[0] = {
-              ...updatedClasses[0],
-              className: classInfo.name,
-              isCustom: classInfo.isCustom,
-              spellcaster: classInfo.spellcaster,
-              hitDie: classInfo.hitDie,
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
             };
-          }
+          });
+        },
 
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes: updatedClasses,
-            class: classInfo, // Keep for backwards compatibility
-          };
+        // Class and spell management
+        updateClass: classInfo => {
+          set(state => {
+            // Ensure character has multiclass structure
+            const migratedCharacter = migrateToMulticlass(state.character);
 
-          // Recalculate spell slots and pact magic using multiclass-aware functions
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          // Preserve existing pact magic used slots if possible
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
-            );
-          }
-
-          return {
-            character: {
-              ...updatedCharacter,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateLevel: level => {
-        const currentState = get();
-        const oldLevel =
-          currentState.character.totalLevel || currentState.character.level;
-        const clampedLevel = Math.max(1, Math.min(20, level));
-
-        // Check if this is a level UP (not down or same)
-        const isLevelUp = clampedLevel > oldLevel;
-
-        set(state => {
-          // Ensure character has multiclass structure
-          const migratedCharacter = migrateToMulticlass(state.character);
-
-          // For single class characters, update the primary class level
-          // For multiclass characters, this updates the total level by adjusting the primary class
-          const updatedClasses = [...(migratedCharacter.classes || [])];
-          if (updatedClasses.length === 1) {
-            // Single class: update the class level directly
-            updatedClasses[0] = {
-              ...updatedClasses[0],
-              level: clampedLevel,
-            };
-          } else if (updatedClasses.length > 1) {
-            // Multiclass: adjust the primary (highest level) class to reach the target total level
-            const currentTotal = updatedClasses.reduce(
-              (sum, cls) => sum + cls.level,
-              0
-            );
-            const levelDifference = clampedLevel - currentTotal;
-
-            if (levelDifference !== 0) {
-              // Find the primary class (highest level)
-              const primaryIndex = updatedClasses.reduce(
-                (maxIndex, cls, index) =>
-                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
-                0
-              );
-
-              const newPrimaryLevel = Math.max(
-                1,
-                updatedClasses[primaryIndex].level + levelDifference
-              );
-              updatedClasses[primaryIndex] = {
-                ...updatedClasses[primaryIndex],
-                level: newPrimaryLevel,
+            // Update the primary class (first class or create new one)
+            const updatedClasses = [...(migratedCharacter.classes || [])];
+            if (updatedClasses.length === 0) {
+              updatedClasses.push({
+                className: classInfo.name,
+                level: migratedCharacter.level || 1,
+                isCustom: classInfo.isCustom,
+                spellcaster: classInfo.spellcaster,
+                hitDie: classInfo.hitDie,
+              });
+            } else {
+              // Update the first (primary) class
+              updatedClasses[0] = {
+                ...updatedClasses[0],
+                className: classInfo.name,
+                isCustom: classInfo.isCustom,
+                spellcaster: classInfo.spellcaster,
+                hitDie: classInfo.hitDie,
               };
             }
-          }
 
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            updatedClasses,
-            migratedCharacter.hitDicePools
-          );
+            const updatedCharacter = {
+              ...migratedCharacter,
+              classes: updatedClasses,
+              class: classInfo, // Keep for backwards compatibility
+            };
 
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes: updatedClasses,
-            totalLevel: clampedLevel,
-            level: clampedLevel, // Keep for backwards compatibility
-            hitDicePools,
-          };
-
-          // Recalculate spell slots and pact magic using multiclass-aware functions
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          // Preserve existing pact magic used slots if possible
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
+            // Recalculate spell slots and pact magic using multiclass-aware functions
+            const newSpellSlots =
+              calculateCharacterSpellSlots(updatedCharacter);
+            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+              newSpellSlots,
+              state.character.spellSlots
             );
-          }
 
-          // Check if level up animation should be shown
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUp = playerSettings?.enableLevelUpAnimation;
-          const shouldShowLevelUp = isLevelUp && enableLevelUp;
+            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+            // Preserve existing pact magic used slots if possible
+            if (state.character.pactMagic && pactMagic) {
+              pactMagic.slots.used = Math.min(
+                state.character.pactMagic.slots.used,
+                pactMagic.slots.max
+              );
+            }
 
-          // Update XP to minimum for the new level (only if current XP is less than required)
-          const minXPForLevel = getXPForLevel(clampedLevel);
-          const currentXP = state.character.experience || 0;
-          const newXP = currentXP < minXPForLevel ? minXPForLevel : currentXP;
-
-          return {
-            character: {
-              ...updatedCharacter,
-              experience: newXP,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-            showLevelUpAnimation: shouldShowLevelUp
-              ? true
-              : state.showLevelUpAnimation,
-            levelUpAnimationLevel: shouldShowLevelUp
-              ? clampedLevel
-              : state.levelUpAnimationLevel,
-          };
-        });
-
-        // Auto-clear the level up animation after 6 seconds
-        if (isLevelUp) {
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-          if (enableLevelUpAnim) {
-            setTimeout(() => {
-              set({ showLevelUpAnimation: false });
-            }, 6000);
-          }
-        }
-      },
-
-      updateSpellSlot: (level, used) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellSlots: {
-              ...state.character.spellSlots,
-              [level]: {
-                ...state.character.spellSlots[level],
-                used: Math.max(
-                  0,
-                  Math.min(used, state.character.spellSlots[level].max)
-                ),
+            return {
+              character: {
+                ...updatedCharacter,
+                spellSlots: preservedSpellSlots,
+                pactMagic,
               },
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-      updatePactMagicSlot: used => {
-        set(state => {
-          if (!state.character.pactMagic) return state;
+        updateLevel: level => {
+          const clampedLevel = Math.max(1, Math.min(20, level));
 
-          return {
+          set(state => {
+            // Ensure character has multiclass structure
+            const migratedCharacter = migrateToMulticlass(state.character);
+
+            // For single class characters, update the primary class level
+            // For multiclass characters, this updates the total level by adjusting the primary class
+            const updatedClasses = [...(migratedCharacter.classes || [])];
+            if (updatedClasses.length === 1) {
+              // Single class: update the class level directly
+              updatedClasses[0] = {
+                ...updatedClasses[0],
+                level: clampedLevel,
+              };
+            } else if (updatedClasses.length > 1) {
+              // Multiclass: adjust the primary (highest level) class to reach the target total level
+              const currentTotal = updatedClasses.reduce(
+                (sum, cls) => sum + cls.level,
+                0
+              );
+              const levelDifference = clampedLevel - currentTotal;
+
+              if (levelDifference !== 0) {
+                // Find the primary class (highest level)
+                const primaryIndex = updatedClasses.reduce(
+                  (maxIndex, cls, index) =>
+                    cls.level > updatedClasses[maxIndex].level
+                      ? index
+                      : maxIndex,
+                  0
+                );
+
+                const newPrimaryLevel = Math.max(
+                  1,
+                  updatedClasses[primaryIndex].level + levelDifference
+                );
+                updatedClasses[primaryIndex] = {
+                  ...updatedClasses[primaryIndex],
+                  level: newPrimaryLevel,
+                };
+              }
+            }
+
+            // Recalculate hit dice pools
+            const hitDicePools = calculateHitDicePools(
+              updatedClasses,
+              migratedCharacter.hitDicePools
+            );
+
+            const updatedCharacter = {
+              ...migratedCharacter,
+              classes: updatedClasses,
+              totalLevel: clampedLevel,
+              level: clampedLevel, // Keep for backwards compatibility
+              hitDicePools,
+            };
+
+            // Recalculate spell slots and pact magic using multiclass-aware functions
+            const newSpellSlots =
+              calculateCharacterSpellSlots(updatedCharacter);
+            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+              newSpellSlots,
+              state.character.spellSlots
+            );
+
+            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+            // Preserve existing pact magic used slots if possible
+            if (state.character.pactMagic && pactMagic) {
+              pactMagic.slots.used = Math.min(
+                state.character.pactMagic.slots.used,
+                pactMagic.slots.max
+              );
+            }
+
+            // Update XP to minimum for the new level (only if current XP is less than required)
+            const minXPForLevel = getXPForLevel(clampedLevel);
+            const currentXP = state.character.experience || 0;
+            const newXP = currentXP < minXPForLevel ? minXPForLevel : currentXP;
+
+            return {
+              character: {
+                ...updatedCharacter,
+                experience: newXP,
+                spellSlots: preservedSpellSlots,
+                pactMagic,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateSpellSlot: (level, used) => {
+          set(state => ({
             character: {
               ...state.character,
-              pactMagic: {
-                ...state.character.pactMagic,
-                slots: {
-                  ...state.character.pactMagic.slots,
+              spellSlots: {
+                ...state.character.spellSlots,
+                [level]: {
+                  ...state.character.spellSlots[level],
                   used: Math.max(
                     0,
-                    Math.min(used, state.character.pactMagic.slots.max)
+                    Math.min(used, state.character.spellSlots[level].max)
                   ),
                 },
               },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      resetSpellSlots: () => {
-        set(state => {
-          const resetSlots: SpellSlots = {
-            1: { ...state.character.spellSlots[1], used: 0 },
-            2: { ...state.character.spellSlots[2], used: 0 },
-            3: { ...state.character.spellSlots[3], used: 0 },
-            4: { ...state.character.spellSlots[4], used: 0 },
-            5: { ...state.character.spellSlots[5], used: 0 },
-            6: { ...state.character.spellSlots[6], used: 0 },
-            7: { ...state.character.spellSlots[7], used: 0 },
-            8: { ...state.character.spellSlots[8], used: 0 },
-            9: { ...state.character.spellSlots[9], used: 0 },
-          };
+        updatePactMagicSlot: used => {
+          set(state => {
+            if (!state.character.pactMagic) return state;
 
-          return {
-            character: {
-              ...state.character,
-              spellSlots: resetSlots,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      resetPactMagicSlots: () => {
-        set(state => {
-          if (!state.character.pactMagic) return state;
-
-          return {
-            character: {
-              ...state.character,
-              pactMagic: {
-                ...state.character.pactMagic,
-                slots: {
-                  ...state.character.pactMagic.slots,
-                  used: 0,
+            return {
+              character: {
+                ...state.character,
+                pactMagic: {
+                  ...state.character.pactMagic,
+                  slots: {
+                    ...state.character.pactMagic.slots,
+                    used: Math.max(
+                      0,
+                      Math.min(used, state.character.pactMagic.slots.max)
+                    ),
+                  },
                 },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Multiclass management
-      addClassLevel: (
-        className,
-        isCustom = false,
-        spellcaster = 'none',
-        hitDie = 8,
-        subclass
-      ) => {
-        set(state => {
-          // Ensure character has multiclass structure
-          const migratedCharacter = migrateToMulticlass(state.character);
-          const classes = [...(migratedCharacter.classes || [])];
-
-          // Find existing class or create new one
-          const existingClassIndex = classes.findIndex(
-            cls => cls.className === className
-          );
-
-          if (existingClassIndex >= 0) {
-            // Level up existing class
-            classes[existingClassIndex] = {
-              ...classes[existingClassIndex],
-              level: classes[existingClassIndex].level + 1,
-              subclass: subclass || classes[existingClassIndex].subclass,
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
             };
-          } else {
-            // Add new class
-            classes.push({
-              className,
-              level: 1,
-              isCustom,
-              spellcaster,
-              hitDie,
-              subclass,
-            });
-          }
+          });
+        },
 
-          const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
+        spendSpellSlot: (level, amount = 1) =>
+          set(state => {
+            const slot = state.character.spellSlots[level];
+            if (!slot) return state;
+            const used = Math.max(0, Math.min(slot.used + amount, slot.max));
+            if (used === slot.used) return state;
+            return {
+              character: {
+                ...state.character,
+                spellSlots: {
+                  ...state.character.spellSlots,
+                  [level]: { ...slot, used },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-          // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) =>
-            current.level > primary.level ? current : primary
-          );
+        restoreSpellSlot: (level, amount = 1) =>
+          set(state => {
+            const slot = state.character.spellSlots[level];
+            if (!slot) return state;
+            const used = Math.max(0, Math.min(slot.used - amount, slot.max));
+            if (used === slot.used) return state;
+            return {
+              character: {
+                ...state.character,
+                spellSlots: {
+                  ...state.character.spellSlots,
+                  [level]: { ...slot, used },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-          const compatibilityClass: ClassInfo = {
-            name: primaryClass.className,
-            isCustom: primaryClass.isCustom,
-            spellcaster: primaryClass.spellcaster,
-            hitDie: primaryClass.hitDie,
-          };
-
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            classes,
-            migratedCharacter.hitDicePools
-          );
-
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes,
-            totalLevel,
-            hitDicePools,
-            class: compatibilityClass,
-            level: totalLevel,
-          };
-
-          // Recalculate spell slots and pact magic
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
+        spendPactMagicSlot: (amount = 1) =>
+          set(state => {
+            const pact = state.character.pactMagic;
+            if (!pact) return state;
+            const used = Math.max(
+              0,
+              Math.min(pact.slots.used + amount, pact.slots.max)
             );
-          }
+            if (used === pact.slots.used) return state;
+            return {
+              character: {
+                ...state.character,
+                pactMagic: { ...pact, slots: { ...pact.slots, used } },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-          return {
-            character: {
-              ...updatedCharacter,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
+        restorePactMagicSlot: (amount = 1) =>
+          set(state => {
+            const pact = state.character.pactMagic;
+            if (!pact) return state;
+            const used = Math.max(
+              0,
+              Math.min(pact.slots.used - amount, pact.slots.max)
+            );
+            if (used === pact.slots.used) return state;
+            return {
+              character: {
+                ...state.character,
+                pactMagic: { ...pact, slots: { ...pact.slots, used } },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
-      removeClassLevel: className => {
-        set(state => {
-          const migratedCharacter = migrateToMulticlass(state.character);
-          const classes = [...(migratedCharacter.classes || [])];
+        resetSpellSlots: () => {
+          set(state => {
+            const resetSlots: SpellSlots = {
+              1: { ...state.character.spellSlots[1], used: 0 },
+              2: { ...state.character.spellSlots[2], used: 0 },
+              3: { ...state.character.spellSlots[3], used: 0 },
+              4: { ...state.character.spellSlots[4], used: 0 },
+              5: { ...state.character.spellSlots[5], used: 0 },
+              6: { ...state.character.spellSlots[6], used: 0 },
+              7: { ...state.character.spellSlots[7], used: 0 },
+              8: { ...state.character.spellSlots[8], used: 0 },
+              9: { ...state.character.spellSlots[9], used: 0 },
+            };
 
-          const classIndex = classes.findIndex(
-            cls => cls.className === className
-          );
-          if (classIndex === -1) {
-            return state; // Class not found
-          }
+            return {
+              character: {
+                ...state.character,
+                spellSlots: resetSlots,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-          if (classes[classIndex].level > 1) {
-            // Reduce level by 1
+        resetPactMagicSlots: () => {
+          set(state => {
+            if (!state.character.pactMagic) return state;
+
+            return {
+              character: {
+                ...state.character,
+                pactMagic: {
+                  ...state.character.pactMagic,
+                  slots: {
+                    ...state.character.pactMagic.slots,
+                    used: 0,
+                  },
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Multiclass management
+        addClassLevel: (
+          className,
+          isCustom = false,
+          spellcaster = 'none',
+          hitDie = 8,
+          subclass
+        ) => {
+          set(state => {
+            // Ensure character has multiclass structure
+            const migratedCharacter = migrateToMulticlass(state.character);
+            const classes = [...(migratedCharacter.classes || [])];
+
+            // Find existing class or create new one
+            const existingClassIndex = classes.findIndex(
+              cls => cls.className === className
+            );
+
+            if (existingClassIndex >= 0) {
+              // Level up existing class
+              classes[existingClassIndex] = {
+                ...classes[existingClassIndex],
+                level: classes[existingClassIndex].level + 1,
+                subclass: subclass || classes[existingClassIndex].subclass,
+              };
+            } else {
+              // Add new class
+              classes.push({
+                className,
+                level: 1,
+                isCustom,
+                spellcaster,
+                hitDie,
+                subclass,
+              });
+            }
+
+            const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
+
+            // Update backwards compatibility fields
+            const primaryClass = classes.reduce((primary, current) =>
+              current.level > primary.level ? current : primary
+            );
+
+            const compatibilityClass: ClassInfo = {
+              name: primaryClass.className,
+              isCustom: primaryClass.isCustom,
+              spellcaster: primaryClass.spellcaster,
+              hitDie: primaryClass.hitDie,
+            };
+
+            // Recalculate hit dice pools
+            const hitDicePools = calculateHitDicePools(
+              classes,
+              migratedCharacter.hitDicePools
+            );
+
+            const updatedCharacter = {
+              ...migratedCharacter,
+              classes,
+              totalLevel,
+              hitDicePools,
+              class: compatibilityClass,
+              level: totalLevel,
+            };
+
+            // Recalculate spell slots and pact magic
+            const newSpellSlots =
+              calculateCharacterSpellSlots(updatedCharacter);
+            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+              newSpellSlots,
+              state.character.spellSlots
+            );
+
+            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+            if (state.character.pactMagic && pactMagic) {
+              pactMagic.slots.used = Math.min(
+                state.character.pactMagic.slots.used,
+                pactMagic.slots.max
+              );
+            }
+
+            return {
+              character: {
+                ...updatedCharacter,
+                spellSlots: preservedSpellSlots,
+                pactMagic,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        removeClassLevel: className => {
+          set(state => {
+            const migratedCharacter = migrateToMulticlass(state.character);
+            const classes = [...(migratedCharacter.classes || [])];
+
+            const classIndex = classes.findIndex(
+              cls => cls.className === className
+            );
+            if (classIndex === -1) {
+              return state; // Class not found
+            }
+
+            if (classes[classIndex].level > 1) {
+              // Reduce level by 1
+              classes[classIndex] = {
+                ...classes[classIndex],
+                level: classes[classIndex].level - 1,
+              };
+            } else {
+              // Remove class entirely
+              classes.splice(classIndex, 1);
+            }
+
+            // If no classes left, this shouldn't happen but handle gracefully
+            if (classes.length === 0) {
+              return state;
+            }
+
+            const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
+
+            // Update backwards compatibility fields
+            const primaryClass = classes.reduce((primary, current) =>
+              current.level > primary.level ? current : primary
+            );
+
+            const compatibilityClass: ClassInfo = {
+              name: primaryClass.className,
+              isCustom: primaryClass.isCustom,
+              spellcaster: primaryClass.spellcaster,
+              hitDie: primaryClass.hitDie,
+            };
+
+            // Recalculate hit dice pools
+            const hitDicePools = calculateHitDicePools(
+              classes,
+              migratedCharacter.hitDicePools
+            );
+
+            const updatedCharacter = {
+              ...migratedCharacter,
+              classes,
+              totalLevel,
+              hitDicePools,
+              class: compatibilityClass,
+              level: totalLevel,
+            };
+
+            // Recalculate spell slots and pact magic
+            const newSpellSlots =
+              calculateCharacterSpellSlots(updatedCharacter);
+            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+              newSpellSlots,
+              state.character.spellSlots
+            );
+
+            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+
+            return {
+              character: {
+                ...updatedCharacter,
+                spellSlots: preservedSpellSlots,
+                pactMagic,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateClassLevel: (className, newLevel) => {
+          set(state => {
+            const migratedCharacter = migrateToMulticlass(state.character);
+            const classes = [...(migratedCharacter.classes || [])];
+
+            const classIndex = classes.findIndex(
+              cls => cls.className === className
+            );
+            if (classIndex === -1) {
+              return state; // Class not found
+            }
+
+            const clampedLevel = Math.max(1, Math.min(20, newLevel));
             classes[classIndex] = {
               ...classes[classIndex],
-              level: classes[classIndex].level - 1,
+              level: clampedLevel,
             };
-          } else {
-            // Remove class entirely
-            classes.splice(classIndex, 1);
-          }
 
-          // If no classes left, this shouldn't happen but handle gracefully
-          if (classes.length === 0) {
-            return state;
-          }
+            const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
 
-          const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
-
-          // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) =>
-            current.level > primary.level ? current : primary
-          );
-
-          const compatibilityClass: ClassInfo = {
-            name: primaryClass.className,
-            isCustom: primaryClass.isCustom,
-            spellcaster: primaryClass.spellcaster,
-            hitDie: primaryClass.hitDie,
-          };
-
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            classes,
-            migratedCharacter.hitDicePools
-          );
-
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes,
-            totalLevel,
-            hitDicePools,
-            class: compatibilityClass,
-            level: totalLevel,
-          };
-
-          // Recalculate spell slots and pact magic
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-
-          return {
-            character: {
-              ...updatedCharacter,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateClassLevel: (className, newLevel) => {
-        set(state => {
-          const migratedCharacter = migrateToMulticlass(state.character);
-          const classes = [...(migratedCharacter.classes || [])];
-
-          const classIndex = classes.findIndex(
-            cls => cls.className === className
-          );
-          if (classIndex === -1) {
-            return state; // Class not found
-          }
-
-          const clampedLevel = Math.max(1, Math.min(20, newLevel));
-          classes[classIndex] = {
-            ...classes[classIndex],
-            level: clampedLevel,
-          };
-
-          const totalLevel = classes.reduce((sum, cls) => sum + cls.level, 0);
-
-          // Update backwards compatibility fields
-          const primaryClass = classes.reduce((primary, current) =>
-            current.level > primary.level ? current : primary
-          );
-
-          const compatibilityClass: ClassInfo = {
-            name: primaryClass.className,
-            isCustom: primaryClass.isCustom,
-            spellcaster: primaryClass.spellcaster,
-            hitDie: primaryClass.hitDie,
-          };
-
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            classes,
-            migratedCharacter.hitDicePools
-          );
-
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes,
-            totalLevel,
-            hitDicePools,
-            class: compatibilityClass,
-            level: totalLevel,
-          };
-
-          // Recalculate spell slots and pact magic
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
+            // Update backwards compatibility fields
+            const primaryClass = classes.reduce((primary, current) =>
+              current.level > primary.level ? current : primary
             );
+
+            const compatibilityClass: ClassInfo = {
+              name: primaryClass.className,
+              isCustom: primaryClass.isCustom,
+              spellcaster: primaryClass.spellcaster,
+              hitDie: primaryClass.hitDie,
+            };
+
+            // Recalculate hit dice pools
+            const hitDicePools = calculateHitDicePools(
+              classes,
+              migratedCharacter.hitDicePools
+            );
+
+            const updatedCharacter = {
+              ...migratedCharacter,
+              classes,
+              totalLevel,
+              hitDicePools,
+              class: compatibilityClass,
+              level: totalLevel,
+            };
+
+            // Recalculate spell slots and pact magic
+            const newSpellSlots =
+              calculateCharacterSpellSlots(updatedCharacter);
+            const preservedSpellSlots = updateSpellSlotsPreservingUsed(
+              newSpellSlots,
+              state.character.spellSlots
+            );
+
+            const pactMagic = calculateCharacterPactMagic(updatedCharacter);
+            if (state.character.pactMagic && pactMagic) {
+              pactMagic.slots.used = Math.min(
+                state.character.pactMagic.slots.used,
+                pactMagic.slots.max
+              );
+            }
+
+            return {
+              character: {
+                ...updatedCharacter,
+                spellSlots: preservedSpellSlots,
+                pactMagic,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        isMulticlassed: () => {
+          const { character } = get();
+          return (character.classes?.length || 0) > 1;
+        },
+
+        getClassDisplayString: () => {
+          const { character } = get();
+
+          if (!character.classes || character.classes.length === 0) {
+            // Fallback to single class format
+            return `${character.class?.name || 'Unknown'} ${character.level || 1}`;
           }
 
-          return {
-            character: {
-              ...updatedCharacter,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
+          if (character.classes.length === 1) {
+            const cls = character.classes[0];
+            return `${cls.className} ${cls.level}`;
+          }
 
-      isMulticlassed: () => {
-        const { character } = get();
-        return (character.classes?.length || 0) > 1;
-      },
+          // Sort classes by level (descending) for display
+          const sortedClasses = [...character.classes].sort(
+            (a, b) => b.level - a.level
+          );
+          const classStrings = sortedClasses.map(
+            cls => `${cls.className} ${cls.level}`
+          );
+          const totalLevel = getCharacterTotalLevel(character);
 
-      getClassDisplayString: () => {
-        const { character } = get();
+          return `${classStrings.join(' / ')} (Level ${totalLevel})`;
+        },
 
-        if (!character.classes || character.classes.length === 0) {
-          // Fallback to single class format
-          return `${character.class?.name || 'Unknown'} ${character.level || 1}`;
-        }
+        // Hit dice management
+        useHitDie: (dieType, count = 1) => {
+          set(state => {
+            const hitDicePools = { ...state.character.hitDicePools };
 
-        if (character.classes.length === 1) {
-          const cls = character.classes[0];
-          return `${cls.className} ${cls.level}`;
-        }
+            if (hitDicePools[dieType]) {
+              const pool = hitDicePools[dieType];
+              const actualCount = Math.min(count, pool.max - pool.used);
 
-        // Sort classes by level (descending) for display
-        const sortedClasses = [...character.classes].sort(
-          (a, b) => b.level - a.level
-        );
-        const classStrings = sortedClasses.map(
-          cls => `${cls.className} ${cls.level}`
-        );
-        const totalLevel = getCharacterTotalLevel(character);
+              if (actualCount > 0) {
+                hitDicePools[dieType] = {
+                  ...pool,
+                  used: pool.used + actualCount,
+                };
+              }
+            }
 
-        return `${classStrings.join(' / ')} (Level ${totalLevel})`;
-      },
+            return {
+              character: {
+                ...state.character,
+                hitDicePools,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-      // Hit dice management
-      useHitDie: (dieType, count = 1) => {
-        set(state => {
-          const hitDicePools = { ...state.character.hitDicePools };
+        restoreHitDice: (dieType, count = 1) => {
+          set(state => {
+            const hitDicePools = { ...state.character.hitDicePools };
 
-          if (hitDicePools[dieType]) {
-            const pool = hitDicePools[dieType];
-            const actualCount = Math.min(count, pool.max - pool.used);
+            if (hitDicePools[dieType]) {
+              const pool = hitDicePools[dieType];
+              const actualCount = Math.min(count, pool.used);
 
-            if (actualCount > 0) {
+              if (actualCount > 0) {
+                hitDicePools[dieType] = {
+                  ...pool,
+                  used: pool.used - actualCount,
+                };
+              }
+            }
+
+            return {
+              character: {
+                ...state.character,
+                hitDicePools,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        resetAllHitDice: () => {
+          set(state => {
+            const hitDicePools = { ...state.character.hitDicePools };
+
+            // Reset all hit dice pools to 0 used
+            Object.keys(hitDicePools).forEach(dieType => {
+              hitDicePools[dieType] = {
+                ...hitDicePools[dieType],
+                used: 0,
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                hitDicePools,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        resetHalfHitDice: () => {
+          set(state => {
+            const hitDicePools = { ...state.character.hitDicePools };
+
+            // Restore half of used hit dice (rounded down)
+            Object.keys(hitDicePools).forEach(dieType => {
+              const pool = hitDicePools[dieType];
+              const restoreCount = Math.floor(pool.used / 2);
+
               hitDicePools[dieType] = {
                 ...pool,
-                used: pool.used + actualCount,
+                used: pool.used - restoreCount,
               };
-            }
-          }
+            });
 
-          return {
-            character: {
-              ...state.character,
-              hitDicePools,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreHitDice: (dieType, count = 1) => {
-        set(state => {
-          const hitDicePools = { ...state.character.hitDicePools };
-
-          if (hitDicePools[dieType]) {
-            const pool = hitDicePools[dieType];
-            const actualCount = Math.min(count, pool.used);
-
-            if (actualCount > 0) {
-              hitDicePools[dieType] = {
-                ...pool,
-                used: pool.used - actualCount,
-              };
-            }
-          }
-
-          return {
-            character: {
-              ...state.character,
-              hitDicePools,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      resetAllHitDice: () => {
-        set(state => {
-          const hitDicePools = { ...state.character.hitDicePools };
-
-          // Reset all hit dice pools to 0 used
-          Object.keys(hitDicePools).forEach(dieType => {
-            hitDicePools[dieType] = {
-              ...hitDicePools[dieType],
-              used: 0,
+            return {
+              character: {
+                ...state.character,
+                hitDicePools,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
             };
           });
+        },
 
-          return {
+        // Concentration management
+        startConcentration: (spellName, spellId, castAt) => {
+          set(state => ({
             character: {
               ...state.character,
-              hitDicePools,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      resetHalfHitDice: () => {
-        set(state => {
-          const hitDicePools = { ...state.character.hitDicePools };
-
-          // Restore half of used hit dice (rounded down)
-          Object.keys(hitDicePools).forEach(dieType => {
-            const pool = hitDicePools[dieType];
-            const restoreCount = Math.floor(pool.used / 2);
-
-            hitDicePools[dieType] = {
-              ...pool,
-              used: pool.used - restoreCount,
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              hitDicePools,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Concentration management
-      startConcentration: (spellName, spellId, castAt) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            concentration: {
-              isConcentrating: true,
-              spellName,
-              spellId,
-              castAt,
-              startedAt: new Date().toISOString(),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      stopConcentration: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            concentration: {
-              isConcentrating: false,
-              spellName: undefined,
-              spellId: undefined,
-              castAt: undefined,
-              startedAt: undefined,
-            },
-            // Auto-dismiss concentration summons
-            summons: (state.character.summons || []).filter(
-              s => !s.requiresConcentration
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      isConcentratingOn: spellName => {
-        const state = get();
-        return (
-          state.character.concentration.isConcentrating &&
-          state.character.concentration.spellName === spellName
-        );
-      },
-
-      // Conditions and diseases management
-      addCondition: (conditionName, source, description, count = 1, notes) => {
-        set(state => {
-          const newCondition: ActiveCondition = {
-            id: `${conditionName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-            name: conditionName,
-            source,
-            description,
-            stackable: conditionName.toLowerCase() === 'exhaustion',
-            count,
-            appliedAt: new Date().toISOString(),
-            notes,
-          };
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeConditions: [
-                  ...state.character.conditionsAndDiseases.activeConditions,
-                  newCondition,
-                ],
+              concentration: {
+                isConcentrating: true,
+                spellName,
+                spellId,
+                castAt,
+                startedAt: new Date().toISOString(),
               },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateCondition: (conditionId, updates) => {
-        set(state => {
-          const updatedConditions =
-            state.character.conditionsAndDiseases.activeConditions.map(
-              condition =>
-                condition.id === conditionId
-                  ? { ...condition, ...updates }
-                  : condition
-            );
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeConditions: updatedConditions,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      removeCondition: conditionId => {
-        set(state => {
-          const filteredConditions =
-            state.character.conditionsAndDiseases.activeConditions.filter(
-              condition => condition.id !== conditionId
-            );
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeConditions: filteredConditions,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      addDisease: (diseaseName, source, description, onsetTime, notes) => {
-        set(state => {
-          const newDisease: ActiveDisease = {
-            id: `${diseaseName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
-            name: diseaseName,
-            source,
-            description,
-            onsetTime,
-            appliedAt: new Date().toISOString(),
-            notes,
-          };
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeDiseases: [
-                  ...state.character.conditionsAndDiseases.activeDiseases,
-                  newDisease,
-                ],
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateDisease: (diseaseId, updates) => {
-        set(state => {
-          const updatedDiseases =
-            state.character.conditionsAndDiseases.activeDiseases.map(disease =>
-              disease.id === diseaseId ? { ...disease, ...updates } : disease
-            );
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeDiseases: updatedDiseases,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      removeDisease: diseaseId => {
-        set(state => {
-          const filteredDiseases =
-            state.character.conditionsAndDiseases.activeDiseases.filter(
-              disease => disease.id !== diseaseId
-            );
-
-          return {
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeDiseases: filteredDiseases,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      setExhaustionVariant: variant => {
-        set(state => ({
-          character: {
-            ...state.character,
-            conditionsAndDiseases: {
-              ...state.character.conditionsAndDiseases,
-              exhaustionVariant: variant,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      clearAllConditions: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            conditionsAndDiseases: {
-              ...state.character.conditionsAndDiseases,
-              activeConditions: [],
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      clearAllDiseases: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            conditionsAndDiseases: {
-              ...state.character.conditionsAndDiseases,
-              activeDiseases: [],
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // XP management
-      addExperience: xpToAdd => {
-        const currentState = get();
-        const oldLevel =
-          currentState.character.totalLevel || currentState.character.level;
-        const newXP = currentState.character.experience + xpToAdd;
-        const newLevel = calculateLevelFromXP(newXP);
-
-        // Check if this is a level UP
-        const isLevelUp = newLevel > oldLevel;
-
-        // Debug logging
-        console.log('addExperience called:', {
-          xpToAdd,
-          oldXP: currentState.character.experience,
-          newXP,
-          oldLevel,
-          newLevel,
-          isLevelUp,
-        });
-
-        set(state => {
-          // Ensure character has multiclass structure
-          const migratedCharacter = migrateToMulticlass(state.character);
-
-          // Update class levels based on new total level
-          const updatedClasses = [...(migratedCharacter.classes || [])];
-          if (updatedClasses.length === 1) {
-            updatedClasses[0] = {
-              ...updatedClasses[0],
-              level: newLevel,
-            };
-          } else if (updatedClasses.length > 1) {
-            // Adjust the primary class to reach the target total level
-            const currentTotal = updatedClasses.reduce(
-              (sum, cls) => sum + cls.level,
-              0
-            );
-            const levelDifference = newLevel - currentTotal;
-
-            if (levelDifference !== 0) {
-              const primaryIndex = updatedClasses.reduce(
-                (maxIndex, cls, index) =>
-                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
-                0
-              );
-
-              updatedClasses[primaryIndex] = {
-                ...updatedClasses[primaryIndex],
-                level: Math.max(
-                  1,
-                  updatedClasses[primaryIndex].level + levelDifference
-                ),
-              };
-            }
-          }
-
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            updatedClasses,
-            migratedCharacter.hitDicePools
-          );
-
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes: updatedClasses,
-            totalLevel: newLevel,
-            level: newLevel,
-            hitDicePools,
-          };
-
-          // Recalculate spell slots using multiclass-aware functions
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          // Preserve existing pact magic used slots if possible
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
-            );
-          }
-
-          // Check if level up animation should be shown
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUp = playerSettings?.enableLevelUpAnimation; // Default to true
-          const shouldShowLevelUp = isLevelUp && enableLevelUp;
-
-          console.log('addExperience animation check:', {
-            isLevelUp,
-            enableLevelUpAnimation: enableLevelUp,
-            shouldShowLevelUp,
-            newLevel,
-          });
-
-          return {
-            character: {
-              ...updatedCharacter,
-              experience: newXP,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-            showLevelUpAnimation: shouldShowLevelUp
-              ? true
-              : state.showLevelUpAnimation,
-            levelUpAnimationLevel: shouldShowLevelUp
-              ? newLevel
-              : state.levelUpAnimationLevel,
-          };
-        });
-
-        // Auto-clear the level up animation after 6 seconds
-        const playerSettings = usePlayerStore.getState().settings;
-        const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-        if (isLevelUp && enableLevelUpAnim) {
-          console.log('Setting up auto-clear timeout for level up animation');
-          setTimeout(() => {
-            set({ showLevelUpAnimation: false });
-          }, 6000);
-        }
-      },
-
-      setExperience: newXP => {
-        const currentState = get();
-        const oldLevel =
-          currentState.character.totalLevel || currentState.character.level;
-        const newLevel = calculateLevelFromXP(newXP);
-
-        // Check if this is a level UP
-        const isLevelUp = newLevel > oldLevel;
-
-        set(state => {
-          // Ensure character has multiclass structure
-          const migratedCharacter = migrateToMulticlass(state.character);
-
-          // Update class levels based on new total level
-          const updatedClasses = [...(migratedCharacter.classes || [])];
-          if (updatedClasses.length === 1) {
-            updatedClasses[0] = {
-              ...updatedClasses[0],
-              level: newLevel,
-            };
-          } else if (updatedClasses.length > 1) {
-            // Adjust the primary class to reach the target total level
-            const currentTotal = updatedClasses.reduce(
-              (sum, cls) => sum + cls.level,
-              0
-            );
-            const levelDifference = newLevel - currentTotal;
-
-            if (levelDifference !== 0) {
-              const primaryIndex = updatedClasses.reduce(
-                (maxIndex, cls, index) =>
-                  cls.level > updatedClasses[maxIndex].level ? index : maxIndex,
-                0
-              );
-
-              updatedClasses[primaryIndex] = {
-                ...updatedClasses[primaryIndex],
-                level: Math.max(
-                  1,
-                  updatedClasses[primaryIndex].level + levelDifference
-                ),
-              };
-            }
-          }
-
-          // Recalculate hit dice pools
-          const hitDicePools = calculateHitDicePools(
-            updatedClasses,
-            migratedCharacter.hitDicePools
-          );
-
-          const updatedCharacter = {
-            ...migratedCharacter,
-            classes: updatedClasses,
-            totalLevel: newLevel,
-            level: newLevel,
-            hitDicePools,
-          };
-
-          // Recalculate spell slots using multiclass-aware functions
-          const newSpellSlots = calculateCharacterSpellSlots(updatedCharacter);
-          const preservedSpellSlots = updateSpellSlotsPreservingUsed(
-            newSpellSlots,
-            state.character.spellSlots
-          );
-
-          const pactMagic = calculateCharacterPactMagic(updatedCharacter);
-          // Preserve existing pact magic used slots if possible
-          if (state.character.pactMagic && pactMagic) {
-            pactMagic.slots.used = Math.min(
-              state.character.pactMagic.slots.used,
-              pactMagic.slots.max
-            );
-          }
-
-          // Check if level up animation should be shown
-          const playerSettings = usePlayerStore.getState().settings;
-          const enableLevelUp = playerSettings?.enableLevelUpAnimation;
-          const shouldShowLevelUp = isLevelUp && enableLevelUp;
-
-          return {
-            character: {
-              ...updatedCharacter,
-              experience: newXP,
-              spellSlots: preservedSpellSlots,
-              pactMagic,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-            showLevelUpAnimation: shouldShowLevelUp
-              ? true
-              : state.showLevelUpAnimation,
-            levelUpAnimationLevel: shouldShowLevelUp
-              ? newLevel
-              : state.levelUpAnimationLevel,
-          };
-        });
-
-        // Auto-clear the level up animation after 6 seconds
-        const playerSettings = usePlayerStore.getState().settings;
-        const enableLevelUpAnim = playerSettings?.enableLevelUpAnimation;
-        if (isLevelUp && enableLevelUpAnim) {
-          setTimeout(() => {
-            set({ showLevelUpAnimation: false });
-          }, 6000);
-        }
-      },
-
-      // Rich text content management
-      addFeature: feature => {
-        set(state => {
-          const newFeature: RichTextContent = {
-            ...feature,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              features: [...state.character.features, newFeature],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateFeature: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            features: state.character.features.map(feature =>
-              feature.id === id
-                ? {
-                    ...feature,
-                    ...updates,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : feature
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteFeature: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            features: state.character.features.filter(
-              feature => feature.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      addTrait: trait => {
-        set(state => {
-          const newTrait: RichTextContent = {
-            ...trait,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              traits: [...state.character.traits, newTrait],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateTrait: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            traits: state.character.traits.map(trait =>
-              trait.id === id
-                ? { ...trait, ...updates, updatedAt: new Date().toISOString() }
-                : trait
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteTrait: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            traits: state.character.traits.filter(trait => trait.id !== id),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      addNote: (
-        note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
-      ) => {
-        set(state => {
-          const newNote: RichTextContent = {
-            ...note,
-            id: generateId(),
-            order: state.character.notes.length, // Set order to the end
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              notes: [...state.character.notes, newNote],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateNote: (id: string, updates: Partial<RichTextContent>) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            notes: state.character.notes.map(note =>
-              note.id === id
-                ? { ...note, ...updates, updatedAt: new Date().toISOString() }
-                : note
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteNote: (id: string) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            notes: state.character.notes.filter(note => note.id !== id),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderNotes: (sourceIndex: number, destinationIndex: number) => {
-        set(state => {
-          const notes = [...state.character.notes];
-          const [removed] = notes.splice(sourceIndex, 1);
-          notes.splice(destinationIndex, 0, removed);
-
-          // Update order property
-          const updatedNotes = notes.map((note, index) => ({
-            ...note,
-            order: index,
-            updatedAt: new Date().toISOString(),
           }));
+        },
 
-          return {
+        stopConcentration: () => {
+          set(state => ({
             character: {
               ...state.character,
-              notes: updatedNotes,
+              concentration: {
+                isConcentrating: false,
+                spellName: undefined,
+                spellId: undefined,
+                castAt: undefined,
+                startedAt: undefined,
+              },
+              // Auto-dismiss concentration summons
+              summons: (state.character.summons || []).filter(
+                s => !s.requiresConcentration
+              ),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      // Trackable trait management
-      addTrackableTrait: trait => {
-        set(state => {
-          const newTrait: TrackableTrait = {
-            ...trait,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
+        isConcentratingOn: spellName => {
+          const state = get();
+          return (
+            state.character.concentration.isConcentrating &&
+            state.character.concentration.spellName === spellName
+          );
+        },
 
-          // Also add as extended feature
-          const newExtendedFeature: ExtendedFeature = {
-            ...newTrait,
-            sourceType: 'other' as const,
-            sourceDetail: newTrait.source || undefined,
-            displayOrder: (state.character.extendedFeatures || []).length,
-            isPassive: newTrait.maxUses === 0,
-          };
+        // Conditions and diseases management
+        addCondition: (
+          conditionName,
+          source,
+          description,
+          count = 1,
+          notes
+        ) => {
+          set(state => {
+            const newCondition: ActiveCondition = {
+              id: `${conditionName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+              name: conditionName,
+              source,
+              description,
+              stackable: conditionName.toLowerCase() === 'exhaustion',
+              count,
+              appliedAt: new Date().toISOString(),
+              notes,
+            };
 
-          return {
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: [
+                    ...state.character.conditionsAndDiseases.activeConditions,
+                    newCondition,
+                  ],
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateCondition: (conditionId, updates) => {
+          set(state => {
+            const updatedConditions =
+              state.character.conditionsAndDiseases.activeConditions.map(
+                condition =>
+                  condition.id === conditionId
+                    ? { ...condition, ...updates }
+                    : condition
+              );
+
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: updatedConditions,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        removeCondition: conditionId => {
+          set(state => {
+            const filteredConditions =
+              state.character.conditionsAndDiseases.activeConditions.filter(
+                condition => condition.id !== conditionId
+              );
+
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: filteredConditions,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        addDisease: (diseaseName, source, description, onsetTime, notes) => {
+          set(state => {
+            const newDisease: ActiveDisease = {
+              id: `${diseaseName.toLowerCase().replace(/[^a-z0-9]/g, '-')}-${Date.now()}`,
+              name: diseaseName,
+              source,
+              description,
+              onsetTime,
+              appliedAt: new Date().toISOString(),
+              notes,
+            };
+
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeDiseases: [
+                    ...state.character.conditionsAndDiseases.activeDiseases,
+                    newDisease,
+                  ],
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateDisease: (diseaseId, updates) => {
+          set(state => {
+            const updatedDiseases =
+              state.character.conditionsAndDiseases.activeDiseases.map(
+                disease =>
+                  disease.id === diseaseId
+                    ? { ...disease, ...updates }
+                    : disease
+              );
+
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeDiseases: updatedDiseases,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        removeDisease: diseaseId => {
+          set(state => {
+            const filteredDiseases =
+              state.character.conditionsAndDiseases.activeDiseases.filter(
+                disease => disease.id !== diseaseId
+              );
+
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeDiseases: filteredDiseases,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setExhaustionVariant: variant => {
+          set(state => ({
             character: {
               ...state.character,
-              trackableTraits: [
-                ...(state.character.trackableTraits || []),
-                newTrait,
-              ],
-              extendedFeatures: [
-                ...(state.character.extendedFeatures || []),
-                newExtendedFeature,
-              ],
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                exhaustionVariant: variant,
+              },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      updateTrackableTrait: (id, updates) => {
-        set(state => {
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.id === id
-                ? {
-                    ...trait,
-                    ...updates,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : trait
-          );
-
-          // Also update corresponding extended feature
-          const updatedExtendedFeatures = (
-            state.character.extendedFeatures || []
-          ).map(feature =>
-            feature.id === id
-              ? {
-                  ...feature,
-                  ...updates,
-                  sourceDetail: updates.source || feature.sourceDetail,
-                  isPassive:
-                    (updates.maxUses !== undefined
-                      ? updates.maxUses
-                      : feature.maxUses) === 0,
-                  updatedAt: new Date().toISOString(),
-                }
-              : feature
-          );
-
-          return {
+        clearAllConditions: () => {
+          set(state => ({
             character: {
               ...state.character,
-              trackableTraits: updatedTraits,
-              extendedFeatures: updatedExtendedFeatures,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeConditions: [],
+              },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      deleteTrackableTrait: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            trackableTraits: (state.character.trackableTraits || []).filter(
-              trait => trait.id !== id
-            ),
-            extendedFeatures: (state.character.extendedFeatures || []).filter(
-              feature => feature.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      useTrackableTrait: id => {
-        set(state => {
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.id === id
-                ? {
-                    ...trait,
-                    usedUses: Math.min(
-                      trait.usedUses + 1,
-                      calculateTraitMaxUses(trait, state.character.level)
-                    ),
-                    updatedAt: new Date().toISOString(),
-                  }
-                : trait
-          );
-
-          // Also update corresponding extended feature
-          const updatedExtendedFeatures = (
-            state.character.extendedFeatures || []
-          ).map(feature =>
-            feature.id === id
-              ? {
-                  ...feature,
-                  usedUses: Math.min(
-                    feature.usedUses + 1,
-                    calculateTraitMaxUses(feature, state.character.level)
-                  ),
-                  updatedAt: new Date().toISOString(),
-                }
-              : feature
-          );
-
-          return {
+        clearAllDiseases: () => {
+          set(state => ({
             character: {
               ...state.character,
-              trackableTraits: updatedTraits,
-              extendedFeatures: updatedExtendedFeatures,
+              conditionsAndDiseases: {
+                ...state.character.conditionsAndDiseases,
+                activeDiseases: [],
+              },
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      resetTrackableTraits: restType => {
-        set(state => {
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.restType === restType || restType === 'long'
-                ? {
-                    ...trait,
-                    usedUses: 0,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : trait
-          );
-
-          // Also update corresponding extended features
-          const updatedExtendedFeatures = (
-            state.character.extendedFeatures || []
-          ).map(feature =>
-            feature.restType === restType || restType === 'long'
-              ? {
-                  ...feature,
-                  usedUses: 0,
-                  updatedAt: new Date().toISOString(),
-                }
-              : feature
-          );
-
-          return {
+        // XP management
+        addExperience: xpToAdd => {
+          set(state => ({
             character: {
               ...state.character,
-              trackableTraits: updatedTraits,
-              extendedFeatures: updatedExtendedFeatures,
+              experience: Math.max(0, state.character.experience + xpToAdd),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      // Extended feature management actions
-      addExtendedFeature: feature => {
-        set(state => {
-          const newFeature: ExtendedFeature = {
-            ...feature,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          // Also add as trackable trait
-          const newTrackableTrait: TrackableTrait = {
-            id: newFeature.id,
-            name: newFeature.name,
-            description: newFeature.description,
-            maxUses: newFeature.maxUses,
-            usedUses: newFeature.usedUses,
-            restType: newFeature.restType,
-            source: newFeature.sourceDetail || newFeature.source,
-            scaleWithProficiency: newFeature.scaleWithProficiency,
-            proficiencyMultiplier: newFeature.proficiencyMultiplier,
-            createdAt: newFeature.createdAt,
-            updatedAt: newFeature.updatedAt,
-          };
-
-          return {
+        setExperience: newXP => {
+          set(state => ({
             character: {
               ...state.character,
-              extendedFeatures: [
-                ...(state.character.extendedFeatures || []),
-                newFeature,
-              ],
-              trackableTraits: [
-                ...(state.character.trackableTraits || []),
-                newTrackableTrait,
-              ],
+              experience: Math.max(0, newXP),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      updateExtendedFeature: (id, updates) => {
-        set(state => {
-          const updatedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
+        applyDmXpAward: award => {
+          const { character } = get();
+          const applied = character.appliedDmXpAwardIds ?? [];
+          if (applied.includes(award.id)) {
+            return { status: 'duplicate' as const, becamePending: false };
+          }
+          const currentLevel = character.totalLevel || character.level || 1;
+          const pendingBefore = shouldLevelUp(
+            character.experience,
+            currentLevel
+          );
+          const newXP =
+            award.mode === 'add'
+              ? Math.max(0, character.experience + award.amount)
+              : Math.max(0, award.amount);
+          const pendingAfter = shouldLevelUp(newXP, currentLevel);
+          set(state => ({
+            character: {
+              ...state.character,
+              experience: newXP,
+              appliedDmXpAwardIds: [...applied, award.id].slice(-150),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+          return {
+            status: 'applied' as const,
+            becamePending: !pendingBefore && pendingAfter,
+          };
+        },
+
+        // Rich text content management
+        addFeature: feature => {
+          set(state => {
+            const newFeature: RichTextContent = {
+              ...feature,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                features: [...state.character.features, newFeature],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateFeature: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              features: state.character.features.map(feature =>
+                feature.id === id
+                  ? {
+                      ...feature,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : feature
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteFeature: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              features: state.character.features.filter(
+                feature => feature.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addTrait: trait => {
+          set(state => {
+            const newTrait: RichTextContent = {
+              ...trait,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                traits: [...state.character.traits, newTrait],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateTrait: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              traits: state.character.traits.map(trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteTrait: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              traits: state.character.traits.filter(trait => trait.id !== id),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addNote: (
+          note: Omit<RichTextContent, 'id' | 'createdAt' | 'updatedAt'>
+        ) => {
+          set(state => {
+            const newNote: RichTextContent = {
+              ...note,
+              id: generateId(),
+              order: state.character.notes.length, // Set order to the end
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                notes: [...state.character.notes, newNote],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateNote: (id: string, updates: Partial<RichTextContent>) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              notes: state.character.notes.map(note =>
+                note.id === id
+                  ? { ...note, ...updates, updatedAt: new Date().toISOString() }
+                  : note
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteNote: (id: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              notes: state.character.notes.filter(note => note.id !== id),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderNotes: (sourceIndex: number, destinationIndex: number) => {
+          set(state => {
+            const notes = [...state.character.notes];
+            const [removed] = notes.splice(sourceIndex, 1);
+            notes.splice(destinationIndex, 0, removed);
+
+            // Update order property
+            const updatedNotes = notes.map((note, index) => ({
+              ...note,
+              order: index,
+              updatedAt: new Date().toISOString(),
+            }));
+
+            return {
+              character: {
+                ...state.character,
+                notes: updatedNotes,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Trackable trait management
+        addTrackableTrait: trait => {
+          set(state => {
+            const newTrait: TrackableTrait = {
+              ...trait,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            // Also add as extended feature
+            const newExtendedFeature: ExtendedFeature = {
+              ...newTrait,
+              sourceType: 'other' as const,
+              sourceDetail: newTrait.source || undefined,
+              displayOrder: (state.character.extendedFeatures || []).length,
+              isPassive: newTrait.maxUses === 0,
+            };
+
+            return {
+              character: {
+                ...state.character,
+                trackableTraits: [
+                  ...(state.character.trackableTraits || []),
+                  newTrait,
+                ],
+                extendedFeatures: [
+                  ...(state.character.extendedFeatures || []),
+                  newExtendedFeature,
+                ],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateTrackableTrait: (id, updates) => {
+          set(state => {
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            );
+
+            // Also update corresponding extended feature
+            const updatedExtendedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
               feature.id === id
                 ? {
                     ...feature,
                     ...updates,
+                    sourceDetail: updates.source || feature.sourceDetail,
+                    isPassive:
+                      (updates.maxUses !== undefined
+                        ? updates.maxUses
+                        : feature.maxUses) === 0,
                     updatedAt: new Date().toISOString(),
                   }
                 : feature
-          );
+            );
 
-          // Also update corresponding trackable trait
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.id === id
-                ? {
-                    ...trait,
-                    ...updates,
-                    source:
-                      updates.sourceDetail || updates.source || trait.source,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : trait
-          );
+            return {
+              character: {
+                ...state.character,
+                trackableTraits: updatedTraits,
+                extendedFeatures: updatedExtendedFeatures,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-          return {
+        deleteTrackableTrait: id => {
+          set(state => ({
             character: {
               ...state.character,
-              extendedFeatures: updatedFeatures,
-              trackableTraits: updatedTraits,
+              trackableTraits: (state.character.trackableTraits || []).filter(
+                trait => trait.id !== id
+              ),
+              extendedFeatures: (state.character.extendedFeatures || []).filter(
+                feature => feature.id !== id
+              ),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving',
-          };
-        });
-      },
+          }));
+        },
 
-      deleteExtendedFeature: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            extendedFeatures: (state.character.extendedFeatures || []).filter(
-              feature => feature.id !== id
-            ),
-            trackableTraits: (state.character.trackableTraits || []).filter(
-              trait => trait.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        useTrackableTrait: id => {
+          set(state => {
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      usedUses: Math.min(
+                        trait.usedUses + 1,
+                        calculateTraitMaxUses(trait, state.character.level)
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            );
 
-      useExtendedFeature: id => {
-        set(state => {
-          const updatedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
+            // Also update corresponding extended feature
+            const updatedExtendedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
               feature.id === id
                 ? {
                     ...feature,
@@ -2826,39 +2932,37 @@ export const useCharacterStore = create<CharacterStore>()(
                     updatedAt: new Date().toISOString(),
                   }
                 : feature
-          );
+            );
 
-          // Also update corresponding trackable trait
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.id === id
-                ? {
-                    ...trait,
-                    usedUses: Math.min(
-                      trait.usedUses + 1,
-                      calculateTraitMaxUses(trait, state.character.level)
-                    ),
-                    updatedAt: new Date().toISOString(),
-                  }
-                : trait
-          );
+            return {
+              character: {
+                ...state.character,
+                trackableTraits: updatedTraits,
+                extendedFeatures: updatedExtendedFeatures,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
 
-          return {
-            character: {
-              ...state.character,
-              extendedFeatures: updatedFeatures,
-              trackableTraits: updatedTraits,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
+        resetTrackableTraits: restType => {
+          set(state => {
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.restType === restType || restType === 'long'
+                  ? {
+                      ...trait,
+                      usedUses: 0,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            );
 
-      resetExtendedFeatures: restType => {
-        set(state => {
-          const updatedFeatures = (state.character.extendedFeatures || []).map(
-            feature =>
+            // Also update corresponding extended features
+            const updatedExtendedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
               feature.restType === restType || restType === 'long'
                 ? {
                     ...feature,
@@ -2866,1844 +2970,2529 @@ export const useCharacterStore = create<CharacterStore>()(
                     updatedAt: new Date().toISOString(),
                   }
                 : feature
-          );
+            );
 
-          // Also update corresponding trackable traits
-          const updatedTraits = (state.character.trackableTraits || []).map(
-            trait =>
-              trait.restType === restType || restType === 'long'
+            return {
+              character: {
+                ...state.character,
+                trackableTraits: updatedTraits,
+                extendedFeatures: updatedExtendedFeatures,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Extended feature management actions
+        addExtendedFeature: feature => {
+          set(state => {
+            const newFeature: ExtendedFeature = {
+              ...feature,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            // Also add as trackable trait
+            const newTrackableTrait: TrackableTrait = {
+              id: newFeature.id,
+              name: newFeature.name,
+              description: newFeature.description,
+              maxUses: newFeature.maxUses,
+              usedUses: newFeature.usedUses,
+              restType: newFeature.restType,
+              source: newFeature.sourceDetail || newFeature.source,
+              scaleWithProficiency: newFeature.scaleWithProficiency,
+              proficiencyMultiplier: newFeature.proficiencyMultiplier,
+              createdAt: newFeature.createdAt,
+              updatedAt: newFeature.updatedAt,
+            };
+
+            return {
+              character: {
+                ...state.character,
+                extendedFeatures: [
+                  ...(state.character.extendedFeatures || []),
+                  newFeature,
+                ],
+                trackableTraits: [
+                  ...(state.character.trackableTraits || []),
+                  newTrackableTrait,
+                ],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateExtendedFeature: (id, updates) => {
+          set(state => {
+            const updatedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
+              feature.id === id
                 ? {
-                    ...trait,
+                    ...feature,
+                    ...updates,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+            );
+
+            // Also update corresponding trackable trait
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      ...updates,
+                      source:
+                        updates.sourceDetail || updates.source || trait.source,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            );
+
+            return {
+              character: {
+                ...state.character,
+                extendedFeatures: updatedFeatures,
+                trackableTraits: updatedTraits,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        deleteExtendedFeature: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              extendedFeatures: (state.character.extendedFeatures || []).filter(
+                feature => feature.id !== id
+              ),
+              trackableTraits: (state.character.trackableTraits || []).filter(
+                trait => trait.id !== id
+              ),
+              favoriteFeatureIds: (
+                state.character.favoriteFeatureIds || []
+              ).filter(fid => fid !== id),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        useExtendedFeature: id => {
+          set(state => {
+            const updatedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
+              feature.id === id
+                ? {
+                    ...feature,
+                    usedUses: Math.min(
+                      feature.usedUses + 1,
+                      calculateTraitMaxUses(feature, state.character.level)
+                    ),
+                    updatedAt: new Date().toISOString(),
+                  }
+                : feature
+            );
+
+            // Also update corresponding trackable trait
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.id === id
+                  ? {
+                      ...trait,
+                      usedUses: Math.min(
+                        trait.usedUses + 1,
+                        calculateTraitMaxUses(trait, state.character.level)
+                      ),
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
+            );
+
+            return {
+              character: {
+                ...state.character,
+                extendedFeatures: updatedFeatures,
+                trackableTraits: updatedTraits,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        resetExtendedFeatures: restType => {
+          set(state => {
+            const updatedFeatures = (
+              state.character.extendedFeatures || []
+            ).map(feature =>
+              feature.restType === restType || restType === 'long'
+                ? {
+                    ...feature,
                     usedUses: 0,
                     updatedAt: new Date().toISOString(),
                   }
-                : trait
-          );
-
-          return {
-            character: {
-              ...state.character,
-              extendedFeatures: updatedFeatures,
-              trackableTraits: updatedTraits,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      reorderExtendedFeatures: (sourceIndex, destinationIndex, sourceType) => {
-        set(state => {
-          const features = [...(state.character.extendedFeatures || [])];
-
-          if (sourceType) {
-            // Reorder within a specific source type
-            const filteredFeatures = features.filter(
-              f => f.sourceType === sourceType
-            );
-            const otherFeatures = features.filter(
-              f => f.sourceType !== sourceType
-            );
-
-            if (
-              sourceIndex >= filteredFeatures.length ||
-              destinationIndex >= filteredFeatures.length
-            ) {
-              return state;
-            }
-
-            const [movedFeature] = filteredFeatures.splice(sourceIndex, 1);
-            filteredFeatures.splice(destinationIndex, 0, movedFeature);
-
-            // Update display orders
-            filteredFeatures.forEach((feature, index) => {
-              feature.displayOrder = index;
-              feature.updatedAt = new Date().toISOString();
-            });
-
-            return {
-              character: {
-                ...state.character,
-                extendedFeatures: [...otherFeatures, ...filteredFeatures],
-              },
-              hasUnsavedChanges: true,
-              saveStatus: 'saving',
-            };
-          } else {
-            // Reorder all features
-            if (
-              sourceIndex >= features.length ||
-              destinationIndex >= features.length
-            ) {
-              return state;
-            }
-
-            const [movedFeature] = features.splice(sourceIndex, 1);
-            features.splice(destinationIndex, 0, movedFeature);
-
-            // Update display orders
-            features.forEach((feature, index) => {
-              feature.displayOrder = index;
-              feature.updatedAt = new Date().toISOString();
-            });
-
-            return {
-              character: {
-                ...state.character,
-                extendedFeatures: features,
-              },
-              hasUnsavedChanges: true,
-              saveStatus: 'saving',
-            };
-          }
-        });
-      },
-
-      migrateTraitsToExtendedFeatures: () => {
-        set(state => {
-          const existingTraits = state.character.trackableTraits || [];
-          const existingExtended = state.character.extendedFeatures || [];
-
-          // Only migrate if there are traits and no extended features yet
-          if (existingTraits.length === 0 || existingExtended.length > 0) {
-            return state;
-          }
-
-          const migratedFeatures: ExtendedFeature[] = existingTraits.map(
-            (trait, index) => ({
-              ...trait,
-              sourceType: 'other' as const,
-              sourceDetail: trait.source || undefined,
-              displayOrder: index,
-              isPassive: trait.maxUses === 0,
-            })
-          );
-
-          return {
-            character: {
-              ...state.character,
-              extendedFeatures: migratedFeatures,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Language management
-      addLanguage: (
-        language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
-      ) => {
-        set(state => {
-          const newLanguage: Language = {
-            ...language,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              languages: [...(state.character.languages || []), newLanguage],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      deleteLanguage: (id: string) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            languages: (state.character.languages || []).filter(
-              lang => lang.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Tool proficiency management
-      addToolProficiency: (
-        tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>
-      ) => {
-        set(state => {
-          const newTool: ToolProficiency = {
-            ...tool,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              toolProficiencies: [
-                ...(state.character.toolProficiencies || []),
-                newTool,
-              ],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateToolProficiency: (
-        id: string,
-        updates: Partial<ToolProficiency>
-      ) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            toolProficiencies: (state.character.toolProficiencies || []).map(
-              tool =>
-                tool.id === id
-                  ? { ...tool, ...updates, updatedAt: new Date().toISOString() }
-                  : tool
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteToolProficiency: (id: string) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            toolProficiencies: (state.character.toolProficiencies || []).filter(
-              tool => tool.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Rest management (centralized)
-      takeShortRest: () => {
-        set(state => {
-          const { character } = state;
-
-          // Reset short rest abilities (trackableTraits and extendedFeatures)
-          const resetTrackableTraits = character.trackableTraits.map(trait =>
-            trait.restType === 'short' ? { ...trait, usedUses: 0 } : trait
-          );
-
-          const resetExtendedFeatures = character.extendedFeatures.map(
-            feature =>
-              feature.restType === 'short' && !feature.isPassive
-                ? { ...feature, usedUses: 0 }
                 : feature
-          );
-
-          // Reset short rest weapon charges
-          const resetWeapons = character.weapons.map(weapon => {
-            if (!weapon.charges || weapon.charges.length === 0) return weapon;
-
-            const resetCharges = weapon.charges.map(charge =>
-              charge.restType === 'short'
-                ? { ...charge, usedCharges: 0 }
-                : charge
             );
 
-            // Only update weapon if any charges were reset
-            const hasResetCharges = weapon.charges.some(
-              c => c.restType === 'short'
+            // Also update corresponding trackable traits
+            const updatedTraits = (state.character.trackableTraits || []).map(
+              trait =>
+                trait.restType === restType || restType === 'long'
+                  ? {
+                      ...trait,
+                      usedUses: 0,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : trait
             );
-            if (!hasResetCharges) return weapon;
 
             return {
-              ...weapon,
-              charges: resetCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          // Reset short rest magic item charges
-          const resetMagicItems = character.magicItems.map(item => {
-            if (!item.charges || item.charges.length === 0) return item;
-
-            const resetCharges = item.charges.map(charge =>
-              charge.restType === 'short'
-                ? { ...charge, usedCharges: 0 }
-                : charge
-            );
-
-            // Only update item if any charges were reset
-            const hasResetCharges = item.charges.some(
-              c => c.restType === 'short'
-            );
-            if (!hasResetCharges) return item;
-
-            return {
-              ...item,
-              charges: resetCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          // Reset Pact Magic slots (if Warlock)
-          let resetPactMagic = character.pactMagic;
-          if (resetPactMagic) {
-            resetPactMagic = {
-              ...resetPactMagic,
-              slots: {
-                ...resetPactMagic.slots,
-                used: 0,
+              character: {
+                ...state.character,
+                extendedFeatures: updatedFeatures,
+                trackableTraits: updatedTraits,
               },
-            };
-          }
-
-          // Reset reaction
-          const resetReaction = {
-            hasUsedReaction: false,
-          };
-
-          return {
-            character: {
-              ...character,
-              trackableTraits: resetTrackableTraits,
-              extendedFeatures: resetExtendedFeatures,
-              weapons: resetWeapons,
-              magicItems: resetMagicItems,
-              pactMagic: resetPactMagic,
-              reaction: resetReaction,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      takeLongRest: () => {
-        set(state => {
-          const { character } = state;
-
-          // Reset ALL abilities (both short and long rest)
-          const resetTrackableTraits = character.trackableTraits.map(trait => ({
-            ...trait,
-            usedUses: 0,
-          }));
-
-          const resetExtendedFeatures = character.extendedFeatures.map(
-            feature =>
-              feature.isPassive ? feature : { ...feature, usedUses: 0 }
-          );
-
-          // Reset ALL weapon charges (both short and long rest)
-          const resetWeapons = character.weapons.map(weapon => {
-            if (!weapon.charges || weapon.charges.length === 0) return weapon;
-
-            return {
-              ...weapon,
-              charges: weapon.charges.map(charge => ({
-                ...charge,
-                usedCharges: 0,
-              })),
-              updatedAt: new Date().toISOString(),
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
             };
           });
+        },
 
-          // Reset ALL magic item charges (short, long, and dawn rest types)
-          const resetMagicItems = character.magicItems.map(item => {
-            if (!item.charges || item.charges.length === 0) return item;
+        reorderExtendedFeatures: (
+          sourceIndex,
+          destinationIndex,
+          sourceType
+        ) => {
+          set(state => {
+            const features = [...(state.character.extendedFeatures || [])];
 
-            return {
-              ...item,
-              charges: item.charges.map(charge => ({
-                ...charge,
-                usedCharges: 0,
-              })),
-              updatedAt: new Date().toISOString(),
-            };
-          });
+            if (sourceType) {
+              // Reorder within a specific source type
+              const filteredFeatures = features.filter(
+                f => f.sourceType === sourceType
+              );
+              const otherFeatures = features.filter(
+                f => f.sourceType !== sourceType
+              );
 
-          // Reset free casts on all spells (innate / at-will tracking)
-          const resetSpells = character.spells.map(spell =>
-            spell.freeCastsUsed ? { ...spell, freeCastsUsed: 0 } : spell
-          );
+              if (
+                sourceIndex >= filteredFeatures.length ||
+                destinationIndex >= filteredFeatures.length
+              ) {
+                return state;
+              }
 
-          // Reset ALL spell slots
-          const resetSpellSlots = { ...character.spellSlots };
-          for (let level = 1; level <= 9; level++) {
-            const slot = character.spellSlots[level as keyof SpellSlots];
-            if (slot) {
-              resetSpellSlots[level as keyof SpellSlots] = {
-                ...slot,
-                used: 0,
+              const [movedFeature] = filteredFeatures.splice(sourceIndex, 1);
+              filteredFeatures.splice(destinationIndex, 0, movedFeature);
+
+              // Update display orders
+              filteredFeatures.forEach((feature, index) => {
+                feature.displayOrder = index;
+                feature.updatedAt = new Date().toISOString();
+              });
+
+              return {
+                character: {
+                  ...state.character,
+                  extendedFeatures: [...otherFeatures, ...filteredFeatures],
+                },
+                hasUnsavedChanges: true,
+                saveStatus: 'saving',
+              };
+            } else {
+              // Reorder all features
+              if (
+                sourceIndex >= features.length ||
+                destinationIndex >= features.length
+              ) {
+                return state;
+              }
+
+              const [movedFeature] = features.splice(sourceIndex, 1);
+              features.splice(destinationIndex, 0, movedFeature);
+
+              // Update display orders
+              features.forEach((feature, index) => {
+                feature.displayOrder = index;
+                feature.updatedAt = new Date().toISOString();
+              });
+
+              return {
+                character: {
+                  ...state.character,
+                  extendedFeatures: features,
+                },
+                hasUnsavedChanges: true,
+                saveStatus: 'saving',
               };
             }
-          }
-
-          // Reset Pact Magic slots (if Warlock)
-          let resetPactMagic = character.pactMagic;
-          if (resetPactMagic) {
-            resetPactMagic = {
-              ...resetPactMagic,
-              slots: {
-                ...resetPactMagic.slots,
-                used: 0,
-              },
-            };
-          }
-
-          // Reset ALL hit dice
-          const resetHitDicePools = { ...character.hitDicePools };
-          Object.keys(resetHitDicePools).forEach(dieType => {
-            resetHitDicePools[dieType] = {
-              ...resetHitDicePools[dieType],
-              used: 0,
-            };
           });
-
-          // Reset HP to max (remove temp HP, heal to full)
-          const resetHitPoints = {
-            ...character.hitPoints,
-            current: character.hitPoints.max,
-            temporary: 0,
-            deathSaves: undefined, // Clear death saves
-          };
-
-          // Reset reaction
-          const resetReaction = {
-            hasUsedReaction: false,
-          };
-
-          // Reset temp AC (deactivate but preserve saved value)
-          const resetIsTempACActive = false;
-
-          // Reset Bardic Inspiration (if Bard)
-          const resetBardicInspiration = character.bardicInspiration
-            ? { ...character.bardicInspiration, usesExpended: 0 }
-            : undefined;
-
-          // Reset summons HP to max, clear temp HP and conditions
-          const resetSummons = character.summons?.map(summon => ({
-            ...summon,
-            entity: {
-              ...summon.entity,
-              currentHp: summon.entity.maxHp,
-              tempHp: 0,
-              conditions: summon.entity.conditions.filter(
-                c => c.source === 'dm'
-              ),
-            },
-          }));
-
-          return {
-            character: {
-              ...character,
-              trackableTraits: resetTrackableTraits,
-              extendedFeatures: resetExtendedFeatures,
-              weapons: resetWeapons,
-              magicItems: resetMagicItems,
-              spells: resetSpells,
-              spellSlots: resetSpellSlots,
-              pactMagic: resetPactMagic,
-              hitDicePools: resetHitDicePools,
-              hitPoints: resetHitPoints,
-              reaction: resetReaction,
-              isTempACActive: resetIsTempACActive,
-              bardicInspiration: resetBardicInspiration,
-              summons: resetSummons,
-              daysSpent: (character.daysSpent || 0) + 1,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Campaign tracking
-      updateDaysSpent: (days: number) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            daysSpent: Math.max(0, days),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving' as SaveStatus,
-        }));
-      },
-
-      incrementDaysSpent: (amount = 1) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            daysSpent: Math.max(0, (state.character.daysSpent || 0) + amount),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving' as SaveStatus,
-        }));
-      },
-
-      updateCharacterBackground: updates => {
-        set(state => ({
-          character: {
-            ...state.character,
-            characterBackground: {
-              ...state.character.characterBackground,
-              ...updates,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving' as SaveStatus,
-        }));
-      },
-
-      // Weapon management actions
-      addWeapon: weapon => {
-        set(state => {
-          const newWeapon: Weapon = {
-            ...weapon,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              weapons: [...state.character.weapons, newWeapon],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateWeapon: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            weapons: state.character.weapons.map(weapon =>
-              weapon.id === id
-                ? { ...weapon, ...updates, updatedAt: new Date().toISOString() }
-                : weapon
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteWeapon: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            weapons: state.character.weapons.filter(weapon => weapon.id !== id),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      equipWeapon: (id, equipped) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            weapons: state.character.weapons.map(weapon =>
-              weapon.id === id
-                ? {
-                    ...weapon,
-                    isEquipped: equipped,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : weapon
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderWeapons: (sourceIndex: number, destinationIndex: number) => {
-        set(state => {
-          const weapons = [...state.character.weapons];
-          const [removed] = weapons.splice(sourceIndex, 1);
-          weapons.splice(destinationIndex, 0, removed);
-
-          // Update all weapons with new timestamps
-          const updatedWeapons = weapons.map(weapon => ({
-            ...weapon,
-            updatedAt: new Date().toISOString(),
-          }));
-
-          return {
-            character: {
-              ...state.character,
-              weapons: updatedWeapons,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      expendWeaponCharge: (weaponId, chargeId) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.charges) return weapon;
-
-            const updatedCharges = weapon.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const maxCharges = calculateWeaponChargeMax(
-                charge,
-                state.character.level
-              );
-              const currentUsed = charge.usedCharges || 0;
-
-              // Don't exceed max charges
-              if (currentUsed >= maxCharges) return charge;
-
-              return {
-                ...charge,
-                usedCharges: currentUsed + 1,
-              };
-            });
-
-            return {
-              ...weapon,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              weapons: updatedWeapons,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreWeaponCharge: (weaponId, chargeId) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.charges) return weapon;
-
-            const updatedCharges = weapon.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const currentUsed = charge.usedCharges || 0;
-
-              // Don't go below 0
-              if (currentUsed <= 0) return charge;
-
-              return {
-                ...charge,
-                usedCharges: currentUsed - 1,
-              };
-            });
-
-            return {
-              ...weapon,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              weapons: updatedWeapons,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      setWeaponChargeUsed: (weaponId, chargeId, usedCount) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.charges) return weapon;
-
-            const updatedCharges = weapon.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const maxCharges = calculateWeaponChargeMax(
-                charge,
-                state.character.level
-              );
-
-              // Clamp between 0 and max
-              const clampedUsed = Math.max(0, Math.min(usedCount, maxCharges));
-
-              return {
-                ...charge,
-                usedCharges: clampedUsed,
-              };
-            });
-
-            return {
-              ...weapon,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              weapons: updatedWeapons,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      expendWeaponChargePoolAbility: (weaponId, abilityId) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
-
-            const ability = weapon.chargePool.abilities.find(
-              a => a.id === abilityId
-            );
-            if (!ability) return weapon;
-
-            const newUsed = weapon.chargePool.usedCharges + ability.cost;
-            if (newUsed > weapon.chargePool.maxCharges) return weapon;
-
-            return {
-              ...weapon,
-              chargePool: {
-                ...weapon.chargePool,
-                usedCharges: newUsed,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, weapons: updatedWeapons },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreWeaponChargePool: (weaponId, amount) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
-
-            const newUsed = Math.max(0, weapon.chargePool.usedCharges - amount);
-
-            return {
-              ...weapon,
-              chargePool: {
-                ...weapon.chargePool,
-                usedCharges: newUsed,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, weapons: updatedWeapons },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      setWeaponChargePoolUsed: (weaponId, usedCount) => {
-        set(state => {
-          const updatedWeapons = state.character.weapons.map(weapon => {
-            if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
-
-            const clamped = Math.max(
-              0,
-              Math.min(usedCount, weapon.chargePool.maxCharges)
-            );
-
-            return {
-              ...weapon,
-              chargePool: {
-                ...weapon.chargePool,
-                usedCharges: clamped,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, weapons: updatedWeapons },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Magic item management actions
-      addMagicItem: item => {
-        set(state => {
-          const newItem: MagicItem = {
-            ...item,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              magicItems: [...(state.character.magicItems || []), newItem],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateMagicItem: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            magicItems: (state.character.magicItems || []).map(item =>
-              item.id === id
-                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
-                : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteMagicItem: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            magicItems: (state.character.magicItems || []).filter(
-              item => item.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      attuneMagicItem: (id, attuned) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            magicItems: (state.character.magicItems || []).map(item =>
-              item.id === id
-                ? {
-                    ...item,
-                    isAttuned: attuned,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      updateAttunementSlots: max => {
-        set(state => ({
-          character: {
-            ...state.character,
-            attunementSlots: {
-              ...state.character.attunementSlots,
-              max,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderMagicItems: (sourceIndex: number, destinationIndex: number) => {
-        set(state => {
-          const magicItems = [...(state.character.magicItems || [])];
-          const [removed] = magicItems.splice(sourceIndex, 1);
-          magicItems.splice(destinationIndex, 0, removed);
-
-          // Update all magic items with new timestamps
-          const updatedMagicItems = magicItems.map(item => ({
-            ...item,
-            updatedAt: new Date().toISOString(),
-          }));
-
-          return {
-            character: {
-              ...state.character,
-              magicItems: updatedMagicItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      expendMagicItemCharge: (itemId, chargeId) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.charges) return item;
-
-            const updatedCharges = item.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const maxCharges = calculateMagicItemChargeMax(
-                charge,
-                state.character.level
-              );
-              const currentUsed = charge.usedCharges || 0;
-
-              // Don't exceed max charges
-              if (currentUsed >= maxCharges) return charge;
-
-              return {
-                ...charge,
-                usedCharges: currentUsed + 1,
-              };
-            });
-
-            return {
-              ...item,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              magicItems: updatedMagicItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreMagicItemCharge: (itemId, chargeId) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.charges) return item;
-
-            const updatedCharges = item.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const currentUsed = charge.usedCharges || 0;
-
-              // Don't go below 0
-              if (currentUsed <= 0) return charge;
-
-              return {
-                ...charge,
-                usedCharges: currentUsed - 1,
-              };
-            });
-
-            return {
-              ...item,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              magicItems: updatedMagicItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      setMagicItemChargeUsed: (itemId, chargeId, usedCount) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.charges) return item;
-
-            const updatedCharges = item.charges.map(charge => {
-              if (charge.id !== chargeId) return charge;
-
-              const maxCharges = calculateMagicItemChargeMax(
-                charge,
-                state.character.level
-              );
-
-              // Clamp between 0 and max
-              const clampedUsed = Math.max(0, Math.min(usedCount, maxCharges));
-
-              return {
-                ...charge,
-                usedCharges: clampedUsed,
-              };
-            });
-
-            return {
-              ...item,
-              charges: updatedCharges,
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: {
-              ...state.character,
-              magicItems: updatedMagicItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      expendChargePoolAbility: (itemId, abilityId) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.chargePool) return item;
-
-            const ability = item.chargePool.abilities.find(
-              a => a.id === abilityId
-            );
-            if (!ability) return item;
-
-            const remaining =
-              item.chargePool.maxCharges - item.chargePool.usedCharges;
-            if (ability.cost > remaining) return item;
-
-            return {
-              ...item,
-              chargePool: {
-                ...item.chargePool,
-                usedCharges: item.chargePool.usedCharges + ability.cost,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, magicItems: updatedMagicItems },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      restoreChargePool: (itemId, amount) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.chargePool) return item;
-
-            const newUsed = Math.max(0, item.chargePool.usedCharges - amount);
-
-            return {
-              ...item,
-              chargePool: {
-                ...item.chargePool,
-                usedCharges: newUsed,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, magicItems: updatedMagicItems },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      setChargePoolUsed: (itemId, usedCount) => {
-        set(state => {
-          const updatedMagicItems = state.character.magicItems.map(item => {
-            if (item.id !== itemId || !item.chargePool) return item;
-
-            const clamped = Math.max(
-              0,
-              Math.min(usedCount, item.chargePool.maxCharges)
-            );
-
-            return {
-              ...item,
-              chargePool: {
-                ...item.chargePool,
-                usedCharges: clamped,
-              },
-              updatedAt: new Date().toISOString(),
-            };
-          });
-
-          return {
-            character: { ...state.character, magicItems: updatedMagicItems },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Armor management
-      addArmorItem: item => {
-        set(state => {
-          const newItem: ArmorItem = {
-            ...item,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              armorItems: [...(state.character.armorItems || []), newItem],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateArmorItem: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            armorItems: state.character.armorItems.map(item =>
-              item.id === id
-                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
-                : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteArmorItem: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            armorItems: state.character.armorItems.filter(
-              item => item.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      equipArmorItem: (id, equipped) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            armorItems: state.character.armorItems.map(item =>
-              item.id === id
-                ? {
-                    ...item,
-                    isEquipped: equipped,
-                    updatedAt: new Date().toISOString(),
-                  }
-                : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderArmorItems: (sourceIndex: number, destinationIndex: number) => {
-        set(state => {
-          const armorItems = [...state.character.armorItems];
-          const [removed] = armorItems.splice(sourceIndex, 1);
-          armorItems.splice(destinationIndex, 0, removed);
-
-          // Update all armor items with new timestamps
-          const updatedArmorItems = armorItems.map(item => ({
-            ...item,
-            updatedAt: new Date().toISOString(),
-          }));
-
-          return {
-            character: {
-              ...state.character,
-              armorItems: updatedArmorItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Inventory management
-      addInventoryItem: item => {
-        set(state => {
-          const newItem: InventoryItem = {
-            ...item,
-            id: generateId(),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-
-          return {
-            character: {
-              ...state.character,
-              inventoryItems: [
-                ...(state.character.inventoryItems || []),
-                newItem,
-              ],
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      updateInventoryItem: (id, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            inventoryItems: state.character.inventoryItems.map(item =>
-              item.id === id
-                ? { ...item, ...updates, updatedAt: new Date().toISOString() }
-                : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      deleteInventoryItem: id => {
-        set(state => ({
-          character: {
-            ...state.character,
-            inventoryItems: state.character.inventoryItems.filter(
-              item => item.id !== id
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      updateItemQuantity: (id, quantity) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            inventoryItems: state.character.inventoryItems.map(item =>
-              item.id === id ? { ...item, quantity } : item
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderInventoryItems: (
-        sourceIndex: number,
-        destinationIndex: number
-      ) => {
-        set(state => {
-          const inventoryItems = [...state.character.inventoryItems];
-          const [removed] = inventoryItems.splice(sourceIndex, 1);
-          inventoryItems.splice(destinationIndex, 0, removed);
-
-          // Update all inventory items with new timestamps
-          const updatedInventoryItems = inventoryItems.map(item => ({
-            ...item,
-            updatedAt: new Date().toISOString(),
-          }));
-
-          return {
-            character: {
-              ...state.character,
-              inventoryItems: updatedInventoryItems,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Currency management
-      updateCurrency: updates => {
-        set(state => ({
-          character: {
-            ...state.character,
-            currency: {
-              ...state.character.currency,
-              ...updates,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      addCurrency: (type, amount) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            currency: {
-              ...state.character.currency,
-              [type]: (state.character.currency[type] || 0) + amount,
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      subtractCurrency: (type, amount) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            currency: {
-              ...state.character.currency,
-              [type]: Math.max(
-                0,
-                (state.character.currency[type] || 0) - amount
-              ),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Spellbook management
-      addSpellToSpellbook: spellId => {
-        set(state => {
-          const isAlreadyKnown =
-            state.character.spellbook.knownSpells.includes(spellId);
-          if (!isAlreadyKnown) {
+        },
+
+        toggleFavoriteFeature: id => {
+          set(state => {
+            const favorites = state.character.favoriteFeatureIds || [];
+            const isFavorite = favorites.includes(id);
             return {
               character: {
                 ...state.character,
-                spellbook: {
-                  ...state.character.spellbook,
-                  knownSpells: [
-                    ...state.character.spellbook.knownSpells,
-                    spellId,
-                  ],
-                },
+                favoriteFeatureIds: isFavorite
+                  ? favorites.filter(fid => fid !== id)
+                  : [...favorites, id],
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving',
             };
-          }
-          return state;
-        });
-      },
+          });
+        },
 
-      removeSpellFromSpellbook: spellId => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellbook: {
-              ...state.character.spellbook,
-              knownSpells: state.character.spellbook.knownSpells.filter(
-                id => id !== spellId
-              ),
-              preparedSpells: state.character.spellbook.preparedSpells.filter(
-                id => id !== spellId
-              ),
-              favoriteSpells: state.character.spellbook.favoriteSpells.filter(
-                id => id !== spellId
-              ),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        migrateTraitsToExtendedFeatures: () => {
+          set(state => {
+            const existingTraits = state.character.trackableTraits || [];
+            const existingExtended = state.character.extendedFeatures || [];
 
-      toggleSpellFavorite: spellId => {
-        set(state => {
-          const isFavorite =
-            state.character.spellbook.favoriteSpells.includes(spellId);
-          return {
-            character: {
-              ...state.character,
-              spellbook: {
-                ...state.character.spellbook,
-                favoriteSpells: isFavorite
-                  ? state.character.spellbook.favoriteSpells.filter(
-                      id => id !== spellId
-                    )
-                  : [...state.character.spellbook.favoriteSpells, spellId],
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
+            // Only migrate if there are traits and no extended features yet
+            if (existingTraits.length === 0 || existingExtended.length > 0) {
+              return state;
+            }
 
-      prepareSpell: spellId => {
-        set(state => {
-          const isAlreadyPrepared =
-            state.character.spellbook.preparedSpells.includes(spellId);
-          if (!isAlreadyPrepared) {
+            const migratedFeatures: ExtendedFeature[] = existingTraits.map(
+              (trait, index) => ({
+                ...trait,
+                sourceType: 'other' as const,
+                sourceDetail: trait.source || undefined,
+                displayOrder: index,
+                isPassive: trait.maxUses === 0,
+              })
+            );
+
             return {
               character: {
                 ...state.character,
-                spellbook: {
-                  ...state.character.spellbook,
-                  preparedSpells: [
-                    ...state.character.spellbook.preparedSpells,
-                    spellId,
-                  ],
-                },
+                extendedFeatures: migratedFeatures,
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving',
             };
-          }
-          return state;
-        });
-      },
+          });
+        },
 
-      unprepareSpell: spellId => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellbook: {
-              ...state.character.spellbook,
-              preparedSpells: state.character.spellbook.preparedSpells.filter(
-                id => id !== spellId
-              ),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        // Language management
+        addLanguage: (
+          language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
+        ) => {
+          set(state => {
+            const newLanguage: Language = {
+              ...language,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
 
-      updateSpellbookSettings: settings => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellbook: {
-              ...state.character.spellbook,
-              spellbookSettings: {
-                ...state.character.spellbook.spellbookSettings,
-                ...settings,
-              },
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      addCustomSpell: (spell: ProcessedSpell) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellbook: {
-              ...state.character.spellbook,
-              customSpells: [
-                ...(state.character.spellbook.customSpells || []),
-                spell,
-              ],
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      removeCustomSpell: spellId => {
-        set(state => ({
-          character: {
-            ...state.character,
-            spellbook: {
-              ...state.character.spellbook,
-              customSpells: (
-                state.character.spellbook.customSpells || []
-              ).filter(s => s.id !== spellId),
-            },
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      reorderPreparedSpells: (
-        sourceIndex: number,
-        destinationIndex: number
-      ) => {
-        set(state => {
-          const preparedSpells = [...state.character.spellbook.preparedSpells];
-          const [removed] = preparedSpells.splice(sourceIndex, 1);
-          preparedSpells.splice(destinationIndex, 0, removed);
-
-          return {
-            character: {
-              ...state.character,
-              spellbook: {
-                ...state.character.spellbook,
-                preparedSpells,
-              },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      reorderSpells: (sourceIndex: number, destinationIndex: number) => {
-        set(state => {
-          const spells = [...state.character.spells];
-          const [removed] = spells.splice(sourceIndex, 1);
-          spells.splice(destinationIndex, 0, removed);
-
-          return {
-            character: {
-              ...state.character,
-              spells,
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          };
-        });
-      },
-
-      // Summon management
-      addSummon: summon => {
-        set(state => {
-          const summons = state.character.summons || [];
-          // For familiars, replace existing one
-          if (summon.type === 'familiar') {
             return {
               character: {
                 ...state.character,
-                summons: [
-                  ...summons.filter(s => s.type !== 'familiar'),
-                  summon,
+                languages: [...(state.character.languages || []), newLanguage],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        deleteLanguage: (id: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              languages: (state.character.languages || []).filter(
+                lang => lang.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Tool proficiency management
+        addToolProficiency: (
+          tool: Omit<ToolProficiency, 'id' | 'createdAt' | 'updatedAt'>
+        ) => {
+          set(state => {
+            const newTool: ToolProficiency = {
+              ...tool,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                toolProficiencies: [
+                  ...(state.character.toolProficiencies || []),
+                  newTool,
                 ],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateToolProficiency: (
+          id: string,
+          updates: Partial<ToolProficiency>
+        ) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              toolProficiencies: (state.character.toolProficiencies || []).map(
+                tool =>
+                  tool.id === id
+                    ? {
+                        ...tool,
+                        ...updates,
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : tool
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteToolProficiency: (id: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              toolProficiencies: (
+                state.character.toolProficiencies || []
+              ).filter(tool => tool.id !== id),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Damage immunities
+        addDamageImmunity: (type: string) => {
+          set(state => {
+            const current = state.character.damageImmunities || [];
+            if (current.includes(type)) return state;
+            return {
+              character: {
+                ...state.character,
+                damageImmunities: [...current, type],
               },
               hasUnsavedChanges: true,
               saveStatus: 'saving' as const,
             };
-          }
-          return {
+          });
+        },
+        removeDamageImmunity: (type: string) => {
+          set(state => ({
             character: {
               ...state.character,
-              summons: [...summons, summon],
+              damageImmunities: (state.character.damageImmunities || []).filter(
+                t => t !== type
+              ),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving' as const,
+          }));
+        },
+
+        // Damage resistances
+        addDamageResistance: (type: string) => {
+          set(state => {
+            const current = state.character.damageResistances || [];
+            if (current.includes(type)) return state;
+            return {
+              character: {
+                ...state.character,
+                damageResistances: [...current, type],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+        removeDamageResistance: (type: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              damageResistances: (
+                state.character.damageResistances || []
+              ).filter(t => t !== type),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
+
+        // Condition immunities
+        addConditionImmunity: (condition: string) => {
+          set(state => {
+            const current = state.character.conditionImmunities || [];
+            if (current.includes(condition)) return state;
+            return {
+              character: {
+                ...state.character,
+                conditionImmunities: [...current, condition],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+        removeConditionImmunity: (condition: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              conditionImmunities: (
+                state.character.conditionImmunities || []
+              ).filter(c => c !== condition),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
+
+        // Senses management
+        addSense: (
+          sense: Omit<
+            import('@/types/character').CharacterSense,
+            'id' | 'createdAt' | 'updatedAt'
+          >
+        ) => {
+          set(state => {
+            const newSense: import('@/types/character').CharacterSense = {
+              ...sense,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            return {
+              character: {
+                ...state.character,
+                senses: [...(state.character.senses || []), newSense],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+        updateSense: (
+          id: string,
+          updates: Partial<import('@/types/character').CharacterSense>
+        ) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              senses: (state.character.senses || []).map(s =>
+                s.id === id
+                  ? { ...s, ...updates, updatedAt: new Date().toISOString() }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
+        removeSense: (id: string) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              senses: (state.character.senses || []).filter(s => s.id !== id),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
+
+        // Temporary buffs management
+        addBuff: buff => {
+          const now = new Date().toISOString();
+          const newBuff: TemporaryBuff = {
+            ...buff,
+            id: `buff-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            createdAt: now,
+            updatedAt: now,
           };
-        });
-      },
+          set(state => ({
+            character: {
+              ...state.character,
+              temporaryBuffs: [
+                ...(state.character.temporaryBuffs || []),
+                newBuff,
+              ],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
 
-      removeSummon: summonId => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).filter(
-              s => s.id !== summonId
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        updateBuff: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              temporaryBuffs: (state.character.temporaryBuffs || []).map(b =>
+                b.id === id
+                  ? { ...b, ...updates, updatedAt: new Date().toISOString() }
+                  : b
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
 
-      updateSummonEntity: (summonId, updates) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s =>
-              s.id === summonId
-                ? { ...s, entity: { ...s.entity, ...updates } }
-                : s
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+        deleteBuff: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              temporaryBuffs: (state.character.temporaryBuffs || []).filter(
+                b => b.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
 
-      damageSummon: (summonId, amount) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s => {
-              if (s.id !== summonId) return s;
-              let remaining = amount;
-              let newTemp = s.entity.tempHp;
-              let newCurrent = s.entity.currentHp;
-              // Temp HP absorbs first
-              if (newTemp > 0) {
-                if (remaining <= newTemp) {
-                  newTemp -= remaining;
-                  remaining = 0;
+        toggleBuff: id => {
+          set(state => {
+            const buffs = state.character.temporaryBuffs || [];
+            const buff = buffs.find(b => b.id === id);
+            if (!buff) return state;
+
+            const nowActive = !buff.isActive;
+            const updatedBuffs = buffs.map(b =>
+              b.id === id
+                ? {
+                    ...b,
+                    isActive: nowActive,
+                    updatedAt: new Date().toISOString(),
+                  }
+                : b
+            );
+
+            // Handle side effects of toggling
+            let hitPoints = { ...state.character.hitPoints };
+            let damageResistances = [
+              ...(state.character.damageResistances || []),
+            ];
+            let damageImmunities = [
+              ...(state.character.damageImmunities || []),
+            ];
+            let conditionImmunities = [
+              ...(state.character.conditionImmunities || []),
+            ];
+
+            for (const effect of buff.effects) {
+              if (effect.targetStat === 'tempHp' && effect.mode === 'grant') {
+                if (nowActive) {
+                  hitPoints = {
+                    ...hitPoints,
+                    temporary: Math.max(hitPoints.temporary, effect.value),
+                  };
                 } else {
-                  remaining -= newTemp;
-                  newTemp = 0;
+                  hitPoints = {
+                    ...hitPoints,
+                    temporary: Math.max(0, hitPoints.temporary - effect.value),
+                  };
                 }
               }
-              newCurrent = Math.max(0, newCurrent - remaining);
+
+              if (
+                effect.targetStat === 'damageResistance' &&
+                effect.targetDamageType
+              ) {
+                if (nowActive) {
+                  if (!damageResistances.includes(effect.targetDamageType)) {
+                    damageResistances.push(effect.targetDamageType);
+                  }
+                } else {
+                  damageResistances = damageResistances.filter(
+                    r => r !== effect.targetDamageType
+                  );
+                }
+              }
+
+              if (
+                effect.targetStat === 'damageImmunity' &&
+                effect.targetDamageType
+              ) {
+                if (nowActive) {
+                  if (!damageImmunities.includes(effect.targetDamageType)) {
+                    damageImmunities.push(effect.targetDamageType);
+                  }
+                } else {
+                  damageImmunities = damageImmunities.filter(
+                    r => r !== effect.targetDamageType
+                  );
+                }
+              }
+
+              if (
+                effect.targetStat === 'conditionImmunity' &&
+                effect.targetCondition
+              ) {
+                if (nowActive) {
+                  if (!conditionImmunities.includes(effect.targetCondition)) {
+                    conditionImmunities.push(effect.targetCondition);
+                  }
+                } else {
+                  conditionImmunities = conditionImmunities.filter(
+                    c => c !== effect.targetCondition
+                  );
+                }
+              }
+            }
+
+            return {
+              character: {
+                ...state.character,
+                temporaryBuffs: updatedBuffs,
+                hitPoints,
+                damageResistances,
+                damageImmunities,
+                conditionImmunities,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+
+        clearAllBuffs: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              temporaryBuffs: [],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as const,
+          }));
+        },
+
+        // Rest management (centralized)
+        takeShortRest: () => {
+          set(state => {
+            const { character } = state;
+
+            // Reset short rest abilities (trackableTraits and extendedFeatures)
+            const resetTrackableTraits = character.trackableTraits.map(trait =>
+              trait.restType === 'short' ? { ...trait, usedUses: 0 } : trait
+            );
+
+            const resetExtendedFeatures = character.extendedFeatures.map(
+              feature =>
+                feature.restType === 'short' && !feature.isPassive
+                  ? { ...feature, usedUses: 0 }
+                  : feature
+            );
+
+            // Reset short rest weapon charges
+            const resetWeapons = character.weapons.map(weapon => {
+              if (!weapon.charges || weapon.charges.length === 0) return weapon;
+
+              const resetCharges = weapon.charges.map(charge =>
+                charge.restType === 'short'
+                  ? { ...charge, usedCharges: 0 }
+                  : charge
+              );
+
+              // Only update weapon if any charges were reset
+              const hasResetCharges = weapon.charges.some(
+                c => c.restType === 'short'
+              );
+              if (!hasResetCharges) return weapon;
+
               return {
-                ...s,
-                entity: {
-                  ...s.entity,
-                  currentHp: newCurrent,
-                  tempHp: newTemp,
+                ...weapon,
+                charges: resetCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            // Reset short rest magic item charges
+            const resetMagicItems = character.magicItems.map(item => {
+              if (!item.charges || item.charges.length === 0) return item;
+
+              const resetCharges = item.charges.map(charge =>
+                charge.restType === 'short'
+                  ? { ...charge, usedCharges: 0 }
+                  : charge
+              );
+
+              // Only update item if any charges were reset
+              const hasResetCharges = item.charges.some(
+                c => c.restType === 'short'
+              );
+              if (!hasResetCharges) return item;
+
+              return {
+                ...item,
+                charges: resetCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            // Reset Pact Magic slots (if Warlock)
+            let resetPactMagic = character.pactMagic;
+            if (resetPactMagic) {
+              resetPactMagic = {
+                ...resetPactMagic,
+                slots: {
+                  ...resetPactMagic.slots,
+                  used: 0,
                 },
               };
-            }),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            }
 
-      healSummon: (summonId, amount) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s =>
-              s.id === summonId
-                ? {
-                    ...s,
-                    entity: {
-                      ...s.entity,
-                      currentHp: Math.min(
-                        s.entity.maxHp,
-                        s.entity.currentHp + amount
-                      ),
-                    },
-                  }
-                : s
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            // Reset reaction
+            const resetReaction = {
+              hasUsedReaction: false,
+            };
 
-      addSummonTempHp: (summonId, amount) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s =>
-              s.id === summonId
-                ? {
-                    ...s,
-                    entity: {
-                      ...s.entity,
-                      tempHp: Math.max(s.entity.tempHp, amount),
-                    },
-                  }
-                : s
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
+            // Reset class resources per each resource's short-rest rule
+            const resetClassResources = {
+              ...(character.classResources ?? {}),
+            };
+            for (const active of getActiveClassResources(character)) {
+              const rule = active.definition.getShortRestReset(
+                active.classLevel
+              );
+              if (rule === 0) continue;
+              const current =
+                resetClassResources[active.definition.id]?.usesExpended ?? 0;
+              resetClassResources[active.definition.id] = {
+                ...resetClassResources[active.definition.id],
+                usesExpended: rule === 'all' ? 0 : Math.max(0, current - 1),
+              };
+            }
 
-      addSummonCondition: (summonId, condition) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s =>
-              s.id === summonId
-                ? {
-                    ...s,
-                    entity: {
-                      ...s.entity,
-                      conditions: [...s.entity.conditions, condition],
-                    },
-                  }
-                : s
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      removeSummonCondition: (summonId, conditionId) => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).map(s =>
-              s.id === summonId
-                ? {
-                    ...s,
-                    entity: {
-                      ...s.entity,
-                      conditions: s.entity.conditions.filter(
-                        c => c.id !== conditionId
-                      ),
-                    },
-                  }
-                : s
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      removeConcentrationSummons: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).filter(
-              s => !s.requiresConcentration
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      dismissFamiliar: () => {
-        set(state => ({
-          character: {
-            ...state.character,
-            summons: (state.character.summons || []).filter(
-              s => s.type !== 'familiar'
-            ),
-          },
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        }));
-      },
-
-      // Persistence actions
-      saveCharacter: () => {
-        try {
-          // Save to localStorage (handled by persist middleware)
-          set({
-            saveStatus: 'saved',
-            lastSaved: new Date(),
-            hasUnsavedChanges: false,
+            return {
+              character: {
+                ...character,
+                trackableTraits: resetTrackableTraits,
+                extendedFeatures: resetExtendedFeatures,
+                weapons: resetWeapons,
+                magicItems: resetMagicItems,
+                pactMagic: resetPactMagic,
+                reaction: resetReaction,
+                classResources: resetClassResources,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
           });
-        } catch (error) {
-          console.error('Failed to save character:', error);
-          set({ saveStatus: 'error' });
-        }
-      },
+        },
 
-      loadCharacter: character => {
-        set({
-          character,
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-          hasUnsavedChanges: false,
-        });
-      },
+        takeLongRest: () => {
+          set(state => {
+            const { character } = state;
 
-      resetCharacter: () => {
-        set({
-          character: {
-            ...DEFAULT_CHARACTER_STATE,
-            id: generateId(),
-          },
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-          hasUnsavedChanges: false,
-        });
-      },
-
-      exportCharacter: () => {
-        const state = get();
-        return {
-          version: APP_VERSION,
-          exportDate: new Date().toISOString(),
-          character: state.character,
-        };
-      },
-
-      importCharacter: exportData => {
-        try {
-          // Basic validation
-          if (
-            !exportData.character ||
-            typeof exportData.character !== 'object'
-          ) {
-            throw new Error('Invalid character data');
-          }
-
-          // Version compatibility check (for future use)
-          if (exportData.version && exportData.version !== APP_VERSION) {
-            console.warn(
-              `Version mismatch: expected ${APP_VERSION}, got ${exportData.version}`
+            // Reset ALL abilities (both short and long rest)
+            const resetTrackableTraits = character.trackableTraits.map(
+              trait => ({
+                ...trait,
+                usedUses: 0,
+              })
             );
-          }
 
+            const resetExtendedFeatures = character.extendedFeatures.map(
+              feature =>
+                feature.isPassive ? feature : { ...feature, usedUses: 0 }
+            );
+
+            // Reset ALL weapon charges (both short and long rest)
+            const resetWeapons = character.weapons.map(weapon => {
+              if (!weapon.charges || weapon.charges.length === 0) return weapon;
+
+              return {
+                ...weapon,
+                charges: weapon.charges.map(charge => ({
+                  ...charge,
+                  usedCharges: 0,
+                })),
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            // Reset ALL magic item charges (short, long, and dawn rest types)
+            const resetMagicItems = character.magicItems.map(item => {
+              if (!item.charges || item.charges.length === 0) return item;
+
+              return {
+                ...item,
+                charges: item.charges.map(charge => ({
+                  ...charge,
+                  usedCharges: 0,
+                })),
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            // Reset free casts on all spells (innate / at-will tracking)
+            const resetSpells = character.spells.map(spell =>
+              spell.freeCastsUsed ? { ...spell, freeCastsUsed: 0 } : spell
+            );
+
+            // Reset ALL spell slots
+            const resetSpellSlots = { ...character.spellSlots };
+            for (let level = 1; level <= 9; level++) {
+              const slot = character.spellSlots[level as keyof SpellSlots];
+              if (slot) {
+                resetSpellSlots[level as keyof SpellSlots] = {
+                  ...slot,
+                  used: 0,
+                };
+              }
+            }
+
+            // Reset Pact Magic slots (if Warlock)
+            let resetPactMagic = character.pactMagic;
+            if (resetPactMagic) {
+              resetPactMagic = {
+                ...resetPactMagic,
+                slots: {
+                  ...resetPactMagic.slots,
+                  used: 0,
+                },
+              };
+            }
+
+            // Reset ALL hit dice
+            const resetHitDicePools = { ...character.hitDicePools };
+            Object.keys(resetHitDicePools).forEach(dieType => {
+              resetHitDicePools[dieType] = {
+                ...resetHitDicePools[dieType],
+                used: 0,
+              };
+            });
+
+            // Reset HP to max (remove temp HP, heal to full)
+            const resetHitPoints = {
+              ...character.hitPoints,
+              current: character.hitPoints.max,
+              temporary: 0,
+              deathSaves: undefined, // Clear death saves
+            };
+
+            // Reset reaction
+            const resetReaction = {
+              hasUsedReaction: false,
+            };
+
+            // Reset temp AC (deactivate but preserve saved value)
+            const resetIsTempACActive = false;
+
+            // Reset all class resources (long rest restores everything)
+            const resetClassResources = Object.fromEntries(
+              Object.entries(character.classResources ?? {}).map(
+                ([id, usage]) => [id, { ...usage, usesExpended: 0 }]
+              )
+            );
+
+            // Deactivate all temporary buffs (preserve them for re-enabling)
+            const deactivatedBuffs = (character.temporaryBuffs || []).map(
+              buff =>
+                buff.isActive
+                  ? {
+                      ...buff,
+                      isActive: false,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : buff
+            );
+
+            // Reset summons HP to max, clear temp HP and conditions
+            const resetSummons = character.summons?.map(summon => ({
+              ...summon,
+              entity: {
+                ...summon.entity,
+                currentHp: summon.entity.maxHp,
+                tempHp: 0,
+                conditions: summon.entity.conditions.filter(
+                  c => c.source === 'dm'
+                ),
+              },
+            }));
+
+            return {
+              character: {
+                ...character,
+                trackableTraits: resetTrackableTraits,
+                extendedFeatures: resetExtendedFeatures,
+                weapons: resetWeapons,
+                magicItems: resetMagicItems,
+                spells: resetSpells,
+                spellSlots: resetSpellSlots,
+                pactMagic: resetPactMagic,
+                hitDicePools: resetHitDicePools,
+                hitPoints: resetHitPoints,
+                reaction: resetReaction,
+                isTempACActive: resetIsTempACActive,
+                classResources: resetClassResources,
+                temporaryBuffs: deactivatedBuffs,
+                summons: resetSummons,
+                daysSpent: (character.daysSpent || 0) + 1,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Campaign tracking
+        updateDaysSpent: (days: number) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              daysSpent: Math.max(0, days),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus,
+          }));
+        },
+
+        incrementDaysSpent: (amount = 1) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              daysSpent: Math.max(0, (state.character.daysSpent || 0) + amount),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus,
+          }));
+        },
+
+        toggleShareHpWithParty: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              shareHpWithParty: !(state.character.shareHpWithParty ?? true),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus,
+          }));
+        },
+
+        updateCharacterBackground: updates => {
+          set(state => ({
+            character: {
+              ...state.character,
+              characterBackground: {
+                ...state.character.characterBackground,
+                ...updates,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving' as SaveStatus,
+          }));
+        },
+
+        // Weapon management actions
+        addWeapon: weapon => {
+          set(state => {
+            const newWeapon: Weapon = {
+              ...weapon,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                weapons: [...state.character.weapons, newWeapon],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateWeapon: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              weapons: state.character.weapons.map(weapon =>
+                weapon.id === id
+                  ? {
+                      ...weapon,
+                      ...updates,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : weapon
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteWeapon: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              weapons: state.character.weapons.filter(
+                weapon => weapon.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        equipWeapon: (id, equipped) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              weapons: state.character.weapons.map(weapon =>
+                weapon.id === id
+                  ? {
+                      ...weapon,
+                      isEquipped: equipped,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : weapon
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderWeapons: (sourceIndex: number, destinationIndex: number) => {
+          set(state => {
+            const weapons = [...state.character.weapons];
+            const [removed] = weapons.splice(sourceIndex, 1);
+            weapons.splice(destinationIndex, 0, removed);
+
+            // Update all weapons with new timestamps
+            const updatedWeapons = weapons.map(weapon => ({
+              ...weapon,
+              updatedAt: new Date().toISOString(),
+            }));
+
+            return {
+              character: {
+                ...state.character,
+                weapons: updatedWeapons,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        expendWeaponCharge: (weaponId, chargeId) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+              const updatedCharges = weapon.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const maxCharges = calculateWeaponChargeMax(
+                  charge,
+                  state.character.level
+                );
+                const currentUsed = charge.usedCharges || 0;
+
+                // Don't exceed max charges
+                if (currentUsed >= maxCharges) return charge;
+
+                return {
+                  ...charge,
+                  usedCharges: currentUsed + 1,
+                };
+              });
+
+              return {
+                ...weapon,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                weapons: updatedWeapons,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        restoreWeaponCharge: (weaponId, chargeId) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+              const updatedCharges = weapon.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const currentUsed = charge.usedCharges || 0;
+
+                // Don't go below 0
+                if (currentUsed <= 0) return charge;
+
+                return {
+                  ...charge,
+                  usedCharges: currentUsed - 1,
+                };
+              });
+
+              return {
+                ...weapon,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                weapons: updatedWeapons,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setWeaponChargeUsed: (weaponId, chargeId, usedCount) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.charges) return weapon;
+
+              const updatedCharges = weapon.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const maxCharges = calculateWeaponChargeMax(
+                  charge,
+                  state.character.level
+                );
+
+                // Clamp between 0 and max
+                const clampedUsed = Math.max(
+                  0,
+                  Math.min(usedCount, maxCharges)
+                );
+
+                return {
+                  ...charge,
+                  usedCharges: clampedUsed,
+                };
+              });
+
+              return {
+                ...weapon,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                weapons: updatedWeapons,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        expendWeaponChargePoolAbility: (weaponId, abilityId) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+              const ability = weapon.chargePool.abilities.find(
+                a => a.id === abilityId
+              );
+              if (!ability) return weapon;
+
+              const newUsed = weapon.chargePool.usedCharges + ability.cost;
+              if (newUsed > weapon.chargePool.maxCharges) return weapon;
+
+              return {
+                ...weapon,
+                chargePool: {
+                  ...weapon.chargePool,
+                  usedCharges: newUsed,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, weapons: updatedWeapons },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        restoreWeaponChargePool: (weaponId, amount) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+              const newUsed = Math.max(
+                0,
+                weapon.chargePool.usedCharges - amount
+              );
+
+              return {
+                ...weapon,
+                chargePool: {
+                  ...weapon.chargePool,
+                  usedCharges: newUsed,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, weapons: updatedWeapons },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setWeaponChargePoolUsed: (weaponId, usedCount) => {
+          set(state => {
+            const updatedWeapons = state.character.weapons.map(weapon => {
+              if (weapon.id !== weaponId || !weapon.chargePool) return weapon;
+
+              const clamped = Math.max(
+                0,
+                Math.min(usedCount, weapon.chargePool.maxCharges)
+              );
+
+              return {
+                ...weapon,
+                chargePool: {
+                  ...weapon.chargePool,
+                  usedCharges: clamped,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, weapons: updatedWeapons },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Magic item management actions
+        addMagicItem: item => {
+          set(state => {
+            const newItem: MagicItem = {
+              ...item,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                magicItems: [...(state.character.magicItems || []), newItem],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateMagicItem: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              magicItems: (state.character.magicItems || []).map(item =>
+                item.id === id
+                  ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                  : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteMagicItem: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              magicItems: (state.character.magicItems || []).filter(
+                item => item.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        attuneMagicItem: (id, attuned) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              magicItems: (state.character.magicItems || []).map(item =>
+                item.id === id
+                  ? {
+                      ...item,
+                      isAttuned: attuned,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        updateAttunementSlots: max => {
+          set(state => ({
+            character: {
+              ...state.character,
+              attunementSlots: {
+                ...state.character.attunementSlots,
+                max,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderMagicItems: (sourceIndex: number, destinationIndex: number) => {
+          set(state => {
+            const magicItems = [...(state.character.magicItems || [])];
+            const [removed] = magicItems.splice(sourceIndex, 1);
+            magicItems.splice(destinationIndex, 0, removed);
+
+            // Update all magic items with new timestamps
+            const updatedMagicItems = magicItems.map(item => ({
+              ...item,
+              updatedAt: new Date().toISOString(),
+            }));
+
+            return {
+              character: {
+                ...state.character,
+                magicItems: updatedMagicItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        expendMagicItemCharge: (itemId, chargeId) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.charges) return item;
+
+              const updatedCharges = item.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const maxCharges = calculateMagicItemChargeMax(
+                  charge,
+                  state.character.level
+                );
+                const currentUsed = charge.usedCharges || 0;
+
+                // Don't exceed max charges
+                if (currentUsed >= maxCharges) return charge;
+
+                return {
+                  ...charge,
+                  usedCharges: currentUsed + 1,
+                };
+              });
+
+              return {
+                ...item,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                magicItems: updatedMagicItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        restoreMagicItemCharge: (itemId, chargeId) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.charges) return item;
+
+              const updatedCharges = item.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const currentUsed = charge.usedCharges || 0;
+
+                // Don't go below 0
+                if (currentUsed <= 0) return charge;
+
+                return {
+                  ...charge,
+                  usedCharges: currentUsed - 1,
+                };
+              });
+
+              return {
+                ...item,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                magicItems: updatedMagicItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setMagicItemChargeUsed: (itemId, chargeId, usedCount) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.charges) return item;
+
+              const updatedCharges = item.charges.map(charge => {
+                if (charge.id !== chargeId) return charge;
+
+                const maxCharges = calculateMagicItemChargeMax(
+                  charge,
+                  state.character.level
+                );
+
+                // Clamp between 0 and max
+                const clampedUsed = Math.max(
+                  0,
+                  Math.min(usedCount, maxCharges)
+                );
+
+                return {
+                  ...charge,
+                  usedCharges: clampedUsed,
+                };
+              });
+
+              return {
+                ...item,
+                charges: updatedCharges,
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: {
+                ...state.character,
+                magicItems: updatedMagicItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        expendChargePoolAbility: (itemId, abilityId) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.chargePool) return item;
+
+              const ability = item.chargePool.abilities.find(
+                a => a.id === abilityId
+              );
+              if (!ability) return item;
+
+              const remaining =
+                item.chargePool.maxCharges - item.chargePool.usedCharges;
+              if (ability.cost > remaining) return item;
+
+              return {
+                ...item,
+                chargePool: {
+                  ...item.chargePool,
+                  usedCharges: item.chargePool.usedCharges + ability.cost,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, magicItems: updatedMagicItems },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        restoreChargePool: (itemId, amount) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.chargePool) return item;
+
+              const newUsed = Math.max(0, item.chargePool.usedCharges - amount);
+
+              return {
+                ...item,
+                chargePool: {
+                  ...item.chargePool,
+                  usedCharges: newUsed,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, magicItems: updatedMagicItems },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        setChargePoolUsed: (itemId, usedCount) => {
+          set(state => {
+            const updatedMagicItems = state.character.magicItems.map(item => {
+              if (item.id !== itemId || !item.chargePool) return item;
+
+              const clamped = Math.max(
+                0,
+                Math.min(usedCount, item.chargePool.maxCharges)
+              );
+
+              return {
+                ...item,
+                chargePool: {
+                  ...item.chargePool,
+                  usedCharges: clamped,
+                },
+                updatedAt: new Date().toISOString(),
+              };
+            });
+
+            return {
+              character: { ...state.character, magicItems: updatedMagicItems },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Armor management
+        addArmorItem: item => {
+          set(state => {
+            const newItem: ArmorItem = {
+              ...item,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                armorItems: [...(state.character.armorItems || []), newItem],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateArmorItem: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              armorItems: state.character.armorItems.map(item =>
+                item.id === id
+                  ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                  : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteArmorItem: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              armorItems: state.character.armorItems.filter(
+                item => item.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        equipArmorItem: (id, equipped) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              armorItems: state.character.armorItems.map(item =>
+                item.id === id
+                  ? {
+                      ...item,
+                      isEquipped: equipped,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderArmorItems: (sourceIndex: number, destinationIndex: number) => {
+          set(state => {
+            const armorItems = [...state.character.armorItems];
+            const [removed] = armorItems.splice(sourceIndex, 1);
+            armorItems.splice(destinationIndex, 0, removed);
+
+            // Update all armor items with new timestamps
+            const updatedArmorItems = armorItems.map(item => ({
+              ...item,
+              updatedAt: new Date().toISOString(),
+            }));
+
+            return {
+              character: {
+                ...state.character,
+                armorItems: updatedArmorItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Inventory management
+        addInventoryItem: item => {
+          set(state => {
+            const newItem: InventoryItem = {
+              ...item,
+              id: generateId(),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+
+            return {
+              character: {
+                ...state.character,
+                inventoryItems: [
+                  ...(state.character.inventoryItems || []),
+                  newItem,
+                ],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        updateInventoryItem: (id, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              inventoryItems: state.character.inventoryItems.map(item =>
+                item.id === id
+                  ? { ...item, ...updates, updatedAt: new Date().toISOString() }
+                  : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        deleteInventoryItem: id => {
+          set(state => ({
+            character: {
+              ...state.character,
+              inventoryItems: state.character.inventoryItems.filter(
+                item => item.id !== id
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        updateItemQuantity: (id, quantity) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              inventoryItems: state.character.inventoryItems.map(item =>
+                item.id === id ? { ...item, quantity } : item
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderInventoryItems: (
+          sourceIndex: number,
+          destinationIndex: number
+        ) => {
+          set(state => {
+            const inventoryItems = [...state.character.inventoryItems];
+            const [removed] = inventoryItems.splice(sourceIndex, 1);
+            inventoryItems.splice(destinationIndex, 0, removed);
+
+            // Update all inventory items with new timestamps
+            const updatedInventoryItems = inventoryItems.map(item => ({
+              ...item,
+              updatedAt: new Date().toISOString(),
+            }));
+
+            return {
+              character: {
+                ...state.character,
+                inventoryItems: updatedInventoryItems,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Currency management
+        updateCurrency: updates => {
+          set(state => ({
+            character: {
+              ...state.character,
+              currency: {
+                ...state.character.currency,
+                ...updates,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addCurrency: (type, amount) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              currency: {
+                ...state.character.currency,
+                [type]: (state.character.currency[type] || 0) + amount,
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        subtractCurrency: (type, amount) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              currency: {
+                ...state.character.currency,
+                [type]: Math.max(
+                  0,
+                  (state.character.currency[type] || 0) - amount
+                ),
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Spellbook management
+        addSpellToSpellbook: spellId => {
+          set(state => {
+            const isAlreadyKnown =
+              state.character.spellbook.knownSpells.includes(spellId);
+            if (!isAlreadyKnown) {
+              return {
+                character: {
+                  ...state.character,
+                  spellbook: {
+                    ...state.character.spellbook,
+                    knownSpells: [
+                      ...state.character.spellbook.knownSpells,
+                      spellId,
+                    ],
+                  },
+                },
+                hasUnsavedChanges: true,
+                saveStatus: 'saving',
+              };
+            }
+            return state;
+          });
+        },
+
+        removeSpellFromSpellbook: spellId => {
+          set(state => ({
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                knownSpells: state.character.spellbook.knownSpells.filter(
+                  id => id !== spellId
+                ),
+                preparedSpells: state.character.spellbook.preparedSpells.filter(
+                  id => id !== spellId
+                ),
+                favoriteSpells: state.character.spellbook.favoriteSpells.filter(
+                  id => id !== spellId
+                ),
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        toggleSpellFavorite: spellId => {
+          set(state => {
+            const isFavorite =
+              state.character.spellbook.favoriteSpells.includes(spellId);
+            return {
+              character: {
+                ...state.character,
+                spellbook: {
+                  ...state.character.spellbook,
+                  favoriteSpells: isFavorite
+                    ? state.character.spellbook.favoriteSpells.filter(
+                        id => id !== spellId
+                      )
+                    : [...state.character.spellbook.favoriteSpells, spellId],
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        prepareSpell: spellId => {
+          set(state => {
+            const isAlreadyPrepared =
+              state.character.spellbook.preparedSpells.includes(spellId);
+            if (!isAlreadyPrepared) {
+              return {
+                character: {
+                  ...state.character,
+                  spellbook: {
+                    ...state.character.spellbook,
+                    preparedSpells: [
+                      ...state.character.spellbook.preparedSpells,
+                      spellId,
+                    ],
+                  },
+                },
+                hasUnsavedChanges: true,
+                saveStatus: 'saving',
+              };
+            }
+            return state;
+          });
+        },
+
+        unprepareSpell: spellId => {
+          set(state => ({
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                preparedSpells: state.character.spellbook.preparedSpells.filter(
+                  id => id !== spellId
+                ),
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        updateSpellbookSettings: settings => {
+          set(state => ({
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                spellbookSettings: {
+                  ...state.character.spellbook.spellbookSettings,
+                  ...settings,
+                },
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addCustomSpell: (spell: ProcessedSpell) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                customSpells: [
+                  ...(state.character.spellbook.customSpells || []),
+                  spell,
+                ],
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        removeCustomSpell: spellId => {
+          set(state => ({
+            character: {
+              ...state.character,
+              spellbook: {
+                ...state.character.spellbook,
+                customSpells: (
+                  state.character.spellbook.customSpells || []
+                ).filter(s => s.id !== spellId),
+              },
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        reorderPreparedSpells: (
+          sourceIndex: number,
+          destinationIndex: number
+        ) => {
+          set(state => {
+            const preparedSpells = [
+              ...state.character.spellbook.preparedSpells,
+            ];
+            const [removed] = preparedSpells.splice(sourceIndex, 1);
+            preparedSpells.splice(destinationIndex, 0, removed);
+
+            return {
+              character: {
+                ...state.character,
+                spellbook: {
+                  ...state.character.spellbook,
+                  preparedSpells,
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        reorderSpells: (sourceIndex: number, destinationIndex: number) => {
+          set(state => {
+            const spells = [...state.character.spells];
+            const [removed] = spells.splice(sourceIndex, 1);
+            spells.splice(destinationIndex, 0, removed);
+
+            return {
+              character: {
+                ...state.character,
+                spells,
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        // Summon management
+        addSummon: summon => {
+          set(state => {
+            const summons = state.character.summons || [];
+            // For familiars, replace existing one
+            if (summon.type === 'familiar') {
+              return {
+                character: {
+                  ...state.character,
+                  summons: [
+                    ...summons.filter(s => s.type !== 'familiar'),
+                    summon,
+                  ],
+                },
+                hasUnsavedChanges: true,
+                saveStatus: 'saving' as const,
+              };
+            }
+            return {
+              character: {
+                ...state.character,
+                summons: [...summons, summon],
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          });
+        },
+
+        removeSummon: summonId => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).filter(
+                s => s.id !== summonId
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        updateSummonEntity: (summonId, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s =>
+                s.id === summonId
+                  ? { ...s, entity: { ...s.entity, ...updates } }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        damageSummon: (summonId, amount) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s => {
+                if (s.id !== summonId) return s;
+                let remaining = amount;
+                let newTemp = s.entity.tempHp;
+                let newCurrent = s.entity.currentHp;
+                // Temp HP absorbs first
+                if (newTemp > 0) {
+                  if (remaining <= newTemp) {
+                    newTemp -= remaining;
+                    remaining = 0;
+                  } else {
+                    remaining -= newTemp;
+                    newTemp = 0;
+                  }
+                }
+                newCurrent = Math.max(0, newCurrent - remaining);
+                return {
+                  ...s,
+                  entity: {
+                    ...s.entity,
+                    currentHp: newCurrent,
+                    tempHp: newTemp,
+                  },
+                };
+              }),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        healSummon: (summonId, amount) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s =>
+                s.id === summonId
+                  ? {
+                      ...s,
+                      entity: {
+                        ...s.entity,
+                        currentHp: Math.min(
+                          s.entity.maxHp,
+                          s.entity.currentHp + amount
+                        ),
+                      },
+                    }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addSummonTempHp: (summonId, amount) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s =>
+                s.id === summonId
+                  ? {
+                      ...s,
+                      entity: {
+                        ...s.entity,
+                        tempHp: Math.max(s.entity.tempHp, amount),
+                      },
+                    }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        addSummonCondition: (summonId, condition) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s =>
+                s.id === summonId
+                  ? {
+                      ...s,
+                      entity: {
+                        ...s.entity,
+                        conditions: [...s.entity.conditions, condition],
+                      },
+                    }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        removeSummonCondition: (summonId, conditionId) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).map(s =>
+                s.id === summonId
+                  ? {
+                      ...s,
+                      entity: {
+                        ...s.entity,
+                        conditions: s.entity.conditions.filter(
+                          c => c.id !== conditionId
+                        ),
+                      },
+                    }
+                  : s
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        removeConcentrationSummons: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).filter(
+                s => !s.requiresConcentration
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        dismissFamiliar: () => {
+          set(state => ({
+            character: {
+              ...state.character,
+              summons: (state.character.summons || []).filter(
+                s => s.type !== 'familiar'
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Saved creature templates
+        addSavedCreature: creature => {
+          set(state => ({
+            character: {
+              ...state.character,
+              savedCreatures: [
+                ...(state.character.savedCreatures || []),
+                creature,
+              ],
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        updateSavedCreature: (creatureId, updates) => {
+          set(state => ({
+            character: {
+              ...state.character,
+              savedCreatures: (state.character.savedCreatures || []).map(c =>
+                c.id === creatureId
+                  ? { ...c, ...updates, updatedAt: new Date().toISOString() }
+                  : c
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        removeSavedCreature: creatureId => {
+          set(state => ({
+            character: {
+              ...state.character,
+              savedCreatures: (state.character.savedCreatures || []).filter(
+                c => c.id !== creatureId
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+        },
+
+        // Persistence actions
+        saveCharacter: () => {
+          try {
+            // Save to localStorage (handled by persist middleware)
+            set({
+              saveStatus: 'saved',
+              lastSaved: new Date(),
+              hasUnsavedChanges: false,
+            });
+          } catch (error) {
+            console.error('Failed to save character:', error);
+            set({ saveStatus: 'error' });
+          }
+        },
+
+        loadCharacter: character => {
+          armCanonicalPersistence(character.id);
+          withExternalApply(() =>
+            set({
+              character,
+              saveStatus: 'saved',
+              lastSaved: new Date(),
+              hasUnsavedChanges: false,
+            })
+          );
+        },
+
+        resetCharacter: () => {
+          const newId = generateId();
+          armCanonicalPersistence(newId);
           set({
-            character: exportData.character,
+            character: {
+              ...DEFAULT_CHARACTER_STATE,
+              id: newId,
+            },
             saveStatus: 'saved',
             lastSaved: new Date(),
             hasUnsavedChanges: false,
           });
+        },
 
-          return true;
-        } catch (error) {
-          console.error('Failed to import character:', error);
-          set({ saveStatus: 'error' });
-          return false;
-        }
-      },
+        exportCharacter: () => {
+          const state = get();
+          return {
+            version: APP_VERSION,
+            exportDate: new Date().toISOString(),
+            character: state.character,
+          };
+        },
 
-      // Auto-save control
-      setSaveStatus: status => {
-        set({ saveStatus: status });
-      },
+        importCharacter: exportData => {
+          try {
+            // Basic validation
+            if (
+              !exportData.character ||
+              typeof exportData.character !== 'object'
+            ) {
+              throw new Error('Invalid character data');
+            }
 
-      markSaved: () => {
-        set({
-          saveStatus: 'saved',
-          lastSaved: new Date(),
-          hasUnsavedChanges: false,
-        });
-      },
+            // Version compatibility check (for future use)
+            if (exportData.version && exportData.version !== APP_VERSION) {
+              console.warn(
+                `Version mismatch: expected ${APP_VERSION}, got ${exportData.version}`
+              );
+            }
 
-      markUnsaved: () => {
-        set({
-          hasUnsavedChanges: true,
-          saveStatus: 'saving',
-        });
-      },
-    }),
+            armCanonicalPersistence(exportData.character.id);
+            set({
+              character: exportData.character,
+              saveStatus: 'saved',
+              lastSaved: new Date(),
+              hasUnsavedChanges: false,
+            });
+
+            return true;
+          } catch (error) {
+            console.error('Failed to import character:', error);
+            set({ saveStatus: 'error' });
+            return false;
+          }
+        },
+
+        // Auto-save control
+        setSaveStatus: status => {
+          set({ saveStatus: status });
+        },
+
+        markSaved: () => {
+          set({
+            saveStatus: 'saved',
+            lastSaved: new Date(),
+            hasUnsavedChanges: false,
+          });
+        },
+
+        markUnsaved: () => {
+          set({
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          });
+        },
+
+        noteIntentApplied: (tabId, seq) =>
+          set(state => ({
+            intentWatermarks: advanceWatermark(state.intentWatermarks, {
+              tabId,
+              seq,
+            }),
+          })),
+      }))
+    ),
     {
       name: STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
-      // Only persist the character data and save metadata
+      skipHydration: isBrowserCharacterCutoverParticipant(),
+      storage: createJSONStorage(() => createPerCharacterStorage()),
       partialize: state => ({
         character: state.character,
         lastSaved: state.lastSaved,
+        intentWatermarks: state.intentWatermarks,
       }),
-      // Handle rehydration and migration
-      onRehydrateStorage: () => state => {
-        if (state) {
-          // Migrate character data if needed
-          state.character = migrateCharacterData(state.character);
-          state.saveStatus = 'saved';
-          state.hasUnsavedChanges = false;
-          state.hasHydrated = true;
-        }
-      },
+      // No onRehydrateStorage: the adapter's getItem returns null, the
+      // store boots empty, and hydration happens through the explicit
+      // load-by-id flow (useCharacterRosterSync → loadCharacterState).
     }
   )
 );
+
+// ——— single-writer wiring ———
+
+function applyForwardedIntent(intent: CharacterIntent): void {
+  const state = useCharacterStore.getState();
+  const action = (state as unknown as Record<string, unknown>)[
+    intent.actionName
+  ];
+  if (typeof action === 'function') {
+    withIntentContext({ tabId: intent.tabId, seq: intent.seq }, () => {
+      (action as (...a: unknown[]) => void)(...intent.args);
+    });
+  }
+  // Actions that never called set (early return before set) still need the
+  // watermark advanced so the sender's retry is dedupable after failover.
+  if (
+    (useCharacterStore.getState().intentWatermarks[intent.tabId]?.seq ?? 0) <
+    intent.seq
+  ) {
+    useCharacterStore.getState().noteIntentApplied(intent.tabId, intent.seq);
+  }
+}
+
+export const characterIntentBus = new CharacterIntentBus({
+  isLeader: characterId => characterWriterLock.isLeader(characterId),
+  getLoadedCharacterId: () => useCharacterStore.getState().character.id,
+  getWatermark: (_characterId, tabId) =>
+    useCharacterStore.getState().intentWatermarks[tabId]?.seq ?? 0,
+  applyIntent: applyForwardedIntent,
+});
+
+function onPromotedToLeader(characterId: string): void {
+  // Hydration barrier (spec): adopt the canonical envelope BEFORE serving
+  // intents or announcing — lock acquisition must not race ahead of the
+  // previous leader's queued storage event.
+  const envelope = readCharacterEnvelope(characterId);
+  const state = useCharacterStore.getState();
+  if (envelope && envelope.character.id === state.character.id) {
+    if (isStrictlyFresher(envelope.character, state.character)) {
+      state.loadCharacterState(envelope.character);
+    }
+    useCharacterStore.setState(current => ({
+      intentWatermarks: mergeWatermarks(
+        envelope.intentWatermarks,
+        current.intentWatermarks
+      ),
+    }));
+  }
+  characterIntentBus.reconcileOwnPending(characterId);
+  characterIntentBus.announceLeadership(characterId);
+}
+
+if (typeof window !== 'undefined') {
+  characterIntentBus.start();
+  // BC listener is installed by start() BEFORE any lock request below —
+  // spec's discovery ordering rule 1.
+  let lastLockTarget: string | null = null;
+  const syncLockTarget = () => {
+    const id = useCharacterStore.getState().character.id;
+    if (id === lastLockTarget) return;
+    lastLockTarget = id;
+    characterWriterLock.switchTo(id, { onPromoted: onPromotedToLeader });
+  };
+  useCharacterStore.subscribe(syncLockTarget);
+  syncLockTarget();
+}
+
+// Cross-tab convergence: adopt fresher envelope writes from other tabs.
+initCrossTabCharacterSync(useCharacterStore);
+
+exposeStoreForE2E('character', useCharacterStore);

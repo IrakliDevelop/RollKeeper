@@ -9,6 +9,8 @@ import {
   ProcessedClass,
   ProcessedSubclass,
   ClassFeature,
+  FeatureChoice,
+  FeatureOption,
   SubclassSpellList,
   SpellcastingType,
 } from '@/types/classes';
@@ -181,11 +183,13 @@ function processClassFeatures(
     let level: number = 1;
     let isSubclassFeature = false;
     let original: string;
+    let refSource: string = source;
 
     if (typeof feature === 'string') {
       const parts = feature.split('|');
       featureName = parts[0] || feature;
       original = feature;
+      refSource = parts[2] || source;
 
       // Determine if this is a subclass feature based on format
       // Subclass format: "Feature Name|Class||Subclass||Level"
@@ -208,6 +212,7 @@ function processClassFeatures(
       featureName = parts[0] || String(feature.classFeature);
       original = String(feature.classFeature);
       isSubclassFeature = Boolean(feature.gainSubclassFeature);
+      refSource = parts[2] || source;
 
       // Apply same logic for object format
       if (parts.length >= 6 && parts[2] === '' && parts[4] === '') {
@@ -220,28 +225,42 @@ function processClassFeatures(
       original = String(feature);
     }
 
-    // Find the feature description in classFeatureDescriptions
-    const featureDesc = classFeatureDescriptions?.find(
-      desc =>
-        desc.name === featureName &&
-        desc.className === className &&
-        desc.level === level
-    );
+    // Find the feature description in classFeatureDescriptions.
+    // PHB (2014) and XPHB (2024) descriptions share one classFeature[]
+    // array per file, so the lookup must match the edition too — the ref
+    // carries it in parts[2] (empty = the class object's own source) —
+    // otherwise whichever edition appears first in the file shadows the
+    // other for colliding name+level pairs (e.g. Wild Shape L2, Rage L1).
+    const matchesFeature = (desc: Record<string, unknown>) =>
+      desc.name === featureName &&
+      desc.className === className &&
+      desc.level === level;
+    const featureDesc =
+      classFeatureDescriptions?.find(
+        desc => matchesFeature(desc) && desc.classSource === refSource
+      ) ?? classFeatureDescriptions?.find(matchesFeature);
 
     let entries: string[] = [];
+    let choice: FeatureChoice | undefined;
     if (featureDesc?.entries && Array.isArray(featureDesc.entries)) {
-      entries = processFeatureEntries(featureDesc.entries);
+      const processed = processFeatureEntries(
+        featureDesc.entries,
+        classFeatureDescriptions
+      );
+      entries = processed.html;
+      choice = processed.choice;
     }
 
     return {
       name: featureName,
       level,
-      source: (featureDesc?.source as string) || source,
+      source: formatSourceForDisplay((featureDesc?.source as string) || source),
       className,
       entries,
       isSubclassFeature,
       original,
       is2024Rules: Boolean(featureDesc?.basicRules2024),
+      ...(choice ? { choice } : {}),
     };
   });
 
@@ -280,8 +299,14 @@ function processSubclassFeatures(
   const features = relevantFeatures.map(featureDesc => {
     const feature = featureDesc as Record<string, unknown>;
     let entries: string[] = [];
+    let choice: FeatureChoice | undefined;
     if (feature.entries && Array.isArray(feature.entries)) {
-      entries = processFeatureEntries(feature.entries);
+      const processed = processFeatureEntries(
+        feature.entries,
+        subclassFeatureDescriptions
+      );
+      entries = processed.html;
+      choice = processed.choice;
     }
 
     // Force 2024 D&D compliance: all subclass features start at level 3 minimum
@@ -291,13 +316,14 @@ function processSubclassFeatures(
     return {
       name: String(feature.name || ''),
       level: adjustedLevel,
-      source: String(feature.source || source),
+      source: formatSourceForDisplay(String(feature.source || source)),
       className,
       entries,
       isSubclassFeature: true,
       subclassShortName,
       original: `${feature.name}|${className}||${subclassShortName}||${feature.level}`,
       is2024Rules: Boolean(feature.basicRules2024),
+      ...(choice ? { choice } : {}),
     };
   });
 
@@ -308,30 +334,68 @@ function processSubclassFeatures(
 /**
  * Process feature entries and flatten nested structures
  */
-function processFeatureEntries(entries: unknown[]): string[] {
+function processFeatureEntries(
+  entries: unknown[],
+  featureDescriptions?: Record<string, unknown>[]
+): { html: string[]; choice?: FeatureChoice } {
   const result: string[] = [];
+  let choice: FeatureChoice | undefined;
 
   for (const entry of entries) {
     if (typeof entry === 'string') {
       result.push(parseReferences(entry).html);
     } else if (entry && typeof entry === 'object') {
       const entryObj = entry as Record<string, unknown>;
-      if (entryObj.type === 'entries' && Array.isArray(entryObj.entries)) {
-        // Nested entries
+      if (entryObj.type === 'options' && Array.isArray(entryObj.entries)) {
+        const count = (entryObj.count as number) || 1;
+        const options: FeatureOption[] = [];
+        for (const optEntry of entryObj.entries) {
+          if (optEntry && typeof optEntry === 'object') {
+            const opt = optEntry as Record<string, unknown>;
+            if (
+              opt.type === 'refClassFeature' &&
+              typeof opt.classFeature === 'string'
+            ) {
+              const resolved = resolveRefClassFeature(
+                opt.classFeature,
+                featureDescriptions
+              );
+              if (resolved) options.push(resolved);
+            } else if (opt.name) {
+              const nested = processFeatureEntries(
+                Array.isArray(opt.entries) ? opt.entries : [],
+                featureDescriptions
+              );
+              options.push({ name: String(opt.name), entries: nested.html });
+            }
+          }
+        }
+        if (options.length > 0) {
+          choice = { count, options };
+        }
+      } else if (
+        entryObj.type === 'entries' &&
+        Array.isArray(entryObj.entries)
+      ) {
         if (entryObj.name) {
           result.push(`<strong>${entryObj.name}</strong>`);
         }
-        result.push(...processFeatureEntries(entryObj.entries));
+        const nested = processFeatureEntries(
+          entryObj.entries,
+          featureDescriptions
+        );
+        result.push(...nested.html);
+        if (nested.choice) choice = nested.choice;
       } else if (entryObj.type === 'inset' && Array.isArray(entryObj.entries)) {
-        // Inset boxes
         if (entryObj.name) {
           result.push(
             `<div class="inset"><strong>${entryObj.name}</strong></div>`
           );
         }
-        result.push(...processFeatureEntries(entryObj.entries));
+        result.push(
+          ...processFeatureEntries(entryObj.entries, featureDescriptions).html
+        );
       } else if (entryObj.type === 'list' && Array.isArray(entryObj.items)) {
-        // Lists
         result.push('<ul>');
         for (const item of entryObj.items) {
           if (typeof item === 'string') {
@@ -340,13 +404,38 @@ function processFeatureEntries(entries: unknown[]): string[] {
         }
         result.push('</ul>');
       } else if (Array.isArray(entryObj.entries)) {
-        // Generic nested entries
-        result.push(...processFeatureEntries(entryObj.entries));
+        const nested = processFeatureEntries(
+          entryObj.entries,
+          featureDescriptions
+        );
+        result.push(...nested.html);
+        if (nested.choice) choice = nested.choice;
       }
     }
   }
 
-  return result;
+  return { html: result, choice };
+}
+
+function resolveRefClassFeature(
+  ref: string,
+  featureDescriptions?: Record<string, unknown>[]
+): FeatureOption | null {
+  if (!featureDescriptions) return null;
+  const parts = ref.split('|');
+  const name = parts[0];
+  const className = parts[1];
+  const level = parseInt(parts[parts.length - 1]);
+
+  const desc = featureDescriptions.find(
+    d => d.name === name && d.className === className && d.level === level
+  );
+  if (!desc) return null;
+
+  const entries = Array.isArray(desc.entries)
+    ? processFeatureEntries(desc.entries, featureDescriptions).html
+    : [];
+  return { name, entries };
 }
 
 /**
@@ -828,10 +917,10 @@ export async function loadAllClasses(): Promise<ProcessedClass[]> {
       // First, prioritize 2024 versions
       const aIs2024 = a.source === 'PHB2024';
       const bIs2024 = b.source === 'PHB2024';
-      
+
       if (aIs2024 && !bIs2024) return -1;
       if (!aIs2024 && bIs2024) return 1;
-      
+
       // Then sort alphabetically by name
       return a.name.localeCompare(b.name);
     });

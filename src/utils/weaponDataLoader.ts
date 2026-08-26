@@ -46,6 +46,7 @@ interface RawWeaponItem {
   type?: string;
   rarity?: string;
   weight?: number;
+  value?: number;
   reqAttune?: boolean | string;
   weaponCategory?: string;
   dmg1?: string;
@@ -98,6 +99,7 @@ function processWeapon(raw: RawWeaponItem): ProcessedWeapon {
     weaponCategory: raw.weaponCategory || 'simple',
     rarity: raw.rarity || 'none',
     weight: raw.weight,
+    value: raw.value,
     description,
     requiresAttunement,
     attunementRequirement,
@@ -121,44 +123,65 @@ function processWeapon(raw: RawWeaponItem): ProcessedWeapon {
   };
 }
 
+function addWeaponToResults(
+  rawItem: RawWeaponItem,
+  seen: Map<string, { source: string; index: number }>,
+  results: ProcessedWeapon[]
+) {
+  const baseType = rawItem.type ? getBaseType(rawItem.type) : '';
+  if (baseType !== 'M' && baseType !== 'R') return;
+  if (!rawItem.weaponCategory || !rawItem.dmg1) return;
+
+  const key = rawItem.name.toLowerCase();
+  const existing = seen.get(key);
+
+  if (existing) {
+    const existingPreferred = PREFERRED_SOURCES.has(existing.source);
+    const newPreferred = PREFERRED_SOURCES.has(rawItem.source);
+
+    if (newPreferred && !existingPreferred) {
+      results[existing.index] = processWeapon(rawItem);
+      seen.set(key, { source: rawItem.source, index: existing.index });
+    }
+    return;
+  }
+
+  const index = results.length;
+  results.push(processWeapon(rawItem));
+  seen.set(key, { source: rawItem.source, index });
+}
+
 export async function loadAllWeapons(): Promise<ProcessedWeapon[]> {
   if (cachedWeapons) return cachedWeapons;
 
   try {
+    const seen = new Map<string, { source: string; index: number }>();
+    const results: ProcessedWeapon[] = [];
+
+    // Load base/mundane weapons from items-base.json first
+    const baseFilePath = path.join(process.cwd(), 'json', 'items-base.json');
+    try {
+      const baseRaw = await fs.readFile(baseFilePath, 'utf-8');
+      const baseData = JSON.parse(baseRaw);
+      if (baseData.baseitem && Array.isArray(baseData.baseitem)) {
+        for (const rawItem of baseData.baseitem as RawWeaponItem[]) {
+          if (!rawItem.weapon) continue;
+          addWeaponToResults(rawItem, seen, results);
+        }
+      }
+    } catch {
+      console.warn('Could not load items-base.json for weapons');
+    }
+
+    // Load magic/special weapons from items.json (overrides base items)
     const filePath = path.join(process.cwd(), 'json', 'items.json');
     const raw = await fs.readFile(filePath, 'utf-8');
     const data = JSON.parse(raw);
 
-    if (!data.item || !Array.isArray(data.item)) {
-      console.error('Invalid items.json structure');
-      return [];
-    }
-
-    const seen = new Map<string, { source: string; index: number }>();
-    const results: ProcessedWeapon[] = [];
-
-    for (const rawItem of data.item as RawWeaponItem[]) {
-      const baseType = rawItem.type ? getBaseType(rawItem.type) : '';
-      if (baseType !== 'M' && baseType !== 'R') continue;
-      if (!rawItem.weaponCategory || !rawItem.dmg1) continue;
-
-      const key = rawItem.name.toLowerCase();
-      const existing = seen.get(key);
-
-      if (existing) {
-        const existingPreferred = PREFERRED_SOURCES.has(existing.source);
-        const newPreferred = PREFERRED_SOURCES.has(rawItem.source);
-
-        if (newPreferred && !existingPreferred) {
-          results[existing.index] = processWeapon(rawItem);
-          seen.set(key, { source: rawItem.source, index: existing.index });
-        }
-        continue;
+    if (data.item && Array.isArray(data.item)) {
+      for (const rawItem of data.item as RawWeaponItem[]) {
+        addWeaponToResults(rawItem, seen, results);
       }
-
-      const index = results.length;
-      results.push(processWeapon(rawItem));
-      seen.set(key, { source: rawItem.source, index });
     }
 
     cachedWeapons = results.sort((a, b) => a.name.localeCompare(b.name));

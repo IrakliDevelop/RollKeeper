@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
-import { usePlayerStore } from '@/store/playerStore';
+import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
+import { useCharacterStore } from '@/store/characterStore';
 import {
   mockFetchResponse,
   mockFetchSequence,
   resetFetch,
 } from '@/test/mocks/fetch';
 import { createMockCharacterState } from '@/test/helpers';
-import type { CharacterState } from '@/types/character';
 
 function seedCharacter(overrides: Record<string, unknown> = {}) {
   const charData = createMockCharacterState({ id: 'char-test' });
@@ -34,6 +34,34 @@ function seedCharacter(overrides: Record<string, unknown> = {}) {
       },
     ],
   });
+}
+
+function seedLinkedCharacter() {
+  const characterData = createMockCharacterState({ id: 'char-1' });
+  usePlayerStore.setState({
+    characters: [
+      {
+        id: 'char-1',
+        name: 'Test Hero',
+        race: 'Human',
+        class: 'Fighter',
+        level: 5,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastPlayed: new Date(),
+        characterData,
+        tags: [],
+        isArchived: false,
+        campaignCode: 'ABC123',
+        campaignName: 'Test Campaign',
+        syncEnabled: true,
+        autoSync: true,
+      } as PlayerCharacter,
+    ],
+    activeCharacterId: 'char-1',
+    lastSelectedCharacterId: 'char-1',
+  });
+  return characterData;
 }
 
 describe('usePlayerSync', () => {
@@ -185,5 +213,178 @@ describe('usePlayerSync', () => {
     expect(char.campaignName).toBeUndefined();
     expect(char.syncEnabled).toBeUndefined();
     expect(result.current.syncStatus).toBe('idle');
+  });
+
+  it('on 410 clears campaign link, notifies, and does NOT attempt rejoin', async () => {
+    const characterData = seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(410, { error: 'removed' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      await result.current.syncNow(characterData);
+    });
+
+    expect(onRemoved).toHaveBeenCalledTimes(1);
+    // two fetches: the sync call, then the self-removal DELETE
+    // (closes the kick-vs-sync resurrection race) — no /join rejoin attempt
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    const [secondUrl, secondOpts] = (fetchFn as ReturnType<typeof vi.fn>).mock
+      .calls[1];
+    expect(secondUrl).toBe('/api/campaign/ABC123/players/char-1');
+    expect(secondOpts.method).toBe('DELETE');
+
+    const char = usePlayerStore.getState().characters[0];
+    expect(char.campaignCode).toBeUndefined();
+    expect(char.syncEnabled).toBeUndefined();
+    expect(result.current.syncStatus).toBe('idle');
+  });
+
+  it('queued pending sync during a 410 does not fire the removal callback twice', async () => {
+    const characterData = seedLinkedCharacter();
+    mockFetchResponse(410, { error: 'removed' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      const first = result.current.syncNow(characterData);
+      // second call while first is in flight → queued into pendingSyncData
+      const second = result.current.syncNow(characterData);
+      await Promise.all([first, second]);
+    });
+
+    expect(onRemoved).toHaveBeenCalledTimes(1);
+  });
+
+  it('non-410 failure still attempts rejoin (existing behavior preserved)', async () => {
+    const characterData = seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(500, { error: 'boom' });
+    const onRemoved = vi.fn();
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1', onRemovedFromCampaign: onRemoved })
+    );
+
+    await act(async () => {
+      await result.current.syncNow(characterData);
+    });
+
+    expect(onRemoved).not.toHaveBeenCalled();
+    // sync call + rejoin attempt
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    expect(usePlayerStore.getState().characters[0].campaignCode).toBe('ABC123');
+  });
+
+  it('leaveCampaign fires server-side removal and clears local link', async () => {
+    seedLinkedCharacter();
+    const fetchFn = mockFetchResponse(200, { success: true });
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1' })
+    );
+
+    act(() => {
+      result.current.leaveCampaign();
+    });
+
+    expect(fetchFn).toHaveBeenCalledWith(
+      '/api/campaign/ABC123/players/char-1',
+      expect.objectContaining({ method: 'DELETE' })
+    );
+    expect(
+      usePlayerStore.getState().characters[0].campaignCode
+    ).toBeUndefined();
+  });
+
+  it('leaveCampaign still clears local link when the server call fails', async () => {
+    seedLinkedCharacter();
+    global.fetch = vi.fn(() =>
+      Promise.reject(new Error('network down'))
+    ) as unknown as typeof global.fetch;
+
+    const { result } = renderHook(() =>
+      usePlayerSync({ characterId: 'char-1' })
+    );
+
+    act(() => {
+      result.current.leaveCampaign();
+    });
+
+    expect(
+      usePlayerStore.getState().characters[0].campaignCode
+    ).toBeUndefined();
+  });
+
+  describe('409 stale handling', () => {
+    it('adopts the server blob when it is newer, without rejoining', async () => {
+      seedLinkedCharacter();
+      const localCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 1,
+      });
+      useCharacterStore.setState({ character: localCharacter });
+
+      const serverCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 4,
+        armorClass: 19,
+      });
+      const fetchFn = mockFetchResponse(409, {
+        error: 'stale',
+        current: { characterData: serverCharacter },
+      });
+
+      const { result } = renderHook(() =>
+        usePlayerSync({ characterId: 'char-1' })
+      );
+      await act(async () => {
+        await result.current.syncNow(localCharacter);
+      });
+
+      expect(useCharacterStore.getState().character.revision).toBe(4);
+      expect(useCharacterStore.getState().character.armorClass).toBe(19);
+      // exactly one fetch — no /join rejoin attempt
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      expect(result.current.syncStatus).toBe('synced');
+      expect(usePlayerStore.getState().characters[0].lastSyncedAt).toEqual(
+        expect.stringMatching(/^\d{4}-\d{2}-\d{2}T/)
+      );
+    });
+
+    it('keeps local state when the 409 blob is not newer', async () => {
+      seedLinkedCharacter();
+      const localCharacter = createMockCharacterState({
+        id: 'char-1',
+        revision: 6,
+      });
+      useCharacterStore.setState({ character: localCharacter });
+
+      mockFetchResponse(409, {
+        error: 'stale',
+        current: {
+          characterData: createMockCharacterState({
+            id: 'char-1',
+            revision: 6,
+            armorClass: 3,
+          }),
+        },
+      });
+
+      const { result } = renderHook(() =>
+        usePlayerSync({ characterId: 'char-1' })
+      );
+      await act(async () => {
+        await result.current.syncNow(localCharacter);
+      });
+
+      expect(useCharacterStore.getState().character.armorClass).not.toBe(3);
+      expect(useCharacterStore.getState().character.revision).toBe(6);
+    });
   });
 });

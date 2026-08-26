@@ -28,6 +28,7 @@ export type SkillName =
 
 import type { SpellbookState } from './spells';
 import type { Summon } from './summon';
+import type { SpellAoe } from './spellAoe';
 
 // Character abilities with scores
 export interface CharacterAbilities {
@@ -65,6 +66,17 @@ export interface Language {
   id: string;
   name: string; // e.g., "Common", "Elvish", "Draconic"
   script?: string; // e.g., "Common", "Elvish", "Draconic" (optional)
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Character sense (darkvision, blindsight, etc.)
+export interface CharacterSense {
+  id: string;
+  name: string; // e.g., "Darkvision", "Blindsight"
+  range: number; // Range in feet
+  source?: string; // e.g., "Racial", "Class Feature", "Spell"
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -112,9 +124,11 @@ export interface HeroicInspiration {
   maxCount?: number; // Optional maximum (some DMs set limits)
 }
 
-// Bardic Inspiration tracking (Bard class feature)
-export interface BardicInspiration {
-  usesExpended: number; // Number of bardic inspiration uses expended (resets on long rest)
+// Generic class resource usage, keyed by ClassResourceDefinition.id
+// (see src/utils/classResources). Maximum is always computed from the
+// registry — never persisted.
+export interface ClassResourceUsage {
+  usesExpended: number;
 }
 
 // Rich text content for character information
@@ -268,6 +282,9 @@ export interface Spell {
   castingSource?: string; // e.g. "Fey Touched", "Drow Magic", "Eldritch Invocation"
   freeCastMax?: number; // 0 = at will (unlimited), 1+ = X free casts per long rest
   freeCastsUsed?: number; // how many free casts used since last long rest
+  tags?: string[];
+  aoe?: SpellAoe | null; // undefined = never detected; null = no AoE (detected-none or user-cleared)
+  damageScaling?: Record<number, string> | null; // undefined = never enriched; null = user-customized damage (scaling off); object = character-level threshold → dice, e.g. { 1: '1d8', 5: '2d8', 11: '3d8', 17: '4d8' }
   createdAt: string;
   updatedAt: string;
 }
@@ -296,6 +313,7 @@ export interface MulticlassInfo {
   spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
   hitDie: number; // d6, d8, d10, d12 - the size of the hit die for this class
   subclass?: string; // Optional subclass name
+  classSource?: string; // PHB or XPHB
 }
 
 // Multiclass validation result
@@ -368,6 +386,7 @@ export interface Weapon {
   enhancementBonus: number;
   attackBonus?: number;
   damageBonus?: number;
+  abilityOverride?: AbilityName; // Override ability for attack/damage (e.g., CHA for Pact of the Blade)
   properties: string[];
   description?: string;
   range?: {
@@ -382,6 +401,8 @@ export interface Weapon {
   chargePool?: ChargePool;
   bonusSpellAttack?: number;
   bonusSpellSaveDc?: number;
+  weight?: number;
+  value?: number; // In copper pieces
   createdAt: string;
   updatedAt: string;
 }
@@ -534,6 +555,15 @@ export interface Currency {
 // Main character state interface
 export interface CharacterState {
   id: string;
+  /** Monotonic per-character mutation counter. Every consumer (other tab,
+   * Redis, DM view) accepts a snapshot only if its revision is newer.
+   * Optional for backwards compat — readers must treat missing as 0. */
+  revision?: number;
+  /** Wall-clock stamp of the last local mutation (same set as the revision
+   * bump). Tiebreak component for equal-revision cross-tab conflicts. */
+  lastMutatedAt?: number;
+  /** TAB_ID of the tab that made the last local mutation. Final tiebreak. */
+  lastMutatedBy?: string;
   // Basic Information
   name: string;
   race: string;
@@ -549,6 +579,9 @@ export interface CharacterState {
   level: number; // Total character level (for backwards compatibility)
 
   experience: number;
+  // DM XP award ids already applied to this character (idempotency guard).
+  // Optional so legacy characters need no migration; capped at 150 entries.
+  appliedDmXpAwardIds?: string[];
   background: string;
   alignment: string;
   creatureType: string;
@@ -611,14 +644,15 @@ export interface CharacterState {
   // Heroic Inspiration
   heroicInspiration: HeroicInspiration;
 
-  // Bardic Inspiration (Bard class feature)
-  bardicInspiration?: BardicInspiration;
+  // Generic class resources (Rage, Wild Shape, Channel Divinity, ...)
+  classResources?: Record<string, ClassResourceUsage>;
 
   // Trackable Traits
   trackableTraits: TrackableTrait[];
 
   // Extended Features (new system)
   extendedFeatures: ExtendedFeature[];
+  favoriteFeatureIds: string[];
 
   // Rich Text Content
   features: RichTextContent[];
@@ -653,6 +687,17 @@ export interface CharacterState {
   // Conditions and diseases
   conditionsAndDiseases: ConditionsDiseasesState;
 
+  // Defenses
+  damageImmunities: string[];
+  damageResistances: string[];
+  conditionImmunities: string[];
+
+  // Senses
+  senses: CharacterSense[];
+
+  // Temporary Buffs
+  temporaryBuffs: TemporaryBuff[];
+
   // Class Features
   jackOfAllTrades: boolean; // Bard feature: add half proficiency to non-proficient skills
 
@@ -661,9 +706,15 @@ export interface CharacterState {
   toolProficiencies: ToolProficiency[];
 
   daysSpent: number; // Number of in-game days spent in the campaign
+  shareHpWithParty?: boolean; // Whether to share HP with party members (default true)
+  spellSlotsExpanded?: boolean; // Whether the full Spell Slot Tracker panel is expanded (default false)
+  stackableInspiration?: boolean; // House-rule: allow holding more than one Heroic Inspiration. Default false. When in a campaign, materialized from the DM's setting.
 
   // Summons (familiars, summoned creatures)
   summons?: Summon[];
+
+  // Saved creature templates (reusable across summon cycles)
+  savedCreatures?: import('@/types/summon').SavedCreature[];
 
   // Miscellaneous
 }
@@ -683,7 +734,12 @@ export interface CharacterExport {
 }
 
 // Save state type
-export type SaveStatus = 'saving' | 'saved' | 'error';
+export type SaveStatus =
+  | 'saving'
+  | 'saved'
+  | 'saved-local'
+  | 'saved-local-mirror-pending'
+  | 'error';
 
 // Exhaustion variants (2014 vs 2024)
 export type ExhaustionVariant = '2014' | '2024';
@@ -792,6 +848,52 @@ export interface ProcessedStatus {
   description: string;
 }
 
+// ========================================
+// TEMPORARY BUFFS
+// ========================================
+
+// Which stat a buff effect targets
+export type BuffTargetStat =
+  | 'ac'
+  | 'maxHp'
+  | 'tempHp'
+  | 'speed'
+  | 'savingThrow'
+  | 'attackBonus'
+  | 'damageResistance'
+  | 'damageImmunity'
+  | 'conditionImmunity';
+
+// How the buff modifies the stat
+export type BuffMode =
+  | 'add' // +N to stat (Haste: +2 AC, Aid: +5 max HP)
+  | 'set' // Set stat to a value (Mage Armor: AC = 13 + DEX)
+  | 'floor' // Minimum value (Barkskin: AC can't be less than 16)
+  | 'grant'; // Grant a flat value (Wild Shape temp HP)
+
+// A single effect within a buff
+export interface BuffEffect {
+  id: string;
+  targetStat: BuffTargetStat;
+  mode: BuffMode;
+  value: number;
+  targetAbility?: AbilityName; // For savingThrow target: which ability
+  targetDamageType?: string; // For damageResistance/damageImmunity: which damage type
+  targetCondition?: string; // For conditionImmunity: which condition
+  description?: string;
+}
+
+// A complete buff with one or more effects
+export interface TemporaryBuff {
+  id: string;
+  name: string;
+  source?: string;
+  effects: BuffEffect[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // Utility functions for extended features
 export function migrateTraitToExtendedFeature(
   trait: TrackableTrait,
@@ -857,6 +959,7 @@ export interface MulticlassInfo {
   spellcaster?: 'full' | 'half' | 'third' | 'warlock' | 'none';
   hitDie: number;
   subclass?: string;
+  classSource?: string; // PHB or XPHB
 }
 
 export interface HitDicePools {

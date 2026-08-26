@@ -1,0 +1,166 @@
+'use client';
+
+import { useCallback, useState } from 'react';
+import Link from 'next/link';
+import { ArrowLeft } from 'lucide-react';
+
+import { Button } from '@/components/ui/forms/button';
+import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
+import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
+import { usePlayerTokenDecorations } from '@/components/ui/campaign/token-overlay/usePlayerTokenDecorations';
+import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useTokenInfoToggle';
+import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
+import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
+import { ToastContainer } from '@/components/ui/feedback/Toast';
+import { useReactionTurnReset } from '@/hooks/useReactionTurnReset';
+
+import { CastingBanner } from './CastingBanner';
+import { CharacterDock } from './CharacterDock';
+import { CombatPanel } from './CombatPanel';
+import { usePlayerVttState } from './PlayerVttScreen.hooks';
+import { SpellPlacementController } from './SpellPlacementController';
+import { StatusEffectTray } from './StatusEffectTray';
+
+interface PlayerVttScreenProps {
+  campaignCode: string;
+  battleMapId: string;
+  characterId: string;
+}
+
+/** Below this viewport width both side panels default to collapsed (spec §1a). */
+const COLLAPSE_BREAKPOINT_PX = 1100;
+const defaultCollapsed = () =>
+  typeof window !== 'undefined' && window.innerWidth < COLLAPSE_BREAKPOINT_PX;
+
+/**
+ * Player VTT screen: battle map canvas + combat panel + character dock +
+ * status tray, composed as canvas children so they share `useActiveTool`
+ * context (required by `SpellPlacementController`).
+ */
+export function PlayerVttScreen({
+  campaignCode,
+  battleMapId,
+  characterId,
+}: PlayerVttScreenProps) {
+  const {
+    character,
+    sharedState,
+    refetchNow,
+    liveInitiative,
+    refetchPartyHpNow,
+    handleEndTurn,
+    pendingPlacement,
+    requestPlacement,
+    cancelPlacement,
+    spellTemplateConfigRef,
+    connectionStatus,
+    setConnectionStatus,
+    toasts,
+    addToast,
+    dismissToast,
+  } = usePlayerVttState(campaignCode, characterId);
+
+  const handleReactionAutoReset = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: 'Reaction refreshed',
+      message: 'Your turn started',
+    });
+  }, [addToast]);
+  useReactionTurnReset(liveInitiative, characterId, handleReactionAutoReset);
+
+  const [combatCollapsed, setCombatCollapsed] = useState(defaultCollapsed);
+  const [dockCollapsed, setDockCollapsed] = useState(defaultCollapsed);
+  const [tokenInfoMode, cycleTokenInfo] = useTokenInfoMode(
+    'rollkeeper-vtt-token-info-player'
+  );
+  const decorations = usePlayerTokenDecorations(liveInitiative);
+  const initiativePrompt = useInitiativePrompt({
+    campaignCode,
+    characterId,
+    sharedState,
+  });
+
+  const handlePoke = useCallback(
+    (feature: string) => {
+      if (feature === 'initiative') refetchNow();
+      if (feature === 'players') refetchPartyHpNow();
+    },
+    [refetchNow, refetchPartyHpNow]
+  );
+
+  return (
+    <PlayerBattleMapCanvas
+      campaignCode={campaignCode}
+      battleMapId={battleMapId}
+      characterId={characterId}
+      characterName={character.name}
+      characterAvatar={character.avatar}
+      hideBackButton
+      onStatus={setConnectionStatus}
+      onPoke={handlePoke}
+      spellTemplateConfigRef={spellTemplateConfigRef}
+      tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
+      onExportError={message =>
+        addToast({ type: 'error', title: 'Export failed', message })
+      }
+    >
+      <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
+      <SpellPlacementController
+        pending={pendingPlacement}
+        configRef={spellTemplateConfigRef}
+        onCancel={cancelPlacement}
+      />
+      {pendingPlacement && (
+        <CastingBanner
+          spellName={pendingPlacement.spellName}
+          aoe={pendingPlacement.aoe}
+          onCancel={cancelPlacement}
+        />
+      )}
+      <div className="pointer-events-none absolute inset-0 z-10">
+        <div className="pointer-events-auto fixed top-3 left-3 z-10">
+          <Link href={`/player/characters/${characterId}`}>
+            <Button
+              variant="ghost"
+              className="flex items-center gap-1.5 text-xs"
+            >
+              <ArrowLeft size={14} />
+              Back to sheet
+            </Button>
+          </Link>
+        </div>
+        <CombatPanel
+          state={liveInitiative}
+          characterId={characterId}
+          onEndTurn={handleEndTurn}
+          collapsed={combatCollapsed}
+          onToggleCollapsed={() => setCombatCollapsed(v => !v)}
+        />
+        <CharacterDock
+          collapsed={dockCollapsed}
+          onToggleCollapsed={() => setDockCollapsed(v => !v)}
+          addToast={addToast}
+          onCastPlacement={requestPlacement}
+          connectionLive={connectionStatus === 'live'}
+          hasPendingPlacement={pendingPlacement !== null}
+          onCancelPlacement={cancelPlacement}
+        />
+        <StatusEffectTray />
+        {initiativePrompt.showPrompt && initiativePrompt.request && (
+          <InitiativeRollPrompt
+            request={initiativePrompt.request}
+            modifier={
+              character.initiative.isOverridden
+                ? character.initiative.value
+                : Math.floor((character.abilities.dexterity - 10) / 2)
+            }
+            onSubmit={initiativePrompt.handleSubmit}
+            onDismiss={initiativePrompt.dismiss}
+          />
+        )}
+      </div>
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+    </PlayerBattleMapCanvas>
+  );
+}

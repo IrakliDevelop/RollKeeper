@@ -1,5 +1,11 @@
 // Encounter tracker types for DM combat management
 
+import { Currency, Spell } from './character';
+import type {
+  ClassResourceIcon,
+  ClassResourceColor,
+} from '@/utils/classResources';
+
 export interface EncounterCondition {
   id: string;
   name: string;
@@ -9,6 +15,8 @@ export interface EncounterCondition {
   sourceSpell?: string; // What spell caused this
   stackCount?: number;
   source?: 'player-sync' | 'dm'; // Where this condition came from
+  kind?: 'buff' | 'debuff' | 'neutral';
+  rounds?: number | null; // remaining rounds; null/undefined = untimed (∞)
 }
 
 export interface MonsterAbility {
@@ -20,6 +28,45 @@ export interface MonsterAbility {
   maxUses?: number;
   usedUses: number;
   restType?: 'short' | 'long' | 'dawn';
+  /**
+   * Provenance: 'npc' = backed by a CampaignNPC entry (authoritative sync);
+   * 'entity' = per-encounter only (monsters, custom, combat-added entries).
+   * Absent on legacy data = treated as 'entity'.
+   */
+  source?: 'npc' | 'entity';
+}
+
+/** Shared shape for the five stat-block entry sections. */
+export interface StatBlockEntry {
+  /** Stable instance id, unique within a stat block. Store-enforced (npcStore migration + create/update normalization); encounter MonsterAbility.id matches it. */
+  id?: string;
+  name: string;
+  text: string;
+  /** Static per-day/authoring uses hint (feeds the abilities pipeline). */
+  uses?: number;
+  /** Link to an NpcResource: using this feature spends `amount` uses. */
+  resourceCost?: {
+    resourceId: string; // NpcResource.id (instance id)
+    amount: number; // positive integer, default 1
+  };
+}
+
+/**
+ * A class-resource pool attached to an NPC (Wild Shape, Channel Divinity, …).
+ * CampaignNPC.resources is the persistent source of truth for usage;
+ * EncounterEntity.resources is a per-add snapshot with the same ids.
+ * Long rest always restores everything; only short-rest recovery is configurable.
+ */
+export interface NpcResource {
+  id: string; // instance id, stable across NPC ↔ entity snapshots
+  definitionId?: string; // ClassResourceDefinition.id when registry-picked; absent = custom
+  name: string;
+  icon: ClassResourceIcon;
+  color: ClassResourceColor;
+  displayStyle: 'pips' | 'pool';
+  maxUses: number; // DM-entered positive integer (NPCs have no level)
+  usesExpended: number; // 0..maxUses
+  shortRestReset: 'all' | number; // number = restore up to N on short rest; 0 = none
 }
 
 export interface LegendaryActionPool {
@@ -43,6 +90,22 @@ export interface MonsterSpellcasting {
   usedSpells: Record<string, number>; // Track per-day usage
 }
 
+export type NPCSpellcastingAbility = 'intelligence' | 'wisdom' | 'charisma';
+
+export interface NPCSpellSlotOverrides {
+  [level: number]: number;
+}
+
+export interface NPCSpellcasting {
+  casterLevel: number;
+  ability: NPCSpellcastingAbility;
+  spellAttackBonus?: number;
+  spellSaveDC?: number;
+  slotOverrides?: NPCSpellSlotOverrides;
+  slotsUsed: Record<number, number>;
+  spells: Spell[];
+}
+
 export interface MonsterStatBlock {
   str: number;
   dex: number;
@@ -51,6 +114,8 @@ export interface MonsterStatBlock {
   wis: number;
   cha: number;
   saves: string;
+  /** Explicit save proficiencies; absent on legacy blocks, where `saves` implies them. */
+  saveProficiencies?: Array<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha'>;
   skills: string;
   speed: string;
   resistances: string;
@@ -59,9 +124,11 @@ export interface MonsterStatBlock {
   conditionImmunities: string[];
   senses: string;
   passivePerception: number;
-  traits: Array<{ name: string; text: string }>;
-  actions: Array<{ name: string; text: string }>;
-  reactions: Array<{ name: string; text: string }>;
+  traits: StatBlockEntry[];
+  actions: StatBlockEntry[];
+  reactions: StatBlockEntry[];
+  bonusActions: StatBlockEntry[];
+  lairActions: StatBlockEntry[];
   cr: string;
   type: string;
   size: string;
@@ -80,18 +147,27 @@ export type ChessPiece =
   | 'knight'
   | 'pawn';
 
+// Player-facing allegiance for a DM-controlled combatant (lets a villain be
+// disguised as an ally until the DM reveals the twist).
+export type PlayerDisposition = 'ally' | 'enemy' | 'neutral';
+
+/** Token side length in grid cells: Tiny/Small/Medium 1, Large 2, Huge 3, Gargantuan 4. */
+export type TokenCellSize = 1 | 2 | 3 | 4;
+
 export interface EncounterEntity {
   id: string;
   type: EntityType;
   name: string;
   initiative: number | null;
   initiativeModifier: number;
+  proficiencyBonus?: number; // Auto-derived from CR for monsters; overridable by DM
 
   // Combat stats
   currentHp: number;
   maxHp: number;
   tempHp: number;
   armorClass: number;
+  tempAc?: number; // Temporary AC bonus (additive on top of armorClass)
 
   // Conditions
   conditions: EncounterCondition[];
@@ -101,10 +177,13 @@ export interface EncounterEntity {
   abilities?: MonsterAbility[];
   legendaryActions?: LegendaryActionPool;
   spellcasting?: MonsterSpellcasting;
+  /** Snapshot of the source NPC's class resources (ids preserved). */
+  resources?: NpcResource[];
 
   // Monster source reference
   monsterSourceId?: string; // ProcessedMonster id for stat block lookup
   monsterStatBlock?: MonsterStatBlock; // Full stat block for display
+  npcSourceId?: string; // CampaignNPC.id for persistent NPC lookup
 
   // Lair action specific
   lairActions?: Array<{
@@ -115,15 +194,31 @@ export interface EncounterEntity {
   }>;
   regionalEffects?: string[];
 
+  // NPC hit dice (for short rest healing in encounters)
+  hitDice?: { current: number; max: number; dieType: string };
+
   // Player-synced (read-only for DM)
   inspirationCount?: number; // Heroic inspiration dice from player
   deathSaves?: { successes: number; failures: number; isStabilized: boolean };
   hasUsedReaction?: boolean; // Whether player has used their reaction this round
 
+  // Player-synced defenses & senses
+  damageResistances?: string[];
+  damageImmunities?: string[];
+  conditionImmunities?: string[];
+  senses?: Array<{ name: string; range: number; source?: string }>;
+
+  // DM condition authority: player-synced conditions the DM explicitly removed
+  suppressedConditions?: string[];
+
   // Visual
   color?: string; // For grouping same monsters
-  isHidden?: boolean; // DM can hide from players
+  avatarUrl?: string; // Portrait shown on DM VTT roster/tokens (players, NPCs, monsters)
+  isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
+  playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
+  playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
+  tokenSize?: TokenCellSize; // Battle-map token footprint; absent = 1 (no migration needed)
 
   // Player sync reference
   playerCharacterId?: string; // Link to playerStore character
@@ -147,22 +242,143 @@ export interface Encounter {
 
   // Settings
   sortOrder: 'initiative' | 'manual';
+
+  // Active "roll initiative" request sent to players during setup (null/absent = none).
+  // Persisted so a DM reload keeps the waiting-list; Redis carries the transport copy.
+  pendingInitiativeRequest?: { requestId: string; requestedAt: number } | null;
+
   // Timestamps
   createdAt: string;
   updatedAt: string;
 }
 
+// How much of an enemy's (non-player) HP players may see during combat.
+export type EnemyHpDisplay = 'off' | 'label' | 'bar' | 'percent' | 'exact';
+
+// Whether players may see non-player conditions and concentration status.
+export type EnemyConditionsDisplay = 'on' | 'off';
+
+// A named HP band shown to players when enemyHpDisplay is 'label'. `minPercent`
+// is the lowest HP percentage (inclusive) at which this label applies.
+export interface HpStateBand {
+  minPercent: number;
+  label: string;
+}
+
+// Global, DM-controlled combat settings (shared across all encounters).
+export interface CombatConfig {
+  enemyHpDisplay: EnemyHpDisplay;
+  hpStateBands: HpStateBand[];
+  enemyConditionsDisplay: EnemyConditionsDisplay;
+  /** DM-defined condition presets available in every combat. */
+  customStatuses?: string[];
+}
+
+export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
+  { minPercent: 100, label: 'Unharmed' },
+  { minPercent: 75, label: 'Healthy' },
+  { minPercent: 50, label: 'Injured' },
+  { minPercent: 25, label: 'Bloodied' },
+  { minPercent: 1, label: 'Near Death' },
+  { minPercent: 0, label: 'Down' },
+];
+
+export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
+  enemyHpDisplay: 'off',
+  hpStateBands: DEFAULT_HP_STATE_BANDS,
+  enemyConditionsDisplay: 'off',
+  customStatuses: [],
+};
+
+export interface NPCInventoryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  description?: string;
+  equipped?: boolean;
+  type?: string; // weapon, armor, potion, wondrous, etc.
+  category?: string; // weapon, armor, tool, consumable, treasure, misc
+  weight?: number; // per item in lbs
+  value?: number; // per item in copper pieces
+  rarity?: string; // common, uncommon, rare, very rare, legendary, artifact
+  /** Full reusable definition when this row came from the DM magic item library. */
+  magicItem?: import('./character').MagicItem;
+}
+
 export interface CampaignNPC {
   id: string;
+  campaignCode: string;
   name: string;
   description?: string;
 
-  // Basic stats
-  armorClass: number;
+  // Core combat stats
+  // Free-text AC so the DM can annotate it (e.g. "16 (natural armor)",
+  // "21 (shield spell)"). The numeric value for combat is parsed from the
+  // leading number via parseArmorClass(). Older data may still be a number.
+  armorClass: string;
   maxHp: number;
+  currentHp?: number; // Persistent HP tracking (defaults to maxHp if undefined)
+  tempHp?: number; // Temporary HP
+  // Temporary AC bonus, free text so the DM can note the source
+  // (e.g. "2 (shield spell)"). The leading number is parsed via parseAcBonus()
+  // and added on top of the parsed armorClass. Older data may be a number.
+  tempAc?: string;
   speed: string;
 
-  // Optional stats
+  // Full stat block (from bestiary import or manual entry)
+  monsterStatBlock?: MonsterStatBlock;
+  bestiarySourceId?: string;
+
+  // Lore (DM-written HTML from rich text editor)
+  loreHtml?: string;
+
+  // XP reward for defeating this NPC
+  xp?: number;
+
+  // Portrait (S3 URL)
+  avatarUrl?: string;
+
+  // Grouping & organization
+  group?: string;
+  tags?: string[];
+
+  // Hit dice
+  hitDice?: { current: number; max: number; dieType: string };
+
+  // Death saves (for encounter tracking)
+  deathSaves?: { successes: number; failures: number };
+
+  // Initiative modifier (defaults to DEX modifier when not set)
+  initiativeModifier?: number;
+
+  // Proficiency bonus (auto-calculated from CR, overridable)
+  proficiencyBonus?: number;
+
+  // Inventory
+  inventory?: NPCInventoryItem[];
+  currency?: Currency;
+
+  // Spellcasting
+  spellcasting?: NPCSpellcasting;
+
+  // Class-resource pools (authoritative usage state; see NpcResource)
+  resources?: NpcResource[];
+
+  // Per-ability usage (entryId → usedUses). Authoritative, like resources.
+  abilityUsage?: Record<string, number>;
+
+  // UI state: which spell tab sections are collapsed
+  collapsedSpellSections?: string[]; // e.g. ['stats', 'slotTracker', 'spells']
+
+  // UI state: last viewed detail tab
+  lastDetailTab?: 'stats' | 'spells' | 'inventory' | 'lore';
+
+  // Passive abilities
+  passivePerception?: number;
+  passiveInsight?: number;
+  passiveInvestigation?: number;
+
+  // Legacy fields (backward compat, superseded by monsterStatBlock when present)
   abilityScores?: {
     str: number;
     dex: number;
@@ -171,15 +387,9 @@ export interface CampaignNPC {
     wis: number;
     cha: number;
   };
-
-  // Optional abilities
   traits?: string[];
   actions?: string[];
 
-  // Visual
-  avatarUrl?: string;
-
-  // Metadata
   createdAt: string;
   updatedAt: string;
 }

@@ -4,10 +4,19 @@ import {
   campaignKey,
   campaignPlayersKey,
   campaignPlayerKey,
+  campaignRemovedKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { CampaignData, CampaignPlayerData } from '@/types/campaign';
+import {
+  guestDeniedResponse,
+  requireGuestPlayerBinding,
+} from '@/lib/guestRouteResponses';
+import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { accountMembershipMatchesLegacyIds } from '@/lib/campaignMembershipAuthority';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export async function POST(
   request: NextRequest,
@@ -16,8 +25,75 @@ export async function POST(
   try {
     const { code } = await params;
     const body = await request.json();
-    const { playerId, playerName, characterId, characterName, characterData } =
-      body;
+    const {
+      playerId: assertedPlayerId,
+      playerName,
+      characterId: assertedCharacterId,
+      characterName,
+      characterData,
+    } = body;
+    let playerId = assertedPlayerId;
+    let characterId = assertedCharacterId;
+
+    const membership = await authorizeCampaignMembershipRoute(code, true);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        {
+          error:
+            membership.status === 409
+              ? 'Membership changes are temporarily frozen'
+              : 'Account membership is required',
+        },
+        { status: membership.status }
+      );
+    }
+    if (membership.mode === 'account') {
+      const security = validateCampaignMembershipMutation(request);
+      if (!security.ok) {
+        return NextResponse.json(
+          { error: security.error },
+          { status: security.status }
+        );
+      }
+      if (
+        !accountMembershipMatchesLegacyIds(membership.principal, [
+          playerId,
+          characterId,
+          characterData?.id,
+        ]) ||
+        !membership.principal.legacyPlayerId ||
+        !membership.principal.legacyCharacterId ||
+        !membership.principal.characterId
+      ) {
+        return NextResponse.json(
+          { error: 'Explicit account character link is required' },
+          { status: 403 }
+        );
+      }
+      playerId = membership.principal.legacyPlayerId;
+      characterId = membership.principal.legacyCharacterId;
+    }
+
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'player:join', true)
+        : ({ mode: 'legacy' } as const);
+    if (guest.mode === 'denied') return guestDeniedResponse(guest);
+    if (guest.mode === 'guest') {
+      const bound = requireGuestPlayerBinding(guest, [
+        playerId,
+        characterId,
+        characterData?.id,
+      ]);
+      if (!bound) {
+        return NextResponse.json(
+          { error: 'Guest player binding does not match' },
+          { status: 403 }
+        );
+      }
+      playerId = bound;
+      characterId = bound;
+    }
 
     if (!playerId || !playerName || !characterId || !characterData) {
       return NextResponse.json(
@@ -51,11 +127,32 @@ export async function POST(
       lastSynced: new Date().toISOString(),
     };
 
+    // Rejoin must not clobber a newer snapshot pushed by another tab:
+    // keep whichever blob has the higher character revision.
+    const existingRaw = await redis.get<string>(
+      campaignPlayerKey(code, playerId)
+    );
+    let dataToStore = playerData;
+    if (existingRaw) {
+      const existing: CampaignPlayerData =
+        typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
+      const storedRevision = existing.characterData?.revision ?? 0;
+      const incomingRevision = characterData.revision ?? 0;
+      if (incomingRevision < storedRevision) {
+        dataToStore = existing;
+      }
+    }
+
     await Promise.all([
       redis.sadd(campaignPlayersKey(code), playerId),
-      redis.set(campaignPlayerKey(code, playerId), JSON.stringify(playerData), {
-        ex: SLIDING_TTL_SECONDS,
-      }),
+      redis.set(
+        campaignPlayerKey(code, playerId),
+        JSON.stringify(dataToStore),
+        {
+          ex: SLIDING_TTL_SECONDS,
+        }
+      ),
+      redis.del(campaignRemovedKey(code, playerId)),
       refreshCampaignTTL(redis, code),
     ]);
 

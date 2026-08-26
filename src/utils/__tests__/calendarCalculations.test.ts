@@ -15,9 +15,11 @@ import {
   formatTime,
   getDayPeriod,
   getTotalDaysForDate,
+  getCampaignDays,
 } from '@/utils/calendarCalculations';
 import {
   createDefaultCalendar,
+  createBarovianCalendar,
   createHarptosCalendar,
   createGreyhawkCalendar,
 } from '@/utils/calendarPresets';
@@ -284,6 +286,26 @@ describe('getAllMoonPhases', () => {
 // ── Grid ────────────────────────────────────────────────────────
 
 describe('getMonthGrid', () => {
+  it('shows the default calendar Monday-first', () => {
+    const grid = getMonthGrid(1, 0, defaultConfig);
+    expect(defaultConfig.weekStartsOn).toBe(1);
+    expect(grid[0][6]).toBe(0);
+  });
+
+  it('keeps the Barovian calendar Sunday-first', () => {
+    const barovia = createBarovianCalendar();
+    const grid = getMonthGrid(1, 0, barovia);
+    expect(barovia.weekStartsOn).toBe(0);
+    expect(grid[0][0]).toBe(0);
+  });
+
+  it('uses the configured first visible weekday without changing dates', () => {
+    const sundayFirst = { ...defaultConfig, weekStartsOn: 0 };
+    const mondayFirst = { ...defaultConfig, weekStartsOn: 1 };
+    expect(getMonthGrid(1, 0, sundayFirst)[0][0]).toBe(0);
+    expect(getMonthGrid(1, 0, mondayFirst)[0][6]).toBe(0);
+  });
+
   it('returns correct number of days for a 30-day month', () => {
     const grid = getMonthGrid(1, 0, defaultConfig);
     const actualDays = grid.flat().filter(d => d !== null);
@@ -324,7 +346,7 @@ describe('getMonthGrid', () => {
 
   it('pads first week with nulls when month starts mid-week', () => {
     // Use a config where month 1 starts on a non-zero weekday
-    const grid = getMonthGrid(1, 1, defaultConfig);
+    const grid = getMonthGrid(1, 1, { ...defaultConfig, weekStartsOn: 0 });
     const firstWeek = grid[0];
     // Month 0 has 30 days, day 30 with 7-day week: 30 % 7 = 2 → month 1 starts on weekday 2
     const leadingNulls = firstWeek.filter(d => d === null).length;
@@ -487,6 +509,158 @@ describe('getTotalDaysForDate', () => {
       defaultConfig
     );
     expect(totalDays).toBe(date.totalDays);
+  });
+});
+
+// ── getCampaignDays ─────────────────────────────────────────────
+
+describe('getCampaignDays', () => {
+  it('returns 0 when current equals start time', () => {
+    expect(getCampaignDays(1000, 1000, defaultConfig)).toBe(0);
+  });
+
+  it('returns 1 after exactly one day has passed', () => {
+    const oneDayMs = getMsPerDay(defaultConfig);
+    expect(getCampaignDays(oneDayMs, 0, defaultConfig)).toBe(1);
+  });
+
+  it('returns 10 after ten days', () => {
+    const tenDaysMs = 10 * getMsPerDay(defaultConfig);
+    expect(getCampaignDays(tenDaysMs, 0, defaultConfig)).toBe(10);
+  });
+
+  it('floors partial days', () => {
+    const almostOneDayMs = getMsPerDay(defaultConfig) - 1;
+    expect(getCampaignDays(almostOneDayMs, 0, defaultConfig)).toBe(0);
+  });
+
+  it('works with a non-zero start time', () => {
+    const start = 5 * getMsPerDay(defaultConfig);
+    const current = start + 3 * getMsPerDay(defaultConfig);
+    expect(getCampaignDays(current, start, defaultConfig)).toBe(3);
+  });
+
+  it('returns negative days when current is before start', () => {
+    const start = 10 * getMsPerDay(defaultConfig);
+    expect(getCampaignDays(0, start, defaultConfig)).toBe(-10);
+  });
+
+  it('works correctly with Harptos calendar (same ms-per-day)', () => {
+    const harptos = createHarptosCalendar();
+    const sevenDaysMs = 7 * getMsPerDay(harptos);
+    expect(getCampaignDays(sevenDaysMs, 0, harptos)).toBe(7);
+  });
+});
+
+// ── timeToDate negative time ────────────────────────────────────
+
+describe('timeToDate negative time', () => {
+  it('handles time = -1 day (one day before epoch)', () => {
+    const date = timeToDate(-86400 * 1000, defaultConfig);
+    expect(date.totalDays).toBe(-1);
+    // rawYear -1 + yearOffset 1 = year 0
+    expect(date.year).toBe(0);
+  });
+
+  it('preserves correct hour/minute/second for negative time with time-of-day offset', () => {
+    // -1 day + 2 hours into that day
+    const ms = -(86400 - 7200) * 1000;
+    const date = timeToDate(ms, defaultConfig);
+    expect(date.hour).toBe(2);
+    expect(date.minute).toBe(0);
+    expect(date.second).toBe(0);
+  });
+});
+
+// ── addTime edge cases ──────────────────────────────────────────
+
+describe('addTime edge cases', () => {
+  it('handles negative delta days (subtracting time)', () => {
+    const start = 5 * 86400 * 1000;
+    const result = addTime(start, defaultConfig, { days: -3 });
+    expect(result).toBe(2 * 86400 * 1000);
+  });
+
+  it('handles negative delta hours', () => {
+    const start = 10 * 3600 * 1000; // 10 hours
+    const result = addTime(start, defaultConfig, { hours: -3 });
+    expect(result).toBe(7 * 3600 * 1000);
+  });
+
+  it('adds fractional combinations correctly', () => {
+    // 1 day + 1 hour + 1 minute + 1 second + 1 round (6s)
+    const result = addTime(0, defaultConfig, {
+      days: 1,
+      hours: 1,
+      minutes: 1,
+      seconds: 1,
+      rounds: 1,
+    });
+    const expected = (86400 + 3600 + 60 + 1 + 6) * 1000;
+    expect(result).toBe(expected);
+  });
+
+  it('uses custom secondsPerRound from mechanics', () => {
+    const config = {
+      ...defaultConfig,
+      mechanics: { ...defaultConfig.mechanics, secondsPerRound: 10 },
+    };
+    const result = addTime(0, config, { rounds: 3 });
+    expect(result).toBe(30 * 1000);
+  });
+});
+
+// ── getShortRestMs / getLongRestMs custom configs ───────────────
+
+describe('getShortRestMs custom config', () => {
+  it('scales with custom minutesPerShortRest', () => {
+    const config = {
+      ...defaultConfig,
+      mechanics: { ...defaultConfig.mechanics, minutesPerShortRest: 30 },
+    };
+    expect(getShortRestMs(config)).toBe(30 * 60 * 1000);
+  });
+
+  it('scales with custom secondsPerMinute', () => {
+    const config = {
+      ...defaultConfig,
+      clock: { ...defaultConfig.clock, secondsPerMinute: 100 },
+      mechanics: { ...defaultConfig.mechanics, minutesPerShortRest: 60 },
+    };
+    expect(getShortRestMs(config)).toBe(60 * 100 * 1000);
+  });
+});
+
+describe('getLongRestMs custom config', () => {
+  it('scales with custom hoursPerLongRest', () => {
+    const config = {
+      ...defaultConfig,
+      mechanics: { ...defaultConfig.mechanics, hoursPerLongRest: 4 },
+    };
+    expect(getLongRestMs(config)).toBe(4 * 60 * 60 * 1000);
+  });
+});
+
+// ── formatDate edge cases ───────────────────────────────────────
+
+describe('formatDate edge cases', () => {
+  it('displays day number as 1-based', () => {
+    // day 0 of month should display as "1"
+    const date = timeToDate(0, defaultConfig);
+    expect(formatDate(date, defaultConfig)).toMatch(/^1 /);
+  });
+
+  it('formats last day of year correctly', () => {
+    // last day of 360-day year: day 359 = month 11 (December), day 29 → display as "30 December"
+    const ms = 359 * 86400 * 1000;
+    const date = timeToDate(ms, defaultConfig);
+    expect(formatDate(date, defaultConfig)).toBe('30 December, Year 1');
+  });
+
+  it('formats year 2 correctly', () => {
+    const ms = 360 * 86400 * 1000;
+    const date = timeToDate(ms, defaultConfig);
+    expect(formatDate(date, defaultConfig)).toContain('Year 2');
   });
 });
 

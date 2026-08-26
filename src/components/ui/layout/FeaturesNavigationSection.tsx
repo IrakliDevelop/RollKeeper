@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { Book, Users, Scroll, Skull } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface NavigationItem {
   title: string;
@@ -79,7 +80,8 @@ export default function FeaturesNavigationSection() {
                 </div>
                 <div>
                   <h2 className="text-heading flex items-center gap-2 text-2xl font-bold">
-                    🎯 D&D Resources & Tools
+                    <AppIcon name="target" className="h-6 w-6" /> D&D Resources
+                    & Tools
                   </h2>
                   {!isExpanded && (
                     <p className="text-muted mt-1 text-sm">

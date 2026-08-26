@@ -8,6 +8,7 @@ interface XPTrackerProps {
   currentLevel: number;
   onAddXP: (xpToAdd: number) => void;
   onSetXP: (newXP: number) => void;
+  pendingLevelUp?: boolean;
   className?: string;
 }
 
@@ -16,6 +17,7 @@ export default function XPTracker({
   currentLevel,
   onAddXP,
   onSetXP,
+  pendingLevelUp,
   className = '',
 }: XPTrackerProps) {
   // Use the shared XPTracker component with full functionality
@@ -31,6 +33,7 @@ export default function XPTracker({
       hideProgressBar={false}
       hideLevelUpAlert={false}
       hideThresholds={false}
+      pendingLevelUp={pendingLevelUp}
       className={className}
     />
   );

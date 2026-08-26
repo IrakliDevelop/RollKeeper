@@ -11,7 +11,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { PlayerCharacter } from '@/store/playerStore';
 
 interface JoinCampaignDialogProps {
@@ -73,7 +73,10 @@ export function JoinCampaignDialog({
 
       const joinRes = await fetch(`/api/campaign/${trimmedCode}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
         body: JSON.stringify({
           playerId: character.id,
           playerName: character.characterData.playerName || character.name,

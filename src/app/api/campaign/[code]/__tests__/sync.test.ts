@@ -1,5 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { resetRedis, getRedisStore, getRedisSet } from '@/test/mocks/redis';
+import {
+  resetRedis,
+  getRedisStore,
+  getRedisSet,
+  seedRedis,
+} from '@/test/mocks/redis';
 import {
   createNextRequest,
   createRouteParams,
@@ -102,5 +107,49 @@ describe('POST /api/campaign/[code]/sync', () => {
     const stored = getRedisStore().get('campaign:ABC123:player:player-1');
     const parsed = JSON.parse(stored!);
     expect(parsed.playerName).toBe('Unknown Player');
+  });
+
+  it('returns 410 when the player was removed from the campaign', async () => {
+    seedRedis('campaign:ABC123:removed:player-1', '1');
+
+    const req = createNextRequest('/api/campaign/ABC123/sync', {
+      method: 'POST',
+      body: {
+        playerId: 'player-1',
+        characterData: createMockCharacterState(),
+      },
+    });
+
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(410);
+    expect(data.error).toBe('removed');
+    // Nothing was written:
+    expect(getRedisStore().has('campaign:ABC123:player:player-1')).toBe(false);
+    expect(getRedisSet('campaign:ABC123:players').has('player-1')).toBe(false);
+  });
+
+  it('removal marker for one player does not affect another', async () => {
+    seedRedis('campaign:ABC123:removed:player-1', '1');
+
+    const req = createNextRequest('/api/campaign/ABC123/sync', {
+      method: 'POST',
+      body: {
+        playerId: 'player-2',
+        characterData: createMockCharacterState(),
+      },
+    });
+
+    const res = await POST(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+
+    expect(res.status).toBe(200);
+    expect(getRedisSet('campaign:ABC123:players').has('player-2')).toBe(true);
   });
 });

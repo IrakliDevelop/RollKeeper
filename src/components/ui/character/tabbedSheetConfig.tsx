@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { AppIcon } from '@/components/ui/icons';
+import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
+import PlayerLocationView from '@/components/ui/campaign/location-map/PlayerLocationView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
+import TemporaryBuffsManager from '@/components/ui/game/TemporaryBuffsManager';
+import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
-import { EnhancedSpellManagement } from '@/components/EnhancedSpellManagement';
+import { SpellManagement } from '@/components/SpellManagement';
 import { WeaponsTab } from '@/components/ui/character/equipment/WeaponsTab';
 import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab';
 import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
@@ -29,7 +36,6 @@ import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatu
 import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
 import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
-import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
 import Languages from '@/components/ui/character/LanguagesAndProficiencies';
 import { SummonsSubTab } from '@/components/ui/character/summons';
 import { ToastData } from '@/components/ui/feedback/Toast';
@@ -38,7 +44,9 @@ import {
   calculateSpellAttackBonus,
   calculateCarryingCapacity,
   calculateSpellSaveDC,
+  shouldLevelUp,
 } from '@/utils/calculations';
+import { calculateTotalWeight } from '@/utils/encumbrance';
 import {
   CharacterState,
   RichTextContent,
@@ -52,7 +60,36 @@ import {
   ToolProficiency,
   Language,
   Spell,
+  InventoryItem,
 } from '@/types/character';
+
+function LevelUpButton({
+  pendingLevelUp = false,
+}: {
+  pendingLevelUp?: boolean;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant="primary"
+        size="sm"
+        onClick={() => setIsOpen(true)}
+        className={
+          pendingLevelUp
+            ? 'ring-accent-emerald-border animate-pulse ring-2'
+            : undefined
+        }
+      >
+        <AppIcon name="levelUp" size={14} />
+        Level Up
+      </Button>
+      {isOpen && (
+        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+      )}
+    </>
+  );
+}
 
 export interface TabbedSheetConfigParams {
   character: CharacterState;
@@ -96,9 +133,9 @@ export interface TabbedSheetConfigParams {
   addExperience: (xp: number) => void;
   setExperience: (xp: number) => void;
 
-  // Spell slots
-  updateSpellSlot: (level: keyof SpellSlots, used: number) => void;
-  updatePactMagicSlot: (used: number) => void;
+  // Spell slots — delta forms (forwarded-intent safe)
+  changeSpellSlotBy: (level: keyof SpellSlots, delta: number) => void;
+  changePactMagicBy: (delta: number) => void;
   resetSpellSlots: () => void;
   resetPactMagicSlots: () => void;
 
@@ -110,8 +147,8 @@ export interface TabbedSheetConfigParams {
   resetReaction: () => void;
   rollInitiative: () => void;
   updateTempArmorClass: (tempAC: number) => void;
-  toggleTempAC: () => void;
-  toggleShield: () => void;
+  setTempACActive: (active: boolean) => void;
+  setShieldEquipped: (equipped: boolean) => void;
   updateShieldBonus: (bonus: number) => void;
 
   // HP handlers
@@ -170,6 +207,7 @@ export interface TabbedSheetConfigParams {
     sourceType?: string
   ) => void;
   addSpellsFromFeat?: (spells: Spell[]) => void;
+  toggleFavoriteFeature: (id: string) => void;
 
   // Tool proficiencies
   addToolProficiency: (
@@ -186,11 +224,14 @@ export interface TabbedSheetConfigParams {
   updateHeroicInspiration: (updates: Partial<HeroicInspiration>) => void;
   useHeroicInspiration: () => void;
   resetHeroicInspiration: () => void;
+  stackableInspiration?: boolean;
+  inCampaign?: boolean;
+  setStackableInspiration?: (enabled: boolean) => void;
 
-  // Bardic inspiration
-  useBardicInspiration: () => void;
-  restoreBardicInspiration: () => void;
-  resetBardicInspiration: () => void;
+  // Class resources
+  useClassResource: (id: string, amount?: number) => void;
+  restoreClassResource: (id: string, amount?: number) => void;
+  resetClassResource: (id: string) => void;
 
   // Languages
   addLanguage: (
@@ -219,6 +260,9 @@ export interface TabbedSheetConfigParams {
   addToast: (toast: Omit<ToastData, 'id'>) => void;
   calendarDays?: number | null;
   campaignCode?: string;
+  customCounter?: { label: string; value: number } | null;
+  locationCount?: number;
+  onSendItem?: (item: InventoryItem) => void;
 }
 
 export function createTabbedSheetConfig(
@@ -230,18 +274,15 @@ export function createTabbedSheetConfig(
     totalLevel,
     proficiencyBonus,
     characterHasSpells,
+    onSendItem,
   } = params;
-
-  const isBard =
-    character.classes?.some(c => c.className.toLowerCase() === 'bard') ||
-    character.class?.name?.toLowerCase() === 'bard';
 
   const tabs: BookmarkTabItem[] = [
     // Tab 1: Actions
     {
       id: 'actions',
       label: 'Actions',
-      icon: '⚔️',
+      icon: <AppIcon name="attack" className="h-4 w-4" />,
       badge: character.concentration?.isConcentrating ? (
         <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
           Conc.
@@ -257,21 +298,53 @@ export function createTabbedSheetConfig(
             animateRoll={params.animateRoll}
             switchToTab={params.switchToTab}
             onStopConcentration={params.stopConcentration}
+            showClassResources={hasHydrated}
+            onUseClassResource={params.useClassResource}
+            onRestoreClassResource={params.restoreClassResource}
+            onResetClassResource={params.resetClassResource}
           />
           {characterHasSpells && (
-            <SpellSlotTracker
-              spellSlots={character.spellSlots}
-              pactMagic={character.pactMagic}
-              onSpellSlotChange={params.updateSpellSlot}
-              onPactMagicChange={
-                character.pactMagic ? params.updatePactMagicSlot : undefined
-              }
-              onResetSpellSlots={params.resetSpellSlots}
-              onResetPactMagic={
-                character.pactMagic ? params.resetPactMagicSlots : undefined
-              }
-              compact
-            />
+            <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
+              <button
+                type="button"
+                onClick={() =>
+                  params.updateCharacter({
+                    spellSlotsExpanded: !character.spellSlotsExpanded,
+                  })
+                }
+                className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
+              >
+                <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
+                  <Zap size={16} />
+                  Spell Slots
+                </div>
+                {character.spellSlotsExpanded ? (
+                  <ChevronDown size={16} className="text-accent-purple-text" />
+                ) : (
+                  <ChevronRight size={16} className="text-accent-purple-text" />
+                )}
+              </button>
+              {character.spellSlotsExpanded && (
+                <div className="p-3">
+                  <SpellSlotTracker
+                    spellSlots={character.spellSlots}
+                    pactMagic={character.pactMagic}
+                    onSpellSlotChange={params.changeSpellSlotBy}
+                    onPactMagicChange={
+                      character.pactMagic ? params.changePactMagicBy : undefined
+                    }
+                    onResetSpellSlots={params.resetSpellSlots}
+                    onResetPactMagic={
+                      character.pactMagic
+                        ? params.resetPactMagicSlots
+                        : undefined
+                    }
+                    compact
+                    hideTitle
+                  />
+                </div>
+              )}
+            </div>
           )}
         </div>
       ),
@@ -281,7 +354,7 @@ export function createTabbedSheetConfig(
     {
       id: 'stats',
       label: 'Stats',
-      icon: '📊',
+      icon: <AppIcon name="abilities" className="h-4 w-4" />,
       content: (
         <div className="space-y-6">
           {/* Header row: Basic Info + Quick Stats */}
@@ -323,16 +396,7 @@ export function createTabbedSheetConfig(
               }
               proficiencyBonus={proficiencyBonus}
               carryingCapacity={calculateCarryingCapacity(character)}
-              currentWeight={
-                character.inventoryItems.reduce(
-                  (sum, item) => sum + (item.weight || 0) * item.quantity,
-                  0
-                ) +
-                (character.armorItems?.reduce(
-                  (sum, item) => sum + (item.weight || 0),
-                  0
-                ) || 0)
-              }
+              currentWeight={calculateTotalWeight(character)}
               itemCount={character.inventoryItems.length}
               spellAttackBonus={calculateSpellAttackBonus(character)}
               spellSaveDC={calculateSpellSaveDC(character)}
@@ -356,17 +420,31 @@ export function createTabbedSheetConfig(
                 }
                 onRollSavingThrow={params.rollSavingThrow}
               />
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                  Experience Points
-                </h2>
-                <XPTracker
-                  currentXP={character.experience}
-                  currentLevel={totalLevel}
-                  onAddXP={params.addExperience}
-                  onSetXP={params.setExperience}
-                />
-              </div>
+              {(() => {
+                const pendingLevelUp = shouldLevelUp(
+                  character.experience,
+                  totalLevel
+                );
+                return (
+                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                    <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
+                      <h2 className="text-heading text-lg font-bold">
+                        Experience Points
+                      </h2>
+                      {totalLevel < 20 && (
+                        <LevelUpButton pendingLevelUp={pendingLevelUp} />
+                      )}
+                    </div>
+                    <XPTracker
+                      currentXP={character.experience}
+                      currentLevel={totalLevel}
+                      onAddXP={params.addExperience}
+                      onSetXP={params.setExperience}
+                      pendingLevelUp={pendingLevelUp}
+                    />
+                  </div>
+                );
+              })()}
             </div>
 
             <div className="lg:sticky lg:top-4">
@@ -391,7 +469,7 @@ export function createTabbedSheetConfig(
     {
       id: 'combat',
       label: 'Combat',
-      icon: '🛡️',
+      icon: <AppIcon name="armor" className="h-4 w-4" />,
       badge:
         (character.summons?.length || 0) > 0 ? (
           <span className="bg-accent-emerald-bg text-accent-emerald-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
@@ -412,7 +490,7 @@ export function createTabbedSheetConfig(
     {
       id: 'spells',
       label: 'Spells',
-      icon: '✨',
+      icon: <AppIcon name="spell" className="h-4 w-4" />,
       hidden: !characterHasSpells && character.spells.length === 0,
       badge:
         character.spells.length > 0 ? (
@@ -433,18 +511,44 @@ export function createTabbedSheetConfig(
           >
             <SpellcastingStats />
           </ErrorBoundary>
-          <SpellSlotTracker
-            spellSlots={character.spellSlots}
-            pactMagic={character.pactMagic}
-            onSpellSlotChange={params.updateSpellSlot}
-            onPactMagicChange={
-              character.pactMagic ? params.updatePactMagicSlot : undefined
-            }
-            onResetSpellSlots={params.resetSpellSlots}
-            onResetPactMagic={
-              character.pactMagic ? params.resetPactMagicSlots : undefined
-            }
-          />
+          <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
+            <button
+              type="button"
+              onClick={() =>
+                params.updateCharacter({
+                  spellSlotsExpanded: !character.spellSlotsExpanded,
+                })
+              }
+              className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
+            >
+              <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
+                <Zap size={16} />
+                Spell Slots
+              </div>
+              {character.spellSlotsExpanded ? (
+                <ChevronDown size={16} className="text-accent-purple-text" />
+              ) : (
+                <ChevronRight size={16} className="text-accent-purple-text" />
+              )}
+            </button>
+            {character.spellSlotsExpanded && (
+              <div className="p-3">
+                <SpellSlotTracker
+                  spellSlots={character.spellSlots}
+                  pactMagic={character.pactMagic}
+                  onSpellSlotChange={params.changeSpellSlotBy}
+                  onPactMagicChange={
+                    character.pactMagic ? params.changePactMagicBy : undefined
+                  }
+                  onResetSpellSlots={params.resetSpellSlots}
+                  onResetPactMagic={
+                    character.pactMagic ? params.resetPactMagicSlots : undefined
+                  }
+                  hideTitle
+                />
+              </div>
+            )}
+          </div>
           <ErrorBoundary
             fallback={
               <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
@@ -452,7 +556,7 @@ export function createTabbedSheetConfig(
               </div>
             }
           >
-            <EnhancedSpellManagement />
+            <SpellManagement />
           </ErrorBoundary>
         </div>
       ),
@@ -462,15 +566,17 @@ export function createTabbedSheetConfig(
     {
       id: 'inventory',
       label: 'Inventory',
-      icon: '🎒',
-      content: <InventoryTabContent character={character} />,
+      icon: <AppIcon name="inventory" className="h-4 w-4" />,
+      content: (
+        <InventoryTabContent character={character} onSendItem={onSendItem} />
+      ),
     },
 
     // Tab 6: Features
     {
       id: 'features',
       label: 'Features',
-      icon: '⚡',
+      icon: <AppIcon name="features" className="h-4 w-4" />,
       badge:
         (character.extendedFeatures?.length || 0) > 0 ? (
           <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
@@ -482,9 +588,8 @@ export function createTabbedSheetConfig(
           character={character}
           totalLevel={totalLevel}
           proficiencyBonus={proficiencyBonus}
-          hasHydrated={hasHydrated}
-          isBard={isBard}
           params={params}
+          customCounter={params.customCounter}
         />
       ),
     },
@@ -493,7 +598,7 @@ export function createTabbedSheetConfig(
     {
       id: 'character',
       label: 'Character',
-      icon: '📋',
+      icon: <AppIcon name="features" className="h-4 w-4" />,
       content: <CharacterTabContent character={character} params={params} />,
     },
 
@@ -501,7 +606,7 @@ export function createTabbedSheetConfig(
     {
       id: 'calendar',
       label: 'Calendar',
-      icon: '📅',
+      icon: <AppIcon name="calendar" className="h-4 w-4" />,
       content: (
         <ErrorBoundary
           fallback={
@@ -520,21 +625,83 @@ export function createTabbedSheetConfig(
     },
   ];
 
+  // Tab 9: Map (conditional — only shown when campaign has at least one synced location)
+  if (params.locationCount && params.locationCount > 0) {
+    tabs.push({
+      id: 'map',
+      label: 'Map',
+      icon: <AppIcon name="map" className="h-4 w-4" />,
+      content: (
+        <ErrorBoundary
+          fallback={
+            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+              <p className="text-muted">Unable to load map</p>
+            </div>
+          }
+        >
+          <PlayerLocationView
+            characterId={character.id}
+            campaignCode={params.campaignCode}
+          />
+        </ErrorBoundary>
+      ),
+    });
+  }
+
   return tabs;
 }
 
 const INVENTORY_SUB_TABS = [
-  { id: 'weapons', label: 'Weapons', icon: '⚔️' },
-  { id: 'magic-items', label: 'Magic Items', icon: '✨' },
-  { id: 'armor', label: 'Armor', icon: '🛡️' },
-  { id: 'items', label: 'Items', icon: '🎒' },
-  { id: 'currency', label: 'Currency', icon: '💰' },
+  {
+    id: 'weapons',
+    label: 'Weapons',
+    icon: <AppIcon name="weapon" className="h-4 w-4" />,
+  },
+  {
+    id: 'magic-items',
+    label: 'Magic Items',
+    icon: <AppIcon name="magicItem" className="h-4 w-4" />,
+  },
+  {
+    id: 'armor',
+    label: 'Armor',
+    icon: <AppIcon name="armor" className="h-4 w-4" />,
+  },
+  {
+    id: 'items',
+    label: 'Items',
+    icon: <AppIcon name="inventory" className="h-4 w-4" />,
+  },
+  {
+    id: 'currency',
+    label: 'Currency',
+    icon: <AppIcon name="currency" className="h-4 w-4" />,
+  },
 ] as const;
 
 type InventorySubTab = (typeof INVENTORY_SUB_TABS)[number]['id'];
 
-function InventoryTabContent({ character }: { character: CharacterState }) {
+// Global setter so external code (e.g. item transfer notification) can switch to items sub-tab
+let inventorySubTabSetter: ((tab: InventorySubTab) => void) | null = null;
+export function setInventorySubTab(tab: InventorySubTab) {
+  inventorySubTabSetter?.(tab);
+}
+
+function InventoryTabContent({
+  character: _character,
+  onSendItem,
+}: {
+  character: CharacterState;
+  onSendItem?: (item: InventoryItem) => void;
+}) {
   const [activeSubTab, setActiveSubTab] = useState<InventorySubTab>('weapons');
+
+  useEffect(() => {
+    inventorySubTabSetter = setActiveSubTab;
+    return () => {
+      inventorySubTabSetter = null;
+    };
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -599,7 +766,7 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
             </div>
           }
         >
-          <InventoryManager />
+          <InventoryManager onSendItem={onSendItem} />
         </ErrorBoundary>
       )}
 
@@ -619,8 +786,16 @@ function InventoryTabContent({ character }: { character: CharacterState }) {
 }
 
 const CHARACTER_SUB_TABS = [
-  { id: 'notes', label: 'Session Notes', icon: '📝' },
-  { id: 'details', label: 'Features & Background', icon: '📋' },
+  {
+    id: 'notes',
+    label: 'Session Notes',
+    icon: <AppIcon name="features" className="h-4 w-4" />,
+  },
+  {
+    id: 'details',
+    label: 'Features & Background',
+    icon: <AppIcon name="character" className="h-4 w-4" />,
+  },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
@@ -672,22 +847,10 @@ function CharacterTabContent({
           {(() => {
             const days = params.calendarDays ?? character.daysSpent ?? 0;
             return (
-              <div className="text-body flex items-center gap-2 text-sm">
-                <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 font-medium shadow-sm">
-                  <span className="text-base">📅</span>
-                  Campaign Day {days}
-                </span>
-                <span className="text-faint">•</span>
-                <span className="text-muted">
-                  {Math.floor(days / 7) > 0 ? (
-                    <>
-                      Week {Math.floor(days / 7) + 1}, Day {(days % 7) + 1}
-                    </>
-                  ) : (
-                    `Day ${days + 1} of the adventure`
-                  )}
-                </span>
-              </div>
+              <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 text-sm font-medium shadow-sm">
+                <AppIcon name="calendar" className="h-4 w-4" />
+                Campaign Day {days + 1}
+              </span>
             );
           })()}
 
@@ -764,8 +927,21 @@ function CharacterTabContent({
 }
 
 const COMBAT_SUB_TABS = [
-  { id: 'player', label: 'Player', icon: '🗡️' },
-  { id: 'summons', label: 'Summons', icon: '🐾' },
+  {
+    id: 'player',
+    label: 'Player',
+    icon: <AppIcon name="character" className="h-4 w-4" />,
+  },
+  {
+    id: 'defenses',
+    label: 'Defenses & Buffs',
+    icon: <AppIcon name="armor" className="h-4 w-4" />,
+  },
+  {
+    id: 'summons',
+    label: 'Summons',
+    icon: <AppIcon name="summon" className="h-4 w-4" />,
+  },
 ] as const;
 
 type CombatSubTab = (typeof COMBAT_SUB_TABS)[number]['id'];
@@ -818,8 +994,8 @@ function CombatTabContent({
                   params.updateCharacter({ armorClass: ac })
                 }
                 onUpdateTempArmorClass={params.updateTempArmorClass}
-                onToggleTempAC={params.toggleTempAC}
-                onToggleShield={params.toggleShield}
+                onSetTempACActive={params.setTempACActive}
+                onSetShieldEquipped={params.setShieldEquipped}
                 onUpdateShieldBonus={params.updateShieldBonus}
               />
               <CombatStats
@@ -888,27 +1064,52 @@ function CombatTabContent({
             <WeaponProficiencies />
           </ErrorBoundary>
 
+          <div id="conditions-section">
+            <ErrorBoundary
+              fallback={
+                <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <p className="text-muted">
+                    Unable to load conditions and diseases manager
+                  </p>
+                </div>
+              }
+            >
+              {hasHydrated ? (
+                <ConditionsDiseasesManager />
+              ) : (
+                <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
+                  <div className="py-4 text-center">
+                    <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
+                    <p className="text-body mt-2">
+                      Loading conditions and diseases...
+                    </p>
+                  </div>
+                </div>
+              )}
+            </ErrorBoundary>
+          </div>
+        </div>
+      )}
+
+      {activeSubTab === 'defenses' && (
+        <div className="space-y-6">
           <ErrorBoundary
             fallback={
-              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">
-                  Unable to load conditions and diseases manager
-                </p>
+              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-4 shadow">
+                <p className="text-muted">Unable to load temporary buffs</p>
               </div>
             }
           >
-            {hasHydrated ? (
-              <ConditionsDiseasesManager />
-            ) : (
-              <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="py-4 text-center">
-                  <div className="border-accent-blue-text-muted mx-auto h-8 w-8 animate-spin rounded-full border-b-2" />
-                  <p className="text-body mt-2">
-                    Loading conditions and diseases...
-                  </p>
-                </div>
+            <TemporaryBuffsManager />
+          </ErrorBoundary>
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <p className="text-muted">Unable to load defenses and senses</p>
               </div>
-            )}
+            }
+          >
+            <DefensesAndSenses />
           </ErrorBoundary>
         </div>
       )}
@@ -928,10 +1129,69 @@ function CombatTabContent({
   );
 }
 
+function DmCustomCounterDisplay({
+  label,
+  value,
+}: {
+  label: string;
+  value: number;
+}) {
+  return (
+    <div className="from-accent-purple-bg to-accent-purple-bg-strong border-accent-purple-border-strong rounded-lg border-2 bg-linear-to-br p-4">
+      {/* Header */}
+      <div className="mb-3 flex items-center gap-2">
+        <Angry className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+        <h3 className="text-accent-purple-text text-lg font-bold">{label}</h3>
+      </div>
+
+      {/* Count */}
+      <div className="mb-4 text-center">
+        <div className="text-accent-purple-text text-3xl font-bold">
+          {value}
+        </div>
+        <div className="text-accent-purple-text-muted text-sm">
+          {value === 1 ? '1 point' : `${value} points`}
+        </div>
+      </div>
+
+      {/* Visual boxes — one per point, no empty placeholders */}
+      <div className="mb-4 flex flex-wrap justify-center gap-2">
+        {Array.from({ length: value }, (_, i) => (
+          <div
+            key={i}
+            className="border-accent-purple-border-strong bg-accent-purple-bg-strong text-accent-purple-text flex h-10 w-10 scale-110 transform items-center justify-center rounded-lg border-2 shadow-lg"
+          >
+            <Angry size={16} />
+          </div>
+        ))}
+      </div>
+
+      {/* Helper text */}
+      <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted rounded p-2 text-center text-xs">
+        <p>
+          <strong>{label}</strong> are assigned by your DM.
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const FEATURES_SUB_TABS = [
-  { id: 'abilities', label: 'Abilities', icon: '⚡' },
-  { id: 'inspiration', label: 'Inspiration', icon: '✨' },
-  { id: 'proficiencies', label: 'Proficiencies', icon: '🔧' },
+  {
+    id: 'abilities',
+    label: 'Abilities',
+    icon: <AppIcon name="abilities" className="h-4 w-4" />,
+  },
+  {
+    id: 'inspiration',
+    label: 'Inspiration',
+    icon: <AppIcon name="inspiration" className="h-4 w-4" />,
+  },
+  {
+    id: 'proficiencies',
+    label: 'Proficiencies',
+    icon: <AppIcon name="proficiencies" className="h-4 w-4" />,
+  },
 ] as const;
 
 type FeaturesSubTab = (typeof FEATURES_SUB_TABS)[number]['id'];
@@ -940,16 +1200,14 @@ function FeaturesTabContent({
   character,
   totalLevel,
   proficiencyBonus,
-  hasHydrated,
-  isBard,
   params,
+  customCounter,
 }: {
   character: CharacterState;
   totalLevel: number;
   proficiencyBonus: number;
-  hasHydrated: boolean;
-  isBard: boolean;
   params: TabbedSheetConfigParams;
+  customCounter?: { label: string; value: number } | null;
 }) {
   const [activeSubTab, setActiveSubTab] = useState<FeaturesSubTab>('abilities');
 
@@ -999,6 +1257,8 @@ function FeaturesTabContent({
             onResetFeatures={params.resetExtendedFeatures}
             onReorderFeatures={params.reorderExtendedFeatures}
             onAddSpells={params.addSpellsFromFeat}
+            favoriteFeatureIds={character.favoriteFeatureIds || []}
+            onToggleFavoriteFeature={params.toggleFavoriteFeature}
           />
         </div>
       )}
@@ -1011,16 +1271,17 @@ function FeaturesTabContent({
             onUpdateInspiration={params.updateHeroicInspiration}
             onUseInspiration={params.useHeroicInspiration}
             onResetInspiration={params.resetHeroicInspiration}
+            stackable={params.stackableInspiration ?? false}
+            showStackableControl={
+              !params.inCampaign && Boolean(params.setStackableInspiration)
+            }
+            dmControlled={Boolean(params.inCampaign)}
+            onToggleStackable={params.setStackableInspiration}
           />
-          {hasHydrated && isBard && (
-            <BardicInspirationTracker
-              bardicInspiration={
-                character.bardicInspiration ?? { usesExpended: 0 }
-              }
-              character={character}
-              onUseInspiration={params.useBardicInspiration}
-              onRestoreInspiration={params.restoreBardicInspiration}
-              onResetInspiration={params.resetBardicInspiration}
+          {customCounter && customCounter.value > 0 && (
+            <DmCustomCounterDisplay
+              label={customCounter.label}
+              value={customCounter.value}
             />
           )}
         </div>

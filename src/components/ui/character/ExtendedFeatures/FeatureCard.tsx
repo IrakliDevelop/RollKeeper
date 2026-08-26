@@ -11,6 +11,7 @@ import {
   Clock,
   AlertCircle,
   CheckCircle2,
+  Star,
 } from 'lucide-react';
 import UnifiedFeatureModal from '@/components/ui/character/ExtendedFeatures/UnifiedFeatureModal';
 import { Button } from '@/components/ui/forms';
@@ -21,6 +22,8 @@ interface FeatureCardProps {
   onUpdate: (updates: Partial<ExtendedFeature>) => void;
   onDelete: () => void;
   onUse: () => void;
+  isFavorite?: boolean;
+  onToggleFavorite?: () => void;
   readonly?: boolean;
   isDragging?: boolean;
 }
@@ -31,6 +34,8 @@ export default function FeatureCard({
   onUpdate,
   onDelete,
   onUse,
+  isFavorite = false,
+  onToggleFavorite,
   readonly = false,
   isDragging = false,
 }: FeatureCardProps) {
@@ -94,6 +99,29 @@ export default function FeatureCard({
                 title="Use feature"
               >
                 <Zap className="h-5 w-5" />
+              </Button>
+            )}
+
+            {/* Favorite Button */}
+            {onToggleFavorite && (
+              <Button
+                onClick={onToggleFavorite}
+                variant="ghost"
+                size="xs"
+                className={
+                  isFavorite
+                    ? 'text-accent-amber-text hover:bg-accent-amber-bg-strong'
+                    : 'text-muted hover:bg-surface-hover'
+                }
+                title={
+                  isFavorite
+                    ? 'Remove from quick actions'
+                    : 'Add to quick actions'
+                }
+              >
+                <Star
+                  className={`h-5 w-5 ${isFavorite ? 'fill-current' : ''}`}
+                />
               </Button>
             )}
 

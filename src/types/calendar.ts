@@ -58,6 +58,7 @@ export interface CalendarConfig {
   eras: Era[];
   yearOffset: number; // added to raw year for display
   yearStartWeekdayOffset: number; // which weekday index year 0 day 0 falls on
+  weekStartsOn?: number; // weekday index shown in the first column (defaults to 0)
   mechanics: MechanicsConfig;
 }
 
@@ -69,7 +70,55 @@ export interface CalendarEvent {
   month: number; // 0-based month index
   day: number; // 0-based day of month
   createdAt: number; // timestamp for ordering
+  color?: string; // hex '#rrggbb' dot marker color
+  emoji?: string; // emoji marker; takes precedence over color
+  visibility?: CalendarEventVisibility; // legacy absence is private
+  references?: CalendarEventReference[];
 }
+
+export type CalendarEventVisibility = 'private' | 'public' | 'discovered';
+
+export interface CalendarEventReference {
+  family: 'location' | 'encounter_definition';
+  legacyId: string;
+}
+
+// Shared save payload for event create/update dialogs
+export type CalendarEventInput = Omit<CalendarEvent, 'id' | 'createdAt'>;
+
+export type WeatherType =
+  | 'clear'
+  | 'cloudy'
+  | 'overcast'
+  | 'fog'
+  | 'rain'
+  | 'heavy-rain'
+  | 'thunderstorm'
+  | 'snow'
+  | 'blizzard'
+  | 'hail'
+  | 'wind'
+  | 'hot'
+  | 'cold';
+
+export const WEATHER_OPTIONS: {
+  type: WeatherType;
+  label: string;
+}[] = [
+  { type: 'clear', label: 'Clear' },
+  { type: 'cloudy', label: 'Cloudy' },
+  { type: 'overcast', label: 'Overcast' },
+  { type: 'fog', label: 'Fog' },
+  { type: 'rain', label: 'Rain' },
+  { type: 'heavy-rain', label: 'Heavy Rain' },
+  { type: 'thunderstorm', label: 'Thunderstorm' },
+  { type: 'snow', label: 'Snow' },
+  { type: 'blizzard', label: 'Blizzard' },
+  { type: 'hail', label: 'Hail' },
+  { type: 'wind', label: 'Windy' },
+  { type: 'hot', label: 'Hot' },
+  { type: 'cold', label: 'Cold' },
+];
 
 export interface CampaignCalendar {
   campaignCode: string;
@@ -77,6 +126,7 @@ export interface CampaignCalendar {
   currentTime: number; // milliseconds since epoch
   startTime: number; // milliseconds since epoch — campaign start reference
   events: CalendarEvent[];
+  weather?: WeatherType;
 }
 
 // Derived from currentTime + config — never stored

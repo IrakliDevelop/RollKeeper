@@ -139,17 +139,150 @@ export const calculateTotalArmorClass = (
 };
 
 /**
- * Calculate total armor class from character state
+ * Effective armor class for NPCs / encounter entities: base AC plus an
+ * additive temporary AC bonus (mirrors the player temp-AC model).
+ */
+export const effectiveAc = (baseAC: number, tempAc?: number): number =>
+  baseAC + (tempAc ?? 0);
+
+/**
+ * Parse a numeric armor class out of a free-text NPC AC field, e.g.
+ * "16 (natural armor)" → 16, "21 (shield spell)" → 21. Accepts a plain
+ * number (legacy data) as-is; falls back to 10 when no number is present.
+ */
+export const parseArmorClass = (value: string | number): number => {
+  if (typeof value === 'number') return value;
+  const match = String(value ?? '').match(/-?\d+/);
+  return match ? parseInt(match[0], 10) : 10;
+};
+
+/**
+ * Parse a numeric AC bonus out of a free-text temp-AC field, e.g.
+ * "2 (shield spell)" → 2. Accepts a plain number (legacy data); returns 0
+ * for empty/undefined or when no number is present.
+ */
+export const parseAcBonus = (value?: string | number): number => {
+  if (value == null || value === '') return 0;
+  if (typeof value === 'number') return value;
+  const match = String(value).match(/-?\d+/);
+  return match ? parseInt(match[0], 10) : 0;
+};
+
+/**
+ * Calculate total armor class from character state, including temporary buff effects.
+ * Buff modes:
+ *   - 'add'   → additive bonus on top of base AC
+ *   - 'set'   → replaces base AC entirely (highest override wins), additive buffs still stack
+ *   - 'floor' → AC cannot be lower than this value (Barkskin-style minimum)
  */
 export const calculateCharacterArmorClass = (
   character: CharacterState
 ): number => {
-  return calculateTotalArmorClass(
+  const baseAC = calculateTotalArmorClass(
     character.armorClass,
     character.isTempACActive ? character.tempArmorClass : 0,
     character.isWearingShield,
     character.shieldBonus
   );
+
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+
+  let additiveTotal = 0;
+  let acOverride: number | null = null;
+  let acFloor = -Infinity;
+
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat !== 'ac') continue;
+      switch (effect.mode) {
+        case 'add':
+          additiveTotal += effect.value;
+          break;
+        case 'set':
+          if (acOverride === null || effect.value > acOverride) {
+            acOverride = effect.value;
+          }
+          break;
+        case 'floor':
+          if (effect.value > acFloor) {
+            acFloor = effect.value;
+          }
+          break;
+      }
+    }
+  }
+
+  let totalAC: number;
+  if (acOverride !== null) {
+    // Override replaces base AC; additive buffs and shield still stack
+    totalAC =
+      acOverride +
+      additiveTotal +
+      (character.isWearingShield ? character.shieldBonus : 0);
+  } else {
+    totalAC = baseAC + additiveTotal;
+  }
+
+  if (acFloor > -Infinity) {
+    totalAC = Math.max(totalAC, acFloor);
+  }
+
+  return totalAC;
+};
+
+/**
+ * Get the total max-HP bonus from active temporary buffs (e.g. Aid spell).
+ */
+export const getBuffMaxHPBonus = (character: CharacterState): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat === 'maxHp' && effect.mode === 'add') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+};
+
+/**
+ * Get the total speed bonus from active temporary buffs.
+ */
+export const getBuffSpeedBonus = (character: CharacterState): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (effect.targetStat === 'speed' && effect.mode === 'add') {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
+};
+
+/**
+ * Get the saving throw bonus from active temporary buffs for a specific ability.
+ */
+export const getBuffSavingThrowBonus = (
+  character: CharacterState,
+  ability: AbilityName
+): number => {
+  const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
+  let bonus = 0;
+  for (const buff of activeBuffs) {
+    for (const effect of buff.effects) {
+      if (
+        effect.targetStat === 'savingThrow' &&
+        effect.mode === 'add' &&
+        (!effect.targetAbility || effect.targetAbility === ability)
+      ) {
+        bonus += effect.value;
+      }
+    }
+  }
+  return bonus;
 };
 
 /**
@@ -161,6 +294,24 @@ export const calculatePassivePerception = (
 ): number => {
   const perceptionModifier = calculateSkillModifier(character, 'perception');
   return 10 + perceptionModifier;
+};
+
+/**
+ * Calculate passive insight
+ * Passive insight = 10 + Insight skill modifier
+ */
+export const calculatePassiveInsight = (character: CharacterState): number => {
+  return 10 + calculateSkillModifier(character, 'insight');
+};
+
+/**
+ * Calculate passive investigation
+ * Passive investigation = 10 + Investigation skill modifier
+ */
+export const calculatePassiveInvestigation = (
+  character: CharacterState
+): number => {
+  return 10 + calculateSkillModifier(character, 'investigation');
 };
 
 /**
@@ -290,6 +441,11 @@ export const getWeaponAbilityModifier = (
   character: CharacterState,
   weapon: Weapon
 ): number => {
+  // Ability override (e.g., CHA for Pact of the Blade, INT for Bladesinging)
+  if (weapon.abilityOverride) {
+    return calculateModifier(character.abilities[weapon.abilityOverride]);
+  }
+
   // Finesse weapons can use DEX or STR (we'll use the higher one)
   if (weapon.weaponType.includes('finesse')) {
     return Math.max(

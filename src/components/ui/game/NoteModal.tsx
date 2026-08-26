@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 import { Button, RichTextEditor } from '@/components/ui/forms';
 import { ToastData } from '@/components/ui/feedback/Toast';
 

@@ -5,7 +5,7 @@ import { Currency } from '@/types/character';
 import { Coins, Plus, Minus, Info } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 
 const CURRENCY_TYPES: {
   [key in keyof Currency]: {
@@ -138,9 +138,11 @@ export function CurrencyManager({
     return breakdown.join(', ');
   };
 
-  const handleCurrencyChange = (type: keyof Currency, value: string) => {
-    const amount = parseInt(value) || 0;
-    setCurrencyAmounts(prev => ({ ...prev, [type]: amount }));
+  const handleCurrencyChange = (
+    type: keyof Currency,
+    value: number | undefined
+  ) => {
+    setCurrencyAmounts(prev => ({ ...prev, [type]: value ?? 0 }));
   };
 
   const addCurrencyAmount = (type: keyof Currency) => {
@@ -270,14 +272,13 @@ export function CurrencyManager({
                       >
                         {config.name}
                       </label>
-                      <Input
-                        type="number"
-                        value={currencyAmounts[type as keyof Currency] || ''}
-                        onChange={e =>
-                          handleCurrencyChange(
-                            type as keyof Currency,
-                            e.target.value
-                          )
+                      <NumberInput
+                        allowEmpty
+                        value={
+                          currencyAmounts[type as keyof Currency] || undefined
+                        }
+                        onChange={v =>
+                          handleCurrencyChange(type as keyof Currency, v)
                         }
                         placeholder="0"
                         min={0}

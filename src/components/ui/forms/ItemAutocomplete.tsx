@@ -1,18 +1,57 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ProcessedItem } from '@/types/items';
+import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 import { Search, X, Loader2, Package } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import {
+  AppIcon,
+  ITEM_CATEGORY_ICONS,
+  getIconName,
+} from '@/components/ui/icons';
 
 interface ItemAutocompleteProps {
   items: ProcessedItem[];
+  magicItems?: ProcessedMagicItem[];
   onSelect: (item: ProcessedItem) => void;
   loading?: boolean;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
+}
+
+const MAGIC_CATEGORY_MAP: Record<string, string> = {
+  wondrous: 'magic',
+  ring: 'magic',
+  staff: 'magic',
+  wand: 'magic',
+  rod: 'magic',
+  scroll: 'consumable',
+  potion: 'consumable',
+  armor: 'armor',
+  shield: 'armor',
+  weapon: 'weapon',
+};
+
+function magicItemToProcessed(mi: ProcessedMagicItem): ProcessedItem {
+  const category = MAGIC_CATEGORY_MAP[mi.category] || 'magic';
+  return {
+    id: `magic-${mi.id}`,
+    name: mi.name,
+    source: mi.source,
+    category,
+    rarity: mi.rarity,
+    weight: mi.weight,
+    value: mi.value,
+    description: mi.description,
+    tags: [
+      mi.category,
+      mi.rarity,
+      ...(mi.requiresAttunement ? ['attunement'] : []),
+    ],
+    rawType: mi.type,
+  };
 }
 
 const CATEGORY_VARIANTS: Record<
@@ -23,17 +62,13 @@ const CATEGORY_VARIANTS: Record<
   armor: 'info',
   tool: 'success',
   misc: 'secondary',
-};
-
-const CATEGORY_EMOJI: Record<string, string> = {
-  weapon: '⚔️',
-  armor: '🛡️',
-  tool: '🔧',
-  misc: '📦',
+  magic: 'warning',
+  consumable: 'success',
 };
 
 export function ItemAutocomplete({
   items,
+  magicItems,
   onSelect,
   loading = false,
   disabled = false,
@@ -48,11 +83,17 @@ export function ItemAutocomplete({
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
+  const allItems = useMemo(() => {
+    if (!magicItems?.length) return items;
+    const converted = magicItems.map(magicItemToProcessed);
+    return [...items, ...converted];
+  }, [items, magicItems]);
+
   const filteredItems = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase().trim();
 
-    return items
+    return allItems
       .filter(item => {
         const name = item.name.toLowerCase();
         return (
@@ -76,7 +117,7 @@ export function ItemAutocomplete({
         return aName.localeCompare(bName);
       })
       .slice(0, 50);
-  }, [items, query]);
+  }, [allItems, query]);
 
   useEffect(() => {
     setSelectedIndex(0);
@@ -165,9 +206,14 @@ export function ItemAutocomplete({
       {selectedItem && (
         <div className="border-accent-purple-border-strong bg-accent-purple-bg mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2">
           <div className="flex items-center gap-2">
-            <span className="text-lg">
-              {CATEGORY_EMOJI[selectedItem.category] || '📦'}
-            </span>
+            <AppIcon
+              name={getIconName(
+                ITEM_CATEGORY_ICONS,
+                selectedItem.category,
+                'item'
+              )}
+              className="h-5 w-5 shrink-0"
+            />
             <div>
               <p className="text-heading font-medium">{selectedItem.name}</p>
               <p className="text-muted text-xs">
@@ -234,9 +280,14 @@ export function ItemAutocomplete({
                       }`}
                     >
                       <div className="flex items-center gap-3">
-                        <span className="text-lg">
-                          {CATEGORY_EMOJI[item.category] || '📦'}
-                        </span>
+                        <AppIcon
+                          name={getIconName(
+                            ITEM_CATEGORY_ICONS,
+                            item.category,
+                            'item'
+                          )}
+                          className="h-5 w-5 shrink-0"
+                        />
                         <div className="min-w-0 flex-1">
                           <p className="text-heading truncate font-medium">
                             {item.name}

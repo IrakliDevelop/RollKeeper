@@ -9,6 +9,7 @@ import {
   MagicItem,
   ArmorItem,
   InventoryItem,
+  ClassResourceUsage,
 } from '@/types/character';
 
 // D&D 5e skill to ability mappings
@@ -363,6 +364,7 @@ export const BACKGROUNDS = [
 // Default character state
 export const DEFAULT_CHARACTER_STATE = {
   name: '',
+  revision: 0,
   race: '',
   class: {
     name: '',
@@ -462,14 +464,14 @@ export const DEFAULT_CHARACTER_STATE = {
     count: 0,
     maxCount: undefined,
   },
+  stackableInspiration: false,
 
-  bardicInspiration: {
-    usesExpended: 0,
-  },
+  classResources: {} as Record<string, ClassResourceUsage>,
 
   trackableTraits: [] as TrackableTrait[],
 
   extendedFeatures: [] as ExtendedFeature[],
+  favoriteFeatureIds: [] as string[],
 
   features: [] as RichTextContent[],
   traits: [] as RichTextContent[],
@@ -542,6 +544,17 @@ export const DEFAULT_CHARACTER_STATE = {
     exhaustionVariant: '2024' as const, // Default to 2024 rules
   },
 
+  // Defenses
+  damageImmunities: [] as string[],
+  damageResistances: [] as string[],
+  conditionImmunities: [] as string[],
+
+  // Senses
+  senses: [] as import('@/types/character').CharacterSense[],
+
+  // Temporary Buffs
+  temporaryBuffs: [] as import('@/types/character').TemporaryBuff[],
+
   // Class Features
   jackOfAllTrades: false, // Bard feature: add half proficiency to non-proficient skills
   languages: [], // Known languages
@@ -582,6 +595,8 @@ export const SPELL_SOURCE_COLORS: Record<string, string> = {
   GHLoE: 'bg-cyan-600',
   VG: 'bg-teal-600',
   'AitFR-AVT': 'bg-green-600',
+  FRHoF: 'bg-amber-600',
+  RHW: 'bg-rose-700',
 };
 
 export const SPELL_SOURCE_BOOKS: Record<string, string> = {
@@ -616,13 +631,29 @@ export const SPELL_SOURCE_BOOKS: Record<string, string> = {
   DMG: "Dungeon Master's Guide",
   DMG2024: "Dungeon Master's Guide 2024",
   XDMG: "Dungeon Master's Guide 2024",
+  FRHoF: 'Forgotten Realms: Heroes of Faerûn',
+  RHW: 'Ravenloft: Horrors Within',
 };
 
 // Auto-save settings
 export const AUTOSAVE_DELAY = 500; // ms
 export const STORAGE_KEY = 'rollkeeper-character';
+/** Per-character canonical envelope key prefix (single-writer sync).
+ * Full key = prefix + characterId. STORAGE_KEY is the legacy single-slot
+ * key, retained as read-only migration input. */
+export const CHARACTER_ENVELOPE_KEY_PREFIX = 'rollkeeper-character:';
+export const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
+export const ENCOUNTER_STORAGE_KEY = 'rollkeeper-encounter-data';
+export const COMBAT_LOG_STORAGE_KEY = 'rollkeeper-combat-log';
 export const APP_VERSION = '1.0.0';
 
 // Avatar upload settings
 export const MAX_AVATAR_SIZE_MB = 5; // Maximum avatar file size in megabytes
 export const MAX_AVATAR_SIZE_BYTES = MAX_AVATAR_SIZE_MB * 1024 * 1024;
+export const MAX_BANNER_SIZE_MB = 10; // Maximum banner file size in megabytes
+export const MAX_BANNER_SIZE_BYTES = MAX_BANNER_SIZE_MB * 1024 * 1024;
+
+/** Maps, notes canvas, and other shared assets uploaded via /api/assets/upload */
+export const MAX_ASSET_UPLOAD_SIZE_MB = 50;
+export const MAX_ASSET_UPLOAD_SIZE_BYTES =
+  MAX_ASSET_UPLOAD_SIZE_MB * 1024 * 1024;

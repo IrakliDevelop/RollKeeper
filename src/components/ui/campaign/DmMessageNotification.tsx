@@ -126,7 +126,7 @@ export function DmMessageNotification({
                 onClick={() => handleAccept(msg)}
                 className="border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
               >
-                Save to Notes
+                View in Notes
               </Button>
             </div>
           </div>

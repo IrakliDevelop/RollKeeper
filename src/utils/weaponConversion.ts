@@ -57,6 +57,8 @@ export interface WeaponAutoFillData {
   chargePool?: ChargePoolFormData;
   bonusSpellAttack?: number;
   bonusSpellSaveDc?: number;
+  weight?: number;
+  value?: number;
 }
 
 function mapDamageType(raw: string | undefined): DamageType {
@@ -191,5 +193,7 @@ export function convertProcessedWeaponToFormData(
     chargePool: chargePoolData,
     bonusSpellAttack: item.bonusSpellAttack,
     bonusSpellSaveDc: item.bonusSpellSaveDc,
+    weight: item.weight,
+    value: item.value,
   };
 }

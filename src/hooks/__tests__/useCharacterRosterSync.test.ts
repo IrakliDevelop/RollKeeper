@@ -1,0 +1,318 @@
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { renderHook, act } from '@testing-library/react';
+
+import { useCharacterRosterSync } from '../useCharacterRosterSync';
+import { characterEnvelopeKey } from '@/lib/characterCanonicalStorage';
+import { useCharacterStore } from '@/store/characterStore';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
+import type { CharacterState } from '@/types/character';
+
+type Props = Parameters<typeof useCharacterRosterSync>[0];
+
+function makeProps(overrides: Partial<Props> = {}): Props {
+  const rosterData = makeCharacter({ id: 'char-1' });
+  return {
+    playerCharacter: { characterData: rosterData },
+    hasHydrated: true,
+    characterId: 'char-1',
+    character: makeCharacter({ id: 'unloaded' }),
+    loadCharacterState: vi.fn(),
+    updateCharacterData: vi.fn(),
+    ...overrides,
+  };
+}
+
+describe('useCharacterRosterSync', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    useCharacterStore.setState({ intentWatermarks: {} });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    window.localStorage.clear();
+    useCharacterStore.setState({ intentWatermarks: {} });
+  });
+
+  it('loads the roster character into the store exactly once per characterId', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const loadCharacterState = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      loadCharacterState,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+    expect(loadCharacterState).toHaveBeenCalledWith(rosterData);
+
+    // Re-render with the same characterId — must not reload.
+    rerender({ ...props, character: rosterData });
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not write back to the roster during the initial-load guard window', () => {
+    const rosterData = makeCharacter({
+      id: 'char-1',
+      hitPoints: { ...makeCharacter().hitPoints, current: 44 },
+    });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: rosterData,
+      updateCharacterData,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    // Character changes immediately after load, before the 50ms guard clears.
+    const damaged: CharacterState = {
+      ...rosterData,
+      hitPoints: { ...rosterData.hitPoints, current: 30 },
+    };
+    rerender({ ...props, character: damaged });
+
+    expect(updateCharacterData).not.toHaveBeenCalled();
+  });
+
+  it('writes live character changes back to the roster once past the guard window', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: rosterData,
+      updateCharacterData,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60);
+    });
+
+    const damaged: CharacterState = {
+      ...rosterData,
+      hitPoints: { ...rosterData.hitPoints, current: 30 },
+    };
+    rerender({ ...props, character: damaged });
+
+    expect(updateCharacterData).toHaveBeenCalledTimes(1);
+    expect(updateCharacterData).toHaveBeenCalledWith(
+      'char-1',
+      expect.objectContaining({
+        hitPoints: expect.objectContaining({ current: 30 }),
+      })
+    );
+  });
+
+  it('does not cancel the hydration guard timer when callback identities change', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: rosterData,
+      updateCharacterData,
+    });
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    rerender({ ...props, loadCharacterState: vi.fn() });
+    act(() => vi.advanceTimersByTime(60));
+    rerender({
+      ...props,
+      loadCharacterState: vi.fn(),
+      character: {
+        ...rosterData,
+        hitPoints: { ...rosterData.hitPoints, current: 30 },
+      },
+    });
+
+    expect(updateCharacterData).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips redundant writes when the character has not actually changed', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: rosterData,
+      updateCharacterData,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60);
+    });
+
+    // Same character reference/content re-rendered — no real change.
+    rerender({ ...props, character: { ...rosterData } });
+
+    expect(updateCharacterData).not.toHaveBeenCalled();
+  });
+
+  it('fires onLoad synchronously with the freshly loaded character data', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const onLoad = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      onLoad,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(onLoad).toHaveBeenCalledTimes(1);
+    expect(onLoad).toHaveBeenCalledWith(rosterData);
+  });
+
+  it('does not load a stale roster blob over fresher store state', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const loadCharacterState = vi.fn();
+    const onLoad = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      loadCharacterState,
+      onLoad,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).not.toHaveBeenCalled();
+    expect(onLoad).not.toHaveBeenCalled();
+  });
+
+  it('still loads a newer roster blob', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 12 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const loadCharacterState = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      loadCharacterState,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+    expect(loadCharacterState).toHaveBeenCalledWith(rosterData);
+  });
+
+  it('loads the canonical envelope over a stale roster entry for the same character', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 7 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: { character: envelopeCharacter, intentWatermarks: {} },
+        version: 0,
+      })
+    );
+    const loadCharacterState = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      loadCharacterState,
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(loadCharacterState).toHaveBeenCalledTimes(1);
+    expect(loadCharacterState).toHaveBeenCalledWith(envelopeCharacter);
+  });
+
+  it('adopts envelope watermarks even when the roster entry wins arbitration (I2)', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    // Strictly fresher than the envelope — the roster entry wins arbitration.
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: { 'tab-x': { seq: 5, lastSeen: 1 } },
+        },
+        version: 0,
+      })
+    );
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().intentWatermarks).toEqual({
+      'tab-x': { seq: 5, lastSeen: 1 },
+    });
+  });
+
+  it('merges envelope watermarks against current in-memory state instead of clobbering', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: { 'tab-x': { seq: 2, lastSeen: 1 } },
+        },
+        version: 0,
+      })
+    );
+    // In-memory already knows about a higher seq for tab-x, and an unrelated
+    // tab-y the envelope has never heard of.
+    useCharacterStore.setState({
+      intentWatermarks: {
+        'tab-x': { seq: 9, lastSeen: 500 },
+        'tab-y': { seq: 1, lastSeen: 2 },
+      },
+    });
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().intentWatermarks).toEqual({
+      'tab-x': { seq: 9, lastSeen: 500 },
+      'tab-y': { seq: 1, lastSeen: 2 },
+    });
+  });
+
+  it('still writes fresher store state back to the roster when a stale load is skipped', () => {
+    const rosterData = makeCharacter({ id: 'char-1', revision: 5 });
+    const liveCharacter = makeCharacter({ id: 'char-1', revision: 10 });
+    const updateCharacterData = vi.fn();
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+      character: liveCharacter,
+      updateCharacterData,
+    });
+
+    const { rerender } = renderHook(p => useCharacterRosterSync(p), {
+      initialProps: props,
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(60);
+    });
+
+    const updatedLive = { ...liveCharacter, revision: 11 };
+    rerender({ ...props, character: updatedLive });
+
+    expect(updateCharacterData).toHaveBeenCalledWith(
+      'char-1',
+      expect.objectContaining({ revision: 11 })
+    );
+  });
+});

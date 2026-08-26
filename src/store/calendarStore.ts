@@ -1,17 +1,19 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
+import { createSafeStorage } from '@/lib/safeStorage';
+import { createCalendarAwareStorage } from '@/lib/durableDm/calendarAwareStorage';
 import type {
   CalendarConfig,
   CalendarEvent,
   CampaignCalendar,
+  WeatherType,
 } from '@/types/calendar';
 
 const CALENDAR_STORAGE_KEY = 'rollkeeper-calendar-data';
 
 function generateEventId(): string {
-  return (
-    'evt-' + Date.now().toString(36) + Math.random().toString(36).substr(2, 9)
-  );
+  return `evt-${crypto.randomUUID()}`;
 }
 
 interface CalendarStoreState {
@@ -33,6 +35,7 @@ interface CalendarStoreState {
     updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
   ) => void;
   deleteEvent: (campaignCode: string, eventId: string) => void;
+  setWeather: (campaignCode: string, weather: WeatherType) => void;
   getEventsForDay: (
     campaignCode: string,
     year: number,
@@ -155,6 +158,14 @@ export const useCalendarStore = create<CalendarStoreState>()(
         }));
       },
 
+      setWeather: (campaignCode, weather) => {
+        set(state => ({
+          calendars: state.calendars.map(c =>
+            c.campaignCode === campaignCode ? { ...c, weather } : c
+          ),
+        }));
+      },
+
       getEventsForDay: (campaignCode, year, month, day) => {
         const calendar = get().calendars.find(
           c => c.campaignCode === campaignCode
@@ -167,7 +178,12 @@ export const useCalendarStore = create<CalendarStoreState>()(
     }),
     {
       name: CALENDAR_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      skipHydration: isIndexedDbMigrationEnabled(),
+      storage: createJSONStorage(() =>
+        typeof localStorage === 'undefined'
+          ? createSafeStorage()
+          : createCalendarAwareStorage(localStorage)
+      ),
       version: 3,
       migrate: (persisted: unknown, version: number) => {
         const state = persisted as CalendarStoreState;

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { TimeDisplay } from './TimeDisplay';
 import { TimeControls } from './TimeControls';
+import { WeatherPicker } from './WeatherPicker';
 import { CalendarNav } from './CalendarNav';
 import { CalendarGrid } from './CalendarGrid';
 import { MoonLegend } from './MoonLegend';
@@ -18,7 +19,7 @@ import { useCalendar } from '@/hooks/useCalendar';
 import { useCalendarStore } from '@/store/calendarStore';
 import { dateToTime, getCampaignDays } from '@/utils/calendarCalculations';
 import type { SelectedDay } from './CalendarGrid';
-import type { CalendarEvent } from '@/types/calendar';
+import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type CalendarTab = 'calendar' | 'events';
 
@@ -38,6 +39,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
   );
   const advanceTime = useCalendarStore(state => state.advanceTime);
   const setCalendarTime = useCalendarStore(state => state.setTime);
+  const setWeather = useCalendarStore(state => state.setWeather);
   const setStartDate = useCalendarStore(state => state.setStartDate);
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
@@ -125,13 +127,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
     setEventDialogOpen(true);
   };
 
-  const handleSaveEvent = (data: {
-    title: string;
-    description: string;
-    year: number;
-    month: number;
-    day: number;
-  }) => {
+  const handleSaveEvent = (data: CalendarEventInput) => {
     if (editingEvent) {
       updateEvent(campaignCode, editingEvent.id, data);
     } else {
@@ -166,12 +162,13 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
       {/* Time display + controls */}
       <Card>
         <CardContent className="space-y-4 p-6">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <TimeDisplay
               date={date}
               config={config}
               moonPhases={moonPhases}
               dayPeriod={dayPeriod}
+              weather={calendar.weather}
               onTimeEdit={(hour, minute) => {
                 const newTime = dateToTime(
                   { ...date, hour, minute, second: 0 },
@@ -180,8 +177,8 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
                 setCalendarTime(campaignCode, newTime);
               }}
             />
-            <div className="flex flex-col items-end gap-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col items-start gap-2 sm:items-end">
+              <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                 <Button
                   variant="ghost"
                   size="sm"
@@ -220,6 +217,12 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
               currentTime={calendar.currentTime}
               config={config}
               onAdvance={handleAdvance}
+            />
+          </div>
+          <div className="border-divider border-t pt-4">
+            <WeatherPicker
+              current={calendar.weather}
+              onChange={weather => setWeather(campaignCode, weather)}
             />
           </div>
         </CardContent>

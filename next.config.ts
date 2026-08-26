@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'rollkeeper-images.s3.eu-central-1.amazonaws.com',
         port: '',
-        pathname: '/avatars/**',
+        pathname: '/**',
       },
     ],
   },

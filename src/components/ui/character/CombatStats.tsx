@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { RotateCcw, Plus, X, Bird, Mountain, Waves } from 'lucide-react';
-import { formatModifier } from '@/utils/calculations';
-import { Button, Input, Switch } from '@/components/ui/forms';
+import { RotateCcw, Plus, X, Bird, Mountain, Waves, Zap } from 'lucide-react';
+import { formatModifier, getBuffSpeedBonus } from '@/utils/calculations';
+import { Button, Switch } from '@/components/ui/forms';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { CharacterState } from '@/types/character';
+import { AppIcon } from '@/components/ui/icons';
 
 interface CombatStatsProps {
   character: CharacterState;
@@ -65,15 +67,12 @@ export default function CombatStats({
                 className="text-accent-amber-text-muted hover:text-accent-amber-text ml-1 h-4 w-4 p-0"
                 title={`Roll initiative (d20 + ${formatModifier(getInitiativeModifier())})`}
               >
-                🎲
+                <AppIcon name="dice" className="h-3.5 w-3.5" />
               </Button>
             </div>
-            <Input
-              type="number"
-              value={getInitiativeModifier().toString()}
-              onChange={e =>
-                onUpdateInitiative(parseInt(e.target.value) || 0, true)
-              }
+            <NumberInput
+              value={getInitiativeModifier()}
+              onChange={v => onUpdateInitiative(v ?? 0, true)}
               className={`[appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
                 character.initiative.isOverridden
                   ? 'text-accent-orange-text'
@@ -90,7 +89,10 @@ export default function CombatStats({
 
         {/* Speed */}
         <div className="text-center">
-          <div className="border-accent-green-border bg-accent-green-bg flex h-20 flex-col justify-center rounded-lg border-2 p-3">
+          <div
+            className="border-accent-green-border bg-accent-green-bg flex flex-col justify-center rounded-lg border-2 p-3"
+            style={{ minHeight: '5rem' }}
+          >
             <div className="text-accent-green-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               SPEED
               <Button
@@ -107,12 +109,20 @@ export default function CombatStats({
                 {showExtraSpeeds ? <X size={10} /> : <Plus size={10} />}
               </Button>
             </div>
-            <Input
-              type="number"
-              value={character.speed.toString()}
-              onChange={e => onUpdateSpeed(parseInt(e.target.value) || 30)}
+            <NumberInput
+              value={character.speed}
+              onChange={v => onUpdateSpeed(v ?? 30)}
+              min={0}
               className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
             />
+            {getBuffSpeedBonus(character) !== 0 && (
+              <div className="text-accent-blue-text mt-0.5 flex items-center justify-center gap-1 text-xs font-medium">
+                <Zap size={10} />
+                Effective: {character.speed + getBuffSpeedBonus(character)}ft (
+                {getBuffSpeedBonus(character) > 0 ? '+' : ''}
+                {getBuffSpeedBonus(character)})
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -125,12 +135,10 @@ export default function CombatStats({
               <Bird size={12} />
               FLY
             </div>
-            <Input
-              type="number"
-              value={(character.flySpeed || 0).toString()}
-              onChange={e =>
-                onUpdateCharacter({ flySpeed: parseInt(e.target.value) || 0 })
-              }
+            <NumberInput
+              value={character.flySpeed || 0}
+              onChange={v => onUpdateCharacter({ flySpeed: v ?? 0 })}
+              min={0}
               className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               placeholder="0"
             />
@@ -140,12 +148,10 @@ export default function CombatStats({
               <Mountain size={12} />
               CLIMB
             </div>
-            <Input
-              type="number"
-              value={(character.climbSpeed || 0).toString()}
-              onChange={e =>
-                onUpdateCharacter({ climbSpeed: parseInt(e.target.value) || 0 })
-              }
+            <NumberInput
+              value={character.climbSpeed || 0}
+              onChange={v => onUpdateCharacter({ climbSpeed: v ?? 0 })}
+              min={0}
               className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               placeholder="0"
             />
@@ -155,12 +161,10 @@ export default function CombatStats({
               <Waves size={12} />
               SWIM
             </div>
-            <Input
-              type="number"
-              value={(character.swimSpeed || 0).toString()}
-              onChange={e =>
-                onUpdateCharacter({ swimSpeed: parseInt(e.target.value) || 0 })
-              }
+            <NumberInput
+              value={character.swimSpeed || 0}
+              onChange={v => onUpdateCharacter({ swimSpeed: v ?? 0 })}
+              min={0}
               className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
               placeholder="0"
             />

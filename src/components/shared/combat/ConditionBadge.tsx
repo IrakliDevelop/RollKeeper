@@ -9,7 +9,20 @@ interface ConditionBadgeProps {
   sourceSpell?: string;
   onRemove?: () => void;
   size?: 'sm' | 'md';
+  variant?: 'condition' | 'buff';
 }
+
+const variantClasses = {
+  condition: {
+    badge: 'border-accent-red-border bg-accent-red-bg text-accent-red-text',
+    remove: 'hover:text-accent-red-text-muted',
+  },
+  buff: {
+    badge:
+      'border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text',
+    remove: 'hover:text-accent-emerald-text-muted',
+  },
+};
 
 export function ConditionBadge({
   name,
@@ -17,18 +30,20 @@ export function ConditionBadge({
   sourceSpell,
   onRemove,
   size = 'sm',
+  variant = 'condition',
 }: ConditionBadgeProps) {
   const sizeClasses =
     size === 'sm' ? 'px-1.5 py-0.5 text-[10px]' : 'px-2 py-1 text-xs';
+  const colors = variantClasses[variant];
 
   return (
     <span
-      className={`border-accent-red-border bg-accent-red-bg text-accent-red-text inline-flex items-center gap-1 rounded-full border font-medium ${sizeClasses}`}
+      className={`${colors.badge} inline-flex min-w-0 items-center gap-1 rounded-full border font-medium ${sizeClasses}`}
       title={sourceSpell ? `From: ${sourceSpell}` : undefined}
     >
-      {name}
+      <span className="min-w-0 truncate">{name}</span>
       {stackCount && stackCount > 1 && (
-        <span className="font-bold">x{stackCount}</span>
+        <span className="shrink-0 font-bold">x{stackCount}</span>
       )}
       {onRemove && (
         <button
@@ -36,7 +51,7 @@ export function ConditionBadge({
             e.stopPropagation();
             onRemove();
           }}
-          className="hover:text-accent-red-text-muted -mr-0.5 rounded-full transition-colors"
+          className={`${colors.remove} -mr-0.5 shrink-0 rounded-full transition-colors`}
           aria-label={`Remove ${name}`}
         >
           <X size={size === 'sm' ? 10 : 12} />

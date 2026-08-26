@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   monsterToEncounterEntity,
   createLairEntity,
+  proficiencyBonusForCr,
 } from '@/utils/encounterConverter';
 import { createMockProcessedMonster } from '@/test/helpers';
 
@@ -233,6 +234,35 @@ describe('monsterToEncounterEntity', () => {
       createMockProcessedMonster({ spellcastingEntries: undefined })
     );
     expect(entity.spellcasting).toBeUndefined();
+  });
+
+  // ── Proficiency bonus ──
+
+  it('populates proficiencyBonus derived from CR', () => {
+    // Mock monster CR is '17' → PB +6
+    const entity = monsterToEncounterEntity(createMockProcessedMonster());
+    expect(entity.proficiencyBonus).toBe(6);
+  });
+});
+
+describe('proficiencyBonusForCr', () => {
+  it('derives the standard 5e proficiency bonus from CR (CR 0–4 → +2)', () => {
+    expect(proficiencyBonusForCr('0')).toBe(2);
+    expect(proficiencyBonusForCr('1/8')).toBe(2);
+    expect(proficiencyBonusForCr('1/4')).toBe(2);
+    expect(proficiencyBonusForCr('1/2')).toBe(2);
+    expect(proficiencyBonusForCr('4')).toBe(2);
+    expect(proficiencyBonusForCr('5')).toBe(3);
+    expect(proficiencyBonusForCr('8')).toBe(3);
+    expect(proficiencyBonusForCr('9')).toBe(4);
+    expect(proficiencyBonusForCr('12')).toBe(4);
+    expect(proficiencyBonusForCr('13')).toBe(5);
+    expect(proficiencyBonusForCr('17')).toBe(6);
+    expect(proficiencyBonusForCr('30')).toBe(9);
+  });
+
+  it('treats missing/empty CR as CR 0 (→ +2)', () => {
+    expect(proficiencyBonusForCr('')).toBe(2);
   });
 });
 

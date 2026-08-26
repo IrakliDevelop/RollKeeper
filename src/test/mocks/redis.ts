@@ -2,10 +2,14 @@ import { vi } from 'vitest';
 
 const store = new Map<string, string>();
 const sets = new Map<string, Set<string>>();
+const lists = new Map<string, string[]>();
+const hashes = new Map<string, Map<string, string>>();
 
 export function resetRedis() {
   store.clear();
   sets.clear();
+  lists.clear();
+  hashes.clear();
 }
 
 export function seedRedis(key: string, value: unknown) {
@@ -16,6 +20,10 @@ export function seedRedisSet(key: string, members: string[]) {
   sets.set(key, new Set(members));
 }
 
+export function seedRedisList(key: string, values: string[]) {
+  lists.set(key, [...values]);
+}
+
 export function getRedisStore() {
   return store;
 }
@@ -24,22 +32,43 @@ export function getRedisSet(key: string): Set<string> {
   return sets.get(key) ?? new Set();
 }
 
-const mockPipeline = () => {
+export function getRedisLists() {
+  return lists;
+}
+
+interface MockPipeline {
+  get(key: string): MockPipeline;
+  set(key: string, value: string): MockPipeline;
+  exec(): Promise<unknown[]>;
+}
+
+const makePipeline = (): MockPipeline => {
   const commands: Array<() => unknown> = [];
-  return {
+  const pipeline: MockPipeline = {
     get: (key: string) => {
       commands.push(() => store.get(key) ?? null);
-      return mockPipeline();
+      return pipeline;
+    },
+    set: (key: string, value: string) => {
+      commands.push(() => {
+        store.set(
+          key,
+          typeof value === 'string' ? value : JSON.stringify(value)
+        );
+        return 'OK';
+      });
+      return pipeline;
     },
     exec: async () => commands.map(fn => fn()),
   };
+  return pipeline;
 };
 
 export const mockRedis = {
   get: vi.fn(async (key: string) => store.get(key) ?? null),
 
   set: vi.fn(async (key: string, value: string) => {
-    store.set(key, value);
+    store.set(key, typeof value === 'string' ? value : JSON.stringify(value));
     return 'OK';
   }),
 
@@ -48,6 +77,8 @@ export const mockRedis = {
     for (const key of keys) {
       if (store.delete(key)) count++;
       if (sets.delete(key)) count++;
+      if (lists.delete(key)) count++;
+      if (hashes.delete(key)) count++;
     }
     return count;
   }),
@@ -69,17 +100,169 @@ export const mockRedis = {
 
   smembers: vi.fn(async (key: string) => [...(sets.get(key) ?? [])]),
 
+  srem: vi.fn(async (key: string, ...members: string[]) => {
+    const s = sets.get(key);
+    if (!s) return 0;
+    let removed = 0;
+    for (const m of members) {
+      if (s.delete(m)) removed++;
+    }
+    return removed;
+  }),
+
+  sismember: vi.fn(async (key: string, member: string) => {
+    return sets.get(key)?.has(member) ? 1 : 0;
+  }),
+
+  lpush: vi.fn(async (key: string, ...values: string[]) => {
+    if (!lists.has(key)) lists.set(key, []);
+    const list = lists.get(key)!;
+    list.unshift(...[...values].reverse());
+    return list.length;
+  }),
+
+  lrange: vi.fn(async (key: string, start: number, stop: number) => {
+    const list = lists.get(key) ?? [];
+    const end = stop === -1 ? list.length : stop + 1;
+    return list.slice(start, end);
+  }),
+
+  ltrim: vi.fn(async (key: string, start: number, stop: number) => {
+    const list = lists.get(key);
+    if (!list) return 'OK';
+    const end = stop === -1 ? list.length : stop + 1;
+    lists.set(key, list.slice(start, end));
+    return 'OK';
+  }),
+
+  rpush: vi.fn(async (key: string, ...values: string[]) => {
+    if (!lists.has(key)) lists.set(key, []);
+    const list = lists.get(key)!;
+    list.push(...values);
+    return list.length;
+  }),
+
+  lrem: vi.fn(async (key: string, count: number, value: string) => {
+    const list = lists.get(key);
+    if (!list) return 0;
+    const limit = count === 0 ? Infinity : Math.abs(count);
+    let removed = 0;
+    // count >= 0 removes head-to-tail — the only direction the app uses
+    for (let i = 0; i < list.length && removed < limit; ) {
+      if (list[i] === value) {
+        list.splice(i, 1);
+        removed++;
+      } else {
+        i++;
+      }
+    }
+    return removed;
+  }),
+
+  llen: vi.fn(async (key: string) => (lists.get(key) ?? []).length),
+
+  // Emulates the production Lua scripts atomically against the in-memory maps.
+  eval: vi.fn(async (script: string, keys: string[], args: string[]) => {
+    if (script.includes('campaign-player-cas-v1')) {
+      const [playerKey, playersKey, removedKey] = keys;
+      const [
+        incomingRevisionRaw,
+        incomingCharacterRaw,
+        playerDataRaw,
+        playerId,
+      ] = args;
+      if (store.has(removedKey)) return ['removed', ''];
+      const existingRaw = store.get(playerKey);
+      if (existingRaw) {
+        const existing = JSON.parse(existingRaw);
+        const storedRevision = existing.characterData?.revision ?? 0;
+        const incomingRevision = Number(incomingRevisionRaw);
+        if (incomingRevision < storedRevision) return ['stale', existingRaw];
+        if (incomingRevision === storedRevision) {
+          if (JSON.stringify(existing.characterData) === incomingCharacterRaw) {
+            return ['identical', existingRaw];
+          }
+          return ['conflict', existingRaw];
+        }
+      }
+      store.set(playerKey, playerDataRaw);
+      if (!sets.has(playersKey)) sets.set(playersKey, new Set());
+      sets.get(playersKey)!.add(playerId);
+      return ['written', playerDataRaw];
+    }
+    if (script.includes('RPUSH') && script.includes('LLEN')) {
+      const [key] = keys;
+      const [value, cap] = args;
+      const list = lists.get(key) ?? [];
+      if (list.length >= Number(cap)) return 'full';
+      lists.set(key, list);
+      list.push(value);
+      return 'ok';
+    }
+    throw new Error('mockRedis.eval: unrecognized script');
+  }),
+
+  hset: vi.fn(async (key: string, field: string, value: string) => {
+    if (!hashes.has(key)) hashes.set(key, new Map());
+    const h = hashes.get(key)!;
+    const isNew = !h.has(field);
+    h.set(field, typeof value === 'string' ? value : JSON.stringify(value));
+    return isNew ? 1 : 0;
+  }),
+
+  hget: vi.fn(async (key: string, field: string) => {
+    return hashes.get(key)?.get(field) ?? null;
+  }),
+
+  hdel: vi.fn(async (key: string, ...fields: string[]) => {
+    const h = hashes.get(key);
+    if (!h) return 0;
+    let removed = 0;
+    for (const f of fields) {
+      if (h.delete(f)) removed++;
+    }
+    return removed;
+  }),
+
+  hgetall: vi.fn(async (key: string) => {
+    const h = hashes.get(key);
+    if (!h || h.size === 0) return null;
+    return Object.fromEntries(h.entries());
+  }),
+
   expire: vi.fn(async () => 1),
 
-  pipeline: vi.fn(() => mockPipeline()),
+  pipeline: vi.fn(() => makePipeline()),
 };
 
 vi.mock('@/lib/redis', () => ({
   getRedis: () => mockRedis,
+  getRawRedis: () => mockRedis,
   campaignKey: (code: string) => `campaign:${code}`,
+  campaignXpKey: (code: string, playerId: string) =>
+    `campaign:${code}:xp:${playerId}`,
   campaignPlayersKey: (code: string) => `campaign:${code}:players`,
   campaignPlayerKey: (code: string, playerId: string) =>
     `campaign:${code}:player:${playerId}`,
+  campaignSharedKey: (code: string, feature: string) =>
+    `campaign:${code}:shared:${feature}`,
+  campaignMessagesKey: (code: string, playerId: string) =>
+    `campaign:${code}:messages:${playerId}`,
+  campaignEffectsKey: (code: string, playerId: string) =>
+    `campaign:${code}:effects:${playerId}`,
+  campaignTransfersKey: (code: string, playerId: string) =>
+    `campaign:${code}:transfers:${playerId}`,
+  campaignRemovedKey: (code: string, playerId: string) =>
+    `campaign:${code}:removed:${playerId}`,
+  campaignLocationsKey: (code: string) => `campaign:${code}:locations`,
+  campaignLocationKey: (code: string, locationId: string) =>
+    `campaign:${code}:location:${locationId}`,
+  campaignBattleMapsKey: (code: string) => `campaign:${code}:battlemaps`,
+  campaignBattleMapKey: (code: string, battleMapId: string) =>
+    `campaign:${code}:battlemap:${battleMapId}`,
+  campaignDisplayKeyKey: (code: string) => `campaign:${code}:displaykey`,
+  characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
-  SLIDING_TTL_SECONDS: 30 * 24 * 60 * 60,
+  SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,
+  CHARACTER_SHARE_TTL_SECONDS: 24 * 60 * 60,
 }));

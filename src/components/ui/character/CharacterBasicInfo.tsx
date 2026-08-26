@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react';
 import SimpleClassSelector from '@/components/ui/character/SimpleClassSelector';
 import MulticlassManager from '@/components/ui/character/MulticlassManager';
 import { Button, Input } from '@/components/ui/forms';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ALIGNMENTS, CREATURE_TYPES } from '@/utils/constants';
 import { CharacterState } from '@/types/character';
@@ -128,14 +129,13 @@ export default function CharacterBasicInfo({
           )}
 
           <div>
-            <Input
+            <NumberInput
               label="Level"
-              type="number"
               placeholder="1"
               min="1"
               max="20"
-              value={level.toString()}
-              onChange={e => onUpdateLevel(parseInt(e.target.value) || 1)}
+              value={level}
+              onChange={v => onUpdateLevel(v ?? 1)}
             />
           </div>
           <div>

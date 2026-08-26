@@ -5,7 +5,13 @@ import {
   MonsterStatBlock,
   LegendaryActionPool,
   MonsterSpellcasting,
+  TokenCellSize,
 } from '@/types/encounter';
+import {
+  ensureStatBlockEntryIds,
+  buildAbilitiesFromNormalizedBlock,
+} from '@/utils/statBlockAbilities';
+import { bestiaryTokenUrl } from '@/utils/bestiaryTokenUrl';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -15,11 +21,13 @@ function generateId(): string {
  * Parse recharge notation from action name.
  * Examples: "Fire Breath {@recharge 5}" → rechargeOn: 5
  *           "Animate Chains (Recharges after a Short or Long Rest)" → restType: 'short'
+ *           "Fire Breath (Recharge 5-6)" → rechargeOn: 5
  */
-function parseRechargeFromName(name: string): {
+export function parseRechargeFromName(name: string): {
   cleanName: string;
   usageType: MonsterAbility['usageType'];
   rechargeOn?: number;
+  maxUses?: number;
   restType?: 'short' | 'long';
 } {
   // {@recharge N} pattern
@@ -29,6 +37,16 @@ function parseRechargeFromName(name: string): {
       cleanName: name.replace(/\s*\{@recharge\s+\d+\}\s*/g, '').trim(),
       usageType: 'recharge',
       rechargeOn: parseInt(rechargeMatch[1], 10),
+    };
+  }
+
+  // "(Recharge N-N)" pattern — e.g., "(Recharge 5-6)"
+  const rechargeRangeMatch = name.match(/\(Recharge\s+(\d+)-(\d+)\)/i);
+  if (rechargeRangeMatch) {
+    return {
+      cleanName: name.replace(rechargeRangeMatch[0], '').trim(),
+      usageType: 'recharge',
+      rechargeOn: parseInt(rechargeRangeMatch[1], 10),
     };
   }
 
@@ -54,56 +72,30 @@ function parseRechargeFromName(name: string): {
     };
   }
 
-  // "(X/Day)" pattern
-  const perDayMatch = name.match(/\((\d+)\/Day\)/i);
+  // "(X/Day)" pattern — also handles "(X/Day, or Y/Day in Lair)" variants
+  const perDayMatch = name.match(/\((\d+)\/Day(?:[^)]*)?\)/i);
   if (perDayMatch) {
     return {
       cleanName: name.replace(perDayMatch[0], '').trim(),
       usageType: 'per-day',
+      maxUses: parseInt(perDayMatch[1], 10),
     };
   }
 
   return { cleanName: name, usageType: 'unlimited' };
 }
 
-function buildMonsterAbilities(monster: ProcessedMonster): MonsterAbility[] {
-  const abilities: MonsterAbility[] = [];
-
-  // Process traits with recharge or per-day
-  for (const trait of monster.traits ?? []) {
-    const parsed = parseRechargeFromName(trait.name);
-    if (parsed.usageType !== 'unlimited') {
-      abilities.push({
-        id: generateId(),
-        name: parsed.cleanName,
-        description: trait.text,
-        usageType: parsed.usageType,
-        rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
-        usedUses: 0,
-        restType: parsed.restType,
-      });
-    }
-  }
-
-  // Process actions with recharge or per-day
-  for (const action of monster.actions ?? []) {
-    const parsed = parseRechargeFromName(action.name);
-    if (parsed.usageType !== 'unlimited') {
-      abilities.push({
-        id: generateId(),
-        name: parsed.cleanName,
-        description: action.text,
-        usageType: parsed.usageType,
-        rechargeOn: parsed.rechargeOn,
-        maxUses: parsed.usageType === 'per-day' ? 1 : undefined,
-        usedUses: 0,
-        restType: parsed.restType,
-      });
-    }
-  }
-
-  return abilities;
+/**
+ * Build a short read-mode usage label for a stat block entry (e.g. "3/Day").
+ * Returns null when the entry has no configured uses, or when the entry name
+ * already conveys the usage (e.g. "(1/Day)", "(Recharge 5-6)") so we don't
+ * duplicate it in the display.
+ */
+export function formatUsesLabel(name: string, uses?: number): string | null {
+  if (uses == null || uses <= 0) return null;
+  // Name already carries a usage marker — the DM's uses count is redundant.
+  if (parseRechargeFromName(name).usageType !== 'unlimited') return null;
+  return `${uses}/Day`;
 }
 
 function buildLegendaryActionPool(
@@ -171,14 +163,44 @@ function buildMonsterSpellcasting(
 /**
  * Calculate ability modifier from score
  */
-function abilityModifier(score: number): number {
+export function abilityModifier(score: number): number {
   return Math.floor((score - 10) / 2);
+}
+
+/** Parse a CR string ("1/8", "1/4", "1/2", "3", "24") to a number. */
+function crToNumber(cr: string): number {
+  if (!cr) return 0;
+  if (cr.includes('/')) {
+    const [numerator, denominator] = cr.split('/');
+    return parseInt(numerator, 10) / parseInt(denominator, 10);
+  }
+  return parseFloat(cr) || 0;
+}
+
+/** Standard 5e proficiency-bonus-by-CR formula (CR 0–4 → +2). */
+export function proficiencyBonusForCr(cr: string): number {
+  const crNum = crToNumber(cr);
+  return 2 + Math.floor(Math.max(crNum - 1, 0) / 4);
+}
+
+/** 5eTools size code → token cells: T/S/M 1, L 2, H 3, G 4 (unknown → 1). */
+export function sizeCodeToTokenCells(code: string | undefined): TokenCellSize {
+  switch (code) {
+    case 'L':
+      return 2;
+    case 'H':
+      return 3;
+    case 'G':
+      return 4;
+    default:
+      return 1;
+  }
 }
 
 /**
  * Build a full stat block from a ProcessedMonster for display in the encounter tracker.
  */
-function buildMonsterStatBlock(
+export function buildMonsterStatBlock(
   monster: ProcessedMonster,
   overrides?: MonsterOverrides
 ): MonsterStatBlock {
@@ -206,6 +228,11 @@ function buildMonsterStatBlock(
       name: r.name,
       text: r.text,
     })),
+    bonusActions: (monster.bonusActions ?? []).map(a => ({
+      name: a.name,
+      text: a.text,
+    })),
+    lairActions: [],
     cr: monster.cr,
     type: typeStr,
     size: monster.size.join(', '),
@@ -223,6 +250,10 @@ export interface MonsterOverrides {
   abilityScoreOverrides?: Partial<
     Record<'str' | 'dex' | 'con' | 'int' | 'wis' | 'cha', number>
   >;
+  /** Fully edited stat block (pre-add editor). Adopted verbatim; abilities are rebuilt from it. */
+  statBlockOverride?: MonsterStatBlock;
+  initiativeModifierOverride?: number;
+  proficiencyBonusOverride?: number;
 }
 
 /**
@@ -235,25 +266,40 @@ export function monsterToEncounterEntity(
 ): Omit<EncounterEntity, 'id'> {
   const hp = options?.hpOverride ?? monster.hpAverage;
   const ac = options?.acOverride ?? monster.acValue;
-  const dex = options?.abilityScoreOverrides?.dex ?? monster.dex;
+  const statBlock = ensureStatBlockEntryIds(
+    options?.statBlockOverride ?? buildMonsterStatBlock(monster, options)
+  );
+  const dex =
+    options?.statBlockOverride?.dex ??
+    options?.abilityScoreOverrides?.dex ??
+    monster.dex;
 
   return {
     type: 'monster',
     name: options?.nameOverride ?? monster.name,
     initiative: null,
-    initiativeModifier: abilityModifier(dex),
+    initiativeModifier:
+      options?.initiativeModifierOverride ?? abilityModifier(dex),
+    proficiencyBonus:
+      options?.proficiencyBonusOverride ??
+      proficiencyBonusForCr(options?.statBlockOverride?.cr ?? monster.cr),
     currentHp: hp,
     maxHp: hp,
     tempHp: 0,
     armorClass: ac,
     conditions: [],
     monsterSourceId: monster.id,
-    monsterStatBlock: buildMonsterStatBlock(monster, options),
-    abilities: buildMonsterAbilities(monster),
+    monsterStatBlock: statBlock,
+    abilities: buildAbilitiesFromNormalizedBlock(statBlock),
     legendaryActions: buildLegendaryActionPool(monster),
     spellcasting: buildMonsterSpellcasting(monster),
     color: options?.color,
     isHidden: false,
+    tokenSize: sizeCodeToTokenCells(monster.size[0]),
+    avatarUrl:
+      monster.hasToken && monster.tokenSource
+        ? bestiaryTokenUrl(monster.tokenSource, monster.name)
+        : undefined,
   };
 }
 

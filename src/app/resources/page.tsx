@@ -2,15 +2,30 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { ArrowLeft, Book, Users, Scroll, Skull, Library } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  Book,
+  Users,
+  Scroll,
+  Skull,
+  Library,
+  Dice6,
+} from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { Card, CardContent } from '@/components/ui/layout/card';
+import { ThemeToggle } from '@/components/ui/ThemeToggle';
 
 interface ResourceItem {
   title: string;
   description: string;
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
-  gradient: string;
-  hoverGradient: string;
+  accentBg: string;
+  accentText: string;
+  accentBorder: string;
+  iconContainerClass: string;
   available: boolean;
   comingSoon?: boolean;
 }
@@ -18,126 +33,143 @@ interface ResourceItem {
 const resourceItems: ResourceItem[] = [
   {
     title: 'Spellbook',
-    description: '540+ D&D spells with advanced filtering',
+    description:
+      '540+ D&D spells with advanced search, filtering by school, level, and class',
     href: '/spellbook',
     icon: Book,
-    gradient: 'from-purple-600 via-violet-600 to-indigo-600',
-    hoverGradient: 'from-purple-700 via-violet-700 to-indigo-700',
+    accentBg: 'bg-accent-purple-bg',
+    accentText: 'text-accent-purple-text',
+    accentBorder: 'border-accent-purple-border',
+    iconContainerClass: 'bg-accent-purple-bg-strong text-accent-purple-text',
     available: true,
   },
   {
     title: 'Classes',
-    description: 'Complete compendium of all D&D classes',
+    description:
+      'Complete compendium of all D&D classes, subclasses, and progression tables',
     href: '/classes',
     icon: Users,
-    gradient: 'from-amber-600 via-orange-600 to-red-600',
-    hoverGradient: 'from-amber-700 via-orange-700 to-red-700',
+    accentBg: 'bg-accent-emerald-bg',
+    accentText: 'text-accent-emerald-text',
+    accentBorder: 'border-accent-emerald-border',
+    iconContainerClass: 'bg-accent-emerald-bg-strong text-accent-emerald-text',
     available: true,
   },
   {
     title: 'Feats',
-    description: 'Browse and manage character feats',
+    description: 'Browse and manage character feats and special abilities',
     href: '/feats',
     icon: Scroll,
-    gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
-    hoverGradient: 'from-emerald-700 via-teal-700 to-cyan-700',
-    available: false,
-    comingSoon: true,
+    accentBg: 'bg-accent-amber-bg',
+    accentText: 'text-accent-amber-text',
+    accentBorder: 'border-accent-amber-border',
+    iconContainerClass: 'bg-accent-amber-bg-strong text-accent-amber-text',
+    available: true,
   },
   {
     title: 'Bestiary',
-    description: 'Monster manual and creature database',
+    description:
+      'Full monster database with stat blocks, search, and CR filtering',
     href: '/bestiary',
     icon: Skull,
-    gradient: 'from-red-600 via-rose-600 to-pink-600',
-    hoverGradient: 'from-red-700 via-rose-700 to-pink-700',
+    accentBg: 'bg-accent-red-bg',
+    accentText: 'text-accent-red-text',
+    accentBorder: 'border-accent-red-border',
+    iconContainerClass: 'bg-accent-red-bg-strong text-accent-red-text',
     available: true,
-    comingSoon: false,
   },
 ];
 
 export default function ResourcesPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <div className="bg-surface min-h-screen">
       {/* Header */}
-      <header className="border-b border-slate-200 bg-white/80 shadow-sm backdrop-blur-sm">
+      <header className="bg-surface/80 border-divider sticky top-0 z-30 border-b backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-4">
               <Link
                 href="/"
-                className="flex items-center gap-2 text-slate-600 transition-colors hover:text-slate-900"
+                className="text-muted hover:text-heading flex items-center gap-2 transition-colors"
               >
                 <ArrowLeft className="h-4 w-4" />
-                <span className="font-medium">Back to Home</span>
+                <span className="hidden font-medium sm:inline">Home</span>
               </Link>
-              <div className="h-6 w-px bg-slate-300"></div>
+              <div className="bg-divider h-6 w-px" />
               <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-gradient-to-br from-indigo-600 to-purple-600 p-2 shadow-md">
-                  <Library className="h-5 w-5 text-white" />
+                <div className="bg-accent-purple-bg-strong rounded-lg p-2">
+                  <Library className="text-accent-purple-text h-5 w-5" />
                 </div>
-                <h1 className="text-xl font-bold text-slate-900">
-                  D&D Resources & Tools
+                <h1 className="text-heading text-lg font-bold sm:text-xl">
+                  D&D Resources
                 </h1>
               </div>
             </div>
-            <nav className="hidden space-x-6 md:flex">
-              <Link
-                href="/player"
-                className="font-medium text-slate-600 transition-colors hover:text-indigo-600"
-              >
-                Player Dashboard
-              </Link>
+            <nav className="flex items-center gap-1 sm:gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/player">Player</Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link href="/dm">DM Tools</Link>
+              </Button>
+              <div className="bg-divider mx-1 h-5 w-px sm:mx-2" />
+              <ThemeToggle />
             </nav>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl px-4 py-10 sm:px-6 sm:py-14 lg:px-8">
         {/* Hero Section */}
-        <div className="mb-12 text-center">
-          <h2 className="mb-4 text-4xl font-bold text-slate-900">
+        <div className="mb-10 text-center sm:mb-14">
+          <div className="mb-4 inline-flex items-center gap-2">
+            <Dice6 className="text-accent-purple-text h-5 w-5" />
+            <span className="text-muted text-sm font-medium tracking-wider uppercase">
+              Reference Library
+            </span>
+          </div>
+          <h2 className="text-heading mb-4 text-3xl font-bold sm:text-4xl">
             Complete D&D Reference Library
           </h2>
-          <p className="mx-auto max-w-3xl text-lg text-slate-600">
-            Access comprehensive D&D resources, tools, and databases to enhance
-            your tabletop experience. From spellbooks to monster manuals,
-            everything you need is right here.
+          <p className="text-body mx-auto max-w-2xl text-base sm:text-lg">
+            Comprehensive resources, tools, and databases to enhance your
+            tabletop experience. Everything you need, right at your fingertips.
           </p>
         </div>
 
         {/* Resources Grid */}
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6 lg:grid-cols-4">
           {resourceItems.map(item => {
             const IconComponent = item.icon;
 
             if (!item.available) {
               return (
-                <div
+                <Card
                   key={item.title}
-                  className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 opacity-60 shadow-sm transition-all duration-300"
+                  variant="bordered"
+                  padding="lg"
+                  className="relative opacity-60"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-br from-slate-100 to-slate-200"></div>
-                  <div className="relative">
+                  <CardContent className="p-0">
                     <div className="mb-4 flex items-center justify-between">
                       <div
-                        className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md grayscale`}
+                        className={`rounded-xl p-3 ${item.iconContainerClass} opacity-50 grayscale`}
                       >
-                        <IconComponent className="h-6 w-6 text-white" />
+                        <IconComponent className="h-6 w-6" />
                       </div>
                       {item.comingSoon && (
-                        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-medium text-amber-800">
+                        <Badge variant="warning" size="sm">
                           Coming Soon
-                        </span>
+                        </Badge>
                       )}
                     </div>
-                    <h3 className="mb-2 text-lg font-semibold text-slate-900">
+                    <h3 className="text-heading mb-2 text-lg font-semibold">
                       {item.title}
                     </h3>
-                    <p className="text-sm text-slate-600">{item.description}</p>
-                  </div>
-                </div>
+                    <p className="text-muted text-sm">{item.description}</p>
+                  </CardContent>
+                </Card>
               );
             }
 
@@ -145,62 +177,64 @@ export default function ResourcesPage() {
               <Link
                 key={item.title}
                 href={item.href}
-                className="group relative overflow-hidden rounded-xl border-2 border-slate-200 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-indigo-300 hover:shadow-lg"
+                className="group focus-visible:ring-ring block rounded-xl focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
               >
-                <div
-                  className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-5`}
-                ></div>
-                <div className="relative">
-                  <div className="mb-4 flex items-center justify-between">
-                    <div
-                      className={`rounded-lg bg-gradient-to-br ${item.gradient} p-3 shadow-md transition-all duration-300 group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} group-hover:scale-110`}
-                    >
-                      <IconComponent className="h-6 w-6 text-white" />
+                <Card
+                  variant="bordered"
+                  padding="lg"
+                  className={`h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:${item.accentBorder} group-focus-within:-translate-y-1 group-focus-within:shadow-lg`}
+                >
+                  <CardContent className="p-0">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div
+                        className={`rounded-xl p-3 transition-transform duration-300 group-hover:scale-110 ${item.iconContainerClass}`}
+                      >
+                        <IconComponent className="h-6 w-6" />
+                      </div>
+                      <div
+                        className={`flex items-center gap-1 ${item.accentText} text-sm font-medium opacity-0 transition-opacity duration-300 group-hover:opacity-100 max-sm:opacity-100 sm:group-focus-within:opacity-100`}
+                      >
+                        <span>Explore</span>
+                        <ArrowRight className="h-4 w-4" />
+                      </div>
                     </div>
-                    <div className="flex items-center gap-1 text-indigo-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100">
-                      <span className="text-sm font-medium">Explore</span>
-                      <ArrowLeft className="h-4 w-4 rotate-180" />
-                    </div>
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold text-slate-900 transition-colors group-hover:text-indigo-900">
-                    {item.title}
-                  </h3>
-                  <p className="text-sm text-slate-600 transition-colors group-hover:text-slate-700">
-                    {item.description}
-                  </p>
-                </div>
+                    <h3 className="text-heading mb-2 text-lg font-semibold">
+                      {item.title}
+                    </h3>
+                    <p className="text-muted text-sm">{item.description}</p>
+                  </CardContent>
+                </Card>
               </Link>
             );
           })}
         </div>
 
-        {/* Additional Info Section */}
-        <div className="mt-16 rounded-xl border border-slate-200 bg-white/60 p-8 shadow-sm backdrop-blur-sm">
-          <div className="text-center">
-            <h3 className="mb-4 text-2xl font-bold text-slate-900">
+        {/* Coming Soon Section */}
+        <Card variant="bordered" padding="lg" className="mt-12 sm:mt-16">
+          <CardContent className="p-0 text-center">
+            <h3 className="text-heading mb-3 text-xl font-bold sm:text-2xl">
               More Resources Coming Soon
             </h3>
-            <p className="mb-6 text-slate-600">
+            <p className="text-body mb-6">
               We&apos;re constantly expanding our collection of D&D tools and
-              resources. Stay tuned for equipment databases, encounter builders,
-              and more!
+              resources.
             </p>
-            <div className="flex flex-wrap justify-center gap-4 text-sm">
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-slate-700">
-                🛡️ Equipment Database
-              </span>
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-slate-700">
-                ⚔️ Encounter Builder
-              </span>
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-slate-700">
-                🎲 Random Generators
-              </span>
-              <span className="rounded-full bg-slate-100 px-4 py-2 text-slate-700">
-                📊 Campaign Tools
-              </span>
+            <div className="flex flex-wrap justify-center gap-3">
+              <Badge variant="neutral" size="md">
+                Equipment Database
+              </Badge>
+              <Badge variant="neutral" size="md">
+                Encounter Builder
+              </Badge>
+              <Badge variant="neutral" size="md">
+                Random Generators
+              </Badge>
+              <Badge variant="neutral" size="md">
+                Campaign Tools
+              </Badge>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </main>
     </div>
   );

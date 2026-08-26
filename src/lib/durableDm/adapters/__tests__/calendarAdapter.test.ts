@@ -1,0 +1,312 @@
+import 'fake-indexeddb/auto';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { calendarAdapter } from '../calendarAdapter';
+import {
+  describeAdapterConformance,
+  describeCardParity,
+  seedFamilySelectionForRun,
+} from './adapterConformance';
+import { createCalendarHarness } from './harnesses/calendar';
+
+describe('calendarAdapter', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  describeAdapterConformance('calendar', createCalendarHarness);
+
+  describeCardParity('calendar', createCalendarHarness, {
+    runIndexedDbMigration: 'runCalendarIndexedDbMigration',
+    commitLocalCutover: 'commitCalendarLocalCutover',
+    markCloudAuthority: 'markCalendarCloudAuthority',
+    rollbackLocalAuthority: 'rollbackCalendarLocalAuthority',
+  });
+
+  it('is invisible when its own client flag is off', () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'false');
+    expect(calendarAdapter.isVisible()).toBe(false);
+  });
+
+  it('normalizes the flat enrollment preview into the generic shape', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    // The fake route answers exactly as the real one does: flat, no documents.
+    harness.seedFlatEnrollmentPreview({
+      authority: 'postgres',
+      epoch: 1,
+      previewFingerprint: 'a'.repeat(64),
+      legacyId: context.campaignCode,
+      serverVersion: 1,
+      schemaVersion: 1,
+      payloadFingerprint: 'b'.repeat(64),
+    });
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    // Reconcile, not conflict, and above all not a second staging run: that is
+    // only reachable if `recordCount` and `documents` were normalized before
+    // `matchesManifest` saw them.
+    harness.setCloudPayloadFingerprint(manifest.records[0].payloadFingerprint);
+    await harness.adapter.activateCloud(context, manifest);
+    expect(harness.trace()).not.toContain('begin-staging');
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'postgres',
+    });
+  });
+
+  it('refuses to stage a calendar that was deleted since the preview', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    // A delete does not remove the row; it rewrites it with `operation:
+    // 'delete'` and leaves `contentFingerprint` alone, so every other
+    // condition in the guard still passes. Message pinned (not a bare
+    // `.rejects.toThrow()`) because `activateCloud`'s
+    // "not ready to back this data category up yet" guard is an adjacent
+    // guard that a bare assertion would let a deleted-delete-guard mutant
+    // survive against.
+    await harness.deleteWorkingCopy(manifest.records[0].legacyId);
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  // Fix round 1 (coordinator review of Task 10): the `!document` clause is
+  // DISTINCT from the delete clause above — a soft delete never makes
+  // `getDocument` return `null` (`commit()` always upserts the same row) —
+  // and was an unpinned surviving mutant before this test (confirmed by
+  // mutation: killing it alone left every existing test green). Reached
+  // NATURALLY here, no raw-row surgery: `hideNamespace()` sets the same
+  // `account-namespace-visibility` flag `removeAccountFromDevice` sets,
+  // which `getDocument` checks before it ever looks the document up.
+  it('refuses to stage a calendar whose namespace has no working copy at all', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.hideNamespace();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  it('makes no projection call during the whole migration chain', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    const calls = harness.recordedApiActions();
+    await harness.adapter.previewManifest(context);
+    await harness.adapter.selectFamily(context);
+    const prepared = await harness.adapter.prepareIndexedDb(context);
+    await harness.adapter.commitLocalCutover(context, {
+      generation: prepared.generation,
+      manifest: prepared.manifest,
+    });
+    expect(calls()).not.toContain('projection-status');
+    expect(calls()).not.toContain('replay-projection');
+    expect(calls()).not.toContain('projection-incidents');
+  });
+
+  it('reports the manifest blockers verbatim, without deciding what to do about them', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seedWithBlocker();
+    const manifest = await harness.adapter.previewManifest(context);
+    expect(manifest.blockers.length).toBeGreaterThan(0);
+  });
+
+  it('activateCloud returns a conflict outcome when the cloud already diverged', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    // Forces the cloud to already report a postgres generation whose
+    // fingerprint does NOT match this run's manifest — the flat preview is
+    // normalized (same shape as the "normalizes..." test above) but never
+    // aligned via `setCloudPayloadFingerprint`, so `matchesManifest` must
+    // disagree and `activateCloud` must resolve to `conflict`, never throw.
+    harness.seedFlatEnrollmentPreview({
+      authority: 'postgres',
+      epoch: 1,
+      previewFingerprint: 'a'.repeat(64),
+      legacyId: context.campaignCode,
+      serverVersion: 1,
+      schemaVersion: 1,
+      payloadFingerprint: 'z'.repeat(64),
+    });
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    const result = await harness.adapter.activateCloud(context, manifest);
+    expect(result.status).toBe('conflict');
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  // The two arms of `prepareIndexedDb`'s `CUTOVER_READY` message ternary,
+  // pinned by distinct tests so each is independently mutation-checkable —
+  // mirrors `campaignSettingsAdapter.test.ts`.
+  it('prepareIndexedDb reports the blocked-candidates message, not the generic gate message, when blockers exist', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seedWithBlocker();
+    await harness.adapter.selectFamily(context);
+    await expect(harness.adapter.prepareIndexedDb(context)).rejects.toThrow(
+      /unresolved candidates/i
+    );
+  });
+
+  it('prepareIndexedDb reports the generic gate message when preparation is not ready for a reason other than blockers', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    // Final fix wave, F5: `prepareIndexedDb` now refuses a selection record
+    // that is not this run's, and that gate fires BEFORE the receipt gate
+    // inside `run*IndexedDbMigration`. The selection is therefore seeded for
+    // the SAME recovery this call passes, so the only guard that can refuse
+    // here is still the one this test is named for.
+    const runContext = {
+      ...context,
+      recovery: { ...context.recovery, manifestHash: 'e'.repeat(64) },
+    };
+    await seedFamilySelectionForRun(harness.adapter, runContext);
+    await expect(harness.adapter.prepareIndexedDb(runContext)).rejects.toThrow(
+      /safety gate/i
+    );
+  });
+
+  // Two sequential guards in `previewManifest`'s post-cutover branch, pinned
+  // by distinct messages so mutating either is caught by a DIFFERENT test.
+  it('previewManifest refuses when the IndexedDB working copy was deleted since cutover', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    await harness.deleteWorkingCopy(context.campaignCode);
+    await expect(harness.adapter.previewManifest(context)).rejects.toThrow(
+      /verified IndexedDB working copy is required/i
+    );
+  });
+
+  it('previewManifest refuses when the IndexedDB working copy fails fingerprint verification', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    await harness.corruptWorkingCopyFingerprint();
+    await expect(harness.adapter.previewManifest(context)).rejects.toThrow(
+      /failed fingerprint verification/i
+    );
+  });
+
+  // Rollback's current-generation/projection-journal precondition: three
+  // independently isolated clauses, matching
+  // `campaignSettingsAdapter.test.ts`'s equivalent trio.
+  it('rollback refuses when the projection journal is not reconciled', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    harness.setProjectionStatus('pending');
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /projection journal/i
+    );
+  });
+
+  it('rollback refuses when the account is no longer cloud-authoritative', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    harness.forcePreviewAuthorityMismatch();
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /exact current Postgres generation/i
+    );
+  });
+
+  it('rollback refuses when the cloud preview response is missing the current generation fingerprints', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    harness.forceIncompleteCloudPreview();
+    await expect(harness.adapter.rollback(context)).rejects.toThrow(
+      /exact current Postgres generation/i
+    );
+  });
+
+  // Divergence from `campaignSettingsAdapter.ts`: the calendar card only
+  // restores the legacy store when the server's `currentGeneration` carries
+  // a payload. Pins the "no payload" arm, which the base conformance
+  // restore test (payload always present via `divergeCloudGeneration`)
+  // never reaches.
+  it('rollback leaves the legacy store untouched when the server currentGeneration carries no payload', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughCloudActivation(context);
+    const before = await harness.readLegacyStorePayload();
+    harness.nullifyCloudPayload();
+    await harness.adapter.rollback(context);
+    expect(await harness.readLegacyStorePayload()).toEqual(before);
+    expect(await harness.adapter.readAuthority(context)).toMatchObject({
+      state: 'legacy',
+      rolledBack: true,
+    });
+  });
+
+  // Task 8 review, Important 3: `assertWorkingCopyUnchanged`'s fingerprint
+  // and schemaVersion clauses were surviving mutants — neutering either
+  // left 35/35 green. Each pinned by its own test so a mutation to either
+  // clause reddens exactly one test.
+  it('refuses to stage a calendar whose working copy fingerprint drifted since the preview', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopyFingerprint();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  it('refuses to stage a calendar whose working copy schemaVersion drifted since the preview', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    await harness.runChainThroughLocalCutover(context);
+    const manifest = await harness.adapter.previewManifest(context);
+    await harness.corruptWorkingCopySchemaVersion();
+    await expect(
+      harness.adapter.activateCloud(context, manifest)
+    ).rejects.toThrow(/changed since the last check/i);
+    expect(harness.trace()).not.toContain('begin-staging');
+  });
+
+  // Task 8 review, Important 5: `prepareIndexedDb`'s `recoveryGate` must
+  // now require a VERIFIED receipt (matching `CalendarSyncControls.tsx`'s
+  // own `prepare()`), not merely an initiated one. Calls `prepareIndexedDb`
+  // directly, bypassing `selectFamily` (which already demands a verified
+  // receipt for the same hash) — the interface enforces no call order, so
+  // this is the only way to observe `prepareIndexedDb`'s OWN gate.
+  it('prepareIndexedDb refuses an initiated-but-unverified recovery receipt', async () => {
+    const harness = createCalendarHarness();
+    const context = await harness.seed();
+    const unverifiedHash = 'f'.repeat(64);
+    await harness.recordUnverifiedReceipt(unverifiedHash);
+    // Task 8 review, fix round 2, Minor 3: pinned to the same
+    // `/safety gate/i` message `campaignSettingsAdapter.test.ts`'s sibling
+    // test ("prepareIndexedDb reports the generic gate message...") already
+    // asserts. This call deliberately goes out of order (skips
+    // `selectFamily`), so several OTHER failures are reachable here too — a
+    // bare `.rejects.toThrow()` would also pass on any of them and stop
+    // discriminating the recoveryGate fix specifically.
+    // Final fix wave, F5: the selection gate refuses a record that is not
+    // this run's, before the receipt gate is reached. Seeded for this exact
+    // recovery so the receipt gate stays the only guard under test -- the
+    // production state this reproduces is "selected while the receipt was
+    // verified, and it stopped being verified afterwards".
+    const runContext = {
+      ...context,
+      recovery: { ...context.recovery, manifestHash: unverifiedHash },
+    };
+    await seedFamilySelectionForRun(harness.adapter, runContext);
+    await expect(harness.adapter.prepareIndexedDb(runContext)).rejects.toThrow(
+      /safety gate/i
+    );
+  });
+});

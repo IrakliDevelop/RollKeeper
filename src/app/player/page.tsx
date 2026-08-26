@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import {
   Plus,
@@ -18,8 +18,8 @@ import {
   ChevronDown,
   ChevronUp,
   TrendingUp,
-  LayoutGrid,
   Link2,
+  Swords,
 } from 'lucide-react';
 import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
@@ -28,6 +28,19 @@ import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 import { ThemeToggle } from '@/components/ui/ThemeToggle';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
+import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
+import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
+import { CharacterCloudBackupControls } from '@/components/ui/character/CharacterCloudBackupControls';
+import { CharacterAutomaticSyncControls } from '@/components/ui/character/CharacterAutomaticSyncControls';
+import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { recordAutomaticCharacterDelete } from '@/lib/supabase/automaticCharacterSyncRuntime';
+import { AppIcon } from '@/components/ui/icons';
+import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
+import {
+  exportAllCharactersToFile,
+  isCharacterBackup,
+} from '@/utils/fileOperations';
 
 export default function PlayerDashboardPage() {
   const {
@@ -39,6 +52,7 @@ export default function PlayerDashboardPage() {
     restoreCharacter,
     deleteCharacter,
     duplicateCharacter,
+    addCloudRecoveredCharacter,
     migrateFromOldStorage,
     importCharacter,
     updateCharacter,
@@ -53,6 +67,32 @@ export default function PlayerDashboardPage() {
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const handleExportAll = useCallback(() => {
+    if (characters.length === 0) return;
+    exportAllCharactersToFile(characters);
+    addToast({
+      type: 'success',
+      title: 'Backup exported',
+      message: `Saved a backup of ${characters.length} character${
+        characters.length === 1 ? '' : 's'
+      }. Keep it somewhere safe.`,
+      duration: 5000,
+    });
+  }, [characters, addToast]);
+
+  // Surface a clear warning if a localStorage save ever fails (quota full).
+  useStorageQuotaListener(
+    useCallback(() => {
+      addToast({
+        type: 'error',
+        title: 'Save failed — storage full',
+        message:
+          'Your latest change could not be saved. Export a backup now to avoid losing data.',
+        duration: 12000,
+      });
+    }, [addToast])
+  );
 
   // Check for migration on component mount
   useEffect(() => {
@@ -84,7 +124,15 @@ export default function PlayerDashboardPage() {
         'Are you sure you want to permanently delete this character? This action cannot be undone.'
       )
     ) {
+      const beforeImage = characters.find(
+        character => character.id === characterId
+      );
       deleteCharacter(characterId);
+      if (beforeImage) {
+        void awaitCharacterPersistenceResult().then(result => {
+          if (result.saved) return recordAutomaticCharacterDelete(beforeImage);
+        });
+      }
     }
   };
 
@@ -106,6 +154,20 @@ export default function PlayerDashboardPage() {
       try {
         const fileText = await file.text();
         const characterData = JSON.parse(fileText);
+
+        // Full-roster backup bundle → restore every character in it.
+        if (isCharacterBackup(characterData)) {
+          const count = characterData.characters.length;
+          characterData.characters.forEach(c => importCharacter(c));
+          addToast({
+            type: 'success',
+            title: 'Backup restored',
+            message: `Imported ${count} character${count === 1 ? '' : 's'} from the backup.`,
+            duration: 5000,
+          });
+          event.target.value = '';
+          return;
+        }
 
         let characterName = 'Imported Character';
         if (characterData.name) {
@@ -218,50 +280,34 @@ export default function PlayerDashboardPage() {
           : 'border-accent-blue-border hover:bg-surface-secondary'
       }`}
     >
-      <div className="p-6">
-        <div className="mb-4 flex items-start gap-3">
-          {/* Avatar */}
+      <div className="p-4 sm:p-5 lg:p-6">
+        {/* Top row: Avatar + Name/Class + Actions */}
+        <div className="mb-3 flex items-start gap-3">
           <div className="flex-shrink-0">
             <AvatarUpload
               avatar={character.avatar}
               characterId={character.id}
               characterName={character.name}
-              onAvatarChange={() => {}} // View only on dashboard
-              size="md"
+              onAvatarChange={() => {}}
+              size="sm"
               editable={false}
             />
           </div>
 
-          {/* Character Info */}
           <div className="min-w-0 flex-1">
-            <div className="mb-2 flex items-start justify-between gap-2">
-              <div className="min-w-0 flex-1">
-                <h3 className="text-heading mb-1 line-clamp-2 text-xl font-semibold">
-                  {character.name}
-                </h3>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span className="text-body text-sm">{character.race}</span>
-                  <span className="text-faint">•</span>
-                  <Badge variant={getClassBadgeVariant(character.class)}>
-                    {character.class}
-                  </Badge>
-                  <span className="text-faint">•</span>
-                  <span className="text-body text-sm">
-                    Level {character.level}
-                  </span>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
+            <div className="flex items-start justify-between gap-1">
+              <h3 className="text-heading min-w-0 flex-1 truncate text-lg leading-tight font-semibold">
+                {character.name}
+              </h3>
               {!isArchived && (
-                <div className="flex flex-shrink-0 space-x-1">
+                <div className="flex flex-shrink-0">
                   <Button
                     onClick={() => handleDuplicateCharacter(character)}
                     variant="ghost"
                     size="sm"
                     title="Duplicate Character"
                   >
-                    <Copy size={16} />
+                    <Copy size={14} />
                   </Button>
                   <Button
                     onClick={() => handleArchiveCharacter(character.id)}
@@ -269,40 +315,54 @@ export default function PlayerDashboardPage() {
                     size="sm"
                     title="Archive Character"
                   >
-                    <Archive size={16} />
+                    <Archive size={14} />
                   </Button>
                 </div>
               )}
             </div>
-
-            {/* Campaign + Tags */}
-            <div className="mt-2 flex flex-wrap gap-1">
-              {character.campaignCode && (
-                <Badge variant="info" size="sm">
-                  <Link2 size={10} className="mr-1" />
-                  {character.campaignName || character.campaignCode}
-                </Badge>
-              )}
-              {character.tags.map(tag => (
-                <Badge key={tag} variant="neutral" size="sm">
-                  {tag}
-                </Badge>
-              ))}
-            </div>
+            <p className="text-body mt-0.5 truncate text-sm">
+              {character.race}
+            </p>
           </div>
         </div>
 
-        <div className="text-muted mb-4 text-sm">
-          <div className="flex justify-between">
-            <span>
-              Created: {new Date(character.createdAt).toLocaleDateString()}
-            </span>
-            <span>
-              Last Played: {new Date(character.lastPlayed).toLocaleDateString()}
-            </span>
-          </div>
+        {/* Class badge + Level */}
+        <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <Badge variant={getClassBadgeVariant(character.class)}>
+            {character.class}
+          </Badge>
+          <span className="text-faint">•</span>
+          <span className="text-body text-sm">Level {character.level}</span>
         </div>
 
+        {/* Campaign + Tags */}
+        {(character.campaignCode || character.tags.length > 0) && (
+          <div className="mb-3 flex flex-wrap gap-1">
+            {character.campaignCode && (
+              <Badge variant="info" size="sm">
+                <Link2 size={10} className="mr-1" />
+                {character.campaignName || character.campaignCode}
+              </Badge>
+            )}
+            {character.tags.map(tag => (
+              <Badge key={tag} variant="neutral" size="sm">
+                {tag}
+              </Badge>
+            ))}
+          </div>
+        )}
+
+        {/* Dates */}
+        <div className="text-muted mb-3 flex justify-between text-xs">
+          <span>
+            Created: {new Date(character.createdAt).toLocaleDateString()}
+          </span>
+          <span>
+            Last Played: {new Date(character.lastPlayed).toLocaleDateString()}
+          </span>
+        </div>
+
+        {/* Actions */}
         <div className="flex space-x-2">
           {!isArchived ? (
             <>
@@ -375,7 +435,7 @@ export default function PlayerDashboardPage() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {/* Dashboard Header */}
-        <div className="mb-8 flex items-center justify-between">
+        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-heading mb-2 text-3xl font-bold">
               Your Characters
@@ -384,7 +444,7 @@ export default function PlayerDashboardPage() {
               Manage your D&D characters and jump into your adventures
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3">
             <Button
               variant="outline"
               leftIcon={<Link2 size={18} />}
@@ -397,8 +457,17 @@ export default function PlayerDashboardPage() {
               leftIcon={<Upload size={18} />}
               onClick={() => fileInputRef.current?.click()}
             >
-              Import Character
+              Import
             </Button>
+            {characters.length > 0 && (
+              <Button
+                variant="outline"
+                leftIcon={<Download size={18} />}
+                onClick={handleExportAll}
+              >
+                Export All
+              </Button>
+            )}
             <input
               ref={fileInputRef}
               type="file"
@@ -413,6 +482,32 @@ export default function PlayerDashboardPage() {
             </Link>
           </div>
         </div>
+
+        {/* Local-storage safety reminder */}
+        {characters.length > 0 && (
+          <DataSafetyBanner onExport={handleExportAll} />
+        )}
+
+        <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+          <h2 className="text-heading text-sm font-semibold">
+            Full browser recovery
+          </h2>
+          <p className="text-muted mb-3 text-sm">
+            Back up all RollKeeper browser data or stage a recovery file for
+            review without replacing active values.
+          </p>
+          <DeviceRecoveryControls />
+          <CharacterStorageMigrationControls />
+        </section>
+
+        <CharacterCloudBackupControls
+          characters={characters}
+          onAddCharacter={character =>
+            addCloudRecoveredCharacter(character as PlayerCharacter)
+          }
+        />
+
+        <CharacterAutomaticSyncControls characters={characters} />
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
@@ -509,7 +604,7 @@ export default function PlayerDashboardPage() {
                   <User size={24} />
                   Active Characters ({activeCharacters.length})
                 </h2>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {activeCharacters.map(character => (
                     <CharacterCard key={character.id} character={character} />
                   ))}
@@ -527,7 +622,7 @@ export default function PlayerDashboardPage() {
                   <Archive size={24} />
                   Archived Characters ({archivedCharacters.length})
                 </h2>
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
                   {archivedCharacters.map(character => (
                     <CharacterCard
                       key={character.id}
@@ -633,40 +728,40 @@ export default function PlayerDashboardPage() {
                   </label>
                 </div>
 
-                {/* Tabbed Layout Toggle */}
+                {/* Combat Start Banner Toggle */}
                 <div className="border-divider bg-surface-secondary flex items-center justify-between rounded-lg border p-4">
                   <div className="flex items-center gap-3">
-                    <div className="bg-accent-blue-bg flex h-10 w-10 items-center justify-center rounded-lg">
-                      <LayoutGrid className="text-accent-blue-text-muted h-5 w-5" />
+                    <div className="bg-accent-red-bg flex h-10 w-10 items-center justify-center rounded-lg">
+                      <Swords className="text-accent-red-text-muted h-5 w-5" />
                     </div>
                     <div>
                       <h4 className="text-heading font-medium">
-                        Tabbed Character Sheet
+                        Combat Start Banner
                       </h4>
                       <p className="text-muted text-sm">
-                        Modern tabbed interface — quickly switch between
-                        sections without scrolling
+                        A &quot;Combat Begins&quot; flourish when the DM starts
+                        a fight
                       </p>
                     </div>
                   </div>
                   <label className="relative inline-flex cursor-pointer items-center">
                     <input
                       type="checkbox"
-                      checked={settings?.enableTabbedLayout ?? false}
+                      checked={settings?.enableCombatStartBanner}
                       onChange={e =>
                         updateSettings({
-                          enableTabbedLayout: e.target.checked,
-                          hasSeenLayoutPrompt: true,
+                          enableCombatStartBanner: e.target.checked,
                         })
                       }
                       className="peer sr-only"
                     />
-                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-blue-500 peer-focus:ring-2 peer-focus:ring-blue-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
+                    <div className="peer bg-divider-strong after:border-divider-strong dark:after:bg-surface-raised h-6 w-11 rounded-full peer-checked:bg-amber-500 peer-focus:ring-2 peer-focus:ring-amber-300 peer-focus:outline-none after:absolute after:top-[2px] after:left-[2px] after:h-5 after:w-5 after:rounded-full after:border after:bg-white after:transition-all after:content-[''] peer-checked:after:translate-x-full peer-checked:after:border-white"></div>
                   </label>
                 </div>
 
                 <p className="text-faint text-center text-sm">
-                  More features coming soon! 🎲{' '}
+                  More features coming soon!{' '}
+                  <AppIcon name="dice" className="inline h-4 w-4" />{' '}
                   <span className="text-amber-500">maybe</span>
                 </p>
               </div>

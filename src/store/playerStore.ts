@@ -1,10 +1,16 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { createSafeStorage } from '@/lib/safeStorage';
+import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import { createCharacterFamilyStateStorage } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
+import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
 import { CharacterState, CharacterExport } from '@/types/character';
-import { DEFAULT_CHARACTER_STATE, STORAGE_KEY } from '@/utils/constants';
-
-// Storage configuration
-const PLAYER_STORAGE_KEY = 'rollkeeper-player-data';
+import {
+  DEFAULT_CHARACTER_STATE,
+  STORAGE_KEY,
+  PLAYER_STORAGE_KEY,
+} from '@/utils/constants';
 
 // Player character interface - contains full CharacterState
 export interface PlayerCharacter {
@@ -27,24 +33,29 @@ export interface PlayerCharacter {
   lastSyncedAt?: string;
 }
 
+export interface CharacterDeletionTombstone {
+  id: string;
+  deletedAt: number;
+  beforeImage: PlayerCharacter;
+}
+
 export interface PlayerSettings {
   enableDeathAnimation: boolean;
   enableLevelUpAnimation: boolean;
-  enableTabbedLayout: boolean;
-  hasSeenLayoutPrompt: boolean;
+  enableCombatStartBanner: boolean;
 }
 
 const DEFAULT_PLAYER_SETTINGS: PlayerSettings = {
   enableDeathAnimation: false,
   enableLevelUpAnimation: false,
-  enableTabbedLayout: false,
-  hasSeenLayoutPrompt: false,
+  enableCombatStartBanner: true,
 };
 
 // Store state interface
 interface PlayerStoreState {
   // Core data
   characters: PlayerCharacter[];
+  characterTombstones: Record<string, CharacterDeletionTombstone>;
   activeCharacterId: string | null;
 
   // Player settings
@@ -76,6 +87,8 @@ interface PlayerStoreState {
   archiveCharacter: (characterId: string) => void;
   restoreCharacter: (characterId: string) => void;
   duplicateCharacter: (characterId: string, newName: string) => string;
+  addCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
+  replaceCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
 
   // Character selection
   setActiveCharacter: (characterId: string | null) => void;
@@ -84,7 +97,7 @@ interface PlayerStoreState {
   migrateFromOldStorage: () => boolean;
   exportCharacter: (characterId: string) => PlayerCharacter | null;
   importCharacter: (
-    data: CharacterState | CharacterExport,
+    data: CharacterState | CharacterExport | PlayerCharacter,
     name?: string
   ) => string;
 
@@ -132,6 +145,9 @@ const createPlayerCharacter = (
 
 // Migration function
 const migrateOldCharacterData = (): PlayerCharacter | null => {
+  // localStorage is unavailable during SSR; migration only runs in the browser.
+  if (typeof window === 'undefined') return null;
+
   try {
     // Check for old character data
     const oldCharacterData = localStorage.getItem(STORAGE_KEY);
@@ -155,7 +171,11 @@ const migrateOldCharacterData = (): PlayerCharacter | null => {
     // Handle different data structures
     let characterState: CharacterState;
 
-    if (parsedData.state) {
+    if (parsedData.state?.character) {
+      // Current Zustand character-store envelope.
+      characterState = parsedData.state.character as CharacterState;
+      console.log('Using Zustand character envelope format');
+    } else if (parsedData.state) {
       // Zustand persist format
       characterState = parsedData.state as CharacterState;
       console.log('Using Zustand persist format');
@@ -201,6 +221,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
     (set, get) => ({
       // Initial state
       characters: [],
+      characterTombstones: {},
       activeCharacterId: null,
       settings: { ...DEFAULT_PLAYER_SETTINGS },
       lastSelectedCharacterId: null,
@@ -274,28 +295,55 @@ export const usePlayerStore = create<PlayerStoreState>()(
         set(state => ({
           characters: state.characters.map(char =>
             char.id === characterId
-              ? {
-                  ...char,
-                  characterData,
-                  name: characterData.name || char.name,
-                  race: characterData.race || char.race,
-                  class: characterData.class?.name || char.class,
-                  level:
-                    characterData.totalLevel ||
-                    characterData.level ||
-                    char.level,
-                  avatar: characterData.avatar, // Update top-level avatar from characterData
-                  updatedAt: new Date(),
-                  lastPlayed: new Date(),
-                }
+              ? (characterData.revision ?? 0) <
+                (char.characterData?.revision ?? 0)
+                ? char // stale write-back (outdated tab copy) — keep the newer entry
+                : {
+                    ...char,
+                    characterData,
+                    name: characterData.name || char.name,
+                    race: characterData.race || char.race,
+                    class: characterData.class?.name || char.class,
+                    level:
+                      characterData.totalLevel ||
+                      characterData.level ||
+                      char.level,
+                    avatar: characterData.avatar, // Update top-level avatar from characterData
+                    updatedAt: new Date(),
+                    lastPlayed: new Date(),
+                  }
               : char
           ),
         }));
       },
 
       deleteCharacter: characterId => {
+        const character = get().characters.find(c => c.id === characterId);
+        if (character?.campaignCode) {
+          // Best-effort: remove this character from the campaign so the DM's
+          // player list doesn't keep a stale entry. Local delete proceeds
+          // regardless of network state.
+          fetch(
+            `/api/campaign/${character.campaignCode}/players/${characterId}`,
+            {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ playerId: characterId }),
+            }
+          ).catch(() => {});
+        }
         set(state => ({
           characters: state.characters.filter(c => c.id !== characterId),
+          characterTombstones: character
+            ? {
+                ...state.characterTombstones,
+                [characterId]: {
+                  id: characterId,
+                  deletedAt: Date.now(),
+                  beforeImage: structuredClone(character),
+                },
+              }
+            : state.characterTombstones,
           activeCharacterId:
             state.activeCharacterId === characterId
               ? null
@@ -354,6 +402,32 @@ export const usePlayerStore = create<PlayerStoreState>()(
         return newPlayerCharacter.id;
       },
 
+      addCloudRecoveredCharacter: character => {
+        if (get().characters.some(candidate => candidate.id === character.id)) {
+          return false;
+        }
+        const recovered = structuredClone(character);
+        set(state => ({
+          characters: [...state.characters, recovered],
+        }));
+        return true;
+      },
+
+      replaceCloudRecoveredCharacter: character => {
+        if (
+          !get().characters.some(candidate => candidate.id === character.id)
+        ) {
+          return false;
+        }
+        const recovered = structuredClone(character);
+        set(state => ({
+          characters: state.characters.map(candidate =>
+            candidate.id === recovered.id ? recovered : candidate
+          ),
+        }));
+        return true;
+      },
+
       // Character selection
       setActiveCharacter: characterId => {
         // Update last played time when setting active
@@ -377,14 +451,6 @@ export const usePlayerStore = create<PlayerStoreState>()(
           activeCharacterId: migratedCharacter.id,
           lastSelectedCharacterId: migratedCharacter.id,
         }));
-
-        // Clean up old storage after successful migration
-        try {
-          localStorage.removeItem(STORAGE_KEY);
-          console.log('Cleaned up old character storage');
-        } catch (error) {
-          console.warn('Failed to clean up old storage:', error);
-        }
 
         return true;
       },
@@ -456,7 +522,16 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }),
     {
       name: PLAYER_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      skipHydration: isBrowserCharacterCutoverParticipant(),
+      storage: createJSONStorage(() =>
+        typeof localStorage !== 'undefined' &&
+        isBrowserCharacterCutoverParticipant()
+          ? createCharacterFamilyStateStorage({
+              backing: localStorage,
+              participant: true,
+            })
+          : createSafeStorage()
+      ),
       version: 1,
       merge: (persistedState, currentState) => ({
         ...currentState,
@@ -482,5 +557,9 @@ export const usePlayerStore = create<PlayerStoreState>()(
     }
   )
 );
+
+exposeStoreForE2E('player', usePlayerStore);
+
+initCrossTabRosterSync(usePlayerStore);
 
 export default usePlayerStore;

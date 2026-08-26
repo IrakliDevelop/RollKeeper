@@ -1,13 +1,17 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
+import { AppIcon, type IconName } from '@/components/ui/icons';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
-import { EnhancedQuickSpells } from '@/components/EnhancedQuickSpells';
+import { QuickSpells } from '@/components/QuickSpells';
+import { QuickFeatures } from '@/components/QuickFeatures';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import ClassResourceTracker from '@/components/ui/character/ClassResourceTracker';
+import { getActiveClassResources } from '@/utils/classResources';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -34,12 +38,16 @@ interface ActionsSectionProps {
   animateRoll?: (notation: string) => Promise<unknown>;
   switchToTab: (tabId: string) => void;
   onStopConcentration: () => void;
+  showClassResources?: boolean;
+  onUseClassResource?: (id: string, amount?: number) => void;
+  onRestoreClassResource?: (id: string, amount?: number) => void;
+  onResetClassResource?: (id: string) => void;
 }
 
 // Simple collapsible component for subsections
 interface CollapsibleSubsectionProps {
   title: string;
-  icon: string;
+  icon: IconName;
   children: React.ReactNode;
   defaultExpanded?: boolean;
   persistKey: string;
@@ -79,7 +87,7 @@ const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
           className="flex flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
           aria-expanded={isExpanded}
         >
-          <span className="text-lg">{icon}</span>
+          <AppIcon name={icon} className="h-5 w-5 shrink-0" />
           <h3 className="text-heading text-lg font-bold">{title}</h3>
           {isExpanded ? (
             <ChevronDown size={20} className="ml-2" />
@@ -108,8 +116,27 @@ export default function ActionsSection({
   animateRoll,
   switchToTab,
   onStopConcentration,
+  showClassResources,
+  onUseClassResource,
+  onRestoreClassResource,
+  onResetClassResource,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
+  // Intentionally narrow deps: only recompute when fields that affect
+  // resource maxima change, not on every character mutation.
+  const classResources = useMemo(
+    () => (showClassResources ? getActiveClassResources(character) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      showClassResources,
+      character.classes,
+      character.class,
+      character.level,
+      character.totalLevel,
+      character.abilities,
+      character.classResources,
+    ]
+  );
   const actionSpells = character.spells.filter(
     spell =>
       (spell.level === 0 && spell.isPrepared) || // Only prepared cantrips
@@ -127,7 +154,7 @@ export default function ActionsSection({
       {/* Ready Weapons - Collapsible */}
       <CollapsibleSubsection
         title="Ready Weapons"
-        icon="⚔️"
+        icon="weapon"
         persistKey="ready-weapons"
         defaultExpanded={true}
         badge={
@@ -155,10 +182,86 @@ export default function ActionsSection({
         </ErrorBoundary>
       </CollapsibleSubsection>
 
+      {/* Class Resources - Collapsible */}
+      {classResources.length > 0 &&
+        onUseClassResource &&
+        onRestoreClassResource &&
+        onResetClassResource && (
+          <CollapsibleSubsection
+            title="Class Resources"
+            icon="damage"
+            persistKey="class-resources"
+            defaultExpanded={true}
+            badge={
+              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
+                {classResources.length}
+              </span>
+            }
+          >
+            <div className="space-y-4">
+              {classResources.map((resource, index) => (
+                <div
+                  key={resource.definition.id}
+                  className={
+                    index > 0 ? 'border-divider border-t pt-4' : undefined
+                  }
+                >
+                  <ClassResourceTracker
+                    resource={resource}
+                    onUse={onUseClassResource}
+                    onRestore={onRestoreClassResource}
+                    onReset={onResetClassResource}
+                  />
+                </div>
+              ))}
+            </div>
+          </CollapsibleSubsection>
+        )}
+
+      {/* Quick Features - Collapsible */}
+      {(character.favoriteFeatureIds || []).length > 0 && (
+        <CollapsibleSubsection
+          title="Quick Features"
+          icon="abilities"
+          persistKey="quick-features"
+          defaultExpanded={true}
+          badge={
+            <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-1 text-sm font-medium">
+              {(character.favoriteFeatureIds || []).length} pinned
+            </span>
+          }
+          extraContent={
+            <Button
+              onClick={e => {
+                e.stopPropagation();
+                switchToTab('features');
+              }}
+              variant="ghost"
+              size="xs"
+              className="bg-accent-amber-bg text-accent-amber-text-muted hover:bg-accent-amber-bg-strong hover:text-accent-amber-text"
+            >
+              Manage
+            </Button>
+          }
+        >
+          <ErrorBoundary
+            fallback={
+              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+                <p className="text-accent-red-text-muted">
+                  Unable to load quick features
+                </p>
+              </div>
+            }
+          >
+            <QuickFeatures />
+          </ErrorBoundary>
+        </CollapsibleSubsection>
+      )}
+
       {/* Quick Spells - Collapsible */}
       <CollapsibleSubsection
         title="Quick Spells"
-        icon="✨"
+        icon="features"
         persistKey="quick-spells"
         defaultExpanded={true}
         badge={
@@ -202,7 +305,7 @@ export default function ActionsSection({
             </div>
           }
         >
-          <EnhancedQuickSpells
+          <QuickSpells
             showAttackRoll={showAttackRoll}
             showSavingThrow={showSavingThrow}
             showDamageRoll={showDamageRoll}

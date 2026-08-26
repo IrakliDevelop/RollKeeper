@@ -5,12 +5,13 @@ import { SpellSlots, PactMagic } from '@/types/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { RotateCcw, Zap } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 interface SpellSlotTrackerProps {
   spellSlots: SpellSlots;
   pactMagic?: PactMagic;
-  onSpellSlotChange?: (level: keyof SpellSlots, used: number) => void;
-  onPactMagicChange?: (used: number) => void;
+  onSpellSlotChange?: (level: keyof SpellSlots, delta: number) => void;
+  onPactMagicChange?: (delta: number) => void;
   onResetSpellSlots?: () => void;
   onResetPactMagic?: () => void;
 
@@ -19,6 +20,7 @@ interface SpellSlotTrackerProps {
   compact?: boolean;
   hideControls?: boolean;
   hideResetButtons?: boolean;
+  hideTitle?: boolean;
   showOnlyUsed?: boolean;
   maxLevelToShow?: number;
 
@@ -36,6 +38,7 @@ export function SpellSlotTracker({
   compact = false,
   hideControls = false,
   hideResetButtons = false,
+  hideTitle = false,
   showOnlyUsed = false,
   maxLevelToShow = 9,
   className = '',
@@ -51,7 +54,7 @@ export function SpellSlotTracker({
   const renderSlotCheckboxes = (
     max: number,
     used: number,
-    onChange?: (used: number) => void
+    onChange?: (delta: number) => void
   ) => {
     const size = compact ? 'w-3 h-3' : 'w-4 h-4';
     const gap = compact ? 'gap-0.5' : 'gap-1';
@@ -64,7 +67,9 @@ export function SpellSlotTracker({
             onClick={() => {
               if (readonly || !onChange) return;
               const newUsed = index < used ? used - 1 : index + 1;
-              onChange(Math.max(0, Math.min(newUsed, max)));
+              const clamped = Math.max(0, Math.min(newUsed, max));
+              const delta = clamped - used;
+              if (delta !== 0) onChange(delta);
             }}
             disabled={readonly || !onChange}
             className={`${size} rounded border-2 transition-colors ${
@@ -98,42 +103,71 @@ export function SpellSlotTracker({
 
   return (
     <div className={containerClasses}>
-      <div className="flex items-center justify-between">
-        <h3
-          className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
-        >
-          <Zap size={compact ? 16 : 20} />
-          Spell Slots
-        </h3>
-        {!readonly && !hideResetButtons && !hideControls && (
-          <div className="flex items-center space-x-2">
-            {hasSpellSlots && onResetSpellSlots && (
-              <Button
-                onClick={onResetSpellSlots}
-                variant="ghost"
-                size="xs"
-                leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                title="Reset all spell slots"
-              >
-                Reset Slots
-              </Button>
-            )}
-            {hasPactMagic && onResetPactMagic && (
-              <Button
-                onClick={onResetPactMagic}
-                variant="ghost"
-                size="xs"
-                leftIcon={<RotateCcw className="h-3 w-3" />}
-                className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                title="Reset pact magic slots"
-              >
-                Reset Pact
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
+      {!hideTitle ? (
+        <div className="flex items-center justify-between">
+          <h3
+            className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
+          >
+            <Zap size={compact ? 16 : 20} />
+            Spell Slots
+          </h3>
+          {!readonly && !hideResetButtons && !hideControls && (
+            <div className="flex items-center space-x-2">
+              {hasSpellSlots && onResetSpellSlots && (
+                <Button
+                  onClick={onResetSpellSlots}
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
+                  title="Reset all spell slots"
+                >
+                  Reset Slots
+                </Button>
+              )}
+              {hasPactMagic && onResetPactMagic && (
+                <Button
+                  onClick={onResetPactMagic}
+                  variant="ghost"
+                  size="xs"
+                  leftIcon={<RotateCcw className="h-3 w-3" />}
+                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
+                  title="Reset pact magic slots"
+                >
+                  Reset Pact
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : !readonly && !hideResetButtons && !hideControls ? (
+        <div className="flex items-center justify-end">
+          {hasSpellSlots && onResetSpellSlots && (
+            <Button
+              onClick={onResetSpellSlots}
+              variant="ghost"
+              size="xs"
+              leftIcon={<RotateCcw className="h-3 w-3" />}
+              className="text-accent-purple-text-muted hover:text-accent-purple-text"
+              title="Reset all spell slots"
+            >
+              Reset Slots
+            </Button>
+          )}
+          {hasPactMagic && onResetPactMagic && (
+            <Button
+              onClick={onResetPactMagic}
+              variant="ghost"
+              size="xs"
+              leftIcon={<RotateCcw className="h-3 w-3" />}
+              className="text-accent-purple-text-muted hover:text-accent-purple-text"
+              title="Reset pact magic slots"
+            >
+              Reset Pact
+            </Button>
+          )}
+        </div>
+      ) : null}
 
       {/* Regular Spell Slots */}
       {hasSpellSlots && levelsToShow.length > 0 && (
@@ -166,7 +200,7 @@ export function SpellSlotTracker({
                   slot.max,
                   slot.used,
                   onSpellSlotChange
-                    ? used => onSpellSlotChange(level, used)
+                    ? delta => onSpellSlotChange(level, delta)
                     : undefined
                 )}
               </div>
@@ -209,8 +243,9 @@ export function SpellSlotTracker({
             )}
           </div>
           {!compact && (
-            <p className="text-accent-purple-text-muted text-xs italic">
-              ⚡ Pact magic slots recharge on a short rest
+            <p className="text-accent-purple-text-muted flex items-center gap-1 text-xs italic">
+              <AppIcon name="reaction" className="h-3.5 w-3.5" />
+              Pact magic slots recharge on a short rest
             </p>
           )}
         </div>
@@ -219,8 +254,9 @@ export function SpellSlotTracker({
       {/* Usage Guide */}
       {!readonly && !hideControls && !compact && (
         <div className="border-accent-purple-border text-muted border-t-2 pt-2 text-xs">
-          <p>
-            💡 Click empty slots to mark as used • Click used slots to mark as
+          <p className="flex items-center gap-1">
+            <AppIcon name="tip" className="h-3.5 w-3.5 shrink-0" />
+            Click empty slots to mark as used • Click used slots to mark as
             available
           </p>
         </div>

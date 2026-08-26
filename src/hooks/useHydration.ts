@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
+import { usePlayerStore } from '@/store/playerStore';
 
 /**
  * Hook to ensure components wait for Zustand store hydration before rendering
@@ -9,16 +10,14 @@ export function useHydration() {
   const hasHydrated = useCharacterStore(state => state.hasHydrated);
 
   useEffect(() => {
-    // Set hasHydrated to true after initial render to prevent hydration mismatches
-    // The onRehydrateStorage callback will have already run if there was stored data
-    if (!hasHydrated) {
-      console.log('[useHydration] Setting hasHydrated to true');
-      const timer = setTimeout(() => {
-        useCharacterStore.setState({ hasHydrated: true });
-      }, 0);
+    if (hasHydrated) return;
 
-      return () => clearTimeout(timer);
-    }
+    const markHydrated = () =>
+      useCharacterStore.setState({ hasHydrated: true });
+    const unsubscribe = usePlayerStore.persist.onFinishHydration(markHydrated);
+    if (usePlayerStore.persist.hasHydrated()) markHydrated();
+
+    return unsubscribe;
   }, [hasHydrated]);
 
   return hasHydrated;

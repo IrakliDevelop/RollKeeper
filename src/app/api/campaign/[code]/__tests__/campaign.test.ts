@@ -75,12 +75,12 @@ describe('PUT /api/campaign/[code]', () => {
     expect(stored).toBeDefined();
   });
 
-  it('overwrites existing campaign', async () => {
+  it('overwrites existing campaign when dmId matches', async () => {
     seedRedis('campaign:ABC123', createMockCampaignData());
 
     const req = createNextRequest('/api/campaign/ABC123', {
       method: 'PUT',
-      body: { dmId: 'dm-1', campaignName: 'Updated Name' },
+      body: { dmId: 'dm-test-123', campaignName: 'Updated Name' },
     });
 
     const res = await PUT(
@@ -89,7 +89,29 @@ describe('PUT /api/campaign/[code]', () => {
     );
     const data = await res.json();
 
+    expect(res.status).toBe(200);
     expect(data.campaign.campaignName).toBe('Updated Name');
+  });
+
+  it('returns 403 and does not overwrite when dmId does not match existing campaign owner', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+
+    const req = createNextRequest('/api/campaign/ABC123', {
+      method: 'PUT',
+      body: { dmId: 'dm-EVIL', campaignName: 'Hijacked Name' },
+    });
+
+    const res = await PUT(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+
+    expect(res.status).toBe(403);
+
+    const stored = getRedisStore().get('campaign:ABC123')!;
+    const campaign = JSON.parse(stored);
+    expect(campaign.campaignName).toBe('Test Campaign');
+    expect(campaign.dmId).toBe('dm-test-123');
   });
 
   it('returns 400 when dmId is missing', async () => {

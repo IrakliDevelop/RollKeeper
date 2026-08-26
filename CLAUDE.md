@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Pull request writing
+
+Keep PR titles, bodies, and verification notes concise. Include only the
+outcome, essential design changes, checks run, and unresolved risks or
+blockers. Omit implementation diaries, task-by-task chronology, raw logs,
+repeated rationale, and generated-session links. Prefer short bullets and link
+to existing documentation or tests instead of restating them. Expand only when
+the user asks or a material risk needs explanation.
+
 ## Commands
 
 ```bash
@@ -68,6 +77,34 @@ Game reference data (spells, monsters, items, etc.) lives in `/json` as large JS
 
 Tests are Storybook component tests run via Vitest + Playwright in headless Chromium. There is no separate Jest config for unit tests despite the `"test": "jest"` script — the actual test runner is `vitest`.
 
+### Final manual browser acceptance (Claude Code)
+
+For PRs that affect browser-visible UI, navigation, authentication, local
+persistence, IndexedDB, offline behavior, downloads, network failures, or
+cloud-sync controls, run the project skill `/rollkeeper-manual-browser`
+(`.claude/skills/rollkeeper-manual-browser/SKILL.md`) after automated checks
+pass and before calling the PR complete or ready to merge.
+
+Claude-specific rules:
+
+- The gate runs only through Claude Code's official Chrome integration
+  (`claude --chrome` or `/chrome`, with the Claude in Chrome extension). It
+  needs an interactive session authenticated with `/login`; it is unavailable
+  with API-key auth, third-party providers, WSL, `claude -p`, or background /
+  headless jobs. In those cases report the gate as **blocked** with the reason —
+  never as passed or skipped.
+- Never substitute Storybook/Vitest, standalone Playwright, a Playwright/Puppeteer
+  MCP server, `curl`, or headless Chromium and call it manual verification. Those
+  are supplemental evidence only.
+- Chrome shares the user's signed-in browser state. Work only in new tabs on the
+  skill's isolated `*.localhost` origins with its synthetic seed data; never read,
+  reuse, or clear the user's real tabs, cookies, storage, or accounts.
+- `AGENTS.md` and `.agents/skills/rollkeeper-manual-browser/SKILL.md` are Codex
+  instructions (Codex desktop in-app Browser). Do not follow their browser setup
+  steps; only reuse the shared checklist and seed script they point to.
+- Server-only and documentation-only PRs may mark the gate not applicable, but
+  the final report and the PR template must state why.
+
 ## Character sheet layout
 
 The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
@@ -126,8 +163,8 @@ import { Autocomplete } from '@/components/ui/forms/Autocomplete';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
 
-// Feedback / overlays — use dialog-new, NOT the legacy Modal
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog-new';
+// Feedback / overlays
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
 
 // Design tokens
 import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
@@ -175,4 +212,14 @@ Use `Button` with `variant`: `primary | secondary | success | danger | warning |
 - Direct state mutation — always use immutable updates
 - `useEffect` data fetching without cleanup
 - Hardcoded colors/spacing — use design tokens
-- The legacy `Modal` component — use `Dialog` from `dialog-new`
+- The legacy `Modal` component — use `Dialog` from `@/components/ui/feedback/dialog`
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

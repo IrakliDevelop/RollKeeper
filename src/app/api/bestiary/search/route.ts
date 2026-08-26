@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadAllBestiary } from '@/utils/bestiaryDataLoader';
-import { filterMonsters } from '@/utils/bestiaryFilters';
+import {
+  filterMonsters,
+  rankMonstersByRelevance,
+} from '@/utils/bestiaryFilters';
 import { BestiaryFilters } from '@/types/bestiary';
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('q') || '';
+    const query = (searchParams.get('q') || '').trim();
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
@@ -55,17 +58,20 @@ export async function GET(request: NextRequest) {
       };
     }
 
-    // Load and filter monsters
+    // Load, filter, and rank monsters
     const allMonsters = await loadAllBestiary();
     const filteredMonsters = filterMonsters(allMonsters, filters);
+    const rankedMonsters = query
+      ? rankMonstersByRelevance(filteredMonsters, query)
+      : filteredMonsters;
 
     // Apply pagination
-    const paginatedMonsters = filteredMonsters.slice(offset, offset + limit);
+    const paginatedMonsters = rankedMonsters.slice(offset, offset + limit);
 
     return NextResponse.json({
       monsters: paginatedMonsters,
-      total: filteredMonsters.length,
-      hasMore: offset + limit < filteredMonsters.length,
+      total: rankedMonsters.length,
+      hasMore: offset + limit < rankedMonsters.length,
       filters: filters,
     });
   } catch (error) {

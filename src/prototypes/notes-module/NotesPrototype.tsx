@@ -287,7 +287,7 @@ export default function NotesPrototype() {
             <div className="flex items-center gap-2 text-amber-800">
               <AlertTriangle size={16} />
               <span className="text-sm font-medium">
-                🧪 Test Prototype - This is an experimental notes feature in
+                Test Prototype - This is an experimental notes feature in
                 development
               </span>
             </div>
@@ -341,7 +341,7 @@ export default function NotesPrototype() {
             <div className="flex items-center gap-2 text-amber-800">
               <AlertTriangle size={16} />
               <span className="text-sm font-medium">
-                🧪 Test Prototype - This is an experimental notes feature in
+                Test Prototype - This is an experimental notes feature in
                 development
               </span>
             </div>
@@ -470,7 +470,7 @@ export default function NotesPrototype() {
           <div className="flex items-center gap-2 text-amber-800">
             <AlertTriangle size={16} />
             <span className="text-sm font-medium">
-              🧪 Test Prototype - This is an experimental notes feature in
+              Test Prototype - This is an experimental notes feature in
               development
             </span>
           </div>

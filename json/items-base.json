@@ -18,14 +18,17 @@
 				}
 			],
 			"referenceSources": [
-				"TTP",
-				"WDMM",
-				"OoW",
 				"IMR",
-				"SCC-ARiR",
 				"JttRC",
 				"KftGV",
-				"PaBTSO"
+				"OoW",
+				"PaBTSO",
+				"RtG",
+				"SCC-ARiR",
+				"TftYP-TSC",
+				"ToA",
+				"TTP",
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Alchemist's Supplies|XPHB"
@@ -205,6 +208,9 @@
 			"page": 150,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"ToA"
+			],
 			"reprintedAs": [
 				"Arrow|XPHB"
 			],
@@ -237,6 +243,12 @@
 			"page": 150,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"CRCotN",
+				"DitLCoT",
+				"IDRotF",
+				"TftYP-TSC"
+			],
 			"reprintedAs": [
 				"Arrows (20)|XPHB"
 			],
@@ -258,6 +270,9 @@
 			"source": "XPHB",
 			"page": 222,
 			"srd52": true,
+			"referenceSources": [
+				"DrDe-TWoO"
+			],
 			"edition": "one",
 			"type": "A|XPHB",
 			"rarity": "none",
@@ -611,7 +626,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"PaBTSO"
+				"PaBTSO",
+				"QftIS",
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Breastplate|XPHB"
@@ -737,7 +754,8 @@
 			"srd52": true,
 			"basicRules2024": true,
 			"referenceSources": [
-				"DrDe-TDoN"
+				"DrDe-TDoN",
+				"DrDe-TFV"
 			],
 			"type": "AT|XPHB",
 			"rarity": "none",
@@ -787,9 +805,11 @@
 			],
 			"referenceSources": [
 				"BGDIA",
-				"IMR",
 				"CM",
+				"IMR",
 				"KftGV",
+				"PaBTSO",
+				"SCC-HfMT",
 				"ToFW"
 			],
 			"reprintedAs": [
@@ -912,6 +932,9 @@
 					"source": "XGE",
 					"page": 80
 				}
+			],
+			"referenceSources": [
+				"OoW"
 			],
 			"reprintedAs": [
 				"Carpenter's Tools|XPHB"
@@ -1056,8 +1079,10 @@
 				}
 			],
 			"referenceSources": [
-				"ToA",
-				"PaBTSO"
+				"DoSI",
+				"KftGV",
+				"PaBTSO",
+				"ToA"
 			],
 			"reprintedAs": [
 				"Cartographer's Tools|XPHB"
@@ -1183,12 +1208,13 @@
 			"basicRules": true,
 			"referenceSources": [
 				"CoS",
-				"SCC-ARiR",
 				"CRCotN",
 				"DSotDQ",
+				"GoS",
 				"PaBTSO",
-				"VEoR",
-				"QftIS"
+				"QftIS",
+				"SCC-ARiR",
+				"VEoR"
 			],
 			"reprintedAs": [
 				"Chain Mail|XPHB"
@@ -1230,7 +1256,10 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-TSC"
+				"CM",
+				"CoS",
+				"TftYP-TSC",
+				"US"
 			],
 			"reprintedAs": [
 				"Chain Shirt|XPHB"
@@ -1279,9 +1308,10 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"WDH",
 				"GoS",
-				"KftGV"
+				"KftGV",
+				"TftYP-AtG",
+				"WDH"
 			],
 			"reprintedAs": [
 				"Club|XPHB"
@@ -1604,7 +1634,15 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"CoS"
+				"CM",
+				"CoS",
+				"CRCotN",
+				"GoS",
+				"IDRotF",
+				"KftGV",
+				"PaBTSO",
+				"SCC-ARiR",
+				"VEoR"
 			],
 			"reprintedAs": [
 				"Bolts (20)|XPHB"
@@ -1663,12 +1701,19 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"BGDIA",
+				"CM",
+				"CoS",
+				"DoSI",
+				"DSotDQ",
 				"GoS",
 				"IDRotF",
-				"CM",
 				"JttRC",
-				"DSotDQ",
-				"QftIS"
+				"PaBTSO",
+				"QftIS",
+				"TftYP-TSC",
+				"ToFW",
+				"VEoR"
 			],
 			"reprintedAs": [
 				"Dagger|XPHB"
@@ -1697,8 +1742,8 @@
 			"srd52": true,
 			"basicRules2024": true,
 			"referenceSources": [
-				"DrDe-TWoO",
-				"DrDe-TFV"
+				"DrDe-TFV",
+				"DrDe-TWoO"
 			],
 			"edition": "one",
 			"type": "M|XPHB",
@@ -1727,6 +1772,9 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"CM"
+			],
 			"reprintedAs": [
 				"Dart|XPHB"
 			],
@@ -1805,7 +1853,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"JttRC"
+				"JttRC",
+				"RtG"
 			],
 			"reprintedAs": [
 				"Drum|XPHB"
@@ -1910,6 +1959,7 @@
 			"source": "DMG",
 			"page": 268,
 			"referenceSources": [
+				"IDRotF",
 				"QftIS"
 			],
 			"reprintedAs": [
@@ -1985,6 +2035,10 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"CoS",
+				"TftYP-AtG"
+			],
 			"reprintedAs": [
 				"Flail|XPHB"
 			],
@@ -2024,6 +2078,10 @@
 			"page": 154,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"RtG",
+				"ToA"
+			],
 			"reprintedAs": [
 				"Flute|XPHB"
 			],
@@ -2077,7 +2135,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"GoS"
+				"GoS",
+				"SCC-ARiR"
 			],
 			"reprintedAs": [
 				"Glaive|XPHB"
@@ -2135,6 +2194,9 @@
 					"source": "XGE",
 					"page": 82
 				}
+			],
+			"referenceSources": [
+				"IMR"
 			],
 			"reprintedAs": [
 				"Glassblower's Tools|XPHB"
@@ -2203,6 +2265,9 @@
 			"page": 220,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TDoN"
+			],
 			"type": "AT|XPHB",
 			"rarity": "none",
 			"weight": 5,
@@ -2254,9 +2319,11 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-AtG",
+				"IDRotF",
+				"PaBTSO",
 				"RMBRE",
-				"PaBTSO"
+				"TftYP-AtG",
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Greataxe|XPHB"
@@ -2357,6 +2424,10 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"PaBTSO",
+				"TftYP-TSC"
+			],
 			"reprintedAs": [
 				"Greatsword|XPHB"
 			],
@@ -2463,6 +2534,7 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"LoX",
 				"ToA"
 			],
 			"reprintedAs": [
@@ -2503,7 +2575,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"CoS"
+				"CM",
+				"CoS",
+				"VEoR"
 			],
 			"reprintedAs": [
 				"Hand Crossbow|XPHB"
@@ -2573,6 +2647,9 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"TftYP-TFoF"
+			],
 			"reprintedAs": [
 				"Handaxe|XPHB"
 			],
@@ -2625,9 +2702,13 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"CM",
 				"CoS",
-				"TTP",
-				"SCC-ARiR"
+				"IDRotF",
+				"KftGV",
+				"PaBTSO",
+				"SCC-ARiR",
+				"TTP"
 			],
 			"reprintedAs": [
 				"Heavy Crossbow|XPHB"
@@ -2686,6 +2767,9 @@
 			"page": 144,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"WDMM"
+			],
 			"reprintedAs": [
 				"Hide Armor|XPHB"
 			],
@@ -2877,9 +2961,10 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"DSotDQ",
 				"GoS",
 				"IDRotF",
-				"DSotDQ"
+				"TftYP-TSC"
 			],
 			"reprintedAs": [
 				"Javelin|XPHB"
@@ -2938,7 +3023,8 @@
 			],
 			"referenceSources": [
 				"IMR",
-				"PaBTSO"
+				"PaBTSO",
+				"RtG"
 			],
 			"reprintedAs": [
 				"Jeweler's Tools|XPHB"
@@ -3227,6 +3313,10 @@
 			"page": 144,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"DSotDQ",
+				"WDMM"
+			],
 			"reprintedAs": [
 				"Leather Armor|XPHB"
 			],
@@ -3269,8 +3359,9 @@
 				}
 			],
 			"referenceSources": [
+				"KftGV",
 				"RtG",
-				"KftGV"
+				"ToA"
 			],
 			"reprintedAs": [
 				"Leatherworker's Tools|XPHB"
@@ -3380,8 +3471,13 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"CoS",
+				"GoS",
+				"IDRotF",
+				"KftGV",
+				"PaBTSO",
 				"TftYP-AtG",
-				"KftGV"
+				"US"
 			],
 			"reprintedAs": [
 				"Light Crossbow|XPHB"
@@ -3514,6 +3610,12 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"IDRotF",
+				"LK",
+				"TftYP-TSC",
+				"WDH"
+			],
 			"reprintedAs": [
 				"Longbow|XPHB"
 			],
@@ -3580,16 +3682,22 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"CoS",
-				"WDH",
-				"GoS",
-				"RMBRE",
-				"US",
 				"CM",
-				"LoX",
+				"CoS",
 				"DSotDQ",
+				"GoS",
+				"IDRotF",
+				"KftGV",
+				"LK",
+				"LoX",
 				"PaBTSO",
-				"VEoR"
+				"QftIS",
+				"RMBRE",
+				"TftYP-TSC",
+				"US",
+				"VEoR",
+				"WDH",
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Longsword|XPHB"
@@ -3644,13 +3752,13 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"DoSI",
+				"JttRC",
+				"LRDT",
+				"RtG",
 				"TftYP-ToH",
 				"ToA",
-				"TTP",
-				"RtG",
-				"JttRC",
-				"DoSI",
-				"LRDT"
+				"TTP"
 			],
 			"reprintedAs": [
 				"Lute|XPHB"
@@ -3705,7 +3813,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"RtG"
+				"RtG",
+				"ToA",
+				"TTP"
 			],
 			"reprintedAs": [
 				"Lyre|XPHB"
@@ -3757,7 +3867,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"QftIS"
+				"QftIS",
+				"VEoR"
 			],
 			"reprintedAs": [
 				"Mace|XPHB"
@@ -3807,12 +3918,14 @@
 				}
 			],
 			"referenceSources": [
+				"CRCotN",
+				"DSotDQ",
 				"GoS",
 				"IMR",
+				"PaBTSO",
 				"RtG",
 				"SCC-ARiR",
-				"CRCotN",
-				"PaBTSO"
+				"ToA"
 			],
 			"reprintedAs": [
 				"Mason's Tools|XPHB"
@@ -3889,7 +4002,8 @@
 			"srd52": true,
 			"basicRules2024": true,
 			"referenceSources": [
-				"DrDe-TDoN"
+				"DrDe-TDoN",
+				"DrDe-TFV"
 			],
 			"type": "AT|XPHB",
 			"rarity": "none",
@@ -3932,7 +4046,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"RMBRE"
+				"RMBRE",
+				"SCC-ARiR"
 			],
 			"reprintedAs": [
 				"Maul|XPHB"
@@ -3984,6 +4099,9 @@
 			"name": "Modern Bullet",
 			"source": "DMG",
 			"page": 268,
+			"referenceSources": [
+				"WDMM"
+			],
 			"edition": "classic",
 			"type": "AF|DMG",
 			"rarity": "none",
@@ -4021,7 +4139,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"GoS"
+				"CoS",
+				"GoS",
+				"PaBTSO"
 			],
 			"reprintedAs": [
 				"Morningstar|XPHB"
@@ -4062,6 +4182,10 @@
 			"name": "Musket",
 			"source": "DMG",
 			"page": 268,
+			"referenceSources": [
+				"CoS",
+				"LoX"
+			],
 			"reprintedAs": [
 				"Musket|XPHB"
 			],
@@ -4157,7 +4281,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"ToA"
+				"ToA",
+				"TTP"
 			],
 			"reprintedAs": [
 				{
@@ -4436,6 +4561,10 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"IDRotF",
+				"KftGV"
+			],
 			"reprintedAs": [
 				"Pike|XPHB"
 			],
@@ -4483,6 +4612,10 @@
 			"name": "Pistol",
 			"source": "DMG",
 			"page": 268,
+			"referenceSources": [
+				"HoL",
+				"LoX"
+			],
 			"reprintedAs": [
 				"Pistol|XPHB"
 			],
@@ -4538,12 +4671,12 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-AtG",
-				"GoS",
 				"BGDIA",
-				"US",
+				"GoS",
 				"PaBTSO",
-				"QftIS"
+				"QftIS",
+				"TftYP-AtG",
+				"US"
 			],
 			"reprintedAs": [
 				"Plate Armor|XPHB"
@@ -4705,6 +4838,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"CM",
+				"PaBTSO",
 				"TTP",
 				"WDH"
 			],
@@ -4756,8 +4891,11 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"CM",
 				"CoS",
-				"DitLCoT"
+				"DitLCoT",
+				"QftIS",
+				"US"
 			],
 			"reprintedAs": [
 				"Rapier|XPHB"
@@ -4982,9 +5120,10 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
+				"CM",
+				"DSotDQ",
 				"TftYP-TFoF",
-				"TTP",
-				"CM"
+				"TTP"
 			],
 			"reprintedAs": [
 				"Scale Mail|XPHB"
@@ -5027,9 +5166,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-TSC",
+				"KftGV",
 				"RMBRE",
-				"KftGV"
+				"TftYP-TSC"
 			],
 			"reprintedAs": [
 				"Scimitar|XPHB"
@@ -5173,12 +5312,17 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-AtG",
-				"TTP",
-				"WDH",
+				"BGDIA",
+				"CRCotN",
 				"GoS",
+				"QftIS",
+				"TftYP-AtG",
+				"TftYP-TSC",
+				"TTP",
+				"US",
+				"VEoR",
 				"WBtW",
-				"VEoR"
+				"WDH"
 			],
 			"reprintedAs": [
 				"Shield|XPHB"
@@ -5217,6 +5361,10 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"CRCotN",
+				"TftYP-TSC"
+			],
 			"reprintedAs": [
 				"Shortbow|XPHB"
 			],
@@ -5243,6 +5391,9 @@
 			"page": 215,
 			"srd52": true,
 			"basicRules2024": true,
+			"referenceSources": [
+				"DrDe-TWoO"
+			],
 			"edition": "one",
 			"type": "R|XPHB",
 			"rarity": "none",
@@ -5271,11 +5422,14 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"CoS",
-				"US",
 				"CM",
+				"CoS",
+				"IDRotF",
 				"KftGV",
-				"PaBTSO"
+				"PaBTSO",
+				"US",
+				"VEoR",
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Shortsword|XPHB"
@@ -5302,8 +5456,8 @@
 			"srd52": true,
 			"basicRules2024": true,
 			"referenceSources": [
-				"DrDe-TWoO",
-				"DrDe-SD"
+				"DrDe-SD",
+				"DrDe-TWoO"
 			],
 			"edition": "one",
 			"type": "M|XPHB",
@@ -5476,7 +5630,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"DoSI"
+				"DoSI",
+				"IDRotF"
 			],
 			"reprintedAs": [
 				"Sling Bullet|XPHB"
@@ -5561,13 +5716,14 @@
 				}
 			],
 			"referenceSources": [
+				"BGDIA",
+				"CM",
+				"IDRotF",
+				"KftGV",
+				"QftIS",
 				"ToA",
 				"TTP",
-				"WDH",
-				"BGDIA",
-				"IDRotF",
-				"CM",
-				"KftGV"
+				"WDH"
 			],
 			"reprintedAs": [
 				"Smith's Tools|XPHB"
@@ -5691,14 +5847,16 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-TSC",
-				"TftYP-AtG",
-				"GoS",
-				"SCC-ARiR",
+				"CRCotN",
 				"DSotDQ",
-				"PaBTSO",
+				"GoS",
 				"LK",
-				"QftIS"
+				"PaBTSO",
+				"QftIS",
+				"SCC-ARiR",
+				"TftYP-AtG",
+				"TftYP-TSC",
+				"US"
 			],
 			"reprintedAs": [
 				"Spear|XPHB"
@@ -5772,8 +5930,9 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TftYP-TSC",
+				"SCC-ARiR",
 				"TftYP-AtG",
+				"TftYP-TSC",
 				"VEoR"
 			],
 			"reprintedAs": [
@@ -5872,13 +6031,13 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"LMoP",
-				"TftYP-TSC",
-				"ToA",
-				"GoS",
 				"BGDIA",
 				"CM",
-				"JttRC"
+				"GoS",
+				"JttRC",
+				"LMoP",
+				"TftYP-TSC",
+				"ToA"
 			],
 			"reprintedAs": [
 				"Studded Leather Armor|XPHB"
@@ -5949,10 +6108,16 @@
 			],
 			"referenceSources": [
 				"BGDIA",
+				"IDRotF",
+				"IMR",
 				"KftGV",
+				"OoW",
 				"PaBTSO",
+				"QftIS",
+				"RtG",
+				"TTP",
 				"VEoR",
-				"QftIS"
+				"WDMM"
 			],
 			"reprintedAs": [
 				"Tinker's Tools|XPHB"
@@ -6076,8 +6241,8 @@
 			"srd": true,
 			"basicRules": true,
 			"referenceSources": [
-				"TTP",
-				"GoS"
+				"GoS",
+				"TTP"
 			],
 			"reprintedAs": [
 				"Trident|XPHB"
@@ -6130,6 +6295,10 @@
 			"page": 154,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"ToA",
+				"TTP"
+			],
 			"reprintedAs": [
 				"Viol|XPHB"
 			],
@@ -6219,6 +6388,9 @@
 			"page": 149,
 			"srd": true,
 			"basicRules": true,
+			"referenceSources": [
+				"CoS"
+			],
 			"reprintedAs": [
 				"War Pick|XPHB"
 			],
@@ -6274,8 +6446,9 @@
 			"basicRules": true,
 			"referenceSources": [
 				"CoS",
+				"GoS",
 				"TftYP-TFoF",
-				"GoS"
+				"US"
 			],
 			"reprintedAs": [
 				"Warhammer|XPHB"
@@ -6506,6 +6679,11 @@
 					"page": 85
 				}
 			],
+			"referenceSources": [
+				"IDRotF",
+				"RtG",
+				"VEoR"
+			],
 			"reprintedAs": [
 				"Woodcarver's Tools|XPHB"
 			],
@@ -6610,7 +6788,7 @@
 							"name": "Craft:",
 							"type": "item",
 							"entries": [
-								"{@item Club|XPHB}, {@item Greatclub|XPHB}, {@item Quarterstaff|XPHB}, Ranged weapons (except {@item Pistol|XPHB}, {@item Musket|XPHB}, and  {@item Sling|XPHB}), {@item Arcane Focus|XPHB}, {@item Arrows (20)|XPHB|Arrows}, {@item Bolts (20)|XPHB|Bolts}, {@item Druidic Focus|XPHB}, {@item Ink Pen|XPHB}, {@item Needles (50)|XPHB|Needles}"
+								"{@item Club|XPHB}, {@item Greatclub|XPHB}, {@item Quarterstaff|XPHB}, Ranged weapons (except {@item Pistol|XPHB}, {@item Musket|XPHB}, and {@item Sling|XPHB}), {@item Arcane Focus|XPHB}, {@item Arrows (20)|XPHB|Arrows}, {@item Bolts (20)|XPHB|Bolts}, {@item Druidic Focus|XPHB}, {@item Ink Pen|XPHB}, {@item Needles (50)|XPHB|Needles}"
 							]
 						}
 					]
@@ -7177,7 +7355,13 @@
 			"source": "XDMG",
 			"page": 215,
 			"entries": [
-				"Idols cast of solid gold, necklaces studded with precious stones, paintings of ancient kings, bejeweled dishes\u2014art objects include all these and more."
+				{
+					"type": "entries",
+					"name": "Treasure (Art Object)",
+					"entries": [
+						"Idols cast of solid gold, necklaces studded with precious stones, paintings of ancient kings, bejeweled dishes\u2014art objects include all these and more."
+					]
+				}
 			]
 		},
 		{
@@ -7196,8 +7380,14 @@
 			"page": 213,
 			"basicRules2024": true,
 			"entries": [
-				"Characters often find coins on their adventures and can spend those coins in shops, inns, and other businesses. Coins come in different denominations based on the relative worth of their material. The Coin Values table lists coins and how much they're worth relative to the Gold Piece, which is the game's main coin. For example, 100 Copper Pieces are worth 1 Gold Piece.",
-				"A coin weighs about a third of an ounce, so fifty coins weigh a pound."
+				{
+					"type": "entries",
+					"name": "Treasure (Coinage)",
+					"entries": [
+						"Characters often find coins on their adventures and can spend those coins in shops, inns, and other businesses. Coins come in different denominations based on the relative worth of their material. The Coin Values table lists coins and how much they're worth relative to the Gold Piece, which is the game's main coin. For example, 100 Copper Pieces are worth 1 Gold Piece.",
+						"A coin weighs about a third of an ounce, so fifty coins weigh a pound."
+					]
+				}
 			]
 		},
 		{
@@ -7215,7 +7405,13 @@
 			"source": "XDMG",
 			"page": 214,
 			"entries": [
-				"Gemstones are small, lightweight, and easily secured compared to their same value in coins."
+				{
+					"type": "entries",
+					"name": "Treasure (Gemstone)",
+					"entries": [
+						"Gemstones are small, lightweight, and easily secured compared to their same value in coins."
+					]
+				}
 			]
 		},
 		{
@@ -7282,7 +7478,13 @@
 				"AT|XPHB"
 			],
 			"entries": [
-				"These special tools include the items needed to pursue a craft or trade. Proficiency with a set of artisan's tools lets you add your proficiency bonus to any ability checks you make using the tools in your craft. Each type of artisan's tools requires a separate proficiency."
+				{
+					"type": "entries",
+					"name": "Artisan's Tools",
+					"entries": [
+						"These special tools include the items needed to pursue a craft or trade. Proficiency with a set of artisan's tools lets you add your proficiency bonus to any ability checks you make using the tools in your craft. Each type of artisan's tools requires a separate proficiency."
+					]
+				}
 			]
 		},
 		{
@@ -7292,8 +7494,14 @@
 			"page": 220,
 			"basicRules2024": true,
 			"entries": [
-				"Artisan's Tools are each focused on crafting items and pursuing a trade. Each type of Artisan's Tools tools requires a separate proficiency.",
-				"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+				{
+					"type": "entries",
+					"name": "Artisan's Tool",
+					"entries": [
+						"Artisan's Tools are each focused on crafting items and pursuing a trade. Each type of Artisan's Tools tools requires a separate proficiency.",
+						"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+					]
+				}
 			]
 		},
 		{
@@ -7352,7 +7560,13 @@
 				"GS|XPHB"
 			],
 			"entries": [
-				"If you are proficient with a gaming set, you can add your proficiency bonus to ability checks you make to play a game with that set. Each type of gaming set requires a separate proficiency."
+				{
+					"type": "entries",
+					"name": "Gaming Set",
+					"entries": [
+						"If you are proficient with a gaming set, you can add your proficiency bonus to ability checks you make to play a game with that set. Each type of gaming set requires a separate proficiency."
+					]
+				}
 			]
 		},
 		{
@@ -7362,7 +7576,13 @@
 			"page": 221,
 			"basicRules2024": true,
 			"entries": [
-				"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+				{
+					"type": "entries",
+					"name": "Tool (Gaming Set)",
+					"entries": [
+						"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+					]
+				}
 			]
 		},
 		{
@@ -7370,6 +7590,12 @@
 			"abbreviation": "GV",
 			"source": "DMG",
 			"page": 135
+		},
+		{
+			"name": "Generic Variant",
+			"abbreviation": "GV",
+			"source": "XDMG",
+			"page": 216
 		},
 		{
 			"name": "Heavy Armor",
@@ -7396,7 +7622,13 @@
 				"INS|XPHB"
 			],
 			"entries": [
-				"If you have proficiency with a given musical instrument, you can add your proficiency bonus to any ability checks you make to play music with the instrument. A bard can use a musical instrument as a spellcasting focus. Each type of musical instrument requires a separate proficiency."
+				{
+					"type": "entries",
+					"name": "Instrument",
+					"entries": [
+						"If you have proficiency with a given musical instrument, you can add your proficiency bonus to any ability checks you make to play music with the instrument. A bard can use a musical instrument as a spellcasting focus. Each type of musical instrument requires a separate proficiency."
+					]
+				}
 			]
 		},
 		{
@@ -7406,7 +7638,13 @@
 			"page": 221,
 			"basicRules2024": true,
 			"entries": [
-				"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+				{
+					"type": "entries",
+					"name": "Tool (Musical Instrument)",
+					"entries": [
+						"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+					]
+				}
 			]
 		},
 		{
@@ -7480,6 +7718,12 @@
 			"page": 143
 		},
 		{
+			"name": "Other",
+			"abbreviation": "OTH",
+			"source": "XPHB",
+			"page": 213
+		},
+		{
 			"name": "Potion",
 			"abbreviation": "P",
 			"source": "PHB",
@@ -7533,13 +7777,31 @@
 			"name": "Rod",
 			"abbreviation": "RD",
 			"source": "DMG",
-			"page": 139
+			"page": 139,
+			"reprintedAs": [
+				"RD|XPHB"
+			]
+		},
+		{
+			"name": "Rod",
+			"abbreviation": "RD",
+			"source": "XDMG",
+			"page": 216
 		},
 		{
 			"name": "Ring",
 			"abbreviation": "RG",
 			"source": "DMG",
-			"page": 139
+			"page": 139,
+			"reprintedAs": [
+				"RG|XPHB"
+			]
+		},
+		{
+			"name": "Ring",
+			"abbreviation": "RG",
+			"source": "XDMG",
+			"page": 216
 		},
 		{
 			"name": "Shield",
@@ -7704,7 +7966,13 @@
 			"page": 220,
 			"basicRules2024": true,
 			"entries": [
-				"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+				{
+					"type": "entries",
+					"name": "Tool",
+					"entries": [
+						"If you have proficiency with a tool, add your {@variantrule Proficiency|XPHB|Proficiency Bonus} to any ability check you make that uses the tool. If you have proficiency in a skill that's used with that check, you have {@variantrule Advantage|XPHB} on the check too."
+					]
+				}
 			]
 		},
 		{
@@ -7729,7 +7997,13 @@
 			"source": "XDMG",
 			"page": 213,
 			"entries": [
-				"Because large numbers of coins can be difficult to transport and account for, many merchants prefer to use trade bars\u2014ingots of precious metals and alloys (usually silver). These bars are valued by weight."
+				{
+					"type": "entries",
+					"name": "Trade Bar",
+					"entries": [
+						"Because large numbers of coins can be difficult to transport and account for, many merchants prefer to use trade bars\u2014ingots of precious metals and alloys (usually silver). These bars are valued by weight."
+					]
+				}
 			]
 		},
 		{
@@ -7741,8 +8015,14 @@
 				"TG|XDMG"
 			],
 			"entries": [
-				"Most wealth is not in coins. It is measured in livestock, grain, land, rights to collect taxes, or rights to resources (such as a mine or a forest).",
-				"Guilds, nobles, and royalty regulate trade. Chartered companies are granted rights to conduct trade along certain routes, to send merchant ships to various ports, or to buy or sell specific goods. Guilds set prices for the goods or services that they control, and determine who may or may not offer those goods and services. Merchants commonly exchange trade goods without using currency."
+				{
+					"type": "entries",
+					"name": "Trade Good",
+					"entries": [
+						"Most wealth is not in coins. It is measured in livestock, grain, land, rights to collect taxes, or rights to resources (such as a mine or a forest).",
+						"Guilds, nobles, and royalty regulate trade. Chartered companies are granted rights to conduct trade along certain routes, to send merchant ships to various ports, or to buy or sell specific goods. Guilds set prices for the goods or services that they control, and determine who may or may not offer those goods and services. Merchants commonly exchange trade goods without using currency."
+					]
+				}
 			]
 		},
 		{
@@ -7751,7 +8031,13 @@
 			"source": "XDMG",
 			"page": 213,
 			"entries": [
-				"Merchants commonly exchange trade goods without using currency."
+				{
+					"type": "entries",
+					"name": "Trade Good",
+					"entries": [
+						"Merchants commonly exchange trade goods without using currency."
+					]
+				}
 			]
 		},
 		{
@@ -7774,7 +8060,16 @@
 			"name": "Wand",
 			"abbreviation": "WD",
 			"source": "DMG",
-			"page": 139
+			"page": 139,
+			"reprintedAs": [
+				"WD|XPHB"
+			]
+		},
+		{
+			"name": "Wand",
+			"abbreviation": "WD",
+			"source": "XDMG",
+			"page": 216
 		}
 	],
 	"itemTypeAdditionalEntries": [

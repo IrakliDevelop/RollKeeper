@@ -310,12 +310,20 @@ export function getMonthGrid(
       config.weekDays.length * 1000) %
     config.weekDays.length;
 
+  // The weekday index is calendar data; weekStartsOn only changes how the
+  // columns are presented. Older saved calendars remain first-day-first.
+  const weekStartsOn = config.weekStartsOn ?? 0;
+  const leadingEmptyDays =
+    (((startWeekday - weekStartsOn) % config.weekDays.length) +
+      config.weekDays.length) %
+    config.weekDays.length;
+
   const daysInMonth = config.months[monthIndex].days;
   const weeks: (number | null)[][] = [];
   let currentWeek: (number | null)[] = [];
 
   // Fill leading nulls
-  for (let i = 0; i < startWeekday; i++) {
+  for (let i = 0; i < leadingEmptyDays; i++) {
     currentWeek.push(null);
   }
 

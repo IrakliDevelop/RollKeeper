@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 
 export default function TestErrorPage() {
   const [shouldThrow, setShouldThrow] = useState(false);
@@ -24,7 +26,8 @@ export default function TestErrorPage() {
             onClick={() => setShouldThrow(true)}
             className="rounded-lg bg-red-600 px-6 py-3 text-white shadow-lg transition-colors hover:bg-red-700"
           >
-            🎲 Roll for Catastrophic Failure
+            <AppIcon name="dice" className="mr-2 inline h-4 w-4" />
+            Roll for Catastrophic Failure
           </button>
 
           <div className="mt-6 rounded-lg border border-yellow-200 bg-yellow-50 p-4">
@@ -34,7 +37,11 @@ export default function TestErrorPage() {
                 className="block text-blue-600 underline hover:text-blue-800"
                 target="_blank"
               >
-                🔗 Test 404 Not Found Page
+                <ExternalLink
+                  aria-hidden="true"
+                  className="mr-2 inline h-4 w-4"
+                />
+                Test 404 Not Found Page
               </a>
             </div>
           </div>

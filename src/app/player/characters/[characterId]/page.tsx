@@ -1,97 +1,92 @@
 'use client';
 
-import { FileText, ArrowLeft, AlertTriangle } from 'lucide-react';
+import { FileText, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import { useAutoSave } from '@/hooks/useAutoSave';
+import { useCantripScalingBackfill } from '@/hooks/useCantripScalingBackfill';
+import { useCharacterAnimations } from '@/hooks/useCharacterAnimations';
 import { usePlayerSync } from '@/hooks/usePlayerSync';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
+import { PartyHPSidebar } from '@/components/ui/campaign/PartyHPSidebar';
 import { DmMessageNotification } from '@/components/ui/campaign/DmMessageNotification';
-import { Button } from '@/components/ui/forms';
-import { Badge } from '@/components/ui/layout';
-
-import SpellSlotTracker from '@/components/ui/character/SpellSlotTracker';
-import TraitTracker from '@/components/ui/character/TraitTracker';
-import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
-import BardicInspirationTracker from '@/components/ui/character/BardicInspirationTracker';
-import XPTracker from '@/components/ui/character/XPTracker';
-
-import HitPointManager from '@/components/ui/character/HitPointManager';
+import { ItemTransferNotification } from '@/components/ui/campaign/ItemTransferNotification';
+import {
+  SendItemDialog,
+  SendItemTarget,
+} from '@/components/ui/campaign/SendItemDialog';
+import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotification';
+import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
+import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
+import type { DmEffect, ItemTransfer, DmXpAward } from '@/types/sharedState';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
-import { WeaponProficiencies } from '@/components/WeaponProficiencies';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
+import { CombatStartBanner } from '@/components/ui/feedback/CombatStartBanner';
+import { BattleMapLiveBanner } from '@/components/ui/campaign/BattleMapLiveBanner';
+import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
-import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
-import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
-import RestManager from '@/components/ui/character/RestManager';
-import DaysSpentTracker from '@/components/ui/character/DaysSpentTracker';
-import AbilityScores from '@/components/ui/character/AbilityScores';
-import ArmorClassManager from '@/components/ui/character/ArmorClassManager';
-import SavingThrows from '@/components/ui/character/SavingThrows';
-import Skills from '@/components/ui/character/Skills';
-import CombatStats from '@/components/ui/character/CombatStats';
-import ActionsSection from '@/components/ui/character/ActionsSection';
-import CollapsibleSection from '@/components/ui/layout/CollapsibleSection';
-import QuickStats from '@/components/ui/character/QuickStats';
-import Languages from '@/components/ui/character/LanguagesAndProficiencies';
-import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
-import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import { useHydration } from '@/hooks/useHydration';
+import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
 import {
   calculateModifier,
   getProficiencyBonus,
   hasSpellSlots,
   calculateSkillModifier,
-  calculateSpellAttackBonus,
-  calculateCarryingCapacity,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import {
   AbilityName,
   SkillName,
   CharacterState,
-  ExtendedFeature,
   Spell,
+  SpellSlots,
+  InventoryItem,
+  MagicItem,
 } from '@/types/character';
-import { useCallback, useEffect, useState, useRef } from 'react';
-import GroupedTabs, {
-  GroupedTabsRef,
-} from '@/components/ui/layout/GroupedTabs';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
-import { createCharacterSheetTabsConfig } from './characterSheetTabs';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
+import { useLiveInitiative } from '@/hooks/useLiveInitiative';
+import { useLocationSync } from '@/hooks/useLocationSync';
+import { usePartySync } from '@/hooks/usePartySync';
 
 import { RollSummary } from '@/types/dice';
 import NotHydrated from '@/components/ui/feedback/NotHydrated';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
+import { InitiativePanel } from '@/components/ui/campaign/InitiativePanel';
+import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPrompt';
+import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import RestDialog from '@/components/ui/character/RestDialog';
 import { useCalendarStore } from '@/store/calendarStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
+import { useDmXpAwardProcessor } from '@/hooks/useDmXpAwardProcessor';
+import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
+import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
+import { useMaterializeCampaignStackable } from '@/hooks/useMaterializeCampaignStackable';
 import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
-import { setCharacterSubTab } from '@/components/ui/character/tabbedSheetConfig';
-import NewLayoutPromptDialog from '@/components/ui/character/NewLayoutPromptDialog';
+import {
+  setCharacterSubTab,
+  setInventorySubTab,
+} from '@/components/ui/character/tabbedSheetConfig';
 
 export default function CharacterSheet() {
   const params = useParams();
   const characterId = params.characterId as string;
 
-  const {
-    getCharacterById,
-    updateCharacterData,
-    settings: playerSettings,
-    updateSettings,
-  } = usePlayerStore();
+  const { getCharacterById, updateCharacterData } = usePlayerStore();
   const playerCharacter = getCharacterById(characterId);
+  const playerSettings = usePlayerStore(s => s.settings);
+  const [showCombatBanner, setShowCombatBanner] = useState(false);
 
   const hasHydrated = useHydration();
 
@@ -116,6 +111,28 @@ export default function CharacterSheet() {
     addToast,
   } = useToast();
 
+  const handleRemovedFromCampaign = useCallback(() => {
+    addToast({
+      type: 'info',
+      title: 'Removed from Campaign',
+      message: 'The DM removed this character from the campaign.',
+      duration: 8000,
+    });
+  }, [addToast]);
+
+  // Warn if a save fails because localStorage is full (auto-save writes here).
+  useStorageQuotaListener(
+    useCallback(() => {
+      addToast({
+        type: 'error',
+        title: 'Save failed — storage full',
+        message:
+          'This change could not be saved. Export a backup from the character list now to avoid losing data.',
+        duration: 12000,
+      });
+    }, [addToast])
+  );
+
   const {
     character,
     saveStatus,
@@ -139,12 +156,15 @@ export default function CharacterSheet() {
     recalculateMaxHP,
     updateClass,
     updateLevel,
-    updateSpellSlot,
-    updatePactMagicSlot,
+    spendSpellSlot,
+    restoreSpellSlot,
+    spendPactMagicSlot,
+    restorePactMagicSlot,
     resetSpellSlots,
     resetPactMagicSlots,
     addExperience,
     setExperience,
+    applyDmXpAward,
     addFeature,
     updateFeature,
     deleteFeature,
@@ -161,6 +181,7 @@ export default function CharacterSheet() {
     useExtendedFeature,
     resetExtendedFeatures,
     reorderExtendedFeatures,
+    toggleFavoriteFeature,
     migrateTraitsToExtendedFeatures,
     updateCharacterBackground,
     exportCharacter,
@@ -169,16 +190,17 @@ export default function CharacterSheet() {
     updateHeroicInspiration,
     useHeroicInspiration: spendHeroicInspiration,
     resetHeroicInspiration,
+    setStackableInspiration,
     toggleReaction,
     resetReaction,
-    // Bardic inspiration methods
-    useBardicInspiration,
-    restoreBardicInspiration,
-    resetBardicInspiration,
+    // Class resource methods
+    useClassResource: expendClassResource,
+    restoreClassResource,
+    resetClassResource,
     updateTempArmorClass,
-    toggleTempAC,
+    setTempACActive,
     toggleJackOfAllTrades,
-    toggleShield,
+    setShieldEquipped,
     updateShieldBonus,
     stopConcentration,
     loadCharacterState,
@@ -200,20 +222,44 @@ export default function CharacterSheet() {
     addToolProficiency,
     updateToolProficiency,
     deleteToolProficiency,
+    // Temporary buffs
+    toggleBuff,
     // Campaign tracking
     updateDaysSpent,
     incrementDaysSpent,
+    toggleShareHpWithParty,
     // Easter egg animations
     showDeathAnimation,
     clearDeathAnimation,
     showLevelUpAnimation,
     levelUpAnimationLevel,
     clearLevelUpAnimation,
+    addInventoryItem,
+    addMagicItem,
+    deleteInventoryItem,
   } = useCharacterStore();
 
   // Derive campaign days from local calendar (may be overridden by shared state below)
   const playerCalendar = useCalendarStore(state =>
     state.calendars.find(c => c.campaignCode === characterId)
+  );
+
+  // Delta dispatchers for pip trackers — forwarded intents must carry
+  // deltas, never absolute values computed from possibly-stale renders.
+  const changeSpellSlotBy = useCallback(
+    (level: keyof SpellSlots, delta: number) => {
+      if (delta > 0) spendSpellSlot(level, delta);
+      else if (delta < 0) restoreSpellSlot(level, -delta);
+    },
+    [spendSpellSlot, restoreSpellSlot]
+  );
+
+  const changePactMagicBy = useCallback(
+    (delta: number) => {
+      if (delta > 0) spendPactMagicSlot(delta);
+      else if (delta < 0) restorePactMagicSlot(-delta);
+    },
+    [spendPactMagicSlot, restorePactMagicSlot]
   );
 
   const handleAddSpellsFromFeat = useCallback(
@@ -230,19 +276,217 @@ export default function CharacterSheet() {
   const [pendingRestType, setPendingRestType] = useState<
     'short' | 'long' | null
   >(null);
+  const [sendingItem, setSendingItem] = useState<InventoryItem | null>(null);
+  const [sendItemDialogOpen, setSendItemDialogOpen] = useState(false);
+  const [isSendingItem, setIsSendingItem] = useState(false);
   const tabbedSheetRef = useRef<TabbedCharacterSheetRef>(null);
 
-  const enableTabbedLayout = playerSettings?.enableTabbedLayout ?? false;
-  const hasSeenLayoutPrompt = playerSettings?.hasSeenLayoutPrompt ?? false;
+  const playerSync = usePlayerSync({
+    characterId,
+    onRemovedFromCampaign: handleRemovedFromCampaign,
+  });
 
-  const playerSync = usePlayerSync({ characterId });
+  // Location sync — used to conditionally show Map tab
+  const { locations: syncedLocations } = useLocationSync(
+    playerSync.campaignCode ?? undefined
+  );
+
+  // Party sync — used for send-item targets, the party HP sidebar, and the
+  // initiative panel. A single instance shared across all three so poke-
+  // driven refreshes reach everything and polling isn't duplicated.
+  const {
+    partyMembers,
+    loading: partyMembersLoading,
+    refetchNow: refetchPartyHpNow,
+  } = usePartySync({
+    campaignCode: playerSync.campaignCode ?? null,
+    currentCharacterId: characterId,
+  });
 
   // Shared DM calendar state (when in a campaign)
-  const { sharedState, acknowledgeMessage } = useSharedCampaignState(
-    playerSync.campaignCode,
-    characterId
-  );
+  const {
+    sharedState,
+    acknowledgeMessage,
+    acknowledgeDmEffects,
+    acknowledgeTransfers,
+    acknowledgeXpAward,
+    pendingTransfers,
+    clearPendingTransfer,
+    refetchNow,
+  } = useSharedCampaignState(playerSync.campaignCode, characterId);
   const sharedCalendar = sharedState?.calendar ?? null;
+
+  const inCampaign = Boolean(playerSync.campaignCode);
+  useMaterializeCampaignStackable({
+    inCampaign,
+    sharedStateLoaded: sharedState !== null,
+    campaignStackable: sharedState?.settings?.stackableInspiration,
+    currentStackable: character.stackableInspiration ?? false,
+    setStackableInspiration,
+  });
+
+  // Live battle map join-state derives from this too — derived here (rather
+  // than lower in the file, where it used to live) so it's available before
+  // the poke listener hook below without violating hook-order rules.
+  const activeBattleMapId = sharedState?.battleMap?.activeBattleMapId ?? null;
+
+  // Best-effort relay listener: a DM poke shaves latency off the next
+  // initiative/party-HP refetch instead of waiting on the poll interval.
+  // Polling remains the source-of-truth guarantee if this never connects.
+  useBattleMapPokes({
+    campaignCode: playerSync.campaignCode,
+    battleMapId: activeBattleMapId,
+    tokenRequest: characterId
+      ? { role: 'player', playerId: characterId }
+      : null,
+    onPoke: feature => {
+      if (feature === 'initiative') refetchNow();
+      if (feature === 'players') refetchPartyHpNow();
+    },
+  });
+
+  // DM → player "roll for initiative" prompt
+  const initiativePrompt = useInitiativePrompt({
+    campaignCode: playerSync.campaignCode,
+    characterId,
+    sharedState,
+  });
+
+  // Auto-save DM messages to notes on arrival so they're never lost
+  const savedMessageIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const messages = sharedState?.messages ?? [];
+    for (const msg of messages) {
+      if (!savedMessageIdsRef.current.has(msg.id)) {
+        savedMessageIdsRef.current.add(msg.id);
+        addNote({
+          title: `[DM] ${msg.title}`,
+          content: msg.content,
+          category: 'note',
+        });
+      }
+    }
+  }, [sharedState?.messages, addNote]);
+
+  // Auto-merge incoming item transfers into inventory
+  const processedTransferIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const transfers = sharedState?.transfers ?? [];
+    if (transfers.length === 0) return;
+
+    let added = false;
+    for (const transfer of transfers) {
+      if (processedTransferIdsRef.current.has(transfer.id)) continue;
+      processedTransferIdsRef.current.add(transfer.id);
+
+      if (transfer.itemKind === 'magic') {
+        const {
+          id: _id,
+          createdAt: _createdAt,
+          updatedAt: _updatedAt,
+          ...item
+        } = transfer.item as MagicItem;
+        void _id;
+        void _createdAt;
+        void _updatedAt;
+        addMagicItem({ ...item, isAttuned: false, isEquipped: false });
+        added = true;
+        continue;
+      }
+
+      const inventoryItem = transfer.item as InventoryItem;
+      addInventoryItem({
+        name: inventoryItem.name,
+        category: inventoryItem.category || 'misc',
+        quantity: inventoryItem.quantity,
+        description: inventoryItem.description,
+        weight: inventoryItem.weight,
+        value: inventoryItem.value,
+        rarity: inventoryItem.rarity,
+        type: inventoryItem.type,
+        location: inventoryItem.location || 'Backpack',
+        tags: inventoryItem.tags || [],
+      });
+      added = true;
+    }
+
+    if (added) {
+      acknowledgeTransfers();
+    }
+  }, [
+    sharedState?.transfers,
+    addInventoryItem,
+    addMagicItem,
+    acknowledgeTransfers,
+  ]);
+
+  // Latch DM effects into local state for the notification toast before
+  // acknowledgment clears them from shared state.
+  const [pendingEffectToasts, setPendingEffectToasts] = useState<DmEffect[]>(
+    []
+  );
+
+  useEffect(() => {
+    const additions = (sharedState?.dmEffects ?? []).filter(
+      e => e.action === 'add'
+    );
+    if (additions.length > 0) {
+      setPendingEffectToasts(additions);
+    }
+  }, [sharedState?.dmEffects]);
+
+  // Apply DM condition overrides (additions/removals) to character store,
+  // then acknowledge to clear them from Redis so the player owns the conditions.
+  useDmConditionOverrides(sharedState?.dmEffects, acknowledgeDmEffects);
+
+  // Detect custom counter changes from the DM and show a toast
+  const prevCounterRef = useRef<number | null>(null);
+  const [counterToast, setCounterToast] = useState<{
+    label: string;
+    value: number;
+    delta: number;
+  } | null>(null);
+
+  useEffect(() => {
+    const counter = sharedState?.customCounter;
+    if (!counter) return;
+
+    const prev = prevCounterRef.current;
+    prevCounterRef.current = counter.value;
+
+    if (prev !== null && counter.value !== prev) {
+      setCounterToast({
+        label: counter.label,
+        value: counter.value,
+        delta: counter.value - prev,
+      });
+    }
+  }, [sharedState?.customCounter]);
+
+  // Apply queued DM XP awards (idempotent), ack each, and toast new ones.
+  const handleXpAwardApplied = useCallback(
+    (award: DmXpAward, becamePending: boolean) => {
+      const headline =
+        award.mode === 'add'
+          ? `DM granted ${award.amount.toLocaleString()} XP`
+          : `DM set your XP to ${award.amount.toLocaleString()}`;
+      addToast({
+        type: 'success',
+        title: headline,
+        message: becamePending
+          ? 'Level up available! Use the Level Up button on the Stats tab.'
+          : '',
+      });
+    },
+    [addToast]
+  );
+
+  useDmXpAwardProcessor({
+    xpAwards: sharedState?.xpAwards,
+    applyDmXpAward,
+    acknowledgeXpAward,
+    onApplied: handleXpAwardApplied,
+  });
 
   const calendarDays = sharedCalendar
     ? getCampaignDays(
@@ -272,67 +516,38 @@ export default function CharacterSheet() {
 
   const { manualSave } = useAutoSave({ onAfterSave: handleAfterSave });
 
-  const lastLoadedCharacterRef = useRef<string | null>(null);
-  const lastSyncedCharacterRef = useRef<CharacterState | null>(null);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  useCantripScalingBackfill();
+  useCharacterAnimations();
 
-  // Load character data into store when component mounts or character changes
-  useEffect(() => {
-    if (playerCharacter && hasHydrated) {
-      const currentCharacterId = playerCharacter.characterData.id;
+  // Auto-migrate existing traits to extended features once a character loads
+  // (mirrors the same load event the roster-sync hook fires on).
+  const handleCharacterLoaded = useCallback(
+    (loadedCharacterData: CharacterState) => {
+      const hasTraits = (loadedCharacterData.trackableTraits || []).length > 0;
+      const hasExtended =
+        (loadedCharacterData.extendedFeatures || []).length > 0;
 
-      // Only load if we haven't loaded this character yet or if it's a different character
-      if (lastLoadedCharacterRef.current !== currentCharacterId) {
-        setIsInitialLoad(true);
-        loadCharacterState(playerCharacter.characterData);
-        lastLoadedCharacterRef.current = currentCharacterId;
-        lastSyncedCharacterRef.current = playerCharacter.characterData;
-
-        // Auto-migrate existing traits to extended features if needed
-        const hasTraits =
-          (playerCharacter.characterData.trackableTraits || []).length > 0;
-        const hasExtended =
-          (playerCharacter.characterData.extendedFeatures || []).length > 0;
-
-        if (hasTraits && !hasExtended) {
-          // Small delay to ensure character state is loaded first
-          setTimeout(() => {
-            migrateTraitsToExtendedFeatures();
-          }, 100);
-        }
-
-        // Mark initial load as complete after state has been set
-        const timer = setTimeout(() => {
-          setIsInitialLoad(false);
-        }, 50);
-
-        return () => clearTimeout(timer);
+      if (hasTraits && !hasExtended) {
+        // Small delay to ensure character state is loaded first
+        setTimeout(() => {
+          migrateTraitsToExtendedFeatures();
+        }, 100);
       }
-    }
-  }, [
+    },
+    [migrateTraitsToExtendedFeatures]
+  );
+
+  // Load character data into the store and sync live edits back to the
+  // roster blob (skipping the initial load) — see useCharacterRosterSync.
+  useCharacterRosterSync({
     playerCharacter,
     hasHydrated,
+    characterId,
+    character,
     loadCharacterState,
-    migrateTraitsToExtendedFeatures,
-  ]);
-
-  // Sync character data back to player store when it changes (skip during initial load)
-  useEffect(() => {
-    if (!isInitialLoad && hasHydrated && character.id === characterId) {
-      // Deep comparison to prevent unnecessary updates and infinite loops
-      const hasActualChanges =
-        !lastSyncedCharacterRef.current ||
-        JSON.stringify(lastSyncedCharacterRef.current) !==
-          JSON.stringify(character);
-
-      if (hasActualChanges) {
-        // Create a deep copy to avoid reference issues
-        const characterCopy = JSON.parse(JSON.stringify(character));
-        updateCharacterData(characterId, characterCopy);
-        lastSyncedCharacterRef.current = characterCopy;
-      }
-    }
-  }, [character, characterId, updateCharacterData, hasHydrated, isInitialLoad]);
+    updateCharacterData,
+    onLoad: handleCharacterLoaded,
+  });
 
   // Calculate derived values (needs to be before early returns due to hooks)
   const totalLevel = character.totalLevel || character.level;
@@ -346,20 +561,9 @@ export default function CharacterSheet() {
     [character.abilities]
   );
 
-  // All other hooks and refs that were after early returns
-  const tabsRef = useRef<GroupedTabsRef>(null);
-
-  // Navigation helper — delegates to whichever layout is active
-  const switchToTab = useCallback(
-    (tabId: string) => {
-      if (enableTabbedLayout) {
-        tabbedSheetRef.current?.switchToTab(tabId);
-      } else {
-        tabsRef.current?.switchToTab(tabId);
-      }
-    },
-    [enableTabbedLayout]
-  );
+  const switchToTab = useCallback((tabId: string) => {
+    tabbedSheetRef.current?.switchToTab(tabId);
+  }, []);
 
   // Auto-update initiative when dexterity changes (if not overridden)
   useEffect(() => {
@@ -388,6 +592,164 @@ export default function CharacterSheet() {
     character.class.name,
     character.hitPoints.calculationMode,
     recalculateMaxHP,
+  ]);
+
+  // Send item to another player
+  const handleSendItem = useCallback((item: InventoryItem) => {
+    setSendingItem(item);
+    setSendItemDialogOpen(true);
+  }, []);
+
+  const sendItemTargets: SendItemTarget[] = useMemo(
+    () =>
+      partyMembers.map(m => ({
+        playerId: m.characterId,
+        playerName: m.playerName,
+        characterName: m.characterName,
+        characterId: m.characterId,
+      })),
+    [partyMembers]
+  );
+
+  const handleConfirmSendItem = useCallback(
+    async (item: InventoryItem, target: SendItemTarget) => {
+      if (!playerSync.campaignCode) return;
+      setIsSendingItem(true);
+      try {
+        const transfer: ItemTransfer = {
+          id: `transfer-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          item,
+          fromPlayerName: character.playerName || character.name || 'Unknown',
+          fromCharacterName: character.name || 'Unknown',
+          fromType: 'player',
+          sentAt: new Date().toISOString(),
+        };
+
+        const res = await fetch(
+          `/api/campaign/${playerSync.campaignCode}/shared`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-rollkeeper-csrf': '1',
+            },
+            body: JSON.stringify({
+              feature: 'item_transfer',
+              data: { transfer, playerId: target.characterId },
+            }),
+          }
+        );
+
+        if (!res.ok) throw new Error('Failed to send item');
+        deleteInventoryItem(item.id);
+      } catch (err) {
+        console.error('Failed to send item:', err);
+      } finally {
+        setIsSendingItem(false);
+      }
+    },
+    [
+      playerSync.campaignCode,
+      character.playerName,
+      character.name,
+      deleteInventoryItem,
+    ]
+  );
+
+  const handleEndTurn = useCallback(
+    async (entityId: string) => {
+      const init = sharedState?.initiative;
+      if (!playerSync.campaignCode || !init) return;
+      try {
+        const res = await fetch(
+          `/api/campaign/${playerSync.campaignCode}/turn-request`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-rollkeeper-csrf': '1',
+            },
+            body: JSON.stringify({
+              encounterId: init.encounterId,
+              round: init.round,
+              entityId,
+              playerId: characterId,
+              requestedAt: new Date().toISOString(),
+            }),
+          }
+        );
+        if (!res.ok) {
+          console.warn(
+            'End-turn request was rejected by the server:',
+            res.status
+          );
+        }
+      } catch (err) {
+        console.error('Failed to send end-turn request:', err);
+      }
+    },
+    [playerSync.campaignCode, sharedState?.initiative, characterId]
+  );
+
+  const onSendItem = playerSync.campaignCode ? handleSendItem : undefined;
+
+  // "Combat begins" banner: fire ONCE per encounter when combat reaches
+  // round 1 — acknowledged in localStorage so reloads during round 1 don't
+  // re-fire it. round !== 1 is ignored so loading into an in-progress fight
+  // doesn't trigger it.
+  const COMBAT_BANNER_ACK_KEY = 'rollkeeper-combat-banner-ack';
+  const enableCombatStartBanner = playerSettings.enableCombatStartBanner;
+  const combatBannerShownForRef = useRef<string | null>(null);
+  const initiativeActive = sharedState?.initiative?.isActive ?? false;
+  const initiativeRound = sharedState?.initiative?.round ?? 0;
+  const initiativeEncounterId = sharedState?.initiative?.encounterId ?? null;
+
+  // Overlay live player HP onto the DM-published initiative snapshot so the
+  // InitiativePanel doesn't wait on the DM tab's poll -> merge -> push
+  // round trip (mirrors the player VTT screen's usePlayerVttState).
+  const liveInitiative = useLiveInitiative(
+    sharedState?.initiative ?? null,
+    character,
+    characterId,
+    partyMembers
+  );
+
+  // Live battle map join-state: the bottom banner hides once THIS map was
+  // joined (a new map id brings it back). `activeBattleMapId` is derived
+  // earlier in this file (see the poke listener wiring above).
+  const { joined: joinedBattleMap, markJoined: markBattleMapJoinedNow } =
+    useJoinedBattleMap(activeBattleMapId);
+  useEffect(() => {
+    if (!initiativeActive) {
+      combatBannerShownForRef.current = null;
+      return;
+    }
+    if (initiativeRound !== 1) return;
+    if (combatBannerShownForRef.current === initiativeEncounterId) return;
+    combatBannerShownForRef.current = initiativeEncounterId;
+    if (!enableCombatStartBanner) return;
+    if (initiativeEncounterId) {
+      try {
+        if (
+          window.localStorage.getItem(COMBAT_BANNER_ACK_KEY) ===
+          initiativeEncounterId
+        ) {
+          return; // already shown for this encounter (e.g. before a reload)
+        }
+        window.localStorage.setItem(
+          COMBAT_BANNER_ACK_KEY,
+          initiativeEncounterId
+        );
+      } catch {
+        // storage unavailable — fall back to once-per-mount behavior
+      }
+    }
+    setShowCombatBanner(true);
+  }, [
+    initiativeActive,
+    initiativeRound,
+    initiativeEncounterId,
+    enableCombatStartBanner,
   ]);
 
   if (!hasHydrated) {
@@ -641,6 +1003,64 @@ export default function CharacterSheet() {
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
         <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
+          {/* Party HP Sidebar */}
+          <PartyHPSidebar
+            campaignCode={playerSync.campaignCode ?? null}
+            partyMembers={partyMembers}
+            loading={partyMembersLoading}
+          />
+
+          {/* Shared initiative panel — shown during active combat */}
+          <InitiativePanel
+            state={liveInitiative}
+            characterId={characterId}
+            onEndTurn={handleEndTurn}
+            battleMapHref={
+              playerSync.campaignCode && activeBattleMapId
+                ? `/player/campaign/${playerSync.campaignCode}/battlemap/${activeBattleMapId}?character=${encodeURIComponent(characterId)}`
+                : undefined
+            }
+          />
+
+          {/* "Combat begins" flourish when a fight starts */}
+          <CombatStartBanner
+            isVisible={showCombatBanner}
+            onDone={() => setShowCombatBanner(false)}
+          />
+
+          {/* DM → player "roll for initiative" request */}
+          {initiativePrompt.showPrompt && initiativePrompt.request && (
+            <InitiativeRollPrompt
+              request={initiativePrompt.request}
+              modifier={getInitiativeModifier()}
+              onSubmit={initiativePrompt.handleSubmit}
+              onDismiss={initiativePrompt.dismiss}
+            />
+          )}
+
+          {/* Live battle map banner: full "Join map" until the player joins
+              this map; afterwards the initiative panel carries the link, with
+              a compact corner pill as fallback while combat is inactive. */}
+          {playerSync.campaignCode &&
+            activeBattleMapId &&
+            (!joinedBattleMap ? (
+              <BattleMapLiveBanner
+                campaignCode={playerSync.campaignCode}
+                battleMapId={activeBattleMapId}
+                mapName={sharedState?.battleMap?.name}
+                characterId={characterId}
+                onJoin={markBattleMapJoinedNow}
+              />
+            ) : !initiativeActive ? (
+              <BattleMapLiveBanner
+                campaignCode={playerSync.campaignCode}
+                battleMapId={activeBattleMapId}
+                mapName={sharedState?.battleMap?.name}
+                characterId={characterId}
+                compact
+              />
+            ) : null)}
+
           {/* Header */}
           <CharacterSheetHeader
             characterId={characterId}
@@ -674,6 +1094,8 @@ export default function CharacterSheet() {
                 onToggleAutoSync={playerSync.toggleAutoSync}
                 onLeaveCampaign={playerSync.leaveCampaign}
                 characterData={character}
+                shareHpWithParty={character.shareHpWithParty ?? true}
+                onToggleShareHp={toggleShareHpWithParty}
               />
             }
           />
@@ -713,7 +1135,7 @@ export default function CharacterSheet() {
 
             <ExperimentalFeaturesSection />
 
-            {/* Character HUD — visible in both layouts */}
+            {/* Character HUD */}
             <CharacterHUD
               character={character}
               calendarDays={calendarDays}
@@ -725,36 +1147,87 @@ export default function CharacterSheet() {
               }
               onToggleInspiration={handleToggleInspiration}
               onToggleReaction={toggleReaction}
+              onUseClassResource={expendClassResource}
+              onRestoreClassResource={restoreClassResource}
               onStopConcentration={stopConcentration}
-              onNavigateToConditions={() => switchToTab('conditions')}
+              onNavigateToConditions={() => {
+                switchToTab('conditions');
+                setTimeout(() => {
+                  document
+                    .getElementById('conditions-section')
+                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }, 150);
+              }}
+              onNavigateToBuffs={() => {
+                switchToTab('combat');
+              }}
+              onNavigateToCombat={() => {
+                switchToTab('combat');
+              }}
+              onNavigateToSpells={() => {
+                switchToTab('spells');
+              }}
+              onToggleBuff={toggleBuff}
               onUpdateCharacter={updateCharacter}
             />
+
+            {/* DM Effects (applied by DM in encounter) */}
+            {pendingEffectToasts.length > 0 && (
+              <DmEffectsNotification
+                effects={pendingEffectToasts}
+                onDismiss={() => setPendingEffectToasts([])}
+              />
+            )}
+
+            {/* DM Custom Counter change notification */}
+            {counterToast && (
+              <DmCounterNotification
+                label={counterToast.label}
+                value={counterToast.value}
+                delta={counterToast.delta}
+                onDismiss={() => setCounterToast(null)}
+              />
+            )}
 
             {/* DM Message Notifications */}
             {(sharedState?.messages?.length ?? 0) > 0 && (
               <DmMessageNotification
                 messages={sharedState!.messages}
                 onAccept={msg => {
-                  addNote({
-                    title: `[DM] ${msg.title}`,
-                    content: msg.content,
-                    category: 'note',
-                  });
                   acknowledgeMessage(msg.id);
                   switchToTab('character');
                   setCharacterSubTab('notes');
-                  addToast({
-                    type: 'success',
-                    title: 'Message saved',
-                    message: `"${msg.title}" has been added to your notes`,
-                    duration: 4000,
-                  });
                 }}
                 onDismiss={messageId => {
                   acknowledgeMessage(messageId);
                 }}
               />
             )}
+
+            {/* Item Transfer Notifications */}
+            {pendingTransfers.length > 0 && (
+              <ItemTransferNotification
+                transfers={pendingTransfers}
+                onDismiss={clearPendingTransfer}
+                onNavigateToInventory={() => {
+                  switchToTab('inventory');
+                  setInventorySubTab('items');
+                }}
+              />
+            )}
+
+            {/* Send Item Dialog */}
+            <SendItemDialog
+              open={sendItemDialogOpen}
+              onClose={() => {
+                setSendItemDialogOpen(false);
+                setSendingItem(null);
+              }}
+              item={sendingItem}
+              targets={sendItemTargets}
+              onSend={handleConfirmSendItem}
+              sending={isSendingItem}
+            />
 
             {/* Rest Dialog triggered from HUD */}
             <RestDialog
@@ -782,699 +1255,107 @@ export default function CharacterSheet() {
               onClose={() => setPendingRestType(null)}
             />
 
-            {/* One-time layout prompt */}
-            {!enableTabbedLayout && !hasSeenLayoutPrompt && hasHydrated && (
-              <NewLayoutPromptDialog
-                onAccept={() =>
-                  updateSettings({
-                    enableTabbedLayout: true,
-                    hasSeenLayoutPrompt: true,
-                  })
-                }
-                onDismiss={() => updateSettings({ hasSeenLayoutPrompt: true })}
+            <main className="relative z-10 mx-auto max-w-7xl">
+              <TabbedCharacterSheet
+                ref={tabbedSheetRef}
+                character={character}
+                hasHydrated={hasHydrated}
+                totalLevel={totalLevel}
+                proficiencyBonus={proficiencyBonus}
+                characterHasSpells={characterHasSpells}
+                updateAbilityScore={updateAbilityScore}
+                rollAbilityCheck={rollAbilityCheck}
+                getSavingThrowModifier={getSavingThrowModifier}
+                updateSavingThrowProficiency={updateSavingThrowProficiency}
+                rollSavingThrow={rollSavingThrow}
+                getSkillModifier={getSkillModifier}
+                updateSkillProficiency={updateSkillProficiency}
+                updateSkillExpertise={updateSkillExpertise}
+                toggleJackOfAllTrades={toggleJackOfAllTrades}
+                rollSkillCheck={rollSkillCheck}
+                toggleSkillBonusAbility={toggleSkillBonusAbility}
+                updateCharacter={updateCharacter}
+                updateClass={updateClass}
+                updateLevel={updateLevel}
+                addClassLevel={addClassLevel}
+                removeClassLevel={removeClassLevel}
+                updateClassLevel={updateClassLevel}
+                getClassDisplayString={getClassDisplayString}
+                addExperience={addExperience}
+                setExperience={setExperience}
+                changeSpellSlotBy={changeSpellSlotBy}
+                changePactMagicBy={changePactMagicBy}
+                resetSpellSlots={resetSpellSlots}
+                resetPactMagicSlots={resetPactMagicSlots}
+                getInitiativeModifier={getInitiativeModifier}
+                updateInitiative={updateInitiative}
+                resetInitiativeToDefault={resetInitiativeToDefault}
+                toggleReaction={toggleReaction}
+                resetReaction={resetReaction}
+                rollInitiative={rollInitiative}
+                updateTempArmorClass={updateTempArmorClass}
+                setTempACActive={setTempACActive}
+                setShieldEquipped={setShieldEquipped}
+                updateShieldBonus={updateShieldBonus}
+                applyDamageToCharacter={applyDamageToCharacter}
+                applyHealingToCharacter={applyHealingToCharacter}
+                addTemporaryHPToCharacter={addTemporaryHPToCharacter}
+                makeDeathSavingThrow={makeDeathSavingThrow}
+                resetDeathSavingThrows={resetDeathSavingThrows}
+                toggleHPCalculationMode={toggleHPCalculationMode}
+                recalculateMaxHP={recalculateMaxHP}
+                updateHitPoints={updateHitPoints}
+                useHitDie={useHitDie}
+                restoreHitDice={restoreHitDice}
+                resetAllHitDice={resetAllHitDice}
+                showAttackRoll={showAttackRoll}
+                showSavingThrow={showSavingThrow}
+                showDamageRoll={showDamageRoll}
+                animateRoll={diceBoxInitialized ? rollDice : undefined}
+                switchToTab={switchToTab}
+                stopConcentration={stopConcentration}
+                addExtendedFeature={addExtendedFeature}
+                updateExtendedFeature={updateExtendedFeature}
+                deleteExtendedFeature={deleteExtendedFeature}
+                useExtendedFeature={useExtendedFeature}
+                resetExtendedFeatures={resetExtendedFeatures}
+                reorderExtendedFeatures={reorderExtendedFeatures}
+                addSpellsFromFeat={handleAddSpellsFromFeat}
+                toggleFavoriteFeature={toggleFavoriteFeature}
+                addToolProficiency={addToolProficiency}
+                updateToolProficiency={updateToolProficiency}
+                deleteToolProficiency={deleteToolProficiency}
+                addHeroicInspiration={addHeroicInspiration}
+                updateHeroicInspiration={updateHeroicInspiration}
+                useHeroicInspiration={spendHeroicInspiration}
+                resetHeroicInspiration={resetHeroicInspiration}
+                stackableInspiration={character.stackableInspiration ?? false}
+                inCampaign={inCampaign}
+                setStackableInspiration={setStackableInspiration}
+                useClassResource={expendClassResource}
+                restoreClassResource={restoreClassResource}
+                resetClassResource={resetClassResource}
+                addLanguage={addLanguage}
+                deleteLanguage={deleteLanguage}
+                addFeature={addFeature}
+                updateFeature={updateFeature}
+                deleteFeature={deleteFeature}
+                addTrait={addTrait}
+                updateTrait={updateTrait}
+                deleteTrait={deleteTrait}
+                updateCharacterBackground={updateCharacterBackground}
+                addNote={addNote}
+                updateNote={updateNote}
+                deleteNote={deleteNote}
+                reorderNotes={reorderNotes}
+                addToast={addToast}
+                calendarDays={calendarDays}
+                campaignCode={playerSync.campaignCode ?? undefined}
+                customCounter={sharedState?.customCounter}
+                locationCount={syncedLocations.length}
+                onSendItem={onSendItem}
               />
-            )}
-
-            {enableTabbedLayout ? (
-              /* Tabbed Layout */
-              <main className="relative z-10 mx-auto max-w-7xl">
-                <TabbedCharacterSheet
-                  ref={tabbedSheetRef}
-                  character={character}
-                  hasHydrated={hasHydrated}
-                  totalLevel={totalLevel}
-                  proficiencyBonus={proficiencyBonus}
-                  characterHasSpells={characterHasSpells}
-                  updateAbilityScore={updateAbilityScore}
-                  rollAbilityCheck={rollAbilityCheck}
-                  getSavingThrowModifier={getSavingThrowModifier}
-                  updateSavingThrowProficiency={updateSavingThrowProficiency}
-                  rollSavingThrow={rollSavingThrow}
-                  getSkillModifier={getSkillModifier}
-                  updateSkillProficiency={updateSkillProficiency}
-                  updateSkillExpertise={updateSkillExpertise}
-                  toggleJackOfAllTrades={toggleJackOfAllTrades}
-                  rollSkillCheck={rollSkillCheck}
-                  toggleSkillBonusAbility={toggleSkillBonusAbility}
-                  updateCharacter={updateCharacter}
-                  updateClass={updateClass}
-                  updateLevel={updateLevel}
-                  addClassLevel={addClassLevel}
-                  removeClassLevel={removeClassLevel}
-                  updateClassLevel={updateClassLevel}
-                  getClassDisplayString={getClassDisplayString}
-                  addExperience={addExperience}
-                  setExperience={setExperience}
-                  updateSpellSlot={updateSpellSlot}
-                  updatePactMagicSlot={updatePactMagicSlot}
-                  resetSpellSlots={resetSpellSlots}
-                  resetPactMagicSlots={resetPactMagicSlots}
-                  getInitiativeModifier={getInitiativeModifier}
-                  updateInitiative={updateInitiative}
-                  resetInitiativeToDefault={resetInitiativeToDefault}
-                  toggleReaction={toggleReaction}
-                  resetReaction={resetReaction}
-                  rollInitiative={rollInitiative}
-                  updateTempArmorClass={updateTempArmorClass}
-                  toggleTempAC={toggleTempAC}
-                  toggleShield={toggleShield}
-                  updateShieldBonus={updateShieldBonus}
-                  applyDamageToCharacter={applyDamageToCharacter}
-                  applyHealingToCharacter={applyHealingToCharacter}
-                  addTemporaryHPToCharacter={addTemporaryHPToCharacter}
-                  makeDeathSavingThrow={makeDeathSavingThrow}
-                  resetDeathSavingThrows={resetDeathSavingThrows}
-                  toggleHPCalculationMode={toggleHPCalculationMode}
-                  recalculateMaxHP={recalculateMaxHP}
-                  updateHitPoints={updateHitPoints}
-                  useHitDie={useHitDie}
-                  restoreHitDice={restoreHitDice}
-                  resetAllHitDice={resetAllHitDice}
-                  showAttackRoll={showAttackRoll}
-                  showSavingThrow={showSavingThrow}
-                  showDamageRoll={showDamageRoll}
-                  animateRoll={diceBoxInitialized ? rollDice : undefined}
-                  switchToTab={switchToTab}
-                  stopConcentration={stopConcentration}
-                  addExtendedFeature={addExtendedFeature}
-                  updateExtendedFeature={updateExtendedFeature}
-                  deleteExtendedFeature={deleteExtendedFeature}
-                  useExtendedFeature={useExtendedFeature}
-                  resetExtendedFeatures={resetExtendedFeatures}
-                  reorderExtendedFeatures={reorderExtendedFeatures}
-                  addSpellsFromFeat={handleAddSpellsFromFeat}
-                  addToolProficiency={addToolProficiency}
-                  updateToolProficiency={updateToolProficiency}
-                  deleteToolProficiency={deleteToolProficiency}
-                  addHeroicInspiration={addHeroicInspiration}
-                  updateHeroicInspiration={updateHeroicInspiration}
-                  useHeroicInspiration={spendHeroicInspiration}
-                  resetHeroicInspiration={resetHeroicInspiration}
-                  useBardicInspiration={useBardicInspiration}
-                  restoreBardicInspiration={restoreBardicInspiration}
-                  resetBardicInspiration={resetBardicInspiration}
-                  addLanguage={addLanguage}
-                  deleteLanguage={deleteLanguage}
-                  addFeature={addFeature}
-                  updateFeature={updateFeature}
-                  deleteFeature={deleteFeature}
-                  addTrait={addTrait}
-                  updateTrait={updateTrait}
-                  deleteTrait={deleteTrait}
-                  updateCharacterBackground={updateCharacterBackground}
-                  addNote={addNote}
-                  updateNote={updateNote}
-                  deleteNote={deleteNote}
-                  reorderNotes={reorderNotes}
-                  addToast={addToast}
-                  calendarDays={calendarDays}
-                  campaignCode={playerSync.campaignCode ?? undefined}
-                />
-              </main>
-            ) : (
-              /* Classic Layout */
-              <main className="relative z-10 mx-auto max-w-7xl space-y-8">
-                {/* Actions Section */}
-                <CollapsibleSection
-                  title="Actions & Combat"
-                  icon="⚔️"
-                  defaultExpanded={true}
-                  persistKey="actions-combat"
-                  className="border-divider-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-slate-from)] to-[var(--gradient-slate-to)] shadow-lg backdrop-blur-sm"
-                  headerClassName="rounded-t-xl"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    character.concentration.isConcentrating && (
-                      <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-3 py-1 text-sm font-medium">
-                        Concentrating
-                      </span>
-                    )
-                  }
-                >
-                  <ActionsSection
-                    character={character}
-                    showAttackRoll={showAttackRoll}
-                    showSavingThrow={showSavingThrow}
-                    showDamageRoll={showDamageRoll}
-                    animateRoll={diceBoxInitialized ? rollDice : undefined}
-                    switchToTab={switchToTab}
-                    onStopConcentration={stopConcentration}
-                  />
-                </CollapsibleSection>
-
-                {/* Rest & Recovery - Standalone Section */}
-                <CollapsibleSection
-                  title="Rest & Recovery"
-                  icon="🛌"
-                  defaultExpanded={false}
-                  persistKey="rest-recovery"
-                  className="border-divider bg-surface-raised rounded-lg border shadow-lg"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    <div className="flex items-center gap-2">
-                      <span className="bg-accent-amber-bg-strong text-accent-amber-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
-                        Day {calendarDays ?? character.daysSpent ?? 0}
-                      </span>
-                      <span className="bg-accent-blue-bg-strong text-accent-blue-text-muted rounded-md px-2 py-0.5 text-xs font-medium">
-                        Short Rest
-                      </span>
-                      <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-md px-2 py-0.5 text-xs font-medium">
-                        Long Rest
-                      </span>
-                    </div>
-                  }
-                >
-                  <div className="space-y-6">
-                    {/* Rest Manager */}
-                    <RestManager
-                      onShortRest={takeShortRest}
-                      onLongRest={() => {
-                        takeLongRest();
-                        if (!sharedCalendar) {
-                          const cal = useCalendarStore
-                            .getState()
-                            .getCalendar(characterId);
-                          if (cal) {
-                            useCalendarStore
-                              .getState()
-                              .advanceTime(
-                                characterId,
-                                getMsPerDay(cal.config)
-                              );
-                          }
-                        }
-                      }}
-                      onShowShortRestToast={showShortRest}
-                      onShowLongRestToast={showLongRest}
-                    />
-
-                    {/* Days Spent Tracker - Full Width */}
-                    <DaysSpentTracker
-                      daysSpent={character.daysSpent || 0}
-                      onUpdateDays={updateDaysSpent}
-                      onIncrementDays={incrementDaysSpent}
-                    />
-                  </div>
-                </CollapsibleSection>
-
-                {/* Section Divider */}
-                <div className="flex items-center justify-center">
-                  <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
-                  <span className="text-muted px-4 font-medium">
-                    Core Stats
-                  </span>
-                  <div className="via-divider-strong h-px w-full max-w-md bg-gradient-to-r from-transparent to-transparent"></div>
-                </div>
-
-                {/* Core D&D Stats Section */}
-                <CollapsibleSection
-                  title="Character Statistics"
-                  icon="📊"
-                  defaultExpanded={true}
-                  persistKey="character-statistics"
-                  className="border-accent-blue-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-blue-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
-                  headerClassName="rounded-t-xl"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    <div className="flex items-center gap-2">
-                      <span className="bg-accent-blue-bg-strong text-accent-blue-text rounded-full px-3 py-1 text-sm font-medium">
-                        Level {totalLevel}
-                      </span>
-                      <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
-                        HP: {character.hitPoints.current}/
-                        {character.hitPoints.max}
-                      </span>
-                    </div>
-                  }
-                >
-                  <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-                    {/* Left Column - Basic Info & Ability Scores */}
-                    <div className="space-y-6 lg:col-span-4">
-                      {/* Basic Character Information */}
-                      <CharacterBasicInfo
-                        character={character}
-                        race={character.race}
-                        characterClass={character.class}
-                        level={character.level}
-                        background={character.background}
-                        playerName={character.playerName}
-                        alignment={character.alignment}
-                        creatureType={character.creatureType || 'Humanoid'}
-                        onUpdateRace={race => updateCharacter({ race })}
-                        onUpdateClass={updateClass}
-                        onUpdateLevel={updateLevel}
-                        onUpdateBackground={background =>
-                          updateCharacter({ background })
-                        }
-                        onUpdatePlayerName={playerName =>
-                          updateCharacter({ playerName })
-                        }
-                        onUpdateAlignment={alignment =>
-                          updateCharacter({ alignment })
-                        }
-                        onUpdateCreatureType={creatureType =>
-                          updateCharacter({ creatureType })
-                        }
-                        onAddClassLevel={addClassLevel}
-                        onRemoveClassLevel={removeClassLevel}
-                        onUpdateClassLevel={updateClassLevel}
-                        getClassDisplayString={getClassDisplayString}
-                      />
-
-                      {/* Ability Scores */}
-                      <AbilityScores
-                        abilities={character.abilities}
-                        characterLevel={totalLevel}
-                        onUpdateAbilityScore={updateAbilityScore}
-                        onRollAbilityCheck={rollAbilityCheck}
-                      />
-
-                      {/* Weapon Proficiencies */}
-                      <ErrorBoundary
-                        fallback={
-                          <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
-                            <h3 className="text-body mb-2 text-sm font-medium">
-                              Weapon Proficiencies
-                            </h3>
-                            <p className="text-muted">
-                              Unable to load weapon proficiencies
-                            </p>
-                          </div>
-                        }
-                      >
-                        <WeaponProficiencies />
-                      </ErrorBoundary>
-
-                      {/* Heroic Inspiration */}
-                      <HeroicInspirationTracker
-                        inspiration={character.heroicInspiration}
-                        onAddInspiration={addHeroicInspiration}
-                        onUpdateInspiration={updateHeroicInspiration}
-                        onUseInspiration={spendHeroicInspiration}
-                        onResetInspiration={resetHeroicInspiration}
-                      />
-
-                      {/* Bardic Inspiration (Bard class only) */}
-                      {hasHydrated &&
-                        (character.classes?.some(
-                          c => c.className.toLowerCase() === 'bard'
-                        ) ||
-                          character.class?.name?.toLowerCase() === 'bard') && (
-                          <BardicInspirationTracker
-                            bardicInspiration={
-                              character.bardicInspiration ?? { usesExpended: 0 }
-                            }
-                            character={character}
-                            onUseInspiration={useBardicInspiration}
-                            onRestoreInspiration={restoreBardicInspiration}
-                            onResetInspiration={resetBardicInspiration}
-                          />
-                        )}
-
-                      {/* Conditions & Diseases Quick View */}
-                      {hasHydrated &&
-                        (character.conditionsAndDiseases?.activeConditions
-                          ?.length > 0 ||
-                          character.conditionsAndDiseases?.activeDiseases
-                            ?.length > 0) && (
-                          <div className="border-accent-red-border rounded-lg border-2 bg-gradient-to-br from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-4 shadow-sm">
-                            <div className="mb-3 flex items-center justify-between">
-                              <h3 className="text-accent-red-text flex items-center gap-2 text-base font-semibold">
-                                <AlertTriangle className="h-5 w-5" />
-                                Active Conditions & Diseases
-                              </h3>
-                              <Button
-                                onClick={() =>
-                                  tabsRef.current?.switchToTab('conditions')
-                                }
-                                variant="ghost"
-                                size="xs"
-                                className="text-accent-red-text-muted hover:bg-accent-red-bg-strong"
-                              >
-                                Manage →
-                              </Button>
-                            </div>
-                            <div className="space-y-2">
-                              {character.conditionsAndDiseases?.activeConditions?.map?.(
-                                condition => (
-                                  <div
-                                    key={condition.id}
-                                    className="border-accent-red-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <Badge variant="danger" size="sm">
-                                        {condition.name}
-                                      </Badge>
-                                      {condition.stackable &&
-                                        condition.count > 1 && (
-                                          <Badge variant="warning" size="sm">
-                                            Level {condition.count}
-                                          </Badge>
-                                        )}
-                                    </div>
-                                    <Badge variant="neutral" size="sm">
-                                      {condition.source}
-                                    </Badge>
-                                  </div>
-                                )
-                              )}
-                              {character.conditionsAndDiseases?.activeDiseases?.map?.(
-                                disease => (
-                                  <div
-                                    key={disease.id}
-                                    className="border-accent-purple-border bg-surface-raised flex items-center justify-between gap-2 rounded-lg border-2 p-2"
-                                  >
-                                    <Badge variant="info" size="sm">
-                                      {disease.name}
-                                    </Badge>
-                                    <Badge variant="neutral" size="sm">
-                                      {disease.source}
-                                    </Badge>
-                                  </div>
-                                )
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                      {/* Quick Stats */}
-                      <QuickStats
-                        passivePerception={10 + getSkillModifier('perception')}
-                        passiveInsight={10 + getSkillModifier('insight')}
-                        passiveInvestigation={
-                          10 + getSkillModifier('investigation')
-                        }
-                        proficiencyBonus={proficiencyBonus}
-                        carryingCapacity={calculateCarryingCapacity(character)}
-                        currentWeight={
-                          character.inventoryItems.reduce(
-                            (sum, item) =>
-                              sum + (item.weight || 0) * item.quantity,
-                            0
-                          ) +
-                          (character.armorItems?.reduce(
-                            (sum, item) => sum + (item.weight || 0),
-                            0
-                          ) || 0)
-                        }
-                        itemCount={character.inventoryItems.length}
-                        spellAttackBonus={calculateSpellAttackBonus(character)}
-                      />
-
-                      {/* Special Abilities - Read-only, only show active abilities from extendedFeatures */}
-                      <TraitTracker<ExtendedFeature>
-                        traits={(character.extendedFeatures || []).filter(
-                          trait => !trait.isPassive
-                        )}
-                        characterLevel={totalLevel}
-                        onUpdateTrait={updateExtendedFeature}
-                        onDeleteTrait={deleteExtendedFeature}
-                        onUseTrait={useExtendedFeature}
-                        onResetTraits={resetExtendedFeatures}
-                        readonly={false}
-                        hideControls={true}
-                        enableViewModal={true}
-                      />
-                    </div>
-
-                    {/* Middle Column - Skills & Saving Throws */}
-                    <div className="space-y-6 lg:col-span-4">
-                      {/* Saving Throws */}
-                      <SavingThrows
-                        savingThrows={character.savingThrows}
-                        getSavingThrowModifier={getSavingThrowModifier}
-                        onUpdateSavingThrowProficiency={
-                          updateSavingThrowProficiency
-                        }
-                        onRollSavingThrow={rollSavingThrow}
-                      />
-
-                      {/* Skills */}
-                      <Skills
-                        skills={character.skills}
-                        jackOfAllTrades={character.jackOfAllTrades ?? false}
-                        proficiencyBonus={proficiencyBonus}
-                        getSkillModifier={getSkillModifier}
-                        onUpdateSkillProficiency={updateSkillProficiency}
-                        onUpdateSkillExpertise={updateSkillExpertise}
-                        onToggleJackOfAllTrades={toggleJackOfAllTrades}
-                        onRollSkillCheck={rollSkillCheck}
-                        onToggleSkillBonusAbility={toggleSkillBonusAbility}
-                      />
-
-                      {/* Experience Points */}
-                      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                          Experience Points
-                        </h2>
-                        <XPTracker
-                          currentXP={character.experience}
-                          currentLevel={totalLevel}
-                          onAddXP={addExperience}
-                          onSetXP={setExperience}
-                        />
-                      </div>
-
-                      {/* Spell Slots */}
-                      {characterHasSpells && (
-                        <SpellSlotTracker
-                          spellSlots={character.spellSlots}
-                          pactMagic={character.pactMagic}
-                          onSpellSlotChange={updateSpellSlot}
-                          onPactMagicChange={
-                            character.pactMagic
-                              ? updatePactMagicSlot
-                              : undefined
-                          }
-                          onResetSpellSlots={resetSpellSlots}
-                          onResetPactMagic={
-                            character.pactMagic
-                              ? resetPactMagicSlots
-                              : undefined
-                          }
-                        />
-                      )}
-                    </div>
-
-                    {/* Right Column - Combat Stats & Features */}
-                    <div className="space-y-6 lg:col-span-4">
-                      {/* Combat Stats */}
-                      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-                          Combat Stats
-                        </h2>
-
-                        {/* Armor Class */}
-                        <ArmorClassManager
-                          character={character}
-                          onUpdateArmorClass={ac =>
-                            updateCharacter({ armorClass: ac })
-                          }
-                          onUpdateTempArmorClass={updateTempArmorClass}
-                          onToggleTempAC={toggleTempAC}
-                          onToggleShield={toggleShield}
-                          onUpdateShieldBonus={updateShieldBonus}
-                        />
-
-                        {/* Combat Stats */}
-                        <CombatStats
-                          character={character}
-                          getInitiativeModifier={getInitiativeModifier}
-                          onUpdateInitiative={updateInitiative}
-                          onResetInitiativeToDefault={resetInitiativeToDefault}
-                          onUpdateSpeed={speed => updateCharacter({ speed })}
-                          onUpdateCharacter={updateCharacter}
-                          onToggleReaction={toggleReaction}
-                          onResetReaction={resetReaction}
-                          onRollInitiative={rollInitiative}
-                        />
-
-                        {/* Hit Points - Now using comprehensive HP Manager */}
-                        <div className="mb-6">
-                          <ErrorBoundary
-                            fallback={
-                              <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                                <h3 className="text-accent-red-text mb-4 text-lg font-bold">
-                                  Hit Points
-                                </h3>
-                                <p className="text-muted">
-                                  Unable to load HP manager
-                                </p>
-                              </div>
-                            }
-                          >
-                            <HitPointManager
-                              hitPoints={character.hitPoints}
-                              classInfo={character.class}
-                              level={totalLevel}
-                              constitutionScore={
-                                character.abilities.constitution
-                              }
-                              onApplyDamage={applyDamageToCharacter}
-                              onApplyHealing={applyHealingToCharacter}
-                              onAddTemporaryHP={addTemporaryHPToCharacter}
-                              onMakeDeathSave={makeDeathSavingThrow}
-                              onResetDeathSaves={resetDeathSavingThrows}
-                              onToggleCalculationMode={toggleHPCalculationMode}
-                              onRecalculateMaxHP={recalculateMaxHP}
-                              onUpdateHitPoints={updateHitPoints}
-                            />
-                          </ErrorBoundary>
-                        </div>
-
-                        {/* Hit Dice */}
-                        <ErrorBoundary
-                          fallback={
-                            <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                              <h3 className="text-body mb-2 text-sm font-medium">
-                                Hit Dice
-                              </h3>
-                              <p className="text-muted">
-                                Unable to load hit dice tracker
-                              </p>
-                            </div>
-                          }
-                        >
-                          <HitDiceTracker
-                            hitDicePools={character.hitDicePools || {}}
-                            onUseHitDie={useHitDie}
-                            onRestoreHitDice={restoreHitDice}
-                            onResetAllHitDice={resetAllHitDice}
-                          />
-                        </ErrorBoundary>
-                      </div>
-                      {/* Languages */}
-                      <Languages
-                        languages={character.languages || []}
-                        onAddLanguage={addLanguage}
-                        onDeleteLanguage={deleteLanguage}
-                      />
-                    </div>
-                  </div>
-                </CollapsibleSection>
-
-                {/* Tool Proficiencies Section */}
-                <CollapsibleSection
-                  title="Tool Proficiencies"
-                  icon="🔧"
-                  defaultExpanded={false}
-                  persistKey="tool-proficiencies"
-                  className="border-accent-indigo-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-indigo-from)] to-[var(--gradient-indigo-to)] shadow-lg backdrop-blur-sm"
-                  headerClassName="rounded-t-xl"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    (character.toolProficiencies?.length || 0) > 0 ? (
-                      <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-full px-3 py-1 text-sm font-medium">
-                        {character.toolProficiencies?.filter(
-                          t => t.proficiencyLevel !== 'none'
-                        ).length || 0}{' '}
-                        proficient
-                      </span>
-                    ) : undefined
-                  }
-                >
-                  <ToolProficienciesSection
-                    toolProficiencies={character.toolProficiencies || []}
-                    proficiencyBonus={proficiencyBonus}
-                    onAddToolProficiency={addToolProficiency}
-                    onUpdateToolProficiency={updateToolProficiency}
-                    onDeleteToolProficiency={deleteToolProficiency}
-                  />
-                </CollapsibleSection>
-
-                {/* Active Abilities & Features Section */}
-                <CollapsibleSection
-                  title="Active Abilities & Features"
-                  icon="⚡"
-                  defaultExpanded={false}
-                  persistKey="active-features"
-                  className="border-accent-amber-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] shadow-lg backdrop-blur-sm"
-                  headerClassName="rounded-t-xl"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    <div className="flex items-center gap-2">
-                      {(character.extendedFeatures?.length || 0) > 0 && (
-                        <span className="bg-accent-amber-bg-strong text-accent-amber-text rounded-full px-3 py-1 text-sm font-medium">
-                          {character.extendedFeatures?.length || 0} abilities
-                        </span>
-                      )}
-                      {character.extendedFeatures?.some(
-                        f => f.usedUses > 0
-                      ) && (
-                        <span className="bg-accent-red-bg-strong text-accent-red-text rounded-full px-3 py-1 text-sm font-medium">
-                          {
-                            character.extendedFeatures?.filter(
-                              f => f.usedUses > 0
-                            ).length
-                          }{' '}
-                          used
-                        </span>
-                      )}
-                    </div>
-                  }
-                >
-                  <ExtendedFeaturesSection
-                    features={character.extendedFeatures || []}
-                    character={character}
-                    onAddFeature={addExtendedFeature}
-                    onUpdateFeature={updateExtendedFeature}
-                    onDeleteFeature={deleteExtendedFeature}
-                    onUseFeature={useExtendedFeature}
-                    onResetFeatures={resetExtendedFeatures}
-                    onReorderFeatures={reorderExtendedFeatures}
-                    onAddSpells={handleAddSpellsFromFeat}
-                  />
-                </CollapsibleSection>
-
-                {/* Grouped Tabbed Interface for Additional Sections */}
-                <CollapsibleSection
-                  title="Character Details & Management"
-                  icon="📋"
-                  defaultExpanded={true}
-                  persistKey="character-details"
-                  className="border-accent-green-border-strong rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-green-from)] to-[var(--gradient-emerald-to)] shadow-lg backdrop-blur-sm"
-                  headerClassName="rounded-t-xl"
-                  contentClassName="px-6 pb-6"
-                  badge={
-                    <div className="flex items-center gap-2">
-                      {character.spells.length > 0 && (
-                        <span className="bg-accent-purple-bg-strong text-accent-purple-text rounded-full px-3 py-1 text-sm font-medium">
-                          {character.spells.length} spells
-                        </span>
-                      )}
-                      {(character.features?.length || 0) > 0 && (
-                        <span className="bg-accent-green-bg-strong text-accent-green-text rounded-full px-3 py-1 text-sm font-medium">
-                          {character.features?.length || 0} features
-                        </span>
-                      )}
-                    </div>
-                  }
-                >
-                  <GroupedTabs
-                    defaultTab="spellcasting"
-                    className="w-full"
-                    groups={createCharacterSheetTabsConfig({
-                      character,
-                      hasHydrated,
-                      addFeature,
-                      updateFeature,
-                      deleteFeature,
-                      addTrait,
-                      updateTrait,
-                      deleteTrait,
-                      updateCharacterBackground,
-                      addNote,
-                      updateNote,
-                      deleteNote,
-                      reorderNotes,
-                      addToast,
-                      calendarDays,
-                    })}
-                    ref={tabsRef}
-                  />
-                </CollapsibleSection>
-              </main>
-            )}
+            </main>
 
             <ToastContainer toasts={toasts} onDismiss={dismissToast} />
 

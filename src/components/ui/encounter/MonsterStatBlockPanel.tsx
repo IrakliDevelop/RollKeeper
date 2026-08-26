@@ -1,11 +1,27 @@
 'use client';
 
 import React from 'react';
-import { MonsterStatBlock } from '@/types/encounter';
+import { NumberField } from '@/components/ui/forms/NumberInput';
+import type {
+  MonsterStatBlock,
+  NpcResource,
+  StatBlockEntry,
+  MonsterAbility,
+} from '@/types/encounter';
+import { getEntryAbilityConfig } from '@/utils/statBlockAbilities';
+import { StatBlockEntryRow } from '@/components/ui/encounter/combat-screen/detail/StatBlockEntryRow';
 
 interface MonsterStatBlockPanelProps {
   statBlock: MonsterStatBlock;
   onUpdate?: (updates: Partial<MonsterStatBlock>) => void;
+  /** When provided, entries with resourceCost render a cost badge + Use button. */
+  resources?: NpcResource[];
+  /** entryId → usedUses (from CampaignNPC.abilityUsage). */
+  abilityUsage?: Record<string, number>;
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
+  readOnly?: boolean;
 }
 
 const ABILITIES = ['str', 'dex', 'con', 'int', 'wis', 'cha'] as const;
@@ -34,27 +50,59 @@ function StatRow({
 function TraitBlock({
   title,
   entries,
+  resources,
+  abilityUsage,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
+  readOnly,
 }: {
   title: string;
-  entries: Array<{ name: string; text: string }>;
+  entries: StatBlockEntry[];
+  resources?: NpcResource[];
+  abilityUsage?: Record<string, number>;
+  onUseEntry?: (entry: StatBlockEntry) => void;
+  onUseAbilityEntry?: (entry: StatBlockEntry) => void;
+  onRestoreAbilityEntry?: (entry: StatBlockEntry) => void;
+  readOnly?: boolean;
 }) {
-  if (entries.length === 0) return null;
+  if (!entries || entries.length === 0) return null;
   return (
     <div className="space-y-2">
       <h5 className="text-heading border-divider border-b pb-1 text-xs font-semibold tracking-wider uppercase">
         {title}
       </h5>
-      {entries.map((entry, i) => (
-        <div key={i} className="text-sm">
-          <span className="text-heading font-semibold italic">
-            {entry.name}.
-          </span>{' '}
-          <span
-            className="text-body"
-            dangerouslySetInnerHTML={{ __html: entry.text }}
+      {entries.map((entry, i) => {
+        const config = entry.id ? getEntryAbilityConfig(entry) : null;
+        const ability: MonsterAbility | undefined =
+          config && entry.id
+            ? {
+                id: entry.id,
+                name: entry.name,
+                description: entry.text,
+                usageType: config.usageType,
+                rechargeOn: config.rechargeOn,
+                maxUses: config.maxUses,
+                usedUses: Math.min(
+                  Math.max(0, abilityUsage?.[entry.id] ?? 0),
+                  config.maxUses
+                ),
+                restType: config.restType,
+              }
+            : undefined;
+        return (
+          <StatBlockEntryRow
+            key={entry.id ?? i}
+            entry={entry}
+            ability={onUseAbilityEntry || readOnly ? ability : undefined}
+            resources={resources}
+            onUseAbility={onUseAbilityEntry}
+            onRestoreAbility={onRestoreAbilityEntry}
+            onSpendCost={onUseEntry}
+            readOnly={readOnly}
           />
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -62,6 +110,12 @@ function TraitBlock({
 export function MonsterStatBlockPanel({
   statBlock,
   onUpdate,
+  resources,
+  abilityUsage,
+  onUseEntry,
+  onUseAbilityEntry,
+  onRestoreAbilityEntry,
+  readOnly,
 }: MonsterStatBlockPanelProps) {
   return (
     <div className="border-accent-red-border bg-surface space-y-3 rounded-lg border p-3">
@@ -80,13 +134,12 @@ export function MonsterStatBlockPanel({
               {ability}
             </span>
             {onUpdate ? (
-              <input
-                type="number"
+              <NumberField
                 value={statBlock[ability]}
-                onChange={e => {
-                  const val = parseInt(e.target.value);
-                  if (!isNaN(val)) onUpdate({ [ability]: val });
+                onChange={v => {
+                  if (v !== undefined) onUpdate({ [ability]: v });
                 }}
+                allowEmpty
                 className="bg-surface-secondary text-heading mx-auto w-full rounded px-0.5 py-0.5 text-center text-sm font-medium"
               />
             ) : (
@@ -144,13 +197,64 @@ export function MonsterStatBlockPanel({
       </div>
 
       {/* Traits */}
-      <TraitBlock title="Traits" entries={statBlock.traits} />
+      <TraitBlock
+        title="Traits"
+        entries={statBlock.traits}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Actions */}
-      <TraitBlock title="Actions" entries={statBlock.actions} />
+      <TraitBlock
+        title="Actions"
+        entries={statBlock.actions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
+
+      {/* Bonus Actions */}
+      <TraitBlock
+        title="Bonus Actions"
+        entries={statBlock.bonusActions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
 
       {/* Reactions */}
-      <TraitBlock title="Reactions" entries={statBlock.reactions} />
+      <TraitBlock
+        title="Reactions"
+        entries={statBlock.reactions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
+
+      {/* Lair Actions */}
+      <TraitBlock
+        title="Lair Actions"
+        entries={statBlock.lairActions}
+        resources={resources}
+        abilityUsage={abilityUsage}
+        onUseEntry={onUseEntry}
+        onUseAbilityEntry={onUseAbilityEntry}
+        onRestoreAbilityEntry={onRestoreAbilityEntry}
+        readOnly={readOnly}
+      />
     </div>
   );
 }

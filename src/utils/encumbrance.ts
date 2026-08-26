@@ -9,20 +9,15 @@ export interface EncumbranceInfo {
 }
 
 /**
- * Calculate encumbrance for a character based on D&D 5e rules.
- * Carry capacity = STR score × 15
- * Encumbered = STR × 5 (speed -10)
- * Heavily encumbered = STR × 10 (speed -20, disadvantage on checks)
+ * Calculate total carried weight from all sources:
+ * weapons, armor, inventory items, and coins.
  */
-export function calculateEncumbrance(char: CharacterState): EncumbranceInfo {
-  const strScore = char.abilities?.strength ?? 10;
-  const carryCapacity = strScore * 15;
-  const encumberedAt = strScore * 5;
-  const heavilyEncumberedAt = strScore * 10;
-
+export function calculateTotalWeight(char: CharacterState): number {
   let totalWeight = 0;
 
-  // Weapons don't have weight in the current type — skip
+  for (const w of char.weapons ?? []) {
+    totalWeight += w.weight ?? 0;
+  }
   for (const a of char.armorItems ?? []) {
     totalWeight += a.weight ?? 0;
   }
@@ -42,6 +37,42 @@ export function calculateEncumbrance(char: CharacterState): EncumbranceInfo {
     totalWeight += totalCoins / 50;
   }
 
+  return Math.round(totalWeight * 10) / 10;
+}
+
+/**
+ * Calculate total value of all carried items in copper pieces.
+ */
+export function calculateTotalValue(char: CharacterState): number {
+  let totalValue = 0;
+
+  for (const w of char.weapons ?? []) {
+    totalValue += w.value ?? 0;
+  }
+  for (const a of char.armorItems ?? []) {
+    totalValue += a.value ?? 0;
+  }
+  for (const item of char.inventoryItems ?? []) {
+    totalValue += (item.value ?? 0) * (item.quantity ?? 1);
+  }
+
+  return totalValue;
+}
+
+/**
+ * Calculate encumbrance for a character based on D&D 5e rules.
+ * Carry capacity = STR score × 15
+ * Encumbered = STR × 5 (speed -10)
+ * Heavily encumbered = STR × 10 (speed -20, disadvantage on checks)
+ */
+export function calculateEncumbrance(char: CharacterState): EncumbranceInfo {
+  const strScore = char.abilities?.strength ?? 10;
+  const carryCapacity = strScore * 15;
+  const encumberedAt = strScore * 5;
+  const heavilyEncumberedAt = strScore * 10;
+
+  const totalWeight = calculateTotalWeight(char);
+
   let status: EncumbranceInfo['status'] = 'normal';
   if (totalWeight > carryCapacity) {
     status = 'over-capacity';
@@ -52,7 +83,7 @@ export function calculateEncumbrance(char: CharacterState): EncumbranceInfo {
   }
 
   return {
-    totalWeight: Math.round(totalWeight * 10) / 10,
+    totalWeight,
     carryCapacity,
     encumberedAt,
     heavilyEncumberedAt,

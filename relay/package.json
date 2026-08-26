@@ -1,0 +1,31 @@
+{
+  "name": "rollkeeper-battlemap-relay",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "tsx watch --env-file-if-exists=.env src/server.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node --env-file-if-exists=.env dist/server.js",
+    "test": "vitest run",
+    "type-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@fieldnotes/core": "0.53.0",
+    "@fieldnotes/sync": "0.10.0",
+    "@fieldnotes/sync-redis": "0.4.0",
+    "@fieldnotes/sync-server": "0.12.0",
+    "redis": "^4.7.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/ws": "^8.18.1",
+    "tsx": "^4.19.0",
+    "typescript": "^5.5.0",
+    "vitest": "^3.0.0",
+    "ws": "^8.21.0"
+  }
+}

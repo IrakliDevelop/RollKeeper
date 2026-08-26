@@ -1,6 +1,8 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { CampaignInfo } from '@/types/campaign';
+import { createCampaignSettingsAwareDmStorage } from '@/lib/durableDm/campaignSettingsAwareStorage';
 
 const DM_STORAGE_KEY = 'rollkeeper-dm-data';
 
@@ -24,6 +26,19 @@ interface DmStoreState {
     code: string,
     playerCharacterId: string
   ) => string | undefined;
+  /** Merge-persist DM dashboard section state on the campaign page. */
+  setDmDashboardUi: (
+    code: string,
+    partial: Partial<{
+      playersSectionOpen: boolean;
+      houseRulesSectionOpen: boolean;
+      npcSectionOpen: boolean;
+      magicItemLibrarySectionOpen: boolean;
+      npcCollapsedGroupNames: string[];
+      npcInlineSpellSlots: boolean;
+      npcSeparateSpellSlotTracker: boolean;
+    }>
+  ) => void;
 }
 
 function generateDmId(): string {
@@ -118,10 +133,26 @@ export const useDmStore = create<DmStoreState>()(
         const campaign = get().campaigns.find(c => c.code === code);
         return campaign?.playerColors?.[playerCharacterId];
       },
+
+      setDmDashboardUi: (code, partial) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            return {
+              ...c,
+              dmDashboardUi: {
+                ...c.dmDashboardUi,
+                ...partial,
+              },
+            };
+          }),
+        }));
+      },
     }),
     {
       name: DM_STORAGE_KEY,
-      storage: createJSONStorage(() => localStorage),
+      skipHydration: isIndexedDbMigrationEnabled(),
+      storage: createJSONStorage(() => createCampaignSettingsAwareDmStorage()),
       version: 1,
     }
   )

@@ -30,9 +30,14 @@ export interface ProcessedMonster {
   traits?: ProcessedTrait[];
   actions?: ProcessedTrait[];
   reactions?: ProcessedTrait[];
+  bonusActions?: ProcessedTrait[];
   legendaryActions?: ProcessedTrait[];
   source: string;
   page: number;
+  /** Monster has token art on 5e.tools (true for all current bestiary data). */
+  hasToken?: boolean;
+  /** RAW source code (XMM, FTD…) for token URLs — `source` is display-formatted. */
+  tokenSource?: string;
 
   // Numeric values for encounter use
   acValue: number;
@@ -103,11 +108,13 @@ export interface RawMonsterData {
   action?: { name: string; entries: string[] }[];
   legendary?: { name: string; entries: string[] }[];
   reaction?: { name: string; entries: string[] }[];
+  bonus?: { name: string; entries: string[] }[];
   legendaryActions?: number;
   conditionImmune?: string[];
   spellcasting?: RawSpellcasting[];
   source: string;
   page?: number;
+  hasToken?: boolean;
 }
 
 export interface RawSpellcasting {

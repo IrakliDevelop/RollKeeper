@@ -1,13 +1,27 @@
 'use client';
 
-import React, { useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
-import { Plus, Swords, Trash2, Clock, Users, Play, Square } from 'lucide-react';
+import {
+  Plus,
+  Swords,
+  Trash2,
+  Clock,
+  Users,
+  Play,
+  Square,
+  Map as MapIcon,
+  Settings,
+} from 'lucide-react';
 import { useEncounterStore } from '@/store/encounterStore';
+import { useBattleMapStore } from '@/store/battleMapStore';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
+import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
+import type { BattleMap } from '@/types/battlemap';
 
 interface EncounterListProps {
   campaignCode: string;
@@ -15,8 +29,10 @@ interface EncounterListProps {
 
 export function EncounterList({ campaignCode }: EncounterListProps) {
   const { encounters, createEncounter, deleteEncounter } = useEncounterStore();
+  const battleMaps = useBattleMapStore(s => s.getBattleMaps)(campaignCode);
   const [newName, setNewName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
 
   const handleCreate = () => {
     if (!newName.trim()) return;
@@ -33,45 +49,59 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 
   return (
     <div className="space-y-6">
-      {/* Create button / form */}
-      {isCreating ? (
-        <div className="bg-surface-raised border-divider flex items-center gap-3 rounded-lg border p-4">
-          <Input
-            value={newName}
-            onChange={e => setNewName(e.target.value)}
-            placeholder="Encounter name..."
-            onKeyDown={e => {
-              if (e.key === 'Enter') handleCreate();
-              if (e.key === 'Escape') setIsCreating(false);
-            }}
-            autoFocus
-            className="flex-1"
-          />
+      {/* Header row: Create button / form + gear button */}
+      <div className="flex items-center gap-2">
+        {isCreating ? (
+          <div className="bg-surface-raised border-divider flex flex-1 items-center gap-3 rounded-lg border p-4">
+            <Input
+              value={newName}
+              onChange={e => setNewName(e.target.value)}
+              placeholder="Encounter name..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCreate();
+                if (e.key === 'Escape') setIsCreating(false);
+              }}
+              autoFocus
+              className="flex-1"
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleCreate}
+              disabled={!newName.trim()}
+            >
+              Create
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setIsCreating(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
           <Button
             variant="primary"
-            size="sm"
-            onClick={handleCreate}
-            disabled={!newName.trim()}
+            onClick={() => setIsCreating(true)}
+            leftIcon={<Plus size={18} />}
           >
-            Create
+            New Encounter
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsCreating(false)}
-          >
-            Cancel
-          </Button>
-        </div>
-      ) : (
+        )}
+
         <Button
-          variant="primary"
-          onClick={() => setIsCreating(true)}
-          leftIcon={<Plus size={18} />}
+          variant="ghost"
+          size="sm"
+          onClick={() => setConfigOpen(true)}
+          title="Combat configuration"
+          aria-label="Open combat configuration"
         >
-          New Encounter
+          <Settings size={16} className="text-muted" />
         </Button>
-      )}
+      </div>
+
+      <CombatConfigDialog open={configOpen} onOpenChange={setConfigOpen} />
 
       {/* Encounter list */}
       {sorted.length === 0 ? (
@@ -91,6 +121,7 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
               key={encounter.id}
               encounter={encounter}
               campaignCode={campaignCode}
+              linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
               onDelete={() => {
                 if (
                   confirm(`Delete "${encounter.name}"? This cannot be undone.`)
@@ -109,10 +140,12 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
 function EncounterCard({
   encounter,
   campaignCode,
+  linkedBattleMap,
   onDelete,
 }: {
   encounter: Encounter;
   campaignCode: string;
+  linkedBattleMap?: BattleMap;
   onDelete: () => void;
 }) {
   const monsterCount = encounter.entities.filter(
@@ -124,8 +157,8 @@ function EncounterCard({
   const npcCount = encounter.entities.filter(e => e.type === 'npc').length;
 
   return (
-    <div className="border-divider bg-surface-raised hover:bg-surface-secondary rounded-lg border shadow-sm transition-all hover:shadow-md">
-      <div className="p-4">
+    <div className="border-divider bg-surface-raised hover:bg-surface-secondary flex h-full flex-col rounded-lg border shadow-sm transition-all hover:shadow-md">
+      <div className="flex flex-1 flex-col p-4">
         <div className="mb-3 flex items-start justify-between">
           <h3 className="text-heading truncate text-lg font-semibold">
             {encounter.name}
@@ -177,7 +210,18 @@ function EncounterCard({
           {new Date(encounter.updatedAt).toLocaleDateString()}
         </div>
 
-        <div className="flex items-center gap-2">
+        {linkedBattleMap && (
+          <Link
+            href={`/dm/campaign/${campaignCode}/battlemaps/${linkedBattleMap.id}`}
+            onClick={e => e.stopPropagation()}
+            className="text-accent-orange-text hover:text-accent-orange-text mb-3 flex items-center gap-1.5 text-xs font-medium"
+          >
+            <MapIcon size={12} />
+            Map: {linkedBattleMap.name}
+          </Link>
+        )}
+
+        <div className="mt-auto flex items-center gap-2 pt-1">
           <Link
             href={`/dm/campaign/${campaignCode}/encounters/${encounter.id}`}
             className="flex-1"

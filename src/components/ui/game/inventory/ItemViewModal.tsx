@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogBody,
   DialogFooter,
-} from '@/components/ui/feedback/dialog-new';
+} from '@/components/ui/feedback/dialog';
 
 interface ItemViewModalProps {
   item: InventoryItem | null;
