@@ -26,6 +26,21 @@ export interface CharacterBackupConfirmation {
   confirmedTargetAccountId: string;
 }
 
+export interface ManualCharacterBackupRunOptions {
+  originPlayerBackupRunId: string;
+}
+
+export class ManualCharacterCloudRejectedError extends Error {
+  readonly name = 'ManualCharacterCloudRejectedError';
+
+  constructor(
+    readonly status: 'conflict' | 'tombstoned',
+    readonly row: CharacterCloudRow | null
+  ) {
+    super(`Cloud backup was not accepted: ${status}`);
+  }
+}
+
 export interface PutCharacterRequest {
   mutationId: string;
   cloudId: string;
@@ -116,7 +131,8 @@ export class ManualCharacterCloudService {
   async backup(
     character: unknown,
     account: CharacterCloudAccount,
-    confirmation: CharacterBackupConfirmation
+    confirmation: CharacterBackupConfirmation,
+    options?: ManualCharacterBackupRunOptions
   ): Promise<VerifiedCharacterBackup> {
     if (!confirmation.guestSelected) {
       throw new Error('Select this guest character explicitly before upload');
@@ -128,6 +144,24 @@ export class ManualCharacterCloudService {
     const legacyId = characterId(character);
     const payload = encodeCharacterCloudPayload(character);
     const fingerprint = await fingerprintCharacterPayload(payload);
+    let restorePoint =
+      options === undefined ? null : this.links.get(account.id, legacyId);
+    if (options !== undefined && restorePoint?.pendingMutation) {
+      // Response loss keeps the pending identity: a thrown fetch propagates
+      // unchanged so the same mutation is retried on the next attempt.
+      const acknowledged = await this.verifyPendingAcknowledgement(
+        account.id,
+        legacyId,
+        restorePoint
+      );
+      if (acknowledged) {
+        restorePoint = acknowledged.link;
+        if (acknowledged.link.contentFingerprint === fingerprint) {
+          return { status: 'verified', row: acknowledged.row, fingerprint };
+        }
+      }
+    }
+
     let link = this.links.get(account.id, legacyId);
     if (link?.pendingMutation?.contentFingerprint !== fingerprint) {
       link = {
@@ -139,6 +173,21 @@ export class ManualCharacterCloudService {
         pendingMutation: {
           mutationId: this.generateMutationId(),
           contentFingerprint: fingerprint,
+          ...(options === undefined
+            ? {}
+            : { originPlayerBackupRunId: options.originPlayerBackupRunId }),
+        },
+      };
+      this.links.save(link);
+    } else if (
+      options !== undefined &&
+      link.pendingMutation.originPlayerBackupRunId === undefined
+    ) {
+      link = {
+        ...link,
+        pendingMutation: {
+          ...link.pendingMutation,
+          originPlayerBackupRunId: options.originPlayerBackupRunId,
         },
       };
       this.links.save(link);
@@ -157,6 +206,17 @@ export class ManualCharacterCloudService {
       expectedServerVersion: link.serverVersion,
     });
     if (result.status !== 'success') {
+      if (options !== undefined) {
+        // An explicit rejection is never response loss: drop the pending
+        // mutation and leave both copies exactly as they were.
+        throw await this.rejectionAfterRestoringLink(
+          account.id,
+          legacyId,
+          restorePoint,
+          result.status,
+          result.characterId
+        );
+      }
       throw new Error(`Cloud backup was not accepted: ${result.status}`);
     }
 
@@ -182,6 +242,57 @@ export class ManualCharacterCloudService {
       pendingMutation: null,
     });
     return { status: 'verified', row, fingerprint };
+  }
+
+  private async verifyPendingAcknowledgement(
+    accountId: string,
+    legacyId: string,
+    previous: CharacterCloudLink
+  ): Promise<{ link: CharacterCloudLink; row: CharacterCloudRow } | null> {
+    const pending = previous.pendingMutation;
+    if (!pending) return null;
+    const row = await this.gateway.fetch(previous.cloudId);
+    if (!row || row.deleted_at !== null || row.legacy_client_id !== legacyId) {
+      return null;
+    }
+    const decoded = await decodeCharacterCloudRow(row);
+    if (
+      decoded.status !== 'supported' ||
+      decoded.contentFingerprint !== pending.contentFingerprint
+    ) {
+      return null;
+    }
+    const link: CharacterCloudLink = {
+      accountId,
+      legacyId,
+      cloudId: row.id,
+      serverVersion: row.server_version,
+      contentFingerprint: decoded.contentFingerprint,
+      pendingMutation: null,
+    };
+    this.links.save(link);
+    return { link, row };
+  }
+
+  private async rejectionAfterRestoringLink(
+    accountId: string,
+    legacyId: string,
+    previous: CharacterCloudLink | null,
+    status: 'conflict' | 'tombstoned',
+    cloudId: string
+  ): Promise<ManualCharacterCloudRejectedError> {
+    let row: CharacterCloudRow | null = null;
+    try {
+      row = await this.gateway.fetch(cloudId);
+    } catch {
+      row = null;
+    }
+    if (previous === null) {
+      this.links.remove(accountId, legacyId);
+    } else {
+      this.links.save({ ...previous, pendingMutation: null });
+    }
+    return new ManualCharacterCloudRejectedError(status, row);
   }
 
   async verify(
