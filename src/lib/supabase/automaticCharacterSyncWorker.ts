@@ -114,6 +114,15 @@ export class AutomaticCharacterSyncWorker {
             this.options.namespace,
             entry.legacyId
           );
+          if (entry.state === 'inflight') {
+            // pauseAggregate deliberately leaves inflight work alone, so a
+            // refused reclaimed lease has to be stopped explicitly; without it
+            // nextRunnable keeps returning it and the drain never advances.
+            await this.options.repository.updateWork(entry.mutationId, {
+              state: 'paused',
+              inflightAt: null,
+            });
+          }
           return 'held' as const;
         }
         return this.dispatch(entry);

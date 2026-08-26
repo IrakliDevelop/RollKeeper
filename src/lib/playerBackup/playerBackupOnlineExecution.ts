@@ -122,7 +122,7 @@ export async function withExistingDatabase<T>(
   }
 }
 
-interface RetainedCharacterIdentity {
+export interface RetainedCharacterIdentity {
   cloudId: string | null;
   mutationId: string | null;
 }
@@ -133,7 +133,7 @@ interface RetainedCharacterIdentity {
  * a cloud copy) carry the `NO_CLOUD_IDENTITY` sentinel, which must never become
  * a put target; a real identity from an earlier attempt is carried forward.
  */
-function retainCharacterIdentity(
+export function retainCharacterIdentity(
   online: PlayerBackupOnlineCheckpoint | undefined,
   link: CharacterCloudLink | null
 ): RetainedCharacterIdentity {
@@ -174,9 +174,8 @@ export function onlineCheckpoint(options: {
 /**
  * Writes one character checkpoint inside a transaction that re-verifies the
  * account-scoped active run pointer. A replaced run aborts without writing.
- * @internal Shared with `playerBackupOngoingExecution`.
  */
-export async function withFencedCheckpoint(options: {
+async function withFencedCheckpoint(options: {
   database: IDBDatabase;
   accountId: string;
   expectedActiveRunId: string;

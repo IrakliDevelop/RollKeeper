@@ -448,6 +448,31 @@ describe('AutomaticCharacterSyncWorker', () => {
     expect(cloud.fetch).not.toHaveBeenCalled();
   });
 
+  it('pauses a reclaimed inflight mutation the dispatch guard refuses', async () => {
+    const cloud = gateway();
+    await repository.commit(mutation('reclaimed'));
+    await repository.markInflight('mutation-1');
+    const guard: AutomaticSyncDispatchGuard = {
+      around: (_entry, task) => task(),
+      authorize: async () => 'hold',
+    };
+    const sync = worker(cloud, true, guard);
+
+    await expect(sync.runOnce()).resolves.toBe('held');
+
+    await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        legacyId: 'reclaimed',
+        state: 'paused',
+        inflightAt: null,
+      }),
+    ]);
+    // Held work must stop being runnable, or the coordinator drain spins.
+    await expect(sync.runOnce()).resolves.toBe('idle');
+    expect(cloud.put).not.toHaveBeenCalled();
+    expect(cloud.fetch).not.toHaveBeenCalled();
+  });
+
   it('runs put, refetch and acknowledgement inside the guard boundary', async () => {
     const events: string[] = [];
     const cloud = gateway();

@@ -1459,6 +1459,120 @@ describe('ongoing player backup work creation', () => {
     ]);
   });
 
+  it('keeps the queued identity when a resumed character is refused under the fence', async () => {
+    await seedRun({ mode: 'ongoing' });
+    await createOngoingHarness().start();
+
+    const refused = createOngoingHarness({
+      beforeLock: async () => {
+        await setCharacterPolicy('hero-a', false);
+      },
+    });
+    const result = await refused.start();
+
+    // The retained queued work is the stronger durable evidence; the guard
+    // holds it at dispatch while the preference stays off.
+    expect(result.queued).toEqual(['hero-a']);
+    expect(result.failed).toEqual([]);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'failed',
+      reason: 'preference-not-acknowledged',
+      cloudId: 'cloud-1',
+      mutationId: 'mutation-1',
+    });
+    // The work minted by the first attempt is retained untouched.
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({ mutationId: 'mutation-1', state: 'queued' }),
+    ]);
+
+    await setCharacterPolicy('hero-a', true);
+    const database = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    if (!database) throw new Error('database is missing');
+    try {
+      const repository = new IndexedDbAutomaticCharacterSyncRepository(
+        database
+      );
+      const worker = new AutomaticCharacterSyncWorker({
+        namespace: NAMESPACE,
+        featureEnabled: true,
+        repository,
+        gateway: createGatewayDouble(),
+        dispatchGuard: createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        }),
+      });
+
+      await expect(worker.runOnce()).resolves.toBe('synced');
+
+      const acknowledged = await deriveOngoing(repository);
+      expect(acknowledged.protected).toEqual(['hero-a']);
+      expect(acknowledged.failed).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('keeps unrelated characters working after one hard failure', async () => {
+    await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    try {
+      const repository = new IndexedDbAutomaticCharacterSyncRepository(
+        database,
+        { randomId: () => 'archived-hero-a' }
+      );
+      await repository.commit({
+        namespace: NAMESPACE,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-archived',
+        operation: 'delete',
+        payload: null,
+        schemaVersion: 1,
+        localRevision: 5,
+        baseServerVersion: 0,
+        contentFingerprint: 'archived',
+        syncPolicy: 'on',
+        updatedAt: CONFIRMED_AT,
+      });
+      const [archived] = await repository.listOutbox(NAMESPACE);
+      await repository.acknowledge(archived!, 'cloud-archived', 1);
+    } finally {
+      database.close();
+    }
+
+    const result = await createOngoingHarness().start();
+
+    expect(result.failed).toEqual(['hero-a']);
+    expect(result.outcomes['hero-a']).toEqual({
+      outcome: 'failed',
+      reason: 'Initial automatic work could not be saved',
+    });
+    expect(result.queued).toEqual(['hero-c']);
+    const documents = (await readStore('documents')) as Array<{
+      legacyId: string;
+      originPlayerBackupRunId?: string;
+      deletedAt: string | null;
+    }>;
+    expect(
+      documents.find(document => document.legacyId === 'hero-a')
+    ).toMatchObject({ deletedAt: CONFIRMED_AT });
+    expect(
+      documents.find(document => document.legacyId === 'hero-a')
+        ?.originPlayerBackupRunId
+    ).toBeUndefined();
+    await expect(readStore('outbox')).resolves.toEqual([
+      expect.objectContaining({
+        legacyId: 'hero-c',
+        originPlayerBackupRunId: 'run-a',
+      }),
+    ]);
+  });
+
   it('derives protected only from an acknowledged document with no pending work', async () => {
     await seedRun({ mode: 'ongoing' });
     const harness = createOngoingHarness();

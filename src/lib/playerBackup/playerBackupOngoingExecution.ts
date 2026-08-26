@@ -24,8 +24,8 @@ import {
   acknowledgeConfirmedSelection,
   derivePlayerBackupRunResult,
   onlineCheckpoint,
+  retainCharacterIdentity,
   withExistingDatabase,
-  withFencedCheckpoint,
 } from './playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from './playerBackupRunFence';
 import {
@@ -41,6 +41,7 @@ import {
   playerBackupActiveRunKey,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
+  readPlayerBackupRunInTransaction,
   updatePlayerBackupCharacterCheckpoint,
 } from './playerBackupRunRepository';
 
@@ -85,24 +86,56 @@ interface OngoingCharacterContext {
   now: () => string;
 }
 
+/**
+ * Records one character's failure in a fenced transaction that first re-reads
+ * its checkpoint: an identity minted by an earlier attempt is carried forward,
+ * so durable work that is already queued (or later acknowledged) stays
+ * attributable to this character instead of being stranded behind the
+ * no-identity sentinel.
+ */
 function recordOngoingFailure(
   context: OngoingCharacterContext,
   reason: string
 ): Promise<void> {
-  return withFencedCheckpoint({
+  return runPlayerBackupTransaction({
     database: context.database,
     accountId: context.accountId,
     expectedActiveRunId: context.expectedActiveRunId,
-    legacyId: context.legacyId,
-    online: onlineCheckpoint({
-      kind: 'automatic',
-      state: 'failed',
-      cloudId: NO_CLOUD_IDENTITY,
-      mutationId: null,
-      recordedAt: context.now(),
-      reason,
-    }),
+    stores: [],
+    task: async transaction => {
+      const meta = transaction.objectStore('meta');
+      const run = await readPlayerBackupRunInTransaction(
+        meta,
+        context.accountId,
+        context.expectedActiveRunId
+      );
+      const retained = retainCharacterIdentity(
+        run.characterCheckpoints[context.legacyId]?.online,
+        null
+      );
+      await updatePlayerBackupCharacterCheckpoint(meta, {
+        accountId: context.accountId,
+        expectedActiveRunId: context.expectedActiveRunId,
+        legacyId: context.legacyId,
+        online: onlineCheckpoint({
+          kind: 'automatic',
+          state: 'failed',
+          cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
+          mutationId: retained.mutationId,
+          recordedAt: context.now(),
+          reason,
+        }),
+      });
+    },
   });
+}
+
+/** Preference refusals keep their own reason; everything else reports itself. */
+function ongoingFailureReason(cause: unknown): string {
+  if (cause instanceof PlayerBackupPreferenceRefusedError) {
+    return 'preference-not-acknowledged';
+  }
+  return cause instanceof Error ? cause.message : String(cause);
 }
 
 /**
@@ -123,82 +156,77 @@ async function createOngoingCharacterWork(
   const contentFingerprint = await fingerprintCharacterPayload(payload);
   const localRevision = characterRevision(character);
 
-  try {
-    await runPlayerBackupTransaction({
-      database: context.database,
-      accountId: context.accountId,
-      expectedActiveRunId: context.expectedActiveRunId,
-      stores: ['documents', 'outbox', 'tombstones'],
-      task: async transaction => {
-        const meta = transaction.objectStore('meta');
-        const run = await assertPlayerBackupRunLocalReady(
+  await runPlayerBackupTransaction({
+    database: context.database,
+    accountId: context.accountId,
+    expectedActiveRunId: context.expectedActiveRunId,
+    stores: ['documents', 'outbox', 'tombstones'],
+    task: async transaction => {
+      const meta = transaction.objectStore('meta');
+      const run = await assertPlayerBackupRunLocalReady(
+        meta,
+        context.accountId,
+        context.expectedActiveRunId
+      );
+      const policy =
+        await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
           meta,
-          context.accountId,
-          context.expectedActiveRunId
+          run.namespace,
+          context.legacyId
         );
-        const policy =
-          await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
-            meta,
-            run.namespace,
-            context.legacyId
-          );
-        const account =
-          await AutomaticCharacterSyncPreferences.readAccountDefaultInTransaction(
-            meta,
-            run.namespace
-          );
-        if (policy !== 'on' || account?.confirmedAt !== run.confirmedAt) {
-          throw new PlayerBackupPreferenceRefusedError();
-        }
-        // An existing checkpoint means this character already has durable
-        // work; a resumed run must never mint a second identity for it.
-        if (run.characterCheckpoints[context.legacyId]?.online) return;
+      const account =
+        await AutomaticCharacterSyncPreferences.readAccountDefaultInTransaction(
+          meta,
+          run.namespace
+        );
+      if (policy !== 'on' || account?.confirmedAt !== run.confirmedAt) {
+        throw new PlayerBackupPreferenceRefusedError();
+      }
+      // An existing checkpoint means this character already has durable
+      // work; a resumed run must never mint a second identity for it.
+      if (run.characterCheckpoints[context.legacyId]?.online) return;
 
-        const existing = (await requestResult(
-          transaction
-            .objectStore('documents')
-            .get([run.namespace, 'character', context.legacyId])
-        )) as AutomaticCharacterDocument | undefined;
-        const cloudId = existing?.cloudId ?? context.generateCloudId();
-        const mutationId = context.generateMutationId();
-        const recordedAt = context.now();
-        const written = await context.repository.writeMutationInTransaction(
-          transaction,
-          {
-            namespace: run.namespace,
-            legacyId: context.legacyId,
-            cloudId,
-            operation: existing ? 'replace' : 'create',
-            payload,
-            schemaVersion: existing?.schemaVersion ?? 1,
-            localRevision,
-            baseServerVersion: existing?.baseServerVersion ?? 0,
-            contentFingerprint,
-            syncPolicy: 'on',
-            updatedAt: recordedAt,
-            originPlayerBackupRunId: run.runId,
-          },
-          { mutationId }
-        );
-        if (!written.saved) throw new Error(WORK_NOT_SAVED);
-        await updatePlayerBackupCharacterCheckpoint(meta, {
-          accountId: context.accountId,
-          expectedActiveRunId: context.expectedActiveRunId,
+      const existing = (await requestResult(
+        transaction
+          .objectStore('documents')
+          .get([run.namespace, 'character', context.legacyId])
+      )) as AutomaticCharacterDocument | undefined;
+      const cloudId = existing?.cloudId ?? context.generateCloudId();
+      const mutationId = context.generateMutationId();
+      const recordedAt = context.now();
+      const written = await context.repository.writeMutationInTransaction(
+        transaction,
+        {
+          namespace: run.namespace,
           legacyId: context.legacyId,
-          online: onlineCheckpoint({
-            kind: 'automatic',
-            state: 'queued',
-            cloudId,
-            mutationId,
-            recordedAt,
-          }),
-        });
-      },
-    });
-  } catch (cause) {
-    if (!(cause instanceof PlayerBackupPreferenceRefusedError)) throw cause;
-    await recordOngoingFailure(context, 'preference-not-acknowledged');
-  }
+          cloudId,
+          operation: existing ? 'replace' : 'create',
+          payload,
+          schemaVersion: existing?.schemaVersion ?? 1,
+          localRevision,
+          baseServerVersion: existing?.baseServerVersion ?? 0,
+          contentFingerprint,
+          syncPolicy: 'on',
+          updatedAt: recordedAt,
+          originPlayerBackupRunId: run.runId,
+        },
+        { mutationId }
+      );
+      if (!written.saved) throw new Error(WORK_NOT_SAVED);
+      await updatePlayerBackupCharacterCheckpoint(meta, {
+        accountId: context.accountId,
+        expectedActiveRunId: context.expectedActiveRunId,
+        legacyId: context.legacyId,
+        online: onlineCheckpoint({
+          kind: 'automatic',
+          state: 'queued',
+          cloudId,
+          mutationId,
+          recordedAt,
+        }),
+      });
+    },
+  });
 }
 
 /**
@@ -232,20 +260,34 @@ export async function startPlayerBackupOngoingWork(
   return withExistingDatabase(options.factory, async database => {
     const repository = new IndexedDbAutomaticCharacterSyncRepository(database);
     for (const legacyId of run.selectedCharacterIds) {
+      const context: OngoingCharacterContext = {
+        database,
+        repository,
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        legacyId,
+        characters: options.characters,
+        generateCloudId: options.generateCloudId,
+        generateMutationId: options.generateMutationId,
+        now: options.now,
+      };
       await withPlayerBackupAccountLock(
         { accountId: options.accountId, locks },
-        () =>
-          createOngoingCharacterWork({
-            database,
-            repository,
-            accountId: options.accountId,
-            expectedActiveRunId: options.expectedActiveRunId,
-            legacyId,
-            characters: options.characters,
-            generateCloudId: options.generateCloudId,
-            generateMutationId: options.generateMutationId,
-            now: options.now,
-          })
+        async () => {
+          try {
+            await createOngoingCharacterWork(context);
+          } catch (cause) {
+            // One character's failure never stops the others; only a replaced
+            // run or a missing lock invalidates the whole run.
+            if (
+              cause instanceof PlayerBackupRunReplacedError ||
+              cause instanceof PlayerBackupLockUnavailableError
+            ) {
+              throw cause;
+            }
+            await recordOngoingFailure(context, ongoingFailureReason(cause));
+          }
+        }
       );
     }
     return derivePlayerBackupRunResult({
