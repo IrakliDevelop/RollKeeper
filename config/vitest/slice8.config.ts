@@ -17,6 +17,8 @@ export default defineConfig({
     include: [
       'src/lib/indexeddb/__tests__/character*.test.ts',
       'src/lib/indexeddb/__tests__/migrationState.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupActiveSelection.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupCoordinator.test.ts',
       'src/lib/playerBackup/__tests__/playerBackupSafety.test.ts',
     ],
     coverage: {

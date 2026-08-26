@@ -1,4 +1,5 @@
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
+import type { CharacterActivationEvidence } from './characterAuthority';
 
 import { CHARACTER_FAMILY } from './characterFamily';
 
@@ -120,6 +121,14 @@ export function markCharacterCutoverActivated(
 ): void {
   const selection = readCharacterCutoverSelection(storage, namespace);
   if (!selection) throw new Error('Character cutover selection is missing');
+  if (
+    (selection.activatedEpoch !== undefined &&
+      selection.activatedEpoch !== epoch) ||
+    (selection.activatedGeneration !== undefined &&
+      selection.activatedGeneration !== generation)
+  ) {
+    throw new Error('Character cutover activation fields already differ');
+  }
   storage.setItem(
     characterCutoverSelectionKey(namespace),
     JSON.stringify({
@@ -128,6 +137,111 @@ export function markCharacterCutoverActivated(
       ...(generation ? { activatedGeneration: generation } : {}),
     })
   );
+}
+
+function selectionMatchesActivationEvidence(
+  selection: CharacterCutoverSelection,
+  evidence: CharacterActivationEvidence
+): boolean {
+  return (
+    selection.version === 1 &&
+    selection.namespace === evidence.namespace &&
+    selection.family === evidence.family &&
+    selection.selectedAt === evidence.selectedAt &&
+    selection.recoveryManifestHash === evidence.recoveryManifestHash &&
+    selection.recoveryRunId === evidence.recoveryRunId &&
+    selection.recoveryCreatedAt === evidence.recoveryCreatedAt
+  );
+}
+
+export function assertCharacterCutoverSelectionActivation(options: {
+  selection: CharacterCutoverSelection | null;
+  evidence: CharacterActivationEvidence | null;
+  namespace: StorageNamespace;
+  generation: string;
+  epoch: number;
+}): CharacterCutoverSelection {
+  const { selection, evidence } = options;
+  if (
+    !selection ||
+    !evidence ||
+    selection.namespace !== options.namespace ||
+    !selectionMatchesActivationEvidence(selection, evidence) ||
+    selection.activatedGeneration !== options.generation ||
+    selection.activatedEpoch !== options.epoch ||
+    evidence.activatedGeneration !== options.generation ||
+    evidence.activatedEpoch !== options.epoch
+  ) {
+    throw new Error('Character selection activation evidence is invalid');
+  }
+  return selection;
+}
+
+export function repairCharacterCutoverActivationFromEvidence(
+  storage: WritableSelectionStorage,
+  namespace: StorageNamespace,
+  evidence: CharacterActivationEvidence,
+  expectedAuthorization: { runId: string; accountId: string }
+): CharacterCutoverSelection {
+  const selection = readCharacterCutoverSelection(storage, namespace);
+  if (
+    !selection ||
+    selection.activatedEpoch !== undefined ||
+    selection.activatedGeneration !== undefined ||
+    !selectionMatchesActivationEvidence(selection, evidence) ||
+    selection.playerBackupRunId !== expectedAuthorization.runId ||
+    selection.playerBackupAccountId !== expectedAuthorization.accountId ||
+    selection.playerBackupRunId !== evidence.playerBackupRunId ||
+    selection.playerBackupAccountId !== evidence.playerBackupAccountId ||
+    selection.playerBackupAuthorizedAt !== evidence.playerBackupAuthorizedAt
+  ) {
+    throw new Error(
+      'Character activation marker does not match immutable evidence'
+    );
+  }
+  const repaired: CharacterCutoverSelection = {
+    ...selection,
+    activatedEpoch: evidence.activatedEpoch,
+    activatedGeneration: evidence.activatedGeneration,
+  };
+  storage.setItem(
+    characterCutoverSelectionKey(namespace),
+    JSON.stringify(repaired)
+  );
+  return repaired;
+}
+
+export function rebindCharacterCutoverSelection(
+  storage: WritableSelectionStorage,
+  namespace: StorageNamespace,
+  options: {
+    evidence: CharacterActivationEvidence;
+    generation: string;
+    epoch: number;
+    playerBackupRunId: string;
+    playerBackupAccountId: string;
+    playerBackupAuthorizedAt: string;
+  }
+): CharacterCutoverSelection {
+  const selection = readCharacterCutoverSelection(storage, namespace);
+  const verified = assertCharacterCutoverSelectionActivation({
+    selection,
+    evidence: options.evidence,
+    namespace,
+    generation: options.generation,
+    epoch: options.epoch,
+  });
+  const rebound: CharacterCutoverSelection = {
+    ...verified,
+    playerBackupRunId: options.playerBackupRunId,
+    playerBackupAccountId: options.playerBackupAccountId,
+    playerBackupAuthorizedAt: options.playerBackupAuthorizedAt,
+  };
+  storage.setItem(
+    characterCutoverSelectionKey(namespace),
+    JSON.stringify(rebound)
+  );
+  return rebound;
 }
 
 export function isSelectedCharacterCutoverProfile(

@@ -1,5 +1,5 @@
 import {
-  type DeviceBackupEntry,
+  type DeviceBackupEntryVectorItem,
   type DeviceBackupV1,
   captureDeviceBackup,
   deviceBackupEntryVectorsEqual,
@@ -122,14 +122,20 @@ type SelectionValidation = {
   accountId: string;
   authorizedAt?: string;
 } & (
-  | { mode: 'first-activation'; broadReceipt: DeviceBackupV1 }
+  | {
+      mode: 'first-activation';
+      broadReceipt: Pick<
+        DeviceBackupV1,
+        'manifestHash' | 'runId' | 'createdAt'
+      >;
+    }
   | { mode: 'active-rebind'; originalEvidence: OriginalActivationEvidence }
 );
 
 function vectorWithoutSelection(
-  entries: readonly DeviceBackupEntry[],
+  entries: readonly DeviceBackupEntryVectorItem[],
   key: string
-): DeviceBackupEntry[] {
+): DeviceBackupEntryVectorItem[] {
   return entries.filter(entry => entry.key !== key);
 }
 
@@ -175,8 +181,8 @@ function validSelection(
 }
 
 export function compareProtectedSourceEntries(options: {
-  before: readonly DeviceBackupEntry[];
-  after: readonly DeviceBackupEntry[];
+  before: readonly DeviceBackupEntryVectorItem[];
+  after: readonly DeviceBackupEntryVectorItem[];
   selectionRaw: string | null;
   selection: SelectionValidation;
 }): {

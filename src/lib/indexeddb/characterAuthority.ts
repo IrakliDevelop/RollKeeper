@@ -78,6 +78,90 @@ interface MigrationStateRecord {
   checkpointAt: string;
 }
 
+export interface CharacterActivationEvidenceInput {
+  selectedAt: string;
+  recoveryManifestHash: string;
+  recoveryRunId: string;
+  recoveryCreatedAt: string;
+  playerBackupRunId: string;
+  playerBackupAccountId: string;
+  playerBackupAuthorizedAt: string;
+}
+
+export interface CharacterActivationEvidence
+  extends CharacterActivationEvidenceInput {
+  version: 1;
+  namespace: StorageNamespace;
+  family: typeof CHARACTER_FAMILY;
+  activatedGeneration: string;
+  activatedEpoch: number;
+  committedAt: string;
+}
+
+interface CharacterActivationEvidenceRecord
+  extends CharacterActivationEvidence {
+  key: string;
+}
+
+export function characterActivationEvidenceKey(
+  namespace: StorageNamespace,
+  generation: string
+): string {
+  return `character-activation-evidence:${namespace}:${generation}`;
+}
+
+export async function readCharacterActivationEvidence(
+  database: IDBDatabase,
+  namespace: StorageNamespace,
+  generation: string
+): Promise<CharacterActivationEvidence | null> {
+  const transaction = database.transaction('meta', 'readonly');
+  const value = (await requestResult(
+    transaction
+      .objectStore('meta')
+      .get(characterActivationEvidenceKey(namespace, generation))
+  )) as CharacterActivationEvidenceRecord | undefined;
+  await transactionComplete(transaction);
+  if (!value) return null;
+  const evidence = structuredClone(value) as CharacterActivationEvidenceRecord;
+  delete (evidence as Partial<CharacterActivationEvidenceRecord>).key;
+  return evidence;
+}
+
+function activationEvidenceRecord(
+  namespace: StorageNamespace,
+  authority: IndexedDbCharacterAuthority,
+  input: CharacterActivationEvidenceInput
+): CharacterActivationEvidenceRecord {
+  if (
+    Object.values(input).some(
+      value => typeof value !== 'string' || value.length === 0
+    )
+  ) {
+    throw new Error('Character activation evidence is incomplete');
+  }
+  return {
+    key: characterActivationEvidenceKey(namespace, authority.generation),
+    version: 1,
+    namespace,
+    family: CHARACTER_FAMILY,
+    ...input,
+    activatedGeneration: authority.generation,
+    activatedEpoch: authority.epoch,
+    committedAt: authority.committedAt,
+  };
+}
+
+function activationEvidenceMatches(
+  existing: CharacterActivationEvidenceRecord | undefined,
+  expected: CharacterActivationEvidenceRecord
+): boolean {
+  return (
+    existing !== undefined &&
+    JSON.stringify(existing) === JSON.stringify(expected)
+  );
+}
+
 export function scopedCharacterAuthorityKeys(namespace: StorageNamespace) {
   return {
     pointer: `active-generation:${namespace}:${CHARACTER_FAMILY}`,
@@ -284,6 +368,7 @@ export async function commitCharacterCutover(
     generation: string;
     confirmed: boolean;
     gates: CharacterCutoverGates;
+    activationEvidence?: CharacterActivationEvidenceInput;
     now: () => string;
     testHooks?: { abortPointerTransaction?: boolean };
   }
@@ -306,8 +391,23 @@ export async function commitCharacterCutover(
       transaction.abort();
       throw new Error('A different character generation is already active');
     }
+    const authority = withoutKey(current);
+    if (options.activationEvidence) {
+      const expected = activationEvidenceRecord(
+        options.namespace,
+        authority,
+        options.activationEvidence
+      );
+      const existing = (await requestResult(meta.get(expected.key))) as
+        | CharacterActivationEvidenceRecord
+        | undefined;
+      if (!activationEvidenceMatches(existing, expected)) {
+        transaction.abort();
+        throw new Error('Immutable character activation evidence is missing');
+      }
+    }
     await transactionComplete(transaction);
-    return withoutKey(current);
+    return authority;
   }
   const state = (await requestResult(meta.get(keys.state))) as
     | MigrationStateRecord
@@ -369,6 +469,23 @@ export async function commitCharacterCutover(
     state: 'IDB_PRIMARY',
     checkpointAt: authority.committedAt,
   });
+  if (options.activationEvidence) {
+    const evidence = activationEvidenceRecord(
+      options.namespace,
+      authority,
+      options.activationEvidence
+    );
+    const existing = (await requestResult(meta.get(evidence.key))) as
+      | CharacterActivationEvidenceRecord
+      | undefined;
+    if (existing && !activationEvidenceMatches(existing, evidence)) {
+      transaction.abort();
+      throw new Error(
+        'Immutable character activation evidence already differs'
+      );
+    }
+    meta.put(evidence);
+  }
   if (options.testHooks?.abortPointerTransaction) {
     transaction.abort();
     try {

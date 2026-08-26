@@ -66,10 +66,10 @@ export type DeviceBackupEntryVectorItem = Pick<
 >;
 
 export function deviceBackupEntryVector(
-  source: DeviceBackupV1 | readonly DeviceBackupEntry[]
+  source: DeviceBackupV1 | readonly DeviceBackupEntryVectorItem[]
 ): DeviceBackupEntryVectorItem[] {
-  const entries: readonly DeviceBackupEntry[] = Array.isArray(source)
-    ? (source as readonly DeviceBackupEntry[])
+  const entries: readonly DeviceBackupEntryVectorItem[] = Array.isArray(source)
+    ? (source as readonly DeviceBackupEntryVectorItem[])
     : (source as DeviceBackupV1).entries;
   return entries
     .map(({ key, byteCount, sha256 }) => ({ key, byteCount, sha256 }))
@@ -77,8 +77,8 @@ export function deviceBackupEntryVector(
 }
 
 export function deviceBackupEntryVectorsEqual(
-  left: DeviceBackupV1 | readonly DeviceBackupEntry[],
-  right: DeviceBackupV1 | readonly DeviceBackupEntry[]
+  left: DeviceBackupV1 | readonly DeviceBackupEntryVectorItem[],
+  right: DeviceBackupV1 | readonly DeviceBackupEntryVectorItem[]
 ): boolean {
   return (
     JSON.stringify(deviceBackupEntryVector(left)) ===

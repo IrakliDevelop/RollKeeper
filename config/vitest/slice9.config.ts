@@ -18,6 +18,8 @@ export default defineConfig({
       'src/lib/indexeddb/__tests__/automaticCharacter*.test.ts',
       'src/lib/supabase/automaticCharacterSync*.test.ts',
       'src/lib/supabase/browserAutomaticCharacterSync.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupCoordinator.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupRunRepository.test.ts',
     ],
     coverage: {
       enabled: true,
