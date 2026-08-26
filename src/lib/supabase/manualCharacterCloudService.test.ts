@@ -374,6 +374,140 @@ describe('player backup run options', () => {
     expect(vi.mocked(cloud.put).mock.calls[1][0].cloudId).toBe('cloud-a');
   });
 
+  it('continues from the refreshed link when acknowledged content has since changed', async () => {
+    const cloud = gateway();
+    const links = createMemoryCharacterCloudLinkRepository();
+    let mutationCount = 0;
+    const service = new ManualCharacterCloudService(
+      cloud,
+      links,
+      () => 'cloud-a',
+      () => `mutation-${++mutationCount}`
+    );
+    vi.mocked(cloud.fetch).mockRejectedValueOnce(new Error('response lost'));
+
+    await expect(
+      service.backup(character, account, confirmation, runOptions)
+    ).rejects.toThrow('response lost');
+    const stale = links.get(account.id, character.id);
+    expect(stale).toEqual({
+      accountId: account.id,
+      legacyId: character.id,
+      cloudId: 'cloud-a',
+      serverVersion: 0,
+      contentFingerprint: null,
+      pendingMutation: {
+        mutationId: 'mutation-1',
+        contentFingerprint: expect.any(String),
+        originPlayerBackupRunId: 'run-a',
+      },
+    });
+    const acknowledgedFingerprint = stale?.pendingMutation?.contentFingerprint;
+    vi.mocked(cloud.put).mockResolvedValue({
+      status: 'conflict',
+      characterId: 'cloud-a',
+      serverVersion: 2,
+    });
+
+    const rejection = await captureRejection(
+      service.backup(
+        { ...character, name: 'Aria the Bold' },
+        account,
+        confirmation,
+        runOptions
+      )
+    );
+
+    expect(rejection).toBeInstanceOf(ManualCharacterCloudRejectedError);
+    expect(cloud.put).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(cloud.put).mock.calls[1][0].mutationId).toBe('mutation-2');
+    expect(vi.mocked(cloud.put).mock.calls[1][0].expectedServerVersion).toBe(1);
+    expect(links.get(account.id, character.id)).toEqual({
+      accountId: account.id,
+      legacyId: character.id,
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: acknowledgedFingerprint,
+      pendingMutation: null,
+    });
+  });
+
+  it('back-fills the origin run on a pending created without options', async () => {
+    const cloud = gateway();
+    const links = createMemoryCharacterCloudLinkRepository();
+    const originalPut = vi.mocked(cloud.put).getMockImplementation();
+    if (!originalPut)
+      throw new Error('test gateway put implementation missing');
+    let pendingDuringPut: PendingCharacterMutation | null | undefined;
+    vi.mocked(cloud.put)
+      .mockImplementationOnce(async () => {
+        throw new Error('response lost');
+      })
+      .mockImplementation(async request => {
+        pendingDuringPut = links.get(account.id, character.id)?.pendingMutation;
+        return originalPut(request);
+      });
+    const service = serviceFor(cloud, links);
+
+    await expect(
+      service.backup(character, account, confirmation)
+    ).rejects.toThrow('response lost');
+    expect(
+      links.get(account.id, character.id)?.pendingMutation
+    ).not.toHaveProperty('originPlayerBackupRunId');
+
+    const result = await service.backup(
+      character,
+      account,
+      confirmation,
+      runOptions
+    );
+
+    expect(result.status).toBe('verified');
+    expect(pendingDuringPut).toEqual({
+      mutationId: 'mutation-a',
+      contentFingerprint: expect.any(String),
+      originPlayerBackupRunId: 'run-a',
+    });
+    expect(vi.mocked(cloud.put).mock.calls[1][0].mutationId).toBe('mutation-a');
+  });
+
+  it('refuses to reuse a cloud id that belongs to another character', async () => {
+    const cloud = gateway();
+    const links = createMemoryCharacterCloudLinkRepository();
+    vi.mocked(cloud.put).mockRejectedValueOnce(new Error('response lost'));
+    const service = serviceFor(cloud, links);
+
+    await expect(
+      service.backup(character, account, confirmation, runOptions)
+    ).rejects.toThrow('response lost');
+    const seeded = links.get(account.id, character.id);
+    vi.mocked(cloud.fetch).mockResolvedValue({
+      id: 'cloud-a',
+      legacy_client_id: 'other',
+      name: 'Someone Else',
+      payload: { id: 'other', name: 'Someone Else' },
+      schema_version: 1,
+      client_revision: 0,
+      server_version: 3,
+      deleted_at: null,
+      created_at: '2026-08-16T00:00:00.000Z',
+      updated_at: '2026-08-16T00:00:00.000Z',
+    });
+
+    await expect(
+      service.backup(character, account, confirmation, runOptions)
+    ).rejects.toThrow('Cloud link identity does not match this character');
+
+    expect(cloud.put).toHaveBeenCalledTimes(1);
+    expect(links.get(account.id, character.id)).toEqual(seeded);
+    expect(seeded?.pendingMutation).toEqual({
+      mutationId: 'mutation-a',
+      contentFingerprint: expect.any(String),
+      originPlayerBackupRunId: 'run-a',
+    });
+  });
+
   it('restores the prior acknowledged link on an explicit conflict and throws a typed error', async () => {
     const cloud = gateway();
     const links = createMemoryCharacterCloudLinkRepository();

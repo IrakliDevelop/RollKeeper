@@ -252,9 +252,13 @@ export class ManualCharacterCloudService {
     const pending = previous.pendingMutation;
     if (!pending) return null;
     const row = await this.gateway.fetch(previous.cloudId);
-    if (!row || row.deleted_at !== null || row.legacy_client_id !== legacyId) {
-      return null;
+    if (!row) return null;
+    if (row.legacy_client_id !== legacyId) {
+      // The linked cloud id belongs to a different character: never re-put onto
+      // it. The pending mutation is retained so the link stays recoverable.
+      throw new Error('Cloud link identity does not match this character');
     }
+    if (row.deleted_at !== null) return null;
     const decoded = await decodeCharacterCloudRow(row);
     if (
       decoded.status !== 'supported' ||
