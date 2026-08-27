@@ -49,7 +49,7 @@ export type {
 } from './playerBackupConflictResolution';
 export {
   PlayerBackupCopyIdCollisionError,
-  acknowledgePlayerBackupApplication,
+  applyPlayerBackupPendingApplication,
   drainPlayerBackupRunWork,
   resolvePlayerBackupConflict,
   settlePlayerBackupOneTimeConflicts,

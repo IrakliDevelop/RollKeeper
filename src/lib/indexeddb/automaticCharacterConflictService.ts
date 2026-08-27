@@ -169,6 +169,12 @@ export class AutomaticCharacterConflictService {
     const conflict = await this.getConflict(conflictId);
     if (!conflict) throw new Error('Automatic sync conflict was not found');
     if (conflict.resolutionState === 'resolved') return 'resolved';
+    if (
+      conflict.originPlayerBackupRunId !== undefined &&
+      options.originPlayerBackupRunId !== conflict.originPlayerBackupRunId
+    ) {
+      throw new Error('Player backup conflict origin is not authorised');
+    }
     const remote = conflict.cloudCandidate as CharacterCloudRow;
     const validation = await validateAutomaticCharacterCandidate(
       remote,
@@ -276,7 +282,8 @@ export class AutomaticCharacterConflictService {
     if (
       json(current.mutationId) !== json(conflict.mutationId) ||
       json(current.localCandidate) !== json(conflict.localCandidate) ||
-      json(current.cloudCandidate) !== json(conflict.cloudCandidate)
+      json(current.cloudCandidate) !== json(conflict.cloudCandidate) ||
+      current.originPlayerBackupRunId !== conflict.originPlayerBackupRunId
     ) {
       abortQuietly(transaction);
       throw new Error('Automatic sync conflict changed during resolution');

@@ -39,9 +39,10 @@ import type {
 import type {
   PlayerBackupConflictComparison,
   PlayerBackupConflictResolution,
+  PlayerBackupLocalApplication,
 } from '../playerBackupConflictCoordinator';
 import {
-  acknowledgePlayerBackupApplication,
+  applyPlayerBackupPendingApplication,
   drainPlayerBackupRunWork,
   holdPlayerBackupCandidateAsideInLock,
   listPlayerBackupConflicts,
@@ -611,17 +612,19 @@ async function readApplicationRecords(
   );
 }
 
-function acknowledgeApplication(options: {
+function applyApplication(options: {
   legacyId: string;
   runId?: string;
   locks?: PlayerBackupExclusiveLockProvider | null;
+  write?: (application: PlayerBackupLocalApplication) => Promise<void> | void;
 }): Promise<boolean> {
-  return acknowledgePlayerBackupApplication({
+  return applyPlayerBackupPendingApplication({
     factory: indexedDB,
     locks: options.locks === undefined ? new ImmediateLocks() : options.locks,
     accountId: ACCOUNT_A,
     expectedActiveRunId: options.runId ?? 'run-a',
     legacyId: options.legacyId,
+    write: options.write ?? (() => undefined),
   });
 }
 
@@ -1683,6 +1686,21 @@ describe('resolvePlayerBackupConflict', () => {
     const links = createMemoryCharacterCloudLinkRepository();
     vi.mocked(gateway.fetch).mockClear();
     await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: [],
+      pending: ['hero-a'],
+    });
+    const beforeApplication = await deriveResult(links);
+    expect(beforeApplication.pending).toEqual(['hero-a']);
+    expect(beforeApplication.complete).toBe(false);
+
+    const write = vi.fn();
+    await expect(applyApplication({ legacyId: 'hero-a', write })).resolves.toBe(
+      true
+    );
+    if (result.status !== 'resolved') throw new Error('Expected resolution');
+    expect(write).toHaveBeenCalledWith(result.apply);
+
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
       settled: ['hero-a'],
       pending: [],
     });
@@ -1822,7 +1840,7 @@ describe('resolvePlayerBackupConflict', () => {
     );
   });
 
-  it('replays the use-cloud application until it is acknowledged', async () => {
+  it('replays the use-cloud application until it is applied', async () => {
     const { harness, gateway, seeded } = await seedConflictScenario();
     const resolve = () =>
       resolveConflict({
@@ -1853,11 +1871,18 @@ describe('resolvePlayerBackupConflict', () => {
     await expect(resolve()).resolves.toEqual({ ...first, workQueued: false });
 
     await expect(
-      acknowledgeApplication({ legacyId: 'hero-a', locks: null })
+      applyApplication({ legacyId: 'hero-a', locks: null })
     ).rejects.toBeInstanceOf(PlayerBackupLockUnavailableError);
-    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
-      true
-    );
+    await expect(
+      applyApplication({
+        legacyId: 'hero-a',
+        write: () => {
+          throw new Error('roster write failed');
+        },
+      })
+    ).rejects.toThrow('roster write failed');
+    expect(await readApplicationRecords()).toHaveLength(1);
+    await expect(applyApplication({ legacyId: 'hero-a' })).resolves.toBe(true);
     expect(await readApplicationRecords()).toEqual([]);
 
     await expect(resolve()).resolves.toEqual({
@@ -1866,9 +1891,7 @@ describe('resolvePlayerBackupConflict', () => {
       apply: null,
       workQueued: false,
     });
-    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
-      false
-    );
+    await expect(applyApplication({ legacyId: 'hero-a' })).resolves.toBe(false);
   });
 
   it('replays the keep-both application under the copy id alone', async () => {
@@ -1900,9 +1923,9 @@ describe('resolvePlayerBackupConflict', () => {
       })
     ).resolves.toEqual({ ...first, workQueued: false });
 
-    await expect(
-      acknowledgeApplication({ legacyId: 'hero-copy' })
-    ).resolves.toBe(true);
+    await expect(applyApplication({ legacyId: 'hero-copy' })).resolves.toBe(
+      true
+    );
     expect(await readApplicationRecords()).toEqual([]);
   });
 
@@ -1945,16 +1968,16 @@ describe('resolvePlayerBackupConflict', () => {
       workQueued: false,
     });
 
-    await expect(
-      acknowledgeApplication({ legacyId: 'hero-copy' })
-    ).resolves.toBe(true);
-    await expect(
-      acknowledgeApplication({ legacyId: 'hero-copy-two' })
-    ).resolves.toBe(true);
+    await expect(applyApplication({ legacyId: 'hero-copy' })).resolves.toBe(
+      true
+    );
+    await expect(applyApplication({ legacyId: 'hero-copy-two' })).resolves.toBe(
+      true
+    );
     expect(await readApplicationRecords()).toEqual([]);
   });
 
-  it('retains the application when the run is replaced before acknowledgement', async () => {
+  it('blocks run replacement until the pending application is applied', async () => {
     const { harness, gateway, seeded } = await seedConflictScenario();
     await resolveConflict({
       conflictId: seeded.conflictId,
@@ -1965,12 +1988,59 @@ describe('resolvePlayerBackupConflict', () => {
     const recorded = await readApplicationRecords();
     expect(recorded).toHaveLength(1);
 
-    await confirmRun('run-b');
-
-    await expect(
-      acknowledgeApplication({ legacyId: 'hero-a' })
-    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    await expect(confirmRun('run-b')).rejects.toThrow(
+      'pending roster application'
+    );
     expect(await readApplicationRecords()).toEqual(recorded);
+
+    await expect(applyApplication({ legacyId: 'hero-a' })).resolves.toBe(true);
+    await expect(confirmRun('run-b')).resolves.toBeUndefined();
+    expect(await readApplicationRecords()).toEqual([]);
+  });
+
+  it('holds the account lock across the roster write and acknowledgement', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'use-cloud',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    const locks = new QueuedLocks();
+    let releaseWrite: (() => void) | undefined;
+    let markWriteStarted: (() => void) | undefined;
+    const writeHeld = new Promise<void>(resolve => {
+      releaseWrite = resolve;
+    });
+    const writeStarted = new Promise<void>(resolve => {
+      markWriteStarted = resolve;
+    });
+
+    const applying = applyApplication({
+      legacyId: 'hero-a',
+      locks,
+      write: async () => {
+        markWriteStarted!();
+        await writeHeld;
+      },
+    });
+    await writeStarted;
+
+    let replacementFinished = false;
+    const replacement = withPlayerBackupAccountLock(
+      { accountId: ACCOUNT_A, locks },
+      () => confirmRun('run-b')
+    ).then(() => {
+      replacementFinished = true;
+    });
+    await Promise.resolve();
+    expect(replacementFinished).toBe(false);
+
+    releaseWrite!();
+    await expect(applying).resolves.toBe(true);
+    await replacement;
+    expect(replacementFinished).toBe(true);
+    expect(await readApplicationRecords()).toEqual([]);
   });
 
   it('refuses keep-mine and use-cloud on an archived candidate with zero gateway calls', async () => {
@@ -2077,9 +2147,7 @@ describe('resolvePlayerBackupConflict', () => {
         conflictId: seeded.conflictId,
       }),
     ]);
-    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
-      true
-    );
+    await expect(applyApplication({ legacyId: 'hero-a' })).resolves.toBe(true);
     expect(await readApplicationRecords()).toEqual([]);
 
     const links = createMemoryCharacterCloudLinkRepository();

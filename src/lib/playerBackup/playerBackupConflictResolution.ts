@@ -39,9 +39,13 @@ import {
   runPlayerBackupTransaction,
   withPlayerBackupAccountLock,
 } from './playerBackupRunFence';
-import type { PlayerBackupRunV1 } from './playerBackupRunRepository';
+import type {
+  PlayerBackupPendingApplicationV1,
+  PlayerBackupRunV1,
+} from './playerBackupRunRepository';
 import {
   PlayerBackupRunReplacedError,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupApplicationKey,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
@@ -71,19 +75,7 @@ export class PlayerBackupCopyIdCollisionError extends Error {
  * The roster change one resolution recorded durably, so a caller that crashed
  * before applying it is handed the same change again on its next attempt.
  */
-export interface PlayerBackupPendingApplication {
-  version: 1;
-  runId: string;
-  accountId: string;
-  kind: 'replace' | 'add';
-  /** The roster entry to write: the character, or the keep-both copy. */
-  legacyId: string;
-  /** The conflicted character the decision was made for. */
-  sourceLegacyId: string;
-  resolution: 'use-cloud' | 'keep-both';
-  conflictId: string;
-  recordedAt: string;
-}
+export type PlayerBackupPendingApplication = PlayerBackupPendingApplicationV1;
 
 /** The local roster change a resolution asks its caller to apply. */
 export interface PlayerBackupLocalApplication {
@@ -424,7 +416,7 @@ export function createPlayerBackupResolutionHook(
           resolution: options.resolution,
           conflictId: current.conflictId,
           recordedAt: options.now(),
-        } satisfies PlayerBackupPendingApplication & { key: string });
+        } satisfies PlayerBackupPendingApplication);
       }
     },
   };
@@ -439,17 +431,12 @@ async function readPendingApplications(
   runId: string
 ): Promise<PlayerBackupPendingApplication[]> {
   const transaction = database.transaction('meta', 'readonly');
-  const rows = (await requestResult(
-    transaction.objectStore('meta').getAll()
-  )) as (PlayerBackupPendingApplication & { key?: unknown })[];
-  await transactionComplete(transaction);
-  const prefix = playerBackupApplicationKey(runId, '');
-  return rows.filter(
-    row =>
-      typeof row.key === 'string' &&
-      row.key.startsWith(prefix) &&
-      row.version === 1
+  const rows = await listPlayerBackupPendingApplicationsInTransaction(
+    transaction.objectStore('meta'),
+    runId
   );
+  await transactionComplete(transaction);
+  return rows;
 }
 
 /** The winning document the caller must mirror into the local roster. */
@@ -717,9 +704,10 @@ async function resolveInLock(
  * run fence. Every gateway mutation and every local write is re-authorised
  * immediately before it happens, so a superseded run resolves nothing.
  *
- * A returned `apply` is a durable debt: the caller writes it to the roster and
- * then calls `acknowledgePlayerBackupApplication`. Until that acknowledgement
- * every retry of this call returns the same change again.
+ * A returned `apply` describes a durable debt. The caller completes it through
+ * `applyPlayerBackupPendingApplication`, which keeps the account lock across
+ * the roster write and acknowledgement. Every retry returns the same change
+ * until that operation succeeds.
  *
  * Must not be called while the caller holds the account lock: it acquires the
  * lock itself, and real Web Locks are not re-entrant.
@@ -740,18 +728,21 @@ export async function resolvePlayerBackupConflict(
 }
 
 /**
- * Clears the recorded roster application for one character once the caller has
- * written it. Idempotent: `false` means there was nothing left to acknowledge.
+ * Applies and clears one durable roster change while retaining the account lock
+ * across the active-run recheck, caller-owned roster write, and acknowledgement.
+ * If the writer throws, the record remains replayable. Idempotent: `false`
+ * means there was nothing left to apply.
  *
  * Must not be called while the caller holds the account lock: it acquires the
  * lock itself, and real Web Locks are not re-entrant.
  */
-export async function acknowledgePlayerBackupApplication(options: {
+export async function applyPlayerBackupPendingApplication(options: {
   factory: IDBFactory;
   locks: PlayerBackupExclusiveLockProvider | null | undefined;
   accountId: string;
   expectedActiveRunId: string;
   legacyId: string;
+  write: (application: PlayerBackupLocalApplication) => Promise<void> | void;
 }): Promise<boolean> {
   if (!hasPlayerBackupExclusiveLockCapability(options.locks)) {
     throw new PlayerBackupLockUnavailableError();
@@ -759,27 +750,62 @@ export async function acknowledgePlayerBackupApplication(options: {
   return withPlayerBackupAccountLock(
     { accountId: options.accountId, locks: options.locks },
     () =>
-      withExistingDatabase(options.factory, database =>
-        runPlayerBackupTransaction({
+      withExistingDatabase(options.factory, async database => {
+        const read = database.transaction('meta', 'readonly');
+        const meta = read.objectStore('meta');
+        const run = await readPlayerBackupRunInTransaction(
+          meta,
+          options.accountId,
+          options.expectedActiveRunId
+        );
+        const key = playerBackupApplicationKey(run.runId, options.legacyId);
+        const recorded = (
+          await listPlayerBackupPendingApplicationsInTransaction(
+            meta,
+            run.runId
+          )
+        ).find(candidate => candidate.key === key);
+        await transactionComplete(read);
+        if (!recorded) return false;
+        if (recorded.accountId !== options.accountId) {
+          throw new Error('Pending roster application account is unsafe');
+        }
+
+        const repository = new IndexedDbAutomaticCharacterSyncRepository(
+          database
+        );
+        const application = await applicationOf(
+          repository,
+          run.namespace,
+          recorded.kind,
+          recorded.legacyId
+        );
+        await options.write(application);
+
+        return runPlayerBackupTransaction({
           database,
           accountId: options.accountId,
           expectedActiveRunId: options.expectedActiveRunId,
           stores: [],
           task: async transaction => {
-            const meta = transaction.objectStore('meta');
-            const run = await readPlayerBackupRunInTransaction(
-              meta,
-              options.accountId,
-              options.expectedActiveRunId
-            );
-            const key = playerBackupApplicationKey(run.runId, options.legacyId);
-            const recorded = await requestResult(meta.get(key));
-            if (!recorded) return false;
-            meta.delete(key);
+            const current = (await requestResult(
+              transaction.objectStore('meta').get(key)
+            )) as PlayerBackupPendingApplication | undefined;
+            if (!current) return false;
+            if (
+              current.conflictId !== recorded.conflictId ||
+              current.accountId !== recorded.accountId ||
+              current.legacyId !== recorded.legacyId
+            ) {
+              throw new Error(
+                'Pending roster application changed during apply'
+              );
+            }
+            transaction.objectStore('meta').delete(key);
             return true;
           },
-        })
-      )
+        });
+      })
   );
 }
 
@@ -809,6 +835,20 @@ async function verifySettledDocument(
   legacyId: string,
   database: IDBDatabase
 ): Promise<boolean> {
+  const pendingApplications = await readPendingApplications(
+    database,
+    run.runId
+  );
+  if (
+    pendingApplications.some(
+      application =>
+        application.accountId === options.accountId &&
+        application.sourceLegacyId === legacyId
+    )
+  ) {
+    return false;
+  }
+
   const repository = new IndexedDbAutomaticCharacterSyncRepository(database);
   const document = await repository.getDocument(run.namespace, legacyId);
   const work = (await repository.listOutbox(run.namespace)).find(
@@ -849,7 +889,7 @@ async function verifySettledDocument(
   }
 
   const verifiedAt = options.now();
-  await runPlayerBackupTransaction({
+  const protectedAfterRosterApply = await runPlayerBackupTransaction({
     database,
     accountId: options.accountId,
     expectedActiveRunId: options.expectedActiveRunId,
@@ -861,6 +901,20 @@ async function verifySettledDocument(
         options.accountId,
         options.expectedActiveRunId
       );
+      const pendingApplications =
+        await listPlayerBackupPendingApplicationsInTransaction(
+          meta,
+          fenced.runId
+        );
+      if (
+        pendingApplications.some(
+          application =>
+            application.accountId === options.accountId &&
+            application.sourceLegacyId === legacyId
+        )
+      ) {
+        return false;
+      }
       const policy =
         await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
           meta,
@@ -886,8 +940,10 @@ async function verifySettledDocument(
           },
         }),
       });
+      return true;
     },
   });
+  if (!protectedAfterRosterApply) return false;
 
   options.links.save({
     accountId: options.accountId,

@@ -3,7 +3,10 @@ import type {
   AutomaticCharacterOutboxEntry,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
-import { openExistingRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import {
+  openExistingRollkeeperDatabase,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import {
@@ -47,6 +50,7 @@ import type {
 } from './playerBackupRunRepository';
 import {
   PlayerBackupRunReplacedError,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
   readPlayerBackupRunInTransaction,
@@ -934,10 +938,27 @@ export async function derivePlayerBackupRunResult(options: {
     automatic && options.repository
       ? await readAutomaticEvidence(options.repository, run.namespace)
       : null;
+  const pendingApplicationSources = automatic
+    ? await withExistingDatabase(options.factory, async database => {
+        const transaction = database.transaction('meta', 'readonly');
+        const applications =
+          await listPlayerBackupPendingApplicationsInTransaction(
+            transaction.objectStore('meta'),
+            run.runId
+          );
+        await transactionComplete(transaction);
+        return new Set(
+          applications
+            .filter(application => application.accountId === run.accountId)
+            .map(application => application.sourceLegacyId)
+        );
+      })
+    : new Set<string>();
   for (const legacyId of run.selectedCharacterIds) {
     const online = run.characterCheckpoints[legacyId]?.online;
-    const derived =
-      online?.kind === 'automatic'
+    const derived = pendingApplicationSources.has(legacyId)
+      ? { outcome: 'pending' as const, reason: 'roster-application-pending' }
+      : online?.kind === 'automatic'
         ? deriveAutomaticOutcome(online, legacyId, evidence)
         : deriveManualOutcome(
             online,

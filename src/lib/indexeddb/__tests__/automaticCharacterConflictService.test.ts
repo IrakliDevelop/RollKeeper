@@ -233,6 +233,32 @@ describe('AutomaticCharacterConflictService', () => {
   });
 
   describe('resolution hook and origin', () => {
+    it('refuses to resolve run-origin work without its matching authorization', async () => {
+      const conflictId = await seedConflict();
+      const transaction = database.transaction('conflicts', 'readwrite');
+      const conflicts = transaction.objectStore('conflicts');
+      const conflict = await requestResult(conflicts.get(conflictId));
+      conflicts.put({ ...conflict, originPlayerBackupRunId: 'run-a' });
+      await transactionComplete(transaction);
+
+      await expect(service.resolve(conflictId, 'keep-mine')).rejects.toThrow(
+        'origin is not authorised'
+      );
+      await expect(service.getConflict(conflictId)).resolves.toMatchObject({
+        resolutionState: 'unresolved',
+        originPlayerBackupRunId: 'run-a',
+      });
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          originPlayerBackupRunId: 'run-a',
+        })
+      ).resolves.toBe('resolved');
+    });
+
     it('runs the hook inside the transaction with the planned mutation id and stamps the origin', async () => {
       const conflictId = await seedConflict();
       const fenced = new AutomaticCharacterConflictService(database, {

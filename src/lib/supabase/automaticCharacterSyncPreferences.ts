@@ -8,6 +8,7 @@ import {
   type PlayerBackupRunV1,
   PlayerBackupRunReplacedError,
   assertValidPlayerBackupRun,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupActiveRunKey,
   playerBackupRunKey,
 } from '@/lib/playerBackup/playerBackupRunRepository';
@@ -210,6 +211,21 @@ export class AutomaticCharacterSyncPreferences {
       transaction.abort();
       await completion.catch(() => undefined);
       throw new PlayerBackupRunReplacedError();
+    }
+    if (
+      observedRunId !== null &&
+      (
+        await listPlayerBackupPendingApplicationsInTransaction(
+          meta,
+          observedRunId
+        )
+      ).length > 0
+    ) {
+      transaction.abort();
+      await completion.catch(() => undefined);
+      throw new Error(
+        'The active player backup run has a pending roster application'
+      );
     }
 
     meta.put({
