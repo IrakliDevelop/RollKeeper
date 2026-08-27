@@ -23,6 +23,9 @@ import { useNPCStore } from '@/store/npcStore';
 import { usePlayerStore } from '@/store/playerStore';
 import { CharacterRecoveryExportControls } from '@/components/ui/feedback/CharacterRecoveryExportControls';
 import { CharacterAutomaticSyncProvider } from '@/components/ui/character/useCharacterAutomaticSync';
+import { PlayerBackupRecovery } from '@/components/ui/character/PlayerBackupRecovery';
+import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
+import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
 
 const slice7Enabled = isIndexedDbMigrationEnabled();
 
@@ -206,6 +209,21 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
   }, []);
 
   if (recoveryRequired) {
+    if (isPlayerBackupWizardVisible()) {
+      return (
+        <main className="bg-surface text-body min-h-screen overflow-x-hidden p-8">
+          <h1 className="text-heading text-2xl font-bold">
+            {COPY.recovery.title}
+          </h1>
+          <p className="text-body mt-2 max-w-2xl text-sm">
+            {COPY.recovery.description}
+          </p>
+          <div className="mt-6">
+            <PlayerBackupRecovery />
+          </div>
+        </main>
+      );
+    }
     return (
       <main className="bg-surface text-body min-h-screen p-8">
         <h1 className="text-heading text-2xl font-bold">Recovery required</h1>

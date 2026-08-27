@@ -1,3 +1,8 @@
+import {
+  decideGenericRestoreWrite,
+  type CharacterRecoveryAuthority,
+} from '@/lib/playerBackup/playerBackupRecoveryPolicy';
+
 const DEVICE_BACKUP_FORMAT = 'rollkeeper-device-backup' as const;
 const DEVICE_BACKUP_FORMAT_VERSION = 1 as const;
 
@@ -240,8 +245,10 @@ function inspectEntry(entry: DeviceBackupEntry): {
 
 export function previewRecoveryBundle(
   bundle: DeviceBackupV1,
-  target: StorageSource
+  target: StorageSource,
+  options: { authority?: CharacterRecoveryAuthority } = {}
 ): RecoveryPreview {
+  const authority = options.authority ?? 'legacy';
   const conflicts: string[] = [];
   const quarantine: RecoveryQuarantinePreview[] = [];
   const versions: Record<string, number> = {};
@@ -250,9 +257,15 @@ export function previewRecoveryBundle(
 
   for (const entry of bundle.entries) {
     const current = sourceValue(target, entry.key);
-    if (current === null) restorableCount += 1;
-    else if (current === entry.rawValue) identicalCount += 1;
-    else conflicts.push(entry.key);
+    const decision = decideGenericRestoreWrite({
+      key: entry.key,
+      rawValue: entry.rawValue,
+      currentValue: current,
+      authority,
+    });
+    if (decision === 'restore') restorableCount += 1;
+    else if (decision === 'identical') identicalCount += 1;
+    else if (decision === 'collision') conflicts.push(entry.key);
 
     const inspected = inspectEntry(entry);
     if (inspected.version !== undefined)
@@ -480,9 +493,11 @@ export async function stageRecoveryBundle(
 export function restoreRecoveryEntries(
   bundle: DeviceBackupV1,
   target: WritableStorageTarget,
-  selectedKeys: readonly string[]
+  selectedKeys: readonly string[],
+  options: { authority?: CharacterRecoveryAuthority } = {}
 ): RecoveryRestoreResult {
   const selected = new Set(selectedKeys);
+  const authority = options.authority ?? 'legacy';
   const result: RecoveryRestoreResult = {
     restored: [],
     identical: [],
@@ -501,10 +516,17 @@ export function restoreRecoveryEntries(
       continue;
     }
     const current = target.getItem(entry.key);
-    if (current === null) {
+    const decision = decideGenericRestoreWrite({
+      key: entry.key,
+      rawValue: entry.rawValue,
+      currentValue: current,
+      authority,
+    });
+    if (decision === 'unavailable') continue;
+    if (decision === 'restore') {
       target.setItem(entry.key, entry.rawValue);
       result.restored.push(entry.key);
-    } else if (current === entry.rawValue) {
+    } else if (decision === 'identical') {
       result.identical.push(entry.key);
     } else {
       result.conflicts.push(entry.key);

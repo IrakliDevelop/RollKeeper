@@ -6,13 +6,23 @@ import { captureDeviceBackup } from '@/lib/deviceRecovery';
 import {
   activateImportedCharacterGeneration,
   importCharacterRecoveryGeneration,
+  inspectCharacterRecoveryBundle,
+  stageCharacterRecoveryFromSerialized,
+  verifyActivatedCharacterRecovery,
 } from '@/lib/indexeddb/characterRecovery';
 import {
   commitCharacterCutover,
+  readCharacterActivationEvidence,
   readCharacterAuthority,
 } from '@/lib/indexeddb/characterAuthority';
 import {
+  readCharacterCutoverSelection,
+  repairRecoveredCharacterSelectionFromEvidence,
+} from '@/lib/indexeddb/characterCutoverSelection';
+import {
+  DATABASE_NAME,
   deleteRollkeeperDatabaseForTests,
+  openExistingRollkeeperDatabase,
   openRollkeeperDatabase,
   requestResult,
   transactionComplete,
@@ -54,6 +64,138 @@ describe('post-cutover character recovery', () => {
   afterEach(async () => {
     localStorage.clear();
     await deleteRollkeeperDatabaseForTests(indexedDB);
+  });
+
+  async function expectLocalDatabaseAbsent() {
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await expect(indexedDB.databases()).resolves.not.toContainEqual(
+      expect.objectContaining({ name: DATABASE_NAME })
+    );
+    await expect(
+      openExistingRollkeeperDatabase({ factory: indexedDB })
+    ).resolves.toBeNull();
+  }
+
+  it('inspects invalid JSON, shape, checksum, aggregate, empty-character, and duplicate keys without creating the database', async () => {
+    const invalid = [
+      ['not-json', 'invalid-json'],
+      [JSON.stringify({ format: 'nope' }), 'invalid-shape'],
+      [
+        JSON.stringify({
+          format: 'rollkeeper-device-backup',
+          formatVersion: 99,
+          appVersion: 'test',
+          runId: 'x',
+          createdAt: 'now',
+          entries: [],
+          manifestHash: '0'.repeat(64),
+          validation: {
+            entryCount: 0,
+            totalBytes: 0,
+            validJsonCount: 0,
+            malformedJsonCount: 0,
+            futureVersionCount: 0,
+            retainedOnlyCount: 0,
+          },
+        }),
+        'unsupported-version',
+      ],
+    ] as const;
+    for (const [serialized, reason] of invalid) {
+      await expect(inspectCharacterRecoveryBundle(serialized)).resolves.toEqual(
+        {
+          ok: false,
+          reason,
+        }
+      );
+    }
+
+    localStorage.setItem(
+      'rollkeeper-player-data',
+      '{"state":{"characters":[]},"version":1}'
+    );
+    const valid = await captureDeviceBackup(localStorage, {
+      appVersion: 'test',
+      runId: 'inspect',
+      timestamp: 'now',
+    });
+    const checksumTampered = structuredClone(valid);
+    checksumTampered.entries[0].rawValue = 'tampered';
+    await expect(
+      inspectCharacterRecoveryBundle(JSON.stringify(checksumTampered))
+    ).resolves.toEqual({ ok: false, reason: 'checksum-mismatch' });
+
+    const aggregateTampered = structuredClone(valid);
+    aggregateTampered.manifestHash = 'f'.repeat(64);
+    await expect(
+      inspectCharacterRecoveryBundle(JSON.stringify(aggregateTampered))
+    ).resolves.toEqual({ ok: false, reason: 'aggregate-mismatch' });
+
+    localStorage.clear();
+    localStorage.setItem(
+      'rollkeeper-dm-data',
+      '{"state":{"campaigns":[]},"version":1}'
+    );
+    const dmOnly = await captureDeviceBackup(localStorage, {
+      appVersion: 'test',
+      runId: 'dm-only',
+      timestamp: 'now',
+    });
+    await expect(
+      inspectCharacterRecoveryBundle(JSON.stringify(dmOnly))
+    ).resolves.toEqual({ ok: false, reason: 'empty-character-set' });
+
+    const { computeManifestHash } = await import('@/lib/deviceRecovery');
+    const duplicateBundle = structuredClone(valid);
+    duplicateBundle.entries = [valid.entries[0], valid.entries[0]];
+    duplicateBundle.manifestHash = await computeManifestHash(
+      duplicateBundle.entries
+    );
+    await expect(
+      inspectCharacterRecoveryBundle(JSON.stringify(duplicateBundle))
+    ).resolves.toEqual({ ok: false, reason: 'duplicate-character-key' });
+
+    await expect(
+      inspectCharacterRecoveryBundle(
+        JSON.stringify({
+          format: 'rollkeeper-current-character-export',
+          formatVersion: 1,
+        })
+      )
+    ).resolves.toEqual({ ok: false, reason: 'diagnostic-not-restorable' });
+
+    await expectLocalDatabaseAbsent();
+  });
+
+  it('rejects invalid files from staging before creating rollkeeper-local', async () => {
+    await expect(
+      stageCharacterRecoveryFromSerialized({
+        factory: indexedDB,
+        serialized: '{broken',
+        namespace: 'guest',
+      })
+    ).rejects.toThrow(/valid JSON|invalid/i);
+    await expectLocalDatabaseAbsent();
+  });
+
+  it('validates a character-only bundle in memory without creating the database', async () => {
+    localStorage.setItem(
+      'rollkeeper-player-data',
+      '{"state":{"characters":[]},"version":1}'
+    );
+    const bundle = await captureDeviceBackup(localStorage, {
+      appVersion: 'test',
+      runId: 'ok',
+      timestamp: 'now',
+    });
+    const inspected = await inspectCharacterRecoveryBundle(
+      JSON.stringify(bundle)
+    );
+    expect(inspected).toMatchObject({
+      ok: true,
+      characterEntries: [{ key: 'rollkeeper-player-data' }],
+    });
+    await expectLocalDatabaseAbsent();
   });
 
   it('validates before parsing, imports only to a new inactive generation, and requires explicit activation', async () => {
@@ -336,6 +478,172 @@ describe('post-cutover character recovery', () => {
       )
     ).toMatchObject({ rawValue: '{broken' });
     await transactionComplete(read);
+    database.close();
+  });
+
+  it('activates a truly empty profile, writes recovery evidence and a generated marker, and verifies IDs/hashes after reopen', async () => {
+    const player =
+      '{"state":{"characters":[{"id":"hero-1","characterData":{"id":"hero-1"}}]},"version":1}';
+    const envelope = '{"state":{"character":{"id":"hero-1"}},"version":0}';
+    const bundle = await captureDeviceBackup(
+      new Map([
+        ['rollkeeper-player-data', player],
+        ['rollkeeper-character:hero-1', envelope],
+      ]),
+      { appVersion: 'test', runId: 'empty-restore', timestamp: 'file-time' }
+    );
+    const serialized = JSON.stringify(bundle);
+    localStorage.clear();
+    await stageCharacterRecoveryFromSerialized({
+      factory: indexedDB,
+      serialized,
+      namespace: 'guest',
+    });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    expect(await readCharacterAuthority(database, 'guest')).toEqual({
+      authority: 'localStorage',
+      epoch: 0,
+    });
+    const result = await activateImportedCharacterGeneration(database, {
+      namespace: 'guest',
+      generation: 'recovery:empty-restore',
+      confirmed: true,
+      now: () => 'activated-at',
+      storage: localStorage,
+    });
+    expect(result).toMatchObject({
+      activated: true,
+      generation: 'recovery:empty-restore',
+      epoch: 1,
+    });
+    const evidence = await readCharacterActivationEvidence(
+      database,
+      'guest',
+      'recovery:empty-restore'
+    );
+    expect(evidence).toMatchObject({
+      recoveryRunId: 'empty-restore',
+      recoveryManifestHash: bundle.manifestHash,
+      recoveryCreatedAt: 'file-time',
+      selectedAt: 'activated-at',
+      activatedGeneration: 'recovery:empty-restore',
+      activatedEpoch: 1,
+    });
+    expect(evidence?.playerBackupRunId).toBeUndefined();
+    expect(evidence?.playerBackupAccountId).toBeUndefined();
+    const marker = readCharacterCutoverSelection(localStorage, 'guest');
+    expect(marker).toMatchObject({
+      recoveryRunId: 'empty-restore',
+      recoveryManifestHash: bundle.manifestHash,
+      recoveryCreatedAt: 'file-time',
+      activatedGeneration: 'recovery:empty-restore',
+      activatedEpoch: 1,
+    });
+    expect(marker?.playerBackupRunId).toBeUndefined();
+    database.close();
+    const reopened = await openRollkeeperDatabase({ factory: indexedDB });
+    await expect(
+      verifyActivatedCharacterRecovery(reopened, {
+        namespace: 'guest',
+        serialized,
+      })
+    ).resolves.toMatchObject({
+      ok: true,
+      characterIds: ['hero-1'],
+    });
+    reopened.close();
+  });
+
+  it('fails closed when a valid active pointer has no generation rows', async () => {
+    const raw = '{"state":{"characters":[]},"version":1}';
+    localStorage.setItem('rollkeeper-player-data', raw);
+    const bundle = await captureDeviceBackup(localStorage, {
+      appVersion: 'test',
+      runId: 'corrupt',
+      timestamp: 'old',
+    });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    await seedActive(database, raw);
+    const wipe = database.transaction('kvGenerations', 'readwrite');
+    const generations = wipe.objectStore('kvGenerations');
+    const activeRows = (
+      (await requestResult(generations.getAll())) as Array<{
+        namespace: string;
+        generation: string;
+        key: string;
+      }>
+    ).filter(row => row.namespace === 'guest' && row.generation === 'active');
+    for (const row of activeRows) {
+      generations.delete([row.namespace, row.generation, row.key]);
+    }
+    await transactionComplete(wipe);
+    await importCharacterRecoveryGeneration(
+      database,
+      JSON.stringify(bundle),
+      'guest'
+    );
+    await expect(
+      activateImportedCharacterGeneration(database, {
+        namespace: 'guest',
+        generation: 'recovery:corrupt',
+        confirmed: true,
+        now: () => 'later',
+        storage: localStorage,
+      })
+    ).rejects.toThrow(/missing/i);
+    expect(await readCharacterAuthority(database, 'guest')).toMatchObject({
+      authority: 'indexedDB',
+      generation: 'active',
+    });
+    expect(readCharacterCutoverSelection(localStorage, 'guest')).toBeNull();
+    database.close();
+  });
+
+  it('does not invent a marker on reload and repairs only from explicit continuation', async () => {
+    const raw = '{"state":{"characters":[]},"version":1}';
+    const bundle = await captureDeviceBackup(
+      new Map([['rollkeeper-player-data', raw]]),
+      {
+        appVersion: 'test',
+        runId: 'crash',
+        timestamp: 'file-time',
+      }
+    );
+    localStorage.clear();
+    await stageCharacterRecoveryFromSerialized({
+      factory: indexedDB,
+      serialized: JSON.stringify(bundle),
+      namespace: 'guest',
+    });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    await activateImportedCharacterGeneration(database, {
+      namespace: 'guest',
+      generation: 'recovery:crash',
+      confirmed: true,
+      now: () => 'activated-at',
+    });
+    expect(readCharacterCutoverSelection(localStorage, 'guest')).toBeNull();
+    const evidence = await readCharacterActivationEvidence(
+      database,
+      'guest',
+      'recovery:crash'
+    );
+    expect(evidence).toMatchObject({
+      recoveryRunId: 'crash',
+      activatedGeneration: 'recovery:crash',
+    });
+    expect(readCharacterCutoverSelection(localStorage, 'guest')).toBeNull();
+    const repaired = repairRecoveredCharacterSelectionFromEvidence(
+      localStorage,
+      'guest',
+      evidence!
+    );
+    expect(repaired).toMatchObject({
+      recoveryRunId: 'crash',
+      activatedGeneration: 'recovery:crash',
+      activatedEpoch: 1,
+    });
+    expect(repaired.playerBackupRunId).toBeUndefined();
     database.close();
   });
 });

@@ -177,6 +177,73 @@ export function assertCharacterCutoverSelectionActivation(options: {
   return selection;
 }
 
+export function writeRecoveredCharacterSelectionMarker(
+  storage: WritableSelectionStorage,
+  evidence: CharacterActivationEvidence
+): CharacterCutoverSelection {
+  if (
+    evidence.playerBackupRunId ||
+    evidence.playerBackupAccountId ||
+    evidence.playerBackupAuthorizedAt
+  ) {
+    throw new Error(
+      'Recovered selection marker cannot carry backup authorization'
+    );
+  }
+  const selection: CharacterCutoverSelection = {
+    version: 1,
+    namespace: evidence.namespace,
+    family: CHARACTER_FAMILY,
+    selectedAt: evidence.selectedAt,
+    recoveryManifestHash: evidence.recoveryManifestHash,
+    recoveryRunId: evidence.recoveryRunId,
+    recoveryCreatedAt: evidence.recoveryCreatedAt,
+    activatedEpoch: evidence.activatedEpoch,
+    activatedGeneration: evidence.activatedGeneration,
+  };
+  storage.setItem(
+    characterCutoverSelectionKey(evidence.namespace),
+    JSON.stringify(selection)
+  );
+  return selection;
+}
+
+export function repairRecoveredCharacterSelectionFromEvidence(
+  storage: WritableSelectionStorage,
+  namespace: StorageNamespace,
+  evidence: CharacterActivationEvidence
+): CharacterCutoverSelection {
+  if (evidence.namespace !== namespace) {
+    throw new Error(
+      'Character activation marker does not match immutable evidence'
+    );
+  }
+  const selection = readCharacterCutoverSelection(storage, namespace);
+  if (
+    selection &&
+    (selection.activatedEpoch !== undefined ||
+      selection.activatedGeneration !== undefined) &&
+    (selection.activatedEpoch !== evidence.activatedEpoch ||
+      selection.activatedGeneration !== evidence.activatedGeneration ||
+      !selectionMatchesActivationEvidence(selection, evidence))
+  ) {
+    throw new Error(
+      'Character activation marker does not match immutable evidence'
+    );
+  }
+  if (
+    selection &&
+    selection.activatedEpoch === undefined &&
+    selection.activatedGeneration === undefined &&
+    !selectionMatchesActivationEvidence(selection, evidence)
+  ) {
+    throw new Error(
+      'Character activation marker does not match immutable evidence'
+    );
+  }
+  return writeRecoveredCharacterSelectionMarker(storage, evidence);
+}
+
 export function repairCharacterCutoverActivationFromEvidence(
   storage: WritableSelectionStorage,
   namespace: StorageNamespace,

@@ -1,13 +1,22 @@
 import {
   previewRecoveryBundle,
   validateDeviceBackupJson,
+  type DeviceBackupEntry,
+  type DeviceBackupV1,
 } from '../deviceRecovery';
 import {
+  characterActivationEvidenceKey,
+  readCharacterAuthority,
   scopedCharacterAuthorityKeys,
   type CharacterAuthority,
 } from './characterAuthority';
 import { CHARACTER_FAMILY, isCharacterFamilyKey } from './characterFamily';
-import { requestResult, transactionComplete } from './localDatabase';
+import { writeRecoveredCharacterSelectionMarker } from './characterCutoverSelection';
+import {
+  openRollkeeperDatabase,
+  requestResult,
+  transactionComplete,
+} from './localDatabase';
 import { validateLegacyEnvelope } from './migrationValidation';
 import { setCharacterRuntimeAuthority } from './characterPersistenceRuntime';
 import type { StorageNamespace } from './shadowJournal';
@@ -18,8 +27,114 @@ interface RecoveryGenerationRecord {
   namespace: StorageNamespace;
   status: 'inactive';
   bundleHash: string;
+  recoveryRunId: string;
+  recoveryCreatedAt: string;
   quarantineCount: number;
   importedAt: string;
+}
+
+interface CompatibilityStorage {
+  length?: number;
+  key?(index: number): string | null;
+  getItem(key: string): string | null;
+  setItem?(key: string, value: string): void;
+}
+
+export type CharacterRecoveryInspectReason =
+  | 'invalid-json'
+  | 'invalid-shape'
+  | 'unsupported-version'
+  | 'checksum-mismatch'
+  | 'aggregate-mismatch'
+  | 'empty-character-set'
+  | 'duplicate-character-key'
+  | 'diagnostic-not-restorable';
+
+export type CharacterRecoveryInspectResult =
+  | {
+      ok: true;
+      bundle: DeviceBackupV1;
+      characterEntries: DeviceBackupEntry[];
+      quarantineCount: number;
+    }
+  | { ok: false; reason: CharacterRecoveryInspectReason };
+
+const DIAGNOSTIC_FORMAT = 'rollkeeper-current-character-export';
+
+function mapValidationError(cause: unknown): CharacterRecoveryInspectReason {
+  const message = cause instanceof Error ? cause.message : '';
+  if (message.includes('not valid JSON')) return 'invalid-json';
+  if (message.includes('Unsupported recovery bundle version'))
+    return 'unsupported-version';
+  if (message.includes('entry checksum mismatch')) return 'checksum-mismatch';
+  if (message.includes('manifest checksum mismatch'))
+    return 'aggregate-mismatch';
+  return 'invalid-shape';
+}
+
+export async function inspectCharacterRecoveryBundle(
+  serialized: string
+): Promise<CharacterRecoveryInspectResult> {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(serialized);
+  } catch {
+    return { ok: false, reason: 'invalid-json' };
+  }
+  if (
+    typeof parsed === 'object' &&
+    parsed !== null &&
+    (parsed as { format?: unknown }).format === DIAGNOSTIC_FORMAT
+  ) {
+    return { ok: false, reason: 'diagnostic-not-restorable' };
+  }
+  let bundle: DeviceBackupV1;
+  try {
+    bundle = await validateDeviceBackupJson(serialized);
+  } catch (cause) {
+    return { ok: false, reason: mapValidationError(cause) };
+  }
+  const characterEntries = bundle.entries.filter(entry =>
+    isCharacterFamilyKey(entry.key)
+  );
+  const keys = characterEntries.map(entry => entry.key);
+  if (new Set(keys).size !== keys.length) {
+    return { ok: false, reason: 'duplicate-character-key' };
+  }
+  if (characterEntries.length === 0) {
+    return { ok: false, reason: 'empty-character-set' };
+  }
+  return {
+    ok: true,
+    bundle,
+    characterEntries,
+    quarantineCount: characterEntries.filter(
+      entry =>
+        validateLegacyEnvelope(entry.key, entry.rawValue).status ===
+        'quarantined'
+    ).length,
+  };
+}
+
+export async function stageCharacterRecoveryFromSerialized(options: {
+  factory: IDBFactory;
+  serialized: string;
+  namespace: StorageNamespace;
+}) {
+  const inspected = await inspectCharacterRecoveryBundle(options.serialized);
+  if (!inspected.ok) {
+    throw new Error(`Character recovery file is ${inspected.reason}`);
+  }
+  const database = await openRollkeeperDatabase({ factory: options.factory });
+  try {
+    return await importCharacterRecoveryGeneration(
+      database,
+      options.serialized,
+      options.namespace
+    );
+  } finally {
+    database.close();
+  }
 }
 
 export async function importCharacterRecoveryGeneration(
@@ -27,17 +142,13 @@ export async function importCharacterRecoveryGeneration(
   serialized: string,
   namespace: StorageNamespace
 ) {
-  // Hashes and the manifest are verified before any entry is parsed or written.
-  const bundle = await validateDeviceBackupJson(serialized);
+  const inspected = await inspectCharacterRecoveryBundle(serialized);
+  if (!inspected.ok) {
+    throw new Error(`Character recovery file is ${inspected.reason}`);
+  }
+  const { bundle, characterEntries: entries, quarantineCount } = inspected;
   const generation = `recovery:${bundle.runId}`;
-  const entries = bundle.entries.filter(entry =>
-    isCharacterFamilyKey(entry.key)
-  );
   const preview = previewRecoveryBundle(bundle, new Map());
-  const quarantineCount = entries.filter(
-    entry =>
-      validateLegacyEnvelope(entry.key, entry.rawValue).status === 'quarantined'
-  ).length;
   const recordKey = `character-recovery:${namespace}:${generation}`;
   const transaction = database.transaction(
     ['meta', 'kvGenerations'],
@@ -78,6 +189,8 @@ export async function importCharacterRecoveryGeneration(
     namespace,
     status: 'inactive',
     bundleHash: bundle.manifestHash,
+    recoveryRunId: bundle.runId,
+    recoveryCreatedAt: bundle.createdAt,
     quarantineCount,
     importedAt: new Date().toISOString(),
   } satisfies RecoveryGenerationRecord);
@@ -91,6 +204,21 @@ export async function importCharacterRecoveryGeneration(
   };
 }
 
+function hasCharacterFamilyCompatibility(
+  storage: CompatibilityStorage | undefined
+): boolean {
+  if (!storage || typeof storage.length !== 'number' || !storage.key) {
+    return false;
+  }
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key && isCharacterFamilyKey(key) && storage.getItem(key) !== null) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export async function activateImportedCharacterGeneration(
   database: IDBDatabase,
   options: {
@@ -98,6 +226,9 @@ export async function activateImportedCharacterGeneration(
     generation: string;
     confirmed: boolean;
     now: () => string;
+    storage?: CompatibilityStorage & {
+      setItem(key: string, value: string): void;
+    };
   }
 ) {
   if (!options.confirmed) {
@@ -181,13 +312,43 @@ export async function activateImportedCharacterGeneration(
             isCharacterFamilyKey(row.key)
         )
       : [];
+  if (authority.authority === 'indexedDB' && activeRows.length === 0) {
+    transaction.abort();
+    throw new Error('Active character generation is missing');
+  }
+  const storage =
+    options.storage ??
+    (typeof localStorage === 'undefined' ? undefined : localStorage);
+  const emptyProfile =
+    authority.authority === 'localStorage' &&
+    !hasCharacterFamilyCompatibility(storage);
   const importedByKey = new Map(importedRows.map(row => [row.key, row]));
   const activeByKey = new Map(activeRows.map(row => [row.key, row]));
-  const divergentKeys = [
-    ...new Set([...activeByKey.keys(), ...importedByKey.keys()]),
-  ].filter(
-    key => activeByKey.get(key)?.rawValue !== importedByKey.get(key)?.rawValue
-  );
+  const legacyByKey = new Map<string, { rawValue: string | null }>();
+  if (
+    authority.authority === 'localStorage' &&
+    storage &&
+    typeof storage.length === 'number' &&
+    storage.key
+  ) {
+    for (let index = 0; index < storage.length; index += 1) {
+      const key = storage.key(index);
+      if (!key || !isCharacterFamilyKey(key)) continue;
+      const rawValue = storage.getItem(key);
+      if (rawValue !== null) legacyByKey.set(key, { rawValue });
+    }
+  }
+  const compareByKey = emptyProfile
+    ? importedByKey
+    : authority.authority === 'indexedDB'
+      ? activeByKey
+      : legacyByKey;
+  const divergentKeys = emptyProfile
+    ? []
+    : [...new Set([...compareByKey.keys(), ...importedByKey.keys()])].filter(
+        key =>
+          compareByKey.get(key)?.rawValue !== importedByKey.get(key)?.rawValue
+      );
   const journalEmpty = !journals.some(
     row =>
       row.namespace === options.namespace && row.family === CHARACTER_FAMILY
@@ -207,7 +368,7 @@ export async function activateImportedCharacterGeneration(
         activeGeneration:
           authority.authority === 'indexedDB' ? authority.generation : null,
         importedGeneration: options.generation,
-        activeRawValue: activeByKey.get(key)?.rawValue ?? null,
+        activeRawValue: compareByKey.get(key)?.rawValue ?? null,
         importedRawValue: importedByKey.get(key)?.rawValue ?? null,
         detectedAt: options.now(),
         resolutionState: 'unresolved',
@@ -249,7 +410,34 @@ export async function activateImportedCharacterGeneration(
     checkpointAt: committedAt,
   });
   meta.put({ ...recovery, status: 'inactive', activatedAt: committedAt });
+  const evidence = {
+    key: characterActivationEvidenceKey(options.namespace, options.generation),
+    version: 1 as const,
+    namespace: options.namespace,
+    family: CHARACTER_FAMILY,
+    selectedAt: committedAt,
+    recoveryManifestHash: recovery.bundleHash,
+    recoveryRunId: recovery.recoveryRunId,
+    recoveryCreatedAt: recovery.recoveryCreatedAt,
+    activatedGeneration: options.generation,
+    activatedEpoch: epoch,
+    committedAt,
+  };
+  const existingEvidence = (await requestResult(meta.get(evidence.key))) as
+    | typeof evidence
+    | undefined;
+  if (
+    existingEvidence &&
+    JSON.stringify(existingEvidence) !== JSON.stringify(evidence)
+  ) {
+    transaction.abort();
+    throw new Error('Immutable character activation evidence already differs');
+  }
+  meta.put(evidence);
   await transactionComplete(transaction);
+  if (options.storage) {
+    writeRecoveredCharacterSelectionMarker(options.storage, evidence);
+  }
   const activated = {
     activated: true as const,
     authority: 'indexedDB' as const,
@@ -261,4 +449,54 @@ export async function activateImportedCharacterGeneration(
   };
   setCharacterRuntimeAuthority(activated);
   return activated;
+}
+
+export async function verifyActivatedCharacterRecovery(
+  database: IDBDatabase,
+  options: { namespace: StorageNamespace; serialized: string }
+) {
+  const inspected = await inspectCharacterRecoveryBundle(options.serialized);
+  if (!inspected.ok) return { ok: false as const, reason: inspected.reason };
+  const authority = await readCharacterAuthority(database, options.namespace);
+  if (authority.authority !== 'indexedDB') {
+    return { ok: false as const, reason: 'authority-mismatch' as const };
+  }
+  const transaction = database.transaction('kvGenerations', 'readonly');
+  const rows = (await requestResult(
+    transaction.objectStore('kvGenerations').getAll()
+  )) as Array<{
+    namespace: StorageNamespace;
+    generation: string;
+    key: string;
+    rawValue: string | null;
+    sourceSha256?: string;
+    presence?: boolean;
+  }>;
+  await transactionComplete(transaction);
+  const active = rows.filter(
+    row =>
+      row.namespace === options.namespace &&
+      row.generation === authority.generation &&
+      isCharacterFamilyKey(row.key) &&
+      row.presence !== false
+  );
+  const byKey = new Map(active.map(row => [row.key, row]));
+  for (const entry of inspected.characterEntries) {
+    const row = byKey.get(entry.key);
+    if (
+      !row ||
+      row.rawValue !== entry.rawValue ||
+      (row.sourceSha256 !== undefined && row.sourceSha256 !== entry.sha256)
+    ) {
+      return { ok: false as const, reason: 'hash-mismatch' as const };
+    }
+  }
+  const characterIds = inspected.characterEntries
+    .flatMap(entry =>
+      entry.key.startsWith('rollkeeper-character:')
+        ? [entry.key.slice('rollkeeper-character:'.length)]
+        : []
+    )
+    .sort();
+  return { ok: true as const, characterIds };
 }

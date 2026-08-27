@@ -229,6 +229,45 @@ export const PLAYER_BACKUP_COPY = {
     saveNew: 'Save a new safety file',
     restoreFrom: 'Restore from a safety file',
     options: 'Recovery options',
+    reviewTitle: 'Review safety file',
+    reviewDescription:
+      'Your current characters and other saved data have not changed. RollKeeper will keep existing data and show different copies for review.',
+    restoreMissing: 'Restore missing data',
+    restoreMissingConfirm:
+      'Restore data that is missing from this browser? Existing data will not be replaced.',
+    restoreMissingResult:
+      'Missing data was restored. Different copies were kept for review.',
+    saveCurrent: 'Save current character recovery file',
+    downloadDetails: 'Download recovery details',
+    restoreCurrent: 'Restore current characters',
+    restorePreview:
+      'Your current characters are ready to restore. The characters already in this browser have not changed.',
+    restoreConfirm:
+      'Restore these characters in this browser? RollKeeper will keep any different local data for review.',
+    restoreSuccess:
+      'Your characters were restored and checked after loading them again.',
+    restoreDifference:
+      'This browser already has different character data. Nothing was replaced. Review both copies in recovery options.',
+    restoreVerificationFailure:
+      'RollKeeper could not verify the restored characters after loading them again. Your recovery file was not changed. Open recovery options before trying again.',
+    invalidFile:
+      'RollKeeper could not check this recovery file. Nothing was changed. Choose another file.',
+    unusable:
+      'Some character data cannot be restored with this version of RollKeeper. It was kept for recovery and nothing was replaced.',
+    downloadOriginal: 'Download original recovery copy',
+    rollback: 'Use the earlier browser saving method',
+    rollbackDescription:
+      'RollKeeper can do this only after it checks that the current saved copies match and no changes are waiting.',
+    rollbackConfirm:
+      'Use the earlier saving method now? Your safety files and recovery copies will be kept.',
+    rollbackRefusal:
+      'RollKeeper could not prove that every current copy matches, so nothing was changed. Open recovery options.',
+    continueActivation: 'Continue recovery',
+    diagnosticHint:
+      'This file is for review only. It cannot restore characters.',
+    chooseFileHint: 'Choose a safety file first.',
+    confirm: 'Restore',
+    cancel: 'Cancel',
   },
   errors: {
     account:

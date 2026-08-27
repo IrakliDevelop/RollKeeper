@@ -198,6 +198,17 @@ describe('PlayerBackupWizard', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(COPY.errors.online);
   });
 
+  it('offers a labeled restore-from-safety-file control on the recovery surface', () => {
+    const { baseElement } = renderWizard('recovery-required');
+    const restore = screen.getByLabelText(COPY.recovery.restoreFrom);
+    expect(restore).toBeEnabled();
+    expect(restore).toHaveAttribute('type', 'file');
+    expect(
+      screen.getByRole('button', { name: COPY.recovery.options })
+    ).toBeInTheDocument();
+    expectPlayerBackupVocabulary(baseElement);
+  });
+
   it('names the safety file input and exposes mismatch as an alert', () => {
     renderWizard('wrong-file');
     expect(screen.getByLabelText(COPY.safety.fileInput)).toBeInTheDocument();
