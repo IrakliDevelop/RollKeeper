@@ -375,6 +375,56 @@ describe('AutomaticCharacterConflictService', () => {
       });
     });
 
+    it('aborts when the hook moves the conflict record under the resolution', async () => {
+      const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+      const moved = { ...cloudRow(), server_version: 9 };
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              await repository.refreshConflictCloudCandidateInTransaction(
+                transaction,
+                conflictId,
+                moved,
+                '2026-02-03T00:00:00.000Z'
+              );
+            },
+          },
+        })
+      ).rejects.toThrow('Automatic sync conflict changed during resolution');
+
+      // The hook's own write is aborted with the rest of the transaction.
+      await expect(service.getConflict(conflictId)).resolves.toEqual(seeded);
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+    });
+
+    it('resolves from the in-transaction record when the hook leaves it alone', async () => {
+      const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              transaction.objectStore('meta').put({ key: 'hook-only' });
+            },
+          },
+        })
+      ).resolves.toBe('resolved');
+
+      await expect(service.getConflict(conflictId)).resolves.toEqual({
+        ...seeded,
+        resolutionState: 'resolved',
+        resolution: 'keep-mine',
+        resolvedAt: '2026-02-02T00:00:00.000Z',
+      });
+    });
+
     it('aborts instead of resurrecting a conflict the hook deleted', async () => {
       const conflictId = await seedConflict();
 

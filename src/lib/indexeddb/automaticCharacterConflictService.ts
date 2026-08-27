@@ -30,10 +30,9 @@ export interface AutomaticConflictResolutionOptions {
    *
    * The hook may only await IndexedDB requests issued on the transaction it is
    * given -- any foreign await auto-commits that transaction and breaks the
-   * fence. It must not edit the conflict record itself: the resolution write
-   * derives from the record read before the transaction opened, so such an
-   * edit is either clobbered or (when it marks the conflict resolved) fences
-   * the resolution off entirely.
+   * fence. It must not edit the conflict record itself: moving the mutation id
+   * or either candidate aborts the whole resolution, and marking the conflict
+   * resolved fences the resolution off entirely.
    */
   transactionHook?: {
     stores?: readonly string[];
@@ -271,13 +270,25 @@ export class AutomaticCharacterConflictService {
       }
     }
 
-    const local = conflict.localCandidate;
+    // The preflight validated `remote`/`decoded` against the pre-transaction
+    // read, so the resolution may only be written when the record still holds
+    // the same work and the same two candidates.
+    if (
+      json(current.mutationId) !== json(conflict.mutationId) ||
+      json(current.localCandidate) !== json(conflict.localCandidate) ||
+      json(current.cloudCandidate) !== json(conflict.cloudCandidate)
+    ) {
+      abortQuietly(transaction);
+      throw new Error('Automatic sync conflict changed during resolution');
+    }
+
+    const local = current.localCandidate;
     if (!local) {
       transaction.abort();
       throw new Error('Local conflict candidate is missing');
     }
 
-    outbox.delete(conflict.mutationId);
+    outbox.delete(current.mutationId);
     if (resolution === 'use-cloud') {
       snapshots.add(snapshot(conflictId, 'local', local, now));
       documents.put({
@@ -337,7 +348,7 @@ export class AutomaticCharacterConflictService {
       }
     }
     conflicts.put({
-      ...conflict,
+      ...current,
       resolutionState: 'resolved',
       resolution,
       resolvedAt: now,
