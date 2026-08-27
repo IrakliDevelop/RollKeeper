@@ -35,6 +35,24 @@ import {
   updatePlayerBackupCharacterCheckpoint,
 } from './playerBackupRunRepository';
 
+// Resolution, explicit restore, one-time settlement and the run-origin drain
+// live in `playerBackupConflictResolution` and are re-exported here so callers
+// keep a single conflict entry point.
+export type {
+  PlayerBackupConflictRefusal,
+  PlayerBackupConflictResolveOptions,
+  PlayerBackupConflictResolveResult,
+  PlayerBackupDrainOptions,
+  PlayerBackupLocalApplication,
+  PlayerBackupSettleOptions,
+} from './playerBackupConflictResolution';
+export {
+  PlayerBackupCopyIdCollisionError,
+  drainPlayerBackupRunWork,
+  resolvePlayerBackupConflict,
+  settlePlayerBackupOneTimeConflicts,
+} from './playerBackupConflictResolution';
+
 /** How the online row differs from the selected local character. */
 export type PlayerBackupConflictComparison = 'newer' | 'different' | 'removed';
 /** Why a candidate was held aside instead of becoming a conflict. */

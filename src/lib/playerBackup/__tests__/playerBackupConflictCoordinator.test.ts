@@ -23,16 +23,37 @@ import {
   encodeCharacterCloudPayload,
   fingerprintCharacterPayload,
 } from '@/lib/supabase/characterCloudCodec';
-import type { CharacterCloudLink } from '@/lib/supabase/characterCloudLinks';
+import { CharacterCloudGatewayError } from '@/lib/supabase/characterCloudGateway';
+import type {
+  CharacterCloudLink,
+  CharacterCloudLinkRepository,
+} from '@/lib/supabase/characterCloudLinks';
+import { createMemoryCharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
+import type {
+  CharacterCloudGateway,
+  CharacterMutationRequest,
+  PutCharacterRequest,
+} from '@/lib/supabase/manualCharacterCloudService';
 
-import type { PlayerBackupConflictComparison } from '../playerBackupConflictCoordinator';
+import type {
+  PlayerBackupConflictComparison,
+  PlayerBackupConflictResolution,
+} from '../playerBackupConflictCoordinator';
 import {
+  drainPlayerBackupRunWork,
   holdPlayerBackupCandidateAsideInLock,
   listPlayerBackupConflicts,
+  resolvePlayerBackupConflict,
   seedPlayerBackupConflict,
+  settlePlayerBackupOneTimeConflicts,
 } from '../playerBackupConflictCoordinator';
+import type { PlayerBackupLocalCharacterSource } from '../playerBackupOnlineExecution';
+import { derivePlayerBackupRunResult } from '../playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
-import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
+import {
+  PlayerBackupLockUnavailableError,
+  withPlayerBackupAccountLock,
+} from '../playerBackupRunFence';
 import type {
   PlayerBackupExecutionPath,
   PlayerBackupRunV1,
@@ -385,6 +406,278 @@ async function expectNoDurableWrites(): Promise<void> {
   expect(await readStore('conflicts')).toEqual([]);
   expect(await readStore('outbox')).toEqual([]);
   expect(await readStore('documents')).toEqual([]);
+}
+
+const ARCHIVED_AT = '2026-08-27T08:00:00.000Z';
+
+type RestoreFailure = 'lost' | 'conflict';
+
+interface ConflictGatewayDouble extends CharacterCloudGateway {
+  rows: Map<string, CharacterCloudRow>;
+  restoreRequests: CharacterMutationRequest[];
+  putRequests: PutCharacterRequest[];
+  failNextRestore: RestoreFailure | null;
+  /** Legacy ids whose `put` fails as an offline gateway error. */
+  failPutFor: Set<string>;
+}
+
+/**
+ * Records every request, applies compare-and-set on `expectedServerVersion`,
+ * clears `deleted_at` on a successful restore and bumps the server version.
+ */
+function createConflictGateway(): ConflictGatewayDouble {
+  const rows = new Map<string, CharacterCloudRow>();
+  const gateway: ConflictGatewayDouble = {
+    rows,
+    restoreRequests: [],
+    putRequests: [],
+    failNextRestore: null,
+    failPutFor: new Set<string>(),
+    fetch: vi.fn(async (cloudId: string) => {
+      const row = rows.get(cloudId);
+      return row ? structuredClone(row) : null;
+    }),
+    restore: vi.fn(async (request: CharacterMutationRequest) => {
+      gateway.restoreRequests.push(structuredClone(request));
+      const mode = gateway.failNextRestore;
+      gateway.failNextRestore = null;
+      const current = rows.get(request.cloudId);
+      if (!current) throw new Error('Cloud character is missing');
+      if (mode === 'conflict') {
+        current.server_version += 1;
+        return {
+          status: 'conflict' as const,
+          characterId: request.cloudId,
+          serverVersion: current.server_version,
+        };
+      }
+      if (current.server_version !== request.expectedServerVersion) {
+        return {
+          status: 'conflict' as const,
+          characterId: request.cloudId,
+          serverVersion: current.server_version,
+        };
+      }
+      current.deleted_at = null;
+      current.server_version += 1;
+      if (mode === 'lost') throw new Error('response lost');
+      return {
+        status: 'success' as const,
+        characterId: request.cloudId,
+        serverVersion: current.server_version,
+      };
+    }),
+    put: vi.fn(async (request: PutCharacterRequest) => {
+      gateway.putRequests.push(structuredClone(request));
+      if (gateway.failPutFor.has(request.legacyId)) {
+        throw new CharacterCloudGatewayError('Network unavailable', 'offline');
+      }
+      const current = rows.get(request.cloudId);
+      if (current && current.server_version !== request.expectedServerVersion) {
+        return {
+          status: 'conflict' as const,
+          characterId: request.cloudId,
+          serverVersion: current.server_version,
+        };
+      }
+      const serverVersion = current ? current.server_version + 1 : 1;
+      rows.set(request.cloudId, {
+        id: request.cloudId,
+        legacy_client_id: request.legacyId,
+        name: request.name,
+        payload: request.payload,
+        schema_version: request.schemaVersion,
+        client_revision: request.clientRevision,
+        server_version: serverVersion,
+        deleted_at: null,
+        created_at: current?.created_at ?? '2026-08-27T00:00:00.000Z',
+        updated_at: '2026-08-27T12:00:00.000Z',
+      });
+      return {
+        status: 'success' as const,
+        characterId: request.cloudId,
+        serverVersion,
+      };
+    }),
+    list: vi.fn(async () =>
+      [...rows.values()].map(row => structuredClone(row))
+    ),
+    archive: vi.fn(),
+  };
+  return gateway;
+}
+
+function roster(): PlayerBackupLocalCharacterSource {
+  return { get: (legacyId: string) => ROSTER[legacyId] ?? null };
+}
+
+/** Seeds a run, a durable conflict and a gateway that already holds the row. */
+async function seedConflictScenario(
+  options: {
+    row?: CharacterCloudRow;
+    comparison?: PlayerBackupConflictComparison;
+    mode?: 'one-time' | 'ongoing';
+    selected?: string[];
+    cleared?: string[];
+  } = {}
+) {
+  await seedRun({
+    mode: options.mode,
+    ...(options.selected ? { selected: options.selected } : {}),
+    ...(options.cleared ? { cleared: options.cleared } : {}),
+  });
+  const harness = createHarness();
+  const row = options.row ?? cloudRow();
+  const gateway = createConflictGateway();
+  gateway.rows.set(row.id, structuredClone(row));
+  const seeded = await harness.seed({
+    row,
+    comparison: options.comparison ?? 'newer',
+  });
+  return { harness, row, gateway, seeded };
+}
+
+function resolveConflict(options: {
+  conflictId: string;
+  resolution: PlayerBackupConflictResolution;
+  gateway: Pick<CharacterCloudGateway, 'fetch' | 'restore'>;
+  generateMutationId: () => string;
+  locks?: PlayerBackupExclusiveLockProvider | null;
+  accountId?: string;
+  runId?: string;
+  copyLegacyId?: string;
+  characters?: PlayerBackupLocalCharacterSource;
+  factory?: IDBFactory;
+}) {
+  return resolvePlayerBackupConflict({
+    factory: options.factory ?? indexedDB,
+    locks: options.locks === undefined ? new ImmediateLocks() : options.locks,
+    accountId: options.accountId ?? ACCOUNT_A,
+    expectedActiveRunId: options.runId ?? 'run-a',
+    conflictId: options.conflictId,
+    resolution: options.resolution,
+    ...(options.copyLegacyId ? { copyLegacyId: options.copyLegacyId } : {}),
+    characters: options.characters ?? roster(),
+    gateway: options.gateway,
+    generateMutationId: options.generateMutationId,
+    now: () => NOW,
+  });
+}
+
+function drainWork(
+  gateway: ConflictGatewayDouble,
+  options: { runId?: string } = {}
+) {
+  return drainPlayerBackupRunWork({
+    factory: indexedDB,
+    locks: new ImmediateLocks(),
+    accountId: ACCOUNT_A,
+    expectedActiveRunId: options.runId ?? 'run-a',
+    gateway,
+    now: () => 1_000,
+    random: () => 0,
+  });
+}
+
+function settleConflicts(
+  gateway: ConflictGatewayDouble,
+  links: CharacterCloudLinkRepository,
+  options: { runId?: string } = {}
+) {
+  return settlePlayerBackupOneTimeConflicts({
+    factory: indexedDB,
+    locks: new ImmediateLocks(),
+    accountId: ACCOUNT_A,
+    expectedActiveRunId: options.runId ?? 'run-a',
+    gateway,
+    links,
+    now: () => NOW,
+  });
+}
+
+async function readCharacterPolicy(legacyId: string): Promise<string | null> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const transaction = database.transaction('meta', 'readonly');
+    const policy =
+      await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+        transaction.objectStore('meta'),
+        NAMESPACE_A,
+        legacyId
+      );
+    await transactionComplete(transaction);
+    return policy;
+  } finally {
+    database.close();
+  }
+}
+
+/** Serialises every request so a queued caller waits for the holder. */
+class QueuedLocks implements PlayerBackupExclusiveLockProvider {
+  private chain: Promise<unknown> = Promise.resolve();
+
+  async request<T>(
+    _name: string,
+    _options: { mode: 'exclusive' },
+    callback: () => Promise<T> | T
+  ): Promise<T> {
+    const queued = this.chain.then(() => callback());
+    this.chain = queued.catch(() => undefined);
+    return queued;
+  }
+}
+
+/** Commits a replacement run for account A, superseding the active pointer. */
+async function confirmRun(
+  runId: string,
+  expectedActiveRunId: string | null = 'run-a'
+): Promise<void> {
+  const database = await openRollkeeperDatabase({ factory: indexedDB });
+  try {
+    await new AutomaticCharacterSyncPreferences(
+      database
+    ).applyConfirmedSelection({
+      expectedActiveRunId,
+      run: buildRun(ACCOUNT_A, {
+        runId,
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: ['hero-b'],
+      }),
+      confirmed: true,
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function deriveResult(links: CharacterCloudLinkRepository) {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    return await derivePlayerBackupRunResult({
+      factory: indexedDB,
+      accountId: ACCOUNT_A,
+      expectedActiveRunId: 'run-a',
+      links,
+      repository: new IndexedDbAutomaticCharacterSyncRepository(database),
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function readConflict(
+  conflictId: string
+): Promise<AutomaticCharacterConflict & { resolution?: string }> {
+  const conflicts = (await readStore(
+    'conflicts'
+  )) as (AutomaticCharacterConflict & {
+    resolution?: string;
+  })[];
+  const found = conflicts.find(record => record.conflictId === conflictId);
+  if (!found) throw new Error(`conflict ${conflictId} is missing`);
+  return found;
 }
 
 beforeEach(() => {
@@ -1070,5 +1363,768 @@ describe('listPlayerBackupConflicts', () => {
         expectedActiveRunId: 'run-a',
       })
     ).rejects.toThrow('Committed player backup run is missing');
+  });
+});
+
+describe('resolvePlayerBackupConflict', () => {
+  it('keep-mine preserves the online candidate, queues run-origin work, and settles to protected after drain', async () => {
+    const { harness, row, gateway, seeded } = await seedConflictScenario();
+
+    const result = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-mine',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+
+    expect(result).toEqual({
+      status: 'resolved',
+      resolution: 'keep-mine',
+      apply: null,
+      workQueued: true,
+    });
+    const snapshots = (await readStore('legacySnapshots')) as {
+      runId: string;
+      key: string;
+      rawValue: string;
+    }[];
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({
+      runId: seeded.conflictId,
+      key: 'automatic-sync-discarded-cloud',
+    });
+    expect(JSON.parse(snapshots[0].rawValue)).toEqual(row);
+
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      mutationId: 'mutation-2',
+      state: 'queued',
+      originPlayerBackupRunId: 'run-a',
+      baseServerVersion: row.server_version,
+    });
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'queued',
+      mutationId: 'mutation-2',
+      reason: 'resolved:keep-mine',
+      cloudId: row.id,
+    });
+
+    await expect(drainWork(gateway)).resolves.toEqual(['synced', 'idle']);
+    expect(gateway.putRequests).toHaveLength(1);
+    expect(gateway.putRequests[0]).toMatchObject({
+      mutationId: 'mutation-2',
+      expectedServerVersion: 2,
+    });
+
+    const links = createMemoryCharacterCloudLinkRepository();
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: ['hero-a'],
+      pending: [],
+    });
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'protected',
+      cloudId: row.id,
+      serverVersion: 3,
+      verifiedAt: NOW,
+    });
+    expect(links.get(ACCOUNT_A, 'hero-a')).toMatchObject({
+      cloudId: row.id,
+      serverVersion: 3,
+      pendingMutation: null,
+    });
+    expect(await readCharacterPolicy('hero-a')).toBe('off');
+
+    const derived = await deriveResult(links);
+    expect(derived.protected).toEqual(['hero-a']);
+    expect(derived.complete).toBe(true);
+  });
+
+  it('use-cloud preserves the local candidate and returns a replace application', async () => {
+    const { harness, row, gateway, seeded } = await seedConflictScenario();
+    const before = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+
+    const result = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'use-cloud',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+
+    const snapshots = (await readStore('legacySnapshots')) as {
+      key: string;
+      rawValue: string;
+    }[];
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0].key).toBe('automatic-sync-discarded-local');
+    expect(JSON.parse(snapshots[0].rawValue)).toEqual(before[0]);
+    expect(await readStore('outbox')).toEqual([]);
+
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents).toHaveLength(1);
+    expect(documents[0].payload).toEqual(row.payload);
+    expect(documents[0].baseServerVersion).toBe(2);
+    expect(result).toEqual({
+      status: 'resolved',
+      resolution: 'use-cloud',
+      apply: {
+        kind: 'replace',
+        legacyId: 'hero-a',
+        payload: documents[0].payload,
+        contentFingerprint: documents[0].contentFingerprint,
+      },
+      workQueued: false,
+    });
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'pending',
+      mutationId: 'mutation-1',
+      reason: 'resolved:use-cloud',
+    });
+
+    const links = createMemoryCharacterCloudLinkRepository();
+    vi.mocked(gateway.fetch).mockClear();
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: ['hero-a'],
+      pending: [],
+    });
+    expect(gateway.fetch).toHaveBeenCalledTimes(1);
+    expect(links.get(ACCOUNT_A, 'hero-a')).toMatchObject({
+      cloudId: row.id,
+      serverVersion: 2,
+      contentFingerprint: documents[0].contentFingerprint,
+      pendingMutation: null,
+    });
+  });
+
+  it('keep-both requires an unused id, copies nested identity, starts off, and survives reload', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      cleared: ['hero-b', 'hero-c'],
+    });
+    const before = await snapshotStores();
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-both',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'refused', reason: 'copy-id-required' });
+    expect(await snapshotStores()).toEqual(before);
+
+    for (const copyLegacyId of ['hero-a', 'hero-b', 'hero-c']) {
+      await expect(
+        resolveConflict({
+          conflictId: seeded.conflictId,
+          resolution: 'keep-both',
+          copyLegacyId,
+          gateway,
+          generateMutationId: harness.identities.generateMutationId,
+        })
+      ).resolves.toEqual({ status: 'refused', reason: 'copy-id-collision' });
+    }
+    expect(await snapshotStores()).toEqual(before);
+    expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
+
+    const result = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-both',
+      copyLegacyId: 'hero-copy',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    const copy = documents.find(document => document.legacyId === 'hero-copy');
+    expect(copy).toMatchObject({
+      syncPolicy: 'off',
+      baseServerVersion: 0,
+      operation: 'create',
+    });
+    expect(copy?.payload).toMatchObject({
+      id: 'hero-copy',
+      characterData: { id: 'hero-copy' },
+    });
+    expect(result).toEqual({
+      status: 'resolved',
+      resolution: 'keep-both',
+      apply: {
+        kind: 'add',
+        legacyId: 'hero-copy',
+        payload: copy?.payload,
+        contentFingerprint: copy?.contentFingerprint,
+      },
+      workQueued: true,
+    });
+
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      legacyId: 'hero-a',
+      mutationId: 'mutation-2',
+      state: 'queued',
+      originPlayerBackupRunId: 'run-a',
+    });
+
+    // `readStore` and `readCharacterPolicy` reopen the database, so both reads
+    // are made against a freshly opened connection.
+    const reloaded = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(reloaded.some(document => document.legacyId === 'hero-copy')).toBe(
+      true
+    );
+    expect(await readCharacterPolicy('hero-copy')).toBe('off');
+  });
+
+  it('repeating a completed resolution writes nothing', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-mine',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    const before = await snapshotStores();
+    const snapshotsBefore = await readStore('legacySnapshots');
+    const mintedBefore =
+      harness.identities.generateMutationId.mock.calls.length;
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-mine',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({
+      status: 'resolved',
+      resolution: 'keep-mine',
+      apply: null,
+      workQueued: false,
+    });
+
+    expect(await snapshotStores()).toEqual(before);
+    expect(await readStore('legacySnapshots')).toEqual(snapshotsBefore);
+    expect(harness.identities.generateMutationId.mock.calls.length).toBe(
+      mintedBefore
+    );
+  });
+
+  it('refuses keep-mine and use-cloud on an archived candidate with zero gateway calls', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row: cloudRow({ deleted_at: ARCHIVED_AT }),
+      comparison: 'removed',
+    });
+
+    for (const resolution of ['keep-mine', 'use-cloud'] as const) {
+      await expect(
+        resolveConflict({
+          conflictId: seeded.conflictId,
+          resolution,
+          gateway,
+          generateMutationId: harness.identities.generateMutationId,
+        })
+      ).resolves.toEqual({
+        status: 'refused',
+        reason: 'archived-requires-restore',
+      });
+    }
+
+    expect(gateway.restore).not.toHaveBeenCalled();
+    expect(gateway.put).not.toHaveBeenCalled();
+    expect(gateway.fetch).not.toHaveBeenCalled();
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+  });
+
+  it('refuses restore-online for a candidate that is not archived', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'restore-online',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'refused', reason: 'not-archived' });
+    expect(gateway.restore).not.toHaveBeenCalled();
+  });
+
+  it('restore-online restores explicitly with a retained identity and attaches an identical row', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row: cloudRow({ deleted_at: ARCHIVED_AT }),
+      comparison: 'removed',
+    });
+
+    const result = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'restore-online',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+
+    expect(gateway.restoreRequests).toEqual([
+      {
+        mutationId: 'mutation-2',
+        cloudId: 'cloud-1',
+        expectedServerVersion: 2,
+      },
+    ]);
+    expect(result).toEqual({ status: 'restored', outcome: 'attached' });
+
+    const conflict = await readConflict(seeded.conflictId);
+    expect(conflict.cloudCandidate).toMatchObject({
+      deleted_at: null,
+      server_version: 3,
+    });
+    expect(conflict.resolutionState).toBe('resolved');
+    expect(conflict.resolution).toBe('use-cloud');
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents[0].baseServerVersion).toBe(3);
+    expect(documents[0].deletedAt).toBeNull();
+
+    const links = createMemoryCharacterCloudLinkRepository();
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: ['hero-a'],
+      pending: [],
+    });
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      state: 'protected',
+      serverVersion: 3,
+    });
+    expect(links.get(ACCOUNT_A, 'hero-a')).toMatchObject({
+      cloudId: 'cloud-1',
+      serverVersion: 3,
+    });
+  });
+
+  it('restore-online leaves a differing row as a three-way conflict', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row: cloudRow({
+        deleted_at: ARCHIVED_AT,
+        payload: encodeCharacterCloudPayload({
+          ...HERO_A,
+          name: 'Hero A (cloud)',
+        }),
+      }),
+      comparison: 'removed',
+    });
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'restore-online',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'restored', outcome: 'unresolved' });
+
+    const listing = await listPlayerBackupConflicts({
+      factory: indexedDB,
+      accountId: ACCOUNT_A,
+      expectedActiveRunId: 'run-a',
+    });
+    expect(listing.conflicts).toHaveLength(1);
+    expect(listing.conflicts[0]).toMatchObject({
+      archived: false,
+      comparison: 'different',
+      resolutionState: 'unresolved',
+      allowedResolutions: ['keep-mine', 'use-cloud', 'keep-both'],
+    });
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      reason: 'conflict:different',
+      mutationId: 'mutation-2',
+    });
+  });
+
+  it('reuses the restore identity after response loss and skips a second restore once acknowledged', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row: cloudRow({ deleted_at: ARCHIVED_AT }),
+      comparison: 'removed',
+    });
+    gateway.failNextRestore = 'lost';
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'restore-online',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).rejects.toThrow('response lost');
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'needs-attention',
+      reason: 'restore-pending',
+      mutationId: 'mutation-2',
+    });
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'restore-online',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'restored', outcome: 'attached' });
+    expect(gateway.restoreRequests).toHaveLength(1);
+    expect(gateway.restoreRequests[0].mutationId).toBe('mutation-2');
+  });
+
+  it('refuses when the archived row changed under the restore', async () => {
+    const row = cloudRow({ deleted_at: ARCHIVED_AT });
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row,
+      comparison: 'removed',
+    });
+    const documentsBefore = await readStore('documents');
+    gateway.failNextRestore = 'conflict';
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'restore-online',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'refused', reason: 'online-changed' });
+
+    const conflict = await readConflict(seeded.conflictId);
+    expect(conflict.resolutionState).toBe('unresolved');
+    expect(conflict.cloudCandidate).toEqual(row);
+    expect(await readStore('documents')).toEqual(documentsBefore);
+    expect(await readStore('legacySnapshots')).toEqual([]);
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      reason: 'restore-pending',
+      mutationId: 'mutation-2',
+    });
+  });
+
+  it('keep-both on an archived candidate restores first then keeps both', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      row: cloudRow({ deleted_at: ARCHIVED_AT }),
+      comparison: 'removed',
+    });
+
+    const result = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-both',
+      copyLegacyId: 'hero-copy',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+
+    expect(gateway.restoreRequests).toEqual([
+      {
+        mutationId: 'mutation-2',
+        cloudId: 'cloud-1',
+        expectedServerVersion: 2,
+      },
+    ]);
+    expect(result).toMatchObject({
+      status: 'resolved',
+      resolution: 'keep-both',
+      workQueued: true,
+    });
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents.some(document => document.legacyId === 'hero-copy')).toBe(
+      true
+    );
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({
+      legacyId: 'hero-a',
+      state: 'queued',
+      mutationId: 'mutation-3',
+      originPlayerBackupRunId: 'run-a',
+    });
+  });
+
+  it('aborts at the fence without changing either candidate', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    const documentsBefore = await readStore('documents');
+    await confirmRun('run-b');
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-mine',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+    expect(await readStore('legacySnapshots')).toEqual([]);
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].state).toBe('conflict');
+    expect(await readStore('documents')).toEqual(documentsBefore);
+    expect(gateway.fetch).not.toHaveBeenCalled();
+    expect(gateway.restore).not.toHaveBeenCalled();
+  });
+
+  it('two tabs cannot resolve stale work after a newer run wins', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    const locks = new QueuedLocks();
+    let releaseTabA: (() => void) | undefined;
+    const held = new Promise<void>(resolve => {
+      releaseTabA = resolve;
+    });
+
+    const tabA = withPlayerBackupAccountLock(
+      { accountId: ACCOUNT_A, locks },
+      async () => {
+        await held;
+        await confirmRun('run-b');
+      }
+    );
+    const tabB = resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-mine',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+      locks,
+    }).catch((cause: unknown) => cause);
+    releaseTabA!();
+    await tabA;
+
+    expect(await tabB).toBeInstanceOf(PlayerBackupRunReplacedError);
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+    expect(await readStore('legacySnapshots')).toEqual([]);
+    expect(await readStore('outbox')).toHaveLength(1);
+    await expect(drainWork(gateway, { runId: 'run-b' })).resolves.toEqual([
+      'idle',
+    ]);
+  });
+
+  it('refuses another account, a stale-run conflict, and an unselected character', async () => {
+    await seedRun({ accountId: ACCOUNT_A, runId: 'run-a' });
+    await seedRun({ accountId: ACCOUNT_B, runId: 'run-b' });
+    const gateway = createConflictGateway();
+    gateway.rows.set('cloud-1', cloudRow());
+    await writeRecords('conflicts', [
+      conflictRecord({
+        conflictId: 'automatic-sync:foreign',
+        mutationId: 'foreign',
+        namespace: `user:${ACCOUNT_B}`,
+      }),
+      conflictRecord({
+        conflictId: 'automatic-sync:stale',
+        mutationId: 'stale',
+        originPlayerBackupRunId: 'run-old',
+      }),
+      conflictRecord({
+        conflictId: 'automatic-sync:cleared',
+        mutationId: 'cleared',
+        legacyId: 'hero-b',
+        cloudCandidate: cloudRow({ legacy_client_id: 'hero-b' }),
+      }),
+    ]);
+    const before = await snapshotStores();
+    const identities = createIdentities('resolve');
+
+    const refusals: Record<string, string> = {
+      'automatic-sync:foreign': 'account-mismatch',
+      'automatic-sync:stale': 'stale-run',
+      'automatic-sync:cleared': 'not-selected',
+    };
+    for (const [conflictId, reason] of Object.entries(refusals)) {
+      await expect(
+        resolveConflict({
+          conflictId,
+          resolution: 'keep-mine',
+          gateway,
+          generateMutationId: identities.generateMutationId,
+        })
+      ).resolves.toEqual({ status: 'refused', reason });
+    }
+
+    expect(await snapshotStores()).toEqual(before);
+    expect(identities.generateMutationId).not.toHaveBeenCalled();
+  });
+
+  it('fails closed without lock capability', async () => {
+    const { seeded } = await seedConflictScenario();
+    const factory = { open: vi.fn() } as unknown as IDBFactory;
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-mine',
+        gateway: createConflictGateway(),
+        generateMutationId: () => 'mutation-x',
+        locks: null,
+        factory,
+      })
+    ).rejects.toBeInstanceOf(PlayerBackupLockUnavailableError);
+    expect(factory.open).not.toHaveBeenCalled();
+  });
+
+  it('throws for a degraded run', async () => {
+    await seedRun({ stage: 'confirmed', executionPath: 'degraded-manual' });
+    await writeRecords('conflicts', [conflictRecord()]);
+
+    await expect(
+      resolveConflict({
+        conflictId: 'automatic-sync:worker-1',
+        resolution: 'keep-mine',
+        gateway: createConflictGateway(),
+        generateMutationId: () => 'mutation-x',
+      })
+    ).rejects.toThrow('Degraded manual backup never resolves a conflict');
+  });
+});
+
+describe('settlePlayerBackupOneTimeConflicts', () => {
+  it('reports pending until the refetched row matches the acknowledged document', async () => {
+    const { harness, row, gateway, seeded } = await seedConflictScenario();
+    await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-mine',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    const links = createMemoryCharacterCloudLinkRepository();
+
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: [],
+      pending: ['hero-a'],
+    });
+
+    await expect(drainWork(gateway)).resolves.toEqual(['synced', 'idle']);
+    const stored = gateway.rows.get(row.id);
+    if (!stored) throw new Error('cloud row is missing');
+    const acknowledged = stored.payload;
+    stored.payload = encodeCharacterCloudPayload({
+      ...HERO_A,
+      name: 'Drifted',
+    });
+    const checkpointBefore = (await readCheckpoints())['hero-a'].online;
+
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: [],
+      pending: ['hero-a'],
+    });
+    expect(links.get(ACCOUNT_A, 'hero-a')).toBeNull();
+    expect((await readCheckpoints())['hero-a'].online).toEqual(
+      checkpointBefore
+    );
+
+    stored.payload = acknowledged;
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: ['hero-a'],
+      pending: [],
+    });
+  });
+
+  it('does nothing for an ongoing run and pause retains data and work', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario({
+      mode: 'ongoing',
+    });
+    await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-mine',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    const links = createMemoryCharacterCloudLinkRepository();
+
+    await expect(settleConflicts(gateway, links)).resolves.toEqual({
+      settled: [],
+      pending: [],
+    });
+
+    const database = await openExistingRollkeeperDatabase({
+      factory: indexedDB,
+    });
+    if (!database) throw new Error('database is missing');
+    try {
+      await new AutomaticCharacterSyncPreferences(database).setCharacter(
+        NAMESPACE_A,
+        'hero-a',
+        false
+      );
+    } finally {
+      database.close();
+    }
+
+    await expect(drainWork(gateway)).resolves.toEqual(['held']);
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].state).toBe('paused');
+    expect(await readStore('documents')).toHaveLength(1);
+    expect(gateway.putRequests).toEqual([]);
+  });
+});
+
+describe('drainPlayerBackupRunWork', () => {
+  it('dispatches run-origin work behind the guard and stops on the first non-synced result', async () => {
+    await seedRun({ selected: ['hero-a', 'hero-b'], cleared: [] });
+    const harness = createHarness();
+    const gateway = createConflictGateway();
+    const rowA = cloudRow();
+    const rowB = cloudRow({
+      id: 'cloud-2',
+      legacy_client_id: 'hero-b',
+      name: 'Hero B',
+      payload: encodeCharacterCloudPayload(HERO_B),
+      client_revision: 1,
+    });
+    gateway.rows.set(rowA.id, structuredClone(rowA));
+    gateway.rows.set(rowB.id, structuredClone(rowB));
+    const seededA = await harness.seed({ row: rowA });
+    const seededB = await harness.seed({ legacyId: 'hero-b', row: rowB });
+    for (const conflictId of [seededA.conflictId, seededB.conflictId]) {
+      await resolveConflict({
+        conflictId,
+        resolution: 'keep-mine',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      });
+    }
+    gateway.failPutFor.add('hero-b');
+
+    await expect(drainWork(gateway)).resolves.toEqual(['synced', 'offline']);
+
+    expect(gateway.putRequests.map(request => request.legacyId)).toEqual([
+      'hero-a',
+      'hero-b',
+    ]);
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0]).toMatchObject({ legacyId: 'hero-b', state: 'offline' });
   });
 });
