@@ -8,6 +8,7 @@ import {
   type PlayerBackupRunV1,
   PlayerBackupRunReplacedError,
   assertValidPlayerBackupRun,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupActiveRunKey,
   playerBackupRunKey,
 } from '@/lib/playerBackup/playerBackupRunRepository';
@@ -211,6 +212,21 @@ export class AutomaticCharacterSyncPreferences {
       await completion.catch(() => undefined);
       throw new PlayerBackupRunReplacedError();
     }
+    if (
+      observedRunId !== null &&
+      (
+        await listPlayerBackupPendingApplicationsInTransaction(
+          meta,
+          observedRunId
+        )
+      ).length > 0
+    ) {
+      transaction.abort();
+      await completion.catch(() => undefined);
+      throw new Error(
+        'The active player backup run has a pending roster application'
+      );
+    }
 
     meta.put({
       ...structuredClone(options.run),
@@ -262,6 +278,25 @@ export class AutomaticCharacterSyncPreferences {
       return;
     }
     await completion;
+  }
+
+  /**
+   * Writes the same per-character preference record as `setCharacter()` on a
+   * `meta` store the caller owns.
+   */
+  static writeCharacterPolicyInTransaction(
+    meta: IDBObjectStore,
+    namespace: `user:${string}`,
+    legacyId: string,
+    policy: 'on' | 'off'
+  ): void {
+    meta.put({
+      key: automaticCharacterSyncCharacterKey(namespace, legacyId),
+      namespace,
+      legacyId,
+      policy,
+      explicit: true,
+    } satisfies CharacterPreferenceRecord);
   }
 
   static async readCharacterPolicyInTransaction(

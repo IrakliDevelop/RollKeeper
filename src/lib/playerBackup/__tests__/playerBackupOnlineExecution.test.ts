@@ -3,8 +3,10 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
+import { AutomaticCharacterConflictService } from '@/lib/indexeddb/automaticCharacterConflictService';
 import {
   IndexedDbAutomaticCharacterSyncRepository,
+  type AutomaticCharacterConflict,
   type AutomaticCharacterOutboxEntry,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { readCharacterAuthority } from '@/lib/indexeddb/characterAuthority';
@@ -424,7 +426,9 @@ async function readCheckpoints(runId = 'run-a') {
   return run!.characterCheckpoints;
 }
 
-async function readStore(name: 'documents' | 'outbox'): Promise<unknown[]> {
+async function readStore(
+  name: 'documents' | 'outbox' | 'conflicts' | 'quarantine'
+): Promise<unknown[]> {
   const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
   if (!database) throw new Error('database is missing');
   try {
@@ -432,6 +436,49 @@ async function readStore(name: 'documents' | 'outbox'): Promise<unknown[]> {
     const records = await requestResult(transaction.objectStore(name).getAll());
     await transactionComplete(transaction);
     return records as unknown[];
+  } finally {
+    database.close();
+  }
+}
+
+/** Marks the stored quarantine record so a rewrite of it is detectable. */
+async function markQuarantineRecord(legacyId: string): Promise<void> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const transaction = database.transaction('quarantine', 'readwrite');
+    const store = transaction.objectStore('quarantine');
+    const records = (await requestResult(store.getAll())) as {
+      legacyId: string;
+      reason: string;
+    }[];
+    for (const record of records) {
+      if (record.legacyId === legacyId) {
+        store.put({ ...record, reason: 'marked-by-test' });
+      }
+    }
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+/** Refuses any non-delete work for one character, as a real deletion would. */
+async function writeTombstone(legacyId: string): Promise<void> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const transaction = database.transaction('tombstones', 'readwrite');
+    transaction.objectStore('tombstones').put({
+      namespace: NAMESPACE,
+      family: 'character',
+      legacyId,
+      localRevision: 1,
+      deletedAt: CONFIRMED_AT,
+      beforeImage: null,
+      mutationId: 'tombstone-1',
+    });
+    await transactionComplete(transaction);
   } finally {
     database.close();
   }
@@ -488,10 +535,12 @@ function createOngoingHarness(
     roster?: Record<string, unknown>;
     locks?: PlayerBackupExclusiveLockProvider | null;
     beforeLock?: () => Promise<void>;
+    gateway?: GatewayDouble;
   } = {}
 ) {
   const roster = options.roster ?? ONGOING_ROSTER;
   const identities = createIdentities();
+  const gateway = options.gateway ?? createGatewayDouble();
   const locks =
     options.locks !== undefined
       ? options.locks
@@ -504,12 +553,13 @@ function createOngoingHarness(
       locks,
       accountId: ACCOUNT,
       expectedActiveRunId: runId,
+      gateway,
       characters: { get: (legacyId: string) => roster[legacyId] ?? null },
       generateCloudId: identities.generateCloudId,
       generateMutationId: identities.generateMutationId,
       now: () => NOW,
     });
-  return { identities, locks, roster, start };
+  return { gateway, identities, locks, roster, start };
 }
 
 function deriveOngoing(repository: IndexedDbAutomaticCharacterSyncRepository) {
@@ -748,11 +798,12 @@ describe('one-time player backup online execution', () => {
       cloudId: 'cloud-a',
       serverVersion: 2,
     });
+    // An integrated run hands the drifted row to the durable conflict path.
     expect(checkpoints['hero-b'].online).toMatchObject({
+      kind: 'automatic',
       state: 'needs-attention',
       cloudId: 'cloud-b',
-      mutationId: null,
-      reason: 'different',
+      reason: 'conflict:different',
     });
     expect(harness.links.get(ACCOUNT, 'hero-b')).toBeNull();
   });
@@ -891,62 +942,6 @@ describe('one-time player backup online execution', () => {
       serverVersion: 1,
       contentFingerprint: expected,
       pendingMutation: null,
-    });
-  });
-
-  it('records an explicit server conflict as needs-attention, restores the prior link, and never retries', async () => {
-    await seedRun();
-    const harness = createHarness();
-    await seedRow(harness.gateway, {
-      cloudId: 'cloud-a',
-      legacyId: 'hero-a',
-      character: HERO_A_OLD,
-      serverVersion: 1,
-      clientRevision: 4,
-    });
-    const priorFingerprint = await fingerprint(HERO_A_OLD);
-    harness.links.save({
-      accountId: ACCOUNT,
-      legacyId: 'hero-a',
-      cloudId: 'cloud-a',
-      serverVersion: 1,
-      contentFingerprint: priorFingerprint,
-      pendingMutation: null,
-    });
-    harness.gateway.failNextPut = 'conflict';
-
-    const first = await harness.execute();
-
-    expect(first.needsAttention).toEqual(['hero-a']);
-    expect(first.outcomes['hero-a']).toEqual({
-      outcome: 'needs-attention',
-      reason: 'rejected:conflict',
-    });
-    expect(harness.links.get(ACCOUNT, 'hero-a')).toEqual({
-      accountId: ACCOUNT,
-      legacyId: 'hero-a',
-      cloudId: 'cloud-a',
-      serverVersion: 1,
-      contentFingerprint: priorFingerprint,
-      pendingMutation: null,
-    });
-    expect(harness.gateway.rows.get('cloud-a')?.server_version).toBe(2);
-    const afterFirst = await readCheckpoints();
-    expect(afterFirst['hero-a'].online).toMatchObject({
-      state: 'needs-attention',
-      cloudId: 'cloud-a',
-      mutationId: 'mutation-1',
-      reason: 'rejected:conflict',
-    });
-
-    const second = await harness.execute();
-
-    expect(second.needsAttention).toEqual(['hero-a']);
-    expect(harness.gateway.put).toHaveBeenCalledTimes(1);
-    const afterSecond = await readCheckpoints();
-    expect(afterSecond['hero-a'].online).toMatchObject({
-      state: 'needs-attention',
-      reason: 'different',
     });
   });
 
@@ -1250,17 +1245,23 @@ describe('one-time player backup online execution', () => {
     const result = await harness.execute();
 
     expect(result.needsAttention).toEqual(['hero-a']);
-    expect(result.outcomes['hero-a']).toEqual({
-      outcome: 'needs-attention',
-      reason: 'rejected:conflict',
-    });
     expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
     const checkpoints = await readCheckpoints();
     expect(checkpoints['hero-a'].online).toMatchObject({
+      kind: 'automatic',
       state: 'needs-attention',
       cloudId: 'cloud-1',
-      reason: 'rejected:conflict',
+      reason: 'conflict:different',
     });
+    // No prior link means the conflict work creates the cloud copy it contests.
+    await expect(readStore('documents')).resolves.toEqual([
+      expect.objectContaining({
+        legacyId: 'hero-a',
+        cloudId: 'cloud-1',
+        operation: 'create',
+        baseServerVersion: 0,
+      }),
+    ]);
   });
 
   it('retries a linked-exact character after a transient failure instead of contesting it', async () => {
@@ -1362,6 +1363,388 @@ describe('one-time player backup online execution', () => {
       state: 'protected',
       cloudId: 'cloud-1',
       mutationId: 'mutation-1',
+    });
+  });
+
+  describe('integrated existing copies (manual)', () => {
+    it('seeds a durable conflict for a different row and continues unrelated characters', async () => {
+      await seedRun({ selected: ['hero-a', 'hero-b'] });
+      const harness = createHarness();
+      const row = await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+
+      const result = await harness.execute();
+
+      expect(result.needsAttention).toEqual(['hero-a']);
+      expect(result.protected).toEqual(['hero-b']);
+      expect(result.complete).toBe(false);
+      expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+      expect(harness.gateway.putRequests[0]).toMatchObject({
+        legacyId: 'hero-b',
+      });
+      await expect(readStore('conflicts')).resolves.toEqual([
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          family: 'character',
+          legacyId: 'hero-a',
+          originPlayerBackupRunId: 'run-a',
+          resolutionState: 'unresolved',
+          cloudCandidate: row,
+        }),
+      ]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        reason: 'conflict:different',
+      });
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
+    });
+
+    it('skips a character owned by the conflict path on resume', async () => {
+      await seedRun({ selected: ['hero-a', 'hero-b'] });
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+
+      const first = await harness.execute();
+      // One listing per character: the contested one and the uploaded one.
+      expect(harness.gateway.list).toHaveBeenCalledTimes(2);
+
+      const resumed = await harness.execute();
+
+      // Both characters short-circuit before any cloud read.
+      expect(harness.gateway.list).toHaveBeenCalledTimes(2);
+      expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+      await expect(readStore('conflicts')).resolves.toHaveLength(1);
+      expect(resumed).toEqual(first);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        reason: 'conflict:different',
+      });
+    });
+
+    it('seeds an archived row without restoring or uploading', async () => {
+      await seedRun();
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A,
+        deletedAt: '2026-08-20T00:00:00.000Z',
+      });
+
+      const result = await harness.execute();
+
+      expect(result.needsAttention).toEqual(['hero-a']);
+      expect(harness.gateway.restore).not.toHaveBeenCalled();
+      expect(harness.gateway.put).not.toHaveBeenCalled();
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toBeNull();
+      await expect(readStore('conflicts')).resolves.toEqual([
+        expect.objectContaining({ legacyId: 'hero-a' }),
+      ]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        reason: 'conflict:removed',
+      });
+    });
+
+    it('holds a future row aside with exact bytes', async () => {
+      await seedRun();
+      const harness = createHarness();
+      const row = await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A,
+        schemaVersion: 99,
+      });
+
+      const result = await harness.execute();
+
+      expect(result.heldAside).toEqual(['hero-a']);
+      expect(harness.gateway.put).not.toHaveBeenCalled();
+      await expect(readStore('quarantine')).resolves.toEqual([
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          family: 'character',
+          legacyId: 'hero-a',
+          rawValue: JSON.stringify(row),
+        }),
+      ]);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'held-aside',
+        cloudId: 'cloud-a',
+        reason: 'future',
+      });
+
+      // A marked record proves the resume rewrites nothing it already holds.
+      await markQuarantineRecord('hero-a');
+      const resumed = await harness.execute();
+
+      expect(resumed).toEqual(result);
+      await expect(readStore('quarantine')).resolves.toEqual([
+        expect.objectContaining({ reason: 'marked-by-test' }),
+      ]);
+    });
+
+    it('contains a seeding failure to one character and keeps the run going', async () => {
+      await seedRun({ selected: ['hero-a', 'hero-b'] });
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      // A tombstone refuses the conflict work the seed tries to write.
+      await writeTombstone('hero-a');
+
+      const result = await harness.execute();
+
+      expect(result.failed).toEqual(['hero-a']);
+      expect(result.outcomes['hero-a']).toEqual({
+        outcome: 'failed',
+        reason: 'Conflict work could not be saved',
+      });
+      expect(result.protected).toEqual(['hero-b']);
+      expect(result.complete).toBe(false);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'failed',
+        cloudId: 'none',
+        mutationId: null,
+        reason: 'Conflict work could not be saved',
+      });
+      expect(checkpoints['hero-b'].online).toMatchObject({
+        state: 'protected',
+      });
+    });
+
+    it('turns an explicit server conflict into a durable conflict without retry', async () => {
+      await seedRun();
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 1,
+        clientRevision: 4,
+      });
+      const priorFingerprint = await fingerprint(HERO_A_OLD);
+      harness.links.save({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      harness.gateway.failNextPut = 'conflict';
+
+      const first = await harness.execute();
+
+      expect(first.needsAttention).toEqual(['hero-a']);
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toEqual({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      await expect(readStore('conflicts')).resolves.toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          originPlayerBackupRunId: 'run-a',
+          resolutionState: 'unresolved',
+          // The refetched row the rejection carried, not the stale listing.
+          cloudCandidate: expect.objectContaining({
+            id: 'cloud-a',
+            server_version: 2,
+          }),
+        }),
+      ]);
+      // The conflict work replaces the linked copy instead of creating one.
+      await expect(readStore('documents')).resolves.toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          cloudId: 'cloud-a',
+          operation: 'replace',
+          baseServerVersion: 1,
+          originPlayerBackupRunId: 'run-a',
+        }),
+      ]);
+      const afterFirst = await readCheckpoints();
+      expect(afterFirst['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        reason: 'conflict:different',
+      });
+
+      const second = await harness.execute();
+
+      expect(second).toEqual(first);
+      expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+      await expect(readStore('conflicts')).resolves.toHaveLength(1);
+    });
+  });
+
+  describe('degraded boundary regression', () => {
+    it('never seeds or quarantines for a degraded run', async () => {
+      await seedRun({
+        stage: 'confirmed',
+        executionPath: 'degraded-manual',
+        selected: ['hero-a', 'hero-b', 'hero-c'],
+      });
+      const harness = createHarness({
+        roster: { 'hero-a': HERO_A, 'hero-b': HERO_B, 'hero-c': HERO_C },
+      });
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-b',
+        legacyId: 'hero-b',
+        character: HERO_B,
+        deletedAt: '2026-08-20T00:00:00.000Z',
+      });
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-c',
+        legacyId: 'hero-c',
+        character: HERO_C,
+        schemaVersion: 99,
+      });
+
+      const result = await harness.execute();
+
+      expect(result.executionPath).toBe('degraded-manual');
+      expect(result.needsAttention).toEqual(['hero-a', 'hero-b']);
+      expect(result.heldAside).toEqual(['hero-c']);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('quarantine')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      await expect(readStore('outbox')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        mutationId: null,
+        reason: 'different',
+      });
+      expect(checkpoints['hero-b'].online).toMatchObject({
+        kind: 'manual',
+        state: 'needs-attention',
+        cloudId: 'cloud-b',
+        mutationId: null,
+        reason: 'removed',
+      });
+      expect(checkpoints['hero-c'].online).toMatchObject({
+        kind: 'manual',
+        state: 'held-aside',
+        cloudId: 'cloud-c',
+        mutationId: null,
+        reason: 'future',
+      });
+    });
+
+    it('keeps a degraded server conflict as rejected:conflict', async () => {
+      await seedRun({ stage: 'confirmed', executionPath: 'degraded-manual' });
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 1,
+        clientRevision: 4,
+      });
+      const priorFingerprint = await fingerprint(HERO_A_OLD);
+      harness.links.save({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      harness.gateway.failNextPut = 'conflict';
+
+      const result = await harness.execute();
+
+      expect(result.outcomes['hero-a']).toEqual({
+        outcome: 'needs-attention',
+        reason: 'rejected:conflict',
+      });
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toEqual({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        mutationId: 'mutation-1',
+        reason: 'rejected:conflict',
+      });
+
+      const resumed = await harness.execute();
+
+      // The rejected copy is never re-sent, and the resume still writes no
+      // durable conflict or quarantine evidence for a degraded run.
+      expect(resumed.needsAttention).toEqual(['hero-a']);
+      expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toEqual({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('quarantine')).resolves.toEqual([]);
+      const afterResume = await readCheckpoints();
+      // The reason drifts to the fresh classification, as Task 6 recorded it.
+      expect(afterResume['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'needs-attention',
+        reason: 'different',
+      });
     });
   });
 });
@@ -1996,5 +2379,475 @@ describe('ongoing player backup work creation', () => {
     } finally {
       database.close();
     }
+  });
+
+  describe('ongoing existing copies', () => {
+    it('attaches an identical row as an acknowledged document without work', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: ONGOING_HERO_A,
+        serverVersion: 2,
+        clientRevision: 5,
+      });
+
+      const result = await harness.start();
+
+      const expected = await fingerprint(ONGOING_HERO_A);
+      await expect(readStore('documents')).resolves.toEqual([
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          family: 'character',
+          legacyId: 'hero-a',
+          cloudId: 'cloud-a',
+          operation: 'replace',
+          schemaVersion: 1,
+          localRevision: 5,
+          baseServerVersion: 2,
+          contentFingerprint: expected,
+          syncPolicy: 'on',
+          updatedAt: NOW,
+          originPlayerBackupRunId: 'run-a',
+          deletedAt: null,
+        }),
+      ]);
+      await expect(readStore('outbox')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toEqual({
+        version: 1,
+        kind: 'automatic',
+        cloudId: 'cloud-a',
+        mutationId: null,
+        state: 'protected',
+        recordedAt: NOW,
+        serverVersion: 2,
+        contentFingerprint: expected,
+        verifiedAt: NOW,
+      });
+      expect(result.protected).toEqual(['hero-a']);
+      expect(result.complete).toBe(true);
+      expect(harness.identities.generateCloudId).not.toHaveBeenCalled();
+      expect(harness.identities.generateMutationId).not.toHaveBeenCalled();
+
+      const database = await openExistingRollkeeperDatabase({
+        factory: indexedDB,
+      });
+      if (!database) throw new Error('database is missing');
+      try {
+        const gateway = createGatewayDouble();
+        const worker = new AutomaticCharacterSyncWorker({
+          namespace: NAMESPACE,
+          featureEnabled: true,
+          repository: new IndexedDbAutomaticCharacterSyncRepository(database),
+          gateway,
+          dispatchGuard: createPlayerBackupDispatchGuard({
+            factory: indexedDB,
+            locks: new ImmediateLocks(),
+            accountId: ACCOUNT,
+          }),
+        });
+
+        await worker.runOnce();
+
+        expect(gateway.put).not.toHaveBeenCalled();
+      } finally {
+        database.close();
+      }
+    });
+
+    it('seeds a conflict for a newer row and continues others', async () => {
+      await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+      const harness = createOngoingHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 3,
+        clientRevision: 9,
+      });
+
+      const result = await harness.start();
+
+      expect(result.needsAttention).toEqual(['hero-a']);
+      expect(result.queued).toEqual(['hero-c']);
+      await expect(readStore('conflicts')).resolves.toEqual([
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          legacyId: 'hero-a',
+          originPlayerBackupRunId: 'run-a',
+          resolutionState: 'unresolved',
+        }),
+      ]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        reason: 'conflict:newer',
+      });
+      // The conflict work carries this run's origin and the document it
+      // preserves; the unrelated character keeps its ordinary queued work.
+      const outbox = (await readStore(
+        'outbox'
+      )) as AutomaticCharacterOutboxEntry[];
+      expect(outbox).toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          state: 'conflict',
+          originPlayerBackupRunId: 'run-a',
+        }),
+        expect.objectContaining({
+          legacyId: 'hero-c',
+          state: 'queued',
+          originPlayerBackupRunId: 'run-a',
+        }),
+      ]);
+    });
+
+    it('seeds an archived row as conflict:removed', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: ONGOING_HERO_A,
+        deletedAt: '2026-08-20T00:00:00.000Z',
+      });
+
+      const result = await harness.start();
+
+      expect(result.needsAttention).toEqual(['hero-a']);
+      expect(harness.gateway.restore).not.toHaveBeenCalled();
+      await expect(readStore('conflicts')).resolves.toHaveLength(1);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'needs-attention',
+        cloudId: 'cloud-a',
+        reason: 'conflict:removed',
+      });
+    });
+
+    it('holds a future row aside', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+      const row = await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: ONGOING_HERO_A,
+        schemaVersion: 99,
+      });
+
+      const result = await harness.start();
+
+      expect(result.heldAside).toEqual(['hero-a']);
+      await expect(readStore('quarantine')).resolves.toEqual([
+        expect.objectContaining({
+          namespace: NAMESPACE,
+          legacyId: 'hero-a',
+          rawValue: JSON.stringify(row),
+        }),
+      ]);
+      await expect(readStore('outbox')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'automatic',
+        state: 'held-aside',
+        cloudId: 'cloud-a',
+        reason: 'future',
+      });
+    });
+
+    it('records a listing failure by category and retries once the listing succeeds', async () => {
+      await seedRun({
+        mode: 'ongoing',
+        selected: ['hero-a', 'hero-b', 'hero-c'],
+      });
+      const harness = createOngoingHarness();
+      harness.gateway.failNextList = 'offline';
+      harness.gateway.failListCount = 3;
+
+      const stalled = await harness.start();
+
+      // A failure recorded before anything was written mints no identity.
+      expect(stalled.offline).toEqual(['hero-a', 'hero-b', 'hero-c']);
+      await expect(readStore('outbox')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      const stalledCheckpoints = await readCheckpoints();
+      for (const legacyId of ['hero-a', 'hero-b', 'hero-c']) {
+        expect(stalledCheckpoints[legacyId].online).toMatchObject({
+          kind: 'automatic',
+          state: 'offline',
+          reason: 'offline',
+          cloudId: 'none',
+          mutationId: null,
+        });
+      }
+      expect(harness.identities.generateMutationId).not.toHaveBeenCalled();
+
+      // The account gained copies of two of them while the listing was down.
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-b',
+        legacyId: 'hero-b',
+        character: ONGOING_ROSTER['hero-b'],
+        serverVersion: 2,
+        clientRevision: 2,
+      });
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-c',
+        legacyId: 'hero-c',
+        character: { ...HERO_C, characterData: { id: 'hero-c', revision: 2 } },
+        serverVersion: 4,
+        clientRevision: 9,
+      });
+
+      const retried = await harness.start();
+
+      // Each character re-correlates and takes the branch its row deserves.
+      expect(retried.queued).toEqual(['hero-a']);
+      expect(retried.protected).toEqual(['hero-b']);
+      expect(retried.needsAttention).toEqual(['hero-c']);
+      await expect(readStore('outbox')).resolves.toEqual([
+        expect.objectContaining({
+          mutationId: 'mutation-1',
+          legacyId: 'hero-a',
+          state: 'queued',
+          originPlayerBackupRunId: 'run-a',
+        }),
+        expect.objectContaining({ legacyId: 'hero-c', state: 'conflict' }),
+      ]);
+      const documents = (await readStore('documents')) as {
+        legacyId: string;
+        cloudId?: string;
+        baseServerVersion: number;
+      }[];
+      expect(documents).toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          cloudId: 'cloud-1',
+          baseServerVersion: 0,
+        }),
+        expect.objectContaining({
+          legacyId: 'hero-b',
+          cloudId: 'cloud-b',
+          baseServerVersion: 2,
+        }),
+        expect.objectContaining({ legacyId: 'hero-c', cloudId: 'cloud-c' }),
+      ]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        state: 'queued',
+        cloudId: 'cloud-1',
+        mutationId: 'mutation-1',
+      });
+      expect(checkpoints['hero-b'].online).toMatchObject({
+        state: 'protected',
+        cloudId: 'cloud-b',
+        mutationId: null,
+      });
+      expect(checkpoints['hero-c'].online).toMatchObject({
+        state: 'needs-attention',
+        cloudId: 'cloud-c',
+        reason: 'conflict:newer',
+      });
+    });
+
+    it('never re-mints work for a character that already has a queued identity', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+
+      const first = await harness.start();
+
+      expect(first.queued).toEqual(['hero-a']);
+      // A cloud copy appears before the resume; the queued work still stands.
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+
+      const resumed = await harness.start();
+
+      expect(resumed).toEqual(first);
+      expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
+      expect(harness.identities.generateCloudId).toHaveBeenCalledTimes(1);
+      await expect(readStore('outbox')).resolves.toEqual([
+        expect.objectContaining({ mutationId: 'mutation-1', state: 'queued' }),
+      ]);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toHaveLength(1);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        state: 'queued',
+        cloudId: 'cloud-1',
+        mutationId: 'mutation-1',
+      });
+    });
+
+    it('keeps the missing path unchanged', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+      // Another character's cloud copy must not be correlated with this one.
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-z',
+        legacyId: 'hero-z',
+        character: HERO_C,
+      });
+
+      const result = await harness.start();
+
+      const expected = await fingerprint(ONGOING_HERO_A);
+      await expect(readStore('documents')).resolves.toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          cloudId: 'cloud-1',
+          operation: 'create',
+          baseServerVersion: 0,
+          contentFingerprint: expected,
+          originPlayerBackupRunId: 'run-a',
+        }),
+      ]);
+      await expect(readStore('outbox')).resolves.toEqual([
+        expect.objectContaining({
+          mutationId: 'mutation-1',
+          legacyId: 'hero-a',
+          state: 'queued',
+        }),
+      ]);
+      expect(result.queued).toEqual(['hero-a']);
+    });
+  });
+
+  describe('dispatch guard run authorisation', () => {
+    it('dispatches one-time run-origin work whose checkpoint is automatic while the preference stays off', async () => {
+      await seedRun();
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      await harness.execute();
+      const [conflict] = (await readStore(
+        'conflicts'
+      )) as AutomaticCharacterConflict[];
+
+      const database = await openExistingRollkeeperDatabase({
+        factory: indexedDB,
+      });
+      if (!database) throw new Error('database is missing');
+      try {
+        const conflicts = new AutomaticCharacterConflictService(database, {
+          randomId: () => 'resolution-1',
+          now: () => NOW,
+        });
+
+        await expect(
+          conflicts.resolve(conflict!.conflictId, 'keep-mine', {
+            originPlayerBackupRunId: 'run-a',
+          })
+        ).resolves.toBe('resolved');
+
+        const queued = (
+          (await readStore('outbox')) as AutomaticCharacterOutboxEntry[]
+        ).filter(entry => entry.state === 'queued');
+        expect(queued).toEqual([
+          expect.objectContaining({
+            mutationId: 'resolution-1',
+            legacyId: 'hero-a',
+            originPlayerBackupRunId: 'run-a',
+          }),
+        ]);
+
+        const guard = createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        });
+        await expect(guard.authorize(queued[0]!)).resolves.toBe('dispatch');
+        // The one-time run authorises its own resolution work without ever
+        // turning the character's preference on.
+        await expect(
+          new AutomaticCharacterSyncPreferences(
+            database
+          ).readConfirmedSelection(NAMESPACE, ['hero-a'])
+        ).resolves.toMatchObject({ characterPolicies: { 'hero-a': 'off' } });
+      } finally {
+        database.close();
+      }
+    });
+
+    it('still holds preference-off for ongoing paused work and for one-time entries without origin', async () => {
+      await seedRun({ mode: 'ongoing' });
+      await createOngoingHarness().start();
+      const [paused] = (await readStore(
+        'outbox'
+      )) as AutomaticCharacterOutboxEntry[];
+      await setCharacterPolicy('hero-a', false);
+
+      await expect(
+        createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        }).authorize(paused!)
+      ).resolves.toEqual({ hold: 'preference-off' });
+
+      await deleteRollkeeperDatabaseForTests(indexedDB);
+      await seedRun();
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      await harness.execute();
+      const [contested] = (await readStore(
+        'outbox'
+      )) as AutomaticCharacterOutboxEntry[];
+      const unstamped: AutomaticCharacterOutboxEntry = { ...contested! };
+      delete unstamped.originPlayerBackupRunId;
+
+      await expect(
+        createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        }).authorize(unstamped)
+      ).resolves.toEqual({ hold: 'preference-off' });
+    });
+
+    it('holds stale-origin work unchanged', async () => {
+      await seedRun();
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      await harness.execute();
+      const [contested] = (await readStore(
+        'outbox'
+      )) as AutomaticCharacterOutboxEntry[];
+
+      await expect(
+        createPlayerBackupDispatchGuard({
+          factory: indexedDB,
+          locks: new ImmediateLocks(),
+          accountId: ACCOUNT,
+        }).authorize({ ...contested!, originPlayerBackupRunId: 'run-old' })
+      ).resolves.toEqual({ hold: 'stale-origin' });
+    });
   });
 });

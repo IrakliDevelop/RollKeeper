@@ -11,6 +11,7 @@ import {
 } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { encodeCharacterCloudPayload } from '@/lib/supabase/characterCloudCodec';
 import type { CharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
 import { createMemoryCharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
 import type {
@@ -45,6 +46,41 @@ const HERO = {
   name: 'Hero Shared',
   characterData: { id: 'hero-shared', revision: 5 },
 };
+const HERO_OLD = {
+  id: 'hero-shared',
+  name: 'Hero Shared',
+  characterData: { id: 'hero-shared', revision: 4 },
+};
+const HERO_FUTURE = {
+  id: 'hero-future',
+  name: 'Hero Future',
+  characterData: { id: 'hero-future', revision: 2 },
+};
+const ROSTER: Record<string, unknown> = {
+  'hero-shared': HERO,
+  'hero-future': HERO_FUTURE,
+};
+
+function cloudRow(options: {
+  cloudId: string;
+  legacyId: string;
+  character: unknown;
+  clientRevision: number;
+  schemaVersion?: number;
+}): CharacterCloudRow {
+  return {
+    id: options.cloudId,
+    legacy_client_id: options.legacyId,
+    name: 'Cloud copy',
+    payload: encodeCharacterCloudPayload(options.character),
+    schema_version: options.schemaVersion ?? 1,
+    client_revision: options.clientRevision,
+    server_version: 3,
+    deleted_at: null,
+    created_at: '2026-08-26T00:00:00.000Z',
+    updated_at: '2026-08-26T00:00:00.000Z',
+  };
+}
 
 class ImmediateLocks implements PlayerBackupExclusiveLockProvider {
   async request<T>(
@@ -128,8 +164,12 @@ async function seedRun(
   }
 }
 
-function createGatewayDouble(): CharacterCloudGateway {
-  const rows = new Map<string, CharacterCloudRow>();
+function createGatewayDouble(
+  seed: readonly CharacterCloudRow[] = []
+): CharacterCloudGateway {
+  const rows = new Map<string, CharacterCloudRow>(
+    seed.map(row => [row.id, row])
+  );
   return {
     put: vi.fn(async (request: PutCharacterRequest) => {
       const current = rows.get(request.cloudId);
@@ -182,7 +222,9 @@ async function readCheckpoints(accountId: string, runId: string) {
   return run!.characterCheckpoints;
 }
 
-async function readStore(name: 'documents' | 'outbox'): Promise<unknown[]> {
+async function readStore(
+  name: 'documents' | 'outbox' | 'conflicts' | 'quarantine'
+): Promise<unknown[]> {
   const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
   if (!database) throw new Error('database is missing');
   try {
@@ -218,9 +260,7 @@ function execute(options: {
     service,
     links: options.links,
     gateway: options.gateway,
-    characters: {
-      get: (legacyId: string) => (legacyId === 'hero-shared' ? HERO : null),
-    },
+    characters: { get: (legacyId: string) => ROSTER[legacyId] ?? null },
     generateCloudId: () => options.cloudId,
     generateMutationId: () => options.mutationId,
     now: () => NOW,
@@ -298,6 +338,70 @@ describe('player backup account isolation and passivity', () => {
 
     const checkpointsAAfterB = await readCheckpoints('account-a', 'run-a');
     expect(checkpointsAAfterB).toEqual(checkpointsAAfterA);
+  });
+
+  it('seeds conflicts and quarantine only inside the executing account namespace', async () => {
+    await seedRun('account-a', {
+      runId: 'run-a',
+      selected: ['hero-shared', 'hero-future'],
+    });
+    await seedRun('account-b', { runId: 'run-b' });
+
+    const links = createMemoryCharacterCloudLinkRepository();
+    const gatewayA = createGatewayDouble([
+      cloudRow({
+        cloudId: 'cloud-a-existing',
+        legacyId: 'hero-shared',
+        character: HERO_OLD,
+        clientRevision: 4,
+      }),
+      cloudRow({
+        cloudId: 'cloud-a-future',
+        legacyId: 'hero-future',
+        character: HERO_FUTURE,
+        clientRevision: 2,
+        schemaVersion: 99,
+      }),
+    ]);
+    const gatewayB = createGatewayDouble();
+
+    const resultA = await execute({
+      accountId: 'account-a',
+      runId: 'run-a',
+      links,
+      gateway: gatewayA,
+      cloudId: 'cloud-a-1',
+      mutationId: 'mutation-a-1',
+    });
+
+    expect(resultA.needsAttention).toEqual(['hero-shared']);
+    expect(resultA.heldAside).toEqual(['hero-future']);
+    expect(gatewayA.put).not.toHaveBeenCalled();
+    expect(gatewayB.list).not.toHaveBeenCalled();
+    for (const name of [
+      'conflicts',
+      'quarantine',
+      'documents',
+      'outbox',
+    ] as const) {
+      const records = (await readStore(name)) as { namespace: string }[];
+      expect(records).not.toHaveLength(0);
+      expect(
+        records.filter(record => record.namespace !== 'user:account-a')
+      ).toEqual([]);
+    }
+
+    // Account B keeps an untouched, still-pending run and no link of its own.
+    expect(links.get('account-b', 'hero-shared')).toBeNull();
+    const checkpointsB = await readCheckpoints('account-b', 'run-b');
+    expect(checkpointsB['hero-shared']).toEqual({ localPreparation: 'ready' });
+    const derivedB = await derivePlayerBackupRunResult({
+      factory: indexedDB,
+      accountId: 'account-b',
+      expectedActiveRunId: 'run-b',
+      links,
+    });
+    expect(derivedB.pending).toEqual(['hero-shared']);
   });
 
   it('leaves unrelated RollKeeper keys and DM-family records unchanged', async () => {

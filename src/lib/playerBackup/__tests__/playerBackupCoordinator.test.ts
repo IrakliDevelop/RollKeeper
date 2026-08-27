@@ -37,6 +37,7 @@ import {
   continuePlayerBackupLocalPreparation,
 } from '../playerBackupCoordinator';
 import { classifyDegradedEligibility } from '../playerBackupEligibility';
+import type { PlayerBackupConflictListing } from '../playerBackupConflictCoordinator';
 import type { PlayerBackupExecutionResult } from '../playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
 import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
@@ -65,6 +66,10 @@ function fakeResult(
     complete: true,
     ...overrides,
   };
+}
+
+function fakeListing(accountId: string): PlayerBackupConflictListing {
+  return { accountId, runId: 'run-a', conflicts: [], heldAside: [] };
 }
 
 const HERO_A = {
@@ -953,6 +958,7 @@ describe('player backup local preparation coordinator', () => {
       expect(coordinator.snapshot()).toMatchObject({
         accountId: 'account-a',
         result: null,
+        resultLoading: false,
       });
     });
 
@@ -968,6 +974,73 @@ describe('player backup local preparation coordinator', () => {
         accountId: 'account-b',
         result,
         resultLoading: false,
+      });
+    });
+  });
+
+  describe('account-token conflict state', () => {
+    it('loads conflicts under the account token and discards a late listing after an account switch', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      const listing = fakeListing('account-a');
+
+      await expect(
+        coordinator.loadConflicts('account-a', async () => listing)
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        conflicts: listing,
+        conflictsLoading: false,
+      });
+
+      let releaseLoader: (() => void) | undefined;
+      const pending = new Promise<PlayerBackupConflictListing>(resolve => {
+        releaseLoader = () => resolve(fakeListing('account-a'));
+      });
+
+      const loading = coordinator.loadConflicts('account-a', () => pending);
+      coordinator.changeAccount('account-b');
+      releaseLoader!();
+
+      await expect(loading).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        conflicts: null,
+        conflictsLoading: false,
+      });
+    });
+
+    it('rejects a listing for another account id', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+
+      await expect(
+        coordinator.loadConflicts('account-a', async () =>
+          fakeListing('account-b')
+        )
+      ).resolves.toBe(false);
+      // The token and the account are still current, so this call still owns
+      // the flag and must clear it rather than strand it.
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        conflicts: null,
+        conflictsLoading: false,
+      });
+    });
+
+    it('clears conflicts synchronously on changeAccount', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      await coordinator.loadConflicts('account-a', async () =>
+        fakeListing('account-a')
+      );
+      expect(coordinator.snapshot().conflicts).not.toBeNull();
+
+      coordinator.changeAccount('account-b');
+
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        conflicts: null,
+        conflictsLoading: false,
       });
     });
   });

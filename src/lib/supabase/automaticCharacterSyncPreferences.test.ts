@@ -296,4 +296,32 @@ describe('AutomaticCharacterSyncPreferences', () => {
     ).resolves.toEqual({ futureDefault: 'on', enabledAt: T3, confirmedAt: T1 });
     await transactionComplete(afterOn);
   });
+
+  it('writes a per-character policy inside a caller transaction', async () => {
+    const preferences = new AutomaticCharacterSyncPreferences(database);
+    const transaction = database.transaction('meta', 'readwrite');
+    const meta = transaction.objectStore('meta');
+    AutomaticCharacterSyncPreferences.writeCharacterPolicyInTransaction(
+      meta,
+      NAMESPACE,
+      'hero',
+      'off'
+    );
+    await expect(
+      AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+        meta,
+        NAMESPACE,
+        'hero'
+      )
+    ).resolves.toBe('off');
+    await transactionComplete(transaction);
+
+    await expect(
+      preferences.resolve(NAMESPACE, {
+        id: 'hero',
+        name: 'Hero',
+        createdAt: '2026-01-03T00:00:00.000Z',
+      })
+    ).resolves.toMatchObject({ enabled: false, source: 'character-off' });
+  });
 });

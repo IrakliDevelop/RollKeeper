@@ -1,6 +1,7 @@
 import type { Json } from '@/types/database.generated';
 
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { fingerprintCharacterPayload } from '@/lib/supabase/characterCloudCodec';
 import { validateAutomaticCharacterCandidate } from '@/lib/supabase/automaticCharacterSyncValidation';
 
 import {
@@ -18,6 +19,31 @@ export type AutomaticConflictResolution =
 interface ConflictServiceOptions {
   randomId?: () => string;
   now?: () => string;
+}
+
+export interface AutomaticConflictResolutionOptions {
+  copyLegacyId?: string;
+  /**
+   * Runs inside the resolution transaction after the conflict is re-read and
+   * found unresolved, and before any write; throwing aborts everything. When
+   * present the transaction also includes 'meta' plus `stores`.
+   *
+   * The hook may only await IndexedDB requests issued on the transaction it is
+   * given -- any foreign await auto-commits that transaction and breaks the
+   * fence. It must not edit the conflict record itself: moving the mutation id
+   * or either candidate aborts the whole resolution, and marking the conflict
+   * resolved fences the resolution off entirely.
+   */
+  transactionHook?: {
+    stores?: readonly string[];
+    run(
+      transaction: IDBTransaction,
+      conflict: AutomaticCharacterConflict,
+      plan: { enqueuedMutationId: string | null }
+    ): Promise<void>;
+  };
+  /** Stamped on the outbox entry that keep-mine / keep-both enqueue. */
+  originPlayerBackupRunId?: string;
 }
 
 interface ConflictSnapshot {
@@ -44,6 +70,14 @@ interface AutomaticSyncQuarantine {
 
 function json(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function abortQuietly(transaction: IDBTransaction): void {
+  try {
+    transaction.abort();
+  } catch {
+    // The transaction may already have completed or aborted.
+  }
 }
 
 function snapshot(
@@ -85,6 +119,18 @@ function copyPayload(payload: Json, legacyId: string): Json {
   return copy as Json;
 }
 
+/** The keep-both copy: a rewritten identity with its own fingerprint. */
+async function copyDocument(
+  payload: Json,
+  legacyId: string
+): Promise<{ payload: Json; contentFingerprint: string }> {
+  const copied = copyPayload(payload, legacyId);
+  return {
+    payload: copied,
+    contentFingerprint: await fingerprintCharacterPayload(copied),
+  };
+}
+
 export class AutomaticCharacterConflictService {
   private readonly randomId: () => string;
   private readonly now: () => string;
@@ -118,11 +164,17 @@ export class AutomaticCharacterConflictService {
   async resolve(
     conflictId: string,
     resolution: AutomaticConflictResolution,
-    options: { copyLegacyId?: string } = {}
+    options: AutomaticConflictResolutionOptions = {}
   ): Promise<'resolved' | 'quarantined'> {
     const conflict = await this.getConflict(conflictId);
     if (!conflict) throw new Error('Automatic sync conflict was not found');
     if (conflict.resolutionState === 'resolved') return 'resolved';
+    if (
+      conflict.originPlayerBackupRunId !== undefined &&
+      options.originPlayerBackupRunId !== conflict.originPlayerBackupRunId
+    ) {
+      throw new Error('Player backup conflict origin is not authorised');
+    }
     const remote = conflict.cloudCandidate as CharacterCloudRow;
     const validation = await validateAutomaticCharacterCandidate(
       remote,
@@ -151,22 +203,99 @@ export class AutomaticCharacterConflictService {
       throw new Error('Cloud conflict candidate identity is unsafe');
     }
 
+    // The keep-both copy is rewritten with a new identity, so its fingerprint
+    // must be recomputed here: inside the transaction any foreign await would
+    // auto-commit it. A missing copy id still aborts inside the transaction.
+    const copied =
+      resolution === 'keep-both' && options.copyLegacyId
+        ? await copyDocument(decoded.rawPayload, options.copyLegacyId)
+        : null;
+
     const now = this.now();
+    const hook = options.transactionHook;
+    const enqueuedMutationId =
+      resolution === 'use-cloud' ? null : this.randomId();
     const transaction = this.database.transaction(
-      ['documents', 'outbox', 'conflicts', 'legacySnapshots'],
+      Array.from(
+        new Set([
+          'documents',
+          'outbox',
+          'conflicts',
+          'legacySnapshots',
+          ...(hook ? ['meta', ...(hook.stores ?? [])] : []),
+        ])
+      ),
       'readwrite'
     );
     const documents = transaction.objectStore('documents');
     const outbox = transaction.objectStore('outbox');
     const conflicts = transaction.objectStore('conflicts');
     const snapshots = transaction.objectStore('legacySnapshots');
-    const local = conflict.localCandidate;
+
+    const readCurrent = () =>
+      requestResult(conflicts.get(conflictId)) as Promise<
+        | (AutomaticCharacterConflict & {
+            resolution?: AutomaticConflictResolution;
+          })
+        | undefined
+      >;
+    const requireConflict = (
+      record:
+        | (AutomaticCharacterConflict & {
+            resolution?: AutomaticConflictResolution;
+          })
+        | undefined
+    ) => {
+      if (!record) {
+        abortQuietly(transaction);
+        throw new Error('Automatic sync conflict was not found');
+      }
+      return record;
+    };
+
+    let current = requireConflict(await readCurrent());
+    if (current.resolutionState === 'resolved') {
+      // Another tab resolved between the pre-read and this transaction: the
+      // hook never runs and nothing is written.
+      await transactionComplete(transaction);
+      return 'resolved';
+    }
+    if (hook) {
+      try {
+        await hook.run(transaction, current, { enqueuedMutationId });
+      } catch (error) {
+        abortQuietly(transaction);
+        throw error;
+      }
+      // The hook shares the transaction, so re-read to fence against a
+      // resolution it observed or performed itself.
+      current = requireConflict(await readCurrent());
+      if (current.resolutionState === 'resolved') {
+        await transactionComplete(transaction);
+        return 'resolved';
+      }
+    }
+
+    // The preflight validated `remote`/`decoded` against the pre-transaction
+    // read, so the resolution may only be written when the record still holds
+    // the same work and the same two candidates.
+    if (
+      json(current.mutationId) !== json(conflict.mutationId) ||
+      json(current.localCandidate) !== json(conflict.localCandidate) ||
+      json(current.cloudCandidate) !== json(conflict.cloudCandidate) ||
+      current.originPlayerBackupRunId !== conflict.originPlayerBackupRunId
+    ) {
+      abortQuietly(transaction);
+      throw new Error('Automatic sync conflict changed during resolution');
+    }
+
+    const local = current.localCandidate;
     if (!local) {
       transaction.abort();
       throw new Error('Local conflict candidate is missing');
     }
 
-    outbox.delete(conflict.mutationId);
+    outbox.delete(current.mutationId);
     if (resolution === 'use-cloud') {
       snapshots.add(snapshot(conflictId, 'local', local, now));
       documents.put({
@@ -189,20 +318,22 @@ export class AutomaticCharacterConflictService {
         updatedAt: now,
       };
       documents.put(resumed);
-      const mutationId = this.randomId();
       outbox.put({
         ...resumed,
-        mutationId,
+        mutationId: enqueuedMutationId as string,
         operation: resumed.deletedAt ? 'delete' : 'replace',
         state: 'queued',
         attemptCount: 0,
         nextAttemptAt: 0,
         lastError: null,
         inflightAt: null,
+        ...(options.originPlayerBackupRunId !== undefined
+          ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
+          : {}),
       } satisfies AutomaticCharacterOutboxEntry);
 
       if (resolution === 'keep-both') {
-        if (!options.copyLegacyId) {
+        if (!options.copyLegacyId || !copied) {
           transaction.abort();
           throw new Error('Keep both requires a new local character ID');
         }
@@ -211,11 +342,11 @@ export class AutomaticCharacterConflictService {
           family: 'character',
           legacyId: options.copyLegacyId,
           operation: 'create',
-          payload: copyPayload(decoded.rawPayload, options.copyLegacyId),
+          payload: copied.payload,
           schemaVersion: remote.schema_version,
           localRevision: 1,
           baseServerVersion: 0,
-          contentFingerprint: decoded.contentFingerprint,
+          contentFingerprint: copied.contentFingerprint,
           syncPolicy: 'off',
           updatedAt: now,
           deletedAt: null,
@@ -224,7 +355,7 @@ export class AutomaticCharacterConflictService {
       }
     }
     conflicts.put({
-      ...conflict,
+      ...current,
       resolutionState: 'resolved',
       resolution,
       resolvedAt: now,

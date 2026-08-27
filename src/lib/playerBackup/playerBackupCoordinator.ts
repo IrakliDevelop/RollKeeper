@@ -33,6 +33,7 @@ import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticChara
 import type { CharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
 
 import type { PlayerBackupCloudPreview } from './playerBackupCloudPreview';
+import type { PlayerBackupConflictListing } from './playerBackupConflictCoordinator';
 import {
   PlayerBackupCloudPreviewController,
   PlayerBackupCloudPreviewError,
@@ -67,6 +68,9 @@ export class PlayerBackupReadOnlyCoordinator {
   private resultToken = 0;
   private result: PlayerBackupExecutionResult | null = null;
   private resultLoading = false;
+  private conflictToken = 0;
+  private conflicts: PlayerBackupConflictListing | null = null;
+  private conflictsLoading = false;
 
   changeAccount(accountId: string | null): void {
     this.accountId = accountId;
@@ -74,6 +78,9 @@ export class PlayerBackupReadOnlyCoordinator {
     this.resultToken += 1;
     this.result = null;
     this.resultLoading = false;
+    this.conflictToken += 1;
+    this.conflicts = null;
+    this.conflictsLoading = false;
     this.cloud.changeAccount(accountId);
   }
 
@@ -84,6 +91,8 @@ export class PlayerBackupReadOnlyCoordinator {
       cloud: this.cloud.snapshot(),
       result: this.result,
       resultLoading: this.resultLoading,
+      conflicts: this.conflicts,
+      conflictsLoading: this.conflictsLoading,
     };
   }
 
@@ -120,11 +129,12 @@ export class PlayerBackupReadOnlyCoordinator {
     this.resultLoading = true;
     try {
       const result = await loader();
-      if (
-        requestToken !== this.resultToken ||
-        this.accountId !== accountId ||
-        result.accountId !== accountId
-      ) {
+      if (requestToken !== this.resultToken || this.accountId !== accountId) {
+        // A newer load owns the flag now, so this one must not touch it.
+        return false;
+      }
+      if (result.accountId !== accountId) {
+        this.resultLoading = false;
         return false;
       }
       this.result = result;
@@ -135,6 +145,36 @@ export class PlayerBackupReadOnlyCoordinator {
         return false;
       }
       this.resultLoading = false;
+      throw cause;
+    }
+  }
+
+  /** Mirrors `loadResult`'s token/account guard for the conflict listing. */
+  async loadConflicts(
+    accountId: string,
+    loader: () => Promise<PlayerBackupConflictListing>
+  ): Promise<boolean> {
+    if (this.accountId !== accountId) this.changeAccount(accountId);
+    const requestToken = ++this.conflictToken;
+    this.conflictsLoading = true;
+    try {
+      const listing = await loader();
+      if (requestToken !== this.conflictToken || this.accountId !== accountId) {
+        // A newer load owns the flag now, so this one must not touch it.
+        return false;
+      }
+      if (listing.accountId !== accountId) {
+        this.conflictsLoading = false;
+        return false;
+      }
+      this.conflicts = listing;
+      this.conflictsLoading = false;
+      return true;
+    } catch (cause) {
+      if (requestToken !== this.conflictToken || this.accountId !== accountId) {
+        return false;
+      }
+      this.conflictsLoading = false;
       throw cause;
     }
   }

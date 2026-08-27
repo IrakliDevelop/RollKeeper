@@ -23,6 +23,7 @@ export default defineConfig({
       'src/lib/playerBackup/__tests__/playerBackupEligibility.test.ts',
       'src/lib/playerBackup/__tests__/playerBackupOnlineExecution.test.ts',
       'src/lib/playerBackup/__tests__/playerBackupAccountIsolation.test.ts',
+      'src/lib/playerBackup/__tests__/playerBackupConflictCoordinator.test.ts',
     ],
     coverage: {
       enabled: true,

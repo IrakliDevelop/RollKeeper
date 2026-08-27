@@ -104,6 +104,20 @@ export interface ActiveRunPointer {
   accountId: string;
 }
 
+/** A conflict resolution whose winning payload still needs a roster write. */
+export interface PlayerBackupPendingApplicationV1 {
+  key: string;
+  version: 1;
+  runId: string;
+  accountId: string;
+  kind: 'replace' | 'add';
+  legacyId: string;
+  sourceLegacyId: string;
+  resolution: 'use-cloud' | 'keep-both';
+  conflictId: string;
+  recordedAt: string;
+}
+
 export class PlayerBackupRunReplacedError extends Error {
   constructor() {
     super('The active player backup run was replaced');
@@ -117,6 +131,40 @@ export function playerBackupRunKey(runId: string): string {
 
 export function playerBackupActiveRunKey(accountId: string): string {
   return `player-backup-active-run:${accountId}`;
+}
+
+/** The roster change one resolution still owes its caller, per character. */
+export function playerBackupApplicationKey(
+  runId: string,
+  legacyId: string
+): string {
+  return `player-backup-application:${runId}:${legacyId}`;
+}
+
+/** Lists one run's durable roster-application debts on the caller transaction. */
+export async function listPlayerBackupPendingApplicationsInTransaction(
+  meta: IDBObjectStore,
+  runId: string
+): Promise<PlayerBackupPendingApplicationV1[]> {
+  const rows = (await requestResult(meta.getAll())) as unknown[];
+  const prefix = playerBackupApplicationKey(runId, '');
+  return rows.filter((row): row is PlayerBackupPendingApplicationV1 => {
+    const candidate = row as Partial<PlayerBackupPendingApplicationV1> | null;
+    return (
+      candidate?.version === 1 &&
+      candidate.runId === runId &&
+      typeof candidate.key === 'string' &&
+      candidate.key.startsWith(prefix) &&
+      typeof candidate.accountId === 'string' &&
+      (candidate.kind === 'replace' || candidate.kind === 'add') &&
+      typeof candidate.legacyId === 'string' &&
+      typeof candidate.sourceLegacyId === 'string' &&
+      (candidate.resolution === 'use-cloud' ||
+        candidate.resolution === 'keep-both') &&
+      typeof candidate.conflictId === 'string' &&
+      typeof candidate.recordedAt === 'string'
+    );
+  });
 }
 
 function isNonEmptyString(value: unknown): value is string {

@@ -1,10 +1,14 @@
 import type {
   AutomaticCharacterDocument,
   AutomaticCharacterOutboxEntry,
-  IndexedDbAutomaticCharacterSyncRepository,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
-import { openExistingRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import {
+  openExistingRollkeeperDatabase,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
+import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import {
   encodeCharacterCloudPayload,
   fingerprintCharacterPayload,
@@ -20,8 +24,15 @@ import type {
 } from '@/lib/supabase/manualCharacterCloudService';
 import { ManualCharacterCloudRejectedError } from '@/lib/supabase/manualCharacterCloudService';
 
-import type { PlayerBackupPreviewCharacter } from './playerBackupCloudPreview';
+import type {
+  PlayerBackupCloudComparison,
+  PlayerBackupPreviewCharacter,
+} from './playerBackupCloudPreview';
 import { compareCloudRows } from './playerBackupCloudPreview';
+import {
+  holdPlayerBackupCandidateAsideInLock,
+  seedPlayerBackupConflictInLock,
+} from './playerBackupConflictCoordinator';
 import type { DegradedCharacterEligibility } from './playerBackupEligibility';
 import { classifyDegradedEligibility } from './playerBackupEligibility';
 import type { PlayerBackupExclusiveLockProvider } from './playerBackupRunFence';
@@ -39,6 +50,7 @@ import type {
 } from './playerBackupRunRepository';
 import {
   PlayerBackupRunReplacedError,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
   readPlayerBackupRunInTransaction,
@@ -349,10 +361,72 @@ interface ManualExecutionContext extends PlayerBackupManualExecutionOptions {
 }
 
 /**
+ * An integrated run never leaves an existing online copy as a terminal refusal:
+ * a contested row becomes a durable conflict that preserves both candidates,
+ * and an unusable one is quarantined with its exact bytes. Both helpers open
+ * their own fenced transaction and write their own checkpoint, so the caller
+ * must hold the account lock and no transaction of its own.
+ *
+ * Returns `false` for a reason this path does not own — the caller keeps its
+ * existing checkpoint. Degraded runs never reach here.
+ */
+async function routeContestedRow(options: {
+  context: ManualExecutionContext;
+  database: IDBDatabase;
+  legacyId: string;
+  character: unknown;
+  reason: DegradedCharacterEligibility['reason'] | PlayerBackupCloudComparison;
+  row: CharacterCloudRow | null;
+  quarantineDetail: string | null;
+  existing: PlayerBackupOnlineCheckpoint | undefined;
+  existingLink: CharacterCloudLink | null;
+}): Promise<boolean> {
+  const { context, existing, reason, row } = options;
+  // The same candidate was already held aside: re-quarantining it on every
+  // resume would rewrite the record without changing anything it holds.
+  if (existing?.state === 'held-aside' && existing.reason === reason) {
+    return true;
+  }
+  const scope = {
+    database: options.database,
+    accountId: context.accountId,
+    expectedActiveRunId: context.expectedActiveRunId,
+    legacyId: options.legacyId,
+    now: context.now,
+  };
+  if (
+    row !== null &&
+    (reason === 'newer' || reason === 'different' || reason === 'removed')
+  ) {
+    await seedPlayerBackupConflictInLock({
+      ...scope,
+      character: options.character,
+      row,
+      comparison: reason,
+      existingLink: options.existingLink,
+      generateMutationId: context.generateMutationId,
+    });
+    return true;
+  }
+  if (reason === 'future' || reason === 'unavailable') {
+    await holdPlayerBackupCandidateAsideInLock({
+      ...scope,
+      row,
+      reason,
+      detail: options.quarantineDetail,
+      checkpointKind: 'manual',
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
  * Runs one selected character end to end while the caller holds the account
  * lock: fenced consent re-read, classification, identity, gateway mutation and
- * the durable checkpoint. Only a replaced run, a missing lock or a broken
- * consent partition escapes; every online failure becomes a checkpoint.
+ * the durable checkpoint. Every online failure becomes a checkpoint here; a
+ * replaced run, a missing lock and a broken consent partition escape to abort
+ * the run, and anything else the caller contains as this character's failure.
  */
 async function processManualCharacter(
   context: ManualExecutionContext,
@@ -367,6 +441,10 @@ async function processManualCharacter(
     });
     const existing = run.characterCheckpoints[legacyId]?.online;
     if (existing?.state === 'protected') return;
+    // The durable conflict/work path owns this character now; its outcome comes
+    // from the conflict, quarantine and work evidence, not from another attempt.
+    if (existing?.kind === 'automatic') return;
+    const integrated = playerBackupExecutionPath(run) === 'integrated';
     const existingLink = context.links.get(context.accountId, legacyId);
     const retained = retainCharacterIdentity(existing, existingLink);
 
@@ -419,6 +497,22 @@ async function processManualCharacter(
 
     const { compared, eligibility } = classified;
     if (!eligibility.eligible) {
+      if (
+        integrated &&
+        (await routeContestedRow({
+          context,
+          database,
+          legacyId,
+          character,
+          reason: eligibility.reason,
+          row: compared.row,
+          quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existing,
+          existingLink,
+        }))
+      ) {
+        return;
+      }
       await writeCheckpoint(
         onlineCheckpoint({
           state:
@@ -447,6 +541,8 @@ async function processManualCharacter(
 
     await uploadCharacter({
       context,
+      database,
+      integrated,
       run,
       legacyId,
       character,
@@ -534,6 +630,8 @@ async function attachIdenticalRow(options: {
  */
 async function uploadCharacter(options: {
   context: ManualExecutionContext;
+  database: IDBDatabase;
+  integrated: boolean;
   run: PlayerBackupRunV1;
   legacyId: string;
   character: unknown;
@@ -618,6 +716,34 @@ async function uploadCharacter(options: {
       // of keeping a link to a cloud copy this run never wrote.
       context.links.remove(context.accountId, options.legacyId);
     }
+    if (
+      options.integrated &&
+      cause instanceof ManualCharacterCloudRejectedError &&
+      cause.row !== null &&
+      cause.row.legacy_client_id === options.legacyId
+    ) {
+      // The service already restored (or removed) the link, so the rejected row
+      // is classified exactly as a listing would classify it and routed into the
+      // same durable evidence instead of a terminal refusal.
+      const compared = (
+        await compareCloudRows([cause.row], [options.character])
+      ).characters[0]!;
+      if (
+        await routeContestedRow({
+          context,
+          database: options.database,
+          legacyId: options.legacyId,
+          character: options.character,
+          reason: compared.state,
+          row: compared.row,
+          quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existing: options.existing,
+          existingLink: context.links.get(context.accountId, options.legacyId),
+        })
+      ) {
+        return;
+      }
+    }
     const mapped = mapExecutionError(cause);
     await options.writeCheckpoint(
       onlineCheckpoint({
@@ -629,6 +755,61 @@ async function uploadCharacter(options: {
       })
     );
   }
+}
+
+/**
+ * Records one character's unexpected failure in its own fenced transaction,
+ * carrying forward the identity an earlier attempt minted. Used for errors the
+ * per-character paths never anticipated -- an aborted coordinator transaction,
+ * work refused by a tombstone -- so one character can fail without stopping the
+ * rest of the run.
+ */
+async function recordManualFailure(
+  context: ManualExecutionContext,
+  legacyId: string,
+  reason: string
+): Promise<void> {
+  await withExistingDatabase(context.factory, database =>
+    runPlayerBackupTransaction({
+      database,
+      accountId: context.accountId,
+      expectedActiveRunId: context.expectedActiveRunId,
+      stores: [],
+      task: async transaction => {
+        const meta = transaction.objectStore('meta');
+        const run = await readPlayerBackupRunInTransaction(
+          meta,
+          context.accountId,
+          context.expectedActiveRunId
+        );
+        const retained = retainCharacterIdentity(
+          run.characterCheckpoints[legacyId]?.online,
+          context.links.get(context.accountId, legacyId)
+        );
+        await updatePlayerBackupCharacterCheckpoint(meta, {
+          accountId: context.accountId,
+          expectedActiveRunId: context.expectedActiveRunId,
+          legacyId,
+          online: onlineCheckpoint({
+            state: 'failed',
+            cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
+            mutationId: retained.mutationId,
+            recordedAt: context.now(),
+            reason,
+          }),
+        });
+      },
+    })
+  );
+}
+
+/** Invalidates the whole run rather than one character. */
+function abortsPlayerBackupRun(cause: unknown): boolean {
+  return (
+    cause instanceof PlayerBackupRunReplacedError ||
+    cause instanceof PlayerBackupLockUnavailableError ||
+    (cause instanceof Error && cause.message === CONSENT_NOT_ACKNOWLEDGED)
+  );
 }
 
 /**
@@ -665,16 +846,34 @@ export async function executePlayerBackupManualRun(
   for (const legacyId of run.selectedCharacterIds) {
     await withPlayerBackupAccountLock(
       { accountId: options.accountId, locks },
-      () => processManualCharacter(context, legacyId)
+      async () => {
+        try {
+          await processManualCharacter(context, legacyId);
+        } catch (cause) {
+          // One character's failure never stops the others; only a replaced
+          // run, a missing lock or a broken consent partition ends the run.
+          if (abortsPlayerBackupRun(cause)) throw cause;
+          await recordManualFailure(
+            context,
+            legacyId,
+            cause instanceof Error ? cause.message : String(cause)
+          );
+        }
+      }
     );
   }
 
-  return derivePlayerBackupRunResult({
-    factory: options.factory,
-    accountId: options.accountId,
-    expectedActiveRunId: options.expectedActiveRunId,
-    links: options.links,
-  });
+  // A character routed into the durable conflict path derives from the
+  // automatic stores, so the repository travels with the link evidence.
+  return withExistingDatabase(options.factory, database =>
+    derivePlayerBackupRunResult({
+      factory: options.factory,
+      accountId: options.accountId,
+      expectedActiveRunId: options.expectedActiveRunId,
+      links: options.links,
+      repository: new IndexedDbAutomaticCharacterSyncRepository(database),
+    })
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -739,10 +938,27 @@ export async function derivePlayerBackupRunResult(options: {
     automatic && options.repository
       ? await readAutomaticEvidence(options.repository, run.namespace)
       : null;
+  const pendingApplicationSources = automatic
+    ? await withExistingDatabase(options.factory, async database => {
+        const transaction = database.transaction('meta', 'readonly');
+        const applications =
+          await listPlayerBackupPendingApplicationsInTransaction(
+            transaction.objectStore('meta'),
+            run.runId
+          );
+        await transactionComplete(transaction);
+        return new Set(
+          applications
+            .filter(application => application.accountId === run.accountId)
+            .map(application => application.sourceLegacyId)
+        );
+      })
+    : new Set<string>();
   for (const legacyId of run.selectedCharacterIds) {
     const online = run.characterCheckpoints[legacyId]?.online;
-    const derived =
-      online?.kind === 'automatic'
+    const derived = pendingApplicationSources.has(legacyId)
+      ? { outcome: 'pending' as const, reason: 'roster-application-pending' }
+      : online?.kind === 'automatic'
         ? deriveAutomaticOutcome(online, legacyId, evidence)
         : deriveManualOutcome(
             online,

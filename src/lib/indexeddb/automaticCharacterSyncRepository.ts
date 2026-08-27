@@ -17,6 +17,9 @@ export type AutomaticSyncWorkState =
 
 const INFLIGHT_LEASE_MS = 30_000;
 
+/** Snapshot key retaining a conflict's superseded local candidate. */
+const SUPERSEDED_LOCAL_SNAPSHOT_KEY = 'automatic-sync-superseded-local';
+
 export interface AutomaticCharacterMutation {
   namespace: StorageNamespace;
   legacyId: string;
@@ -69,6 +72,7 @@ export interface AutomaticCharacterConflict {
   cloudCandidate: unknown;
   detectedAt: string;
   resolutionState: 'unresolved' | 'resolved';
+  originPlayerBackupRunId?: string;
 }
 
 export interface AutomaticCommitResult {
@@ -536,6 +540,29 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       ['documents', 'outbox', 'conflicts'],
       'readwrite'
     );
+    await this.preserveConflictInTransaction(
+      transaction,
+      entry,
+      cloudCandidate,
+      detectedAt
+    );
+    await transactionComplete(transaction);
+  }
+
+  /**
+   * Performs the same document/conflict/outbox writes as `preserveConflict()`
+   * on a transaction the caller owns (over at least `['documents', 'outbox',
+   * 'conflicts']`), and returns the stored conflict record. The run origin is
+   * stamped only when `options.originPlayerBackupRunId` is supplied, so legacy
+   * callers keep writing byte-identical records.
+   */
+  async preserveConflictInTransaction(
+    transaction: IDBTransaction,
+    entry: AutomaticCharacterOutboxEntry,
+    cloudCandidate: unknown,
+    detectedAt: string,
+    options: { originPlayerBackupRunId?: string } = {}
+  ): Promise<AutomaticCharacterConflict> {
     const localCandidate = (await requestResult(
       transaction
         .objectStore('documents')
@@ -550,7 +577,7 @@ export class IndexedDbAutomaticCharacterSyncRepository {
     if (resolvableLocalCandidate !== localCandidate) {
       transaction.objectStore('documents').put(resolvableLocalCandidate);
     }
-    transaction.objectStore('conflicts').put({
+    const conflict: AutomaticCharacterConflict = {
       conflictId: `automatic-sync:${entry.mutationId}`,
       namespace: entry.namespace,
       family: 'character',
@@ -562,14 +589,115 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       cloudCandidate: structuredClone(cloudCandidate),
       detectedAt,
       resolutionState: 'unresolved',
-    } satisfies AutomaticCharacterConflict);
+      ...(options.originPlayerBackupRunId !== undefined
+        ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
+        : {}),
+    };
+    transaction.objectStore('conflicts').put(conflict);
     transaction.objectStore('outbox').put({
       ...entry,
       state: 'conflict',
       lastError: 'Cloud version conflicts with local work',
       inflightAt: null,
     });
-    await transactionComplete(transaction);
+    return conflict;
+  }
+
+  /**
+   * Reads this namespace's character conflicts on a transaction the caller
+   * owns (over at least `['conflicts']`).
+   */
+  async listConflictsInTransaction(
+    transaction: IDBTransaction,
+    namespace: StorageNamespace
+  ): Promise<AutomaticCharacterConflict[]> {
+    const conflicts = (await requestResult(
+      transaction.objectStore('conflicts').getAll()
+    )) as AutomaticCharacterConflict[];
+    return conflicts.filter(
+      conflict =>
+        conflict.namespace === namespace && conflict.family === 'character'
+    );
+  }
+
+  /**
+   * Replaces the cloud candidate of an unresolved conflict on a transaction
+   * the caller owns (over at least `['conflicts']`). Throws when the conflict
+   * is missing or already resolved so the caller can abort. The run origin is
+   * restamped only when `options.originPlayerBackupRunId` is supplied, so
+   * legacy four-argument callers keep writing byte-identical records.
+   */
+  async refreshConflictCloudCandidateInTransaction(
+    transaction: IDBTransaction,
+    conflictId: string,
+    cloudCandidate: unknown,
+    detectedAt: string,
+    options: { originPlayerBackupRunId?: string } = {}
+  ): Promise<AutomaticCharacterConflict> {
+    const conflicts = transaction.objectStore('conflicts');
+    const current = (await requestResult(conflicts.get(conflictId))) as
+      | AutomaticCharacterConflict
+      | undefined;
+    if (!current || current.resolutionState !== 'unresolved') {
+      throw new Error('Conflict is not unresolved');
+    }
+    const refreshed: AutomaticCharacterConflict = {
+      ...current,
+      cloudCandidate: structuredClone(cloudCandidate),
+      detectedAt,
+      ...(options.originPlayerBackupRunId !== undefined
+        ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
+        : {}),
+    };
+    conflicts.put(refreshed);
+    return refreshed;
+  }
+
+  /**
+   * Replaces an unresolved conflict's local candidate, and the matching
+   * document, on a transaction the caller owns (over at least `['documents',
+   * 'conflicts', 'legacySnapshots']`). The superseded candidate is preserved
+   * first as an immutable `automatic-sync-superseded-local` snapshot keyed by
+   * the conflict, so nothing the local stores held is discarded. Throws when
+   * the conflict is missing or already resolved so the caller can abort.
+   */
+  async refreshConflictLocalCandidateInTransaction(
+    transaction: IDBTransaction,
+    conflictId: string,
+    localCandidate: AutomaticCharacterDocument,
+    detectedAt: string
+  ): Promise<AutomaticCharacterConflict> {
+    const conflicts = transaction.objectStore('conflicts');
+    const current = (await requestResult(conflicts.get(conflictId))) as
+      | AutomaticCharacterConflict
+      | undefined;
+    if (!current || current.resolutionState !== 'unresolved') {
+      throw new Error('Conflict is not unresolved');
+    }
+    const snapshots = transaction.objectStore('legacySnapshots');
+    const captured = (await requestResult(snapshots.getAll())) as {
+      runId: string;
+    }[];
+    const rawValue = JSON.stringify(current.localCandidate);
+    snapshots.add({
+      runId: conflictId,
+      key: SUPERSEDED_LOCAL_SNAPSHOT_KEY,
+      captureNumber:
+        captured.filter(row => row.runId === conflictId).length + 1,
+      presence: true,
+      rawValue,
+      byteCount: new TextEncoder().encode(rawValue).byteLength,
+      capturedAt: detectedAt,
+      immutable: true,
+    });
+    transaction.objectStore('documents').put(structuredClone(localCandidate));
+    const refreshed: AutomaticCharacterConflict = {
+      ...current,
+      localCandidate: structuredClone(localCandidate),
+      detectedAt,
+    };
+    conflicts.put(refreshed);
+    return refreshed;
   }
 
   async listConflicts(
@@ -635,6 +763,29 @@ export class IndexedDbAutomaticCharacterSyncRepository {
     detectedAt: string
   ): Promise<void> {
     const transaction = this.database.transaction('quarantine', 'readwrite');
+    this.quarantineCloudCandidateInTransaction(
+      transaction,
+      namespace,
+      legacyId,
+      cloudCandidate,
+      reason,
+      detectedAt
+    );
+    await transactionComplete(transaction);
+  }
+
+  /**
+   * Writes the same quarantine record as `quarantineCloudCandidate()` on a
+   * transaction the caller owns (over at least `['quarantine']`).
+   */
+  quarantineCloudCandidateInTransaction(
+    transaction: IDBTransaction,
+    namespace: StorageNamespace,
+    legacyId: string,
+    cloudCandidate: unknown,
+    reason: string,
+    detectedAt: string
+  ): void {
     transaction.objectStore('quarantine').put({
       quarantineId: `automatic-sync-pull:${namespace}:${legacyId}`,
       namespace,
@@ -647,7 +798,25 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       reason,
       detectedAt,
     });
-    await transactionComplete(transaction);
+  }
+
+  /**
+   * Puts a document that the cloud has already acknowledged, without creating
+   * any outbox work, on a transaction the caller owns (over at least
+   * `['documents']`).
+   */
+  writeAcknowledgedDocumentInTransaction(
+    transaction: IDBTransaction,
+    mutation: AutomaticCharacterMutation & { cloudId: string }
+  ): void {
+    if (!mutation.cloudId || mutation.baseServerVersion <= 0) {
+      throw new Error('Acknowledged document requires a server version');
+    }
+    transaction.objectStore('documents').put({
+      ...structuredClone(mutation),
+      family: 'character',
+      deletedAt: null,
+    } satisfies AutomaticCharacterDocument);
   }
 
   async listQuarantine(

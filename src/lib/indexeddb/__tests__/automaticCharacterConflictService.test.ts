@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { fingerprintCharacterPayload } from '@/lib/supabase/characterCloudCodec';
 
 import {
   IndexedDbAutomaticCharacterSyncRepository,
@@ -15,6 +16,8 @@ import {
 import {
   deleteRollkeeperDatabaseForTests,
   openRollkeeperDatabase,
+  requestResult,
+  transactionComplete,
 } from '../localDatabase';
 
 const NAMESPACE = 'user:account-a' as const;
@@ -119,6 +122,14 @@ describe('AutomaticCharacterConflictService', () => {
       payload: expect.objectContaining({ name: 'Cloud candidate' }),
     });
     expect(copy?.cloudId).toBeUndefined();
+    // The copy carries a rewritten identity, so it must carry its own
+    // fingerprint rather than the cloud row's.
+    await expect(fingerprintCharacterPayload(copy?.payload)).resolves.toBe(
+      copy?.contentFingerprint
+    );
+    await expect(
+      fingerprintCharacterPayload(cloudRow().payload)
+    ).resolves.not.toBe(copy?.contentFingerprint);
     await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
       expect.objectContaining({ legacyId: 'character-a', state: 'queued' }),
     ]);
@@ -218,6 +229,248 @@ describe('AutomaticCharacterConflictService', () => {
       repository.getDocument(NAMESPACE, 'character-a')
     ).resolves.toMatchObject({
       payload: expect.objectContaining({ name: 'Local candidate' }),
+    });
+  });
+
+  describe('resolution hook and origin', () => {
+    it('refuses to resolve run-origin work without its matching authorization', async () => {
+      const conflictId = await seedConflict();
+      const transaction = database.transaction('conflicts', 'readwrite');
+      const conflicts = transaction.objectStore('conflicts');
+      const conflict = await requestResult(conflicts.get(conflictId));
+      conflicts.put({ ...conflict, originPlayerBackupRunId: 'run-a' });
+      await transactionComplete(transaction);
+
+      await expect(service.resolve(conflictId, 'keep-mine')).rejects.toThrow(
+        'origin is not authorised'
+      );
+      await expect(service.getConflict(conflictId)).resolves.toMatchObject({
+        resolutionState: 'unresolved',
+        originPlayerBackupRunId: 'run-a',
+      });
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          originPlayerBackupRunId: 'run-a',
+        })
+      ).resolves.toBe('resolved');
+    });
+
+    it('runs the hook inside the transaction with the planned mutation id and stamps the origin', async () => {
+      const conflictId = await seedConflict();
+      const fenced = new AutomaticCharacterConflictService(database, {
+        randomId: () => 'mutation-2',
+        now: () => '2026-01-02T00:00:00.000Z',
+      });
+      const observed: Array<{
+        hasMeta: boolean;
+        conflictId: string;
+        enqueuedMutationId: string | null;
+      }> = [];
+
+      await expect(
+        fenced.resolve(conflictId, 'keep-mine', {
+          originPlayerBackupRunId: 'run-a',
+          transactionHook: {
+            run: async (transaction, conflict, plan) => {
+              observed.push({
+                hasMeta: transaction.objectStoreNames.contains('meta'),
+                conflictId: conflict.conflictId,
+                enqueuedMutationId: plan.enqueuedMutationId,
+              });
+              transaction.objectStore('meta').put({ key: 'hook-marker' });
+            },
+          },
+        })
+      ).resolves.toBe('resolved');
+
+      expect(observed).toEqual([
+        { hasMeta: true, conflictId, enqueuedMutationId: 'mutation-2' },
+      ]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({
+          mutationId: 'mutation-2',
+          originPlayerBackupRunId: 'run-a',
+        }),
+      ]);
+      const read = database.transaction('meta', 'readonly');
+      await expect(
+        requestResult(read.objectStore('meta').get('hook-marker'))
+      ).resolves.toEqual({ key: 'hook-marker' });
+      await transactionComplete(read);
+    });
+
+    it('gives use-cloud a null planned mutation id', async () => {
+      const conflictId = await seedConflict();
+      const plans: Array<string | null> = [];
+
+      await expect(
+        service.resolve(conflictId, 'use-cloud', {
+          transactionHook: {
+            run: async (_transaction, _conflict, plan) => {
+              plans.push(plan.enqueuedMutationId);
+            },
+          },
+        })
+      ).resolves.toBe('resolved');
+
+      expect(plans).toEqual([null]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([]);
+    });
+
+    it('aborts everything when the hook throws', async () => {
+      const conflictId = await seedConflict();
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async () => {
+              throw new Error('fence');
+            },
+          },
+        })
+      ).rejects.toThrow('fence');
+
+      await expect(service.getConflict(conflictId)).resolves.toMatchObject({
+        resolutionState: 'unresolved',
+      });
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+      await expect(
+        repository.getDocument(NAMESPACE, 'character-a')
+      ).resolves.toMatchObject({
+        payload: expect.objectContaining({ name: 'Local candidate' }),
+        updatedAt: '2026-02-01T00:00:00.000Z',
+      });
+    });
+
+    it('writes no origin key without the option', async () => {
+      const conflictId = await seedConflict();
+      await service.resolve(conflictId, 'keep-both', {
+        copyLegacyId: 'character-cloud-copy',
+      });
+
+      const [enqueued] = await repository.listOutbox(NAMESPACE);
+      expect(Object.keys(enqueued)).not.toContain('originPlayerBackupRunId');
+      expect(enqueued).toMatchObject({
+        legacyId: 'character-a',
+        operation: 'replace',
+        state: 'queued',
+        baseServerVersion: 2,
+      });
+    });
+
+    it('returns resolved without writes when the in-transaction re-read is already resolved', async () => {
+      const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+      let hookRuns = 0;
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async (transaction, conflict) => {
+              hookRuns += 1;
+              transaction
+                .objectStore('conflicts')
+                .put({ ...conflict, resolutionState: 'resolved' });
+            },
+          },
+        })
+      ).resolves.toBe('resolved');
+
+      expect(hookRuns).toBe(1);
+      // The service adds no resolution/resolvedAt of its own: the stored record
+      // is exactly what the hook wrote.
+      await expect(service.getConflict(conflictId)).resolves.toEqual({
+        ...seeded,
+        resolutionState: 'resolved',
+      });
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+      await expect(
+        repository.getDocument(NAMESPACE, 'character-a')
+      ).resolves.toMatchObject({
+        payload: expect.objectContaining({ name: 'Local candidate' }),
+      });
+    });
+
+    it('aborts when the hook moves the conflict record under the resolution', async () => {
+      const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+      const moved = { ...cloudRow(), server_version: 9 };
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              await repository.refreshConflictCloudCandidateInTransaction(
+                transaction,
+                conflictId,
+                moved,
+                '2026-02-03T00:00:00.000Z'
+              );
+            },
+          },
+        })
+      ).rejects.toThrow('Automatic sync conflict changed during resolution');
+
+      // The hook's own write is aborted with the rest of the transaction.
+      await expect(service.getConflict(conflictId)).resolves.toEqual(seeded);
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
+    });
+
+    it('resolves from the in-transaction record when the hook leaves it alone', async () => {
+      const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              transaction.objectStore('meta').put({ key: 'hook-only' });
+            },
+          },
+        })
+      ).resolves.toBe('resolved');
+
+      await expect(service.getConflict(conflictId)).resolves.toEqual({
+        ...seeded,
+        resolutionState: 'resolved',
+        resolution: 'keep-mine',
+        resolvedAt: '2026-02-02T00:00:00.000Z',
+      });
+    });
+
+    it('aborts instead of resurrecting a conflict the hook deleted', async () => {
+      const conflictId = await seedConflict();
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              transaction.objectStore('conflicts').delete(conflictId);
+            },
+          },
+        })
+      ).rejects.toThrow('Automatic sync conflict was not found');
+
+      await expect(service.getConflict(conflictId)).resolves.toMatchObject({
+        resolutionState: 'unresolved',
+      });
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
     });
   });
 });
