@@ -112,6 +112,28 @@ interface OngoingCharacterContext {
 }
 
 /**
+ * Whether a checkpoint is durable evidence a resumed run must never overwrite:
+ * an identity or work was minted for this character, or its online candidate
+ * was preserved as a conflict or held aside.
+ *
+ * A failure recorded before anything was written — a missing roster entry, a
+ * refused preference, a failed listing — carries no identity and must not
+ * strand the character: the next run re-correlates it and creates its work.
+ */
+function ongoingWorkAlreadyExists(
+  online: PlayerBackupOnlineCheckpoint | undefined
+): boolean {
+  if (!online) return false;
+  if (online.mutationId !== null) return true;
+  return (
+    online.state === 'queued' ||
+    online.state === 'protected' ||
+    online.state === 'needs-attention' ||
+    online.state === 'held-aside'
+  );
+}
+
+/**
  * Records one character's failure in a fenced transaction that first re-reads
  * its checkpoint: an identity minted by an earlier attempt is carried forward,
  * so durable work that is already queued (or later acknowledged) stays
@@ -275,7 +297,13 @@ async function attachOngoingIdenticalRow(
     task: async transaction => {
       const meta = transaction.objectStore('meta');
       const run = await assertOngoingConsentInTransaction(context, meta);
-      if (run.characterCheckpoints[context.legacyId]?.online) return;
+      if (
+        ongoingWorkAlreadyExists(
+          run.characterCheckpoints[context.legacyId]?.online
+        )
+      ) {
+        return;
+      }
       context.repository.writeAcknowledgedDocumentInTransaction(transaction, {
         namespace: run.namespace,
         legacyId: context.legacyId,
@@ -365,7 +393,12 @@ async function seedOngoingConflict(
   const existing = await readOngoingCheckpoint(context);
   // Durable evidence this character already has stands; only an unresolved
   // contest may be refreshed, and the seed decides that for itself.
-  if (existing && existing.state !== 'needs-attention') return;
+  if (
+    existing?.state !== 'needs-attention' &&
+    ongoingWorkAlreadyExists(existing)
+  ) {
+    return;
+  }
   await seedPlayerBackupConflictInLock({
     ...ongoingLockScope(context),
     character,
@@ -398,9 +431,15 @@ async function createInitialOngoingWork(
     task: async transaction => {
       const meta = transaction.objectStore('meta');
       const run = await assertOngoingConsentInTransaction(context, meta);
-      // An existing checkpoint means this character already has durable
-      // work; a resumed run must never mint a second identity for it.
-      if (run.characterCheckpoints[context.legacyId]?.online) return;
+      // Durable work or an identity already exists for this character; a
+      // resumed run must never mint a second one for it.
+      if (
+        ongoingWorkAlreadyExists(
+          run.characterCheckpoints[context.legacyId]?.online
+        )
+      ) {
+        return;
+      }
 
       const existing = (await requestResult(
         transaction

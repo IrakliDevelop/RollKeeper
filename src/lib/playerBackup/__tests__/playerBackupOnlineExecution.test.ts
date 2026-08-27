@@ -2448,25 +2448,131 @@ describe('ongoing player backup work creation', () => {
       });
     });
 
-    it('records a listing failure by category without creating work', async () => {
-      await seedRun({ mode: 'ongoing', selected: ['hero-a', 'hero-c'] });
+    it('records a listing failure by category and retries once the listing succeeds', async () => {
+      await seedRun({
+        mode: 'ongoing',
+        selected: ['hero-a', 'hero-b', 'hero-c'],
+      });
       const harness = createOngoingHarness();
       harness.gateway.failNextList = 'offline';
+      harness.gateway.failListCount = 3;
 
-      const result = await harness.start();
+      const stalled = await harness.start();
 
-      expect(result.offline).toEqual(['hero-a']);
-      expect(result.queued).toEqual(['hero-c']);
+      // A failure recorded before anything was written mints no identity.
+      expect(stalled.offline).toEqual(['hero-a', 'hero-b', 'hero-c']);
+      await expect(readStore('outbox')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      const stalledCheckpoints = await readCheckpoints();
+      for (const legacyId of ['hero-a', 'hero-b', 'hero-c']) {
+        expect(stalledCheckpoints[legacyId].online).toMatchObject({
+          kind: 'automatic',
+          state: 'offline',
+          reason: 'offline',
+          cloudId: 'none',
+          mutationId: null,
+        });
+      }
+      expect(harness.identities.generateMutationId).not.toHaveBeenCalled();
+
+      // The account gained copies of two of them while the listing was down.
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-b',
+        legacyId: 'hero-b',
+        character: ONGOING_ROSTER['hero-b'],
+        serverVersion: 2,
+        clientRevision: 2,
+      });
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-c',
+        legacyId: 'hero-c',
+        character: { ...HERO_C, characterData: { id: 'hero-c', revision: 2 } },
+        serverVersion: 4,
+        clientRevision: 9,
+      });
+
+      const retried = await harness.start();
+
+      // Each character re-correlates and takes the branch its row deserves.
+      expect(retried.queued).toEqual(['hero-a']);
+      expect(retried.protected).toEqual(['hero-b']);
+      expect(retried.needsAttention).toEqual(['hero-c']);
       await expect(readStore('outbox')).resolves.toEqual([
-        expect.objectContaining({ legacyId: 'hero-c' }),
+        expect.objectContaining({
+          mutationId: 'mutation-1',
+          legacyId: 'hero-a',
+          state: 'queued',
+          originPlayerBackupRunId: 'run-a',
+        }),
+        expect.objectContaining({ legacyId: 'hero-c', state: 'conflict' }),
+      ]);
+      const documents = (await readStore('documents')) as {
+        legacyId: string;
+        cloudId?: string;
+        baseServerVersion: number;
+      }[];
+      expect(documents).toEqual([
+        expect.objectContaining({
+          legacyId: 'hero-a',
+          cloudId: 'cloud-1',
+          baseServerVersion: 0,
+        }),
+        expect.objectContaining({
+          legacyId: 'hero-b',
+          cloudId: 'cloud-b',
+          baseServerVersion: 2,
+        }),
+        expect.objectContaining({ legacyId: 'hero-c', cloudId: 'cloud-c' }),
       ]);
       const checkpoints = await readCheckpoints();
       expect(checkpoints['hero-a'].online).toMatchObject({
-        kind: 'automatic',
-        state: 'offline',
-        reason: 'offline',
-        cloudId: 'none',
+        state: 'queued',
+        cloudId: 'cloud-1',
+        mutationId: 'mutation-1',
+      });
+      expect(checkpoints['hero-b'].online).toMatchObject({
+        state: 'protected',
+        cloudId: 'cloud-b',
         mutationId: null,
+      });
+      expect(checkpoints['hero-c'].online).toMatchObject({
+        state: 'needs-attention',
+        cloudId: 'cloud-c',
+        reason: 'conflict:newer',
+      });
+    });
+
+    it('never re-mints work for a character that already has a queued identity', async () => {
+      await seedRun({ mode: 'ongoing' });
+      const harness = createOngoingHarness();
+
+      const first = await harness.start();
+
+      expect(first.queued).toEqual(['hero-a']);
+      // A cloud copy appears before the resume; the queued work still stands.
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+
+      const resumed = await harness.start();
+
+      expect(resumed).toEqual(first);
+      expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
+      expect(harness.identities.generateCloudId).toHaveBeenCalledTimes(1);
+      await expect(readStore('outbox')).resolves.toEqual([
+        expect.objectContaining({ mutationId: 'mutation-1', state: 'queued' }),
+      ]);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toHaveLength(1);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        state: 'queued',
+        cloudId: 'cloud-1',
+        mutationId: 'mutation-1',
       });
     });
 
