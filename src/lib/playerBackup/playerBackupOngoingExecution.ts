@@ -17,7 +17,20 @@ import {
   encodeCharacterCloudPayload,
   fingerprintCharacterPayload,
 } from '@/lib/supabase/characterCloudCodec';
+import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { CharacterCloudGatewayError } from '@/lib/supabase/characterCloudGateway';
+import type { CharacterCloudGateway } from '@/lib/supabase/manualCharacterCloudService';
 
+import type { PlayerBackupPreviewCharacter } from './playerBackupCloudPreview';
+import { compareCloudRows } from './playerBackupCloudPreview';
+import type {
+  PlayerBackupConflictComparison,
+  PlayerBackupHeldAsideReason,
+} from './playerBackupConflictCoordinator';
+import {
+  holdPlayerBackupCandidateAsideInLock,
+  seedPlayerBackupConflictInLock,
+} from './playerBackupConflictCoordinator';
 import type {
   PlayerBackupExecutionResult,
   PlayerBackupLocalCharacterSource,
@@ -38,7 +51,12 @@ import {
   runPlayerBackupTransaction,
   withPlayerBackupAccountLock,
 } from './playerBackupRunFence';
-import type { ActiveRunPointer } from './playerBackupRunRepository';
+import type {
+  ActiveRunPointer,
+  PlayerBackupOnlineCheckpoint,
+  PlayerBackupOnlineCheckpointState,
+  PlayerBackupRunV1,
+} from './playerBackupRunRepository';
 import {
   PlayerBackupRunReplacedError,
   assertPlayerBackupRunLocalReady,
@@ -58,6 +76,8 @@ export interface PlayerBackupOngoingStartOptions {
   locks: PlayerBackupExclusiveLockProvider | null | undefined;
   accountId: string;
   expectedActiveRunId: string;
+  /** Correlates each selected character with the account's existing copies. */
+  gateway: Pick<CharacterCloudGateway, 'list'>;
   characters: PlayerBackupLocalCharacterSource;
   generateCloudId: () => string;
   generateMutationId: () => string;
@@ -84,6 +104,7 @@ interface OngoingCharacterContext {
   accountId: string;
   expectedActiveRunId: string;
   legacyId: string;
+  gateway: Pick<CharacterCloudGateway, 'list'>;
   characters: PlayerBackupLocalCharacterSource;
   generateCloudId: () => string;
   generateMutationId: () => string;
@@ -99,7 +120,8 @@ interface OngoingCharacterContext {
  */
 function recordOngoingFailure(
   context: OngoingCharacterContext,
-  reason: string
+  reason: string,
+  state: PlayerBackupOnlineCheckpointState = 'failed'
 ): Promise<void> {
   return runPlayerBackupTransaction({
     database: context.database,
@@ -123,7 +145,7 @@ function recordOngoingFailure(
         legacyId: context.legacyId,
         online: onlineCheckpoint({
           kind: 'automatic',
-          state: 'failed',
+          state,
           cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
           mutationId: retained.mutationId,
           recordedAt: context.now(),
@@ -173,19 +195,197 @@ async function supersedeStaleRunWork(
 }
 
 /**
+ * Reads the run's consent partition for this character inside the caller's
+ * fenced transaction, exactly as the initial-work path does.
+ */
+async function assertOngoingConsentInTransaction(
+  context: OngoingCharacterContext,
+  meta: IDBObjectStore
+): Promise<PlayerBackupRunV1> {
+  const run = await assertPlayerBackupRunLocalReady(
+    meta,
+    context.accountId,
+    context.expectedActiveRunId
+  );
+  const policy =
+    await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+      meta,
+      run.namespace,
+      context.legacyId
+    );
+  const account =
+    await AutomaticCharacterSyncPreferences.readAccountDefaultInTransaction(
+      meta,
+      run.namespace
+    );
+  if (policy !== 'on' || account?.confirmedAt !== run.confirmedAt) {
+    throw new PlayerBackupPreferenceRefusedError();
+  }
+  return run;
+}
+
+/**
+ * Lists the account's cloud copies and classifies this character against them.
+ * The listing runs before any transaction opens, because a foreign await
+ * auto-commits an IndexedDB transaction. A gateway failure is recorded by its
+ * own category and no work is created.
+ */
+async function correlateOngoingRow(
+  context: OngoingCharacterContext,
+  character: unknown
+): Promise<PlayerBackupPreviewCharacter | null> {
+  let rows;
+  try {
+    rows = await context.gateway.list();
+  } catch (cause) {
+    if (!(cause instanceof CharacterCloudGatewayError)) throw cause;
+    await recordOngoingFailure(
+      context,
+      cause.category === 'failed' ? cause.message : cause.category,
+      cause.category
+    );
+    return null;
+  }
+  const { characters } = await compareCloudRows(rows, [character]);
+  return characters[0]!;
+}
+
+/**
+ * The cloud already holds this exact content: the document is recorded as
+ * acknowledged so later edits replace that row, and no work is ever queued for
+ * it. Everything asynchronous runs before the fenced transaction opens.
+ */
+async function attachOngoingIdenticalRow(
+  context: OngoingCharacterContext,
+  character: unknown,
+  compared: PlayerBackupPreviewCharacter
+): Promise<void> {
+  const row = compared.row;
+  const decoded = compared.decoded;
+  if (!row || !decoded) throw new Error('Cloud comparison is missing its row');
+  const payload = encodeCharacterCloudPayload(character);
+  const localRevision = characterRevision(character);
+  const recordedAt = context.now();
+
+  await runPlayerBackupTransaction({
+    database: context.database,
+    accountId: context.accountId,
+    expectedActiveRunId: context.expectedActiveRunId,
+    stores: ['documents'],
+    task: async transaction => {
+      const meta = transaction.objectStore('meta');
+      const run = await assertOngoingConsentInTransaction(context, meta);
+      if (run.characterCheckpoints[context.legacyId]?.online) return;
+      context.repository.writeAcknowledgedDocumentInTransaction(transaction, {
+        namespace: run.namespace,
+        legacyId: context.legacyId,
+        cloudId: row.id,
+        operation: 'replace',
+        payload,
+        schemaVersion: row.schema_version,
+        localRevision,
+        baseServerVersion: row.server_version,
+        contentFingerprint: decoded.contentFingerprint,
+        syncPolicy: 'on',
+        updatedAt: recordedAt,
+        originPlayerBackupRunId: run.runId,
+      });
+      await updatePlayerBackupCharacterCheckpoint(meta, {
+        accountId: context.accountId,
+        expectedActiveRunId: context.expectedActiveRunId,
+        legacyId: context.legacyId,
+        online: onlineCheckpoint({
+          kind: 'automatic',
+          state: 'protected',
+          cloudId: row.id,
+          mutationId: null,
+          recordedAt,
+          verified: {
+            serverVersion: row.server_version,
+            contentFingerprint: decoded.contentFingerprint,
+            verifiedAt: recordedAt,
+          },
+        }),
+      });
+    },
+  });
+}
+
+/** The checkpoint this character already carries, read outside the fence. */
+async function readOngoingCheckpoint(
+  context: OngoingCharacterContext
+): Promise<PlayerBackupOnlineCheckpoint | undefined> {
+  const transaction = context.database.transaction('meta', 'readonly');
+  const run = await readPlayerBackupRunInTransaction(
+    transaction.objectStore('meta'),
+    context.accountId,
+    context.expectedActiveRunId
+  );
+  await transactionComplete(transaction);
+  return run.characterCheckpoints[context.legacyId]?.online;
+}
+
+/** The fenced scope both durable-evidence helpers open for themselves. */
+function ongoingLockScope(context: OngoingCharacterContext) {
+  return {
+    database: context.database,
+    accountId: context.accountId,
+    expectedActiveRunId: context.expectedActiveRunId,
+    legacyId: context.legacyId,
+    now: context.now,
+  };
+}
+
+/** Quarantines an unusable online candidate with its exact bytes. */
+function holdOngoingCandidateAside(
+  context: OngoingCharacterContext,
+  compared: PlayerBackupPreviewCharacter,
+  reason: PlayerBackupHeldAsideReason
+): Promise<void> {
+  return holdPlayerBackupCandidateAsideInLock({
+    ...ongoingLockScope(context),
+    row: compared.row,
+    reason,
+    detail: compared.decoded?.quarantineReason ?? null,
+    checkpointKind: 'automatic',
+  });
+}
+
+/**
+ * Preserves both candidates of a contested row as a durable conflict. An
+ * ongoing run never holds a link, so the conflict work bases itself on the
+ * document alone.
+ */
+async function seedOngoingConflict(
+  context: OngoingCharacterContext,
+  character: unknown,
+  compared: PlayerBackupPreviewCharacter & { row: CharacterCloudRow },
+  comparison: PlayerBackupConflictComparison
+): Promise<void> {
+  const existing = await readOngoingCheckpoint(context);
+  // Durable evidence this character already has stands; only an unresolved
+  // contest may be refreshed, and the seed decides that for itself.
+  if (existing && existing.state !== 'needs-attention') return;
+  await seedPlayerBackupConflictInLock({
+    ...ongoingLockScope(context),
+    character,
+    row: compared.row,
+    comparison,
+    existingLink: null,
+    generateMutationId: context.generateMutationId,
+  });
+}
+
+/**
  * Creates the initial document, outbox entry and `queued` checkpoint for one
  * selected character in a single fenced transaction. The payload and its
  * fingerprint are computed first: an IndexedDB transaction auto-commits on any
  * await that is not one of its own requests.
  */
-async function createOngoingCharacterWork(
-  context: OngoingCharacterContext
+async function createInitialOngoingWork(
+  context: OngoingCharacterContext,
+  character: unknown
 ): Promise<void> {
-  const character = context.characters.get(context.legacyId);
-  if (character === null || character === undefined) {
-    await recordOngoingFailure(context, 'local-character-missing');
-    return;
-  }
   const payload = encodeCharacterCloudPayload(character);
   const contentFingerprint = await fingerprintCharacterPayload(payload);
   const localRevision = characterRevision(character);
@@ -197,25 +397,7 @@ async function createOngoingCharacterWork(
     stores: ['documents', 'outbox', 'tombstones'],
     task: async transaction => {
       const meta = transaction.objectStore('meta');
-      const run = await assertPlayerBackupRunLocalReady(
-        meta,
-        context.accountId,
-        context.expectedActiveRunId
-      );
-      const policy =
-        await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
-          meta,
-          run.namespace,
-          context.legacyId
-        );
-      const account =
-        await AutomaticCharacterSyncPreferences.readAccountDefaultInTransaction(
-          meta,
-          run.namespace
-        );
-      if (policy !== 'on' || account?.confirmedAt !== run.confirmedAt) {
-        throw new PlayerBackupPreferenceRefusedError();
-      }
+      const run = await assertOngoingConsentInTransaction(context, meta);
       // An existing checkpoint means this character already has durable
       // work; a resumed run must never mint a second identity for it.
       if (run.characterCheckpoints[context.legacyId]?.online) return;
@@ -269,6 +451,40 @@ async function createOngoingCharacterWork(
 }
 
 /**
+ * Prepares one selected character: an account with no cloud copy of it gets
+ * ordinary initial work, an exact copy is adopted as already acknowledged, and
+ * anything else becomes durable conflict or quarantine evidence.
+ */
+async function createOngoingCharacterWork(
+  context: OngoingCharacterContext
+): Promise<void> {
+  const character = context.characters.get(context.legacyId);
+  if (character === null || character === undefined) {
+    await recordOngoingFailure(context, 'local-character-missing');
+    return;
+  }
+  const compared = await correlateOngoingRow(context, character);
+  if (!compared) return;
+  switch (compared.state) {
+    case 'missing':
+      return createInitialOngoingWork(context, character);
+    case 'identical':
+      return attachOngoingIdenticalRow(context, character, compared);
+    case 'future':
+    case 'unavailable':
+      return holdOngoingCandidateAside(context, compared, compared.state);
+    default:
+      // Every remaining comparison carries the row it contests.
+      return seedOngoingConflict(
+        context,
+        character,
+        compared as PlayerBackupPreviewCharacter & { row: CharacterCloudRow },
+        compared.state
+      );
+  }
+}
+
+/**
  * Creates the initial automatic work for a local-ready ongoing run. Dispatch
  * stays with the automatic sync worker, which drains the queued entries behind
  * `createPlayerBackupDispatchGuard`.
@@ -305,6 +521,7 @@ export async function startPlayerBackupOngoingWork(
         accountId: options.accountId,
         expectedActiveRunId: options.expectedActiveRunId,
         legacyId,
+        gateway: options.gateway,
         characters: options.characters,
         generateCloudId: options.generateCloudId,
         generateMutationId: options.generateMutationId,
@@ -336,6 +553,42 @@ export async function startPlayerBackupOngoingWork(
       repository,
     });
   });
+}
+
+/**
+ * A one-time run never turns a character's preference on, so its own initial
+ * and conflict-resolution work would otherwise be held forever. The run's
+ * committed consent authorises it instead: the work must carry this run's
+ * origin, and the character must still be selected and owned by the durable
+ * work path. Anything else stays paused.
+ */
+async function authorizeRunOriginWork(
+  meta: IDBObjectStore,
+  options: {
+    accountId: string;
+    runId: string;
+    legacyId: string;
+    originPlayerBackupRunId: string | undefined;
+  }
+): Promise<AutomaticSyncDispatchDecision> {
+  if (options.originPlayerBackupRunId !== options.runId) {
+    return { hold: 'preference-off' };
+  }
+  let run: PlayerBackupRunV1;
+  try {
+    run = await readPlayerBackupRunInTransaction(
+      meta,
+      options.accountId,
+      options.runId
+    );
+  } catch {
+    return { hold: 'preference-off' };
+  }
+  return run.mode === 'one-time' &&
+    run.selectedCharacterIds.includes(options.legacyId) &&
+    run.characterCheckpoints[options.legacyId]?.online?.kind === 'automatic'
+    ? 'dispatch'
+    : { hold: 'preference-off' };
 }
 
 /**
@@ -379,7 +632,17 @@ export function createPlayerBackupDispatchGuard(options: {
               namespace,
               entry.legacyId
             );
-          decision = policy === 'off' ? { hold: 'preference-off' } : 'dispatch';
+          decision =
+            policy === 'off'
+              ? pointer
+                ? await authorizeRunOriginWork(meta, {
+                    accountId: options.accountId,
+                    runId: pointer.runId,
+                    legacyId: entry.legacyId,
+                    originPlayerBackupRunId: entry.originPlayerBackupRunId,
+                  })
+                : { hold: 'preference-off' }
+              : 'dispatch';
         }
         await transactionComplete(transaction);
         return decision;

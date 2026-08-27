@@ -1,10 +1,11 @@
 import type {
   AutomaticCharacterDocument,
   AutomaticCharacterOutboxEntry,
-  IndexedDbAutomaticCharacterSyncRepository,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { openExistingRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
+import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import {
   encodeCharacterCloudPayload,
   fingerprintCharacterPayload,
@@ -20,8 +21,15 @@ import type {
 } from '@/lib/supabase/manualCharacterCloudService';
 import { ManualCharacterCloudRejectedError } from '@/lib/supabase/manualCharacterCloudService';
 
-import type { PlayerBackupPreviewCharacter } from './playerBackupCloudPreview';
+import type {
+  PlayerBackupCloudComparison,
+  PlayerBackupPreviewCharacter,
+} from './playerBackupCloudPreview';
 import { compareCloudRows } from './playerBackupCloudPreview';
+import {
+  holdPlayerBackupCandidateAsideInLock,
+  seedPlayerBackupConflictInLock,
+} from './playerBackupConflictCoordinator';
 import type { DegradedCharacterEligibility } from './playerBackupEligibility';
 import { classifyDegradedEligibility } from './playerBackupEligibility';
 import type { PlayerBackupExclusiveLockProvider } from './playerBackupRunFence';
@@ -349,6 +357,61 @@ interface ManualExecutionContext extends PlayerBackupManualExecutionOptions {
 }
 
 /**
+ * An integrated run never leaves an existing online copy as a terminal refusal:
+ * a contested row becomes a durable conflict that preserves both candidates,
+ * and an unusable one is quarantined with its exact bytes. Both helpers open
+ * their own fenced transaction and write their own checkpoint, so the caller
+ * must hold the account lock and no transaction of its own.
+ *
+ * Returns `false` for a reason this path does not own — the caller keeps its
+ * existing checkpoint. Degraded runs never reach here.
+ */
+async function routeContestedRow(options: {
+  context: ManualExecutionContext;
+  database: IDBDatabase;
+  legacyId: string;
+  character: unknown;
+  reason: DegradedCharacterEligibility['reason'] | PlayerBackupCloudComparison;
+  row: CharacterCloudRow | null;
+  quarantineDetail: string | null;
+  existingLink: CharacterCloudLink | null;
+}): Promise<boolean> {
+  const { context, reason, row } = options;
+  const scope = {
+    database: options.database,
+    accountId: context.accountId,
+    expectedActiveRunId: context.expectedActiveRunId,
+    legacyId: options.legacyId,
+    now: context.now,
+  };
+  if (
+    row !== null &&
+    (reason === 'newer' || reason === 'different' || reason === 'removed')
+  ) {
+    await seedPlayerBackupConflictInLock({
+      ...scope,
+      character: options.character,
+      row,
+      comparison: reason,
+      existingLink: options.existingLink,
+      generateMutationId: context.generateMutationId,
+    });
+    return true;
+  }
+  if (reason === 'future' || reason === 'unavailable') {
+    await holdPlayerBackupCandidateAsideInLock({
+      ...scope,
+      row,
+      reason,
+      detail: options.quarantineDetail,
+      checkpointKind: 'manual',
+    });
+    return true;
+  }
+  return false;
+}
+
+/**
  * Runs one selected character end to end while the caller holds the account
  * lock: fenced consent re-read, classification, identity, gateway mutation and
  * the durable checkpoint. Only a replaced run, a missing lock or a broken
@@ -367,6 +430,10 @@ async function processManualCharacter(
     });
     const existing = run.characterCheckpoints[legacyId]?.online;
     if (existing?.state === 'protected') return;
+    // The durable conflict/work path owns this character now; its outcome comes
+    // from the conflict, quarantine and work evidence, not from another attempt.
+    if (existing?.kind === 'automatic') return;
+    const integrated = playerBackupExecutionPath(run) === 'integrated';
     const existingLink = context.links.get(context.accountId, legacyId);
     const retained = retainCharacterIdentity(existing, existingLink);
 
@@ -419,6 +486,21 @@ async function processManualCharacter(
 
     const { compared, eligibility } = classified;
     if (!eligibility.eligible) {
+      if (
+        integrated &&
+        (await routeContestedRow({
+          context,
+          database,
+          legacyId,
+          character,
+          reason: eligibility.reason,
+          row: compared.row,
+          quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existingLink,
+        }))
+      ) {
+        return;
+      }
       await writeCheckpoint(
         onlineCheckpoint({
           state:
@@ -447,6 +529,8 @@ async function processManualCharacter(
 
     await uploadCharacter({
       context,
+      database,
+      integrated,
       run,
       legacyId,
       character,
@@ -534,6 +618,8 @@ async function attachIdenticalRow(options: {
  */
 async function uploadCharacter(options: {
   context: ManualExecutionContext;
+  database: IDBDatabase;
+  integrated: boolean;
   run: PlayerBackupRunV1;
   legacyId: string;
   character: unknown;
@@ -618,6 +704,33 @@ async function uploadCharacter(options: {
       // of keeping a link to a cloud copy this run never wrote.
       context.links.remove(context.accountId, options.legacyId);
     }
+    if (
+      options.integrated &&
+      cause instanceof ManualCharacterCloudRejectedError &&
+      cause.row !== null &&
+      cause.row.legacy_client_id === options.legacyId
+    ) {
+      // The service already restored (or removed) the link, so the rejected row
+      // is classified exactly as a listing would classify it and routed into the
+      // same durable evidence instead of a terminal refusal.
+      const compared = (
+        await compareCloudRows([cause.row], [options.character])
+      ).characters[0]!;
+      if (
+        await routeContestedRow({
+          context,
+          database: options.database,
+          legacyId: options.legacyId,
+          character: options.character,
+          reason: compared.state,
+          row: compared.row,
+          quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existingLink: context.links.get(context.accountId, options.legacyId),
+        })
+      ) {
+        return;
+      }
+    }
     const mapped = mapExecutionError(cause);
     await options.writeCheckpoint(
       onlineCheckpoint({
@@ -669,12 +782,17 @@ export async function executePlayerBackupManualRun(
     );
   }
 
-  return derivePlayerBackupRunResult({
-    factory: options.factory,
-    accountId: options.accountId,
-    expectedActiveRunId: options.expectedActiveRunId,
-    links: options.links,
-  });
+  // A character routed into the durable conflict path derives from the
+  // automatic stores, so the repository travels with the link evidence.
+  return withExistingDatabase(options.factory, database =>
+    derivePlayerBackupRunResult({
+      factory: options.factory,
+      accountId: options.accountId,
+      expectedActiveRunId: options.expectedActiveRunId,
+      links: options.links,
+      repository: new IndexedDbAutomaticCharacterSyncRepository(database),
+    })
+  );
 }
 
 // ---------------------------------------------------------------------------
