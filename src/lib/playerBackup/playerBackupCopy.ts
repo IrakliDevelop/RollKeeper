@@ -245,14 +245,17 @@ export function confirmationCopy(input: {
   authority: 'legacy' | 'active';
 }): string {
   const prepare = input.integratedLocalPath && input.authority === 'legacy';
+  const selection = `${input.count} selected ${
+    input.count === 1 ? 'character' : 'characters'
+  }`;
   if (input.mode === 'ongoing') {
     return prepare
-      ? `RollKeeper will prepare character saving in this browser, copy ${input.count} selected characters to ${input.email}, and keep their online backups up to date. New characters will also be protected unless you turn backup off for them. Your characters stay available here. Nothing is deleted.`
-      : `RollKeeper will copy ${input.count} selected characters to ${input.email} and keep their online backups up to date. New characters will also be protected unless you turn backup off for them. Your characters stay available here. Nothing is deleted.`;
+      ? `RollKeeper will prepare character saving in this browser, copy ${selection} to ${input.email}, and keep their online backups up to date. New characters will also be protected unless you turn backup off for them. Your characters stay available here. Nothing is deleted.`
+      : `RollKeeper will copy ${selection} to ${input.email} and keep their online backups up to date. New characters will also be protected unless you turn backup off for them. Your characters stay available here. Nothing is deleted.`;
   }
   return prepare
-    ? `RollKeeper will prepare character saving in this browser and save one online copy of ${input.count} selected characters to ${input.email}. Later changes stay here until you back up again. Nothing is deleted.`
-    : `RollKeeper will save one online copy of ${input.count} selected characters to ${input.email}. Later changes stay in this browser until you back up again. Your characters stay available here. Nothing is deleted or moved.`;
+    ? `RollKeeper will prepare character saving in this browser and save one online copy of ${selection} to ${input.email}. Later changes stay here until you back up again. Nothing is deleted.`
+    : `RollKeeper will save one online copy of ${selection} to ${input.email}. Later changes stay in this browser until you back up again. Your characters stay available here. Nothing is deleted or moved.`;
 }
 
 export type PlayerBackupErrorChannel =

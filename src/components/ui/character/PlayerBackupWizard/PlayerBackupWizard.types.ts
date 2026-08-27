@@ -48,6 +48,7 @@ export interface PlayerBackupResultRow {
 export interface PlayerBackupConflictCard {
   conflictId: string;
   legacyId: string;
+  applicationLegacyId: string;
   name: string;
   description: string;
   choices: Array<{

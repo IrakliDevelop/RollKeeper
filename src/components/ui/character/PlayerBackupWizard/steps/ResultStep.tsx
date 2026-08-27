@@ -112,7 +112,7 @@ export function ResultStep({
               <Button
                 className="mt-2"
                 variant="primary"
-                onClick={() => onApplyPending(conflict.legacyId)}
+                onClick={() => onApplyPending(conflict.applicationLegacyId)}
                 disabled={view.busy}
               >
                 {COPY.conflict.applyPending}

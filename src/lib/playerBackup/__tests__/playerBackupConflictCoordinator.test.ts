@@ -1912,6 +1912,21 @@ describe('resolvePlayerBackupConflict', () => {
         resolution: 'keep-both',
       }),
     ]);
+    await expect(
+      listPlayerBackupConflicts({
+        factory: indexedDB,
+        accountId: ACCOUNT_A,
+        expectedActiveRunId: 'run-a',
+      })
+    ).resolves.toMatchObject({
+      conflicts: [
+        {
+          conflictId: seeded.conflictId,
+          legacyId: 'hero-a',
+          pendingApplicationLegacyId: 'hero-copy',
+        },
+      ],
+    });
 
     // The copy id lives in the durable record, so the retry never repeats it.
     await expect(

@@ -494,6 +494,7 @@ export function createPlayerBackupWizardFixture(
             {
               conflictId: 'conflict-aveline',
               legacyId: 'aveline',
+              applicationLegacyId: 'aveline',
               name: 'Sister Aveline',
               description: COPY.conflict.description,
               pendingApplication: false,

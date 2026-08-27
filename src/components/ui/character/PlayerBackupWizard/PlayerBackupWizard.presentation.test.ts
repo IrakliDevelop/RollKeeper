@@ -159,6 +159,7 @@ describe('projectPlayerBackupManagement', () => {
           {
             conflictId: 'conflict-aveline',
             legacyId: 'aveline',
+            applicationLegacyId: 'aveline',
             name: 'Sister Aveline',
             description: COPY.conflict.description,
             pendingApplication: true,

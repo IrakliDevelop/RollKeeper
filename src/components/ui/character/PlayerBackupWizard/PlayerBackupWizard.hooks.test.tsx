@@ -5,7 +5,10 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
+import { verifyDownloadedDeviceBackup } from '@/lib/deviceRecovery';
 import { PlayerBackupReadOnlyCoordinator } from '@/lib/playerBackup/playerBackupCoordinator';
+import { listPlayerBackupConflicts } from '@/lib/playerBackup/playerBackupConflictCoordinator';
+import { derivePlayerBackupRunResult } from '@/lib/playerBackup/playerBackupOnlineExecution';
 import type { PlayerBackupRunV1 } from '@/lib/playerBackup/playerBackupRunRepository';
 
 import { usePlayerBackupWizard } from './PlayerBackupWizard.hooks';
@@ -165,6 +168,12 @@ vi.mock(
       >();
     return {
       ...actual,
+      withExistingDatabase: vi.fn(
+        async (
+          _factory: IDBFactory,
+          task: (database: IDBDatabase) => Promise<unknown>
+        ) => task({} as IDBDatabase)
+      ),
       derivePlayerBackupRunResult: vi.fn(async () => ({
         runId: 'run-1',
         accountId: 'acc-a',
@@ -252,6 +261,7 @@ vi.mock(
           {
             conflictId: 'conflict-1',
             legacyId: 'hero-a',
+            pendingApplicationLegacyId: null,
             mutationId: 'mutation-1',
             comparison: 'different',
             archived: false,
@@ -273,11 +283,34 @@ function Probe() {
     <div>
       <span data-testid="alert">{view.selection.alert ?? ''}</span>
       <span data-testid="signed-in">{String(view.account.signedIn)}</span>
+      <span data-testid="account-error">{view.account.error ?? ''}</span>
       <span data-testid="receipt">{view.safety.receipt}</span>
+      <span data-testid="live-status">{view.liveStatus ?? ''}</span>
       <span data-testid="action-error">{view.actionError ?? ''}</span>
       <span data-testid="continue">{String(view.result.continueSetup)}</span>
+      <span data-testid="run-ready">{String(view.result.closeSafe)}</span>
+      <span data-testid="apply-id">
+        {view.result.conflicts[0]?.applicationLegacyId ?? ''}
+      </span>
+      <span data-testid="result-title">{view.result.title}</span>
+      <span data-testid="result-headline">{view.result.headline}</span>
+      <span data-testid="result-row-status">
+        {view.result.rows[0]?.statusLabel ?? ''}
+      </span>
       <button type="button" onClick={actions.onSaveSafetyFile}>
         save-safety
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          actions.onChooseSafetyFile(
+            new File(['{}'], 'rollkeeper-device-backup.json', {
+              type: 'application/json',
+            })
+          )
+        }
+      >
+        choose-safety
       </button>
       <button
         type="button"
@@ -291,7 +324,14 @@ function Probe() {
       >
         resolve-mine
       </button>
-      <button type="button" onClick={() => actions.onApplyPending('hero-a')}>
+      <button
+        type="button"
+        onClick={() =>
+          actions.onApplyPending(
+            view.result.conflicts[0]?.applicationLegacyId ?? 'hero-a'
+          )
+        }
+      >
         apply-pending
       </button>
       <button type="button" onClick={actions.onCheckNow}>
@@ -328,6 +368,23 @@ async function signIn(id: string, email: string) {
 }
 
 describe('usePlayerBackupWizard', () => {
+  it('treats a missing auth session as signed out instead of an error', async () => {
+    auth.getUser.mockResolvedValueOnce({
+      data: { user: null },
+      error: Object.assign(new Error('Auth session missing!'), {
+        name: 'AuthSessionMissingError',
+        __isAuthError: true,
+        status: 400,
+      }) as never,
+    });
+
+    render(<Probe />);
+
+    await waitFor(() => expect(auth.getUser).toHaveBeenCalled());
+    expect(screen.getByTestId('signed-in')).toHaveTextContent('false');
+    expect(screen.getByTestId('account-error')).toHaveTextContent('');
+  });
+
   it('does not treat the first sign-in as an account change', async () => {
     await signIn('acc-a', 'a@example.com');
     expect(screen.getByTestId('alert')).toHaveTextContent('');
@@ -365,6 +422,40 @@ describe('usePlayerBackupWizard', () => {
     );
   });
 
+  it('replaces a stale safety mismatch announcement after verification', async () => {
+    const user = userEvent.setup();
+    await signIn('acc-a', 'a@example.com');
+    await user.click(screen.getByRole('button', { name: 'save-safety' }));
+    await waitFor(() => {
+      expect(safety.savePlayerBackupSafetyFiles).toHaveBeenCalled();
+    });
+    safety.finishSave();
+    await waitFor(() => {
+      expect(screen.getByTestId('receipt')).toHaveTextContent(
+        'download-started'
+      );
+    });
+
+    vi.mocked(verifyDownloadedDeviceBackup).mockRejectedValueOnce(
+      new Error('mismatch')
+    );
+    await user.click(screen.getByRole('button', { name: 'choose-safety' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('live-status')).toHaveTextContent(
+        COPY.safety.mismatchTitle
+      );
+    });
+
+    vi.mocked(verifyDownloadedDeviceBackup).mockResolvedValueOnce({} as never);
+    await user.click(screen.getByRole('button', { name: 'choose-safety' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('receipt')).toHaveTextContent('checked');
+      expect(screen.getByTestId('live-status')).toHaveTextContent(
+        COPY.safety.verifiedTitle
+      );
+    });
+  });
+
   it('supplies a copy id and drains then settles a one-time keep-both resolution', async () => {
     const user = userEvent.setup();
     conflictApis.resolvePlayerBackupConflict.mockResolvedValue({
@@ -380,7 +471,7 @@ describe('usePlayerBackupWizard', () => {
     });
     await signIn('acc-a', 'a@example.com');
     await waitFor(() => {
-      expect(screen.getByTestId('continue')).toHaveTextContent('true');
+      expect(screen.getByTestId('run-ready')).toHaveTextContent('true');
     });
     await user.click(screen.getByRole('button', { name: 'resolve-both' }));
     await waitFor(() => {
@@ -420,7 +511,7 @@ describe('usePlayerBackupWizard', () => {
     );
     await signIn('acc-a', 'a@example.com');
     await waitFor(() => {
-      expect(screen.getByTestId('continue')).toHaveTextContent('true');
+      expect(screen.getByTestId('run-ready')).toHaveTextContent('true');
     });
     await user.click(screen.getByRole('button', { name: 'apply-pending' }));
     await waitFor(() => {
@@ -432,6 +523,109 @@ describe('usePlayerBackupWizard', () => {
     expect(screen.getByTestId('action-error')).toHaveTextContent(
       COPY.errors.online
     );
+  });
+
+  it('applies a keep-both target id and settles the one-time run afterwards', async () => {
+    const user = userEvent.setup();
+    vi.mocked(derivePlayerBackupRunResult).mockResolvedValueOnce({
+      runId: 'run-1',
+      accountId: 'acc-a',
+      mode: 'one-time',
+      executionPath: 'integrated',
+      protected: [],
+      queued: [],
+      offline: [],
+      authRequired: [],
+      needsAttention: [],
+      heldAside: [],
+      failed: [],
+      pending: ['hero-a'],
+      outcomes: {
+        'hero-a': {
+          outcome: 'pending',
+          reason: 'roster-application-pending',
+        },
+      },
+      complete: false,
+    });
+    vi.mocked(listPlayerBackupConflicts).mockResolvedValueOnce({
+      accountId: 'acc-a',
+      runId: 'run-1',
+      conflicts: [
+        {
+          conflictId: 'conflict-1',
+          legacyId: 'hero-a',
+          pendingApplicationLegacyId: 'hero-copy',
+          mutationId: 'mutation-1',
+          comparison: 'different',
+          archived: false,
+          originPlayerBackupRunId: 'run-1',
+          detectedAt: 'now',
+          resolutionState: 'resolved',
+          allowedResolutions: [],
+          localCandidate: null,
+          cloudCandidate: {} as never,
+        },
+      ],
+      heldAside: [],
+    });
+    conflictApis.applyPlayerBackupPendingApplication.mockResolvedValueOnce(
+      true
+    );
+    conflictApis.settlePlayerBackupOneTimeConflicts.mockResolvedValueOnce({
+      settled: ['hero-a'],
+      pending: [],
+    });
+
+    await signIn('acc-a', 'a@example.com');
+    await waitFor(() => {
+      expect(screen.getByTestId('apply-id')).toHaveTextContent('hero-copy');
+    });
+    await user.click(screen.getByRole('button', { name: 'apply-pending' }));
+
+    await waitFor(() => {
+      expect(
+        conflictApis.applyPlayerBackupPendingApplication
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({ legacyId: 'hero-copy' })
+      );
+      expect(
+        conflictApis.settlePlayerBackupOneTimeConflicts
+      ).toHaveBeenCalled();
+    });
+  });
+
+  it('projects durable queued work as backing up instead of attention', async () => {
+    vi.mocked(derivePlayerBackupRunResult).mockResolvedValueOnce({
+      runId: 'run-1',
+      accountId: 'acc-a',
+      mode: 'ongoing',
+      executionPath: 'integrated',
+      protected: [],
+      queued: ['hero-a'],
+      offline: [],
+      authRequired: [],
+      needsAttention: [],
+      heldAside: [],
+      failed: [],
+      pending: [],
+      outcomes: {
+        'hero-a': { outcome: 'queued', reason: null },
+      },
+      complete: false,
+    });
+
+    await signIn('acc-a', 'a@example.com');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('result-title')).toHaveTextContent(
+        COPY.result.backingUpTitle
+      );
+      expect(screen.getByTestId('result-headline')).toHaveTextContent(
+        COPY.result.backingUpHeadline(1)
+      );
+      expect(screen.getByTestId('continue')).toHaveTextContent('false');
+    });
   });
 
   it('reloads durable run results and conflicts when checking now', async () => {
@@ -446,7 +640,7 @@ describe('usePlayerBackupWizard', () => {
     );
     await signIn('acc-a', 'a@example.com');
     await waitFor(() => {
-      expect(screen.getByTestId('continue')).toHaveTextContent('true');
+      expect(screen.getByTestId('run-ready')).toHaveTextContent('true');
     });
     loadResult.mockClear();
     loadConflicts.mockClear();
@@ -455,5 +649,8 @@ describe('usePlayerBackupWizard', () => {
       expect(loadResult).toHaveBeenCalled();
       expect(loadConflicts).toHaveBeenCalled();
     });
+    expect(
+      vi.mocked(derivePlayerBackupRunResult).mock.calls.at(-1)?.[0].repository
+    ).toBeDefined();
   });
 });

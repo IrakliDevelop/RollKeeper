@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isAuthSessionMissingError } from '@supabase/supabase-js';
 
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import {
@@ -41,8 +42,10 @@ import {
 import {
   derivePlayerBackupRunResult,
   executePlayerBackupManualRun,
+  withExistingDatabase,
 } from '@/lib/playerBackup/playerBackupOnlineExecution';
 import { startPlayerBackupOngoingWork } from '@/lib/playerBackup/playerBackupOngoingExecution';
+import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import {
   hasPlayerBackupExclusiveLockCapability,
   type PlayerBackupExclusiveLockProvider,
@@ -111,6 +114,23 @@ function publishSnapshot(
   ) => void
 ) {
   setSnapshot(coordinator.snapshot());
+}
+
+function deriveBrowserPlayerBackupResult(options: {
+  factory: IDBFactory;
+  storage: Storage;
+  accountId: string;
+  runId: string;
+}) {
+  return withExistingDatabase(options.factory, database =>
+    derivePlayerBackupRunResult({
+      factory: options.factory,
+      accountId: options.accountId,
+      expectedActiveRunId: options.runId,
+      links: createCharacterCloudLinkRepository(options.storage),
+      repository: new IndexedDbAutomaticCharacterSyncRepository(database),
+    })
+  );
 }
 
 export function usePlayerBackupWizard(): {
@@ -194,35 +214,44 @@ export function usePlayerBackupWizard(): {
     [announce]
   );
 
-  useEffect(() => {
-    const client = createSupabaseBrowserClient();
-    if (!client) return undefined;
-    let cancelled = false;
-    const applySession = (user: { id: string; email?: string } | null) => {
-      if (cancelled) return;
+  const applyAccountSession = useCallback(
+    (user: { id: string; email?: string } | null) => {
       const next = user ? { id: user.id, email: user.email ?? user.id } : null;
       setAccount(current => {
         if (current?.id === next?.id) return next ?? current;
         clearAccountScopedState(current?.id ?? null, next?.id ?? null);
         return next;
       });
-    };
+    },
+    [clearAccountScopedState]
+  );
+
+  useEffect(() => {
+    const client = createSupabaseBrowserClient();
+    if (!client) return undefined;
+    let cancelled = false;
     void client.auth.getUser().then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
+        if (isAuthSessionMissingError(error)) {
+          setAccountError(null);
+          applyAccountSession(null);
+          return;
+        }
         setAccountError(mapPlayerBackupError('account', error));
         return;
       }
-      applySession(data.user);
+      setAccountError(null);
+      applyAccountSession(data.user);
     });
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      applySession(session?.user ?? null);
+      if (!cancelled) applyAccountSession(session?.user ?? null);
     });
     return () => {
       cancelled = true;
       data.subscription.unsubscribe();
     };
-  }, [clearAccountScopedState]);
+  }, [applyAccountSession]);
 
   useEffect(() => {
     const coordinator = coordinatorRef.current;
@@ -251,11 +280,11 @@ export function usePlayerBackupWizard(): {
         const run = coordinator.snapshot().run;
         if (run) {
           await coordinator.loadResult(accountId, () =>
-            derivePlayerBackupRunResult({
+            deriveBrowserPlayerBackupResult({
               factory: indexedDB,
+              storage: window.localStorage,
               accountId,
-              expectedActiveRunId: run.runId,
-              links: createCharacterCloudLinkRepository(window.localStorage),
+              runId: run.runId,
             })
           );
           await coordinator.loadConflicts(accountId, () =>
@@ -434,9 +463,10 @@ export function usePlayerBackupWizard(): {
           ? 'Read back from your account and matches this browser'
           : 'One online copy saved and checked. Later changes stay here.';
       }
-      if (outcome.outcome === 'offline' || outcome.outcome === 'queued') {
+      if (outcome.outcome === 'offline') {
         return COPY.result.offlineBody;
       }
+      if (outcome.outcome === 'queued') return COPY.result.backingUpBody;
       if (outcome.outcome === 'held-aside') {
         return COPY.conflict.futureDescription;
       }
@@ -459,60 +489,93 @@ export function usePlayerBackupWizard(): {
                 : character.tone,
       };
     });
+    const attentionCount =
+      execution.needsAttention.length +
+      execution.failed.length +
+      execution.authRequired.length +
+      execution.heldAside.length;
+    const backingUp =
+      execution.queued.length + execution.pending.length > 0 &&
+      attentionCount === 0 &&
+      execution.offline.length === 0;
+    const waitingForConnection =
+      execution.offline.length > 0 && attentionCount === 0;
     return {
       title: execution.complete
         ? COPY.result.protectedTitle
-        : COPY.result.partialTitle,
+        : waitingForConnection
+          ? COPY.result.offlineTitle
+          : backingUp
+            ? COPY.result.backingUpTitle
+            : COPY.result.partialTitle,
       headline: execution.complete
         ? execution.mode === 'ongoing'
           ? COPY.result.ongoingComplete(execution.protected.length)
           : COPY.result.oneTimeComplete(execution.protected.length)
-        : COPY.result.partialDescription(
-            execution.protected.length,
-            execution.needsAttention.length + execution.failed.length
-          ),
+        : waitingForConnection
+          ? COPY.result.offlineHeadline
+          : backingUp
+            ? COPY.result.backingUpHeadline(
+                execution.queued.length + execution.pending.length
+              )
+            : COPY.result.partialDescription(
+                execution.protected.length,
+                attentionCount
+              ),
       body: execution.complete
         ? execution.mode === 'ongoing'
           ? 'New characters will also be protected unless you turn backup off for them.'
           : 'Later changes stay in this browser until you back up again.'
-        : 'Nothing was deleted.',
-      tone: execution.complete ? 'ok' : 'warn',
+        : waitingForConnection
+          ? COPY.result.offlineBody
+          : backingUp
+            ? COPY.result.backingUpBody
+            : 'Nothing was deleted.',
+      tone: execution.complete ? 'ok' : backingUp ? 'info' : 'warn',
       rows,
       conflicts: (snapshot.conflicts?.conflicts ?? [])
         .filter(
           conflict =>
             conflict.resolutionState === 'unresolved' ||
+            conflict.pendingApplicationLegacyId !== null ||
             pendingIds.has(conflict.legacyId)
         )
-        .map(conflict => ({
-          conflictId: conflict.conflictId,
-          legacyId: conflict.legacyId,
-          name:
-            characters.find(row => row.id === conflict.legacyId)?.name ??
-            conflict.legacyId,
-          description: pendingIds.has(conflict.legacyId)
-            ? COPY.conflict.pendingBody
-            : COPY.conflict.description,
-          pendingApplication: pendingIds.has(conflict.legacyId),
-          choices: conflict.allowedResolutions
-            .filter(resolution => resolution !== 'restore-online')
-            .map(resolution => ({
-              resolution,
-              label:
-                resolution === 'keep-mine'
-                  ? COPY.conflict.keepMine
-                  : resolution === 'use-cloud'
-                    ? COPY.conflict.useOnline
-                    : COPY.conflict.keepBoth,
-              body:
-                resolution === 'keep-mine'
-                  ? COPY.conflict.keepMineBody
-                  : resolution === 'use-cloud'
-                    ? COPY.conflict.useOnlineBody
-                    : COPY.conflict.keepBothBody,
-              enabled: !pendingIds.has(conflict.legacyId),
-            })),
-        })),
+        .map(conflict => {
+          const pendingApplication =
+            conflict.pendingApplicationLegacyId !== null ||
+            pendingIds.has(conflict.legacyId);
+          return {
+            conflictId: conflict.conflictId,
+            legacyId: conflict.legacyId,
+            applicationLegacyId:
+              conflict.pendingApplicationLegacyId ?? conflict.legacyId,
+            name:
+              characters.find(row => row.id === conflict.legacyId)?.name ??
+              conflict.legacyId,
+            description: pendingApplication
+              ? COPY.conflict.pendingBody
+              : COPY.conflict.description,
+            pendingApplication,
+            choices: conflict.allowedResolutions
+              .filter(resolution => resolution !== 'restore-online')
+              .map(resolution => ({
+                resolution,
+                label:
+                  resolution === 'keep-mine'
+                    ? COPY.conflict.keepMine
+                    : resolution === 'use-cloud'
+                      ? COPY.conflict.useOnline
+                      : COPY.conflict.keepBoth,
+                body:
+                  resolution === 'keep-mine'
+                    ? COPY.conflict.keepMineBody
+                    : resolution === 'use-cloud'
+                      ? COPY.conflict.useOnlineBody
+                      : COPY.conflict.keepBothBody,
+                enabled: !pendingApplication,
+              })),
+          };
+        }),
       heldAside: (snapshot.conflicts?.heldAside ?? []).map(item => ({
         legacyId: item.legacyId,
         name:
@@ -521,7 +584,10 @@ export function usePlayerBackupWizard(): {
         recoveryAvailable: item.recoveryAvailable,
         downloadEnabled: false,
       })),
-      continueSetup: Boolean(snapshot.run) && !execution.complete,
+      continueSetup:
+        Boolean(snapshot.run) &&
+        execution.pending.length > 0 &&
+        pendingIds.size === 0,
       closeSafe: Boolean(snapshot.run),
     } satisfies PlayerBackupWizardView['result'];
   }, [characters, snapshot.conflicts, snapshot.result, snapshot.run]);
@@ -572,11 +638,11 @@ export function usePlayerBackupWizard(): {
     await coordinatorRef.current.discoverRun(indexedDB);
     if (generation !== mutationGeneration.current) return;
     await coordinatorRef.current.loadResult(accountId, () =>
-      derivePlayerBackupRunResult({
+      deriveBrowserPlayerBackupResult({
         factory: indexedDB,
+        storage: window.localStorage,
         accountId,
-        expectedActiveRunId: runId,
-        links: createCharacterCloudLinkRepository(window.localStorage),
+        runId,
       })
     );
     if (generation !== mutationGeneration.current) return;
@@ -692,22 +758,19 @@ export function usePlayerBackupWizard(): {
         .then(({ data, error }) => {
           if (generation !== mutationGeneration.current) return;
           if (error) {
+            if (isAuthSessionMissingError(error)) {
+              setAccountError(null);
+              applyAccountSession(null);
+              announce(null);
+              return;
+            }
             setAccountError(mapPlayerBackupError('account', error));
             announce(mapPlayerBackupError('account', error));
             return;
           }
-          if (data.user) {
-            const next = {
-              id: data.user.id,
-              email: data.user.email ?? data.user.id,
-            };
-            setAccount(current => {
-              if (current?.id === next.id) return next;
-              clearAccountScopedState(current?.id ?? null, next.id);
-              return next;
-            });
-            setAccountError(null);
-          }
+          applyAccountSession(data.user);
+          setAccountError(null);
+          announce(null);
         })
         .finally(() => {
           if (generation === mutationGeneration.current) setBusy(false);
@@ -792,9 +855,9 @@ export function usePlayerBackupWizard(): {
         )
         .then(() => {
           if (generation !== mutationGeneration.current) return;
+          const extraReady =
+            !safety.extraFileRequired || Boolean(verifiedCurrent.current);
           setSafety(current => {
-            const extraReady =
-              !current.extraFileRequired || Boolean(verifiedCurrent.current);
             return {
               ...current,
               receipt: extraReady ? 'checked' : 'download-started',
@@ -804,6 +867,9 @@ export function usePlayerBackupWizard(): {
               pickedFileName: file.name,
             };
           });
+          announce(
+            extraReady ? COPY.safety.verifiedTitle : COPY.safety.downloadStarted
+          );
         })
         .catch(() => {
           if (generation !== mutationGeneration.current) return;
@@ -857,10 +923,10 @@ export function usePlayerBackupWizard(): {
           });
           if (generation !== mutationGeneration.current) return;
           verifiedCurrent.current = extra;
+          const broadReady = Boolean(
+            verifiedBroad.current && safety.pickedFileName
+          );
           setSafety(current => {
-            const broadReady = Boolean(
-              verifiedBroad.current && current.pickedFileName
-            );
             return {
               ...current,
               extraChecked: true,
@@ -871,6 +937,9 @@ export function usePlayerBackupWizard(): {
                 : current.badgeLabel,
             };
           });
+          announce(
+            broadReady ? COPY.safety.verifiedTitle : COPY.safety.downloadStarted
+          );
         })
         .catch(() => {
           if (generation !== mutationGeneration.current) return;
@@ -1176,40 +1245,54 @@ export function usePlayerBackupWizard(): {
       const locks = navigator.locks as
         | PlayerBackupExclusiveLockProvider
         | undefined;
+      const gateway = run?.mode === 'one-time' ? gatewayFromBrowser() : null;
       if (
         !run ||
         !accountId ||
-        !hasPlayerBackupExclusiveLockCapability(locks)
+        !hasPlayerBackupExclusiveLockCapability(locks) ||
+        (run.mode === 'one-time' && !gateway)
       ) {
         return;
       }
       const generation = mutationGeneration.current;
       setBusy(true);
       setActionError(null);
-      void applyPlayerBackupPendingApplication({
-        factory: indexedDB,
-        locks,
-        accountId,
-        expectedActiveRunId: run.runId,
-        legacyId,
-        write: application => {
-          const store = usePlayerStore.getState();
-          const payload = application.payload as unknown as Parameters<
-            typeof store.addCloudRecoveredCharacter
-          >[0];
-          const accepted =
-            application.kind === 'replace'
-              ? store.replaceCloudRecoveredCharacter(payload)
-              : store.addCloudRecoveredCharacter(payload);
-          if (!accepted) {
-            throw new Error('Roster write was not accepted');
-          }
-        },
-      })
-        .then(() => {
-          if (generation !== mutationGeneration.current) return;
-          return reloadDurableEvidence(accountId, run.runId, generation);
-        })
+      void (async () => {
+        await applyPlayerBackupPendingApplication({
+          factory: indexedDB,
+          locks,
+          accountId,
+          expectedActiveRunId: run.runId,
+          legacyId,
+          write: application => {
+            const store = usePlayerStore.getState();
+            const payload = application.payload as unknown as Parameters<
+              typeof store.addCloudRecoveredCharacter
+            >[0];
+            const accepted =
+              application.kind === 'replace'
+                ? store.replaceCloudRecoveredCharacter(payload)
+                : store.addCloudRecoveredCharacter(payload);
+            if (!accepted) {
+              throw new Error('Roster write was not accepted');
+            }
+          },
+        });
+        if (generation !== mutationGeneration.current) return;
+        if (run.mode === 'one-time') {
+          await settlePlayerBackupOneTimeConflicts({
+            factory: indexedDB,
+            locks,
+            accountId,
+            expectedActiveRunId: run.runId,
+            gateway: gateway!,
+            links: createCharacterCloudLinkRepository(window.localStorage),
+            now: () => new Date().toISOString(),
+          });
+        }
+        if (generation !== mutationGeneration.current) return;
+        await reloadDurableEvidence(accountId, run.runId, generation);
+      })()
         .catch(cause => {
           if (generation !== mutationGeneration.current) return;
           reportError('online', cause);
