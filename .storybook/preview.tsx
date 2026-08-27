@@ -15,7 +15,11 @@ function ThemeWrapper({
     document.documentElement.setAttribute('data-theme', theme);
     // Also set background color for the story container
     document.body.style.backgroundColor =
-      theme === 'dark' ? '#0f172a' : '#f8fafc';
+      theme === 'dark'
+        ? '#0f172a'
+        : theme === 'parchment'
+          ? '#f4ead4'
+          : '#f8fafc';
     document.body.style.color = theme === 'dark' ? '#f1f5f9' : '#1e293b';
   }, [theme]);
 
@@ -25,7 +29,12 @@ function ThemeWrapper({
       style={{
         padding: '1rem',
         minHeight: '100vh',
-        backgroundColor: theme === 'dark' ? '#0f172a' : '#f8fafc',
+        backgroundColor:
+          theme === 'dark'
+            ? '#0f172a'
+            : theme === 'parchment'
+              ? '#f4ead4'
+              : '#f8fafc',
         color: theme === 'dark' ? '#f1f5f9' : '#1e293b',
       }}
     >
@@ -73,6 +82,7 @@ const preview: Preview = {
         items: [
           { value: 'light', title: 'Light', icon: 'sun' },
           { value: 'dark', title: 'Dark', icon: 'moon' },
+          { value: 'parchment', title: 'Parchment', icon: 'document' },
         ],
         dynamicTitle: true,
       },
