@@ -119,6 +119,14 @@ export function playerBackupActiveRunKey(accountId: string): string {
   return `player-backup-active-run:${accountId}`;
 }
 
+/** The roster change one resolution still owes its caller, per character. */
+export function playerBackupApplicationKey(
+  runId: string,
+  legacyId: string
+): string {
+  return `player-backup-application:${runId}:${legacyId}`;
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.length > 0;
 }
