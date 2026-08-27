@@ -332,11 +332,14 @@ describe('AutomaticCharacterConflictService', () => {
 
     it('returns resolved without writes when the in-transaction re-read is already resolved', async () => {
       const conflictId = await seedConflict();
+      const seeded = await service.getConflict(conflictId);
+      let hookRuns = 0;
 
       await expect(
         service.resolve(conflictId, 'keep-mine', {
           transactionHook: {
             run: async (transaction, conflict) => {
+              hookRuns += 1;
               transaction
                 .objectStore('conflicts')
                 .put({ ...conflict, resolutionState: 'resolved' });
@@ -345,6 +348,13 @@ describe('AutomaticCharacterConflictService', () => {
         })
       ).resolves.toBe('resolved');
 
+      expect(hookRuns).toBe(1);
+      // The service adds no resolution/resolvedAt of its own: the stored record
+      // is exactly what the hook wrote.
+      await expect(service.getConflict(conflictId)).resolves.toEqual({
+        ...seeded,
+        resolutionState: 'resolved',
+      });
       await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
       await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
         expect.objectContaining({ state: 'conflict' }),
@@ -354,6 +364,28 @@ describe('AutomaticCharacterConflictService', () => {
       ).resolves.toMatchObject({
         payload: expect.objectContaining({ name: 'Local candidate' }),
       });
+    });
+
+    it('aborts instead of resurrecting a conflict the hook deleted', async () => {
+      const conflictId = await seedConflict();
+
+      await expect(
+        service.resolve(conflictId, 'keep-mine', {
+          transactionHook: {
+            run: async transaction => {
+              transaction.objectStore('conflicts').delete(conflictId);
+            },
+          },
+        })
+      ).rejects.toThrow('Automatic sync conflict was not found');
+
+      await expect(service.getConflict(conflictId)).resolves.toMatchObject({
+        resolutionState: 'unresolved',
+      });
+      await expect(service.listSnapshots(conflictId)).resolves.toEqual([]);
+      await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
+        expect.objectContaining({ state: 'conflict' }),
+      ]);
     });
   });
 });

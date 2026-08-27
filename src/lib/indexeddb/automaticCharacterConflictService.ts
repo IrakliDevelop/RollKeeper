@@ -24,8 +24,15 @@ export interface AutomaticConflictResolutionOptions {
   copyLegacyId?: string;
   /**
    * Runs inside the resolution transaction after the conflict is re-read and
-   * before any write; throwing aborts everything. When present the transaction
-   * also includes 'meta' plus `stores`.
+   * found unresolved, and before any write; throwing aborts everything. When
+   * present the transaction also includes 'meta' plus `stores`.
+   *
+   * The hook may only await IndexedDB requests issued on the transaction it is
+   * given -- any foreign await auto-commits that transaction and breaks the
+   * fence. It must not edit the conflict record itself: the resolution write
+   * derives from the record read before the transaction opened, so such an
+   * edit is either clobbered or (when it marks the conflict resolved) fences
+   * the resolution off entirely.
    */
   transactionHook?: {
     stores?: readonly string[];
@@ -206,10 +213,26 @@ export class AutomaticCharacterConflictService {
           })
         | undefined
       >;
-    let current = await readCurrent();
-    if (!current) {
-      abortQuietly(transaction);
-      throw new Error('Automatic sync conflict was not found');
+    const requireConflict = (
+      record:
+        | (AutomaticCharacterConflict & {
+            resolution?: AutomaticConflictResolution;
+          })
+        | undefined
+    ) => {
+      if (!record) {
+        abortQuietly(transaction);
+        throw new Error('Automatic sync conflict was not found');
+      }
+      return record;
+    };
+
+    let current = requireConflict(await readCurrent());
+    if (current.resolutionState === 'resolved') {
+      // Another tab resolved between the pre-read and this transaction: the
+      // hook never runs and nothing is written.
+      await transactionComplete(transaction);
+      return 'resolved';
     }
     if (hook) {
       try {
@@ -220,11 +243,11 @@ export class AutomaticCharacterConflictService {
       }
       // The hook shares the transaction, so re-read to fence against a
       // resolution it observed or performed itself.
-      current = (await readCurrent()) ?? current;
-    }
-    if (current.resolutionState === 'resolved') {
-      await transactionComplete(transaction);
-      return 'resolved';
+      current = requireConflict(await readCurrent());
+      if (current.resolutionState === 'resolved') {
+        await transactionComplete(transaction);
+        return 'resolved';
+      }
     }
 
     const local = conflict.localCandidate;
