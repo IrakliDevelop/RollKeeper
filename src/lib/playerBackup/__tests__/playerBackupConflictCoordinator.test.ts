@@ -1906,6 +1906,54 @@ describe('resolvePlayerBackupConflict', () => {
     expect(await readApplicationRecords()).toEqual([]);
   });
 
+  it('replays each conflict of one character under its own copy id', async () => {
+    const { harness, gateway, row, seeded } = await seedConflictScenario();
+    const replay = (conflictId: string) =>
+      resolveConflict({
+        conflictId,
+        resolution: 'keep-both',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      });
+
+    const first = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-both',
+      copyLegacyId: 'hero-copy',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    // The character conflicts again in the same run, so a second unacknowledged
+    // application now shares its source character with the first.
+    const reseeded = await harness.seed({ row });
+    expect(reseeded.conflictId).not.toBe(seeded.conflictId);
+    const second = await resolveConflict({
+      conflictId: reseeded.conflictId,
+      resolution: 'keep-both',
+      copyLegacyId: 'hero-copy-two',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    expect(await readApplicationRecords()).toHaveLength(2);
+
+    await expect(replay(seeded.conflictId)).resolves.toEqual({
+      ...first,
+      workQueued: false,
+    });
+    await expect(replay(reseeded.conflictId)).resolves.toEqual({
+      ...second,
+      workQueued: false,
+    });
+
+    await expect(
+      acknowledgeApplication({ legacyId: 'hero-copy' })
+    ).resolves.toBe(true);
+    await expect(
+      acknowledgeApplication({ legacyId: 'hero-copy-two' })
+    ).resolves.toBe(true);
+    expect(await readApplicationRecords()).toEqual([]);
+  });
+
   it('retains the application when the run is replaced before acknowledgement', async () => {
     const { harness, gateway, seeded } = await seedConflictScenario();
     await resolveConflict({
@@ -1987,7 +2035,16 @@ describe('resolvePlayerBackupConflict', () => {
         expectedServerVersion: 2,
       },
     ]);
-    expect(result).toEqual({ status: 'restored', outcome: 'attached' });
+    expect(result).toEqual({
+      status: 'restored',
+      outcome: 'attached',
+      apply: {
+        kind: 'replace',
+        legacyId: 'hero-a',
+        payload: expect.anything(),
+        contentFingerprint: expect.any(String),
+      },
+    });
 
     const conflict = await readConflict(seeded.conflictId);
     expect(conflict.cloudCandidate).toMatchObject({
@@ -2001,6 +2058,29 @@ describe('resolvePlayerBackupConflict', () => {
     )) as AutomaticCharacterDocument[];
     expect(documents[0].baseServerVersion).toBe(3);
     expect(documents[0].deletedAt).toBeNull();
+    // The attach is an ordinary use-cloud application: the caller mirrors it
+    // into the roster and acknowledges it like any other.
+    if (result.status !== 'restored' || !result.apply) {
+      throw new Error('restore-attach did not return an application');
+    }
+    expect(result.apply.payload).toEqual(documents[0].payload);
+    expect(result.apply.contentFingerprint).toBe(
+      documents[0].contentFingerprint
+    );
+    expect(await readApplicationRecords()).toEqual([
+      expect.objectContaining({
+        key: 'player-backup-application:run-a:hero-a',
+        kind: 'replace',
+        legacyId: 'hero-a',
+        sourceLegacyId: 'hero-a',
+        resolution: 'use-cloud',
+        conflictId: seeded.conflictId,
+      }),
+    ]);
+    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
+      true
+    );
+    expect(await readApplicationRecords()).toEqual([]);
 
     const links = createMemoryCharacterCloudLinkRepository();
     await expect(settleConflicts(gateway, links)).resolves.toEqual({
@@ -2036,7 +2116,11 @@ describe('resolvePlayerBackupConflict', () => {
         gateway,
         generateMutationId: harness.identities.generateMutationId,
       })
-    ).resolves.toEqual({ status: 'restored', outcome: 'unresolved' });
+    ).resolves.toEqual({
+      status: 'restored',
+      outcome: 'unresolved',
+      apply: null,
+    });
 
     const listing = await listPlayerBackupConflicts({
       factory: indexedDB,
@@ -2085,7 +2169,11 @@ describe('resolvePlayerBackupConflict', () => {
         gateway,
         generateMutationId: harness.identities.generateMutationId,
       })
-    ).resolves.toEqual({ status: 'restored', outcome: 'attached' });
+    ).resolves.toEqual({
+      status: 'restored',
+      outcome: 'attached',
+      apply: expect.objectContaining({ kind: 'replace', legacyId: 'hero-a' }),
+    });
     expect(gateway.restoreRequests).toHaveLength(1);
     expect(gateway.restoreRequests[0].mutationId).toBe('mutation-2');
   });

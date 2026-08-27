@@ -110,7 +110,12 @@ export type PlayerBackupConflictResolveResult =
       apply: PlayerBackupLocalApplication | null;
       workQueued: boolean;
     }
-  | { status: 'restored'; outcome: 'attached' | 'unresolved' }
+  | {
+      status: 'restored';
+      outcome: 'attached' | 'unresolved';
+      /** Non-null only for `attached`, and acknowledged like any other. */
+      apply: PlayerBackupLocalApplication | null;
+    }
   | { status: 'quarantined' }
   | { status: 'refused'; reason: PlayerBackupConflictRefusal };
 
@@ -440,7 +445,10 @@ async function readPendingApplications(
   await transactionComplete(transaction);
   const prefix = playerBackupApplicationKey(runId, '');
   return rows.filter(
-    row => typeof row.key === 'string' && row.key.startsWith(prefix)
+    row =>
+      typeof row.key === 'string' &&
+      row.key.startsWith(prefix) &&
+      row.version === 1
   );
 }
 
@@ -625,8 +633,10 @@ async function resolveInLock(
     if (!resolution) throw new Error(RESOLUTION_MISSING);
     // A caller that crashed between the resolution and the roster write is
     // handed the recorded change again, until it acknowledges it.
+    // Selected by conflict, not by character: one character may resolve more
+    // than one conflict in a run, each owing its own roster change.
     const pending = (await readPendingApplications(database, run.runId)).find(
-      record => record.sourceLegacyId === conflict.legacyId
+      record => record.conflictId === conflict.conflictId
     );
     return {
       status: 'resolved',
@@ -680,11 +690,13 @@ async function resolveInLock(
     if (restored.comparison !== 'identical') {
       // The restored row now contests the local one: all three ordinary
       // resolutions become available against the refreshed candidate.
-      return { status: 'restored', outcome: 'unresolved' };
+      return { status: 'restored', outcome: 'unresolved', apply: null };
     }
     const applied = await applyResolution(context, 'use-cloud');
+    // The attach is an ordinary use-cloud resolution, so it owes the same
+    // durable roster change: it is handed to the caller rather than dropped.
     return applied.status === 'resolved'
-      ? { status: 'restored', outcome: 'attached' }
+      ? { status: 'restored', outcome: 'attached', apply: applied.apply }
       : applied;
   }
   if (archived) {
