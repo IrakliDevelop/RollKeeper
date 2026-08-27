@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
 import {
@@ -21,16 +21,104 @@ import {
   requestResult,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { createMemoryCharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
+import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 
 import {
+  PlayerBackupCloudPreviewError,
+  previewPlayerBackupCloud,
+} from '../playerBackupCloudPreview';
+import {
+  PlayerBackupEligibilityChangedError,
   PlayerBackupReadOnlyCoordinator,
+  confirmDegradedPlayerBackupConsent,
   confirmPlayerBackupConsent,
   continuePlayerBackupLocalPreparation,
 } from '../playerBackupCoordinator';
+import { classifyDegradedEligibility } from '../playerBackupEligibility';
+import type { PlayerBackupExecutionResult } from '../playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
 import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
+import { playerBackupExecutionPath } from '../playerBackupRunRepository';
 
 const RAW = '{"state":{"characters":[{"id":"hero-a"}]},"version":1}';
+
+function fakeResult(
+  accountId: string,
+  overrides: Partial<PlayerBackupExecutionResult> = {}
+): PlayerBackupExecutionResult {
+  return {
+    runId: 'run-a',
+    accountId,
+    mode: 'one-time',
+    executionPath: 'integrated',
+    protected: ['hero-a'],
+    queued: [],
+    offline: [],
+    authRequired: [],
+    needsAttention: [],
+    heldAside: [],
+    failed: [],
+    pending: [],
+    outcomes: { 'hero-a': { outcome: 'protected', reason: null } },
+    complete: true,
+    ...overrides,
+  };
+}
+
+const HERO_A = {
+  id: 'hero-a',
+  name: 'Hero A',
+  characterData: { id: 'hero-a', revision: 5 },
+};
+const HERO_B = {
+  id: 'hero-b',
+  name: 'Hero B',
+  characterData: { id: 'hero-b', revision: 5 },
+};
+
+function cloudRow(payload: unknown): CharacterCloudRow {
+  return {
+    id: 'cloud-b',
+    legacy_client_id: 'hero-b',
+    name: 'Hero B',
+    payload,
+    schema_version: 1,
+    client_revision: 1,
+    server_version: 1,
+    deleted_at: null,
+    created_at: '2026-08-26T00:00:00.000Z',
+    updated_at: '2026-08-26T00:00:00.000Z',
+  };
+}
+
+function cloudDouble(options: {
+  rows: CharacterCloudRow[];
+  accountId?: string;
+  expectedAccountId?: string;
+}) {
+  const gateway = {
+    list: vi.fn(async () => options.rows),
+    put: vi.fn(),
+  };
+  const auth = {
+    getUser: vi.fn(async () => ({
+      data: { user: { id: options.accountId ?? 'account-a' } },
+    })),
+  };
+  const read = vi.fn(() =>
+    previewPlayerBackupCloud({
+      auth,
+      gateway,
+      ...(options.expectedAccountId
+        ? { expectedAccountId: options.expectedAccountId }
+        : {}),
+      localCharacters: [HERO_A, HERO_B],
+    })
+  );
+  return { gateway, auth, read };
+}
 
 class ImmediateLocks implements PlayerBackupExclusiveLockProvider {
   async request<T>(
@@ -100,6 +188,8 @@ describe('player backup local preparation coordinator', () => {
       confirmedAt: '2026-08-26T10:00:00.000Z',
     });
     expect(confirmed.stage).toBe('confirmed');
+    expect(confirmed.executionPath).toBeUndefined();
+    expect(playerBackupExecutionPath(confirmed)).toBe('integrated');
     expect(
       localStorage.getItem(characterCutoverSelectionKey('guest'))
     ).toBeNull();
@@ -601,5 +691,284 @@ describe('player backup local preparation coordinator', () => {
     expect(readCharacterCutoverSelection(localStorage, 'guest')).toEqual(
       rebound
     );
+  });
+
+  describe('degraded manual consent', () => {
+    it('aborts the whole confirmation with zero writes when a selected row becomes contested under the lock', async () => {
+      const { bundle, receipts } = await safety();
+      const links = createMemoryCharacterCloudLinkRepository();
+      const preflight = cloudDouble({
+        rows: [cloudRow(HERO_B)],
+        expectedAccountId: 'account-a',
+      });
+      const preflightSnapshot = classifyDegradedEligibility({
+        preview: await preflight.read(),
+        links,
+      });
+      expect(preflightSnapshot.characters.map(entry => entry.reason)).toEqual([
+        'missing',
+        'identical',
+      ]);
+      expect(preflightSnapshot.eligibleCharacterIds).toEqual([
+        'hero-a',
+        'hero-b',
+      ]);
+
+      const drifted = cloudDouble({
+        rows: [cloudRow({ ...HERO_B, name: 'Hero B renamed' })],
+        expectedAccountId: 'account-a',
+      });
+      const failure: unknown = await confirmDegradedPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-degraded',
+        eligibleCharacterIds: ['hero-a', 'hero-b'],
+        selectedCharacterIds: ['hero-a', 'hero-b'],
+        clearedCharacterIds: [],
+        broadSafetyBundle: bundle,
+        authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+        confirmedAt: '2026-08-26T10:00:00.000Z',
+        preview: drifted.read,
+        links,
+      }).then(
+        () => null,
+        cause => cause
+      );
+      expect(failure).toBeInstanceOf(PlayerBackupEligibilityChangedError);
+      expect(failure).toMatchObject({
+        name: 'PlayerBackupEligibilityChangedError',
+        message: 'Online eligibility changed before confirmation',
+        changedCharacterIds: ['hero-b'],
+      });
+
+      await expect(
+        openExistingRollkeeperDatabase({ factory: indexedDB })
+      ).resolves.toBeNull();
+      await new Promise(resolve => setTimeout(resolve, 0));
+      await expect(indexedDB.databases()).resolves.not.toContainEqual(
+        expect.objectContaining({ name: 'rollkeeper-local' })
+      );
+      expect(links.get('account-a', 'hero-a')).toBeNull();
+      expect(links.get('account-a', 'hero-b')).toBeNull();
+      expect(drifted.gateway.put).not.toHaveBeenCalled();
+      expect(
+        localStorage.getItem(characterCutoverSelectionKey('guest'))
+      ).toBeNull();
+    });
+
+    it('commits a degraded one-time run that never prepares local authority', async () => {
+      const { bundle, receipts } = await safety();
+      const links = createMemoryCharacterCloudLinkRepository();
+      const cloud = cloudDouble({
+        rows: [cloudRow(HERO_B)],
+        expectedAccountId: 'account-a',
+      });
+      const run = await confirmDegradedPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-degraded',
+        eligibleCharacterIds: ['hero-a', 'hero-b'],
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: ['hero-b'],
+        broadSafetyBundle: bundle,
+        authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+        confirmedAt: '2026-08-26T10:00:00.000Z',
+        preview: cloud.read,
+        links,
+      });
+      expect(run).toMatchObject({
+        executionPath: 'degraded-manual',
+        mode: 'one-time',
+        futureDefault: 'off',
+        stage: 'confirmed',
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: ['hero-b'],
+      });
+      expect(playerBackupExecutionPath(run)).toBe('degraded-manual');
+      expect(cloud.read).toHaveBeenCalledOnce();
+      expect(cloud.gateway.put).not.toHaveBeenCalled();
+
+      const database = await openExistingRollkeeperDatabase({
+        factory: indexedDB,
+      });
+      const acknowledged = await new AutomaticCharacterSyncPreferences(
+        database!
+      ).readConfirmedSelection('user:account-a', ['hero-a', 'hero-b']);
+      database!.close();
+      expect(acknowledged).toEqual({
+        characterPolicies: { 'hero-a': 'off', 'hero-b': 'off' },
+        futureDefault: 'off',
+        confirmedAt: '2026-08-26T10:00:00.000Z',
+      });
+
+      await expect(
+        continuePlayerBackupLocalPreparation({
+          factory: indexedDB,
+          storage: localStorage,
+          locks: new ImmediateLocks(),
+          receipts,
+          accountId: 'account-a',
+          appVersion: 'test',
+          ownerId: 'tab-a',
+          now: () => '2026-08-26T10:05:00.000Z',
+          nowMs: () => 1,
+        })
+      ).rejects.toThrow(
+        'Degraded manual backup never prepares local authority'
+      );
+      expect(
+        localStorage.getItem(characterCutoverSelectionKey('guest'))
+      ).toBeNull();
+
+      const passive = new PlayerBackupReadOnlyCoordinator();
+      passive.changeAccount('account-a');
+      await expect(passive.discoverRun(indexedDB)).resolves.toMatchObject({
+        runId: 'run-degraded',
+        stage: 'confirmed',
+        executionPath: 'degraded-manual',
+      });
+    });
+
+    it('rejects a changed account under the lock before any write', async () => {
+      const { bundle, receipts } = await safety();
+      const links = createMemoryCharacterCloudLinkRepository();
+      // No expectedAccountId, so the coordinator's own account guard is exercised.
+      const cloud = cloudDouble({ rows: [], accountId: 'account-b' });
+      const failure: unknown = await confirmDegradedPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-degraded',
+        eligibleCharacterIds: ['hero-a'],
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: [],
+        broadSafetyBundle: bundle,
+        authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+        confirmedAt: '2026-08-26T10:00:00.000Z',
+        preview: cloud.read,
+        links,
+      }).then(
+        () => null,
+        cause => cause
+      );
+      expect(failure).toBeInstanceOf(PlayerBackupCloudPreviewError);
+      expect(failure).toMatchObject({ category: 'account-changed' });
+      await expect(
+        openExistingRollkeeperDatabase({ factory: indexedDB })
+      ).resolves.toBeNull();
+      expect(cloud.gateway.put).not.toHaveBeenCalled();
+    });
+
+    it('fails closed without lock capability', async () => {
+      const { bundle, receipts } = await safety();
+      const links = createMemoryCharacterCloudLinkRepository();
+      const cloud = cloudDouble({
+        rows: [cloudRow(HERO_B)],
+        expectedAccountId: 'account-a',
+      });
+      await expect(
+        confirmDegradedPlayerBackupConsent({
+          factory: indexedDB,
+          storage: localStorage,
+          locks: null,
+          receipts,
+          accountId: 'account-a',
+          expectedActiveRunId: null,
+          runId: 'run-degraded',
+          eligibleCharacterIds: ['hero-a', 'hero-b'],
+          selectedCharacterIds: ['hero-a', 'hero-b'],
+          clearedCharacterIds: [],
+          broadSafetyBundle: bundle,
+          authority: {
+            kind: 'legacy',
+            namespace: 'guest',
+            family: 'character',
+          },
+          confirmedAt: '2026-08-26T10:00:00.000Z',
+          preview: cloud.read,
+          links,
+        })
+      ).rejects.toBeInstanceOf(PlayerBackupLockUnavailableError);
+      expect(cloud.read).not.toHaveBeenCalled();
+      expect(cloud.gateway.list).not.toHaveBeenCalled();
+      await expect(
+        openExistingRollkeeperDatabase({ factory: indexedDB })
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe('account-token result state', () => {
+    it('applies a current-account result', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      const result = fakeResult('account-a');
+
+      await expect(
+        coordinator.loadResult('account-a', async () => result)
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        result,
+        resultLoading: false,
+      });
+    });
+
+    it('discards a result resolving after changeAccount switches away', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      let releaseLoader: (() => void) | undefined;
+      const pending = new Promise<PlayerBackupExecutionResult>(resolve => {
+        releaseLoader = () => resolve(fakeResult('account-a'));
+      });
+
+      const loading = coordinator.loadResult('account-a', () => pending);
+      coordinator.changeAccount('account-b');
+      releaseLoader!();
+
+      await expect(loading).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        result: null,
+      });
+    });
+
+    it('discards a result whose accountId differs from the requested account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+
+      await expect(
+        coordinator.loadResult('account-a', async () => fakeResult('account-b'))
+      ).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        result: null,
+      });
+    });
+
+    it('switches the coordinator account first when loadResult targets a different account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      const result = fakeResult('account-b');
+
+      await expect(
+        coordinator.loadResult('account-b', async () => result)
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        result,
+        resultLoading: false,
+      });
+    });
   });
 });

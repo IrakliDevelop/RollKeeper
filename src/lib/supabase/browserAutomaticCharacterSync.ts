@@ -6,6 +6,8 @@ import {
 import { readCharacterAuthority } from '@/lib/indexeddb/characterAuthority';
 import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
+import { createPlayerBackupDispatchGuard } from '@/lib/playerBackup/playerBackupOngoingExecution';
 
 import { createSupabaseBrowserClient } from './browser';
 import { AutomaticCharacterSyncCoordinator } from './automaticCharacterSyncCoordinator';
@@ -127,6 +129,18 @@ export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAuto
     featureEnabled: true,
     repository,
     gateway,
+    ...(isPlayerBackupWizardVisible()
+      ? {
+          dispatchGuard: createPlayerBackupDispatchGuard({
+            factory: indexedDB,
+            locks:
+              typeof navigator !== 'undefined' && navigator.locks
+                ? navigator.locks
+                : null,
+            accountId,
+          }),
+        }
+      : {}),
   });
   const puller = new AutomaticCharacterSyncPuller({
     namespace,

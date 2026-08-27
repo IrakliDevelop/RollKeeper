@@ -270,4 +270,152 @@ describe('IndexedDbAutomaticCharacterSyncRepository', () => {
       baseServerVersion: 2,
     });
   });
+
+  it('writes origin-aware initial work inside a caller transaction and preserves the origin through work transitions', async () => {
+    const repo = repository();
+    const transaction = database.transaction(
+      ['documents', 'outbox', 'tombstones'],
+      'readwrite'
+    );
+    const result = await repo.writeMutationInTransaction(
+      transaction,
+      mutation({ originPlayerBackupRunId: 'run-a' }),
+      { mutationId: 'mutation-run-a' }
+    );
+    await transactionComplete(transaction);
+    expect(result).toEqual({ saved: true, mutationId: 'mutation-run-a' });
+
+    const read = database.transaction(['documents', 'outbox'], 'readonly');
+    const document = await requestResult(
+      read.objectStore('documents').get([NAMESPACE, 'character', 'character-a'])
+    );
+    const outbox = await requestResult(
+      read.objectStore('outbox').get('mutation-run-a')
+    );
+    await transactionComplete(read);
+    expect(document).toMatchObject({ originPlayerBackupRunId: 'run-a' });
+    expect(outbox).toMatchObject({ originPlayerBackupRunId: 'run-a' });
+
+    await repo.updateWork('mutation-run-a', {
+      state: 'retry',
+      nextAttemptAt: 1_000,
+      lastError: 'temporary',
+    });
+    await expect(repo.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        originPlayerBackupRunId: 'run-a',
+        state: 'retry',
+      }),
+    ]);
+
+    await repo.markInflight('mutation-run-a');
+    await expect(repo.listOutbox(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        originPlayerBackupRunId: 'run-a',
+        state: 'inflight',
+      }),
+    ]);
+
+    const [entry] = await repo.listOutbox(NAMESPACE);
+    await repo.preserveConflict(
+      entry,
+      { id: 'cloud-a' },
+      '2026-02-02T00:00:00Z'
+    );
+    await expect(repo.listConflicts(NAMESPACE)).resolves.toEqual([
+      expect.objectContaining({
+        localCandidate: expect.objectContaining({
+          originPlayerBackupRunId: 'run-a',
+        }),
+      }),
+    ]);
+
+    await repo.acknowledge(entry, 'cloud-a', 2);
+    await expect(
+      repo.getDocument(NAMESPACE, 'character-a')
+    ).resolves.toMatchObject({
+      originPlayerBackupRunId: 'run-a',
+      cloudId: 'cloud-a',
+      baseServerVersion: 2,
+    });
+  });
+
+  it('aborting the caller transaction leaves no document or outbox entry', async () => {
+    const repo = repository();
+    const transaction = database.transaction(
+      ['documents', 'outbox', 'tombstones'],
+      'readwrite'
+    );
+    const completion = transactionComplete(transaction);
+    const result = await repo.writeMutationInTransaction(
+      transaction,
+      mutation(),
+      { mutationId: 'mutation-abort' }
+    );
+    expect(result).toEqual({ saved: true, mutationId: 'mutation-abort' });
+    transaction.abort();
+    await expect(completion).rejects.toThrow();
+
+    const read = database.transaction(['documents', 'outbox'], 'readonly');
+    const document = await requestResult(
+      read.objectStore('documents').get([NAMESPACE, 'character', 'character-a'])
+    );
+    const outbox = await requestResult(
+      read.objectStore('outbox').get('mutation-abort')
+    );
+    await transactionComplete(read);
+    expect(document).toBeUndefined();
+    expect(outbox).toBeUndefined();
+  });
+
+  it('refuses guest and tombstoned aggregates inside a caller transaction without writing', async () => {
+    const repo = repository();
+
+    const guestTransaction = database.transaction(
+      ['documents', 'outbox', 'tombstones'],
+      'readwrite'
+    );
+    await expect(
+      repo.writeMutationInTransaction(
+        guestTransaction,
+        mutation({ namespace: 'guest' }),
+        { mutationId: 'mutation-guest' }
+      )
+    ).resolves.toEqual({ saved: false, reason: 'guest' });
+    await transactionComplete(guestTransaction);
+
+    await repo.commit(mutation());
+    await repo.commit(
+      mutation({
+        operation: 'delete',
+        localRevision: 2,
+        payload: null,
+        contentFingerprint: 'deleted',
+      })
+    );
+
+    const tombstoneTransaction = database.transaction(
+      ['documents', 'outbox', 'tombstones'],
+      'readwrite'
+    );
+    await expect(
+      repo.writeMutationInTransaction(
+        tombstoneTransaction,
+        mutation({
+          localRevision: 3,
+          payload: { id: 'character-a', name: 'stale' },
+        }),
+        { mutationId: 'mutation-stale' }
+      )
+    ).resolves.toEqual({ saved: false, reason: 'tombstoned' });
+    await transactionComplete(tombstoneTransaction);
+
+    const outbox = await repo.listOutbox(NAMESPACE);
+    expect(
+      outbox.find(entry => entry.mutationId === 'mutation-stale')
+    ).toBeUndefined();
+    expect(
+      outbox.find(entry => entry.mutationId === 'mutation-guest')
+    ).toBeUndefined();
+  });
 });

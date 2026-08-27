@@ -30,13 +30,22 @@ import {
 import { withMigrationLock } from '@/lib/indexeddb/migrationLock';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 
+import type { CharacterCloudLinkRepository } from '@/lib/supabase/characterCloudLinks';
+
 import type { PlayerBackupCloudPreview } from './playerBackupCloudPreview';
-import { PlayerBackupCloudPreviewController } from './playerBackupCloudPreview';
+import {
+  PlayerBackupCloudPreviewController,
+  PlayerBackupCloudPreviewError,
+} from './playerBackupCloudPreview';
+import type { PlayerBackupExecutionResult } from './playerBackupOnlineExecution';
 import { rebindPlayerBackupActiveSelection } from './playerBackupActiveSelection';
+import { classifyDegradedEligibility } from './playerBackupEligibility';
 import {
   advancePlayerBackupRunToLocalReady,
   type PlayerBackupAuthoritySnapshot,
+  type PlayerBackupExecutionPath,
   type PlayerBackupRunV1,
+  playerBackupExecutionPath,
   readActivePlayerBackupRun,
 } from './playerBackupRunRepository';
 import {
@@ -55,10 +64,16 @@ export class PlayerBackupReadOnlyCoordinator {
   readonly cloud = new PlayerBackupCloudPreviewController();
   private accountId: string | null = null;
   private run: PlayerBackupRunV1 | null = null;
+  private resultToken = 0;
+  private result: PlayerBackupExecutionResult | null = null;
+  private resultLoading = false;
 
   changeAccount(accountId: string | null): void {
     this.accountId = accountId;
     this.run = null;
+    this.resultToken += 1;
+    this.result = null;
+    this.resultLoading = false;
     this.cloud.changeAccount(accountId);
   }
 
@@ -67,6 +82,8 @@ export class PlayerBackupReadOnlyCoordinator {
       accountId: this.accountId,
       run: this.run,
       cloud: this.cloud.snapshot(),
+      result: this.result,
+      resultLoading: this.resultLoading,
     };
   }
 
@@ -86,6 +103,40 @@ export class PlayerBackupReadOnlyCoordinator {
   ): Promise<boolean> {
     if (this.accountId !== accountId) this.changeAccount(accountId);
     return this.cloud.load(accountId, loader);
+  }
+
+  /**
+   * Mirrors `cloud.load`'s token/account guard: a result is applied only when
+   * this call's token and account are still current and the loaded result's
+   * own `accountId` matches. `changeAccount` bumps the token synchronously, so
+   * a result that resolves after the account switched is discarded.
+   */
+  async loadResult(
+    accountId: string,
+    loader: () => Promise<PlayerBackupExecutionResult>
+  ): Promise<boolean> {
+    if (this.accountId !== accountId) this.changeAccount(accountId);
+    const requestToken = ++this.resultToken;
+    this.resultLoading = true;
+    try {
+      const result = await loader();
+      if (
+        requestToken !== this.resultToken ||
+        this.accountId !== accountId ||
+        result.accountId !== accountId
+      ) {
+        return false;
+      }
+      this.result = result;
+      this.resultLoading = false;
+      return true;
+    } catch (cause) {
+      if (requestToken !== this.resultToken || this.accountId !== accountId) {
+        return false;
+      }
+      this.resultLoading = false;
+      throw cause;
+    }
   }
 }
 
@@ -111,6 +162,14 @@ async function protectedEntryDigest(
   return computeManifestHash(protectedEntries(bundle.entries, authority));
 }
 
+export class PlayerBackupEligibilityChangedError extends Error {
+  readonly name = 'PlayerBackupEligibilityChangedError';
+
+  constructor(readonly changedCharacterIds: string[]) {
+    super('Online eligibility changed before confirmation');
+  }
+}
+
 export async function confirmPlayerBackupConsent(options: {
   factory: IDBFactory;
   storage: Storage;
@@ -129,10 +188,17 @@ export async function confirmPlayerBackupConsent(options: {
   >;
   authority: PlayerBackupAuthoritySnapshot;
   confirmedAt: string;
+  executionPath?: PlayerBackupExecutionPath;
+  /**
+   * Awaited as the first statement inside the account lock, before any safety
+   * read or database open, so a throw leaves the confirmation without writes.
+   */
+  recheckUnderLock?: () => Promise<void>;
 }): Promise<PlayerBackupRunV1> {
   return withPlayerBackupAccountLock(
     { accountId: options.accountId, locks: options.locks },
     async () => {
+      if (options.recheckUnderLock) await options.recheckUnderLock();
       await assertFreshVerifiedBroadSafetyFile({
         bundle: options.broadSafetyBundle,
         storage: options.storage,
@@ -227,6 +293,9 @@ export async function confirmPlayerBackupConsent(options: {
         authority: structuredClone(options.authority),
         confirmedAt: options.confirmedAt,
         stage: 'confirmed',
+        ...(options.executionPath
+          ? { executionPath: options.executionPath }
+          : {}),
         characterCheckpoints: Object.fromEntries(
           options.selectedCharacterIds.map(id => [
             id,
@@ -274,6 +343,51 @@ export async function confirmPlayerBackupConsent(options: {
       return run;
     }
   );
+}
+
+/**
+ * Confirms a one-time degraded manual run. The eligibility recheck runs inside
+ * the account lock before any write, so a contested character aborts the whole
+ * confirmation.
+ */
+export async function confirmDegradedPlayerBackupConsent(
+  options: Omit<
+    Parameters<typeof confirmPlayerBackupConsent>[0],
+    'mode' | 'executionPath' | 'recheckUnderLock'
+  > & {
+    preview: () => Promise<PlayerBackupCloudPreview>;
+    links: CharacterCloudLinkRepository;
+  }
+): Promise<PlayerBackupRunV1> {
+  const { preview, links, ...consent } = options;
+  return confirmPlayerBackupConsent({
+    ...consent,
+    mode: 'one-time',
+    executionPath: 'degraded-manual',
+    recheckUnderLock: async () => {
+      const fresh = await preview();
+      if (fresh.account.id !== consent.accountId) {
+        throw new PlayerBackupCloudPreviewError('account-changed');
+      }
+      const snapshot = classifyDegradedEligibility({ preview: fresh, links });
+      const changed = consent.selectedCharacterIds.filter(
+        id => !snapshot.eligibleCharacterIds.includes(id)
+      );
+      if (changed.length) {
+        throw new PlayerBackupEligibilityChangedError(changed);
+      }
+      const present = new Set(fresh.characters.map(entry => entry.legacyId));
+      const absent = [
+        ...new Set([
+          ...consent.clearedCharacterIds,
+          ...consent.eligibleCharacterIds,
+        ]),
+      ].filter(id => !present.has(id));
+      if (absent.length) {
+        throw new PlayerBackupEligibilityChangedError(absent);
+      }
+    },
+  });
 }
 
 async function verifiedReceiptEntries(
@@ -399,6 +513,9 @@ export async function continuePlayerBackupLocalPreparation(options: {
   };
 }): Promise<PlayerBackupRunV1> {
   const discovered = await readCurrentRun(options.accountId, options.factory);
+  if (playerBackupExecutionPath(discovered) === 'degraded-manual') {
+    throw new Error('Degraded manual backup never prepares local authority');
+  }
   if (discovered.stage === 'local-ready') return discovered;
 
   if (discovered.authority.kind === 'indexedDB') {

@@ -25,6 +25,31 @@ export interface AutomaticCharacterSyncGateway {
   list(): Promise<CharacterCloudRow[]>;
 }
 
+/**
+ * Wraps one dispatch attempt. `around` holds the caller's exclusive boundary
+ * (the player backup account lock) for the whole push, refetch and durable
+ * acknowledgement; `authorize` runs inside it, before any state change or
+ * gateway call, and refuses work whose origin run or preference is stale.
+ */
+export type AutomaticSyncDispatchDecision =
+  | 'dispatch'
+  /**
+   * `stale-origin` refuses this one entry only: work from a superseded run must
+   * stop without stopping the character's current work. `preference-off` and
+   * `unavailable` refuse the whole character until it is authorised again.
+   */
+  | { hold: 'stale-origin' | 'preference-off' | 'unavailable' };
+
+export interface AutomaticSyncDispatchGuard {
+  around<T>(
+    entry: AutomaticCharacterOutboxEntry,
+    task: () => Promise<T>
+  ): Promise<T>;
+  authorize(
+    entry: AutomaticCharacterOutboxEntry
+  ): Promise<AutomaticSyncDispatchDecision>;
+}
+
 interface WorkerOptions {
   namespace: StorageNamespace;
   featureEnabled: boolean;
@@ -33,6 +58,7 @@ interface WorkerOptions {
   now?: () => number;
   random?: () => number;
   fingerprint?: (payload: Json) => Promise<string>;
+  dispatchGuard?: AutomaticSyncDispatchGuard;
 }
 
 export type AutomaticSyncRunResult =
@@ -43,7 +69,8 @@ export type AutomaticSyncRunResult =
   | 'auth-required'
   | 'failed'
   | 'conflict'
-  | 'quarantined';
+  | 'quarantined'
+  | 'held';
 
 function retryDelay(attempt: number, random: () => number): number {
   const exponential = Math.min(300_000, 2_000 * 2 ** Math.max(0, attempt - 1));
@@ -89,6 +116,45 @@ export class AutomaticCharacterSyncWorker {
     );
     this.firstDrain = false;
     if (!entry) return 'idle';
+    const guard = this.options.dispatchGuard;
+    if (!guard) return this.dispatch(entry);
+    try {
+      return await guard.around(entry, async () => {
+        const decision = await guard.authorize(entry);
+        if (decision === 'dispatch') return this.dispatch(entry);
+        if (decision.hold === 'stale-origin') {
+          // Only this entry is stale. Pausing the aggregate would also stop
+          // the character's current work, whose preference is still on.
+          await this.options.repository.updateWork(entry.mutationId, {
+            state: 'paused',
+            inflightAt: null,
+          });
+          return 'held' as const;
+        }
+        await this.options.repository.pauseAggregate(
+          this.options.namespace,
+          entry.legacyId
+        );
+        if (entry.state === 'inflight') {
+          // pauseAggregate deliberately leaves inflight work alone, so a
+          // refused reclaimed lease has to be stopped explicitly; without it
+          // nextRunnable keeps returning it and the drain never advances.
+          await this.options.repository.updateWork(entry.mutationId, {
+            state: 'paused',
+            inflightAt: null,
+          });
+        }
+        return 'held' as const;
+      });
+    } catch (cause) {
+      // A guard that cannot take its boundary retains the work for retry.
+      return this.retain(entry, cause);
+    }
+  }
+
+  private async dispatch(
+    entry: AutomaticCharacterOutboxEntry
+  ): Promise<AutomaticSyncRunResult> {
     await this.options.repository.markInflight(entry.mutationId);
     try {
       const result = await this.push(entry);
@@ -119,37 +185,44 @@ export class AutomaticCharacterSyncWorker {
       );
       return 'synced';
     } catch (cause) {
-      const category =
-        cause instanceof CharacterCloudGatewayError ? cause.category : 'failed';
-      if (category === 'auth-required') {
-        await this.options.repository.updateWork(entry.mutationId, {
-          state: 'auth-required',
-          attemptCount: entry.attemptCount + 1,
-          lastError: 'Authentication required',
-          inflightAt: null,
-        });
-        return 'auth-required';
-      }
-      if (category === 'offline') {
-        await this.options.repository.updateWork(entry.mutationId, {
-          state: 'offline',
-          attemptCount: entry.attemptCount + 1,
-          nextAttemptAt: this.now(),
-          lastError: 'Network unavailable',
-          inflightAt: null,
-        });
-        return 'offline';
-      }
-      const attemptCount = entry.attemptCount + 1;
+      return this.retain(entry, cause);
+    }
+  }
+
+  private async retain(
+    entry: AutomaticCharacterOutboxEntry,
+    cause: unknown
+  ): Promise<AutomaticSyncRunResult> {
+    const category =
+      cause instanceof CharacterCloudGatewayError ? cause.category : 'failed';
+    if (category === 'auth-required') {
       await this.options.repository.updateWork(entry.mutationId, {
-        state: 'retry',
-        attemptCount,
-        nextAttemptAt: this.now() + retryDelay(attemptCount, this.random),
-        lastError: cause instanceof Error ? cause.message : 'Cloud sync failed',
+        state: 'auth-required',
+        attemptCount: entry.attemptCount + 1,
+        lastError: 'Authentication required',
         inflightAt: null,
       });
-      return 'failed';
+      return 'auth-required';
     }
+    if (category === 'offline') {
+      await this.options.repository.updateWork(entry.mutationId, {
+        state: 'offline',
+        attemptCount: entry.attemptCount + 1,
+        nextAttemptAt: this.now(),
+        lastError: 'Network unavailable',
+        inflightAt: null,
+      });
+      return 'offline';
+    }
+    const attemptCount = entry.attemptCount + 1;
+    await this.options.repository.updateWork(entry.mutationId, {
+      state: 'retry',
+      attemptCount,
+      nextAttemptAt: this.now() + retryDelay(attemptCount, this.random),
+      lastError: cause instanceof Error ? cause.message : 'Cloud sync failed',
+      inflightAt: null,
+    });
+    return 'failed';
   }
 
   retryNow(legacyId?: string): Promise<void> {

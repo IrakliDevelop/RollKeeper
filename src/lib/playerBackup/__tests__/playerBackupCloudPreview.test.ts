@@ -10,6 +10,7 @@ import {
 
 import {
   PlayerBackupCloudPreviewController,
+  compareCloudRows,
   previewPlayerBackupCloud,
 } from '../playerBackupCloudPreview';
 import type { PlayerBackupCloudPreview } from '../playerBackupCloudPreview';
@@ -190,5 +191,84 @@ describe('read-only player backup cloud preview', () => {
     await expect(indexedDB.databases()).resolves.not.toContainEqual(
       expect.objectContaining({ name: DATABASE_NAME })
     );
+  });
+});
+
+describe('shared cloud row comparison', () => {
+  const HERO_1 = {
+    id: 'hero-1',
+    name: 'Hero',
+    characterData: { id: 'hero-1' },
+  };
+  const HERO_2 = {
+    id: 'hero-2',
+    name: 'Duplicated',
+    characterData: { id: 'hero-2' },
+  };
+  const HERO_3 = {
+    id: 'hero-3',
+    name: 'Future',
+    characterData: { id: 'hero-3' },
+  };
+  const HERO_4 = {
+    id: 'hero-4',
+    name: 'Removed',
+    characterData: { id: 'hero-4' },
+  };
+  const HERO_6 = {
+    id: 'hero-6',
+    name: 'Local only',
+    characterData: { id: 'hero-6' },
+  };
+  const HERO_7 = {
+    id: 'hero-7',
+    name: 'Older locally',
+    characterData: { id: 'hero-7', revision: 1 },
+  };
+
+  const rows = [
+    row(),
+    row({ id: 'cloud-2a', legacy_client_id: 'hero-2' }),
+    row({ id: 'cloud-2b', legacy_client_id: 'hero-2' }),
+    row({ id: 'cloud-3', legacy_client_id: 'hero-3', schema_version: 99 }),
+    row({
+      id: 'cloud-4',
+      legacy_client_id: 'hero-4',
+      deleted_at: '2026-08-26T01:00:00.000Z',
+    }),
+    row({ id: 'cloud-5', legacy_client_id: 'hero-5' }),
+    row({
+      id: 'cloud-7',
+      legacy_client_id: 'hero-7',
+      client_revision: 9,
+      payload: { id: 'hero-7', name: 'Cloud', characterData: { id: 'hero-7' } },
+    }),
+  ];
+  const localCharacters = [HERO_1, HERO_2, HERO_3, HERO_4, HERO_6, HERO_7];
+
+  it('produces exactly the classification previewPlayerBackupCloud publishes', async () => {
+    const preview = await previewPlayerBackupCloud({
+      auth: {
+        getUser: vi
+          .fn()
+          .mockResolvedValue({ data: { user: { id: 'account-a' } } }),
+      },
+      gateway: { list: vi.fn().mockResolvedValue(rows) },
+      localCharacters,
+    });
+
+    const compared = await compareCloudRows(rows, localCharacters);
+
+    expect(compared.characters).toEqual(preview.characters);
+    expect(compared.onlineOnly).toEqual(preview.onlineOnly);
+    expect(compared.characters.map(entry => entry.state)).toEqual([
+      'identical',
+      'unavailable',
+      'future',
+      'removed',
+      'missing',
+      'newer',
+    ]);
+    expect(compared.onlineOnly.map(entry => entry.row.id)).toEqual(['cloud-5']);
   });
 });

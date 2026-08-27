@@ -11,6 +11,7 @@ import {
   createBrowserAutomaticCharacterSync,
   subscribeBrowserAutomaticCharacterAccountChanges,
 } from './browserAutomaticCharacterSync';
+import type { AutomaticCharacterSyncWorker as AutomaticCharacterSyncWorkerType } from './automaticCharacterSyncWorker';
 import { createSupabaseCharacterCloudGateway } from './characterCloudGateway';
 
 vi.mock('./browser', () => ({ createSupabaseBrowserClient: vi.fn() }));
@@ -21,6 +22,31 @@ vi.mock('./characterCloudGateway', async importOriginal => {
   const actual =
     await importOriginal<typeof import('./characterCloudGateway')>();
   return { ...actual, createSupabaseCharacterCloudGateway: vi.fn() };
+});
+
+const workerOptionsCapture = vi.hoisted(() => ({
+  current: null as
+    | ConstructorParameters<typeof AutomaticCharacterSyncWorkerType>[0]
+    | null,
+}));
+
+vi.mock('./automaticCharacterSyncWorker', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('./automaticCharacterSyncWorker')>();
+  class RecordingAutomaticCharacterSyncWorker extends actual.AutomaticCharacterSyncWorker {
+    constructor(
+      options: ConstructorParameters<
+        typeof actual.AutomaticCharacterSyncWorker
+      >[0]
+    ) {
+      workerOptionsCapture.current = options;
+      super(options);
+    }
+  }
+  return {
+    ...actual,
+    AutomaticCharacterSyncWorker: RecordingAutomaticCharacterSyncWorker,
+  };
 });
 
 const selection = {
@@ -373,5 +399,67 @@ describe('browser automatic character sync authority routing', () => {
     ).rejects.toThrow(/IndexedDB/i);
     expect(gateway.put).not.toHaveBeenCalled();
     context!.close();
+  });
+
+  describe('wizard-gated dispatch guard', () => {
+    const originalWizardFlag =
+      process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
+
+    beforeEach(() => {
+      workerOptionsCapture.current = null;
+      localStorage.setItem(
+        characterCutoverSelectionKey('guest'),
+        JSON.stringify(selection)
+      );
+      vi.mocked(createSupabaseBrowserClient).mockReturnValue({
+        auth: {
+          getUser: vi.fn(async () => ({
+            data: { user: { id: 'account-a', email: 'synthetic@localhost' } },
+            error: null,
+          })),
+        },
+      } as never);
+    });
+
+    afterEach(() => {
+      if (originalWizardFlag === undefined) {
+        delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
+      } else {
+        process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE =
+          originalWizardFlag;
+      }
+    });
+
+    it('passes a dispatchGuard to the worker when the wizard is visible', async () => {
+      process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE = 'true';
+
+      const context = await createBrowserAutomaticCharacterSync();
+
+      expect(context).not.toBeNull();
+      expect(workerOptionsCapture.current).not.toBeNull();
+      expect('dispatchGuard' in (workerOptionsCapture.current as object)).toBe(
+        true
+      );
+      expect(workerOptionsCapture.current?.dispatchGuard).toEqual(
+        expect.objectContaining({
+          around: expect.any(Function),
+          authorize: expect.any(Function),
+        })
+      );
+      context!.close();
+    });
+
+    it('omits the dispatchGuard option entirely when the wizard is not visible', async () => {
+      delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
+
+      const context = await createBrowserAutomaticCharacterSync();
+
+      expect(context).not.toBeNull();
+      expect(workerOptionsCapture.current).not.toBeNull();
+      expect('dispatchGuard' in (workerOptionsCapture.current as object)).toBe(
+        false
+      );
+      context!.close();
+    });
   });
 });

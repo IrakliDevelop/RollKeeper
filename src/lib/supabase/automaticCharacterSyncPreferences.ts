@@ -264,6 +264,61 @@ export class AutomaticCharacterSyncPreferences {
     await completion;
   }
 
+  static async readCharacterPolicyInTransaction(
+    meta: IDBObjectStore,
+    namespace: `user:${string}`,
+    legacyId: string
+  ): Promise<'on' | 'off' | null> {
+    const record = (await requestResult(
+      meta.get(automaticCharacterSyncCharacterKey(namespace, legacyId))
+    )) as CharacterPreferenceRecord | undefined;
+    return record?.policy ?? null;
+  }
+
+  static async readAccountDefaultInTransaction(
+    meta: IDBObjectStore,
+    namespace: `user:${string}`
+  ): Promise<{
+    futureDefault: 'on' | 'off';
+    enabledAt: string;
+    confirmedAt: string | null;
+  } | null> {
+    const record = (await requestResult(
+      meta.get(automaticCharacterSyncAccountKey(namespace))
+    )) as AccountDefaultRecord | undefined;
+    if (!record) return null;
+    return {
+      futureDefault: record.futureDefault,
+      enabledAt: record.enabledAt,
+      confirmedAt: record.confirmedAt ?? null,
+    };
+  }
+
+  async setFutureDefault(
+    namespace: StorageNamespace,
+    futureDefault: 'on' | 'off',
+    at: string
+  ): Promise<void> {
+    const userNamespace = accountNamespace(namespace);
+    const transaction = this.database.transaction('meta', 'readwrite');
+    const meta = transaction.objectStore('meta');
+    const key = automaticCharacterSyncAccountKey(userNamespace);
+    const existing = (await requestResult(meta.get(key))) as
+      | AccountDefaultRecord
+      | undefined;
+    const record: AccountDefaultRecord = {
+      key,
+      namespace: userNamespace,
+      futureDefault,
+      enabledAt: futureDefault === 'on' ? at : (existing?.enabledAt ?? at),
+    };
+    if (existing?.confirmedAt !== undefined) {
+      record.confirmedAt = existing.confirmedAt;
+    }
+    meta.put(record);
+    await transactionComplete(transaction);
+  }
+
   async readConfirmedSelection(
     namespace: StorageNamespace,
     eligibleCharacterIds: readonly string[]

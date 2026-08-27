@@ -125,8 +125,9 @@ export class AutomaticCharacterSyncCoordinator {
         continue;
       }
       if (result === 'idle' || result === 'disabled') return;
-      if (result !== 'conflict') return;
-      // A conflict pauses only its aggregate; continue looking for other work.
+      if (result !== 'conflict' && result !== 'held') return;
+      // A conflict or a guard hold pauses only its aggregate; continue
+      // looking for other work.
     }
   }
 }

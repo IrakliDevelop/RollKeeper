@@ -29,6 +29,7 @@ export interface AutomaticCharacterMutation {
   syncPolicy: AutomaticSyncPolicy;
   updatedAt: string;
   cloudId?: string;
+  originPlayerBackupRunId?: string;
 }
 
 export interface AutomaticCharacterDocument extends AutomaticCharacterMutation {
@@ -130,21 +131,10 @@ export class IndexedDbAutomaticCharacterSyncRepository {
     );
     const completed = transactionComplete(transaction);
     try {
-      const documents = transaction.objectStore('documents');
-      const outbox = transaction.objectStore('outbox');
-      const tombstones = transaction.objectStore('tombstones');
-      const aggregateKey = [mutation.namespace, 'character', mutation.legacyId];
-      const [current, tombstone, pending] = await Promise.all([
-        requestResult(documents.get(aggregateKey)) as Promise<
-          AutomaticCharacterDocument | undefined
-        >,
-        requestResult(tombstones.get(aggregateKey)) as Promise<
-          AutomaticCharacterTombstone | undefined
-        >,
-        requestResult(outbox.getAll()) as Promise<
-          AutomaticCharacterOutboxEntry[]
-        >,
-      ]);
+      const { current, tombstone, pending } = await this.readMutationContext(
+        transaction,
+        mutation
+      );
 
       if (mutation.operation !== 'delete' && tombstone) {
         await completed;
@@ -159,45 +149,17 @@ export class IndexedDbAutomaticCharacterSyncRepository {
         return { saved: false, reason: 'failed' };
       }
 
-      for (const entry of pending) {
-        if (entry.state === 'queued' && aggregateMatches(entry, mutation)) {
-          outbox.delete(entry.mutationId);
-        }
-      }
-
-      const document: AutomaticCharacterDocument = {
-        ...structuredClone(mutation),
-        family: 'character',
-        deletedAt: mutation.operation === 'delete' ? mutation.updatedAt : null,
-      };
-      documents.put(document);
-
-      if (mutation.operation === 'delete') {
-        tombstones.put({
-          namespace: mutation.namespace,
-          family: 'character',
-          legacyId: mutation.legacyId,
-          localRevision: mutation.localRevision,
-          deletedAt: mutation.updatedAt,
-          beforeImage: current ? structuredClone(current) : null,
-          mutationId,
-        } satisfies AutomaticCharacterTombstone);
-      }
-
-      outbox.put({
-        ...structuredClone(mutation),
+      const result = this.writeMutation(
+        transaction,
+        mutation,
         mutationId,
-        family: 'character',
-        state: 'queued',
-        attemptCount: 0,
-        nextAttemptAt: 0,
-        lastError: null,
-        inflightAt: null,
-      } satisfies AutomaticCharacterOutboxEntry);
+        current,
+        pending
+      );
 
       if (testHooks.abortTransaction) transaction.abort();
       await completed;
-      return { saved: true, mutationId };
+      return result;
     } catch {
       try {
         transaction.abort();
@@ -211,6 +173,117 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       }
       return { saved: false, reason: 'failed' };
     }
+  }
+
+  /**
+   * Writes the initial document and outbox entry for `mutation` inside a
+   * transaction the caller owns (over at least `['documents', 'outbox',
+   * 'tombstones']`). Semantics match `commit()` minus its `beforeCommit`/
+   * abort test hooks.
+   */
+  async writeMutationInTransaction(
+    transaction: IDBTransaction,
+    mutation: AutomaticCharacterMutation,
+    options: { mutationId: string }
+  ): Promise<AutomaticCommitResult> {
+    if (mutation.namespace === 'guest') {
+      return { saved: false, reason: 'guest' };
+    }
+    const { current, tombstone, pending } = await this.readMutationContext(
+      transaction,
+      mutation
+    );
+    if (mutation.operation !== 'delete' && tombstone) {
+      return { saved: false, reason: 'tombstoned' };
+    }
+    return this.writeMutation(
+      transaction,
+      mutation,
+      options.mutationId,
+      current,
+      pending
+    );
+  }
+
+  private async readMutationContext(
+    transaction: IDBTransaction,
+    mutation: AutomaticCharacterMutation
+  ): Promise<{
+    current: AutomaticCharacterDocument | undefined;
+    tombstone: AutomaticCharacterTombstone | undefined;
+    pending: AutomaticCharacterOutboxEntry[];
+  }> {
+    const documents = transaction.objectStore('documents');
+    const outbox = transaction.objectStore('outbox');
+    const tombstones = transaction.objectStore('tombstones');
+    const aggregateKey = [mutation.namespace, 'character', mutation.legacyId];
+    const [current, tombstone, pending] = await Promise.all([
+      requestResult(documents.get(aggregateKey)) as Promise<
+        AutomaticCharacterDocument | undefined
+      >,
+      requestResult(tombstones.get(aggregateKey)) as Promise<
+        AutomaticCharacterTombstone | undefined
+      >,
+      requestResult(outbox.getAll()) as Promise<
+        AutomaticCharacterOutboxEntry[]
+      >,
+    ]);
+    return { current, tombstone, pending };
+  }
+
+  /**
+   * Performs the document/outbox/tombstone writes shared by `commit()` and
+   * `writeMutationInTransaction()`. Assumes the guest and tombstone checks
+   * have already passed.
+   */
+  private writeMutation(
+    transaction: IDBTransaction,
+    mutation: AutomaticCharacterMutation,
+    mutationId: string,
+    current: AutomaticCharacterDocument | undefined,
+    pending: AutomaticCharacterOutboxEntry[]
+  ): AutomaticCommitResult {
+    const documents = transaction.objectStore('documents');
+    const outbox = transaction.objectStore('outbox');
+    const tombstones = transaction.objectStore('tombstones');
+
+    for (const entry of pending) {
+      if (entry.state === 'queued' && aggregateMatches(entry, mutation)) {
+        outbox.delete(entry.mutationId);
+      }
+    }
+
+    const document: AutomaticCharacterDocument = {
+      ...structuredClone(mutation),
+      family: 'character',
+      deletedAt: mutation.operation === 'delete' ? mutation.updatedAt : null,
+    };
+    documents.put(document);
+
+    if (mutation.operation === 'delete') {
+      tombstones.put({
+        namespace: mutation.namespace,
+        family: 'character',
+        legacyId: mutation.legacyId,
+        localRevision: mutation.localRevision,
+        deletedAt: mutation.updatedAt,
+        beforeImage: current ? structuredClone(current) : null,
+        mutationId,
+      } satisfies AutomaticCharacterTombstone);
+    }
+
+    outbox.put({
+      ...structuredClone(mutation),
+      mutationId,
+      family: 'character',
+      state: 'queued',
+      attemptCount: 0,
+      nextAttemptAt: 0,
+      lastError: null,
+      inflightAt: null,
+    } satisfies AutomaticCharacterOutboxEntry);
+
+    return { saved: true, mutationId };
   }
 
   async listOutbox(
