@@ -9,6 +9,7 @@ import type {
   AutomaticSyncQuarantineRecord,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import { AutomaticCharacterConflictService } from '@/lib/indexeddb/automaticCharacterConflictService';
 import type { ObjectStoreName } from '@/lib/indexeddb/localDatabase';
 import {
   deleteRollkeeperDatabaseForTests,
@@ -47,6 +48,7 @@ import {
   seedPlayerBackupConflict,
   settlePlayerBackupOneTimeConflicts,
 } from '../playerBackupConflictCoordinator';
+import { createPlayerBackupResolutionHook } from '../playerBackupConflictResolution';
 import type { PlayerBackupLocalCharacterSource } from '../playerBackupOnlineExecution';
 import { derivePlayerBackupRunResult } from '../playerBackupOnlineExecution';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
@@ -593,6 +595,52 @@ function settleConflicts(
     links,
     now: () => NOW,
   });
+}
+
+/**
+ * Runs the real resolution transaction with only the fenced hook in play, so
+ * the hook's own assertions are exercised rather than the pre-lock checks.
+ */
+async function resolveWithFencedHook(options: {
+  conflictId: string;
+  expectedActiveRunId: string;
+  resolution: 'keep-mine' | 'use-cloud' | 'keep-both';
+  copyLegacyId?: string;
+}): Promise<'resolved' | 'quarantined'> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    return await new AutomaticCharacterConflictService(database, {
+      randomId: () => 'mutation-hook',
+      now: () => NOW,
+    }).resolve(options.conflictId, options.resolution, {
+      originPlayerBackupRunId: 'run-a',
+      ...(options.copyLegacyId ? { copyLegacyId: options.copyLegacyId } : {}),
+      transactionHook: createPlayerBackupResolutionHook({
+        accountId: ACCOUNT_A,
+        expectedActiveRunId: options.expectedActiveRunId,
+        resolution: options.resolution,
+        ...(options.copyLegacyId ? { copyLegacyId: options.copyLegacyId } : {}),
+        now: () => NOW,
+      }),
+    });
+  } finally {
+    database.close();
+  }
+}
+
+async function writeCharacterPreference(legacyId: string): Promise<void> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    await new AutomaticCharacterSyncPreferences(database).setCharacter(
+      NAMESPACE_A,
+      legacyId,
+      false
+    );
+  } finally {
+    database.close();
+  }
 }
 
 async function readCharacterPolicy(legacyId: string): Promise<string | null> {
@@ -1862,7 +1910,7 @@ describe('resolvePlayerBackupConflict', () => {
     });
   });
 
-  it('aborts at the fence without changing either candidate', async () => {
+  it('refuses a replaced run before the lock without changing either candidate', async () => {
     const { harness, gateway, seeded } = await seedConflictScenario();
     const documentsBefore = await readStore('documents');
     await confirmRun('run-b');
@@ -1891,6 +1939,9 @@ describe('resolvePlayerBackupConflict', () => {
   });
 
   it('two tabs cannot resolve stale work after a newer run wins', async () => {
+    // Tab B waits for the lock, so its pre-lock run read already sees run-b:
+    // the fence refuses it before the resolution transaction opens. The hook's
+    // own assertions are covered by `the resolution transaction fence` below.
     const { harness, gateway, seeded } = await seedConflictScenario();
     const locks = new QueuedLocks();
     let releaseTabA: (() => void) | undefined;
@@ -2126,5 +2177,140 @@ describe('drainPlayerBackupRunWork', () => {
     )) as AutomaticCharacterOutboxEntry[];
     expect(outbox).toHaveLength(1);
     expect(outbox[0]).toMatchObject({ legacyId: 'hero-b', state: 'offline' });
+  });
+});
+
+describe('the resolution transaction fence', () => {
+  it('aborts the resolution transaction when the run pointer moved under the hook', async () => {
+    const { seeded } = await seedConflictScenario();
+    await confirmRun('run-b');
+    const before = await snapshotStores();
+
+    await expect(
+      resolveWithFencedHook({
+        conflictId: seeded.conflictId,
+        expectedActiveRunId: 'run-a',
+        resolution: 'keep-mine',
+      })
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+    expect(await readStore('legacySnapshots')).toEqual([]);
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].state).toBe('conflict');
+    expect(await snapshotStores()).toEqual(before);
+  });
+
+  it('aborts the resolution transaction for a run that is not local-ready', async () => {
+    const { seeded } = await seedConflictScenario();
+    // `run-b` is integrated and current, but it never reached local-ready.
+    await confirmRun('run-b');
+    const before = await snapshotStores();
+
+    await expect(
+      resolveWithFencedHook({
+        conflictId: seeded.conflictId,
+        expectedActiveRunId: 'run-b',
+        resolution: 'keep-mine',
+      })
+    ).rejects.toThrow(
+      'Conflict resolution is not authorised by the active run'
+    );
+
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+    expect(await readStore('legacySnapshots')).toEqual([]);
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox).toHaveLength(1);
+    expect(outbox[0].state).toBe('conflict');
+    expect(await snapshotStores()).toEqual(before);
+  });
+
+  it('refuses a copy id the local stores already hold', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    const [local] = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    await writeRecords('documents', [{ ...local, legacyId: 'hero-copy' }]);
+    const beforeDocument = await snapshotStores();
+    const mintedBefore =
+      harness.identities.generateMutationId.mock.calls.length;
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-both',
+        copyLegacyId: 'hero-copy',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'refused', reason: 'copy-id-collision' });
+    expect(await snapshotStores()).toEqual(beforeDocument);
+    // `resolve` mints the enqueue identity before it opens the transaction;
+    // the aborted transaction discards it without writing anything.
+    expect(harness.identities.generateMutationId.mock.calls.length).toBe(
+      mintedBefore + 1
+    );
+
+    await writeCharacterPreference('hero-spare');
+    const beforePreference = await snapshotStores();
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-both',
+        copyLegacyId: 'hero-spare',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'refused', reason: 'copy-id-collision' });
+    expect(await snapshotStores()).toEqual(beforePreference);
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+  });
+
+  it('quarantines an unsafe candidate and holds the character aside', async () => {
+    const row = cloudRow({ schema_version: 99 });
+    const { harness, gateway, seeded } = await seedConflictScenario({ row });
+
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-mine',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ status: 'quarantined' });
+
+    const quarantine = (await readStore(
+      'quarantine'
+    )) as AutomaticSyncQuarantineRecord[];
+    expect(quarantine).toHaveLength(1);
+    expect(quarantine[0]).toMatchObject({
+      quarantineId: `automatic-sync-quarantine:${seeded.conflictId}`,
+      namespace: NAMESPACE_A,
+      legacyId: 'hero-a',
+    });
+    expect(JSON.parse(quarantine[0].rawValue)).toEqual(row);
+    expect((await readCheckpoints())['hero-a'].online).toMatchObject({
+      kind: 'automatic',
+      state: 'held-aside',
+      reason: 'quarantined',
+      cloudId: row.id,
+      mutationId: 'mutation-1',
+    });
+    expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
+      'unresolved'
+    );
+    expect(await readStore('legacySnapshots')).toEqual([]);
   });
 });

@@ -52,6 +52,7 @@ const NOT_AUTHORISED =
   'Conflict resolution is not authorised by the active run';
 const RESTORE_UNVERIFIED = 'Cloud restore verification failed';
 const RESOLUTION_MISSING = 'Resolved conflict has no recorded resolution';
+const DOCUMENT_MISSING = 'Resolved character document is missing';
 
 /** Thrown inside the resolution hook so the whole transaction aborts. */
 export class PlayerBackupCopyIdCollisionError extends Error {
@@ -302,65 +303,83 @@ async function restoreArchivedCandidate(
 // Resolution
 // ---------------------------------------------------------------------------
 
+/** @internal Exported so the in-transaction fence can be tested directly. */
+export interface PlayerBackupResolutionHookOptions {
+  accountId: string;
+  expectedActiveRunId: string;
+  resolution: 'keep-mine' | 'use-cloud' | 'keep-both';
+  copyLegacyId?: string;
+  now: () => string;
+}
+
 /**
- * Runs inside the resolution transaction, after the conflict is re-read and
- * before any write. It only ever awaits requests on that transaction: the run
- * fence, the keep-both collision reads, the copy's explicit `off` preference
- * and the run checkpoint. It never touches the conflict record.
+ * Builds the hook that runs inside the resolution transaction, after the
+ * conflict is re-read and before any write. It only ever awaits requests on
+ * that transaction: the run fence, the keep-both collision reads, the copy's
+ * explicit `off` preference and the run checkpoint. It never touches the
+ * conflict record, and any throw aborts the whole resolution.
+ *
+ * @internal Exported for direct fence tests; production callers reach it
+ * through `resolvePlayerBackupConflict`.
  */
-async function resolutionHook(
-  context: ResolutionContext,
-  resolution: AppliedResolution,
-  transaction: IDBTransaction,
-  current: AutomaticCharacterConflict,
-  plan: { enqueuedMutationId: string | null }
-): Promise<void> {
-  const { options } = context;
-  const meta = transaction.objectStore('meta');
-  const fenced = await assertResolvableConflict(meta, {
-    accountId: options.accountId,
-    expectedActiveRunId: options.expectedActiveRunId,
-    legacyId: current.legacyId,
-    namespace: current.namespace,
-  });
+export function createPlayerBackupResolutionHook(
+  options: PlayerBackupResolutionHookOptions
+): {
+  run(
+    transaction: IDBTransaction,
+    current: AutomaticCharacterConflict,
+    plan: { enqueuedMutationId: string | null }
+  ): Promise<void>;
+} {
+  return {
+    async run(transaction, current, plan) {
+      const meta = transaction.objectStore('meta');
+      const fenced = await assertResolvableConflict(meta, {
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        legacyId: current.legacyId,
+        namespace: current.namespace,
+      });
 
-  if (resolution === 'keep-both') {
-    const copyLegacyId = options.copyLegacyId as string;
-    const copyDocument = await requestResult(
-      transaction
-        .objectStore('documents')
-        .get([fenced.namespace, 'character', copyLegacyId])
-    );
-    const copyPolicy =
-      await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
-        meta,
-        fenced.namespace,
-        copyLegacyId
-      );
-    if (copyDocument || copyPolicy !== null) {
-      throw new PlayerBackupCopyIdCollisionError();
-    }
-    AutomaticCharacterSyncPreferences.writeCharacterPolicyInTransaction(
-      meta,
-      fenced.namespace,
-      copyLegacyId,
-      'off'
-    );
-  }
+      if (options.resolution === 'keep-both') {
+        const copyLegacyId = options.copyLegacyId as string;
+        const copyDocument = await requestResult(
+          transaction
+            .objectStore('documents')
+            .get([fenced.namespace, 'character', copyLegacyId])
+        );
+        const copyPolicy =
+          await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+            meta,
+            fenced.namespace,
+            copyLegacyId
+          );
+        if (copyDocument || copyPolicy !== null) {
+          throw new PlayerBackupCopyIdCollisionError();
+        }
+        AutomaticCharacterSyncPreferences.writeCharacterPolicyInTransaction(
+          meta,
+          fenced.namespace,
+          copyLegacyId,
+          'off'
+        );
+      }
 
-  await updatePlayerBackupCharacterCheckpoint(meta, {
-    accountId: options.accountId,
-    expectedActiveRunId: options.expectedActiveRunId,
-    legacyId: current.legacyId,
-    online: onlineCheckpoint({
-      kind: 'automatic',
-      state: plan.enqueuedMutationId ? 'queued' : 'pending',
-      cloudId: (current.cloudCandidate as CharacterCloudRow).id,
-      mutationId: plan.enqueuedMutationId ?? current.mutationId,
-      recordedAt: options.now(),
-      reason: `resolved:${resolution}`,
-    }),
-  });
+      await updatePlayerBackupCharacterCheckpoint(meta, {
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        legacyId: current.legacyId,
+        online: onlineCheckpoint({
+          kind: 'automatic',
+          state: plan.enqueuedMutationId ? 'queued' : 'pending',
+          cloudId: (current.cloudCandidate as CharacterCloudRow).id,
+          mutationId: plan.enqueuedMutationId ?? current.mutationId,
+          recordedAt: options.now(),
+          reason: `resolved:${options.resolution}`,
+        }),
+      });
+    },
+  };
 }
 
 /** The winning document the caller must mirror into the local roster. */
@@ -377,7 +396,11 @@ async function applicationFor(
     context.conflict.namespace,
     legacyId
   );
-  if (!document || document.payload === null) return null;
+  if (!document || document.payload === null) {
+    // The resolution transaction committed this document, so its absence means
+    // the local stores no longer support the decision the caller was given.
+    throw new Error(DOCUMENT_MISSING);
+  }
   return {
     kind: resolution === 'use-cloud' ? 'replace' : 'add',
     legacyId,
@@ -396,10 +419,13 @@ async function applyResolution(
     outcome = await context.service.resolve(options.conflictId, resolution, {
       ...(options.copyLegacyId ? { copyLegacyId: options.copyLegacyId } : {}),
       originPlayerBackupRunId: context.run.runId,
-      transactionHook: {
-        run: (transaction, current, plan) =>
-          resolutionHook(context, resolution, transaction, current, plan),
-      },
+      transactionHook: createPlayerBackupResolutionHook({
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        resolution,
+        ...(options.copyLegacyId ? { copyLegacyId: options.copyLegacyId } : {}),
+        now: options.now,
+      }),
     });
   } catch (cause) {
     if (cause instanceof PlayerBackupCopyIdCollisionError) {
