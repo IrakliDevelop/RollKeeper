@@ -264,6 +264,25 @@ export class AutomaticCharacterSyncPreferences {
     await completion;
   }
 
+  /**
+   * Writes the same per-character preference record as `setCharacter()` on a
+   * `meta` store the caller owns.
+   */
+  static writeCharacterPolicyInTransaction(
+    meta: IDBObjectStore,
+    namespace: `user:${string}`,
+    legacyId: string,
+    policy: 'on' | 'off'
+  ): void {
+    meta.put({
+      key: automaticCharacterSyncCharacterKey(namespace, legacyId),
+      namespace,
+      legacyId,
+      policy,
+      explicit: true,
+    } satisfies CharacterPreferenceRecord);
+  }
+
   static async readCharacterPolicyInTransaction(
     meta: IDBObjectStore,
     namespace: `user:${string}`,

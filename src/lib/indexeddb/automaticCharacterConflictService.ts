@@ -20,6 +20,25 @@ interface ConflictServiceOptions {
   now?: () => string;
 }
 
+export interface AutomaticConflictResolutionOptions {
+  copyLegacyId?: string;
+  /**
+   * Runs inside the resolution transaction after the conflict is re-read and
+   * before any write; throwing aborts everything. When present the transaction
+   * also includes 'meta' plus `stores`.
+   */
+  transactionHook?: {
+    stores?: readonly string[];
+    run(
+      transaction: IDBTransaction,
+      conflict: AutomaticCharacterConflict,
+      plan: { enqueuedMutationId: string | null }
+    ): Promise<void>;
+  };
+  /** Stamped on the outbox entry that keep-mine / keep-both enqueue. */
+  originPlayerBackupRunId?: string;
+}
+
 interface ConflictSnapshot {
   runId: string;
   key: string;
@@ -44,6 +63,14 @@ interface AutomaticSyncQuarantine {
 
 function json(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function abortQuietly(transaction: IDBTransaction): void {
+  try {
+    transaction.abort();
+  } catch {
+    // The transaction may already have completed or aborted.
+  }
 }
 
 function snapshot(
@@ -118,7 +145,7 @@ export class AutomaticCharacterConflictService {
   async resolve(
     conflictId: string,
     resolution: AutomaticConflictResolution,
-    options: { copyLegacyId?: string } = {}
+    options: AutomaticConflictResolutionOptions = {}
   ): Promise<'resolved' | 'quarantined'> {
     const conflict = await this.getConflict(conflictId);
     if (!conflict) throw new Error('Automatic sync conflict was not found');
@@ -152,14 +179,54 @@ export class AutomaticCharacterConflictService {
     }
 
     const now = this.now();
+    const hook = options.transactionHook;
+    const enqueuedMutationId =
+      resolution === 'use-cloud' ? null : this.randomId();
     const transaction = this.database.transaction(
-      ['documents', 'outbox', 'conflicts', 'legacySnapshots'],
+      Array.from(
+        new Set([
+          'documents',
+          'outbox',
+          'conflicts',
+          'legacySnapshots',
+          ...(hook ? ['meta', ...(hook.stores ?? [])] : []),
+        ])
+      ),
       'readwrite'
     );
     const documents = transaction.objectStore('documents');
     const outbox = transaction.objectStore('outbox');
     const conflicts = transaction.objectStore('conflicts');
     const snapshots = transaction.objectStore('legacySnapshots');
+
+    const readCurrent = () =>
+      requestResult(conflicts.get(conflictId)) as Promise<
+        | (AutomaticCharacterConflict & {
+            resolution?: AutomaticConflictResolution;
+          })
+        | undefined
+      >;
+    let current = await readCurrent();
+    if (!current) {
+      abortQuietly(transaction);
+      throw new Error('Automatic sync conflict was not found');
+    }
+    if (hook) {
+      try {
+        await hook.run(transaction, current, { enqueuedMutationId });
+      } catch (error) {
+        abortQuietly(transaction);
+        throw error;
+      }
+      // The hook shares the transaction, so re-read to fence against a
+      // resolution it observed or performed itself.
+      current = (await readCurrent()) ?? current;
+    }
+    if (current.resolutionState === 'resolved') {
+      await transactionComplete(transaction);
+      return 'resolved';
+    }
+
     const local = conflict.localCandidate;
     if (!local) {
       transaction.abort();
@@ -189,16 +256,18 @@ export class AutomaticCharacterConflictService {
         updatedAt: now,
       };
       documents.put(resumed);
-      const mutationId = this.randomId();
       outbox.put({
         ...resumed,
-        mutationId,
+        mutationId: enqueuedMutationId as string,
         operation: resumed.deletedAt ? 'delete' : 'replace',
         state: 'queued',
         attemptCount: 0,
         nextAttemptAt: 0,
         lastError: null,
         inflightAt: null,
+        ...(options.originPlayerBackupRunId !== undefined
+          ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
+          : {}),
       } satisfies AutomaticCharacterOutboxEntry);
 
       if (resolution === 'keep-both') {
