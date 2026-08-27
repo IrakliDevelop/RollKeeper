@@ -3,7 +3,10 @@ import type { Json } from '@/types/database.generated';
 import type { AutomaticCharacterConflict } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { AutomaticCharacterConflictService } from '@/lib/indexeddb/automaticCharacterConflictService';
-import { requestResult } from '@/lib/indexeddb/localDatabase';
+import {
+  requestResult,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import { decodeCharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
@@ -39,6 +42,7 @@ import {
 import type { PlayerBackupRunV1 } from './playerBackupRunRepository';
 import {
   PlayerBackupRunReplacedError,
+  playerBackupApplicationKey,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
   readPlayerBackupRunInTransaction,
@@ -61,6 +65,24 @@ export class PlayerBackupCopyIdCollisionError extends Error {
   constructor() {
     super('Keep both requires an unused character id');
   }
+}
+
+/**
+ * The roster change one resolution recorded durably, so a caller that crashed
+ * before applying it is handed the same change again on its next attempt.
+ */
+export interface PlayerBackupPendingApplication {
+  version: 1;
+  runId: string;
+  accountId: string;
+  kind: 'replace' | 'add';
+  /** The roster entry to write: the character, or the keep-both copy. */
+  legacyId: string;
+  /** The conflicted character the decision was made for. */
+  sourceLegacyId: string;
+  resolution: 'use-cloud' | 'keep-both';
+  conflictId: string;
+  recordedAt: string;
 }
 
 /** The local roster change a resolution asks its caller to apply. */
@@ -378,35 +400,84 @@ export function createPlayerBackupResolutionHook(
           reason: `resolved:${options.resolution}`,
         }),
       });
+
+      if (options.resolution !== 'keep-mine') {
+        // The roster lives outside this transaction, so the change it owes is
+        // recorded with the resolution and survives until it is acknowledged.
+        const legacyId =
+          options.resolution === 'use-cloud'
+            ? current.legacyId
+            : (options.copyLegacyId as string);
+        meta.put({
+          key: playerBackupApplicationKey(fenced.runId, legacyId),
+          version: 1,
+          runId: fenced.runId,
+          accountId: options.accountId,
+          kind: options.resolution === 'use-cloud' ? 'replace' : 'add',
+          legacyId,
+          sourceLegacyId: current.legacyId,
+          resolution: options.resolution,
+          conflictId: current.conflictId,
+          recordedAt: options.now(),
+        } satisfies PlayerBackupPendingApplication & { key: string });
+      }
     },
   };
 }
 
-/** The winning document the caller must mirror into the local roster. */
-async function applicationFor(
-  context: ResolutionContext,
-  resolution: AppliedResolution
-): Promise<PlayerBackupLocalApplication | null> {
-  if (resolution === 'keep-mine') return null;
-  const legacyId =
-    resolution === 'use-cloud'
-      ? context.conflict.legacyId
-      : (context.options.copyLegacyId as string);
-  const document = await context.repository.getDocument(
-    context.conflict.namespace,
-    legacyId
+/**
+ * Reads the active run's outstanding roster applications. The `meta` store has
+ * no index, so the run-scoped key prefix is the filter.
+ */
+async function readPendingApplications(
+  database: IDBDatabase,
+  runId: string
+): Promise<PlayerBackupPendingApplication[]> {
+  const transaction = database.transaction('meta', 'readonly');
+  const rows = (await requestResult(
+    transaction.objectStore('meta').getAll()
+  )) as (PlayerBackupPendingApplication & { key?: unknown })[];
+  await transactionComplete(transaction);
+  const prefix = playerBackupApplicationKey(runId, '');
+  return rows.filter(
+    row => typeof row.key === 'string' && row.key.startsWith(prefix)
   );
+}
+
+/** The winning document the caller must mirror into the local roster. */
+async function applicationOf(
+  repository: IndexedDbAutomaticCharacterSyncRepository,
+  namespace: AutomaticCharacterConflict['namespace'],
+  kind: 'replace' | 'add',
+  legacyId: string
+): Promise<PlayerBackupLocalApplication> {
+  const document = await repository.getDocument(namespace, legacyId);
   if (!document || document.payload === null) {
     // The resolution transaction committed this document, so its absence means
     // the local stores no longer support the decision the caller was given.
     throw new Error(DOCUMENT_MISSING);
   }
   return {
-    kind: resolution === 'use-cloud' ? 'replace' : 'add',
+    kind,
     legacyId,
     payload: document.payload,
     contentFingerprint: document.contentFingerprint,
   };
+}
+
+async function applicationFor(
+  context: ResolutionContext,
+  resolution: AppliedResolution
+): Promise<PlayerBackupLocalApplication | null> {
+  if (resolution === 'keep-mine') return null;
+  return applicationOf(
+    context.repository,
+    context.conflict.namespace,
+    resolution === 'use-cloud' ? 'replace' : 'add',
+    resolution === 'use-cloud'
+      ? context.conflict.legacyId
+      : (context.options.copyLegacyId as string)
+  );
 }
 
 /**
@@ -552,7 +623,24 @@ async function resolveInLock(
   if (conflict.resolutionState === 'resolved') {
     const resolution = conflict.resolution;
     if (!resolution) throw new Error(RESOLUTION_MISSING);
-    return { status: 'resolved', resolution, apply: null, workQueued: false };
+    // A caller that crashed between the resolution and the roster write is
+    // handed the recorded change again, until it acknowledges it.
+    const pending = (await readPendingApplications(database, run.runId)).find(
+      record => record.sourceLegacyId === conflict.legacyId
+    );
+    return {
+      status: 'resolved',
+      resolution,
+      apply: pending
+        ? await applicationOf(
+            repository,
+            conflict.namespace,
+            pending.kind,
+            pending.legacyId
+          )
+        : null,
+      workQueued: false,
+    };
   }
 
   const { resolution } = options;
@@ -617,6 +705,10 @@ async function resolveInLock(
  * run fence. Every gateway mutation and every local write is re-authorised
  * immediately before it happens, so a superseded run resolves nothing.
  *
+ * A returned `apply` is a durable debt: the caller writes it to the roster and
+ * then calls `acknowledgePlayerBackupApplication`. Until that acknowledgement
+ * every retry of this call returns the same change again.
+ *
  * Must not be called while the caller holds the account lock: it acquires the
  * lock itself, and real Web Locks are not re-entrant.
  */
@@ -631,6 +723,50 @@ export async function resolvePlayerBackupConflict(
     () =>
       withExistingDatabase(options.factory, database =>
         resolveInLock(options, database)
+      )
+  );
+}
+
+/**
+ * Clears the recorded roster application for one character once the caller has
+ * written it. Idempotent: `false` means there was nothing left to acknowledge.
+ *
+ * Must not be called while the caller holds the account lock: it acquires the
+ * lock itself, and real Web Locks are not re-entrant.
+ */
+export async function acknowledgePlayerBackupApplication(options: {
+  factory: IDBFactory;
+  locks: PlayerBackupExclusiveLockProvider | null | undefined;
+  accountId: string;
+  expectedActiveRunId: string;
+  legacyId: string;
+}): Promise<boolean> {
+  if (!hasPlayerBackupExclusiveLockCapability(options.locks)) {
+    throw new PlayerBackupLockUnavailableError();
+  }
+  return withPlayerBackupAccountLock(
+    { accountId: options.accountId, locks: options.locks },
+    () =>
+      withExistingDatabase(options.factory, database =>
+        runPlayerBackupTransaction({
+          database,
+          accountId: options.accountId,
+          expectedActiveRunId: options.expectedActiveRunId,
+          stores: [],
+          task: async transaction => {
+            const meta = transaction.objectStore('meta');
+            const run = await readPlayerBackupRunInTransaction(
+              meta,
+              options.accountId,
+              options.expectedActiveRunId
+            );
+            const key = playerBackupApplicationKey(run.runId, options.legacyId);
+            const recorded = await requestResult(meta.get(key));
+            if (!recorded) return false;
+            meta.delete(key);
+            return true;
+          },
+        })
       )
   );
 }

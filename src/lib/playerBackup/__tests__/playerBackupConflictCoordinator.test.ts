@@ -41,6 +41,7 @@ import type {
   PlayerBackupConflictResolution,
 } from '../playerBackupConflictCoordinator';
 import {
+  acknowledgePlayerBackupApplication,
   drainPlayerBackupRunWork,
   holdPlayerBackupCandidateAsideInLock,
   listPlayerBackupConflicts,
@@ -595,6 +596,32 @@ function resolveConflict(options: {
     gateway: options.gateway,
     generateMutationId: options.generateMutationId,
     now: () => NOW,
+  });
+}
+
+/** The durable roster applications the active run still owes its caller. */
+async function readApplicationRecords(
+  runId = 'run-a'
+): Promise<Record<string, unknown>[]> {
+  const rows = (await readStore('meta')) as Record<string, unknown>[];
+  return rows.filter(
+    row =>
+      typeof row.key === 'string' &&
+      row.key.startsWith(`player-backup-application:${runId}:`)
+  );
+}
+
+function acknowledgeApplication(options: {
+  legacyId: string;
+  runId?: string;
+  locks?: PlayerBackupExclusiveLockProvider | null;
+}): Promise<boolean> {
+  return acknowledgePlayerBackupApplication({
+    factory: indexedDB,
+    locks: options.locks === undefined ? new ImmediateLocks() : options.locks,
+    accountId: ACCOUNT_A,
+    expectedActiveRunId: options.runId ?? 'run-a',
+    legacyId: options.legacyId,
   });
 }
 
@@ -1795,6 +1822,109 @@ describe('resolvePlayerBackupConflict', () => {
     );
   });
 
+  it('replays the use-cloud application until it is acknowledged', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    const resolve = () =>
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'use-cloud',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      });
+
+    const first = await resolve();
+    expect(await readApplicationRecords()).toEqual([
+      {
+        key: 'player-backup-application:run-a:hero-a',
+        version: 1,
+        runId: 'run-a',
+        accountId: ACCOUNT_A,
+        kind: 'replace',
+        legacyId: 'hero-a',
+        sourceLegacyId: 'hero-a',
+        resolution: 'use-cloud',
+        conflictId: seeded.conflictId,
+        recordedAt: NOW,
+      },
+    ]);
+
+    // A crash before the roster was written retries the whole call, so the
+    // already-resolved answer must still carry the application.
+    await expect(resolve()).resolves.toEqual({ ...first, workQueued: false });
+
+    await expect(
+      acknowledgeApplication({ legacyId: 'hero-a', locks: null })
+    ).rejects.toBeInstanceOf(PlayerBackupLockUnavailableError);
+    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
+      true
+    );
+    expect(await readApplicationRecords()).toEqual([]);
+
+    await expect(resolve()).resolves.toEqual({
+      status: 'resolved',
+      resolution: 'use-cloud',
+      apply: null,
+      workQueued: false,
+    });
+    await expect(acknowledgeApplication({ legacyId: 'hero-a' })).resolves.toBe(
+      false
+    );
+  });
+
+  it('replays the keep-both application under the copy id alone', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    const first = await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'keep-both',
+      copyLegacyId: 'hero-copy',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    expect(await readApplicationRecords()).toEqual([
+      expect.objectContaining({
+        key: 'player-backup-application:run-a:hero-copy',
+        kind: 'add',
+        legacyId: 'hero-copy',
+        sourceLegacyId: 'hero-a',
+        resolution: 'keep-both',
+      }),
+    ]);
+
+    // The copy id lives in the durable record, so the retry never repeats it.
+    await expect(
+      resolveConflict({
+        conflictId: seeded.conflictId,
+        resolution: 'keep-both',
+        gateway,
+        generateMutationId: harness.identities.generateMutationId,
+      })
+    ).resolves.toEqual({ ...first, workQueued: false });
+
+    await expect(
+      acknowledgeApplication({ legacyId: 'hero-copy' })
+    ).resolves.toBe(true);
+    expect(await readApplicationRecords()).toEqual([]);
+  });
+
+  it('retains the application when the run is replaced before acknowledgement', async () => {
+    const { harness, gateway, seeded } = await seedConflictScenario();
+    await resolveConflict({
+      conflictId: seeded.conflictId,
+      resolution: 'use-cloud',
+      gateway,
+      generateMutationId: harness.identities.generateMutationId,
+    });
+    const recorded = await readApplicationRecords();
+    expect(recorded).toHaveLength(1);
+
+    await confirmRun('run-b');
+
+    await expect(
+      acknowledgeApplication({ legacyId: 'hero-a' })
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    expect(await readApplicationRecords()).toEqual(recorded);
+  });
+
   it('refuses keep-mine and use-cloud on an archived candidate with zero gateway calls', async () => {
     const { harness, gateway, seeded } = await seedConflictScenario({
       row: cloudRow({ deleted_at: ARCHIVED_AT }),
@@ -2433,6 +2563,7 @@ describe('the resolution transaction fence', () => {
       })
     ).resolves.toEqual({ status: 'refused', reason: 'copy-id-collision' });
     expect(await snapshotStores()).toEqual(beforePreference);
+    expect(await readApplicationRecords()).toEqual([]);
     expect((await readConflict(seeded.conflictId)).resolutionState).toBe(
       'unresolved'
     );

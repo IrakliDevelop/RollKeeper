@@ -44,10 +44,12 @@ export type {
   PlayerBackupConflictResolveResult,
   PlayerBackupDrainOptions,
   PlayerBackupLocalApplication,
+  PlayerBackupPendingApplication,
   PlayerBackupSettleOptions,
 } from './playerBackupConflictResolution';
 export {
   PlayerBackupCopyIdCollisionError,
+  acknowledgePlayerBackupApplication,
   drainPlayerBackupRunWork,
   resolvePlayerBackupConflict,
   settlePlayerBackupOneTimeConflicts,
