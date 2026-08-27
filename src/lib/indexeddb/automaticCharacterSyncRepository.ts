@@ -17,6 +17,9 @@ export type AutomaticSyncWorkState =
 
 const INFLIGHT_LEASE_MS = 30_000;
 
+/** Snapshot key retaining a conflict's superseded local candidate. */
+const SUPERSEDED_LOCAL_SNAPSHOT_KEY = 'automatic-sync-superseded-local';
+
 export interface AutomaticCharacterMutation {
   namespace: StorageNamespace;
   legacyId: string;
@@ -645,6 +648,53 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       ...(options.originPlayerBackupRunId !== undefined
         ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
         : {}),
+    };
+    conflicts.put(refreshed);
+    return refreshed;
+  }
+
+  /**
+   * Replaces an unresolved conflict's local candidate, and the matching
+   * document, on a transaction the caller owns (over at least `['documents',
+   * 'conflicts', 'legacySnapshots']`). The superseded candidate is preserved
+   * first as an immutable `automatic-sync-superseded-local` snapshot keyed by
+   * the conflict, so nothing the local stores held is discarded. Throws when
+   * the conflict is missing or already resolved so the caller can abort.
+   */
+  async refreshConflictLocalCandidateInTransaction(
+    transaction: IDBTransaction,
+    conflictId: string,
+    localCandidate: AutomaticCharacterDocument,
+    detectedAt: string
+  ): Promise<AutomaticCharacterConflict> {
+    const conflicts = transaction.objectStore('conflicts');
+    const current = (await requestResult(conflicts.get(conflictId))) as
+      | AutomaticCharacterConflict
+      | undefined;
+    if (!current || current.resolutionState !== 'unresolved') {
+      throw new Error('Conflict is not unresolved');
+    }
+    const snapshots = transaction.objectStore('legacySnapshots');
+    const captured = (await requestResult(snapshots.getAll())) as {
+      runId: string;
+    }[];
+    const rawValue = JSON.stringify(current.localCandidate);
+    snapshots.add({
+      runId: conflictId,
+      key: SUPERSEDED_LOCAL_SNAPSHOT_KEY,
+      captureNumber:
+        captured.filter(row => row.runId === conflictId).length + 1,
+      presence: true,
+      rawValue,
+      byteCount: new TextEncoder().encode(rawValue).byteLength,
+      capturedAt: detectedAt,
+      immutable: true,
+    });
+    transaction.objectStore('documents').put(structuredClone(localCandidate));
+    const refreshed: AutomaticCharacterConflict = {
+      ...current,
+      localCandidate: structuredClone(localCandidate),
+      detectedAt,
     };
     conflicts.put(refreshed);
     return refreshed;
