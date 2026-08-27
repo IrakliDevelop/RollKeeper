@@ -620,13 +620,16 @@ export class IndexedDbAutomaticCharacterSyncRepository {
   /**
    * Replaces the cloud candidate of an unresolved conflict on a transaction
    * the caller owns (over at least `['conflicts']`). Throws when the conflict
-   * is missing or already resolved so the caller can abort.
+   * is missing or already resolved so the caller can abort. The run origin is
+   * restamped only when `options.originPlayerBackupRunId` is supplied, so
+   * legacy four-argument callers keep writing byte-identical records.
    */
   async refreshConflictCloudCandidateInTransaction(
     transaction: IDBTransaction,
     conflictId: string,
     cloudCandidate: unknown,
-    detectedAt: string
+    detectedAt: string,
+    options: { originPlayerBackupRunId?: string } = {}
   ): Promise<AutomaticCharacterConflict> {
     const conflicts = transaction.objectStore('conflicts');
     const current = (await requestResult(conflicts.get(conflictId))) as
@@ -639,6 +642,9 @@ export class IndexedDbAutomaticCharacterSyncRepository {
       ...current,
       cloudCandidate: structuredClone(cloudCandidate),
       detectedAt,
+      ...(options.originPlayerBackupRunId !== undefined
+        ? { originPlayerBackupRunId: options.originPlayerBackupRunId }
+        : {}),
     };
     conflicts.put(refreshed);
     return refreshed;

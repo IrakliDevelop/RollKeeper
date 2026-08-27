@@ -581,6 +581,44 @@ describe('IndexedDbAutomaticCharacterSyncRepository', () => {
       ).rejects.toThrow('Conflict is not unresolved');
     });
 
+    it('stamps a run origin on refresh only when one is supplied', async () => {
+      const repo = repository();
+      await repo.commit(mutation());
+      const [entry] = await repo.listOutbox(NAMESPACE);
+      await repo.preserveConflict(
+        entry,
+        { id: 'cloud-a' },
+        '2026-02-02T00:00:00Z'
+      );
+      const conflictId = `automatic-sync:${entry.mutationId}`;
+
+      const untouched = database.transaction('conflicts', 'readwrite');
+      const legacy = await repo.refreshConflictCloudCandidateInTransaction(
+        untouched,
+        conflictId,
+        { id: 'cloud-a', server_version: 2 },
+        '2026-02-03T00:00:00.000Z'
+      );
+      await transactionComplete(untouched);
+      expect('originPlayerBackupRunId' in legacy).toBe(false);
+
+      const stamped = database.transaction('conflicts', 'readwrite');
+      const adopted = await repo.refreshConflictCloudCandidateInTransaction(
+        stamped,
+        conflictId,
+        { id: 'cloud-a', server_version: 3 },
+        '2026-02-04T00:00:00.000Z',
+        { originPlayerBackupRunId: 'run-a' }
+      );
+      await transactionComplete(stamped);
+      expect(adopted).toMatchObject({
+        cloudCandidate: { id: 'cloud-a', server_version: 3 },
+        detectedAt: '2026-02-04T00:00:00.000Z',
+        originPlayerBackupRunId: 'run-a',
+      });
+      await expect(repo.listConflicts(NAMESPACE)).resolves.toEqual([adopted]);
+    });
+
     it('quarantines on the caller transaction with the same record as quarantineCloudCandidate', async () => {
       const repo = repository();
       const transaction = database.transaction('quarantine', 'readwrite');

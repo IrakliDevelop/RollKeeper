@@ -4,9 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
   AutomaticCharacterConflict,
+  AutomaticCharacterDocument,
   AutomaticCharacterOutboxEntry,
   AutomaticSyncQuarantineRecord,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import type { ObjectStoreName } from '@/lib/indexeddb/localDatabase';
 import {
   deleteRollkeeperDatabaseForTests,
@@ -272,6 +274,79 @@ async function writeRecords(
   }
 }
 
+/** A conflict record shaped like ordinary automatic sync leaves behind. */
+function conflictRecord(
+  overrides: Partial<AutomaticCharacterConflict> = {}
+): AutomaticCharacterConflict {
+  return {
+    conflictId: 'automatic-sync:worker-1',
+    namespace: NAMESPACE_A,
+    family: 'character',
+    legacyId: 'hero-a',
+    mutationId: 'worker-1',
+    localCandidate: null,
+    cloudCandidate: cloudRow(),
+    detectedAt: NOW,
+    resolutionState: 'unresolved',
+    ...overrides,
+  };
+}
+
+/**
+ * Drives the real worker path — commit, then `preserveConflict` — so the
+ * adopted conflict has genuine work behind it, then optionally stamps a
+ * superseded run's origin on it.
+ */
+async function seedWorkerConflict(options: {
+  row: CharacterCloudRow;
+  legacyId?: string;
+  mutationId?: string;
+  originPlayerBackupRunId?: string;
+}): Promise<string> {
+  const legacyId = options.legacyId ?? 'hero-a';
+  const mutationId = options.mutationId ?? 'worker-1';
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const repository = new IndexedDbAutomaticCharacterSyncRepository(database, {
+      randomId: () => mutationId,
+    });
+    const saved = await repository.commit({
+      namespace: NAMESPACE_A,
+      legacyId,
+      operation: 'create',
+      payload: encodeCharacterCloudPayload(ROSTER[legacyId]),
+      schemaVersion: 1,
+      localRevision: 5,
+      baseServerVersion: 0,
+      contentFingerprint: await fingerprint(ROSTER[legacyId]),
+      syncPolicy: 'off',
+      updatedAt: '2026-08-27T10:45:00.000Z',
+    });
+    expect(saved.saved).toBe(true);
+    const [entry] = await repository.listOutbox(NAMESPACE_A);
+    await repository.preserveConflict(
+      entry,
+      options.row,
+      '2026-08-27T10:50:00.000Z'
+    );
+  } finally {
+    database.close();
+  }
+  if (options.originPlayerBackupRunId) {
+    const [conflict] = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    await writeRecords('conflicts', [
+      {
+        ...conflict,
+        originPlayerBackupRunId: options.originPlayerBackupRunId,
+      },
+    ]);
+  }
+  return `automatic-sync:${mutationId}`;
+}
+
 async function readCheckpoints(accountId = ACCOUNT_A, runId = 'run-a') {
   const run = await readActivePlayerBackupRun({
     accountId,
@@ -388,6 +463,155 @@ describe('seedPlayerBackupConflict', () => {
     });
     expect(harness.identities.generateMutationId).toHaveBeenCalledTimes(1);
     expect(await snapshotStores()).toEqual(before);
+    const conflicts = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    expect(conflicts[0].originPlayerBackupRunId).toBe('run-a');
+  });
+
+  it('adopts an unclaimed worker conflict into the active run', async () => {
+    await seedRun();
+    const row = cloudRow();
+    const conflictId = await seedWorkerConflict({ row });
+    const harness = createHarness();
+
+    const result = await harness.seed({ row, comparison: 'newer' });
+
+    expect(result).toEqual({
+      conflictId,
+      mutationId: 'worker-1',
+      created: false,
+      refreshed: true,
+    });
+    expect(harness.identities.generateMutationId).not.toHaveBeenCalled();
+    const conflicts = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].originPlayerBackupRunId).toBe('run-a');
+    expect(conflicts[0].detectedAt).toBe(NOW);
+    expect(await readStore('outbox')).toHaveLength(1);
+    const checkpoints = await readCheckpoints();
+    expect(checkpoints['hero-a'].online).toMatchObject({
+      mutationId: 'worker-1',
+      reason: 'conflict:newer',
+      state: 'needs-attention',
+    });
+  });
+
+  it('adopts a conflict stamped by a superseded run', async () => {
+    await seedRun();
+    const row = cloudRow();
+    const conflictId = await seedWorkerConflict({
+      row,
+      originPlayerBackupRunId: 'run-old',
+    });
+    const harness = createHarness();
+
+    const result = await harness.seed({ row });
+
+    expect(result).toEqual({
+      conflictId,
+      mutationId: 'worker-1',
+      created: false,
+      refreshed: true,
+    });
+    const conflicts = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0].originPlayerBackupRunId).toBe('run-a');
+    expect((await readCheckpoints())['hero-a'].online?.mutationId).toBe(
+      'worker-1'
+    );
+  });
+
+  it('replaces the linked cloud copy instead of creating a second one', async () => {
+    await seedRun();
+    const harness = createHarness();
+    const row = cloudRow();
+
+    await harness.seed({
+      row,
+      existingLink: {
+        accountId: ACCOUNT_A,
+        legacyId: 'hero-a',
+        cloudId: row.id,
+        serverVersion: 1,
+        contentFingerprint: 'stale-fingerprint',
+      },
+    });
+
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents).toHaveLength(1);
+    expect(documents[0]).toMatchObject({
+      operation: 'replace',
+      baseServerVersion: 1,
+      cloudId: row.id,
+    });
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox[0]).toMatchObject({
+      operation: 'replace',
+      baseServerVersion: 1,
+    });
+    // `preserveConflictInTransaction` only patches a base-0 candidate, so the
+    // cloud identity here comes straight from the written document.
+    const conflicts = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    expect(conflicts[0].localCandidate?.cloudId).toBe(row.id);
+    expect(conflicts[0].localCandidate?.baseServerVersion).toBe(1);
+  });
+
+  it('prefers the acknowledged document server version over the link', async () => {
+    await seedRun();
+    const row = cloudRow();
+    await writeRecords('documents', [
+      {
+        namespace: NAMESPACE_A,
+        family: 'character',
+        legacyId: 'hero-a',
+        operation: 'replace',
+        payload: encodeCharacterCloudPayload(HERO_A),
+        schemaVersion: 1,
+        localRevision: 4,
+        baseServerVersion: 2,
+        contentFingerprint: 'older-fingerprint',
+        syncPolicy: 'off',
+        updatedAt: '2026-08-27T09:30:00.000Z',
+        cloudId: row.id,
+        deletedAt: null,
+      } satisfies AutomaticCharacterDocument,
+    ]);
+    const harness = createHarness();
+
+    await harness.seed({
+      row,
+      existingLink: {
+        accountId: ACCOUNT_A,
+        legacyId: 'hero-a',
+        cloudId: row.id,
+        serverVersion: 1,
+        contentFingerprint: null,
+      },
+    });
+
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents).toHaveLength(1);
+    expect(documents[0]).toMatchObject({
+      operation: 'replace',
+      baseServerVersion: 2,
+    });
+    const outbox = (await readStore(
+      'outbox'
+    )) as AutomaticCharacterOutboxEntry[];
+    expect(outbox[0].baseServerVersion).toBe(2);
   });
 
   it('refreshes the online candidate when the server version moved', async () => {
@@ -753,6 +977,71 @@ describe('listPlayerBackupConflicts', () => {
 
     expect(await databaseVersion()).toBe(versionBefore);
     expect(await snapshotStores()).toEqual(before);
+  });
+
+  it('never offers resolutions for a conflict a superseded run stamped', async () => {
+    await seedRun();
+    await writeRecords('conflicts', [
+      conflictRecord({
+        conflictId: 'automatic-sync:stale',
+        mutationId: 'stale',
+        originPlayerBackupRunId: 'run-old',
+      }),
+      conflictRecord({
+        conflictId: 'automatic-sync:unclaimed',
+        mutationId: 'unclaimed',
+      }),
+    ]);
+
+    const listing = await listPlayerBackupConflicts({
+      factory: indexedDB,
+      accountId: ACCOUNT_A,
+      expectedActiveRunId: 'run-a',
+    });
+
+    const byId = Object.fromEntries(
+      listing.conflicts.map(conflict => [conflict.conflictId, conflict])
+    );
+    expect(byId['automatic-sync:stale']).toMatchObject({
+      originPlayerBackupRunId: 'run-old',
+      allowedResolutions: [],
+    });
+    expect(byId['automatic-sync:unclaimed']).toMatchObject({
+      originPlayerBackupRunId: null,
+      allowedResolutions: ['keep-mine', 'use-cloud', 'keep-both'],
+    });
+  });
+
+  it('lists nothing for a degraded manual run', async () => {
+    await seedRun({ stage: 'confirmed', executionPath: 'degraded-manual' });
+    await writeRecords('conflicts', [conflictRecord()]);
+    await writeRecords('quarantine', [
+      {
+        quarantineId: `automatic-sync-pull:${NAMESPACE_A}:hero-a`,
+        namespace: NAMESPACE_A,
+        family: 'character',
+        legacyId: 'hero-a',
+        rawValue: JSON.stringify(cloudRow()),
+        reason: 'future',
+        detectedAt: NOW,
+      },
+    ]);
+
+    const listing = await listPlayerBackupConflicts({
+      factory: indexedDB,
+      accountId: ACCOUNT_A,
+      expectedActiveRunId: 'run-a',
+    });
+
+    expect(listing).toEqual({
+      accountId: ACCOUNT_A,
+      runId: 'run-a',
+      conflicts: [],
+      heldAside: [],
+    });
+    // The records are still there; the empty listing is a gate, not an absence.
+    expect(await readStore('conflicts')).toHaveLength(1);
+    expect(await readStore('quarantine')).toHaveLength(1);
   });
 
   it('throws when the run is missing', async () => {

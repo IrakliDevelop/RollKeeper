@@ -155,10 +155,12 @@ function localRevisionOf(character: unknown): number {
     : 0;
 }
 
+/** A candidate without a readable `deleted_at` counts as archived: the safe
+ * direction, since only an explicit recovery decision may resurrect one. */
 function isArchivedCandidate(candidate: unknown): boolean {
-  const deletedAt = (candidate as { deleted_at?: string | null } | null)
-    ?.deleted_at;
-  return deletedAt !== null && deletedAt !== undefined;
+  return (
+    (candidate as { deleted_at?: string | null } | null)?.deleted_at !== null
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -250,7 +252,13 @@ export async function seedPlayerBackupConflictInLock(
           conflict.resolutionState === 'unresolved'
       );
       if (existing) {
-        if (sameCandidate(existing.cloudCandidate, row)) {
+        // An unresolved conflict left by ordinary automatic sync (no origin) or
+        // by a superseded run is adopted into this run — the new consent
+        // authorises it — but only once it carries this run's origin.
+        if (
+          sameCandidate(existing.cloudCandidate, row) &&
+          existing.originPlayerBackupRunId === run.runId
+        ) {
           return {
             conflictId: existing.conflictId,
             mutationId: existing.mutationId,
@@ -262,7 +270,8 @@ export async function seedPlayerBackupConflictInLock(
           transaction,
           existing.conflictId,
           row,
-          recordedAt
+          recordedAt,
+          { originPlayerBackupRunId: run.runId }
         );
         await writeCheckpoint(existing.mutationId);
         return {
@@ -471,17 +480,22 @@ function summarizeConflict(
   run: PlayerBackupRunV1
 ): PlayerBackupConflictSummary {
   const archived = isArchivedCandidate(conflict.cloudCandidate);
+  const origin = conflict.originPlayerBackupRunId ?? null;
+  // Work stamped by a superseded run is retained, never resolved through this
+  // wizard, until a seed adopts it into the active run. A conflict with no
+  // origin has not been claimed by any run and stays resolvable.
+  const stale = origin !== null && origin !== run.runId;
   return {
     conflictId: conflict.conflictId,
     legacyId: conflict.legacyId,
     mutationId: conflict.mutationId,
     comparison: checkpointComparison(run, conflict.legacyId),
     archived,
-    originPlayerBackupRunId: conflict.originPlayerBackupRunId ?? null,
+    originPlayerBackupRunId: origin,
     detectedAt: conflict.detectedAt,
     resolutionState: conflict.resolutionState,
     allowedResolutions:
-      conflict.resolutionState === 'resolved'
+      conflict.resolutionState === 'resolved' || stale
         ? []
         : [...(archived ? UNRESOLVED_ARCHIVED : UNRESOLVED_PRESENT)],
     localCandidate: conflict.localCandidate,
@@ -505,6 +519,16 @@ export async function listPlayerBackupConflicts(options: {
   if (!run || run.runId !== options.expectedActiveRunId) {
     throw new Error(RUN_MISSING);
   }
+  if (playerBackupExecutionPath(run) === 'degraded-manual') {
+    // A degraded run never seeds, quarantines or resolves integrated conflicts,
+    // so it has nothing of its own to list and must not surface anyone else's.
+    return {
+      accountId: run.accountId,
+      runId: run.runId,
+      conflicts: [],
+      heldAside: [],
+    };
+  }
   const selected = new Set(run.selectedCharacterIds);
   return withExistingDatabase(options.factory, async database => {
     const repository = new IndexedDbAutomaticCharacterSyncRepository(database);
@@ -522,7 +546,8 @@ export async function listPlayerBackupConflicts(options: {
           legacyId: record.legacyId,
           reason: record.reason,
           detectedAt: record.detectedAt,
-          recoveryAvailable: record.rawValue.length > 0,
+          recoveryAvailable:
+            typeof record.rawValue === 'string' && record.rawValue.length > 0,
         })),
     };
   });
