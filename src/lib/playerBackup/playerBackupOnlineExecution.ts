@@ -374,9 +374,15 @@ async function routeContestedRow(options: {
   reason: DegradedCharacterEligibility['reason'] | PlayerBackupCloudComparison;
   row: CharacterCloudRow | null;
   quarantineDetail: string | null;
+  existing: PlayerBackupOnlineCheckpoint | undefined;
   existingLink: CharacterCloudLink | null;
 }): Promise<boolean> {
-  const { context, reason, row } = options;
+  const { context, existing, reason, row } = options;
+  // The same candidate was already held aside: re-quarantining it on every
+  // resume would rewrite the record without changing anything it holds.
+  if (existing?.state === 'held-aside' && existing.reason === reason) {
+    return true;
+  }
   const scope = {
     database: options.database,
     accountId: context.accountId,
@@ -414,8 +420,9 @@ async function routeContestedRow(options: {
 /**
  * Runs one selected character end to end while the caller holds the account
  * lock: fenced consent re-read, classification, identity, gateway mutation and
- * the durable checkpoint. Only a replaced run, a missing lock or a broken
- * consent partition escapes; every online failure becomes a checkpoint.
+ * the durable checkpoint. Every online failure becomes a checkpoint here; a
+ * replaced run, a missing lock and a broken consent partition escape to abort
+ * the run, and anything else the caller contains as this character's failure.
  */
 async function processManualCharacter(
   context: ManualExecutionContext,
@@ -496,6 +503,7 @@ async function processManualCharacter(
           reason: eligibility.reason,
           row: compared.row,
           quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existing,
           existingLink,
         }))
       ) {
@@ -725,6 +733,7 @@ async function uploadCharacter(options: {
           reason: compared.state,
           row: compared.row,
           quarantineDetail: compared.decoded?.quarantineReason ?? null,
+          existing: options.existing,
           existingLink: context.links.get(context.accountId, options.legacyId),
         })
       ) {
@@ -742,6 +751,61 @@ async function uploadCharacter(options: {
       })
     );
   }
+}
+
+/**
+ * Records one character's unexpected failure in its own fenced transaction,
+ * carrying forward the identity an earlier attempt minted. Used for errors the
+ * per-character paths never anticipated -- an aborted coordinator transaction,
+ * work refused by a tombstone -- so one character can fail without stopping the
+ * rest of the run.
+ */
+async function recordManualFailure(
+  context: ManualExecutionContext,
+  legacyId: string,
+  reason: string
+): Promise<void> {
+  await withExistingDatabase(context.factory, database =>
+    runPlayerBackupTransaction({
+      database,
+      accountId: context.accountId,
+      expectedActiveRunId: context.expectedActiveRunId,
+      stores: [],
+      task: async transaction => {
+        const meta = transaction.objectStore('meta');
+        const run = await readPlayerBackupRunInTransaction(
+          meta,
+          context.accountId,
+          context.expectedActiveRunId
+        );
+        const retained = retainCharacterIdentity(
+          run.characterCheckpoints[legacyId]?.online,
+          context.links.get(context.accountId, legacyId)
+        );
+        await updatePlayerBackupCharacterCheckpoint(meta, {
+          accountId: context.accountId,
+          expectedActiveRunId: context.expectedActiveRunId,
+          legacyId,
+          online: onlineCheckpoint({
+            state: 'failed',
+            cloudId: retained.cloudId ?? NO_CLOUD_IDENTITY,
+            mutationId: retained.mutationId,
+            recordedAt: context.now(),
+            reason,
+          }),
+        });
+      },
+    })
+  );
+}
+
+/** Invalidates the whole run rather than one character. */
+function abortsPlayerBackupRun(cause: unknown): boolean {
+  return (
+    cause instanceof PlayerBackupRunReplacedError ||
+    cause instanceof PlayerBackupLockUnavailableError ||
+    (cause instanceof Error && cause.message === CONSENT_NOT_ACKNOWLEDGED)
+  );
 }
 
 /**
@@ -778,7 +842,20 @@ export async function executePlayerBackupManualRun(
   for (const legacyId of run.selectedCharacterIds) {
     await withPlayerBackupAccountLock(
       { accountId: options.accountId, locks },
-      () => processManualCharacter(context, legacyId)
+      async () => {
+        try {
+          await processManualCharacter(context, legacyId);
+        } catch (cause) {
+          // One character's failure never stops the others; only a replaced
+          // run, a missing lock or a broken consent partition ends the run.
+          if (abortsPlayerBackupRun(cause)) throw cause;
+          await recordManualFailure(
+            context,
+            legacyId,
+            cause instanceof Error ? cause.message : String(cause)
+          );
+        }
+      }
     );
   }
 

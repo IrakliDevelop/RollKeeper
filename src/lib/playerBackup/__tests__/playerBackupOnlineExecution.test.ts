@@ -441,6 +441,49 @@ async function readStore(
   }
 }
 
+/** Marks the stored quarantine record so a rewrite of it is detectable. */
+async function markQuarantineRecord(legacyId: string): Promise<void> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const transaction = database.transaction('quarantine', 'readwrite');
+    const store = transaction.objectStore('quarantine');
+    const records = (await requestResult(store.getAll())) as {
+      legacyId: string;
+      reason: string;
+    }[];
+    for (const record of records) {
+      if (record.legacyId === legacyId) {
+        store.put({ ...record, reason: 'marked-by-test' });
+      }
+    }
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+}
+
+/** Refuses any non-delete work for one character, as a real deletion would. */
+async function writeTombstone(legacyId: string): Promise<void> {
+  const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
+  if (!database) throw new Error('database is missing');
+  try {
+    const transaction = database.transaction('tombstones', 'readwrite');
+    transaction.objectStore('tombstones').put({
+      namespace: NAMESPACE,
+      family: 'character',
+      legacyId,
+      localRevision: 1,
+      deletedAt: CONFIRMED_AT,
+      beforeImage: null,
+      mutationId: 'tombstone-1',
+    });
+    await transactionComplete(transaction);
+  } finally {
+    database.close();
+  }
+}
+
 class ImmediateLocks implements PlayerBackupExclusiveLockProvider {
   async request<T>(
     _name: string,
@@ -1452,6 +1495,52 @@ describe('one-time player backup online execution', () => {
         cloudId: 'cloud-a',
         reason: 'future',
       });
+
+      // A marked record proves the resume rewrites nothing it already holds.
+      await markQuarantineRecord('hero-a');
+      const resumed = await harness.execute();
+
+      expect(resumed).toEqual(result);
+      await expect(readStore('quarantine')).resolves.toEqual([
+        expect.objectContaining({ reason: 'marked-by-test' }),
+      ]);
+    });
+
+    it('contains a seeding failure to one character and keeps the run going', async () => {
+      await seedRun({ selected: ['hero-a', 'hero-b'] });
+      const harness = createHarness();
+      await seedRow(harness.gateway, {
+        cloudId: 'cloud-a',
+        legacyId: 'hero-a',
+        character: HERO_A_OLD,
+        serverVersion: 4,
+        clientRevision: 4,
+      });
+      // A tombstone refuses the conflict work the seed tries to write.
+      await writeTombstone('hero-a');
+
+      const result = await harness.execute();
+
+      expect(result.failed).toEqual(['hero-a']);
+      expect(result.outcomes['hero-a']).toEqual({
+        outcome: 'failed',
+        reason: 'Conflict work could not be saved',
+      });
+      expect(result.protected).toEqual(['hero-b']);
+      expect(result.complete).toBe(false);
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('documents')).resolves.toEqual([]);
+      const checkpoints = await readCheckpoints();
+      expect(checkpoints['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'failed',
+        cloudId: 'none',
+        mutationId: null,
+        reason: 'Conflict work could not be saved',
+      });
+      expect(checkpoints['hero-b'].online).toMatchObject({
+        state: 'protected',
+      });
     });
 
     it('turns an explicit server conflict into a durable conflict without retry', async () => {
@@ -1631,6 +1720,30 @@ describe('one-time player backup online execution', () => {
         cloudId: 'cloud-a',
         mutationId: 'mutation-1',
         reason: 'rejected:conflict',
+      });
+
+      const resumed = await harness.execute();
+
+      // The rejected copy is never re-sent, and the resume still writes no
+      // durable conflict or quarantine evidence for a degraded run.
+      expect(resumed.needsAttention).toEqual(['hero-a']);
+      expect(harness.gateway.put).toHaveBeenCalledTimes(1);
+      expect(harness.links.get(ACCOUNT, 'hero-a')).toEqual({
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: priorFingerprint,
+        pendingMutation: null,
+      });
+      await expect(readStore('conflicts')).resolves.toEqual([]);
+      await expect(readStore('quarantine')).resolves.toEqual([]);
+      const afterResume = await readCheckpoints();
+      // The reason drifts to the fresh classification, as Task 6 recorded it.
+      expect(afterResume['hero-a'].online).toMatchObject({
+        kind: 'manual',
+        state: 'needs-attention',
+        reason: 'different',
       });
     });
   });
