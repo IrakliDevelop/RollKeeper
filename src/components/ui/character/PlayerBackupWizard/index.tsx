@@ -19,7 +19,7 @@ import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy'
 import type { PlayerBackupWizardProps } from './PlayerBackupWizard.types';
 import { AccountStep } from './steps/AccountStep';
 import { CharacterSelectionStep } from './steps/CharacterSelectionStep';
-import { ManagementPanel } from './steps/ManagementPanel';
+import { PlayerBackupManager } from '../PlayerBackupManager';
 import { RecoveryPanel } from './steps/RecoveryPanel';
 import { ResultStep } from './steps/ResultStep';
 import { SafetyFileStep } from './steps/SafetyFileStep';
@@ -275,7 +275,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
           <div className="border-divider bg-surface-raised flex flex-col gap-4 rounded-xl border-2 p-6 shadow-2xl">
             <ActionErrorBanner message={view.actionError} />
             {view.surface === 'manage' ? (
-              <ManagementPanel view={view} actions={actions} />
+              <PlayerBackupManager view={view} actions={actions} />
             ) : (
               <RecoveryPanel view={view} actions={actions} />
             )}

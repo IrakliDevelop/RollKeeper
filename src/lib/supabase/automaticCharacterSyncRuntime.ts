@@ -46,3 +46,7 @@ export async function recordAutomaticCharacterDelete(
   if (result === 'queued') await activeRuntime.wake();
   return result;
 }
+
+export async function wakeAutomaticCharacterSyncRuntime(): Promise<void> {
+  await activeRuntime?.wake();
+}

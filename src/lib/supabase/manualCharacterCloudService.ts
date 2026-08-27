@@ -163,6 +163,26 @@ export class ManualCharacterCloudService {
     }
 
     let link = this.links.get(account.id, legacyId);
+    if (
+      link &&
+      !link.pendingMutation &&
+      link.contentFingerprint === fingerprint
+    ) {
+      const existing = await this.gateway.fetch(link.cloudId);
+      if (
+        existing &&
+        existing.deleted_at === null &&
+        existing.server_version === link.serverVersion
+      ) {
+        const decoded = await decodeCharacterCloudRow(existing);
+        if (
+          decoded.status === 'supported' &&
+          decoded.contentFingerprint === fingerprint
+        ) {
+          return { status: 'verified', row: existing, fingerprint };
+        }
+      }
+    }
     if (link?.pendingMutation?.contentFingerprint !== fingerprint) {
       link = {
         accountId: account.id,
@@ -330,18 +350,64 @@ export class ManualCharacterCloudService {
     account: CharacterCloudAccount,
     expectedServerVersion: number
   ): Promise<{ serverVersion: number; deletedAt: string }> {
-    void account;
+    const row = await this.gateway.fetch(cloudId);
+    if (!row) throw new Error('Cloud copy was not found');
+    const legacyId = row.legacy_client_id;
+    let link = this.links.get(account.id, legacyId);
+    if (link?.pendingArchive) {
+      if (row.deleted_at) {
+        this.links.save({
+          ...link,
+          cloudId,
+          serverVersion: row.server_version,
+          pendingArchive: null,
+        });
+        return {
+          serverVersion: row.server_version,
+          deletedAt: row.deleted_at,
+        };
+      }
+    } else {
+      link = {
+        accountId: account.id,
+        legacyId,
+        cloudId,
+        serverVersion: link?.serverVersion ?? row.server_version,
+        contentFingerprint: link?.contentFingerprint ?? null,
+        pendingMutation: link?.pendingMutation ?? null,
+        pendingArchive: {
+          mutationId: this.generateMutationId(),
+          expectedServerVersion,
+        },
+      };
+      this.links.save(link);
+    }
+    if (!link?.pendingArchive) {
+      throw new Error('Cloud archive mutation state is missing');
+    }
+    const pending = link.pendingArchive;
     const result = await this.gateway.archive({
-      mutationId: this.generateMutationId(),
+      mutationId: pending.mutationId,
       cloudId,
-      expectedServerVersion,
+      expectedServerVersion: pending.expectedServerVersion,
     });
     if (result.status !== 'success') {
       throw new Error(`Cloud archive was not accepted: ${result.status}`);
     }
-    const row = await this.gateway.fetch(result.characterId);
-    if (!row?.deleted_at) throw new Error('Cloud archive verification failed');
-    return { serverVersion: row.server_version, deletedAt: row.deleted_at };
+    const verified = await this.gateway.fetch(result.characterId);
+    if (!verified?.deleted_at) {
+      throw new Error('Cloud archive verification failed');
+    }
+    this.links.save({
+      ...link,
+      cloudId: verified.id,
+      serverVersion: verified.server_version,
+      pendingArchive: null,
+    });
+    return {
+      serverVersion: verified.server_version,
+      deletedAt: verified.deleted_at,
+    };
   }
 
   async restoreCloudArchive(

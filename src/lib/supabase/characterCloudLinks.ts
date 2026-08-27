@@ -7,6 +7,11 @@ export interface PendingCharacterMutation {
   originPlayerBackupRunId?: string;
 }
 
+export interface PendingCharacterArchive {
+  mutationId: string;
+  expectedServerVersion: number;
+}
+
 export interface CharacterCloudLink {
   accountId: string;
   legacyId: string;
@@ -14,6 +19,7 @@ export interface CharacterCloudLink {
   serverVersion: number;
   contentFingerprint: string | null;
   pendingMutation?: PendingCharacterMutation | null;
+  pendingArchive?: PendingCharacterArchive | null;
 }
 
 export interface CharacterCloudLinkRepository {

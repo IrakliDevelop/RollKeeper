@@ -141,7 +141,38 @@ describe('projectPlayerBackupWizardView', () => {
 });
 
 describe('projectPlayerBackupManagement', () => {
-  it('groups durable results and leaves pause/resume/remove disabled', () => {
+  it('enables pause and restore when the matching capabilities are on', () => {
+    const management = projectPlayerBackupManagement({
+      characters: CHARACTERS,
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: COPY.selection.alreadyProtected,
+            note: 'Kept up to date.',
+            tone: 'ok',
+          },
+        ],
+        conflicts: [],
+      },
+      futureDefaultOn: true,
+      futureDefaultEnabled: true,
+      manualMutation: true,
+      automaticMutation: true,
+      cloudLegacyIds: ['aveline'],
+    });
+    expect(management.futureDefaultEnabled).toBe(true);
+    expect(management.rows[0]?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'pause', enabled: true }),
+        expect.objectContaining({ action: 'remove', enabled: true }),
+      ])
+    );
+  });
+
+  it('keeps choose enabled for conflicted rows', () => {
     const management = projectPlayerBackupManagement({
       characters: CHARACTERS,
       result: {
@@ -169,15 +200,87 @@ describe('projectPlayerBackupManagement', () => {
       },
       futureDefaultOn: true,
     });
-    expect(management.futureDefaultEnabled).toBe(false);
     expect(management.rows[0]?.actions[0]).toMatchObject({
       action: 'choose',
       enabled: true,
     });
-    expect(
-      management.rows
-        .flatMap(row => row.actions)
-        .filter(action => action.action === 'pause')
-    ).toEqual([]);
+  });
+
+  it('merges online-only copies and disables cloud actions without a cloud row', () => {
+    const management = projectPlayerBackupManagement({
+      characters: CHARACTERS,
+      onlineOnly: [
+        {
+          id: 'cloud-only',
+          name: 'Online Only',
+          state: 'available',
+        },
+      ],
+      cloudLegacyIds: ['cloud-only'],
+      result: EMPTY_RESULT,
+      futureDefaultOn: false,
+      manualMutation: true,
+      automaticMutation: true,
+    });
+    const local = management.rows.find(row => row.id === 'aveline');
+    const online = management.rows.find(row => row.id === 'cloud-only');
+    expect(online).toMatchObject({
+      id: 'cloud-only',
+      name: 'Online Only',
+    });
+    expect(online?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'restore-here', enabled: true }),
+        expect.objectContaining({ action: 'remove', enabled: true }),
+      ])
+    );
+    expect(local?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: 'restore-here',
+          enabled: false,
+        }),
+        expect.objectContaining({ action: 'remove', enabled: false }),
+        expect.objectContaining({
+          action: 'download-recovery',
+          enabled: false,
+        }),
+      ])
+    );
+  });
+
+  it('keeps removed and future online-only copies distinct', () => {
+    const management = projectPlayerBackupManagement({
+      characters: [],
+      onlineOnly: [
+        { id: 'removed', name: 'Removed', state: 'removed' },
+        { id: 'future', name: 'Future', state: 'future' },
+      ],
+      cloudLegacyIds: ['removed', 'future'],
+      result: EMPTY_RESULT,
+      futureDefaultOn: false,
+      manualMutation: true,
+      automaticMutation: true,
+    });
+    const removed = management.rows.find(row => row.id === 'removed');
+    const future = management.rows.find(row => row.id === 'future');
+    expect(removed?.statusLabel).toBe(COPY.selection.removed);
+    expect(removed?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'restore-here', enabled: true }),
+        expect.objectContaining({ action: 'remove', enabled: false }),
+      ])
+    );
+    expect(future?.statusLabel).toBe(COPY.selection.unavailable);
+    expect(future?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'restore-here', enabled: false }),
+        expect.objectContaining({
+          action: 'download-recovery',
+          enabled: true,
+        }),
+        expect.objectContaining({ action: 'remove', enabled: false }),
+      ])
+    );
   });
 });

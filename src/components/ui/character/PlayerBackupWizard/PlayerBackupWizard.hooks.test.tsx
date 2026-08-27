@@ -297,6 +297,8 @@ function Probe() {
       <span data-testid="result-row-status">
         {view.result.rows[0]?.statusLabel ?? ''}
       </span>
+      <span data-testid="surface">{view.surface}</span>
+      <span data-testid="step">{view.step}</span>
       <button type="button" onClick={actions.onSaveSafetyFile}>
         save-safety
       </button>
@@ -652,5 +654,75 @@ describe('usePlayerBackupWizard', () => {
     expect(
       vi.mocked(derivePlayerBackupRunResult).mock.calls.at(-1)?.[0].repository
     ).toBeDefined();
+  });
+
+  it('keeps stale manage intent on setup until durable evidence exists', async () => {
+    function ManageProbe() {
+      const { view } = usePlayerBackupWizard({ intent: 'manage' });
+      return (
+        <div>
+          <span data-testid="surface">{view.surface}</span>
+          <span data-testid="signed-in">{String(view.account.signedIn)}</span>
+        </div>
+      );
+    }
+    render(<ManageProbe />);
+    await waitFor(() => expect(auth.getUser).toHaveBeenCalled());
+    expect(screen.getByTestId('signed-in')).toHaveTextContent('false');
+    expect(screen.getByTestId('surface')).toHaveTextContent('wizard');
+  });
+
+  it('keeps an unfinished durable run on its result surface', async () => {
+    vi.mocked(listPlayerBackupConflicts).mockResolvedValueOnce({
+      accountId: 'acc-a',
+      runId: 'run-1',
+      conflicts: [],
+      heldAside: [],
+    });
+    function ManageProbe() {
+      const { view } = usePlayerBackupWizard({ intent: 'manage' });
+      return (
+        <div>
+          <span data-testid="surface">{view.surface}</span>
+          <span data-testid="step">{view.step}</span>
+        </div>
+      );
+    }
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<ManageProbe />);
+    await waitFor(() => {
+      expect(screen.getByTestId('step')).toHaveTextContent('result');
+    });
+    expect(screen.getByTestId('surface')).toHaveTextContent('wizard');
+  });
+
+  it('honors manage intent after durable protection exists', async () => {
+    vi.mocked(derivePlayerBackupRunResult).mockResolvedValueOnce({
+      runId: 'run-1',
+      accountId: 'acc-a',
+      mode: 'one-time',
+      executionPath: 'integrated',
+      protected: ['hero-a'],
+      queued: [],
+      offline: [],
+      authRequired: [],
+      needsAttention: [],
+      heldAside: [],
+      failed: [],
+      pending: [],
+      outcomes: {
+        'hero-a': { outcome: 'protected', reason: null },
+      },
+      complete: true,
+    });
+    function ManageProbe() {
+      const { view } = usePlayerBackupWizard({ intent: 'manage' });
+      return <span data-testid="surface">{view.surface}</span>;
+    }
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<ManageProbe />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('manage');
+    });
   });
 });

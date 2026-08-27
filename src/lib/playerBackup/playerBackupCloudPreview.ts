@@ -175,12 +175,13 @@ export async function compareCloudRows(
     })
   );
   const localIds = new Set(characters.map(character => character.legacyId));
+  const onlineOnly = [...byLegacyId.entries()].flatMap(
+    ([legacyId, candidate]) =>
+      candidate !== null && !localIds.has(legacyId) ? [candidate] : []
+  );
   return {
     characters,
-    onlineOnly: decoded.filter(
-      (candidate): candidate is DecodedCloudCharacter =>
-        candidate !== null && !localIds.has(candidate.row.legacy_client_id)
-    ),
+    onlineOnly,
   };
 }
 
@@ -217,6 +218,7 @@ export async function previewPlayerBackupCloud(options: {
 export interface PlayerBackupCloudPreviewSnapshot {
   accountId: string | null;
   characters: PlayerBackupPreviewCharacter[];
+  onlineOnly: DecodedCloudCharacter[];
   loading: boolean;
 }
 
@@ -225,16 +227,21 @@ export class PlayerBackupCloudPreviewController {
   private state: PlayerBackupCloudPreviewSnapshot = {
     accountId: null,
     characters: [],
+    onlineOnly: [],
     loading: false,
   };
 
   snapshot(): PlayerBackupCloudPreviewSnapshot {
-    return { ...this.state, characters: [...this.state.characters] };
+    return {
+      ...this.state,
+      characters: [...this.state.characters],
+      onlineOnly: [...this.state.onlineOnly],
+    };
   }
 
   changeAccount(accountId: string | null): void {
     this.token += 1;
-    this.state = { accountId, characters: [], loading: false };
+    this.state = { accountId, characters: [], onlineOnly: [], loading: false };
   }
 
   async load(
@@ -242,7 +249,7 @@ export class PlayerBackupCloudPreviewController {
     loader: () => Promise<PlayerBackupCloudPreview>
   ): Promise<boolean> {
     const requestToken = ++this.token;
-    this.state = { accountId, characters: [], loading: true };
+    this.state = { accountId, characters: [], onlineOnly: [], loading: true };
     try {
       const result = await loader();
       if (
@@ -255,6 +262,7 @@ export class PlayerBackupCloudPreviewController {
       this.state = {
         accountId,
         characters: result.characters,
+        onlineOnly: result.onlineOnly,
         loading: false,
       };
       return true;
@@ -262,7 +270,12 @@ export class PlayerBackupCloudPreviewController {
       if (requestToken !== this.token || this.state.accountId !== accountId) {
         return false;
       }
-      this.state = { accountId, characters: [], loading: false };
+      this.state = {
+        accountId,
+        characters: [],
+        onlineOnly: [],
+        loading: false,
+      };
       throw cause;
     }
   }

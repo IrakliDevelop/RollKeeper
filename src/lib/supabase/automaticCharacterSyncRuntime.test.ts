@@ -5,6 +5,7 @@ import {
   configureAutomaticCharacterSyncRuntime,
   recordAutomaticCharacterDelete,
   recordAutomaticCharacterEdit,
+  wakeAutomaticCharacterSyncRuntime,
 } from './automaticCharacterSyncRuntime';
 
 const character = {
@@ -23,6 +24,7 @@ describe('automatic character sync runtime bridge', () => {
     await expect(recordAutomaticCharacterDelete(character)).resolves.toBe(
       'local-only'
     );
+    await expect(wakeAutomaticCharacterSyncRuntime()).resolves.toBeUndefined();
   });
 
   it('records durable work before waking the worker', async () => {
@@ -83,5 +85,18 @@ describe('automatic character sync runtime bridge', () => {
     expect(runtime.stop).not.toHaveBeenCalled();
     clearAutomaticCharacterSyncRuntime('account-a');
     expect(runtime.stop).toHaveBeenCalledOnce();
+  });
+
+  it('wakes the existing authorized worker without changing work identity', async () => {
+    const wake = vi.fn(async () => undefined);
+    configureAutomaticCharacterSyncRuntime({
+      accountId: 'account-a',
+      recordEdit: vi.fn(),
+      recordDelete: vi.fn(),
+      wake,
+      stop: vi.fn(),
+    });
+    await wakeAutomaticCharacterSyncRuntime();
+    expect(wake).toHaveBeenCalledOnce();
   });
 });

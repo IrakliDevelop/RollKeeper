@@ -203,10 +203,48 @@ export const EMPTY_MANAGEMENT: PlayerBackupWizardView['management'] = {
   futureDefaultEnabled: false,
 };
 
+function cloudManagementActions(options: {
+  hasCloudRow: boolean;
+  manual: boolean;
+}): PlayerBackupWizardView['management']['rows'][number]['actions'] {
+  const mutate = options.manual && options.hasCloudRow;
+  return [
+    {
+      label: COPY.management.restoreHere,
+      enabled: mutate,
+      action: 'restore-here',
+    },
+    {
+      label: COPY.management.restoreCopy,
+      enabled: mutate,
+      action: 'restore-copy',
+    },
+    {
+      label: COPY.conflict.downloadRecovery,
+      enabled: options.hasCloudRow,
+      action: 'download-recovery',
+    },
+    {
+      label: COPY.management.remove,
+      enabled: mutate,
+      action: 'remove',
+    },
+  ];
+}
+
 export function projectPlayerBackupManagement(input: {
   characters: PlayerBackupCharacterRow[];
+  onlineOnly?: ReadonlyArray<{
+    id: string;
+    name: string;
+    state: 'available' | 'removed' | 'future';
+  }>;
+  cloudLegacyIds?: readonly string[];
   result: PlayerBackupWizardView['result'];
   futureDefaultOn: boolean;
+  futureDefaultEnabled?: boolean;
+  manualMutation?: boolean;
+  automaticMutation?: boolean;
 }): PlayerBackupWizardView['management'] {
   const conflictIds = new Set(
     input.result.conflicts.map(conflict => conflict.legacyId)
@@ -214,35 +252,101 @@ export function projectPlayerBackupManagement(input: {
   const heldAsideIds = new Set(
     input.result.heldAside.map(item => item.legacyId)
   );
-  const rows = input.characters.map(character => {
+  const cloudLegacyIds = new Set(input.cloudLegacyIds ?? []);
+  const manual = input.manualMutation === true;
+  const automatic = input.automaticMutation === true;
+  const localIds = new Set(input.characters.map(character => character.id));
+  const localRows = input.characters.map(character => {
     const conflicted = conflictIds.has(character.id);
     const heldAside = heldAsideIds.has(character.id);
     const resultRow = input.result.rows.find(row => row.id === character.id);
+    const statusLabel = resultRow?.statusLabel ?? character.statusLabel;
+    const paused = statusLabel === COPY.selection.paused;
+    const savedOnce = statusLabel === COPY.selection.oneTimeProtected;
+    const protectedOngoing =
+      statusLabel === COPY.selection.alreadyProtected ||
+      resultRow?.tone === 'ok';
+    const hasCloudRow = cloudLegacyIds.has(character.id);
     return {
       id: character.id,
       name: character.name,
-      statusLabel: resultRow?.statusLabel ?? character.statusLabel,
+      statusLabel,
       note: resultRow?.note ?? character.note,
       tone: resultRow?.tone ?? character.tone,
       actions: conflicted
-        ? [{ label: COPY.conflict.title, enabled: true, action: 'choose' }]
+        ? [
+            {
+              label: COPY.conflict.title,
+              enabled: true,
+              action: 'choose' as const,
+            },
+          ]
         : heldAside
           ? [
               {
                 label: COPY.conflict.downloadRecovery,
-                enabled: false,
-                action: 'download-recovery',
+                enabled: hasCloudRow,
+                action: 'download-recovery' as const,
               },
             ]
           : [
-              {
-                label: COPY.management.pause,
-                enabled: false,
-                action: 'pause',
-              },
+              ...(protectedOngoing && !paused && !savedOnce
+                ? [
+                    {
+                      label: COPY.management.pause,
+                      enabled: automatic,
+                      action: 'pause' as const,
+                    },
+                  ]
+                : []),
+              ...(paused || savedOnce
+                ? [
+                    {
+                      label: COPY.management.resume,
+                      enabled: automatic,
+                      action: 'resume' as const,
+                    },
+                    {
+                      label: COPY.management.backupNow,
+                      enabled: manual,
+                      action: 'backup-now' as const,
+                    },
+                  ]
+                : []),
+              ...cloudManagementActions({ hasCloudRow, manual }),
             ],
     };
   });
+  const onlineRows = (input.onlineOnly ?? [])
+    .filter(entry => !localIds.has(entry.id))
+    .map(entry => {
+      const hasCloudRow = cloudLegacyIds.has(entry.id);
+      const actions = cloudManagementActions({ hasCloudRow, manual }).map(
+        action =>
+          entry.state === 'future'
+            ? {
+                ...action,
+                enabled: action.action === 'download-recovery' && hasCloudRow,
+              }
+            : entry.state === 'removed' && action.action === 'remove'
+              ? { ...action, enabled: false }
+              : action
+      );
+      return {
+        id: entry.id,
+        name: entry.name,
+        statusLabel:
+          entry.state === 'removed'
+            ? COPY.selection.removed
+            : entry.state === 'future'
+              ? COPY.selection.unavailable
+              : COPY.selection.oneTimeProtected,
+        note: '',
+        tone: entry.state === 'future' ? ('warn' as const) : ('info' as const),
+        actions,
+      };
+    });
+  const rows = [...localRows, ...onlineRows];
   const protectedCount = rows.filter(row => row.tone === 'ok').length;
   const pausedCount = rows.filter(
     row => row.statusLabel === COPY.selection.paused
@@ -259,7 +363,7 @@ export function projectPlayerBackupManagement(input: {
     ),
     rows,
     futureDefaultOn: input.futureDefaultOn,
-    futureDefaultEnabled: false,
+    futureDefaultEnabled: input.futureDefaultEnabled === true,
   };
 }
 

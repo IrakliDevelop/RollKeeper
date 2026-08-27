@@ -92,6 +92,19 @@ describe('read-only player backup cloud preview', () => {
     ).rejects.toMatchObject({ category: 'account-changed' });
   });
 
+  it('excludes ambiguous duplicate online-only rows', async () => {
+    const compared = await compareCloudRows(
+      [
+        row({ id: 'cloud-a', legacy_client_id: 'online-only' }),
+        row({ id: 'cloud-b', legacy_client_id: 'online-only' }),
+        row({ id: 'cloud-c', legacy_client_id: 'unique-online' }),
+      ],
+      []
+    );
+    expect(compared.onlineOnly).toHaveLength(1);
+    expect(compared.onlineOnly[0]?.row.id).toBe('cloud-c');
+  });
+
   it('clears old rows synchronously and discards stale responses', async () => {
     let finish!: (value: PlayerBackupCloudPreview) => void;
     const controller = new PlayerBackupCloudPreviewController();
@@ -106,6 +119,7 @@ describe('read-only player backup cloud preview', () => {
     expect(controller.snapshot()).toEqual({
       accountId: 'account-b',
       characters: [],
+      onlineOnly: [],
       loading: false,
     });
     finish({ account: { id: 'account-a' }, characters: [], onlineOnly: [] });
@@ -129,6 +143,7 @@ describe('read-only player backup cloud preview', () => {
     expect(controller.snapshot()).toEqual({
       accountId: 'account-b',
       characters: [],
+      onlineOnly: [],
       loading: false,
     });
   });
