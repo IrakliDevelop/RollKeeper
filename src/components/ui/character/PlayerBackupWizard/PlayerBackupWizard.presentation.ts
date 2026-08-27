@@ -29,6 +29,7 @@ export interface PlayerBackupWizardProjectionInput {
   management: PlayerBackupWizardView['management'];
   recovery: PlayerBackupWizardView['recovery'];
   liveStatus: string | null;
+  actionError?: string | null;
   busy: boolean;
 }
 
@@ -102,6 +103,7 @@ export function projectPlayerBackupWizardView(
   );
   const resultDone = input.step === 'result';
   const nextDisabled =
+    input.step === 'selection' ||
     (input.step === 'account' && !signedIn) ||
     (input.step === 'safety' && !safetyReady);
 
@@ -176,6 +178,7 @@ export function projectPlayerBackupWizardView(
       nextDisabled,
     },
     liveStatus: input.liveStatus,
+    actionError: input.actionError ?? null,
     busy: input.busy,
   };
 }

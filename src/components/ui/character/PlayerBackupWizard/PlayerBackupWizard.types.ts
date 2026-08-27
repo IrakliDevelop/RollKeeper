@@ -63,6 +63,7 @@ export interface PlayerBackupHeldAsideCard {
   legacyId: string;
   name: string;
   recoveryAvailable: boolean;
+  downloadEnabled: boolean;
 }
 
 export interface PlayerBackupManagementRow {
@@ -143,6 +144,7 @@ export interface PlayerBackupWizardView {
     nextDisabled: boolean;
   };
   liveStatus: string | null;
+  actionError: string | null;
   busy: boolean;
 }
 

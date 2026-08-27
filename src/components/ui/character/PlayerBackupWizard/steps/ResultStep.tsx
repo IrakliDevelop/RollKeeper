@@ -160,6 +160,7 @@ export function ResultStep({
             <Button
               className="mt-3"
               variant="outline"
+              disabled={!item.downloadEnabled}
               onClick={() => onDownloadRecoveryCopy(item.legacyId)}
             >
               {COPY.conflict.downloadRecovery}

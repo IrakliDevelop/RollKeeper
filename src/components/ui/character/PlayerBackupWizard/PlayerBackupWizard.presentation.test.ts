@@ -132,6 +132,12 @@ describe('projectPlayerBackupWizardView', () => {
     expect(view.selection.confirmEnabled).toBe(false);
     expect(view.selection.confirmHint).toBe(COPY.selection.noSelection);
   });
+
+  it('disables the selection footer so the consent card stays the only confirm control', () => {
+    const view = projectPlayerBackupWizardView(input());
+    expect(view.footer.nextLabel).toBe('Review and confirm');
+    expect(view.footer.nextDisabled).toBe(true);
+  });
 });
 
 describe('projectPlayerBackupManagement', () => {

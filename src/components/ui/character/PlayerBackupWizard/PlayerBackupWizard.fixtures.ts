@@ -186,6 +186,7 @@ function baseView(): PlayerBackupWizardView {
     },
     footer: footer('account', true, 'Continue'),
     liveStatus: null,
+    actionError: null,
     busy: false,
   };
 }
@@ -350,7 +351,7 @@ export function createPlayerBackupWizardFixture(
         compactStepLabel: COPY.selection.eyebrow,
         rail: rail('selection'),
         headerNote: COPY.account.signedIn(EMAIL),
-        footer: footer('selection', false, 'Review and confirm'),
+        footer: footer('selection', true, 'Review and confirm'),
       };
     case 'one-copy-only':
       return {
@@ -371,7 +372,7 @@ export function createPlayerBackupWizardFixture(
             authority: 'legacy',
           }),
         },
-        footer: footer('selection', false, 'Review and confirm'),
+        footer: footer('selection', true, 'Review and confirm'),
       };
     case 'account-changed':
       return {
@@ -541,6 +542,7 @@ export function createPlayerBackupWizardFixture(
               legacyId: 'roderick',
               name: 'Sir Roderick',
               recoveryAvailable: true,
+              downloadEnabled: false,
             },
           ],
         },

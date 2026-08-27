@@ -93,6 +93,19 @@ function SetupRail({ view }: Pick<PlayerBackupWizardProps, 'view'>) {
   );
 }
 
+function ActionErrorBanner({ message }: { message: string | null }) {
+  if (!message) return null;
+  return (
+    <div
+      role="alert"
+      tabIndex={-1}
+      className="border-accent-red-border bg-accent-red-bg rounded-lg border p-3.5"
+    >
+      <p className="text-accent-red-text text-[13px]">{message}</p>
+    </div>
+  );
+}
+
 export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
   useEffect(() => {
     const alert = document.querySelector('[role="alert"]');
@@ -111,6 +124,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
     view.account.error,
     view.safety.receipt,
     view.selection.alert,
+    view.actionError,
     view.step,
     view.surface,
   ]);
@@ -176,6 +190,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
             <DialogBody className="flex min-w-0 gap-5 overflow-x-hidden">
               <SetupRail view={view} />
               <div className="flex min-w-0 flex-1 flex-col gap-4">
+                <ActionErrorBanner message={view.actionError} />
                 {view.step === 'account' ? (
                   <AccountStep
                     view={view}
@@ -258,6 +273,7 @@ export function PlayerBackupWizard({ view, actions }: PlayerBackupWizardProps) {
       ) : (
         <div className="mx-auto max-w-4xl px-4 py-10 sm:px-6">
           <div className="border-divider bg-surface-raised flex flex-col gap-4 rounded-xl border-2 p-6 shadow-2xl">
+            <ActionErrorBanner message={view.actionError} />
             {view.surface === 'manage' ? (
               <ManagementPanel view={view} actions={actions} />
             ) : (

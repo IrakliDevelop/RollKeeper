@@ -120,6 +120,7 @@ const SCENARIO_EXPECTATIONS: Record<
   'needs-newer-version': {
     heading: COPY.result.partialTitle,
     copy: COPY.conflict.futureTitle,
+    control: { name: COPY.conflict.downloadRecovery, disabled: true },
   },
   'manage-backups': {
     heading: COPY.management.title,
@@ -187,6 +188,14 @@ describe('PlayerBackupWizard', () => {
       screen.getByRole('button', { name: COPY.selection.ongoingButton })
     );
     expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces mutation failures as a visible alert', () => {
+    renderWizard({
+      ...createPlayerBackupWizardFixture('choose-characters'),
+      actionError: COPY.errors.online,
+    });
+    expect(screen.getByRole('alert')).toHaveTextContent(COPY.errors.online);
   });
 
   it('names the safety file input and exposes mismatch as an alert', () => {
