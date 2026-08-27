@@ -73,7 +73,19 @@ export interface PlayerBackupManagementRow {
   statusLabel: string;
   note: string;
   tone: PlayerBackupTone;
-  actions: Array<{ label: string; enabled: boolean; action: string }>;
+  actions: Array<{
+    label: string;
+    enabled: boolean;
+    action:
+      | 'choose'
+      | 'pause'
+      | 'resume'
+      | 'backup-now'
+      | 'restore-here'
+      | 'restore-copy'
+      | 'download-recovery'
+      | 'remove';
+  }>;
 }
 
 export interface PlayerBackupWizardView {
@@ -175,6 +187,13 @@ export interface PlayerBackupWizardActions {
   onOpenRecovery: () => void;
   onOpenManage: () => void;
   onDownloadRecoveryCopy: (legacyId: string) => void;
+  onPauseCharacter: (legacyId: string) => void;
+  onResumeCharacter: (legacyId: string) => void;
+  onBackupNow: (legacyId: string) => void;
+  onRestoreHere: (legacyId: string) => void;
+  onRestoreCopy: (legacyId: string) => void;
+  onRemoveOnlineCopy: (legacyId: string) => void;
+  onToggleFutureDefault: (enabled: boolean) => void;
 }
 
 export interface PlayerBackupWizardProps {

@@ -297,6 +297,8 @@ function Probe() {
       <span data-testid="result-row-status">
         {view.result.rows[0]?.statusLabel ?? ''}
       </span>
+      <span data-testid="surface">{view.surface}</span>
+      <span data-testid="step">{view.step}</span>
       <button type="button" onClick={actions.onSaveSafetyFile}>
         save-safety
       </button>
@@ -652,5 +654,23 @@ describe('usePlayerBackupWizard', () => {
     expect(
       vi.mocked(derivePlayerBackupRunResult).mock.calls.at(-1)?.[0].repository
     ).toBeDefined();
+  });
+
+  it('honors manage intent instead of reopening the expanded result', async () => {
+    function ManageProbe() {
+      const { view } = usePlayerBackupWizard({ intent: 'manage' });
+      return (
+        <div>
+          <span data-testid="surface">{view.surface}</span>
+          <span data-testid="step">{view.step}</span>
+        </div>
+      );
+    }
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<ManageProbe />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('manage');
+    });
+    expect(screen.getByTestId('step')).not.toHaveTextContent('result');
   });
 });

@@ -647,6 +647,13 @@ export function createIdlePlayerBackupWizardActions(
     onOpenRecovery: idle,
     onOpenManage: idle,
     onDownloadRecoveryCopy: idle,
+    onPauseCharacter: idle,
+    onResumeCharacter: idle,
+    onBackupNow: idle,
+    onRestoreHere: idle,
+    onRestoreCopy: idle,
+    onRemoveOnlineCopy: idle,
+    onToggleFutureDefault: idle,
     ...overrides,
   };
 }

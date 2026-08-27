@@ -1,0 +1,176 @@
+import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
+import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
+import type {
+  CharacterCloudAccount,
+  ManualCharacterCloudService,
+  VerifiedCharacterBackup,
+} from '@/lib/supabase/manualCharacterCloudService';
+import type { RestoreMode } from '@/lib/supabase/characterCloudCodec';
+
+import { withExistingDatabase } from './playerBackupOnlineExecution';
+import {
+  type PlayerBackupExclusiveLockProvider,
+  mutatePlayerBackupWithFence,
+} from './playerBackupRunFence';
+
+export interface PlayerBackupManagementService {
+  backup: ManualCharacterCloudService['backup'];
+  archive: ManualCharacterCloudService['archive'];
+  prepareRestore: ManualCharacterCloudService['prepareRestore'];
+}
+
+export interface PlayerBackupManagementBase {
+  factory: IDBFactory;
+  locks: PlayerBackupExclusiveLockProvider | null | undefined;
+  accountId: string;
+  expectedActiveRunId: string;
+}
+
+function account(accountId: string): CharacterCloudAccount {
+  return { id: accountId };
+}
+
+function namespaceFor(accountId: string): `user:${string}` {
+  return `user:${accountId}`;
+}
+
+export async function backupPlayerBackupCharacterNow(
+  options: PlayerBackupManagementBase & {
+    character: unknown;
+    service: Pick<PlayerBackupManagementService, 'backup'>;
+  }
+): Promise<VerifiedCharacterBackup> {
+  return mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      options.service.backup(
+        options.character,
+        account(options.accountId),
+        {
+          guestSelected: true,
+          confirmedTargetAccountId: options.accountId,
+        },
+        { originPlayerBackupRunId: options.expectedActiveRunId }
+      ),
+  });
+}
+
+export async function pausePlayerBackupCharacter(
+  options: PlayerBackupManagementBase & {
+    legacyId: string;
+    service?: Pick<PlayerBackupManagementService, 'archive'>;
+  }
+): Promise<void> {
+  void options.service;
+  await mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      withExistingDatabase(options.factory, async database => {
+        const preferences = new AutomaticCharacterSyncPreferences(database);
+        const repository = new IndexedDbAutomaticCharacterSyncRepository(
+          database
+        );
+        const namespace = namespaceFor(options.accountId);
+        await preferences.setCharacter(namespace, options.legacyId, false);
+        await repository.pauseAggregate(namespace, options.legacyId);
+      }),
+  });
+}
+
+export async function resumePlayerBackupCharacter(
+  options: PlayerBackupManagementBase & {
+    legacyId: string;
+    wake?: () => Promise<void> | void;
+  }
+): Promise<void> {
+  await mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      withExistingDatabase(options.factory, async database => {
+        const preferences = new AutomaticCharacterSyncPreferences(database);
+        const repository = new IndexedDbAutomaticCharacterSyncRepository(
+          database
+        );
+        const namespace = namespaceFor(options.accountId);
+        await preferences.setCharacter(namespace, options.legacyId, true);
+        await repository.resumeAggregate(namespace, options.legacyId);
+      }),
+  });
+  await options.wake?.();
+}
+
+export async function setPlayerBackupFutureDefault(
+  options: PlayerBackupManagementBase & {
+    futureDefault: 'on' | 'off';
+    at: string;
+  }
+): Promise<void> {
+  await mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      withExistingDatabase(options.factory, async database => {
+        const preferences = new AutomaticCharacterSyncPreferences(database);
+        await preferences.setFutureDefault(
+          namespaceFor(options.accountId),
+          options.futureDefault,
+          options.at
+        );
+      }),
+  });
+}
+
+export async function archivePlayerBackupOnlineCopy(
+  options: PlayerBackupManagementBase & {
+    cloudId: string;
+    expectedServerVersion: number;
+    service: Pick<PlayerBackupManagementService, 'archive'>;
+  }
+): Promise<{ serverVersion: number; deletedAt: string }> {
+  return mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      options.service.archive(
+        options.cloudId,
+        account(options.accountId),
+        options.expectedServerVersion
+      ),
+  });
+}
+
+export async function restorePlayerBackupCharacter(
+  options: PlayerBackupManagementBase & {
+    cloudId: string;
+    localCharacters: readonly unknown[];
+    mode: RestoreMode;
+    service: Pick<PlayerBackupManagementService, 'prepareRestore'>;
+  }
+): Promise<Awaited<ReturnType<ManualCharacterCloudService['prepareRestore']>>> {
+  return mutatePlayerBackupWithFence({
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    locks: options.locks,
+    factory: options.factory,
+    mutateAndAcknowledge: () =>
+      options.service.prepareRestore(
+        options.cloudId,
+        account(options.accountId),
+        options.localCharacters,
+        options.mode
+      ),
+  });
+}

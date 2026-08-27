@@ -61,7 +61,21 @@ import {
 } from '@/lib/playerBackup/playerBackupSafety';
 import { projectCharacterBackupStatus } from '@/lib/playerBackup/playerBackupStatus';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import {
+  readPlayerBackupCharacterPolicies,
+  type PlayerBackupRouteIntent,
+} from '@/lib/playerBackup/playerBackupDashboard';
+import {
+  archivePlayerBackupOnlineCopy,
+  backupPlayerBackupCharacterNow,
+  pausePlayerBackupCharacter,
+  restorePlayerBackupCharacter,
+  resumePlayerBackupCharacter,
+  setPlayerBackupFutureDefault,
+} from '@/lib/playerBackup/playerBackupManagement';
 import { createManualCharacterCloud } from '@/lib/supabase/characterCloud';
+import { downloadCharacterCloudRecovery } from '@/lib/supabase/characterCloudRecovery';
+import { wakeAutomaticCharacterSyncRuntime } from '@/lib/supabase/automaticCharacterSyncRuntime';
 import { usePlayerStore } from '@/store/playerStore';
 import { APP_VERSION } from '@/utils/constants';
 
@@ -133,7 +147,11 @@ function deriveBrowserPlayerBackupResult(options: {
   );
 }
 
-export function usePlayerBackupWizard(): {
+export function usePlayerBackupWizard(
+  options: {
+    intent?: PlayerBackupRouteIntent | null;
+  } = {}
+): {
   view: PlayerBackupWizardView;
   actions: PlayerBackupWizardActions;
 } {
@@ -145,7 +163,13 @@ export function usePlayerBackupWizard(): {
   } | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const [step, setStep] = useState<PlayerBackupWizardStep>('account');
-  const [surface, setSurface] = useState<PlayerBackupWizardSurface>('wizard');
+  const [surface, setSurface] = useState<PlayerBackupWizardSurface>(() =>
+    options.intent === 'manage'
+      ? 'manage'
+      : options.intent === 'recovery'
+        ? 'recovery'
+        : 'wizard'
+  );
   const [busy, setBusy] = useState(false);
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [safety, setSafety] =
@@ -169,6 +193,7 @@ export function usePlayerBackupWizard(): {
   const [snapshot, setSnapshot] = useState(() =>
     coordinatorRef.current.snapshot()
   );
+  const [policies, setPolicies] = useState<Record<string, 'on' | 'off'>>({});
   const verifiedBroad = useRef<DeviceBackupV1 | null>(null);
   const pendingCurrent = useRef<ActiveCharacterRecoveryBundle | null>(null);
   const verifiedCurrent = useRef<ActiveCharacterRecoveryBundle | null>(null);
@@ -195,6 +220,7 @@ export function usePlayerBackupWizard(): {
       mutationGeneration.current += 1;
       coordinatorRef.current.changeAccount(nextAccountId);
       publishSnapshot(coordinatorRef.current, setSnapshot);
+      setPolicies({});
       verifiedBroad.current = null;
       pendingCurrent.current = null;
       verifiedCurrent.current = null;
@@ -264,6 +290,17 @@ export function usePlayerBackupWizard(): {
           typeof indexedDB === 'undefined' ? null : indexedDB
         );
         if (cancelled) return;
+        if (typeof indexedDB !== 'undefined') {
+          const nextPolicies = await readPlayerBackupCharacterPolicies({
+            factory: indexedDB,
+            accountId,
+            characterIds: usePlayerStore
+              .getState()
+              .characters.map(item => item.id),
+          });
+          if (cancelled) return;
+          setPolicies(nextPolicies);
+        }
         const preview = createBrowserPlayerBackupCloudPreview({
           manualRead: capabilities.calls.manualRead,
           automaticRead: capabilities.calls.automaticRead,
@@ -295,8 +332,12 @@ export function usePlayerBackupWizard(): {
             })
           );
           if (!cancelled) {
-            setStep('result');
-            announce(COPY.chrome.continueSetup);
+            if (options.intent === 'manage') setSurface('manage');
+            else if (options.intent === 'recovery') setSurface('recovery');
+            else {
+              setStep('result');
+              announce(COPY.chrome.continueSetup);
+            }
           }
         }
       } catch (cause) {
@@ -315,6 +356,7 @@ export function usePlayerBackupWizard(): {
     announce,
     capabilities.calls.automaticRead,
     capabilities.calls.manualRead,
+    options.intent,
   ]);
 
   const characters: PlayerBackupCharacterRow[] = useMemo(() => {
@@ -384,6 +426,9 @@ export function usePlayerBackupWizard(): {
           : eligible && selectedIds.has(character.id);
       const status = projectCharacterBackupStatus({
         acknowledged: preview?.state === 'identical',
+        preference: policies[character.id] ?? null,
+        explicitlyPaused:
+          snapshot.run?.mode === 'ongoing' && policies[character.id] === 'off',
         conflict: preview?.state === 'different' || preview?.state === 'newer',
         heldAside: preview?.state === 'future',
         offline: preview?.state === 'unavailable',
@@ -407,6 +452,8 @@ export function usePlayerBackupWizard(): {
     snapshot.cloud.accountId,
     snapshot.cloud.characters,
     snapshot.cloud.loading,
+    policies,
+    snapshot.run?.mode,
   ]);
 
   const selectedCount = characters.filter(
@@ -434,10 +481,14 @@ export function usePlayerBackupWizard(): {
     );
     const outcomeLabel = (
       outcome: (typeof execution.outcomes)[string] | undefined,
-      fallback: string
+      fallback: string,
+      legacyId: string
     ) => {
       if (!outcome) return fallback;
       if (outcome.outcome === 'protected') {
+        if (execution.mode === 'ongoing' && policies[legacyId] === 'off') {
+          return COPY.selection.paused;
+        }
         return execution.mode === 'ongoing'
           ? 'Protected'
           : COPY.selection.oneTimeProtected;
@@ -474,13 +525,18 @@ export function usePlayerBackupWizard(): {
     };
     const rows = characters.map(character => {
       const outcome = execution.outcomes[character.id];
+      const paused =
+        outcome?.outcome === 'protected' &&
+        execution.mode === 'ongoing' &&
+        policies[character.id] === 'off';
       return {
         id: character.id,
         name: character.name,
-        statusLabel: outcomeLabel(outcome, character.statusLabel),
+        statusLabel: outcomeLabel(outcome, character.statusLabel, character.id),
         note: outcomeNote(outcome, character.note),
-        tone:
-          outcome?.outcome === 'protected'
+        tone: paused
+          ? 'info'
+          : outcome?.outcome === 'protected'
             ? 'ok'
             : outcome?.outcome === 'offline' || outcome?.outcome === 'queued'
               ? 'info'
@@ -582,7 +638,7 @@ export function usePlayerBackupWizard(): {
           characters.find(row => row.id === item.legacyId)?.name ??
           item.legacyId,
         recoveryAvailable: item.recoveryAvailable,
-        downloadEnabled: false,
+        downloadEnabled: item.recoveryAvailable,
       })),
       continueSetup:
         Boolean(snapshot.run) &&
@@ -590,7 +646,7 @@ export function usePlayerBackupWizard(): {
         pendingIds.size === 0,
       closeSafe: Boolean(snapshot.run),
     } satisfies PlayerBackupWizardView['result'];
-  }, [characters, snapshot.conflicts, snapshot.result, snapshot.run]);
+  }, [characters, policies, snapshot.conflicts, snapshot.result, snapshot.run]);
 
   const view = projectPlayerBackupWizardView({
     surface,
@@ -612,7 +668,10 @@ export function usePlayerBackupWizard(): {
     management: projectPlayerBackupManagement({
       characters,
       result,
-      futureDefaultOn: snapshot.run?.mode === 'ongoing',
+      futureDefaultOn: snapshot.run?.futureDefault === 'on',
+      futureDefaultEnabled: capabilities.calls.automaticMutation,
+      manualMutation: capabilities.calls.manualMutation,
+      automaticMutation: capabilities.calls.automaticMutation,
     }),
     recovery: EMPTY_RECOVERY,
     liveStatus,
@@ -654,6 +713,13 @@ export function usePlayerBackupWizard(): {
       })
     );
     if (generation !== mutationGeneration.current) return;
+    const nextPolicies = await readPlayerBackupCharacterPolicies({
+      factory: indexedDB,
+      accountId,
+      characterIds: usePlayerStore.getState().characters.map(item => item.id),
+    });
+    if (generation !== mutationGeneration.current) return;
+    setPolicies(nextPolicies);
     publishSnapshot(coordinatorRef.current, setSnapshot);
   };
 
@@ -1307,7 +1373,266 @@ export function usePlayerBackupWizard(): {
     },
     onOpenRecovery: () => setSurface('recovery'),
     onOpenManage: () => setSurface('manage'),
-    onDownloadRecoveryCopy: () => undefined,
+    onDownloadRecoveryCopy: legacyId => {
+      const cloud = createManualCharacterCloud(window.localStorage);
+      const row = snapshot.cloud.characters.find(
+        character => character.legacyId === legacyId
+      )?.row;
+      if (!cloud || !row) {
+        reportError('online', new Error('recovery-unavailable'));
+        return;
+      }
+      downloadCharacterCloudRecovery(cloud.service.recoveryFor(row));
+    },
+    onPauseCharacter: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      if (!run || !accountId) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void pausePlayerBackupCharacter({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        legacyId,
+      })
+        .then(async () => {
+          if (generation !== mutationGeneration.current) return;
+          announce(COPY.management.pauseSuccess);
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onResumeCharacter: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      if (!run || !accountId) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void resumePlayerBackupCharacter({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        legacyId,
+        wake: () => wakeAutomaticCharacterSyncRuntime(),
+      })
+        .then(async () => {
+          if (generation !== mutationGeneration.current) return;
+          announce(COPY.management.resumeSuccess);
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onBackupNow: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      const cloud = createManualCharacterCloud(window.localStorage);
+      const character = usePlayerStore
+        .getState()
+        .characters.find(item => item.id === legacyId);
+      if (!run || !accountId || !cloud || !character) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void backupPlayerBackupCharacterNow({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        character,
+        service: cloud.service,
+      })
+        .then(async () => {
+          if (generation !== mutationGeneration.current) return;
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onRestoreHere: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      const cloud = createManualCharacterCloud(window.localStorage);
+      const cloudId = snapshot.cloud.characters.find(
+        character => character.legacyId === legacyId
+      )?.row?.id;
+      if (!run || !accountId || !cloud || !cloudId) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void restorePlayerBackupCharacter({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        cloudId,
+        localCharacters: usePlayerStore.getState().characters,
+        mode: 'original',
+        service: cloud.service,
+      })
+        .then(async prepared => {
+          if (generation !== mutationGeneration.current) return;
+          if (!prepared.plan.character) return;
+          const store = usePlayerStore.getState();
+          store.replaceCloudRecoveredCharacter(
+            prepared.plan.character as unknown as Parameters<
+              typeof store.replaceCloudRecoveredCharacter
+            >[0]
+          );
+          cloud.service.attachLink(prepared.link);
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onRestoreCopy: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      const cloud = createManualCharacterCloud(window.localStorage);
+      const cloudId = snapshot.cloud.characters.find(
+        character => character.legacyId === legacyId
+      )?.row?.id;
+      if (!run || !accountId || !cloud || !cloudId) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void restorePlayerBackupCharacter({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        cloudId,
+        localCharacters: usePlayerStore.getState().characters,
+        mode: 'copy',
+        service: cloud.service,
+      })
+        .then(async prepared => {
+          if (generation !== mutationGeneration.current) return;
+          if (!prepared.plan.character) return;
+          const store = usePlayerStore.getState();
+          store.addCloudRecoveredCharacter(
+            prepared.plan.character as unknown as Parameters<
+              typeof store.addCloudRecoveredCharacter
+            >[0]
+          );
+          cloud.service.attachLink(prepared.link);
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onRemoveOnlineCopy: legacyId => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      const cloud = createManualCharacterCloud(window.localStorage);
+      const row = snapshot.cloud.characters.find(
+        character => character.legacyId === legacyId
+      )?.row;
+      if (!run || !accountId || !cloud || !row) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void archivePlayerBackupOnlineCopy({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        cloudId: row.id,
+        expectedServerVersion: row.server_version,
+        service: cloud.service,
+      })
+        .then(async () => {
+          if (generation !== mutationGeneration.current) return;
+          announce(COPY.management.removeSuccess);
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
+    onToggleFutureDefault: enabled => {
+      const run = snapshot.run;
+      const accountId = account?.id;
+      const locks = navigator.locks as
+        | PlayerBackupExclusiveLockProvider
+        | undefined;
+      if (!run || !accountId) return;
+      const generation = mutationGeneration.current;
+      setBusy(true);
+      setActionError(null);
+      void setPlayerBackupFutureDefault({
+        factory: indexedDB,
+        locks,
+        accountId,
+        expectedActiveRunId: run.runId,
+        futureDefault: enabled ? 'on' : 'off',
+        at: new Date().toISOString(),
+      })
+        .then(async () => {
+          if (generation !== mutationGeneration.current) return;
+          await reloadDurableEvidence(accountId, run.runId, generation);
+        })
+        .catch(cause => {
+          if (generation !== mutationGeneration.current) return;
+          reportError('online', cause);
+        })
+        .finally(() => {
+          if (generation === mutationGeneration.current) setBusy(false);
+        });
+    },
   };
 
   return { view, actions };

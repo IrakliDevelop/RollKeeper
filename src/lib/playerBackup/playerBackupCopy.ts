@@ -4,6 +4,47 @@ export const PLAYER_BACKUP_COPY = {
     description:
       'Save a safety file, choose your characters, and protect them with your account.',
     action: 'Back up my characters online',
+    manage: 'Manage backups',
+    restore: 'Restore characters',
+    notStarted: {
+      title: 'Protect your characters',
+      description:
+        'Save a safety file, choose your characters, and protect them with your account.',
+      action: 'Back up my characters online',
+    },
+    resumable: {
+      title: 'Character backup is not finished',
+      description:
+        'Your completed steps are still safe. Continue when you are ready.',
+      action: 'Continue character backup',
+    },
+    ongoing: {
+      title: 'Online backup is on',
+    },
+    oneTime: {
+      title: 'Online copies saved',
+    },
+    noCharacters: {
+      title: 'No characters to back up',
+      description: 'Create a character or restore one from a backup first.',
+      action: 'Create a character',
+      secondary: 'Restore characters',
+    },
+    unavailable: {
+      title: 'Online backup is unavailable right now',
+      description:
+        'Your characters are still safe in this browser. You can save or restore a safety file.',
+      action: 'Save a safety file',
+      secondary: 'Restore characters',
+    },
+    counts: {
+      protected: 'protected',
+      paused: 'paused',
+      waiting: 'backing up',
+      attention: 'needs attention',
+      copiesSaved: 'copies saved',
+      thisBrowserOnly: 'this browser only',
+    },
   },
   chrome: {
     back: 'Back to my characters',
@@ -156,7 +197,11 @@ export const PLAYER_BACKUP_COPY = {
       pausedCount: number,
       attentionCount: number
     ) =>
-      `${protectedCount} protected, ${pausedCount} paused, ${attentionCount} need attention`,
+      `${protectedCount} protected, ${pausedCount} paused, ${
+        attentionCount === 1
+          ? '1 needs attention'
+          : `${attentionCount} need attention`
+      }`,
     futureDefault: 'Protect new characters automatically',
     futureDefaultDescription:
       'New characters will use online backup after they are first saved in this browser.',
@@ -166,8 +211,13 @@ export const PLAYER_BACKUP_COPY = {
     restoreHere: 'Restore here',
     restoreCopy: 'Restore as another character',
     remove: 'Remove online copy',
+    removeSuccess:
+      'The online copy was removed. The character in this browser was not changed.',
+    pauseSuccess:
+      'Online updates are paused. Existing local and online copies were kept.',
+    resumeSuccess: 'Online backup is on again.',
     unavailable:
-      'These backup changes are not available from this preview. Your characters were not changed.',
+      'These backup changes are not available right now. Your characters were not changed.',
   },
   recovery: {
     title: 'Your characters need recovery',
@@ -192,6 +242,45 @@ export const PLAYER_BACKUP_COPY = {
       'RollKeeper could not verify a recovery file for your current characters. Nothing was changed. Try again, or open recovery options.',
   },
 } as const;
+
+export function dashboardOngoingDescription(
+  protectedCount: number,
+  attentionCount: number
+): string {
+  const protectedPhrase =
+    protectedCount === 1
+      ? '1 character is protected'
+      : `${protectedCount} characters are protected`;
+  const attentionPhrase =
+    attentionCount === 1
+      ? '1 needs attention'
+      : `${attentionCount} need attention`;
+  return `${protectedPhrase}. ${attentionPhrase}.`;
+}
+
+export function dashboardOneTimeDescription(protectedCount: number): string {
+  const saved =
+    protectedCount === 1
+      ? '1 character was saved online'
+      : `${protectedCount} characters were saved online`;
+  return `${saved}. Later changes stay in this browser until you back up again.`;
+}
+
+export function managementSummaryCopy(
+  protectedCount: number,
+  pausedCount: number,
+  attentionCount: number
+): string {
+  return PLAYER_BACKUP_COPY.management.summary(
+    protectedCount,
+    pausedCount,
+    attentionCount
+  );
+}
+
+export function managementRemoveConfirm(name: string): string {
+  return `Remove the online copy of ${name}? The character in this browser will stay. RollKeeper keeps the removed online copy available for recovery.`;
+}
 
 export function safetyFileCopy(input: {
   authority: 'legacy' | 'active';

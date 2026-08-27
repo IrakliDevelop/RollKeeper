@@ -11,6 +11,7 @@ import PlayerBackupPage from '../page';
 const navigation = vi.hoisted(() => ({
   replace: vi.fn(),
   push: vi.fn(),
+  searchParams: new URLSearchParams(),
 }));
 
 vi.mock('next/navigation', async importOriginal => {
@@ -18,6 +19,7 @@ vi.mock('next/navigation', async importOriginal => {
   return {
     ...actual,
     useRouter: () => navigation,
+    useSearchParams: () => navigation.searchParams,
   };
 });
 
@@ -26,6 +28,7 @@ afterEach(() => {
   document.body.replaceChildren();
   navigation.replace.mockClear();
   navigation.push.mockClear();
+  navigation.searchParams.delete('intent');
   delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
 });
 
@@ -76,5 +79,15 @@ describe('/player/backup', () => {
     expect(degraded).not.toHaveBeenCalled();
     confirm.mockRestore();
     degraded.mockRestore();
+  });
+
+  it('opens compact management when intent=manage', async () => {
+    process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE = 'true';
+    navigation.searchParams.set('intent', 'manage');
+    render(await PlayerBackupPage());
+    expect(
+      screen.getByRole('heading', { name: COPY.management.title })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

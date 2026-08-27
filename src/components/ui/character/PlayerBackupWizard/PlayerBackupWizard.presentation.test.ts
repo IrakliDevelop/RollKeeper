@@ -141,7 +141,37 @@ describe('projectPlayerBackupWizardView', () => {
 });
 
 describe('projectPlayerBackupManagement', () => {
-  it('groups durable results and leaves pause/resume/remove disabled', () => {
+  it('enables pause and restore when the matching capabilities are on', () => {
+    const management = projectPlayerBackupManagement({
+      characters: CHARACTERS,
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: COPY.selection.alreadyProtected,
+            note: 'Kept up to date.',
+            tone: 'ok',
+          },
+        ],
+        conflicts: [],
+      },
+      futureDefaultOn: true,
+      futureDefaultEnabled: true,
+      manualMutation: true,
+      automaticMutation: true,
+    });
+    expect(management.futureDefaultEnabled).toBe(true);
+    expect(management.rows[0]?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'pause', enabled: true }),
+        expect.objectContaining({ action: 'remove', enabled: true }),
+      ])
+    );
+  });
+
+  it('keeps choose enabled for conflicted rows', () => {
     const management = projectPlayerBackupManagement({
       characters: CHARACTERS,
       result: {
@@ -169,15 +199,9 @@ describe('projectPlayerBackupManagement', () => {
       },
       futureDefaultOn: true,
     });
-    expect(management.futureDefaultEnabled).toBe(false);
     expect(management.rows[0]?.actions[0]).toMatchObject({
       action: 'choose',
       enabled: true,
     });
-    expect(
-      management.rows
-        .flatMap(row => row.actions)
-        .filter(action => action.action === 'pause')
-    ).toEqual([]);
   });
 });

@@ -207,6 +207,9 @@ export function projectPlayerBackupManagement(input: {
   characters: PlayerBackupCharacterRow[];
   result: PlayerBackupWizardView['result'];
   futureDefaultOn: boolean;
+  futureDefaultEnabled?: boolean;
+  manualMutation?: boolean;
+  automaticMutation?: boolean;
 }): PlayerBackupWizardView['management'] {
   const conflictIds = new Set(
     input.result.conflicts.map(conflict => conflict.legacyId)
@@ -214,31 +217,83 @@ export function projectPlayerBackupManagement(input: {
   const heldAsideIds = new Set(
     input.result.heldAside.map(item => item.legacyId)
   );
+  const manual = input.manualMutation === true;
+  const automatic = input.automaticMutation === true;
   const rows = input.characters.map(character => {
     const conflicted = conflictIds.has(character.id);
     const heldAside = heldAsideIds.has(character.id);
     const resultRow = input.result.rows.find(row => row.id === character.id);
+    const statusLabel = resultRow?.statusLabel ?? character.statusLabel;
+    const paused = statusLabel === COPY.selection.paused;
+    const savedOnce = statusLabel === COPY.selection.oneTimeProtected;
+    const protectedOngoing =
+      statusLabel === COPY.selection.alreadyProtected ||
+      resultRow?.tone === 'ok';
     return {
       id: character.id,
       name: character.name,
-      statusLabel: resultRow?.statusLabel ?? character.statusLabel,
+      statusLabel,
       note: resultRow?.note ?? character.note,
       tone: resultRow?.tone ?? character.tone,
       actions: conflicted
-        ? [{ label: COPY.conflict.title, enabled: true, action: 'choose' }]
+        ? [
+            {
+              label: COPY.conflict.title,
+              enabled: true,
+              action: 'choose' as const,
+            },
+          ]
         : heldAside
           ? [
               {
                 label: COPY.conflict.downloadRecovery,
-                enabled: false,
-                action: 'download-recovery',
+                enabled: true,
+                action: 'download-recovery' as const,
               },
             ]
           : [
+              ...(protectedOngoing && !paused && !savedOnce
+                ? [
+                    {
+                      label: COPY.management.pause,
+                      enabled: automatic,
+                      action: 'pause' as const,
+                    },
+                  ]
+                : []),
+              ...(paused || savedOnce
+                ? [
+                    {
+                      label: COPY.management.resume,
+                      enabled: automatic,
+                      action: 'resume' as const,
+                    },
+                    {
+                      label: COPY.management.backupNow,
+                      enabled: manual,
+                      action: 'backup-now' as const,
+                    },
+                  ]
+                : []),
               {
-                label: COPY.management.pause,
-                enabled: false,
-                action: 'pause',
+                label: COPY.management.restoreHere,
+                enabled: manual,
+                action: 'restore-here' as const,
+              },
+              {
+                label: COPY.management.restoreCopy,
+                enabled: manual,
+                action: 'restore-copy' as const,
+              },
+              {
+                label: COPY.conflict.downloadRecovery,
+                enabled: true,
+                action: 'download-recovery' as const,
+              },
+              {
+                label: COPY.management.remove,
+                enabled: manual,
+                action: 'remove' as const,
               },
             ],
     };
@@ -259,7 +314,7 @@ export function projectPlayerBackupManagement(input: {
     ),
     rows,
     futureDefaultOn: input.futureDefaultOn,
-    futureDefaultEnabled: false,
+    futureDefaultEnabled: input.futureDefaultEnabled === true,
   };
 }
 

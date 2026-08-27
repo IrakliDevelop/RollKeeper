@@ -33,7 +33,9 @@ import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryC
 import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
 import { CharacterCloudBackupControls } from '@/components/ui/character/CharacterCloudBackupControls';
 import { CharacterAutomaticSyncControls } from '@/components/ui/character/CharacterAutomaticSyncControls';
+import { PlayerBackupDashboardSurface } from '@/components/ui/character/PlayerBackupDashboardSurface';
 import { awaitCharacterPersistenceResult } from '@/lib/indexeddb/characterPersistenceRuntime';
+import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
 import { recordAutomaticCharacterDelete } from '@/lib/supabase/automaticCharacterSyncRuntime';
 import { AppIcon } from '@/components/ui/icons';
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
@@ -67,6 +69,7 @@ export default function PlayerDashboardPage() {
   const activeCharacters = getActiveCharacters();
   const archivedCharacters = getArchivedCharacters();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const wizardOwnsBackup = isPlayerBackupWizardVisible();
 
   const handleExportAll = useCallback(() => {
     if (characters.length === 0) return;
@@ -459,7 +462,7 @@ export default function PlayerDashboardPage() {
             >
               Import
             </Button>
-            {characters.length > 0 && (
+            {characters.length > 0 && !wizardOwnsBackup && (
               <Button
                 variant="outline"
                 leftIcon={<Download size={18} />}
@@ -483,31 +486,39 @@ export default function PlayerDashboardPage() {
           </div>
         </div>
 
+        {wizardOwnsBackup ? <PlayerBackupDashboardSurface /> : null}
+
         {/* Local-storage safety reminder */}
-        {characters.length > 0 && (
+        {!wizardOwnsBackup && characters.length > 0 && (
           <DataSafetyBanner onExport={handleExportAll} />
         )}
 
-        <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
-          <h2 className="text-heading text-sm font-semibold">
-            Full browser recovery
-          </h2>
-          <p className="text-muted mb-3 text-sm">
-            Back up all RollKeeper browser data or stage a recovery file for
-            review without replacing active values.
-          </p>
-          <DeviceRecoveryControls />
-          <CharacterStorageMigrationControls />
-        </section>
+        {!wizardOwnsBackup ? (
+          <section className="border-divider bg-surface-secondary mb-6 rounded-lg border p-4">
+            <h2 className="text-heading text-sm font-semibold">
+              Full browser recovery
+            </h2>
+            <p className="text-muted mb-3 text-sm">
+              Back up all RollKeeper browser data or stage a recovery file for
+              review without replacing active values.
+            </p>
+            <DeviceRecoveryControls />
+            <CharacterStorageMigrationControls />
+          </section>
+        ) : null}
 
-        <CharacterCloudBackupControls
-          characters={characters}
-          onAddCharacter={character =>
-            addCloudRecoveredCharacter(character as PlayerCharacter)
-          }
-        />
+        {!wizardOwnsBackup ? (
+          <CharacterCloudBackupControls
+            characters={characters}
+            onAddCharacter={character =>
+              addCloudRecoveredCharacter(character as PlayerCharacter)
+            }
+          />
+        ) : null}
 
-        <CharacterAutomaticSyncControls characters={characters} />
+        {!wizardOwnsBackup ? (
+          <CharacterAutomaticSyncControls characters={characters} />
+        ) : null}
 
         {/* Stats Cards */}
         <div className="mb-8 grid grid-cols-1 gap-6 md:grid-cols-3">
