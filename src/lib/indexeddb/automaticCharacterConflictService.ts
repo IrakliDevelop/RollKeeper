@@ -1,6 +1,7 @@
 import type { Json } from '@/types/database.generated';
 
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { fingerprintCharacterPayload } from '@/lib/supabase/characterCloudCodec';
 import { validateAutomaticCharacterCandidate } from '@/lib/supabase/automaticCharacterSyncValidation';
 
 import {
@@ -119,6 +120,18 @@ function copyPayload(payload: Json, legacyId: string): Json {
   return copy as Json;
 }
 
+/** The keep-both copy: a rewritten identity with its own fingerprint. */
+async function copyDocument(
+  payload: Json,
+  legacyId: string
+): Promise<{ payload: Json; contentFingerprint: string }> {
+  const copied = copyPayload(payload, legacyId);
+  return {
+    payload: copied,
+    contentFingerprint: await fingerprintCharacterPayload(copied),
+  };
+}
+
 export class AutomaticCharacterConflictService {
   private readonly randomId: () => string;
   private readonly now: () => string;
@@ -184,6 +197,14 @@ export class AutomaticCharacterConflictService {
     ) {
       throw new Error('Cloud conflict candidate identity is unsafe');
     }
+
+    // The keep-both copy is rewritten with a new identity, so its fingerprint
+    // must be recomputed here: inside the transaction any foreign await would
+    // auto-commit it. A missing copy id still aborts inside the transaction.
+    const copied =
+      resolution === 'keep-both' && options.copyLegacyId
+        ? await copyDocument(decoded.rawPayload, options.copyLegacyId)
+        : null;
 
     const now = this.now();
     const hook = options.transactionHook;
@@ -294,7 +315,7 @@ export class AutomaticCharacterConflictService {
       } satisfies AutomaticCharacterOutboxEntry);
 
       if (resolution === 'keep-both') {
-        if (!options.copyLegacyId) {
+        if (!options.copyLegacyId || !copied) {
           transaction.abort();
           throw new Error('Keep both requires a new local character ID');
         }
@@ -303,11 +324,11 @@ export class AutomaticCharacterConflictService {
           family: 'character',
           legacyId: options.copyLegacyId,
           operation: 'create',
-          payload: copyPayload(decoded.rawPayload, options.copyLegacyId),
+          payload: copied.payload,
           schemaVersion: remote.schema_version,
           localRevision: 1,
           baseServerVersion: 0,
-          contentFingerprint: decoded.contentFingerprint,
+          contentFingerprint: copied.contentFingerprint,
           syncPolicy: 'off',
           updatedAt: now,
           deletedAt: null,

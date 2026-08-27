@@ -1658,6 +1658,14 @@ describe('resolvePlayerBackupConflict', () => {
       },
       workQueued: true,
     });
+    if (result.status !== 'resolved' || !result.apply) {
+      throw new Error('keep-both did not return an application');
+    }
+    // The copy's payload was rewritten with a new identity, so its
+    // fingerprint must describe the copy and not the online row.
+    await expect(
+      fingerprintCharacterPayload(result.apply.payload)
+    ).resolves.toBe(result.apply.contentFingerprint);
 
     const outbox = (await readStore(
       'outbox'

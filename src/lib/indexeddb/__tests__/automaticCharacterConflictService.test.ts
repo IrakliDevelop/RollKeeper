@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
+import { fingerprintCharacterPayload } from '@/lib/supabase/characterCloudCodec';
 
 import {
   IndexedDbAutomaticCharacterSyncRepository,
@@ -121,6 +122,14 @@ describe('AutomaticCharacterConflictService', () => {
       payload: expect.objectContaining({ name: 'Cloud candidate' }),
     });
     expect(copy?.cloudId).toBeUndefined();
+    // The copy carries a rewritten identity, so it must carry its own
+    // fingerprint rather than the cloud row's.
+    await expect(fingerprintCharacterPayload(copy?.payload)).resolves.toBe(
+      copy?.contentFingerprint
+    );
+    await expect(
+      fingerprintCharacterPayload(cloudRow().payload)
+    ).resolves.not.toBe(copy?.contentFingerprint);
     await expect(repository.listOutbox(NAMESPACE)).resolves.toEqual([
       expect.objectContaining({ legacyId: 'character-a', state: 'queued' }),
     ]);
