@@ -52,6 +52,15 @@ describe('IndexedDbAutomaticCharacterSyncRepository', () => {
       randomId: () => `mutation-${++mutationNumber}`,
     });
 
+  async function readSnapshots(): Promise<unknown[]> {
+    const transaction = database.transaction('legacySnapshots', 'readonly');
+    const rows = await requestResult(
+      transaction.objectStore('legacySnapshots').getAll()
+    );
+    await transactionComplete(transaction);
+    return rows as unknown[];
+  }
+
   it('atomically commits the local document and outbox before acknowledging saved', async () => {
     const result = await repository().commit(mutation());
     expect(result).toMatchObject({ saved: true, mutationId: 'mutation-1' });
@@ -617,6 +626,142 @@ describe('IndexedDbAutomaticCharacterSyncRepository', () => {
         originPlayerBackupRunId: 'run-a',
       });
       await expect(repo.listConflicts(NAMESPACE)).resolves.toEqual([adopted]);
+    });
+
+    it('refreshes a stale local candidate, snapshotting the superseded one', async () => {
+      const repo = repository();
+      await repo.commit(mutation());
+      const [entry] = await repo.listOutbox(NAMESPACE);
+      await repo.preserveConflict(
+        entry,
+        { id: 'cloud-a' },
+        '2026-02-02T00:00:00Z'
+      );
+      const conflictId = `automatic-sync:${entry.mutationId}`;
+      const [preserved] = await repo.listConflicts(NAMESPACE);
+      const fresh = {
+        ...mutation({
+          localRevision: 4,
+          contentFingerprint: 'fingerprint-4',
+          payload: { id: 'character-a', name: 'Fresh' },
+        }),
+        family: 'character' as const,
+        deletedAt: null,
+      };
+
+      const transaction = database.transaction(
+        ['documents', 'conflicts', 'legacySnapshots'],
+        'readwrite'
+      );
+      const refreshed = await repo.refreshConflictLocalCandidateInTransaction(
+        transaction,
+        conflictId,
+        fresh,
+        '2026-02-03T00:00:00.000Z'
+      );
+      await transactionComplete(transaction);
+
+      expect(refreshed).toMatchObject({
+        conflictId,
+        localCandidate: fresh,
+        detectedAt: '2026-02-03T00:00:00.000Z',
+        resolutionState: 'unresolved',
+      });
+      await expect(repo.listConflicts(NAMESPACE)).resolves.toEqual([refreshed]);
+      await expect(repo.getDocument(NAMESPACE, 'character-a')).resolves.toEqual(
+        fresh
+      );
+      const rawValue = JSON.stringify(preserved.localCandidate);
+      await expect(readSnapshots()).resolves.toEqual([
+        {
+          runId: conflictId,
+          key: 'automatic-sync-superseded-local',
+          captureNumber: 1,
+          presence: true,
+          rawValue,
+          byteCount: new TextEncoder().encode(rawValue).byteLength,
+          capturedAt: '2026-02-03T00:00:00.000Z',
+          immutable: true,
+        },
+      ]);
+
+      // A candidate that goes stale twice keeps both superseded copies.
+      const again = database.transaction(
+        ['documents', 'conflicts', 'legacySnapshots'],
+        'readwrite'
+      );
+      await repo.refreshConflictLocalCandidateInTransaction(
+        again,
+        conflictId,
+        { ...fresh, localRevision: 5, contentFingerprint: 'fingerprint-5' },
+        '2026-02-04T00:00:00.000Z'
+      );
+      await transactionComplete(again);
+      await expect(readSnapshots()).resolves.toEqual([
+        expect.objectContaining({ captureNumber: 1, rawValue }),
+        expect.objectContaining({
+          captureNumber: 2,
+          rawValue: JSON.stringify(fresh),
+        }),
+      ]);
+    });
+
+    it('refuses a missing or resolved conflict and leaves nothing behind on abort', async () => {
+      const repo = repository();
+      await repo.commit(mutation());
+      const [entry] = await repo.listOutbox(NAMESPACE);
+      await repo.preserveConflict(
+        entry,
+        { id: 'cloud-a' },
+        '2026-02-02T00:00:00Z'
+      );
+      const conflictId = `automatic-sync:${entry.mutationId}`;
+      const [preserved] = await repo.listConflicts(NAMESPACE);
+      const fresh = {
+        ...mutation({ localRevision: 4, contentFingerprint: 'fingerprint-4' }),
+        family: 'character' as const,
+        deletedAt: null,
+      };
+      const stores = ['documents', 'conflicts', 'legacySnapshots'] as const;
+
+      const missing = database.transaction(stores, 'readwrite');
+      await expect(
+        repo.refreshConflictLocalCandidateInTransaction(
+          missing,
+          'automatic-sync:missing',
+          fresh,
+          '2026-02-03T00:00:00.000Z'
+        )
+      ).rejects.toThrow('Conflict is not unresolved');
+
+      const aborted = database.transaction(stores, 'readwrite');
+      const completion = transactionComplete(aborted);
+      await repo.refreshConflictLocalCandidateInTransaction(
+        aborted,
+        conflictId,
+        fresh,
+        '2026-02-03T00:00:00.000Z'
+      );
+      aborted.abort();
+      await expect(completion).rejects.toThrow();
+      await expect(repo.listConflicts(NAMESPACE)).resolves.toEqual([preserved]);
+      await expect(readSnapshots()).resolves.toEqual([]);
+
+      const resolve = database.transaction('conflicts', 'readwrite');
+      resolve
+        .objectStore('conflicts')
+        .put({ ...preserved, resolutionState: 'resolved' });
+      await transactionComplete(resolve);
+
+      const rejected = database.transaction(stores, 'readwrite');
+      await expect(
+        repo.refreshConflictLocalCandidateInTransaction(
+          rejected,
+          conflictId,
+          fresh,
+          '2026-02-04T00:00:00.000Z'
+        )
+      ).rejects.toThrow('Conflict is not unresolved');
     });
 
     it('quarantines on the caller transaction with the same record as quarantineCloudCandidate', async () => {

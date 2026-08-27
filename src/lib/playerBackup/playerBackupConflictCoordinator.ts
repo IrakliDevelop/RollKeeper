@@ -246,7 +246,13 @@ export async function seedPlayerBackupConflictInLock(
     database: options.database,
     accountId: options.accountId,
     expectedActiveRunId: options.expectedActiveRunId,
-    stores: ['documents', 'outbox', 'tombstones', 'conflicts'],
+    stores: [
+      'documents',
+      'outbox',
+      'tombstones',
+      'conflicts',
+      'legacySnapshots',
+    ],
     task: async transaction => {
       const meta = transaction.objectStore('meta');
       const run = await assertSeedableRun(meta, {
@@ -285,12 +291,20 @@ export async function seedPlayerBackupConflictInLock(
         if (preservedCloudId !== undefined && preservedCloudId !== row.id) {
           throw new Error(UNSAFE_CANDIDATE);
         }
+        // A candidate preserved before the character changed no longer states
+        // what this run would back up, so it is verified against the freshly
+        // read character rather than adopted on trust.
+        const localMatches =
+          existing.localCandidate !== null &&
+          existing.localCandidate.contentFingerprint === contentFingerprint &&
+          existing.localCandidate.localRevision === localRevision;
         // An unresolved conflict left by ordinary automatic sync (no origin) or
         // by a superseded run is adopted into this run — the new consent
         // authorises it — but only once it carries this run's origin.
         if (
           sameCandidate(existing.cloudCandidate, row) &&
-          existing.originPlayerBackupRunId === run.runId
+          existing.originPlayerBackupRunId === run.runId &&
+          localMatches
         ) {
           return {
             conflictId: existing.conflictId,
@@ -299,13 +313,45 @@ export async function seedPlayerBackupConflictInLock(
             refreshed: false,
           };
         }
-        await repository.refreshConflictCloudCandidateInTransaction(
-          transaction,
-          existing.conflictId,
-          row,
-          recordedAt,
-          { originPlayerBackupRunId: run.runId }
-        );
+        if (!localMatches) {
+          await repository.refreshConflictLocalCandidateInTransaction(
+            transaction,
+            existing.conflictId,
+            {
+              namespace: run.namespace,
+              family: 'character',
+              legacyId,
+              cloudId: row.id,
+              operation:
+                (existing.localCandidate?.baseServerVersion ?? 0) > 0
+                  ? 'replace'
+                  : 'create',
+              payload,
+              schemaVersion: existing.localCandidate?.schemaVersion ?? 1,
+              localRevision,
+              baseServerVersion:
+                existing.localCandidate?.baseServerVersion ?? 0,
+              contentFingerprint,
+              syncPolicy: run.mode === 'ongoing' ? 'on' : 'off',
+              updatedAt: recordedAt,
+              deletedAt: null,
+              originPlayerBackupRunId: run.runId,
+            },
+            recordedAt
+          );
+        }
+        if (
+          !sameCandidate(existing.cloudCandidate, row) ||
+          existing.originPlayerBackupRunId !== run.runId
+        ) {
+          await repository.refreshConflictCloudCandidateInTransaction(
+            transaction,
+            existing.conflictId,
+            row,
+            recordedAt,
+            { originPlayerBackupRunId: run.runId }
+          );
+        }
         await writeCheckpoint(existing.mutationId);
         return {
           conflictId: existing.conflictId,

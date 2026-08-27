@@ -325,9 +325,13 @@ async function seedWorkerConflict(options: {
   legacyId?: string;
   mutationId?: string;
   originPlayerBackupRunId?: string;
+  /** Local character the worker committed, when it is not the current one. */
+  character?: unknown;
+  localRevision?: number;
 }): Promise<string> {
   const legacyId = options.legacyId ?? 'hero-a';
   const mutationId = options.mutationId ?? 'worker-1';
+  const character = options.character ?? ROSTER[legacyId];
   const database = await openExistingRollkeeperDatabase({ factory: indexedDB });
   if (!database) throw new Error('database is missing');
   try {
@@ -338,11 +342,11 @@ async function seedWorkerConflict(options: {
       namespace: NAMESPACE_A,
       legacyId,
       operation: 'create',
-      payload: encodeCharacterCloudPayload(ROSTER[legacyId]),
+      payload: encodeCharacterCloudPayload(character),
       schemaVersion: 1,
-      localRevision: 5,
+      localRevision: options.localRevision ?? 5,
       baseServerVersion: 0,
-      contentFingerprint: await fingerprint(ROSTER[legacyId]),
+      contentFingerprint: await fingerprint(character),
       syncPolicy: 'off',
       updatedAt: '2026-08-27T10:45:00.000Z',
     });
@@ -896,6 +900,74 @@ describe('seedPlayerBackupConflict', () => {
     expect((await readCheckpoints())['hero-a'].online?.mutationId).toBe(
       'worker-1'
     );
+  });
+
+  it('refreshes a stale local candidate before adopting a conflict', async () => {
+    await seedRun();
+    const row = cloudRow();
+    const stale = {
+      id: 'hero-a',
+      name: 'Hero A',
+      characterData: { id: 'hero-a', revision: 3 },
+    };
+    const conflictId = await seedWorkerConflict({
+      row,
+      character: stale,
+      localRevision: 3,
+    });
+    const harness = createHarness();
+
+    const result = await harness.seed({ row });
+
+    expect(result).toEqual({
+      conflictId,
+      mutationId: 'worker-1',
+      created: false,
+      refreshed: true,
+    });
+    const fresh = await fingerprint(HERO_A);
+    const [conflict] = (await readStore(
+      'conflicts'
+    )) as AutomaticCharacterConflict[];
+    expect(conflict.localCandidate).toMatchObject({
+      contentFingerprint: fresh,
+      localRevision: 5,
+      cloudId: row.id,
+      originPlayerBackupRunId: 'run-a',
+    });
+    expect(conflict.originPlayerBackupRunId).toBe('run-a');
+    const documents = (await readStore(
+      'documents'
+    )) as AutomaticCharacterDocument[];
+    expect(documents).toEqual([conflict.localCandidate]);
+    const snapshots = (await readStore('legacySnapshots')) as {
+      runId: string;
+      key: string;
+      captureNumber: number;
+      rawValue: string;
+    }[];
+    expect(snapshots).toHaveLength(1);
+    expect(snapshots[0]).toMatchObject({
+      runId: conflictId,
+      key: 'automatic-sync-superseded-local',
+      captureNumber: 1,
+    });
+    expect(JSON.parse(snapshots[0].rawValue)).toMatchObject({
+      payload: encodeCharacterCloudPayload(stale),
+      localRevision: 3,
+    });
+
+    const before = await snapshotStores();
+    const second = await harness.seed({ row });
+
+    expect(second).toEqual({
+      conflictId,
+      mutationId: 'worker-1',
+      created: false,
+      refreshed: false,
+    });
+    expect(await snapshotStores()).toEqual(before);
+    expect(await readStore('legacySnapshots')).toEqual(snapshots);
   });
 
   it('refuses to adopt a conflict whose local candidate points at another cloud copy', async () => {
