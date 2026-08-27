@@ -129,7 +129,7 @@ export function usePlayerBackupDashboard(): {
             .characters.map(item => item.id),
         });
         if (cancelled || token !== generation.current) return;
-        setPolicies(nextPolicies);
+        setPolicies(nextPolicies.characterPolicies);
         const preview = createBrowserPlayerBackupCloudPreview({
           manualRead: capabilities.calls.manualRead,
           automaticRead: capabilities.calls.automaticRead,

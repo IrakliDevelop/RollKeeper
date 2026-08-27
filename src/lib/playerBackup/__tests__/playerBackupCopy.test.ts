@@ -138,6 +138,9 @@ describe('player backup copy', () => {
     expect(dashboardOneTimeDescription(4)).toBe(
       '4 characters were saved online. Later changes stay in this browser until you back up again.'
     );
+    expect(dashboardOneTimeDescription(0, 2)).toBe(
+      '2 characters are paused. Existing local and online copies were kept.'
+    );
     expect(managementSummaryCopy(1, 1, 1)).toBe(
       '1 protected, 1 paused, 1 needs attention'
     );

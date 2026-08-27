@@ -125,4 +125,23 @@ describe('character cloud-link metadata', () => {
       contentFingerprint: 'fingerprint-b',
     });
   });
+
+  it('round-trips pendingArchive mutation identity', () => {
+    const repository = createCharacterCloudLinkRepository(localStorage);
+    repository.save({
+      accountId: 'user-a',
+      legacyId: 'legacy-a',
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: 'fingerprint-a',
+      pendingArchive: {
+        mutationId: 'archive-a',
+        expectedServerVersion: 3,
+      },
+    });
+    expect(repository.get('user-a', 'legacy-a')?.pendingArchive).toEqual({
+      mutationId: 'archive-a',
+      expectedServerVersion: 3,
+    });
+  });
 });

@@ -5,6 +5,7 @@ import type {
   ManualCharacterCloudService,
   VerifiedCharacterBackup,
 } from '@/lib/supabase/manualCharacterCloudService';
+import type { CharacterCloudLink } from '@/lib/supabase/characterCloudLinks';
 import type { RestoreMode } from '@/lib/supabase/characterCloudCodec';
 
 import { withExistingDatabase } from './playerBackupOnlineExecution';
@@ -158,6 +159,12 @@ export async function restorePlayerBackupCharacter(
     localCharacters: readonly unknown[];
     mode: RestoreMode;
     service: Pick<PlayerBackupManagementService, 'prepareRestore'>;
+    assertCurrent: () => void;
+    has: (legacyId: string) => boolean;
+    add: (character: unknown) => boolean;
+    replace: (character: unknown) => boolean;
+    persistRoster: () => Promise<{ saved: boolean }>;
+    attachLink: (link: CharacterCloudLink) => void;
   }
 ): Promise<Awaited<ReturnType<ManualCharacterCloudService['prepareRestore']>>> {
   return mutatePlayerBackupWithFence({
@@ -165,12 +172,37 @@ export async function restorePlayerBackupCharacter(
     expectedActiveRunId: options.expectedActiveRunId,
     locks: options.locks,
     factory: options.factory,
-    mutateAndAcknowledge: () =>
-      options.service.prepareRestore(
+    mutateAndAcknowledge: async () => {
+      options.assertCurrent();
+      const prepared = await options.service.prepareRestore(
         options.cloudId,
         account(options.accountId),
         options.localCharacters,
         options.mode
-      ),
+      );
+      options.assertCurrent();
+      const { plan, link } = prepared;
+      if (plan.kind === 'quarantined') {
+        throw new Error(plan.reason ?? 'Cloud restore is not supported');
+      }
+      if (plan.character) {
+        const accepted =
+          plan.kind === 'restore-copy' || !options.has(plan.character.id)
+            ? options.add(plan.character)
+            : options.replace(plan.character);
+        if (!accepted) {
+          throw new Error('Roster write was not accepted');
+        }
+        const persisted = await options.persistRoster();
+        if (!persisted.saved) {
+          throw new Error('Restored character was not saved in this browser');
+        }
+      }
+      if (plan.attachCloudLink) {
+        options.assertCurrent();
+        options.attachLink(link);
+      }
+      return prepared;
+    },
   });
 }

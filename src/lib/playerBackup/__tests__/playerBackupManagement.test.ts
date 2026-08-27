@@ -17,6 +17,7 @@ import {
   archivePlayerBackupOnlineCopy,
   backupPlayerBackupCharacterNow,
   pausePlayerBackupCharacter,
+  restorePlayerBackupCharacter,
   resumePlayerBackupCharacter,
   setPlayerBackupFutureDefault,
 } from '../playerBackupManagement';
@@ -172,7 +173,7 @@ describe('player backup management', () => {
     expect(result).toEqual({ status: 'verified', row, fingerprint: 'fp' });
   });
 
-  it('reuses one mutation identity across rapid repeats', async () => {
+  it('serializes rapid repeats through the account lock', async () => {
     const backup = vi.fn().mockResolvedValue({
       status: 'verified',
       row: { id: 'cloud-a' },
@@ -340,5 +341,190 @@ describe('player backup management', () => {
       service: { archive },
     });
     expect(archive).toHaveBeenCalledWith('cloud-a', { id: ACCOUNT }, 3);
+  });
+
+  it('commits restore inside the fence and honors attachCloudLink', async () => {
+    const add = vi.fn().mockReturnValue(true);
+    const replace = vi.fn().mockReturnValue(true);
+    const has = vi.fn().mockReturnValue(false);
+    const persistRoster = vi.fn().mockResolvedValue({ saved: true });
+    const attachLink = vi.fn();
+    const link = {
+      accountId: ACCOUNT,
+      legacyId: 'hero-a',
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: 'fp',
+      pendingMutation: null,
+    };
+    const prepareRestore = vi
+      .fn()
+      .mockResolvedValueOnce({
+        plan: {
+          kind: 'restore-original',
+          character: { id: 'hero-a', name: 'Hero A' },
+          attachCloudLink: true,
+          reason: null,
+        },
+        link,
+      })
+      .mockResolvedValueOnce({
+        plan: {
+          kind: 'restore-copy',
+          character: { id: 'hero-copy', name: 'Hero A (Cloud Copy)' },
+          attachCloudLink: false,
+          reason: null,
+        },
+        link,
+      })
+      .mockResolvedValueOnce({
+        plan: {
+          kind: 'attach-link',
+          character: null,
+          attachCloudLink: true,
+          reason: null,
+        },
+        link,
+      })
+      .mockResolvedValueOnce({
+        plan: {
+          kind: 'quarantined',
+          character: null,
+          attachCloudLink: false,
+          reason: 'unsupported',
+        },
+        link,
+      });
+
+    const base = {
+      factory: indexedDB,
+      locks: new QueuedLocks(),
+      accountId: ACCOUNT,
+      expectedActiveRunId: RUN_ID,
+      cloudId: 'cloud-a',
+      service: { prepareRestore },
+      assertCurrent: vi.fn(),
+      has,
+      add,
+      replace,
+      persistRoster,
+      attachLink,
+    };
+
+    await restorePlayerBackupCharacter({
+      ...base,
+      localCharacters: [],
+      mode: 'original',
+    });
+    expect(add).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+    expect(persistRoster).toHaveBeenCalledOnce();
+    expect(attachLink).toHaveBeenCalledWith(link);
+
+    add.mockClear();
+    persistRoster.mockClear();
+    attachLink.mockClear();
+    await restorePlayerBackupCharacter({
+      ...base,
+      localCharacters: [HERO],
+      mode: 'copy',
+    });
+    expect(add).toHaveBeenCalledOnce();
+    expect(replace).not.toHaveBeenCalled();
+    expect(persistRoster).toHaveBeenCalledOnce();
+    expect(attachLink).not.toHaveBeenCalled();
+
+    add.mockClear();
+    persistRoster.mockClear();
+    attachLink.mockClear();
+    await restorePlayerBackupCharacter({
+      ...base,
+      localCharacters: [HERO],
+      mode: 'original',
+    });
+    expect(add).not.toHaveBeenCalled();
+    expect(replace).not.toHaveBeenCalled();
+    expect(persistRoster).not.toHaveBeenCalled();
+    expect(attachLink).toHaveBeenCalledWith(link);
+
+    await expect(
+      restorePlayerBackupCharacter({
+        ...base,
+        localCharacters: [HERO],
+        mode: 'original',
+      })
+    ).rejects.toThrow('unsupported');
+    expect(attachLink).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects a restore when the account changes before the local commit', async () => {
+    let finishRestore!: (value: {
+      plan: {
+        kind: 'restore-original';
+        character: { id: string; name: string; characterData: { id: string } };
+        attachCloudLink: true;
+        reason: null;
+      };
+      link: {
+        accountId: string;
+        legacyId: string;
+        cloudId: string;
+        serverVersion: number;
+        contentFingerprint: string;
+        pendingMutation: null;
+      };
+      recovery: never;
+    }) => void;
+    const prepareRestore = vi.fn(
+      () =>
+        new Promise<Parameters<typeof finishRestore>[0]>(resolve => {
+          finishRestore = resolve;
+        })
+    );
+    let current = true;
+    const add = vi.fn().mockReturnValue(true);
+    const restore = restorePlayerBackupCharacter({
+      factory: indexedDB,
+      locks: new QueuedLocks(),
+      accountId: ACCOUNT,
+      expectedActiveRunId: RUN_ID,
+      cloudId: 'cloud-a',
+      localCharacters: [],
+      mode: 'original',
+      service: { prepareRestore },
+      assertCurrent: () => {
+        if (!current) throw new PlayerBackupRunReplacedError();
+      },
+      has: () => false,
+      add,
+      replace: vi.fn().mockReturnValue(true),
+      persistRoster: vi.fn().mockResolvedValue({ saved: true }),
+      attachLink: vi.fn(),
+    });
+    await vi.waitFor(() => expect(prepareRestore).toHaveBeenCalledOnce());
+    current = false;
+    finishRestore({
+      plan: {
+        kind: 'restore-original',
+        character: {
+          id: 'hero-a',
+          name: 'Hero A',
+          characterData: { id: 'hero-a' },
+        },
+        attachCloudLink: true,
+        reason: null,
+      },
+      link: {
+        accountId: ACCOUNT,
+        legacyId: 'hero-a',
+        cloudId: 'cloud-a',
+        serverVersion: 1,
+        contentFingerprint: 'fp',
+        pendingMutation: null,
+      },
+      recovery: {} as never,
+    });
+    await expect(restore).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    expect(add).not.toHaveBeenCalled();
   });
 });

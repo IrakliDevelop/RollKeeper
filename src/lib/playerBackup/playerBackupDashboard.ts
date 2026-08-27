@@ -103,18 +103,24 @@ export async function readPlayerBackupCharacterPolicies(options: {
   factory: IDBFactory;
   accountId: string;
   characterIds: readonly string[];
-}): Promise<Record<string, 'on' | 'off'>> {
+}): Promise<{
+  characterPolicies: Record<string, 'on' | 'off'>;
+  futureDefault: 'on' | 'off' | null;
+}> {
   const database = await openExistingRollkeeperDatabase({
     factory: options.factory,
   });
-  if (!database) return {};
+  if (!database) return { characterPolicies: {}, futureDefault: null };
   try {
     const preferences = new AutomaticCharacterSyncPreferences(database);
     const confirmed = await preferences.readConfirmedSelection(
       `user:${options.accountId}`,
       options.characterIds
     );
-    return confirmed.characterPolicies;
+    return {
+      characterPolicies: confirmed.characterPolicies,
+      futureDefault: confirmed.futureDefault,
+    };
   } finally {
     database.close();
   }
@@ -138,7 +144,7 @@ export function projectDashboardCharacterStatus(input: {
     preference,
     conflict: input.conflict,
   };
-  if (input.outcome === 'protected' || input.cloudState === 'identical') {
+  if (input.outcome === 'protected') {
     evidence.acknowledged = true;
     if (preference === 'off' && input.mode === 'ongoing') {
       evidence.explicitlyPaused = true;
@@ -295,15 +301,33 @@ export function projectPlayerBackupDashboard(
     input.hasAcknowledgedCurrentAccountCopy &&
     savedOnceCount + pausedCount > 0
   ) {
+    const counts = [
+      ...(savedOnceCount > 0
+        ? [
+            {
+              value: savedOnceCount,
+              label: COPY.dashboard.counts.copiesSaved,
+            },
+          ]
+        : []),
+      ...(pausedCount > 0
+        ? [{ value: pausedCount, label: COPY.dashboard.counts.paused }]
+        : []),
+      ...(localOnlyCount > 0
+        ? [
+            {
+              value: localOnlyCount,
+              label: COPY.dashboard.counts.thisBrowserOnly,
+            },
+          ]
+        : []),
+    ];
     return {
       scenario: 'one-time-complete',
       tone: 'info',
       title: COPY.dashboard.oneTime.title,
-      description: dashboardOneTimeDescription(savedOnceCount),
-      counts: [
-        { value: savedOnceCount, label: COPY.dashboard.counts.copiesSaved },
-        { value: localOnlyCount, label: COPY.dashboard.counts.thisBrowserOnly },
-      ],
+      description: dashboardOneTimeDescription(savedOnceCount, pausedCount),
+      counts,
       primary: action('manage', COPY.dashboard.manage, MANAGE_HREF),
       secondary: restore,
     };

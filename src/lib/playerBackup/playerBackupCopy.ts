@@ -258,7 +258,17 @@ export function dashboardOngoingDescription(
   return `${protectedPhrase}. ${attentionPhrase}.`;
 }
 
-export function dashboardOneTimeDescription(protectedCount: number): string {
+export function dashboardOneTimeDescription(
+  protectedCount: number,
+  pausedCount = 0
+): string {
+  if (protectedCount === 0 && pausedCount > 0) {
+    const paused =
+      pausedCount === 1
+        ? '1 character is paused'
+        : `${pausedCount} characters are paused`;
+    return `${paused}. Existing local and online copies were kept.`;
+  }
   const saved =
     protectedCount === 1
       ? '1 character was saved online'

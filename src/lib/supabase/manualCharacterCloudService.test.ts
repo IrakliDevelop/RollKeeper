@@ -129,6 +129,35 @@ describe('manual character cloud service', () => {
     expect(links.get(account.id, character.id)?.pendingMutation).toBeNull();
   });
 
+  it('verifies an unchanged acknowledged backup without another mutation', async () => {
+    const cloud = gateway();
+    const links = createMemoryCharacterCloudLinkRepository();
+    let minted = 0;
+    const service = new ManualCharacterCloudService(
+      cloud,
+      links,
+      () => 'cloud-a',
+      () => `mutation-${++minted}`
+    );
+    const confirmation = {
+      guestSelected: true,
+      confirmedTargetAccountId: account.id,
+    };
+    const runOptions = { originPlayerBackupRunId: 'run-a' };
+
+    await service.backup(character, account, confirmation, runOptions);
+    const repeated = await service.backup(
+      character,
+      account,
+      confirmation,
+      runOptions
+    );
+
+    expect(repeated.status).toBe('verified');
+    expect(cloud.put).toHaveBeenCalledTimes(1);
+    expect(minted).toBe(1);
+  });
+
   it('does not report success until a refetched row decodes and matches the fingerprint', async () => {
     const cloud = gateway();
     vi.mocked(cloud.fetch).mockResolvedValue({
@@ -212,6 +241,52 @@ describe('manual character cloud service', () => {
     expect(restored.deletedAt).toBeNull();
     expect(cloud.archive).toHaveBeenCalledTimes(1);
     expect(cloud.restore).toHaveBeenCalledTimes(1);
+  });
+
+  it('reuses the first archive mutation identity after a committed response is lost', async () => {
+    const cloud = gateway();
+    const originalArchive = vi.mocked(cloud.archive).getMockImplementation();
+    if (!originalArchive)
+      throw new Error('test gateway archive implementation missing');
+    vi.mocked(cloud.archive)
+      .mockImplementationOnce(async request => {
+        await originalArchive(request);
+        throw new Error('response lost');
+      })
+      .mockImplementation(originalArchive);
+    const links = createMemoryCharacterCloudLinkRepository();
+    let minted = 0;
+    const generateMutationId = () => `mutation-${++minted}`;
+    const service = new ManualCharacterCloudService(
+      cloud,
+      links,
+      () => 'cloud-a',
+      generateMutationId
+    );
+    await service.backup(character, account, {
+      guestSelected: true,
+      confirmedTargetAccountId: account.id,
+    });
+
+    await expect(service.archive('cloud-a', account, 1)).rejects.toThrow(
+      'response lost'
+    );
+    const pending = links.get(account.id, character.id)?.pendingArchive;
+    expect(pending?.mutationId).toBe('mutation-2');
+    const otherTab = new ManualCharacterCloudService(
+      cloud,
+      links,
+      () => 'cloud-a',
+      generateMutationId
+    );
+    const archived = await otherTab.archive('cloud-a', account, 1);
+    expect(archived.deletedAt).not.toBeNull();
+    expect(cloud.archive).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(cloud.archive).mock.calls[0][0].mutationId).toBe(
+      'mutation-2'
+    );
+    expect(minted).toBe(2);
+    expect(links.get(account.id, character.id)?.pendingArchive).toBeNull();
   });
 
   it('keeps future schemas quarantined and returns raw recovery data', async () => {

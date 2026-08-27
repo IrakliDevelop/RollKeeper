@@ -98,6 +98,23 @@ describe('projectDashboardCharacterStatus', () => {
     ).toBe('saved-once');
     expect(projectDashboardCharacterStatus({})).toBe('not-backed-up');
   });
+
+  it('does not treat a read-only identical preview as acknowledged backup', () => {
+    expect(
+      projectDashboardCharacterStatus({
+        cloudState: 'identical',
+        mode: 'one-time',
+      })
+    ).toBe('not-backed-up');
+    expect(
+      projectDashboardCharacterStatus({
+        outcome: 'protected',
+        cloudState: 'identical',
+        mode: 'one-time',
+        preference: 'off',
+      })
+    ).toBe('saved-once');
+  });
 });
 
 describe('projectPlayerBackupDashboard', () => {
@@ -233,7 +250,26 @@ describe('projectPlayerBackupDashboard', () => {
     expect(view.scenario).toBe('one-time-complete');
     expect(view.counts).toEqual([
       { value: 1, label: COPY.dashboard.counts.copiesSaved },
+      { value: 1, label: COPY.dashboard.counts.paused },
       { value: 1, label: COPY.dashboard.counts.thisBrowserOnly },
+    ]);
+  });
+
+  it('reports paused copies instead of zero saved when every acknowledged character is paused', () => {
+    const view = projectPlayerBackupDashboard(
+      input({
+        characterCount: 2,
+        hasAcknowledgedCurrentAccountCopy: true,
+        characters: characters([
+          ['a', 'paused'],
+          ['b', 'paused'],
+        ]),
+      })
+    );
+    expect(view.scenario).toBe('one-time-complete');
+    expect(view.description).not.toMatch(/0 character/);
+    expect(view.counts).toEqual([
+      { value: 2, label: COPY.dashboard.counts.paused },
     ]);
   });
 

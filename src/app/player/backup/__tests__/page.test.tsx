@@ -81,13 +81,15 @@ describe('/player/backup', () => {
     degraded.mockRestore();
   });
 
-  it('opens compact management when intent=manage', async () => {
+  it('does not open compact management from a stale manage intent', async () => {
     process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE = 'true';
     navigation.searchParams.set('intent', 'manage');
     render(await PlayerBackupPage());
     expect(
-      screen.getByRole('heading', { name: COPY.management.title })
+      screen.queryByRole('heading', { name: COPY.management.title })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: COPY.account.title })
     ).toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });
