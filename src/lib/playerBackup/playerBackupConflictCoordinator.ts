@@ -4,7 +4,10 @@ import type {
   AutomaticCharacterOutboxEntry,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
-import { requestResult } from '@/lib/indexeddb/localDatabase';
+import {
+  requestResult,
+  transactionComplete,
+} from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import type { CharacterCloudRow } from '@/lib/supabase/characterCloudCodec';
 import {
@@ -29,6 +32,7 @@ import {
 import type { PlayerBackupRunV1 } from './playerBackupRunRepository';
 import {
   assertPlayerBackupRunLocalReady,
+  listPlayerBackupPendingApplicationsInTransaction,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
   readPlayerBackupRunInTransaction,
@@ -526,6 +530,7 @@ export interface PlayerBackupConflictSummary {
   originPlayerBackupRunId: string | null;
   detectedAt: string;
   resolutionState: 'unresolved' | 'resolved';
+  pendingApplicationLegacyId: string | null;
   allowedResolutions: PlayerBackupConflictResolution[];
   localCandidate: AutomaticCharacterDocument | null;
   cloudCandidate: CharacterCloudRow;
@@ -564,7 +569,8 @@ function checkpointComparison(
 
 function summarizeConflict(
   conflict: AutomaticCharacterConflict,
-  run: PlayerBackupRunV1
+  run: PlayerBackupRunV1,
+  pendingApplicationLegacyId: string | null
 ): PlayerBackupConflictSummary {
   const archived = isArchivedCandidate(conflict.cloudCandidate);
   const origin = conflict.originPlayerBackupRunId ?? null;
@@ -581,6 +587,7 @@ function summarizeConflict(
     originPlayerBackupRunId: origin,
     detectedAt: conflict.detectedAt,
     resolutionState: conflict.resolutionState,
+    pendingApplicationLegacyId,
     allowedResolutions:
       conflict.resolutionState === 'resolved' || stale
         ? []
@@ -621,12 +628,30 @@ export async function listPlayerBackupConflicts(options: {
     const repository = new IndexedDbAutomaticCharacterSyncRepository(database);
     const conflicts = await repository.listConflicts(run.namespace);
     const quarantine = await repository.listQuarantine(run.namespace);
+    const transaction = database.transaction('meta', 'readonly');
+    const pendingApplications =
+      await listPlayerBackupPendingApplicationsInTransaction(
+        transaction.objectStore('meta'),
+        run.runId
+      );
+    await transactionComplete(transaction);
+    const pendingApplicationByConflict = new Map(
+      pendingApplications
+        .filter(application => application.accountId === run.accountId)
+        .map(application => [application.conflictId, application.legacyId])
+    );
     return {
       accountId: run.accountId,
       runId: run.runId,
       conflicts: conflicts
         .filter(conflict => selected.has(conflict.legacyId))
-        .map(conflict => summarizeConflict(conflict, run)),
+        .map(conflict =>
+          summarizeConflict(
+            conflict,
+            run,
+            pendingApplicationByConflict.get(conflict.conflictId) ?? null
+          )
+        ),
       heldAside: quarantine
         .filter(record => selected.has(record.legacyId))
         .map(record => ({

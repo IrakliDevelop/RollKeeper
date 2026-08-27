@@ -53,6 +53,21 @@ describe('player backup copy', () => {
     ).not.toContain('prepare character saving');
   });
 
+  it.each(['ongoing', 'one-time'] as const)(
+    'uses singular confirmation copy for one %s character',
+    mode => {
+      const copy = confirmationCopy({
+        mode,
+        count: 1,
+        email: 'hero@example.com',
+        integratedLocalPath: true,
+        authority: 'legacy',
+      });
+      expect(copy).toContain('1 selected character');
+      expect(copy).not.toContain('1 selected characters');
+    }
+  );
+
   it.each(['different', 'newer', 'removed', 'unavailable', 'future'] as const)(
     'makes degraded %s rows unavailable and unchecked',
     state => {
