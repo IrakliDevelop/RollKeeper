@@ -958,6 +958,7 @@ describe('player backup local preparation coordinator', () => {
       expect(coordinator.snapshot()).toMatchObject({
         accountId: 'account-a',
         result: null,
+        resultLoading: false,
       });
     });
 
@@ -1017,11 +1018,12 @@ describe('player backup local preparation coordinator', () => {
           fakeListing('account-b')
         )
       ).resolves.toBe(false);
-      // Loading is deliberately left as `loadResult` leaves it: a listing for
-      // the wrong account is discarded, not treated as a finished load.
+      // The token and the account are still current, so this call still owns
+      // the flag and must clear it rather than strand it.
       expect(coordinator.snapshot()).toMatchObject({
         accountId: 'account-a',
         conflicts: null,
+        conflictsLoading: false,
       });
     });
 

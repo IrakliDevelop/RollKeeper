@@ -409,6 +409,43 @@ async function applicationFor(
   };
 }
 
+/**
+ * Reads the keep-both collision evidence in its own fenced transaction, so an
+ * archived candidate is never restored online for a copy id the local stores
+ * already hold. The in-hook check stays: it is the atomic guard.
+ */
+async function copyIdCollides(context: ResolutionContext): Promise<boolean> {
+  const { options, conflict } = context;
+  const copyLegacyId = options.copyLegacyId as string;
+  return runPlayerBackupTransaction({
+    database: context.database,
+    accountId: options.accountId,
+    expectedActiveRunId: options.expectedActiveRunId,
+    stores: ['documents'],
+    task: async transaction => {
+      const meta = transaction.objectStore('meta');
+      const fenced = await assertResolvableConflict(meta, {
+        accountId: options.accountId,
+        expectedActiveRunId: options.expectedActiveRunId,
+        legacyId: conflict.legacyId,
+        namespace: conflict.namespace,
+      });
+      const copyDocument = await requestResult(
+        transaction
+          .objectStore('documents')
+          .get([fenced.namespace, 'character', copyLegacyId])
+      );
+      const copyPolicy =
+        await AutomaticCharacterSyncPreferences.readCharacterPolicyInTransaction(
+          meta,
+          fenced.namespace,
+          copyLegacyId
+        );
+      return Boolean(copyDocument) || copyPolicy !== null;
+    },
+  });
+}
+
 async function applyResolution(
   context: ResolutionContext,
   resolution: AppliedResolution
@@ -564,7 +601,10 @@ async function resolveInLock(
   }
   if (archived) {
     // Keep both is the only remaining resolution an archived candidate allows,
-    // and it keeps the online copy, so the row is restored first.
+    // and it keeps the online copy, so the row is restored first. A copy id the
+    // local stores already hold is refused before that, so a doomed decision
+    // never resurrects a cloud copy.
+    if (await copyIdCollides(context)) return refused('copy-id-collision');
     const restored = await restoreArchivedCandidate(context);
     if (restored.status === 'refused') return restored;
   }
@@ -576,6 +616,9 @@ async function resolveInLock(
  * Applies one explicit conflict decision under the account lock, behind the
  * run fence. Every gateway mutation and every local write is re-authorised
  * immediately before it happens, so a superseded run resolves nothing.
+ *
+ * Must not be called while the caller holds the account lock: it acquires the
+ * lock itself, and real Web Locks are not re-entrant.
  */
 export async function resolvePlayerBackupConflict(
   options: PlayerBackupConflictResolveOptions
@@ -713,6 +756,9 @@ async function verifySettledDocument(
  * One-time runs only. Verifies each acknowledged resolution document by
  * refetch and records `protected` plus the manual link. Ongoing runs keep
  * their own preference and never settle here.
+ *
+ * Must not be called while the caller holds the account lock: it acquires the
+ * lock itself, and real Web Locks are not re-entrant.
  */
 export async function settlePlayerBackupOneTimeConflicts(
   options: PlayerBackupSettleOptions
@@ -736,13 +782,27 @@ export async function settlePlayerBackupOneTimeConflicts(
     if (checkpoint?.kind !== 'automatic' || checkpoint.state === 'protected') {
       continue;
     }
-    const verified = await withPlayerBackupAccountLock(
-      { accountId: options.accountId, locks: options.locks },
-      () =>
-        withExistingDatabase(options.factory, database =>
-          verifySettledDocument(options, run, legacyId, database)
-        )
-    );
+    let verified = false;
+    try {
+      verified = await withPlayerBackupAccountLock(
+        { accountId: options.accountId, locks: options.locks },
+        () =>
+          withExistingDatabase(options.factory, database =>
+            verifySettledDocument(options, run, legacyId, database)
+          )
+      );
+    } catch (cause) {
+      // One character's refusal -- a withdrawn consent partition, an
+      // unreadable database -- leaves it pending without discarding what the
+      // other characters already settled. Only a replaced run or a missing
+      // lock invalidates the whole call.
+      if (
+        cause instanceof PlayerBackupRunReplacedError ||
+        cause instanceof PlayerBackupLockUnavailableError
+      ) {
+        throw cause;
+      }
+    }
     (verified ? settled : pending).push(legacyId);
   }
   return { settled, pending };
@@ -766,6 +826,9 @@ export interface PlayerBackupDrainOptions {
  * Drains the active run's namespace through `AutomaticCharacterSyncWorker`
  * behind `createPlayerBackupDispatchGuard`. Stops at the first non-`synced`
  * result, or after one more iteration than there is queued work.
+ *
+ * Must not be called while the caller holds the account lock: the dispatch
+ * guard takes it per attempt, and real Web Locks are not re-entrant.
  */
 export async function drainPlayerBackupRunWork(
   options: PlayerBackupDrainOptions

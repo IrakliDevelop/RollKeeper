@@ -68,7 +68,7 @@ export const CONFLICT_REASON_PREFIX = 'conflict:';
 export const RESTORE_PENDING_REASON = 'restore-pending';
 
 const UNSAFE_CANDIDATE = 'Cloud conflict candidate identity is unsafe';
-const DEGRADED_NEVER_SEEDS = 'Degraded manual backup never seeds a conflict';
+const DEGRADED_NEVER = 'Degraded manual backup never ';
 const NOT_SELECTED = 'Character is not selected in this player backup run';
 const WORK_NOT_SAVED = 'Conflict work could not be saved';
 const RUN_MISSING = 'Committed player backup run is missing';
@@ -94,11 +94,17 @@ const UNRESOLVED_PRESENT: PlayerBackupConflictResolution[] = [
  *
  * The execution path is checked against a permissive read first, so a degraded
  * run — which is structurally pinned to stage `confirmed` — is refused for
- * being degraded rather than for not being local-ready.
+ * being degraded rather than for not being local-ready. `action` names what
+ * the caller was attempting, so that refusal reads truthfully.
  */
 async function assertSeedableRun(
   meta: IDBObjectStore,
-  options: { accountId: string; expectedActiveRunId: string; legacyId: string }
+  options: {
+    accountId: string;
+    expectedActiveRunId: string;
+    legacyId: string;
+    action: 'seeds a conflict' | 'holds a candidate aside';
+  }
 ): Promise<PlayerBackupRunV1> {
   const committed = await readPlayerBackupRunInTransaction(
     meta,
@@ -106,7 +112,7 @@ async function assertSeedableRun(
     options.expectedActiveRunId
   );
   if (playerBackupExecutionPath(committed) !== 'integrated') {
-    throw new Error(DEGRADED_NEVER_SEEDS);
+    throw new Error(`${DEGRADED_NEVER}${options.action}`);
   }
   const run = await assertPlayerBackupRunLocalReady(
     meta,
@@ -247,6 +253,7 @@ export async function seedPlayerBackupConflictInLock(
         accountId: options.accountId,
         expectedActiveRunId: options.expectedActiveRunId,
         legacyId,
+        action: 'seeds a conflict',
       });
 
       const writeCheckpoint = (mutationId: string) =>
@@ -270,6 +277,14 @@ export async function seedPlayerBackupConflictInLock(
           conflict.resolutionState === 'unresolved'
       );
       if (existing) {
+        // Adopting a conflict whose preserved local candidate already points
+        // at a different cloud copy would silently retarget it, so the
+        // transaction aborts instead. A candidate that never carried a cloud
+        // identity (base version zero) is still adoptable.
+        const preservedCloudId = existing.localCandidate?.cloudId;
+        if (preservedCloudId !== undefined && preservedCloudId !== row.id) {
+          throw new Error(UNSAFE_CANDIDATE);
+        }
         // An unresolved conflict left by ordinary automatic sync (no origin) or
         // by a superseded run is adopted into this run — the new consent
         // authorises it — but only once it carries this run's origin.
@@ -355,7 +370,12 @@ export async function seedPlayerBackupConflictInLock(
   });
 }
 
-/** Acquires the account lock, then seeds inside it. Fails closed without one. */
+/**
+ * Acquires the account lock, then seeds inside it. Fails closed without one.
+ *
+ * Must not be called while the caller holds the account lock; use
+ * `seedPlayerBackupConflictInLock` from inside the lock.
+ */
 export async function seedPlayerBackupConflict(
   options: Omit<PlayerBackupConflictSeedInLockOptions, 'database'> & {
     factory: IDBFactory;
@@ -415,6 +435,7 @@ export async function holdPlayerBackupCandidateAsideInLock(
         accountId: options.accountId,
         expectedActiveRunId: options.expectedActiveRunId,
         legacyId,
+        action: 'holds a candidate aside',
       });
       if (row) {
         repository.quarantineCloudCandidateInTransaction(

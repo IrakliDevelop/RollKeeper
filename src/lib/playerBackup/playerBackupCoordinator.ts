@@ -129,11 +129,12 @@ export class PlayerBackupReadOnlyCoordinator {
     this.resultLoading = true;
     try {
       const result = await loader();
-      if (
-        requestToken !== this.resultToken ||
-        this.accountId !== accountId ||
-        result.accountId !== accountId
-      ) {
+      if (requestToken !== this.resultToken || this.accountId !== accountId) {
+        // A newer load owns the flag now, so this one must not touch it.
+        return false;
+      }
+      if (result.accountId !== accountId) {
+        this.resultLoading = false;
         return false;
       }
       this.result = result;
@@ -158,11 +159,12 @@ export class PlayerBackupReadOnlyCoordinator {
     this.conflictsLoading = true;
     try {
       const listing = await loader();
-      if (
-        requestToken !== this.conflictToken ||
-        this.accountId !== accountId ||
-        listing.accountId !== accountId
-      ) {
+      if (requestToken !== this.conflictToken || this.accountId !== accountId) {
+        // A newer load owns the flag now, so this one must not touch it.
+        return false;
+      }
+      if (listing.accountId !== accountId) {
+        this.conflictsLoading = false;
         return false;
       }
       this.conflicts = listing;
