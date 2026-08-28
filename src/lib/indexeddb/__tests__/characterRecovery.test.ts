@@ -10,6 +10,7 @@ import {
   inspectPlayerBackupSafetyFile,
   stageCharacterRecoveryFromSerialized,
   verifyActivatedCharacterRecovery,
+  verifyLegacyCharacterRecovery,
   visibleCharactersMatchRecovery,
 } from '@/lib/indexeddb/characterRecovery';
 import {
@@ -796,5 +797,70 @@ describe('post-cutover character recovery', () => {
         ['hero-1', 'hero-2']
       )
     ).toBe(false);
+  });
+
+  it('verifies exact legacy recovery bytes and visible character IDs', async () => {
+    const player =
+      '{"state":{"characters":[{"id":"hero-1","name":"Hero One","race":"Human","class":"Fighter","level":1,"createdAt":"2020-01-01T00:00:00.000Z","updatedAt":"2020-01-01T00:00:00.000Z","lastPlayed":"2020-01-01T00:00:00.000Z","characterData":{"id":"hero-1"},"tags":[],"isArchived":false}]},"version":1}';
+    const envelope =
+      '{"state":{"character":{"id":"hero-1","name":"Hero One"}},"version":0}';
+    const bundle = await captureDeviceBackup(
+      new Map([
+        ['rollkeeper-player-data', player],
+        ['rollkeeper-character:hero-1', envelope],
+      ]),
+      { appVersion: 'test', runId: 'legacy-verify', timestamp: 'now' }
+    );
+    const serialized = JSON.stringify(bundle);
+    localStorage.setItem('rollkeeper-player-data', player);
+    localStorage.setItem('rollkeeper-character:hero-1', envelope);
+
+    await expect(
+      verifyLegacyCharacterRecovery({
+        serialized,
+        storage: localStorage,
+        visibleCharacters: [{ id: 'hero-1', tags: [] }],
+      })
+    ).resolves.toEqual({ ok: true, characterIds: ['hero-1'] });
+
+    localStorage.setItem('rollkeeper-character:hero-1', '{"changed":true}');
+    await expect(
+      verifyLegacyCharacterRecovery({
+        serialized,
+        storage: localStorage,
+        visibleCharacters: [{ id: 'hero-1', tags: [] }],
+      })
+    ).resolves.toEqual({ ok: false, reason: 'hash-mismatch' });
+
+    localStorage.setItem('rollkeeper-character:hero-1', envelope);
+    await expect(
+      verifyLegacyCharacterRecovery({
+        serialized,
+        storage: localStorage,
+        visibleCharacters: [{ id: 'other-hero', tags: [] }],
+      })
+    ).resolves.toEqual({ ok: false, reason: 'visible-mismatch' });
+  });
+
+  it('fails legacy verification for invalid or quarantined files', async () => {
+    await expect(
+      verifyLegacyCharacterRecovery({
+        serialized: 'not-json',
+        storage: localStorage,
+        visibleCharacters: [],
+      })
+    ).resolves.toEqual({ ok: false, reason: 'invalid-json' });
+
+    const quarantined = await captureDeviceBackup(
+      new Map([['rollkeeper-character:hero-1', '{"state":{},"version":0}']]),
+      { appVersion: 'test', runId: 'legacy-quarantine', timestamp: 'now' }
+    );
+    await expect(
+      verifyLegacyCharacterRecovery({
+        serialized: JSON.stringify(quarantined),
+        storage: localStorage,
+        visibleCharacters: [],
+      })
+    ).resolves.toEqual({ ok: false, reason: 'quarantined' });
   });
 });
