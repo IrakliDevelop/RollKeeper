@@ -19,6 +19,7 @@ import {
   openExistingRollkeeperDatabase,
 } from '@/lib/indexeddb/localDatabase';
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
+import { usePlayerStore } from '@/store/playerStore';
 
 const PLAYABLE_PLAYER =
   '{"state":{"characters":[{"id":"hero-1","name":"Hero One","race":"Human","class":"Fighter","level":1,"createdAt":"2020-01-01T00:00:00.000Z","updatedAt":"2020-01-01T00:00:00.000Z","lastPlayed":"2020-01-01T00:00:00.000Z","characterData":{"id":"hero-1"},"tags":[],"isArchived":false}]},"version":1}';
@@ -85,6 +86,7 @@ async function uploadSafetyFile(serialized: string) {
 describe('PlayerBackupRecovery', () => {
   afterEach(async () => {
     cleanup();
+    usePlayerStore.setState({ characters: [] });
     localStorage.clear();
     caps.localAuthorityMutation = false;
     resetCharacterPersistenceRuntimeForTests();
@@ -141,7 +143,7 @@ describe('PlayerBackupRecovery', () => {
       screen.getByRole('button', { name: COPY.recovery.confirm })
     );
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      COPY.recovery.restoreMissingResult
+      COPY.recovery.restoreSuccess
     );
     expect(
       await openExistingRollkeeperDatabase({ factory: indexedDB })
@@ -149,6 +151,35 @@ describe('PlayerBackupRecovery', () => {
     expect(localStorage.getItem('rollkeeper-player-data')).toBe(
       PLAYABLE_PLAYER
     );
+    expect(usePlayerStore.getState().characters).toEqual([
+      expect.objectContaining({ id: 'hero-1', tags: [] }),
+    ]);
+  });
+
+  it('switches the mounted stores to the activated authority before reporting success', async () => {
+    caps.localAuthorityMutation = true;
+    const bundle = await captureDeviceBackup(
+      new Map([['rollkeeper-player-data', PLAYABLE_PLAYER]]),
+      { appVersion: 'test', runId: 'activate-visible', timestamp: 'now' }
+    );
+    render(<PlayerBackupRecovery />);
+    await uploadSafetyFile(JSON.stringify(bundle));
+    fireEvent.click(
+      await screen.findByRole('button', { name: COPY.recovery.restoreCurrent })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.recovery.confirm })
+    );
+    expect(await screen.findByText(COPY.recovery.restorePreview)).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.recovery.confirm })
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      COPY.recovery.restoreSuccess
+    );
+    expect(usePlayerStore.getState().characters).toEqual([
+      expect.objectContaining({ id: 'hero-1', tags: [] }),
+    ]);
   });
 
   it('stages an inactive generation without activating until a second confirmation', async () => {
@@ -207,6 +238,29 @@ describe('PlayerBackupRecovery', () => {
       epoch: 0,
     });
     database!.close();
+  });
+
+  it('does not write an unusable per-character envelope through the legacy fallback', async () => {
+    const bundle = await captureDeviceBackup(
+      new Map([
+        ['rollkeeper-player-data', PLAYABLE_PLAYER],
+        ['rollkeeper-character:hero-1', '{"state":{},"version":0}'],
+      ]),
+      { appVersion: 'test', runId: 'unusable-legacy', timestamp: 'now' }
+    );
+    render(<PlayerBackupRecovery />);
+    await uploadSafetyFile(JSON.stringify(bundle));
+    fireEvent.click(
+      await screen.findByRole('button', { name: COPY.recovery.restoreCurrent })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: COPY.recovery.confirm })
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      COPY.recovery.unusable
+    );
+    expect(localStorage.getItem('rollkeeper-player-data')).toBeNull();
+    expect(localStorage.getItem('rollkeeper-character:hero-1')).toBeNull();
   });
 
   it('proves rollback generation after reopen instead of inferring from parity', async () => {

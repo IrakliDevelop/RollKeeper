@@ -107,4 +107,13 @@ describe('pure passthrough migration and validation', () => {
       )
     ).toMatchObject({ status: 'quarantined', reason: 'reference-integrity' });
   });
+
+  it('quarantines a per-character envelope with no character payload', () => {
+    expect(
+      validateLegacyEnvelope(
+        'rollkeeper-character:hero-a',
+        '{"state":{},"version":0}'
+      )
+    ).toMatchObject({ status: 'quarantined', reason: 'semantic-integrity' });
+  });
 });

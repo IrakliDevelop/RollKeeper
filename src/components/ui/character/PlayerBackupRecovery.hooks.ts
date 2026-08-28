@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useRef, useState } from 'react';
+import { createJSONStorage } from 'zustand/middleware';
 
 import { browserRecoveryRepository } from '@/lib/browserRecoveryRepository';
 import {
@@ -14,6 +15,7 @@ import {
   stageCharacterRecoveryFromSerialized,
   activateImportedCharacterGeneration,
   verifyActivatedCharacterRecovery,
+  verifyLegacyCharacterRecovery,
 } from '@/lib/indexeddb/characterRecovery';
 import {
   captureActiveCharacterRecoveryBundle,
@@ -30,8 +32,12 @@ import {
   openExistingRollkeeperDatabase,
   openRollkeeperDatabase,
 } from '@/lib/indexeddb/localDatabase';
-import { applyActivatedRuntimeFromSelection } from '@/lib/indexeddb/characterPersistenceRuntime';
+import {
+  applyActivatedRuntimeFromSelection,
+  createCharacterFamilyStateStorage,
+} from '@/lib/indexeddb/characterPersistenceRuntime';
 import { repairRecoveredCharacterSelectionFromEvidence } from '@/lib/indexeddb/characterCutoverSelection';
+import { createPerCharacterStorage } from '@/lib/characterCanonicalStorage';
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
 import {
@@ -75,6 +81,21 @@ function downloadText(serialized: string, filename: string): void {
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
+}
+
+function routeMountedStoresToActivatedAuthority(): void {
+  const playerStorage = createJSONStorage(() =>
+    createCharacterFamilyStateStorage({
+      backing: localStorage,
+      participant: true,
+    })
+  );
+  const characterStorage = createJSONStorage(() => createPerCharacterStorage());
+  if (!playerStorage || !characterStorage) {
+    throw new Error('Character persistence storage is unavailable');
+  }
+  usePlayerStore.persist.setOptions({ storage: playerStorage });
+  useCharacterStore.persist.setOptions({ storage: characterStorage });
 }
 
 export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
@@ -195,18 +216,45 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
           setResultKind('invalid');
           return;
         }
+        if (inspected.quarantineCount > 0) {
+          setConfirmKind(null);
+          setReviewKind(null);
+          setResultKind('unusable');
+          announce(COPY.recovery.unusable);
+          return;
+        }
         const keys = genericRestorePreselectedKeys(
           inspected.bundle.entries,
           key => localStorage.getItem(key),
           'legacy'
         );
-        restoreRecoveryEntries(inspected.bundle, localStorage, keys, {
-          authority: 'legacy',
-        });
+        const restored = restoreRecoveryEntries(
+          inspected.bundle,
+          localStorage,
+          keys,
+          { authority: 'legacy' }
+        );
         setConfirmKind(null);
         setReviewKind(null);
-        setResultKind('generic-success');
-        announce(COPY.recovery.restoreMissingResult);
+        if (restored.conflicts.length > 0) {
+          setResultKind('difference');
+          announce(COPY.recovery.restoreDifference);
+          return;
+        }
+        await usePlayerStore.persist.rehydrate();
+        await useCharacterStore.persist.rehydrate();
+        const verified = await verifyLegacyCharacterRecovery({
+          serialized,
+          storage: localStorage,
+          visibleCharacters: usePlayerStore.getState().characters,
+        });
+        if (verified.ok) {
+          setResultKind('character-success');
+          announce(COPY.recovery.restoreSuccess);
+        } else {
+          setResultKind('verification-failure');
+          announce(COPY.recovery.restoreVerificationFailure);
+        }
         return;
       }
       const staged = await stageCharacterRecoveryFromSerialized({
@@ -258,7 +306,10 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
       database = undefined;
       const reopened = await openRollkeeperDatabase({ factory: indexedDB });
       try {
-        applyActivatedRuntimeFromSelection(localStorage, namespace);
+        if (!applyActivatedRuntimeFromSelection(localStorage, namespace)) {
+          throw new Error('Activated character selection is unavailable');
+        }
+        routeMountedStoresToActivatedAuthority();
         await usePlayerStore.persist.rehydrate();
         await useCharacterStore.persist.rehydrate();
         const verified = await verifyActivatedCharacterRecovery(reopened, {

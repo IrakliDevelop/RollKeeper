@@ -333,12 +333,19 @@ test('empty profile without local authority mutation restores missing data witho
   await expect(
     page.getByRole('alert').filter({
       hasText:
-        'Missing data was restored. Different copies were kept for review.',
+        'Your characters were restored and checked after loading them again.',
     })
   ).toBeVisible();
   expect(await databaseNames(page)).not.toContain('rollkeeper-local');
   expect(
     await page.evaluate(() => localStorage.getItem('rollkeeper-player-data'))
   ).toBe(PLAYER_RAW);
+  expect(
+    await page.evaluate(() =>
+      window.__rkStores?.player
+        .getState()
+        .characters.map(character => character.id)
+    )
+  ).toEqual(['hero-1']);
   await context.close();
 });

@@ -566,6 +566,30 @@ export function visibleCharactersMatchRecovery(
   );
 }
 
+export async function verifyLegacyCharacterRecovery(options: {
+  serialized: string;
+  storage: { getItem(key: string): string | null };
+  visibleCharacters: ReadonlyArray<{ id: string; tags?: unknown }>;
+}) {
+  const inspected = await inspectCharacterRecoveryBundle(options.serialized);
+  if (!inspected.ok) return { ok: false as const, reason: inspected.reason };
+  if (inspected.quarantineCount > 0) {
+    return { ok: false as const, reason: 'quarantined' as const };
+  }
+  for (const entry of inspected.characterEntries) {
+    if (options.storage.getItem(entry.key) !== entry.rawValue) {
+      return { ok: false as const, reason: 'hash-mismatch' as const };
+    }
+  }
+  const characterIds = expectedVisibleCharacterIds(inspected.characterEntries);
+  if (
+    !visibleCharactersMatchRecovery(options.visibleCharacters, characterIds)
+  ) {
+    return { ok: false as const, reason: 'visible-mismatch' as const };
+  }
+  return { ok: true as const, characterIds };
+}
+
 function expectedVisibleCharacterIds(
   entries: readonly DeviceBackupEntry[]
 ): string[] {

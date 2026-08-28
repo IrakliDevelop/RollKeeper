@@ -164,7 +164,14 @@ export function validateLegacyEnvelope(
   if (key.startsWith('rollkeeper-character:')) {
     const id = key.slice('rollkeeper-character:'.length);
     const character = parsed.state.character;
-    if (isRecord(character) && character.id !== id) {
+    if (!isRecord(character) || typeof character.id !== 'string') {
+      return quarantine(
+        rawValue,
+        'semantic-integrity',
+        'Character envelope payload is incomplete'
+      );
+    }
+    if (character.id !== id) {
       return quarantine(
         rawValue,
         'reference-integrity',
