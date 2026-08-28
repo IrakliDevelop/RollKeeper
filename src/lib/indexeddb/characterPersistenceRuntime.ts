@@ -14,6 +14,7 @@ import {
 } from './localDatabase';
 import { createSafeStorage } from '../safeStorage';
 import { readCharacterCutoverSelection } from './characterCutoverSelection';
+import type { StorageNamespace } from './shadowJournal';
 
 type RuntimeAuthority =
   | IndexedDbCharacterAuthority
@@ -64,6 +65,28 @@ export function setCharacterRuntimeAuthority(
   runtimeAuthority = authority;
 }
 
+export function applyActivatedRuntimeFromSelection(
+  storage: { getItem(key: string): string | null },
+  namespace: StorageNamespace = 'guest'
+): boolean {
+  const selection = readCharacterCutoverSelection(storage, namespace);
+  if (
+    selection?.activatedEpoch === undefined ||
+    !selection.activatedGeneration
+  ) {
+    return false;
+  }
+  runtimeAuthority = {
+    authority: 'indexedDB',
+    namespace,
+    family: 'character',
+    generation: selection.activatedGeneration,
+    epoch: selection.activatedEpoch,
+    committedAt: selection.selectedAt,
+  };
+  return true;
+}
+
 function initializeActivatedRuntimeFromSelection(): void {
   if (
     runtimeAuthority.authority === 'indexedDB' ||
@@ -71,22 +94,9 @@ function initializeActivatedRuntimeFromSelection(): void {
   ) {
     return;
   }
-  const selection = readCharacterCutoverSelection(localStorage, 'guest');
-  if (
-    selection?.activatedEpoch === undefined ||
-    !selection.activatedGeneration
-  ) {
-    return;
+  if (applyActivatedRuntimeFromSelection(localStorage, 'guest')) {
+    activeBootstrapPending = true;
   }
-  runtimeAuthority = {
-    authority: 'indexedDB',
-    namespace: 'guest',
-    family: 'character',
-    generation: selection.activatedGeneration,
-    epoch: selection.activatedEpoch,
-    committedAt: selection.selectedAt,
-  };
-  activeBootstrapPending = true;
 }
 
 export function finishCharacterPersistenceBootstrap(): void {

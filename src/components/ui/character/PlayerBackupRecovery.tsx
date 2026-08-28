@@ -232,16 +232,19 @@ export function PlayerBackupRecovery({
             <DialogTitle>
               {recovery.confirmKind === 'rollback'
                 ? COPY.recovery.rollback
-                : recovery.confirmKind === 'character'
+                : recovery.confirmKind === 'character' ||
+                    recovery.confirmKind === 'character-activate'
                   ? COPY.recovery.restoreCurrent
                   : COPY.recovery.restoreMissing}
             </DialogTitle>
             <DialogDescription>
               {recovery.confirmKind === 'rollback'
                 ? COPY.recovery.rollbackConfirm
-                : recovery.confirmKind === 'character'
-                  ? COPY.recovery.restoreConfirm
-                  : COPY.recovery.restoreMissingConfirm}
+                : recovery.confirmKind === 'character-activate'
+                  ? COPY.recovery.restorePreview
+                  : recovery.confirmKind === 'character'
+                    ? COPY.recovery.restoreConfirm
+                    : COPY.recovery.restoreMissingConfirm}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -257,6 +260,8 @@ export function PlayerBackupRecovery({
               onClick={() => {
                 if (recovery.confirmKind === 'rollback')
                   void recovery.handleConfirmRollback();
+                else if (recovery.confirmKind === 'character-activate')
+                  void recovery.handleConfirmCharacterActivate();
                 else if (recovery.confirmKind === 'character')
                   void recovery.handleConfirmCharacter();
                 else void recovery.handleConfirmGeneric();

@@ -11,6 +11,7 @@ import {
   decideGenericRestoreWrite,
   GENERIC_RESTORE_DENIED_CONTROL_PREFIXES,
   genericRestorePreselectedKeys,
+  shouldUseLegacyGenericCharacterRestore,
 } from '../playerBackupRecoveryPolicy';
 
 const VALID_STORE = '{"state":{"items":[]},"version":1}';
@@ -335,5 +336,26 @@ describe('playerBackupRecoveryPolicy', () => {
     });
     expect(values.get('rollkeeper-player-data')).toBe(player);
     expect(values.get('rollkeeper-character:hero-1')).toBe(envelope);
+  });
+
+  it('uses generic legacy restore for any localStorage profile when local authority mutation is unavailable', () => {
+    expect(
+      shouldUseLegacyGenericCharacterRestore({
+        authority: 'localStorage',
+        localAuthorityMutation: false,
+      })
+    ).toBe(true);
+    expect(
+      shouldUseLegacyGenericCharacterRestore({
+        authority: 'localStorage',
+        localAuthorityMutation: true,
+      })
+    ).toBe(false);
+    expect(
+      shouldUseLegacyGenericCharacterRestore({
+        authority: 'indexedDB',
+        localAuthorityMutation: false,
+      })
+    ).toBe(false);
   });
 });

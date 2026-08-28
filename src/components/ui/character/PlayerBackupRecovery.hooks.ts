@@ -8,9 +8,9 @@ import {
   initiateDeviceBackupDownload,
   restoreRecoveryEntries,
 } from '@/lib/deviceRecovery';
-import { isCharacterFamilyKey } from '@/lib/indexeddb/characterFamily';
 import {
   inspectCharacterRecoveryBundle,
+  inspectPlayerBackupSafetyFile,
   stageCharacterRecoveryFromSerialized,
   activateImportedCharacterGeneration,
   verifyActivatedCharacterRecovery,
@@ -24,20 +24,32 @@ import {
   readCharacterActivationEvidence,
   readCharacterAuthority,
   rollbackCharacterAuthority,
+  verifyCharacterRollbackGenerationAfterReopen,
 } from '@/lib/indexeddb/characterAuthority';
 import {
   openExistingRollkeeperDatabase,
   openRollkeeperDatabase,
 } from '@/lib/indexeddb/localDatabase';
+import { applyActivatedRuntimeFromSelection } from '@/lib/indexeddb/characterPersistenceRuntime';
 import { repairRecoveredCharacterSelectionFromEvidence } from '@/lib/indexeddb/characterCutoverSelection';
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
-import { genericRestorePreselectedKeys } from '@/lib/playerBackup/playerBackupRecoveryPolicy';
+import {
+  genericRestorePreselectedKeys,
+  shouldUseLegacyGenericCharacterRestore,
+} from '@/lib/playerBackup/playerBackupRecoveryPolicy';
 import { readPlayerBackupCapabilities } from '@/lib/playerBackup/playerBackupFlags';
 import { APP_VERSION } from '@/utils/constants';
+import { usePlayerStore } from '@/store/playerStore';
+import { useCharacterStore } from '@/store/characterStore';
 
 export type RecoveryReviewKind = 'generic' | 'character' | 'unusable';
-export type RecoveryConfirmKind = 'generic' | 'character' | 'rollback' | null;
+export type RecoveryConfirmKind =
+  | 'generic'
+  | 'character'
+  | 'character-activate'
+  | 'rollback'
+  | null;
 export type RecoveryResultKind =
   | 'generic-success'
   | 'character-success'
@@ -65,23 +77,6 @@ function downloadText(serialized: string, filename: string): void {
   }
 }
 
-function isCharacterOnly(entries: readonly { key: string }[]): boolean {
-  return (
-    entries.length > 0 &&
-    entries.every(entry => isCharacterFamilyKey(entry.key))
-  );
-}
-
-function hasLocalCharacterFamily(storage: Storage): boolean {
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key && isCharacterFamilyKey(key) && storage.getItem(key) !== null) {
-      return true;
-    }
-  }
-  return false;
-}
-
 export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
   const [busy, setBusy] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
@@ -91,6 +86,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const serializedRef = useRef<string | null>(null);
+  const stagedGenerationRef = useRef<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [hasOriginal, setHasOriginal] = useState(false);
 
@@ -109,7 +105,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
       const serialized = await file.text();
       serializedRef.current = serialized;
       setHasOriginal(true);
-      const inspected = await inspectCharacterRecoveryBundle(serialized);
+      const inspected = await inspectPlayerBackupSafetyFile(serialized);
       if (!inspected.ok) {
         setReviewKind(null);
         setResultKind(
@@ -124,9 +120,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
         );
         return;
       }
-      setReviewKind(
-        isCharacterOnly(inspected.bundle.entries) ? 'character' : 'generic'
-      );
+      setReviewKind(inspected.kind);
     } catch {
       setResultKind('invalid');
       announce(COPY.recovery.invalidFile);
@@ -142,7 +136,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
     setBusy(true);
     setError(null);
     try {
-      const inspected = await inspectCharacterRecoveryBundle(serialized);
+      const inspected = await inspectPlayerBackupSafetyFile(serialized);
       if (!inspected.ok) {
         setResultKind('invalid');
         return;
@@ -191,9 +185,10 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
         : { authority: 'localStorage' as const, epoch: 0 };
       existing?.close();
       if (
-        authority.authority === 'localStorage' &&
-        !capabilities.calls.localAuthorityMutation &&
-        hasLocalCharacterFamily(localStorage)
+        shouldUseLegacyGenericCharacterRestore({
+          authority: authority.authority,
+          localAuthorityMutation: capabilities.calls.localAuthorityMutation,
+        })
       ) {
         const inspected = await inspectCharacterRecoveryBundle(serialized);
         if (!inspected.ok) {
@@ -219,56 +214,76 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
         serialized,
         namespace,
       });
+      stagedGenerationRef.current = staged.generation;
+      setReviewKind(null);
       if (staged.quarantineCount > 0) {
         setConfirmKind(null);
         setResultKind('unusable');
         announce(COPY.recovery.unusable);
         return;
       }
-      const database = await openRollkeeperDatabase({ factory: indexedDB });
-      try {
-        const activated = await activateImportedCharacterGeneration(database, {
-          namespace,
-          generation: staged.generation,
-          confirmed: true,
-          now: () => new Date().toISOString(),
-          storage: localStorage,
-        });
-        if (!activated.activated) {
-          setConfirmKind(null);
-          setReviewKind(null);
-          setResultKind('difference');
-          announce(COPY.recovery.restoreDifference);
-          return;
-        }
-        database.close();
-        const reopened = await openRollkeeperDatabase({ factory: indexedDB });
-        try {
-          const verified = await verifyActivatedCharacterRecovery(reopened, {
-            namespace,
-            serialized,
-          });
-          setConfirmKind(null);
-          setReviewKind(null);
-          if (verified.ok) {
-            setResultKind('character-success');
-            announce(COPY.recovery.restoreSuccess);
-          } else {
-            setResultKind('verification-failure');
-            announce(COPY.recovery.restoreVerificationFailure);
-          }
-        } finally {
-          reopened.close();
-        }
-      } catch {
-        database.close();
-        setResultKind('verification-failure');
-        announce(COPY.recovery.restoreVerificationFailure);
-      }
+      setConfirmKind('character-activate');
     } catch {
       setResultKind('invalid');
       announce(COPY.recovery.invalidFile);
     } finally {
+      setBusy(false);
+    }
+  }, [namespace]);
+
+  const handleConfirmCharacterActivate = useCallback(async () => {
+    const serialized = serializedRef.current;
+    const generation = stagedGenerationRef.current;
+    if (!serialized || !generation) return;
+    setBusy(true);
+    setError(null);
+    let database: IDBDatabase | undefined;
+    try {
+      database = await openRollkeeperDatabase({ factory: indexedDB });
+      const activated = await activateImportedCharacterGeneration(database, {
+        namespace,
+        generation,
+        confirmed: true,
+        now: () => new Date().toISOString(),
+        storage: localStorage,
+      });
+      if (!activated.activated) {
+        setConfirmKind(null);
+        setReviewKind(null);
+        setResultKind('difference');
+        announce(COPY.recovery.restoreDifference);
+        return;
+      }
+      database.close();
+      database = undefined;
+      const reopened = await openRollkeeperDatabase({ factory: indexedDB });
+      try {
+        applyActivatedRuntimeFromSelection(localStorage, namespace);
+        await usePlayerStore.persist.rehydrate();
+        await useCharacterStore.persist.rehydrate();
+        const verified = await verifyActivatedCharacterRecovery(reopened, {
+          namespace,
+          serialized,
+          storage: localStorage,
+          visibleCharacters: usePlayerStore.getState().characters,
+        });
+        setConfirmKind(null);
+        setReviewKind(null);
+        if (verified.ok) {
+          setResultKind('character-success');
+          announce(COPY.recovery.restoreSuccess);
+        } else {
+          setResultKind('verification-failure');
+          announce(COPY.recovery.restoreVerificationFailure);
+        }
+      } finally {
+        reopened.close();
+      }
+    } catch {
+      setResultKind('verification-failure');
+      announce(COPY.recovery.restoreVerificationFailure);
+    } finally {
+      database?.close();
       setBusy(false);
     }
   }, [namespace]);
@@ -349,6 +364,12 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
         storage: localStorage,
         namespace,
       });
+      const reopenVerified = await verifyCharacterRollbackGenerationAfterReopen(
+        indexedDB,
+        namespace,
+        coverage.authority.generation,
+        coverage.authority.epoch
+      );
       const database = await openRollkeeperDatabase({ factory: indexedDB });
       try {
         const result = await rollbackCharacterAuthority(
@@ -358,8 +379,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
             namespace,
             expectedEpoch: coverage.authority.epoch,
             confirmed: true,
-            reopenVerified:
-              coverage.parity && coverage.matchingJournalCount === 0,
+            reopenVerified,
             now: () => new Date().toISOString(),
           }
         );
@@ -429,6 +449,7 @@ export function usePlayerBackupRecovery(namespace: StorageNamespace = 'guest') {
     handleChooseFile,
     handleConfirmGeneric,
     handleConfirmCharacter,
+    handleConfirmCharacterActivate,
     handleSaveCurrent,
     handleDownloadDetails,
     handleDownloadOriginal,

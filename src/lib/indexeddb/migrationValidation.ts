@@ -60,7 +60,13 @@ function validatePlayerReferences(
   if (!Array.isArray(state.characters)) return null;
   const ids = new Set<string>();
   for (const candidate of state.characters) {
-    if (!isRecord(candidate) || typeof candidate.id !== 'string') continue;
+    if (!isRecord(candidate) || typeof candidate.id !== 'string') {
+      return quarantine(
+        rawValue,
+        'semantic-integrity',
+        'Character roster entry is incomplete'
+      );
+    }
     if (ids.has(candidate.id)) {
       return quarantine(
         rawValue,
@@ -80,8 +86,30 @@ function validatePlayerReferences(
         'Roster and character payload IDs differ'
       );
     }
+    if (!isPlayableRosterCharacter(candidate)) {
+      return quarantine(
+        rawValue,
+        'semantic-integrity',
+        'Character roster entry is incomplete'
+      );
+    }
   }
   return null;
+}
+
+function isPlayableRosterCharacter(
+  candidate: Record<string, unknown>
+): boolean {
+  return (
+    typeof candidate.name === 'string' &&
+    typeof candidate.race === 'string' &&
+    typeof candidate.class === 'string' &&
+    typeof candidate.level === 'number' &&
+    Array.isArray(candidate.tags) &&
+    candidate.tags.every(tag => typeof tag === 'string') &&
+    candidate.createdAt != null &&
+    candidate.lastPlayed != null
+  );
 }
 
 export function validateLegacyEnvelope(

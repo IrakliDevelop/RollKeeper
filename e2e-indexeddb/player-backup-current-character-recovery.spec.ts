@@ -1,11 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 const PLAYER_RAW =
-  '{"state":{"characters":[{"id":"hero-1","name":"Hero One","characterData":{"id":"hero-1","name":"Hero One"}}]},"version":1}';
+  '{"state":{"characters":[{"id":"hero-1","name":"Hero One","race":"Human","class":"Fighter","level":1,"createdAt":"2020-01-01T00:00:00.000Z","updatedAt":"2020-01-01T00:00:00.000Z","lastPlayed":"2020-01-01T00:00:00.000Z","characterData":{"id":"hero-1","name":"Hero One"},"tags":[],"isArchived":false}]},"version":1}';
 const ENVELOPE_RAW =
   '{"state":{"character":{"id":"hero-1","name":"Hero One"}},"version":0}';
 const STALE_MIRROR =
-  '{"state":{"characters":[{"id":"hero-1","name":"Stale Mirror"}]},"version":1}';
+  '{"state":{"characters":[{"id":"hero-1","name":"Stale Mirror","race":"Human","class":"Fighter","level":1,"createdAt":"2020-01-01T00:00:00.000Z","updatedAt":"2020-01-01T00:00:00.000Z","lastPlayed":"2020-01-01T00:00:00.000Z","characterData":{"id":"hero-1","name":"Stale Mirror"},"tags":[],"isArchived":false}]},"version":1}';
 
 async function seedActiveProfile(page: Page) {
   await page.goto('/player/backup?intent=recovery');
@@ -186,31 +186,6 @@ test('downloads the current-character safety file, restores those exact bytes, a
     retainedBundle.entries.every(entry => !entry.key.includes('Stale'))
   ).toBe(true);
 
-  await page.evaluate(async () => {
-    const names = await indexedDB.databases();
-    await Promise.all(
-      names.flatMap(item =>
-        item.name
-          ? [
-              new Promise<void>((resolve, reject) => {
-                const request = indexedDB.deleteDatabase(item.name!);
-                request.onsuccess = () => resolve();
-                request.onblocked = () => resolve();
-                request.onerror = () => reject(request.error);
-              }),
-            ]
-          : []
-      )
-    );
-    localStorage.removeItem('rollkeeper-player-data');
-    localStorage.removeItem('rollkeeper-character:hero-1');
-    localStorage.removeItem('rollkeeper:indexeddb-selection:guest:character');
-  });
-  await page.reload();
-  await expect(
-    page.getByRole('heading', { name: 'Your characters need recovery' })
-  ).toBeVisible();
-
   await page
     .getByLabel('Restore from a safety file')
     .setInputFiles(retainedPath!);
@@ -225,6 +200,12 @@ test('downloads the current-character safety file, restores those exact bytes, a
       'Restore these characters in this browser? RollKeeper will keep any different local data for review.'
     )
   ).toBeVisible();
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await expect(
+    page.getByText(
+      'Your current characters are ready to restore. The characters already in this browser have not changed.'
+    )
+  ).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: 'Restore' }).click();
   await expect(
     page.getByRole('alert').filter({
@@ -303,5 +284,61 @@ test('downloads the current-character safety file, restores those exact bytes, a
   expect(JSON.parse(restored.marker!).activatedGeneration).toBe(
     restored.generation
   );
+  await context.close();
+});
+
+test('empty profile without local authority mutation restores missing data without creating IndexedDB', async ({
+  browser,
+}) => {
+  const context = await browser.newContext({ acceptDownloads: true });
+  const page = await context.newPage();
+  await seedActiveProfile(page);
+  await page.getByRole('button', { name: 'Recovery options' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page
+    .getByRole('button', { name: 'Save current character recovery file' })
+    .click();
+  const download = await downloadPromise;
+  const retainedPath = await download.path();
+  expect(retainedPath).toBeTruthy();
+
+  await page.evaluate(async () => {
+    const names = await indexedDB.databases();
+    await Promise.all(
+      names.flatMap(item =>
+        item.name
+          ? [
+              new Promise<void>((resolve, reject) => {
+                const request = indexedDB.deleteDatabase(item.name!);
+                request.onsuccess = () => resolve();
+                request.onblocked = () => resolve();
+                request.onerror = () => reject(request.error);
+              }),
+            ]
+          : []
+      )
+    );
+    localStorage.removeItem('rollkeeper-player-data');
+    localStorage.removeItem('rollkeeper-character:hero-1');
+    localStorage.removeItem('rollkeeper:indexeddb-selection:guest:character');
+  });
+  await page.reload();
+  await page
+    .getByLabel('Restore from a safety file')
+    .setInputFiles(retainedPath!);
+  await page
+    .getByRole('button', { name: 'Restore current characters' })
+    .click();
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await expect(
+    page.getByRole('alert').filter({
+      hasText:
+        'Missing data was restored. Different copies were kept for review.',
+    })
+  ).toBeVisible();
+  expect(await databaseNames(page)).not.toContain('rollkeeper-local');
+  expect(
+    await page.evaluate(() => localStorage.getItem('rollkeeper-player-data'))
+  ).toBe(PLAYER_RAW);
   await context.close();
 });

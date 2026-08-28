@@ -11,7 +11,10 @@ import {
   type CharacterAuthority,
 } from './characterAuthority';
 import { CHARACTER_FAMILY, isCharacterFamilyKey } from './characterFamily';
-import { writeRecoveredCharacterSelectionMarker } from './characterCutoverSelection';
+import {
+  readCharacterCutoverSelection,
+  writeRecoveredCharacterSelectionMarker,
+} from './characterCutoverSelection';
 import {
   openRollkeeperDatabase,
   requestResult,
@@ -72,9 +75,19 @@ function mapValidationError(cause: unknown): CharacterRecoveryInspectReason {
   return 'invalid-shape';
 }
 
-export async function inspectCharacterRecoveryBundle(
+export type SafetyFileInspectResult =
+  | {
+      ok: true;
+      kind: 'character' | 'generic';
+      bundle: DeviceBackupV1;
+      characterEntries: DeviceBackupEntry[];
+      quarantineCount: number;
+    }
+  | { ok: false; reason: CharacterRecoveryInspectReason };
+
+export async function inspectPlayerBackupSafetyFile(
   serialized: string
-): Promise<CharacterRecoveryInspectResult> {
+): Promise<SafetyFileInspectResult> {
   let parsed: unknown;
   try {
     parsed = JSON.parse(serialized);
@@ -101,18 +114,32 @@ export async function inspectCharacterRecoveryBundle(
   if (new Set(keys).size !== keys.length) {
     return { ok: false, reason: 'duplicate-character-key' };
   }
-  if (characterEntries.length === 0) {
+  const quarantineCount = characterEntries.filter(
+    entry =>
+      validateLegacyEnvelope(entry.key, entry.rawValue).status === 'quarantined'
+  ).length;
+  return {
+    ok: true,
+    kind: characterEntries.length > 0 ? 'character' : 'generic',
+    bundle,
+    characterEntries,
+    quarantineCount,
+  };
+}
+
+export async function inspectCharacterRecoveryBundle(
+  serialized: string
+): Promise<CharacterRecoveryInspectResult> {
+  const inspected = await inspectPlayerBackupSafetyFile(serialized);
+  if (!inspected.ok) return inspected;
+  if (inspected.characterEntries.length === 0) {
     return { ok: false, reason: 'empty-character-set' };
   }
   return {
     ok: true,
-    bundle,
-    characterEntries,
-    quarantineCount: characterEntries.filter(
-      entry =>
-        validateLegacyEnvelope(entry.key, entry.rawValue).status ===
-        'quarantined'
-    ).length,
+    bundle: inspected.bundle,
+    characterEntries: inspected.characterEntries,
+    quarantineCount: inspected.quarantineCount,
   };
 }
 
@@ -453,13 +480,31 @@ export async function activateImportedCharacterGeneration(
 
 export async function verifyActivatedCharacterRecovery(
   database: IDBDatabase,
-  options: { namespace: StorageNamespace; serialized: string }
+  options: {
+    namespace: StorageNamespace;
+    serialized: string;
+    storage?: { getItem(key: string): string | null };
+    visibleCharacters?: ReadonlyArray<{ id: string; tags?: unknown }>;
+  }
 ) {
   const inspected = await inspectCharacterRecoveryBundle(options.serialized);
   if (!inspected.ok) return { ok: false as const, reason: inspected.reason };
   const authority = await readCharacterAuthority(database, options.namespace);
   if (authority.authority !== 'indexedDB') {
     return { ok: false as const, reason: 'authority-mismatch' as const };
+  }
+  if (options.storage) {
+    const marker = readCharacterCutoverSelection(
+      options.storage,
+      options.namespace
+    );
+    if (
+      !marker ||
+      marker.activatedGeneration !== authority.generation ||
+      marker.activatedEpoch !== authority.epoch
+    ) {
+      return { ok: false as const, reason: 'marker-mismatch' as const };
+    }
   }
   const transaction = database.transaction('kvGenerations', 'readonly');
   const rows = (await requestResult(
@@ -491,12 +536,57 @@ export async function verifyActivatedCharacterRecovery(
       return { ok: false as const, reason: 'hash-mismatch' as const };
     }
   }
-  const characterIds = inspected.characterEntries
-    .flatMap(entry =>
-      entry.key.startsWith('rollkeeper-character:')
-        ? [entry.key.slice('rollkeeper-character:'.length)]
-        : []
-    )
-    .sort();
+  const characterIds = expectedVisibleCharacterIds(inspected.characterEntries);
+  if (
+    options.visibleCharacters &&
+    !visibleCharactersMatchRecovery(options.visibleCharacters, characterIds)
+  ) {
+    return { ok: false as const, reason: 'visible-mismatch' as const };
+  }
   return { ok: true as const, characterIds };
+}
+
+export function visibleCharactersMatchRecovery(
+  characters: ReadonlyArray<{ id: string; tags?: unknown }>,
+  expectedIds: readonly string[]
+): boolean {
+  if (
+    !characters.every(
+      character =>
+        typeof character.id === 'string' && Array.isArray(character.tags)
+    )
+  ) {
+    return false;
+  }
+  const actual = [...characters.map(character => character.id)].sort();
+  const expected = [...expectedIds].sort();
+  return (
+    actual.length === expected.length &&
+    actual.every((id, index) => id === expected[index])
+  );
+}
+
+function expectedVisibleCharacterIds(
+  entries: readonly DeviceBackupEntry[]
+): string[] {
+  const envelopeIds = entries.flatMap(entry =>
+    entry.key.startsWith('rollkeeper-character:')
+      ? [entry.key.slice('rollkeeper-character:'.length)]
+      : []
+  );
+  if (envelopeIds.length > 0) return [...new Set(envelopeIds)].sort();
+  const roster = entries.find(entry => entry.key === 'rollkeeper-player-data');
+  if (!roster) return [];
+  try {
+    const parsed = JSON.parse(roster.rawValue) as {
+      state?: { characters?: Array<{ id?: unknown }> };
+    };
+    return (parsed.state?.characters ?? [])
+      .flatMap(character =>
+        typeof character.id === 'string' ? [character.id] : []
+      )
+      .sort();
+  } catch {
+    return [];
+  }
 }

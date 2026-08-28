@@ -63,6 +63,12 @@ describe('pure passthrough migration and validation', () => {
       '{"state":{"characters":[{"id":"a","characterData":{"id":"b"}}]},"version":1}',
       'reference-integrity',
     ],
+    [
+      'incomplete roster character missing tags',
+      'rollkeeper-player-data',
+      '{"state":{"characters":[{"id":"hero-1","name":"Hero One","characterData":{"id":"hero-1"}}]},"version":1}',
+      'semantic-integrity',
+    ],
   ])('quarantines %s without activating it', (_label, key, raw, reason) => {
     expect(validateLegacyEnvelope(key, raw)).toMatchObject({
       status: 'quarantined',

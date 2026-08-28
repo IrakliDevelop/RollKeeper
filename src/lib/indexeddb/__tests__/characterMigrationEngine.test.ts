@@ -124,7 +124,17 @@ describe('character-only Slice 7 preparation', () => {
       JSON.stringify({
         state: {
           characters: [
-            { id: 'hero', characterData: { ...stamp, marker: 'roster' } },
+            {
+              id: 'hero',
+              name: 'Hero',
+              race: 'Human',
+              class: 'Fighter',
+              level: 1,
+              createdAt: '2020-01-01T00:00:00.000Z',
+              lastPlayed: '2020-01-01T00:00:00.000Z',
+              tags: [],
+              characterData: { ...stamp, marker: 'roster' },
+            },
           ],
         },
         version: 1,

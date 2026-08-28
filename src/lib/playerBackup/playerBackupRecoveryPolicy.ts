@@ -97,3 +97,12 @@ export function genericRestorePreselectedKeys(
     )
     .map(entry => entry.key);
 }
+
+export function shouldUseLegacyGenericCharacterRestore(options: {
+  authority: 'localStorage' | 'indexedDB';
+  localAuthorityMutation: boolean;
+}): boolean {
+  return (
+    options.authority === 'localStorage' && !options.localAuthorityMutation
+  );
+}
