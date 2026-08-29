@@ -174,4 +174,21 @@ describe('player backup copy', () => {
     );
     expect(mapPlayerBackupError('online', raw)).not.toContain(raw.message);
   });
+
+  it('uses the approved recovery copy deck', () => {
+    expect(PLAYER_BACKUP_COPY.recovery).toMatchObject({
+      sectionTitle: 'Safety files and recovery',
+      restoreFrom: 'Restore from a safety file',
+      reviewTitle: 'Review safety file',
+      restoreMissing: 'Restore missing data',
+      restoreCurrent: 'Restore current characters',
+      restoreSuccess:
+        'Your characters were restored and checked after loading them again.',
+      invalidFile:
+        'RollKeeper could not check this recovery file. Nothing was changed. Choose another file.',
+      rollback: 'Use the earlier browser saving method',
+      downloadDetails: 'Download recovery details',
+      downloadOriginal: 'Download original recovery copy',
+    });
+  });
 });

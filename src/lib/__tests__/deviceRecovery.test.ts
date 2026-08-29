@@ -168,7 +168,7 @@ describe('device recovery bundle', () => {
 
     expect(preview).toMatchObject({
       entryCount: 4,
-      restorableCount: 2,
+      restorableCount: 0,
       identicalCount: 1,
       conflictCount: 1,
       quarantineCount: 2,
@@ -188,7 +188,7 @@ describe('device recovery bundle', () => {
     ]);
 
     const emptyPreview = previewRecoveryBundle(bundle, new Map());
-    expect(emptyPreview.restorableCount).toBe(4);
+    expect(emptyPreview.restorableCount).toBe(2);
     expect(emptyPreview.conflictCount).toBe(0);
   });
 

@@ -26,7 +26,7 @@
     "format:ci": "node scripts/quality-ratchet.mjs format",
     "test": "vitest run --project unit",
     "test:e2e": "playwright test",
-    "test:indexeddb:e2e": "playwright test --config playwright.indexeddb.config.ts",
+    "test:indexeddb:e2e": "playwright test --config playwright.indexeddb.config.ts && playwright test --config playwright.player-backup-recovery.config.ts",
     "test:automatic-sync:e2e": "playwright test --config playwright.automatic-sync.config.ts",
     "test:slice8:coverage": "vitest run --config config/vitest/slice8.config.ts",
     "test:slice9:coverage": "vitest run --config config/vitest/slice9.config.ts",

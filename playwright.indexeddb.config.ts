@@ -35,5 +35,11 @@ export default defineConfig({
     reuseExistingServer: false,
     timeout: 120_000,
   },
-  projects: [{ name: 'chromium-indexeddb', use: { browserName: 'chromium' } }],
+  projects: [
+    {
+      name: 'chromium-indexeddb',
+      use: { browserName: 'chromium' },
+      testIgnore: /player-backup-current-character-recovery/,
+    },
+  ],
 });

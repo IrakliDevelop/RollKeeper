@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  applyActivatedRuntimeFromSelection,
   awaitCharacterPersistence,
   awaitCharacterPersistenceResult,
   freezeCharacterPersistenceForCutover,
@@ -415,5 +416,46 @@ describe('character persistence authority router', () => {
     await expect(
       activeStorage.getItem('rollkeeper-player-data')
     ).rejects.toThrow(/authority changed/i);
+  });
+
+  it('overwrites runtime from the generated recovery marker before hydration', async () => {
+    setCharacterRuntimeAuthority({
+      authority: 'indexedDB',
+      namespace: 'guest',
+      family: 'character',
+      generation: 'stale',
+      epoch: 1,
+      committedAt: 'old',
+    });
+    localStorage.setItem(
+      'rollkeeper:indexeddb-selection:guest:character',
+      JSON.stringify({
+        version: 1,
+        namespace: 'guest',
+        family: 'character',
+        selectedAt: 'activated-at',
+        activatedEpoch: 7,
+        activatedGeneration: 'recovery:file',
+      })
+    );
+    expect(applyActivatedRuntimeFromSelection(localStorage, 'guest')).toBe(
+      true
+    );
+    const readActive = vi.fn().mockResolvedValue('from-idb');
+    const storage = createCharacterFamilyStateStorage({
+      backing: localStorage,
+      participant: true,
+      readActive,
+    });
+    await expect(storage.getItem('rollkeeper-player-data')).resolves.toBe(
+      'from-idb'
+    );
+    expect(readActive).toHaveBeenCalledWith(
+      expect.objectContaining({
+        generation: 'recovery:file',
+        epoch: 7,
+      }),
+      'rollkeeper-player-data'
+    );
   });
 });

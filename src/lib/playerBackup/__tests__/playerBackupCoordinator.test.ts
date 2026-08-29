@@ -43,7 +43,8 @@ import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence'
 import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
 import { playerBackupExecutionPath } from '../playerBackupRunRepository';
 
-const RAW = '{"state":{"characters":[{"id":"hero-a"}]},"version":1}';
+const RAW =
+  '{"state":{"characters":[{"id":"hero-a","name":"Hero A","race":"Human","class":"Fighter","level":1,"createdAt":"2020-01-01T00:00:00.000Z","updatedAt":"2020-01-01T00:00:00.000Z","lastPlayed":"2020-01-01T00:00:00.000Z","characterData":{"id":"hero-a"},"tags":[],"isArchived":false}]},"version":1}';
 
 function fakeResult(
   accountId: string,

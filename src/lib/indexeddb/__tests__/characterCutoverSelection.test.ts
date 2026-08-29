@@ -9,7 +9,9 @@ import {
   isSelectedCharacterCutoverProfile,
   markCharacterCutoverActivated,
   readCharacterCutoverSelection,
+  repairRecoveredCharacterSelectionFromEvidence,
   selectCharacterCutover,
+  writeRecoveredCharacterSelectionMarker,
 } from '@/lib/indexeddb/characterCutoverSelection';
 
 describe('character cutover opt-in', () => {
@@ -115,5 +117,81 @@ describe('character cutover opt-in', () => {
     vi.stubGlobal('localStorage', undefined);
     expect(isBrowserCharacterCutoverParticipant()).toBe(false);
     vi.unstubAllGlobals();
+  });
+
+  it('writes a recovered marker from evidence and refuses backup authorization or mismatched continuation', () => {
+    const values = new Map<string, string>();
+    const storage = {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+    };
+    const evidence = {
+      version: 1 as const,
+      namespace: 'guest' as const,
+      family: 'character' as const,
+      selectedAt: 'activated-at',
+      recoveryManifestHash: 'hash',
+      recoveryRunId: 'run',
+      recoveryCreatedAt: 'file-time',
+      activatedGeneration: 'recovery:run',
+      activatedEpoch: 1,
+      committedAt: 'activated-at',
+    };
+
+    expect(() =>
+      writeRecoveredCharacterSelectionMarker(storage, {
+        ...evidence,
+        playerBackupRunId: 'backup-run',
+      })
+    ).toThrow(/backup authorization/i);
+
+    const written = writeRecoveredCharacterSelectionMarker(storage, evidence);
+    expect(written).toMatchObject({
+      recoveryRunId: 'run',
+      activatedGeneration: 'recovery:run',
+      activatedEpoch: 1,
+    });
+    expect(written.playerBackupRunId).toBeUndefined();
+
+    expect(() =>
+      repairRecoveredCharacterSelectionFromEvidence(storage, 'user:a', evidence)
+    ).toThrow(/immutable evidence/i);
+
+    expect(
+      repairRecoveredCharacterSelectionFromEvidence(storage, 'guest', evidence)
+    ).toMatchObject({ activatedGeneration: 'recovery:run' });
+
+    values.set(
+      characterCutoverSelectionKey('guest'),
+      JSON.stringify({
+        ...written,
+        activatedGeneration: 'other',
+      })
+    );
+    expect(() =>
+      repairRecoveredCharacterSelectionFromEvidence(storage, 'guest', evidence)
+    ).toThrow(/immutable evidence/i);
+
+    values.set(
+      characterCutoverSelectionKey('guest'),
+      JSON.stringify({
+        version: 1,
+        namespace: 'guest',
+        family: 'character',
+        selectedAt: 'different',
+        recoveryManifestHash: 'hash',
+        recoveryRunId: 'run',
+        recoveryCreatedAt: 'file-time',
+      })
+    );
+    expect(() =>
+      repairRecoveredCharacterSelectionFromEvidence(storage, 'guest', evidence)
+    ).toThrow(/immutable evidence/i);
+
+    values.delete(characterCutoverSelectionKey('guest'));
+    expect(
+      repairRecoveredCharacterSelectionFromEvidence(storage, 'guest', evidence)
+        .activatedEpoch
+    ).toBe(1);
   });
 });

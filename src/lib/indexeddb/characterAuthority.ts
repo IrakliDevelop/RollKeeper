@@ -83,9 +83,9 @@ export interface CharacterActivationEvidenceInput {
   recoveryManifestHash: string;
   recoveryRunId: string;
   recoveryCreatedAt: string;
-  playerBackupRunId: string;
-  playerBackupAccountId: string;
-  playerBackupAuthorizedAt: string;
+  playerBackupRunId?: string;
+  playerBackupAccountId?: string;
+  playerBackupAuthorizedAt?: string;
 }
 
 export interface CharacterActivationEvidence
@@ -133,10 +133,28 @@ function activationEvidenceRecord(
   authority: IndexedDbCharacterAuthority,
   input: CharacterActivationEvidenceInput
 ): CharacterActivationEvidenceRecord {
+  const required = [
+    input.selectedAt,
+    input.recoveryManifestHash,
+    input.recoveryRunId,
+    input.recoveryCreatedAt,
+  ];
+  if (required.some(value => typeof value !== 'string' || value.length === 0)) {
+    throw new Error('Character activation evidence is incomplete');
+  }
+  const authorization = [
+    input.playerBackupRunId,
+    input.playerBackupAccountId,
+    input.playerBackupAuthorizedAt,
+  ];
+  const authorizationPresent = authorization.filter(
+    value => value !== undefined
+  );
   if (
-    Object.values(input).some(
+    authorizationPresent.some(
       value => typeof value !== 'string' || value.length === 0
-    )
+    ) ||
+    (authorizationPresent.length > 0 && authorizationPresent.length !== 3)
   ) {
     throw new Error('Character activation evidence is incomplete');
   }
@@ -145,7 +163,17 @@ function activationEvidenceRecord(
     version: 1,
     namespace,
     family: CHARACTER_FAMILY,
-    ...input,
+    selectedAt: input.selectedAt,
+    recoveryManifestHash: input.recoveryManifestHash,
+    recoveryRunId: input.recoveryRunId,
+    recoveryCreatedAt: input.recoveryCreatedAt,
+    ...(input.playerBackupRunId
+      ? {
+          playerBackupRunId: input.playerBackupRunId,
+          playerBackupAccountId: input.playerBackupAccountId,
+          playerBackupAuthorizedAt: input.playerBackupAuthorizedAt,
+        }
+      : {}),
     activatedGeneration: authority.generation,
     activatedEpoch: authority.epoch,
     committedAt: authority.committedAt,
