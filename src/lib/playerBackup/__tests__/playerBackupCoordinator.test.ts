@@ -599,6 +599,7 @@ describe('player backup local preparation coordinator', () => {
       })
     ).rejects.toThrow(/receipt entries are missing/i);
 
+    const originalDmData = localStorage.getItem('rollkeeper-dm-data');
     localStorage.setItem('rollkeeper-dm-data', '{"dm":"tampered"}');
     await expect(
       continuePlayerBackupLocalPreparation({
@@ -606,6 +607,42 @@ describe('player backup local preparation coordinator', () => {
         receipts,
       })
     ).rejects.toThrow(/protected source changed/i);
+    localStorage.setItem('rollkeeper-dm-data', originalDmData!);
+
+    const verifiedForSameManifest = await receipts.readVerifiedDownloadReceipt(
+      bundle.manifestHash
+    );
+    await expect(
+      continuePlayerBackupLocalPreparation({
+        ...continuation,
+        receipts: {
+          hasVerifiedDownloadReceipt: async () => true,
+          readVerifiedDownloadReceipt: async () => ({
+            ...verifiedForSameManifest!,
+            runId: 'later-identical-download',
+            manifestHash: 'some-other-manifest',
+          }),
+        },
+      })
+    ).rejects.toThrow(/receipt entries are missing/i);
+
+    // The receipt store is keyed by manifest hash, so a later download of the
+    // same bytes (a second tab, or "Save safety file" twice) replaces the
+    // download id the run recorded. The verified entry vector for that exact
+    // manifest is still the byte proof consent was given on, so preparation
+    // must accept it instead of stranding the confirmed run.
+    await expect(
+      continuePlayerBackupLocalPreparation({
+        ...continuation,
+        receipts: {
+          hasVerifiedDownloadReceipt: async () => true,
+          readVerifiedDownloadReceipt: async () => ({
+            ...verifiedForSameManifest!,
+            runId: 'later-identical-download',
+          }),
+        },
+      })
+    ).resolves.toMatchObject({ stage: 'local-ready' });
   });
 
   it('repairs a post-pointer marker interruption only on explicit continuation', async () => {

@@ -206,9 +206,15 @@ export const EMPTY_MANAGEMENT: PlayerBackupWizardView['management'] = {
   futureDefaultEnabled: false,
 };
 
+const CURRENT_CLOUD_ATTENTION_STATES = new Set<
+  NonNullable<PlayerBackupCharacterRow['cloudState']>
+>(['newer', 'removed', 'future', 'unavailable']);
+
 function cloudManagementActions(options: {
   hasCloudRow: boolean;
   manual: boolean;
+  /** An already-removed online copy can be restored, not removed again. */
+  removed?: boolean;
 }): PlayerBackupWizardView['management']['rows'][number]['actions'] {
   const mutate = options.manual && options.hasCloudRow;
   return [
@@ -229,7 +235,7 @@ function cloudManagementActions(options: {
     },
     {
       label: COPY.management.remove,
-      enabled: mutate,
+      enabled: mutate && options.removed !== true,
       action: 'remove',
     },
   ];
@@ -264,21 +270,31 @@ export function projectPlayerBackupManagement(input: {
     const heldAside =
       heldAsideIds.has(character.id) || character.cloudState === 'future';
     const resultRow = input.result.rows.find(row => row.id === character.id);
+    // A current online read that a durable result cannot explain wins over the
+    // stale result label. `different` is excluded on purpose: local edits made
+    // after a one-time copy read as `different` (local ahead), which is the
+    // ordinary "later changes stay here until you choose Back up now" state.
     const currentCloudAttention =
       character.cloudState !== undefined &&
-      !['missing', 'identical'].includes(character.cloudState);
+      CURRENT_CLOUD_ATTENTION_STATES.has(character.cloudState);
     const currentCloudCopy = currentCloudAttention
       ? degradedCharacterCopy(
           character.cloudState as Parameters<typeof degradedCharacterCopy>[0]
         )
       : null;
-    const statusLabel = currentCloudAttention
-      ? character.statusLabel
-      : (resultRow?.statusLabel ?? character.statusLabel);
-    const paused = statusLabel === COPY.selection.paused;
-    const savedOnce = statusLabel === COPY.selection.oneTimeProtected;
+    // Actions always derive from durable evidence so a transient online read
+    // cannot hide Back up now or offer ongoing-only controls.
+    const durableLabel = resultRow?.statusLabel ?? character.statusLabel;
+    const removedOnline = character.cloudState === 'removed';
+    const statusLabel = removedOnline
+      ? COPY.selection.removed
+      : currentCloudAttention
+        ? character.statusLabel
+        : durableLabel;
+    const paused = durableLabel === COPY.selection.paused;
+    const savedOnce = durableLabel === COPY.selection.oneTimeProtected;
     const protectedOngoing =
-      statusLabel === COPY.selection.alreadyProtected ||
+      durableLabel === COPY.selection.alreadyProtected ||
       resultRow?.tone === 'ok';
     const hasCloudRow = cloudLegacyIds.has(character.id);
     return {
@@ -331,7 +347,11 @@ export function projectPlayerBackupManagement(input: {
                     },
                   ]
                 : []),
-              ...cloudManagementActions({ hasCloudRow, manual }),
+              ...cloudManagementActions({
+                hasCloudRow,
+                manual,
+                removed: removedOnline,
+              }),
             ],
     };
   });

@@ -248,6 +248,142 @@ describe('projectPlayerBackupManagement', () => {
     ]);
   });
 
+  it('keeps Back up now for a one-time character edited after its online copy', () => {
+    // A local edit after a one-time copy makes the cloud preview read
+    // `different` (local ahead of the online copy). That is the ordinary
+    // "later changes stay here until you choose Back up now" state, not a
+    // degraded-selection warning.
+    const management = projectPlayerBackupManagement({
+      characters: [
+        {
+          ...CHARACTERS[0]!,
+          statusLabel: 'Review needed first',
+          note: 'This account already has another copy of this character.',
+          tone: 'warn',
+          cloudState: 'different',
+        },
+      ],
+      cloudLegacyIds: ['aveline'],
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: COPY.selection.oneTimeProtected,
+            note: 'One online copy saved and checked. Later changes stay here.',
+            tone: 'ok',
+          },
+        ],
+      },
+      futureDefaultOn: false,
+      manualMutation: true,
+      automaticMutation: true,
+    });
+
+    expect(management.summary).toContain('1 protected');
+    expect(management.rows[0]).toMatchObject({
+      statusLabel: COPY.selection.oneTimeProtected,
+      tone: 'ok',
+    });
+    expect(management.rows[0]?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'backup-now', enabled: true }),
+        expect.objectContaining({ action: 'resume', enabled: true }),
+      ])
+    );
+    expect(management.rows[0]?.actions).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ action: 'pause' })])
+    );
+  });
+
+  it('keeps durable actions when a newer online copy needs attention', () => {
+    const management = projectPlayerBackupManagement({
+      characters: [
+        {
+          ...CHARACTERS[0]!,
+          statusLabel: 'Review needed first',
+          note: 'The online copy has changes that are not in this browser.',
+          tone: 'warn',
+          cloudState: 'newer',
+        },
+      ],
+      cloudLegacyIds: ['aveline'],
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: COPY.selection.oneTimeProtected,
+            note: 'One online copy saved and checked. Later changes stay here.',
+            tone: 'ok',
+          },
+        ],
+      },
+      futureDefaultOn: false,
+      manualMutation: true,
+      automaticMutation: true,
+    });
+
+    expect(management.summary).toContain('1 needs attention');
+    expect(management.rows[0]).toMatchObject({
+      statusLabel: 'Review needed first',
+      tone: 'warn',
+    });
+    expect(management.rows[0]?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'backup-now', enabled: true }),
+        expect.objectContaining({ action: 'download-recovery', enabled: true }),
+      ])
+    );
+    expect(management.rows[0]?.actions).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ action: 'pause' })])
+    );
+  });
+
+  it('shows a removed online copy with recovery actions and no second removal', () => {
+    const management = projectPlayerBackupManagement({
+      characters: [
+        {
+          ...CHARACTERS[0]!,
+          statusLabel: COPY.selection.notProtected,
+          note: 'Fighter',
+          tone: 'none',
+          cloudState: 'removed',
+        },
+      ],
+      cloudLegacyIds: ['aveline'],
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: 'Needs attention',
+            note: 'RollKeeper kept both versions.',
+            tone: 'warn',
+          },
+        ],
+      },
+      futureDefaultOn: false,
+      manualMutation: true,
+    });
+
+    expect(management.rows[0]).toMatchObject({
+      statusLabel: COPY.selection.removed,
+      note: expect.stringContaining('removed online copy'),
+      tone: 'warn',
+    });
+    expect(management.rows[0]?.actions).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: 'restore-here', enabled: true }),
+        expect.objectContaining({ action: 'download-recovery', enabled: true }),
+        expect.objectContaining({ action: 'remove', enabled: false }),
+      ])
+    );
+  });
+
   it('merges online-only copies and disables cloud actions without a cloud row', () => {
     const management = projectPlayerBackupManagement({
       characters: CHARACTERS,
