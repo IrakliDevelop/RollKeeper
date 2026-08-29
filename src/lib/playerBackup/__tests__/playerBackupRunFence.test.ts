@@ -9,11 +9,14 @@ import {
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
 
+import { PlayerBackupRunReplacedError } from '../playerBackupRunRepository';
 import {
   type PlayerBackupExclusiveLockProvider,
   PlayerBackupLockUnavailableError,
+  assertActivePlayerBackupRun,
   hasPlayerBackupExclusiveLockCapability,
   mutatePlayerBackupWithFence,
+  playerBackupAccountLockName,
   runPlayerBackupTransaction,
   withPlayerBackupAccountLock,
 } from '../playerBackupRunFence';
@@ -70,6 +73,43 @@ describe('player backup run fence', () => {
   afterEach(async () => {
     database.close();
     await deleteRollkeeperDatabaseForTests(indexedDB);
+  });
+
+  it('fails closed without an account identity before requesting a lock', async () => {
+    const task = vi.fn();
+    await expect(
+      withPlayerBackupAccountLock(
+        { accountId: '', locks: new QueuedLocks() },
+        task
+      )
+    ).rejects.toThrow(/account is required/i);
+    expect(task).not.toHaveBeenCalled();
+    expect(() => playerBackupAccountLockName('')).toThrow(
+      /account is required/i
+    );
+  });
+
+  it('fails closed when the local database is absent', async () => {
+    database.close();
+    await deleteRollkeeperDatabaseForTests(indexedDB);
+    await expect(
+      assertActivePlayerBackupRun({
+        accountId: 'account-a',
+        expectedActiveRunId: 'run-a',
+        factory: indexedDB,
+      })
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    await expect(
+      mutatePlayerBackupWithFence({
+        accountId: 'account-a',
+        expectedActiveRunId: 'run-a',
+        locks: new QueuedLocks(),
+        factory: indexedDB,
+        mutateAndAcknowledge: vi.fn(),
+      })
+    ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    database = await openRollkeeperDatabase({ factory: indexedDB });
+    await seedPointer(database, 'run-a');
   });
 
   it('fails closed without an exclusive account lock capability', async () => {

@@ -527,4 +527,97 @@ describe('player backup management', () => {
     await expect(restore).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
     expect(add).not.toHaveBeenCalled();
   });
+
+  it('fails closed when the roster or local persist refuses the restored character', async () => {
+    const link = {
+      accountId: ACCOUNT,
+      legacyId: 'hero-a',
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: 'fp',
+      pendingMutation: null,
+    };
+    const restored = {
+      plan: {
+        kind: 'restore-original' as const,
+        character: { id: 'hero-a', name: 'Hero A' },
+        attachCloudLink: true,
+        reason: null,
+      },
+      link,
+    };
+    const prepareRestore = vi.fn().mockResolvedValue(restored);
+    const base = {
+      factory: indexedDB,
+      locks: new QueuedLocks(),
+      accountId: ACCOUNT,
+      expectedActiveRunId: RUN_ID,
+      cloudId: 'cloud-a',
+      localCharacters: [HERO],
+      mode: 'original' as const,
+      service: { prepareRestore },
+      assertCurrent: vi.fn(),
+      attachLink: vi.fn(),
+    };
+
+    await expect(
+      restorePlayerBackupCharacter({
+        ...base,
+        has: () => true,
+        add: vi.fn(),
+        replace: vi.fn().mockReturnValue(false),
+        persistRoster: vi.fn(),
+      })
+    ).rejects.toThrow('Roster write was not accepted');
+    expect(base.attachLink).not.toHaveBeenCalled();
+
+    await expect(
+      restorePlayerBackupCharacter({
+        ...base,
+        has: () => false,
+        add: vi.fn().mockReturnValue(true),
+        replace: vi.fn(),
+        persistRoster: vi.fn().mockResolvedValue({ saved: false }),
+      })
+    ).rejects.toThrow('Restored character was not saved in this browser');
+    expect(base.attachLink).not.toHaveBeenCalled();
+  });
+
+  it('fails closed for a quarantined restore without a reason', async () => {
+    await expect(
+      restorePlayerBackupCharacter({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        expectedActiveRunId: RUN_ID,
+        cloudId: 'cloud-a',
+        localCharacters: [HERO],
+        mode: 'original',
+        service: {
+          prepareRestore: vi.fn().mockResolvedValue({
+            plan: {
+              kind: 'quarantined',
+              character: null,
+              attachCloudLink: false,
+              reason: null,
+            },
+            link: {
+              accountId: ACCOUNT,
+              legacyId: 'hero-a',
+              cloudId: 'cloud-a',
+              serverVersion: 1,
+              contentFingerprint: 'fp',
+              pendingMutation: null,
+            },
+          }),
+        },
+        assertCurrent: vi.fn(),
+        has: () => false,
+        add: vi.fn(),
+        replace: vi.fn(),
+        persistRoster: vi.fn(),
+        attachLink: vi.fn(),
+      })
+    ).rejects.toThrow('Cloud restore is not supported');
+  });
 });

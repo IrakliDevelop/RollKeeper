@@ -1,6 +1,6 @@
 import 'fake-indexeddb/auto';
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   commitCharacterCutover,
@@ -12,6 +12,8 @@ import {
   repairCharacterCutoverActivationFromEvidence,
   selectCharacterCutover,
 } from '@/lib/indexeddb/characterCutoverSelection';
+import * as characterAuthority from '@/lib/indexeddb/characterAuthority';
+import * as localDatabase from '@/lib/indexeddb/localDatabase';
 import {
   deleteRollkeeperDatabaseForTests,
   openRollkeeperDatabase,
@@ -268,5 +270,154 @@ describe('player backup active selection', () => {
     expect(
       localStorage.getItem('rollkeeper:indexeddb-selection:guest:character')
     ).toBe(before);
+  });
+
+  it('fails closed when the database disappears after the active-run check', async () => {
+    const authority = await seedActive(database);
+    markCharacterCutoverActivated(
+      localStorage,
+      'guest',
+      authority.epoch,
+      authority.generation
+    );
+    await seedActiveRun(database, 'run-b');
+    const before = localStorage.getItem(
+      'rollkeeper:indexeddb-selection:guest:character'
+    );
+    const originalOpen = localDatabase.openExistingRollkeeperDatabase;
+    const openSpy = vi
+      .spyOn(localDatabase, 'openExistingRollkeeperDatabase')
+      .mockImplementationOnce(options => originalOpen(options))
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      rebindPlayerBackupActiveSelection({
+        factory: indexedDB,
+        storage: localStorage,
+        namespace: 'guest',
+        accountId: 'account-b',
+        expectedActiveRunId: 'run-b',
+        authorizedAt: 'authorized-b',
+        expectedAuthority: {
+          generation: authority.generation,
+          epoch: authority.epoch,
+        },
+        currentCharacterSafetyVerified: true,
+        locks: new ImmediateLocks(),
+        ownerId: 'tab-b',
+        nowMs: () => 1,
+      })
+    ).rejects.toThrow(/authority is missing/i);
+    expect(openSpy).toHaveBeenCalledTimes(2);
+    expect(
+      localStorage.getItem('rollkeeper:indexeddb-selection:guest:character')
+    ).toBe(before);
+    openSpy.mockRestore();
+  });
+
+  it('fails closed without current-character coverage or a verified extra file', async () => {
+    const authority = await seedActive(database);
+    markCharacterCutoverActivated(
+      localStorage,
+      'guest',
+      authority.epoch,
+      authority.generation
+    );
+    await seedActiveRun(database, 'run-b');
+    const before = localStorage.getItem(
+      'rollkeeper:indexeddb-selection:guest:character'
+    );
+    const coverageSpy = vi
+      .spyOn(characterAuthority, 'inspectCurrentCharacterSafetyCoverage')
+      .mockResolvedValue({
+        authority: {
+          authority: 'indexedDB',
+          namespace: 'guest',
+          family: 'character',
+          generation: authority.generation,
+          epoch: authority.epoch,
+          committedAt: 'committed-a',
+        },
+        rows: [],
+        parity: false,
+        matchingJournalCount: 1,
+        broadFileCoversCurrentCharacters: false,
+      });
+
+    await expect(
+      rebindPlayerBackupActiveSelection({
+        factory: indexedDB,
+        storage: localStorage,
+        namespace: 'guest',
+        accountId: 'account-b',
+        expectedActiveRunId: 'run-b',
+        authorizedAt: 'authorized-b',
+        expectedAuthority: {
+          generation: authority.generation,
+          epoch: authority.epoch,
+        },
+        currentCharacterSafetyVerified: false,
+        locks: new ImmediateLocks(),
+        ownerId: 'tab-b',
+        nowMs: () => 1,
+      })
+    ).rejects.toThrow(/safety coverage is missing/i);
+    expect(
+      localStorage.getItem('rollkeeper:indexeddb-selection:guest:character')
+    ).toBe(before);
+    coverageSpy.mockRestore();
+  });
+
+  it('fails closed when the rebound selection cannot be read back', async () => {
+    const authority = await seedActive(database);
+    markCharacterCutoverActivated(
+      localStorage,
+      'guest',
+      authority.epoch,
+      authority.generation
+    );
+    await seedActiveRun(database, 'run-b');
+    let rebindWrote = false;
+    const storage: Storage = {
+      get length() {
+        return localStorage.length;
+      },
+      clear: () => localStorage.clear(),
+      key: index => localStorage.key(index),
+      removeItem: key => localStorage.removeItem(key),
+      getItem: key => {
+        const value = localStorage.getItem(key);
+        if (rebindWrote && key.includes('indexeddb-selection') && value) {
+          return JSON.stringify({
+            ...JSON.parse(value),
+            playerBackupRunId: 'stale-run',
+          });
+        }
+        return value;
+      },
+      setItem: (key, value) => {
+        if (key.includes('indexeddb-selection')) rebindWrote = true;
+        localStorage.setItem(key, value);
+      },
+    };
+
+    await expect(
+      rebindPlayerBackupActiveSelection({
+        factory: indexedDB,
+        storage,
+        namespace: 'guest',
+        accountId: 'account-b',
+        expectedActiveRunId: 'run-b',
+        authorizedAt: 'authorized-b',
+        expectedAuthority: {
+          generation: authority.generation,
+          epoch: authority.epoch,
+        },
+        currentCharacterSafetyVerified: true,
+        locks: new ImmediateLocks(),
+        ownerId: 'tab-b',
+        nowMs: () => 1,
+      })
+    ).rejects.toThrow(/could not be verified/i);
   });
 });
