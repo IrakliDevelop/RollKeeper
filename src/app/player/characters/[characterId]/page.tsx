@@ -1141,7 +1141,7 @@ export default function CharacterSheet() {
               calendarDays={calendarDays}
               onShortRest={() => setPendingRestType('short')}
               onLongRest={() => setPendingRestType('long')}
-              onIncrementDays={incrementDaysSpent}
+              onIncrementDays={() => incrementDaysSpent(1)}
               onDecrementDays={() =>
                 updateDaysSpent(Math.max(0, (character.daysSpent || 0) - 1))
               }
