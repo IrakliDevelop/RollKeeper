@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { captureDeviceBackup } from '@/lib/deviceRecovery';
+import * as characterAuthority from '@/lib/indexeddb/characterAuthority';
 import {
   characterActivationEvidenceKey,
   commitCharacterFamilyWrite,
@@ -421,6 +422,190 @@ describe('player backup local preparation coordinator', () => {
     await expect(indexedDB.databases()).resolves.not.toContainEqual(
       expect.objectContaining({ name: 'rollkeeper-local' })
     );
+  });
+
+  it('rejects legacy consent while an orphan selection is present', async () => {
+    const { bundle, receipts } = await safety();
+    selectCharacterCutover(
+      localStorage,
+      'guest',
+      true,
+      () => 'selected',
+      {
+        manifestHash: bundle.manifestHash,
+        runId: bundle.runId,
+        createdAt: bundle.createdAt,
+      },
+      {
+        runId: 'orphan',
+        accountId: 'account-a',
+        authorizedAt: 'authorized',
+      }
+    );
+    await expect(
+      confirmPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-a',
+        mode: 'ongoing',
+        eligibleCharacterIds: ['hero-a'],
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: [],
+        broadSafetyBundle: bundle,
+        authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+        confirmedAt: 'confirmed',
+      })
+    ).rejects.toThrow(/orphan selection/i);
+    await expect(
+      openExistingRollkeeperDatabase({ factory: indexedDB })
+    ).resolves.toBeNull();
+  });
+
+  it('refuses indexedDB consent without proved current-character coverage', async () => {
+    const { bundle, receipts } = await safety();
+    const coverageSpy = vi
+      .spyOn(characterAuthority, 'inspectCurrentCharacterSafetyCoverage')
+      .mockResolvedValue({
+        authority: {
+          authority: 'indexedDB',
+          namespace: 'guest',
+          family: 'character',
+          generation: 'generation-a',
+          epoch: 1,
+          committedAt: 'committed-a',
+        },
+        rows: [],
+        parity: false,
+        matchingJournalCount: 1,
+        broadFileCoversCurrentCharacters: false,
+      });
+    await expect(
+      confirmPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-a',
+        mode: 'ongoing',
+        eligibleCharacterIds: ['hero-a'],
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: [],
+        broadSafetyBundle: bundle,
+        authority: {
+          kind: 'indexedDB',
+          namespace: 'guest',
+          family: 'character',
+          generation: 'generation-a',
+          epoch: 1,
+        },
+        confirmedAt: 'confirmed',
+      })
+    ).rejects.toThrow(/current character safety coverage is required/i);
+    coverageSpy.mockRestore();
+    await expect(
+      openExistingRollkeeperDatabase({ factory: indexedDB })
+    ).resolves.toBeNull();
+  });
+
+  it('fails closed when durable consent cannot be acknowledged', async () => {
+    const { bundle, receipts } = await safety();
+    const spy = vi
+      .spyOn(
+        AutomaticCharacterSyncPreferences.prototype,
+        'readConfirmedSelection'
+      )
+      .mockResolvedValue({
+        characterPolicies: {},
+        futureDefault: null,
+        confirmedAt: null,
+      });
+    await expect(
+      confirmPlayerBackupConsent({
+        factory: indexedDB,
+        storage: localStorage,
+        locks: new ImmediateLocks(),
+        receipts,
+        accountId: 'account-a',
+        expectedActiveRunId: null,
+        runId: 'run-a',
+        mode: 'ongoing',
+        eligibleCharacterIds: ['hero-a'],
+        selectedCharacterIds: ['hero-a'],
+        clearedCharacterIds: [],
+        broadSafetyBundle: bundle,
+        authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+        confirmedAt: 'confirmed',
+      })
+    ).rejects.toThrow(/could not be acknowledged/i);
+    spy.mockRestore();
+  });
+
+  it('fails closed when the verified receipt or protected source is missing after consent', async () => {
+    const { bundle, receipts } = await safety();
+    await confirmPlayerBackupConsent({
+      factory: indexedDB,
+      storage: localStorage,
+      locks: new ImmediateLocks(),
+      receipts,
+      accountId: 'account-a',
+      expectedActiveRunId: null,
+      runId: 'run-a',
+      mode: 'ongoing',
+      eligibleCharacterIds: ['hero-a'],
+      selectedCharacterIds: ['hero-a'],
+      clearedCharacterIds: [],
+      broadSafetyBundle: bundle,
+      authority: { kind: 'legacy', namespace: 'guest', family: 'character' },
+      confirmedAt: '2026-08-26T10:00:00.000Z',
+    });
+    const continuation = {
+      factory: indexedDB,
+      storage: localStorage,
+      locks: new ImmediateLocks(),
+      accountId: 'account-a',
+      appVersion: 'test',
+      ownerId: 'tab-a',
+      now: () => 'now',
+      nowMs: () => 1,
+    };
+    await expect(
+      continuePlayerBackupLocalPreparation({
+        ...continuation,
+        receipts: {
+          hasVerifiedDownloadReceipt: async () => false,
+          readVerifiedDownloadReceipt: async () => null,
+        },
+      })
+    ).rejects.toThrow(/receipt is missing/i);
+
+    await expect(
+      continuePlayerBackupLocalPreparation({
+        ...continuation,
+        receipts: {
+          hasVerifiedDownloadReceipt: async () => true,
+          readVerifiedDownloadReceipt: async () => ({
+            runId: 'other-run',
+            manifestHash: bundle.manifestHash,
+            initiatedAt: bundle.createdAt,
+            verifiedAt: 'verified',
+          }),
+        },
+      })
+    ).rejects.toThrow(/receipt entries are missing/i);
+
+    localStorage.setItem('rollkeeper-dm-data', '{"dm":"tampered"}');
+    await expect(
+      continuePlayerBackupLocalPreparation({
+        ...continuation,
+        receipts,
+      })
+    ).rejects.toThrow(/protected source changed/i);
   });
 
   it('repairs a post-pointer marker interruption only on explicit continuation', async () => {
@@ -912,9 +1097,100 @@ describe('player backup local preparation coordinator', () => {
         openExistingRollkeeperDatabase({ factory: indexedDB })
       ).resolves.toBeNull();
     });
+
+    it('aborts confirmation when a selected or cleared character disappears under the lock', async () => {
+      const { bundle, receipts } = await safety();
+      const links = createMemoryCharacterCloudLinkRepository();
+      const missingCleared = cloudDouble({
+        rows: [],
+        expectedAccountId: 'account-a',
+      });
+      await expect(
+        confirmDegradedPlayerBackupConsent({
+          factory: indexedDB,
+          storage: localStorage,
+          locks: new ImmediateLocks(),
+          receipts,
+          accountId: 'account-a',
+          expectedActiveRunId: null,
+          runId: 'run-degraded',
+          eligibleCharacterIds: ['hero-a', 'hero-c'],
+          selectedCharacterIds: ['hero-a'],
+          clearedCharacterIds: ['hero-c'],
+          broadSafetyBundle: bundle,
+          authority: {
+            kind: 'legacy',
+            namespace: 'guest',
+            family: 'character',
+          },
+          confirmedAt: '2026-08-26T10:00:00.000Z',
+          preview: missingCleared.read,
+          links,
+        })
+      ).rejects.toMatchObject({
+        name: 'PlayerBackupEligibilityChangedError',
+        changedCharacterIds: ['hero-c'],
+      });
+      await expect(
+        openExistingRollkeeperDatabase({ factory: indexedDB })
+      ).resolves.toBeNull();
+    });
   });
 
   describe('account-token result state', () => {
+    it('discovers no run and makes no database until an account is set', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      await expect(coordinator.discoverRun(indexedDB)).resolves.toBeNull();
+      expect(coordinator.snapshot().accountId).toBeNull();
+      await expect(
+        openExistingRollkeeperDatabase({ factory: indexedDB })
+      ).resolves.toBeNull();
+    });
+
+    it('switches account synchronously before a cloud load for a different account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      await expect(
+        coordinator.loadCloud('account-b', async () => ({
+          account: { id: 'account-b' },
+          characters: [],
+          onlineOnly: [],
+        }))
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot().accountId).toBe('account-b');
+    });
+
+    it('discards a result error after the account switches and rethrows while current', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      let rejectStale!: (cause: Error) => void;
+      const stale = new Promise<PlayerBackupExecutionResult>(
+        (_resolve, reject) => {
+          rejectStale = reject;
+        }
+      );
+      const loading = coordinator.loadResult('account-a', () => stale);
+      coordinator.changeAccount('account-b');
+      rejectStale(new Error('stale-account-result'));
+      await expect(loading).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        result: null,
+      });
+
+      coordinator.changeAccount('account-a');
+      await expect(
+        coordinator.loadResult('account-a', async () => {
+          throw new Error('current-account-result');
+        })
+      ).rejects.toThrow('current-account-result');
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
+        result: null,
+        resultLoading: false,
+      });
+    });
+
     it('applies a current-account result', async () => {
       const coordinator = new PlayerBackupReadOnlyCoordinator();
       coordinator.changeAccount('account-a');
@@ -1010,6 +1286,20 @@ describe('player backup local preparation coordinator', () => {
       });
     });
 
+    it('switches account synchronously before loading conflicts for a different account', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      await expect(
+        coordinator.loadConflicts('account-b', async () =>
+          fakeListing('account-b')
+        )
+      ).resolves.toBe(true);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        conflicts: fakeListing('account-b'),
+      });
+    });
+
     it('rejects a listing for another account id', async () => {
       const coordinator = new PlayerBackupReadOnlyCoordinator();
       coordinator.changeAccount('account-a');
@@ -1040,6 +1330,37 @@ describe('player backup local preparation coordinator', () => {
 
       expect(coordinator.snapshot()).toMatchObject({
         accountId: 'account-b',
+        conflicts: null,
+        conflictsLoading: false,
+      });
+    });
+
+    it('discards a conflict error after the account switches and rethrows while current', async () => {
+      const coordinator = new PlayerBackupReadOnlyCoordinator();
+      coordinator.changeAccount('account-a');
+      let rejectStale!: (cause: Error) => void;
+      const stale = new Promise<PlayerBackupConflictListing>(
+        (_resolve, reject) => {
+          rejectStale = reject;
+        }
+      );
+      const loading = coordinator.loadConflicts('account-a', () => stale);
+      coordinator.changeAccount('account-b');
+      rejectStale(new Error('stale-account-conflicts'));
+      await expect(loading).resolves.toBe(false);
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-b',
+        conflicts: null,
+      });
+
+      coordinator.changeAccount('account-a');
+      await expect(
+        coordinator.loadConflicts('account-a', async () => {
+          throw new Error('current-account-conflicts');
+        })
+      ).rejects.toThrow('current-account-conflicts');
+      expect(coordinator.snapshot()).toMatchObject({
+        accountId: 'account-a',
         conflicts: null,
         conflictsLoading: false,
       });

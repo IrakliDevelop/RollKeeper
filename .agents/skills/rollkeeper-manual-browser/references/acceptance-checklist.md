@@ -93,6 +93,190 @@ failure path.
 - Confirm retained raw or recovery data is present using hashes and metadata,
   without reproducing its payload in the report.
 
+## Player Backup Wizard
+
+Applies when a PR changes the player backup wizard, dashboard
+summary/manager, backup coordinator, account routing, character cloud
+controls, local character authority, recovery, or relevant flags.
+
+Use the Codex desktop in-app Browser through the existing skill (Claude Code
+Chrome may reuse this checklist). Standalone Playwright is supplemental and
+cannot satisfy this gate. Use an ephemeral local server, isolated `.localhost`
+origins only, local fake auth, and fake cloud/gateway services. Never use
+real credentials or production endpoints.
+
+Create the synthetic character through the visible `/player/characters/new`
+UI using the seed script's `characterDraft`, then add the script's unrelated
+`localStorageEntries`. Current seed version is `2`. Independently validate
+every downloaded recovery artifact. Report exact flag values, branch, commit,
+port, origin labels, seed version, counts/bytes, and abbreviated hashes. The
+verdict is passed, failed, or blocked. Do not print raw payloads, credentials,
+cookies, or secrets.
+
+A success label, HTTP status, Playwright result, or storage screenshot alone
+is insufficient. For every scenario below, record visible user actions,
+durable storage/server evidence, relevant network mutation counts, reload or
+multi-tab proof, failure-path evidence, and final unrelated-data hashes.
+
+Use these origins or equivalent fresh labels:
+
+- `rk-player-control.localhost` — umbrella off, lower flags on (non-vacuous
+  legacy control)
+- `rk-player-a.localhost` / `rk-player-b.localhost` — participating account A
+  and account-switch isolation
+- `rk-player-conflict.localhost` — independent same-account conflict work
+- `rk-player-race.localhost` — two-tab run fencing and lock behavior
+- `rk-player-degraded.localhost` — lower-capability combinations
+
+Keep `NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE` and every lower capability
+flag default-off unless a scenario explicitly turns a flag on for that
+isolated origin.
+
+1. Generate the skill seed, create the synthetic character through visible UI,
+   add the emitted unrelated entries, and prove identical raw-pair counts,
+   UTF-8 bytes, and hashes across starting origins.
+2. On the control origin, prove no wizard launcher, direct route absence,
+   legacy panels still present according to lower flags, no new
+   player-wizard record, no cutover selection/database, and no character
+   cloud write from view, sign-in, sign-out, reload, or navigation. On an
+   untouched wizard-on origin, inspect before and after route view and prove
+   the non-creating probe leaves `rollkeeper-local` absent.
+3. On A, open through the visible launcher; verify signed-out and sign-in
+   return behavior. Prove sign-in itself writes no character/storage
+   selection. With enabled lower capabilities, observe the current-account
+   list/fetch reads needed for character statuses and prove there are still
+   zero link, run, preference, work, ownership, upload, update, archive, or
+   restore mutations.
+4. Before activation, download the broad and current-character safety files
+   through visible controls, independently parse them, and verify
+   format/version, every entry byte count/hash, aggregate hash, and expected
+   character/unrelated entries. Prove download initiation alone cannot
+   continue. Reselect and prove the verified receipt before any local
+   ownership change. Change one unrelated key and prove confirmation fails
+   against the full entry vector.
+5. Cancel before final confirmation and prove zero consent run, selection,
+   active pointer, preference, document, pending work, or cloud write.
+   Reload and confirm safe resume.
+6. Run the default all-character ongoing flow with one selected character
+   previously paused. Observe the exact confirmation, then prove the consent
+   run, selected-on/cleared-off partition, and future-default-on record
+   committed together before selection. Prove only the exact semantically
+   valid character-selection key differs from the safety file at the
+   activation gate. Then prove local activation and a validated online
+   acknowledgement (refetch identity, server version, and content
+   fingerprint).
+7. Reload, navigate away/back, open a second same-origin tab, and prove the
+   compact dashboard summary derives from durable state and edits remain
+   acknowledged before their online status changes.
+8. Exercise one-time mode with one character cleared. After the consent
+   transaction and cutover selection are durable but before the first
+   manual link, stop and reload. Prove resume uses the recorded one-time mode
+   and exact selected/cleared IDs, uploads no cleared character, writes
+   selected and cleared preferences plus future default off, and does not
+   fall back to “select all.” Prove later edits do not create new cloud work.
+   Then use **Back up now** and verify the new acknowledged version.
+9. Go offline after a confirmed edit. Prove local acknowledgement and
+   retained pending work, reload offline, restore connectivity, retry/resume,
+   and validate the eventual row. Inject committed-response loss and prove
+   the same mutation identity is retried.
+10. Use two same-account isolated origins to create a conflict. Exercise
+    **Keep my changes**, **Use online version**, and **Keep both** from fresh
+    deterministic resets. Prove neither candidate disappears, discarded
+    candidates are retained, and the keep-both character starts with online
+    backup off.
+11. Inject future-format online data. Prove active local data remains,
+    recovery download contains the exact raw candidate, friendly vocabulary
+    is used, and no forbidden implementation term appears. Prove no
+    active-local overwrite.
+12. Switch from account A to B with A's run unfinished. Prove A's run, rows,
+    and statuses disappear immediately, B cannot read/continue/adopt/modify
+    them, and zero B write occurs until a new explicit confirmation. Switch
+    back and verify A's exact recorded scope returns.
+13. Pause and resume one character, turn the future default off/on, and
+    soft-remove an online copy. Prove pausing deletes nothing, soft removal
+    changes no local character, and each action is scoped to the intended
+    account and character.
+14. Restore an absent character, restore a collision as another character,
+    and import a safety file before and after cutover. Include a post-cutover
+    file with character selection/activation, cloud-link, and unknown
+    retained-only records plus forged `managed` classifications. Prove none of
+    those control records is selectable or written into a fresh profile,
+    authority stays on the fresh profile's valid path, and active character
+    entries use the dedicated inactive-generation import. Submit invalid
+    JSON/shape and bad checksum/aggregate files and prove the local database
+    remains absent. Then submit a checksum-valid bundle containing malformed
+    and future-version character envelopes; prove their exact raw values
+    and quarantine evidence are staged inactive while activation and the
+    active pointer remain unchanged. Exercise recovery-required exports and
+    a successful parity-gated rollback. Validate downloaded artifacts
+    independently.
+15. Compare unrelated DM, encounter, NPC, calendar, location, battle-map,
+    combat-log, magic-item, canvas, theme, and sentinel raw hashes at the
+    end. They must remain byte-identical except for an explicitly exercised
+    recovery action targeting that key.
+16. Check 390 px and desktop layouts; light, dark, and parchment themes;
+    keyboard-only completion; focus after step changes/errors; accessible
+    names; live regions; contrast; and no horizontal overflow.
+17. On the race origin, open two tabs under the same account and let both
+    observe the same active-run pointer. Confirm different selections as close
+    together as the harness permits. Prove only one compare-and-replace
+    commit wins, the stale tab creates no local work and makes no network
+    mutation, and its UI reloads the winning run. Hold one fake gateway
+    response open and prove another confirmation waits for the account lock
+    until acknowledgement is durable. In the injected no-lock fixture,
+    prove confirmation fails closed while read-only status and safety-file
+    recovery remain usable.
+18. On the degraded origin, exercise the three `M=false` combinations where
+    `C=false` or `S=false` and prove the surface offers only
+    safety-file/recovery actions with zero consent or backup mutation. Then
+    use `M=true, C=true, S=false`; inject missing, identical, exact recognized
+    linked, newer, different, archived, unreadable, unavailable, and
+    future-format rows. Prove only the first three safe classes are selected,
+    every other class is unavailable with its friendly next action, and an
+    all-contested roster has no confirmation. Change a selected row to
+    contested during the locked recheck and prove zero run, preference,
+    link, pending mutation, or gateway call. Separately change the server
+    row after consent and return an explicit conflict; prove neither copy
+    is overwritten, the integrated resolver and automatic retry remain
+    absent, only the rejected attempt is cleared, and recovery guidance is
+    shown. Complete a clean eligible manual copy and prove it changes no
+    selection or active-authority field and creates no automatic
+    document/work.
+19. During account A's first activation, prove its selection recovery
+    fields match A's verified safety receipt and immutable activation
+    evidence is committed with the active generation/epoch. Then force a
+    character save whose compatibility mirror remains stale and whose
+    mirror retry continues to fail. Open the wizard and prove route view
+    does not retry it, the broad file is not described as containing current
+    characters, and confirmation requires both a reselected broad file and
+    a reselected current-character bundle. Independently prove the extra
+    file is a valid `rollkeeper-device-backup` built from the active
+    generation rather than the stale mirror, then alter it and prove zero
+    run. Restore exact bytes and explicitly confirm full-capability setup
+    as account B with the newly saved files. Prove rebind validates A's
+    original selection fields against A's activation evidence, validates
+    B's new files through B's consent run, preserves the original
+    selection/recovery/epoch/generation fields, updates only B's
+    run/account/authorization fields, survives reload, and still initializes
+    the same authority after switching back to A and reloading. Inject a
+    mismatched or missing activation-evidence record and prove fail-closed
+    recovery with zero online work. In a new isolated recovery profile, prove
+    route view and opening recovery leave `rollkeeper-local` absent;
+    submit a damaged file and prove it remains absent. Then explicitly import
+    the exact extra file captured from A and prove the database is created
+    with only inactive recovery state and no setup run, preference, pointer,
+    marker, online work, or network call. Confirm restore, close/reopen, and
+    prove the restored character IDs/content hashes match the downloaded
+    entries and visible characters. Repeat with divergent local data and
+    prove both candidates remain while authority does not switch. Finally
+    allow mirror retry to succeed, save again, and prove exact parity plus
+    an empty matching journal permits one broad file generated after
+    reconciliation.
+
+Writing this section does not itself pass the 19-scenario product
+acceptance. That gate still has to be executed on a later PR that changes
+the player-backup product surface.
+
 ## Slice 11F — Combat log archive cloud sync
 
 Applies to changes touching the `combat_log_archive` durable DM family (the
@@ -261,3 +445,7 @@ Use this compact structure in the PR or final report:
 6. Artifacts: filenames or categories plus independent hash-validation result.
 7. Automation: commands and counts, clearly labeled supplemental.
 8. Verdict: passed, failed, or blocked, with remaining risks.
+
+When the Player Backup Wizard section applies, Environment, Seed, and
+Artifacts must include origin labels, seed version, exact flag values, and
+independent artifact hashes.

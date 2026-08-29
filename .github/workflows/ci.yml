@@ -59,6 +59,9 @@ jobs:
           --coverage.thresholds.functions=90
           --coverage.thresholds.branches=85
 
+      - name: Player backup wizard coverage contract
+        run: npm run test:player-backup-wizard:coverage
+
   production-build:
     name: Production build
     runs-on: ubuntu-latest
