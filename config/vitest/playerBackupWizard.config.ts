@@ -7,16 +7,15 @@ import { defineConfig } from 'vitest/config';
 //
 // coverage.include is an explicit list of lib modules that own consent,
 // selection partitioning, run identity, destructive cloud action, conflict
-// preservation, recovery write eligibility, acknowledgement, or
-// stale-response rejection. Do not replace it with a glob: well-tested copy
-// or presentation modules would mask an under-tested destructive module.
+// preservation, recovery write eligibility, acknowledgement, stale-response
+// rejection, or locked cloud-row classification used by degraded enrollment.
+// Do not replace it with a glob: well-tested copy or presentation modules
+// would mask an under-tested destructive module.
 //
 // Deliberately excluded from coverage.include (still exercised by tests
 // where needed):
 // - playerBackupCopy.ts — pure presentation strings
 // - playerBackupDashboard.ts / playerBackupStatus.ts — view/status projectors
-// - playerBackupCloudPreview.ts — read-only list/classify; enrollment refusal
-//   is owned by playerBackupEligibility.ts and the coordinator
 // - React surfaces (PlayerBackupWizard/, PlayerBackupManager.tsx,
 //   PlayerBackupRecovery.tsx, usePlayerBackupDashboard.ts,
 //   PersistenceBootstrap.tsx, route pages) — component behavior stays in
@@ -73,6 +72,7 @@ export default defineConfig({
         'src/lib/playerBackup/playerBackupManagement.ts',
         'src/lib/playerBackup/playerBackupEligibility.ts',
         'src/lib/playerBackup/playerBackupFlags.ts',
+        'src/lib/playerBackup/playerBackupCloudPreview.ts',
       ],
       thresholds: {
         perFile: true,

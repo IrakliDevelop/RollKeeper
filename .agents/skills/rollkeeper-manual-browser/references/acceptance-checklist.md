@@ -101,46 +101,56 @@ controls, local character authority, recovery, or relevant flags.
 
 Use the Codex desktop in-app Browser through the existing skill (Claude Code
 Chrome may reuse this checklist). Standalone Playwright is supplemental and
-cannot satisfy this gate. Use an ephemeral local server, isolated `.localhost`
-origins only, local fake auth, and fake cloud/gateway services. Never use
-real credentials or production endpoints.
+cannot satisfy this gate. Use isolated `.localhost` origins only, local
+fake auth, and fake cloud/gateway services. Never use real credentials or
+production endpoints.
+
+`NEXT_PUBLIC_*` flags are fixed for a Next.js server process and cannot be
+selected per hostname. Start a separate ephemeral `next` process (and port)
+for each flag profile. Do not point umbrella-off and umbrella-on origins at
+the same process. Record the origin-to-port mapping in the evidence.
 
 Create the synthetic character through the visible `/player/characters/new`
 UI using the seed script's `characterDraft`, then add the script's unrelated
 `localStorageEntries`. Current seed version is `2`. Independently validate
 every downloaded recovery artifact. Report exact flag values, branch, commit,
-port, origin labels, seed version, counts/bytes, and abbreviated hashes. The
-verdict is passed, failed, or blocked. Do not print raw payloads, credentials,
-cookies, or secrets.
+origin-to-port mapping, origin labels, seed version, counts/bytes, and
+abbreviated hashes. The verdict is passed, failed, or blocked. Do not print
+raw payloads, credentials, cookies, or secrets.
 
 A success label, HTTP status, Playwright result, or storage screenshot alone
 is insufficient. For every scenario below, record visible user actions,
 durable storage/server evidence, relevant network mutation counts, reload or
 multi-tab proof, failure-path evidence, and final unrelated-data hashes.
 
-Use these origins or equivalent fresh labels:
+Use these origins or equivalent fresh labels, each bound to the server
+that matches its flag profile:
 
-- `rk-player-control.localhost` — umbrella off, lower flags on (non-vacuous
-  legacy control)
+- `rk-player-control.localhost` — umbrella-off server (lower flags on for
+  a non-vacuous legacy control)
 - `rk-player-a.localhost` / `rk-player-b.localhost` — participating account A
-  and account-switch isolation
+  and account-switch isolation on the wizard-on server
 - `rk-player-conflict.localhost` — independent same-account conflict work
-- `rk-player-race.localhost` — two-tab run fencing and lock behavior
-- `rk-player-degraded.localhost` — lower-capability combinations
+  on the wizard-on server
+- `rk-player-race.localhost` — two-tab run fencing and lock behavior on the
+  wizard-on server
+- `rk-player-degraded.localhost` — lower-capability combinations on their
+  own server whenever that profile's flags differ from wizard-on
 
 Keep `NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE` and every lower capability
 flag default-off unless a scenario explicitly turns a flag on for that
-isolated origin.
+flag-profile server.
 
 1. Generate the skill seed, create the synthetic character through visible UI,
    add the emitted unrelated entries, and prove identical raw-pair counts,
    UTF-8 bytes, and hashes across starting origins.
-2. On the control origin, prove no wizard launcher, direct route absence,
-   legacy panels still present according to lower flags, no new
-   player-wizard record, no cutover selection/database, and no character
-   cloud write from view, sign-in, sign-out, reload, or navigation. On an
-   untouched wizard-on origin, inspect before and after route view and prove
-   the non-creating probe leaves `rollkeeper-local` absent.
+2. On the control origin (umbrella-off server), prove no wizard launcher,
+   direct route absence, legacy panels still present according to lower
+   flags, no new player-wizard record, no cutover selection/database, and
+   no character cloud write from view, sign-in, sign-out, reload, or
+   navigation. On an untouched wizard-on origin (separate wizard-on
+   server), inspect before and after route view and prove the
+   non-creating probe leaves `rollkeeper-local` absent.
 3. On A, open through the visible launcher; verify signed-out and sign-in
    return behavior. Prove sign-in itself writes no character/storage
    selection. With enabled lower capabilities, observe the current-account
@@ -437,7 +447,8 @@ control origin with the flag off.
 
 Use this compact structure in the PR or final report:
 
-1. Environment: branch, commit, local flags, port, origin labels.
+1. Environment: branch, commit, local flags, origin-to-port mapping (one
+   port per flag-profile server), origin labels.
 2. Seed: seed version, entry count, total bytes, abbreviated hash vector.
 3. Manual actions: visible action followed by observed outcome.
 4. Durability: authority, acknowledgement proof, reload and multi-tab result.
@@ -447,5 +458,5 @@ Use this compact structure in the PR or final report:
 8. Verdict: passed, failed, or blocked, with remaining risks.
 
 When the Player Backup Wizard section applies, Environment, Seed, and
-Artifacts must include origin labels, seed version, exact flag values, and
-independent artifact hashes.
+Artifacts must include origin-to-port mapping, origin labels, seed version,
+exact flag values, and independent artifact hashes.

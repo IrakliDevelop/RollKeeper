@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import 'fake-indexeddb/auto';
 
 import {
@@ -7,10 +7,14 @@ import {
   openRollkeeperDatabase,
   transactionComplete,
 } from '@/lib/indexeddb/localDatabase';
+import * as supabaseBrowser from '@/lib/supabase/browser';
+import * as characterCloudCodec from '@/lib/supabase/characterCloudCodec';
+import * as characterCloudGateway from '@/lib/supabase/characterCloudGateway';
 
 import {
   PlayerBackupCloudPreviewController,
   compareCloudRows,
+  createBrowserPlayerBackupCloudPreview,
   previewPlayerBackupCloud,
 } from '../playerBackupCloudPreview';
 import type { PlayerBackupCloudPreview } from '../playerBackupCloudPreview';
@@ -92,6 +96,66 @@ describe('read-only player backup cloud preview', () => {
     ).rejects.toMatchObject({ category: 'account-changed' });
   });
 
+  it('does not list cloud rows when the signed-in account is not the expected account', async () => {
+    const gateway = { list: vi.fn() };
+    await expect(
+      previewPlayerBackupCloud({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: 'account-b' } } }),
+        },
+        gateway,
+        expectedAccountId: 'account-a',
+        localCharacters: [],
+      })
+    ).rejects.toMatchObject({ category: 'account-changed' });
+    expect(gateway.list).not.toHaveBeenCalled();
+  });
+
+  it('treats a thrown auth read as offline before any list call', async () => {
+    const gateway = { list: vi.fn() };
+    await expect(
+      previewPlayerBackupCloud({
+        auth: { getUser: vi.fn().mockRejectedValue(new Error('network down')) },
+        gateway,
+        localCharacters: [],
+      })
+    ).rejects.toMatchObject({ category: 'offline' });
+    expect(gateway.list).not.toHaveBeenCalled();
+  });
+
+  it('treats an auth error as failed before any list call', async () => {
+    const gateway = { list: vi.fn() };
+    await expect(
+      previewPlayerBackupCloud({
+        auth: {
+          getUser: vi.fn().mockResolvedValue({
+            data: { user: { id: 'account-a' } },
+            error: { message: 'session unreadable' },
+          }),
+        },
+        gateway,
+        localCharacters: [],
+      })
+    ).rejects.toMatchObject({ category: 'failed' });
+    expect(gateway.list).not.toHaveBeenCalled();
+  });
+
+  it('treats a thrown cloud list as offline', async () => {
+    await expect(
+      previewPlayerBackupCloud({
+        auth: {
+          getUser: vi
+            .fn()
+            .mockResolvedValue({ data: { user: { id: 'account-a' } } }),
+        },
+        gateway: { list: vi.fn().mockRejectedValue(new Error('list failed')) },
+        localCharacters: [],
+      })
+    ).rejects.toMatchObject({ category: 'offline' });
+  });
+
   it('excludes ambiguous duplicate online-only rows', async () => {
     const compared = await compareCloudRows(
       [
@@ -142,6 +206,73 @@ describe('read-only player backup cloud preview', () => {
     await expect(loading).resolves.toBe(false);
     expect(controller.snapshot()).toEqual({
       accountId: 'account-b',
+      characters: [],
+      onlineOnly: [],
+      loading: false,
+    });
+  });
+
+  it('keeps the current-account snapshot after a successful load', async () => {
+    const controller = new PlayerBackupCloudPreviewController();
+    await expect(
+      controller.load('account-a', async () => ({
+        account: { id: 'account-a' },
+        characters: [
+          {
+            legacyId: 'hero-1',
+            name: 'Hero',
+            state: 'identical',
+            row: null,
+            decoded: null,
+          },
+        ],
+        onlineOnly: [],
+      }))
+    ).resolves.toBe(true);
+    expect(controller.snapshot()).toMatchObject({
+      accountId: 'account-a',
+      loading: false,
+    });
+    expect(controller.snapshot().characters).toEqual([
+      {
+        legacyId: 'hero-1',
+        name: 'Hero',
+        state: 'identical',
+        row: null,
+        decoded: null,
+      },
+    ]);
+  });
+
+  it('discards a successful load whose result belongs to a different account', async () => {
+    const controller = new PlayerBackupCloudPreviewController();
+    await expect(
+      controller.load('account-a', async () => ({
+        account: { id: 'account-b' },
+        characters: [
+          {
+            legacyId: 'hero-1',
+            name: 'Hero',
+            state: 'identical',
+            row: null,
+            decoded: null,
+          },
+        ],
+        onlineOnly: [],
+      }))
+    ).resolves.toBe(false);
+    expect(controller.snapshot().characters).toEqual([]);
+  });
+
+  it('clears loading and rethrows when the current-account load fails', async () => {
+    const controller = new PlayerBackupCloudPreviewController();
+    await expect(
+      controller.load('account-a', async () => {
+        throw new Error('preview failed');
+      })
+    ).rejects.toThrow('preview failed');
+    expect(controller.snapshot()).toEqual({
+      accountId: 'account-a',
       characters: [],
       onlineOnly: [],
       loading: false,
@@ -240,6 +371,11 @@ describe('shared cloud row comparison', () => {
     name: 'Older locally',
     characterData: { id: 'hero-7', revision: 1 },
   };
+  const HERO_8 = {
+    id: 'hero-8',
+    name: 'Drifted locally',
+    characterData: { id: 'hero-8', revision: 4 },
+  };
 
   const rows = [
     row(),
@@ -258,8 +394,22 @@ describe('shared cloud row comparison', () => {
       client_revision: 9,
       payload: { id: 'hero-7', name: 'Cloud', characterData: { id: 'hero-7' } },
     }),
+    row({
+      id: 'cloud-8',
+      legacy_client_id: 'hero-8',
+      client_revision: 2,
+      payload: { id: 'hero-8', name: 'Cloud', characterData: { id: 'hero-8' } },
+    }),
   ];
-  const localCharacters = [HERO_1, HERO_2, HERO_3, HERO_4, HERO_6, HERO_7];
+  const localCharacters = [
+    HERO_1,
+    HERO_2,
+    HERO_3,
+    HERO_4,
+    HERO_6,
+    HERO_7,
+    HERO_8,
+  ];
 
   it('produces exactly the classification previewPlayerBackupCloud publishes', async () => {
     const preview = await previewPlayerBackupCloud({
@@ -283,7 +433,126 @@ describe('shared cloud row comparison', () => {
       'removed',
       'missing',
       'newer',
+      'different',
     ]);
     expect(compared.onlineOnly.map(entry => entry.row.id)).toEqual(['cloud-5']);
+  });
+
+  it('classifies a local character as unavailable when decode throws', async () => {
+    const decode = vi
+      .spyOn(characterCloudCodec, 'decodeCharacterCloudRow')
+      .mockRejectedValue(new Error('corrupt row'));
+    try {
+      const compared = await compareCloudRows([row()], [HERO_1]);
+      expect(compared.characters).toEqual([
+        {
+          legacyId: 'hero-1',
+          name: 'Hero',
+          state: 'unavailable',
+          row: null,
+          decoded: null,
+        },
+      ]);
+    } finally {
+      decode.mockRestore();
+    }
+  });
+
+  it('refuses to classify a local character that has no identity', async () => {
+    await expect(compareCloudRows([], [null])).rejects.toMatchObject({
+      category: 'failed',
+    });
+    await expect(compareCloudRows([], [{}])).rejects.toMatchObject({
+      category: 'failed',
+    });
+  });
+
+  it('resolves identity from characterData and names unnamed local characters', async () => {
+    const compared = await compareCloudRows(
+      [],
+      [{ characterData: { id: 'hero-unnamed' } }]
+    );
+    expect(compared.characters).toEqual([
+      {
+        legacyId: 'hero-unnamed',
+        name: 'Unnamed character',
+        state: 'missing',
+        row: null,
+        decoded: null,
+      },
+    ]);
+  });
+
+  it('treats a missing local revision as zero when the cloud copy is newer', async () => {
+    const compared = await compareCloudRows(
+      [
+        row({
+          id: 'cloud-9',
+          legacy_client_id: 'hero-9',
+          client_revision: 5,
+          payload: {
+            id: 'hero-9',
+            name: 'Cloud',
+            characterData: { id: 'hero-9' },
+          },
+        }),
+      ],
+      [{ id: 'hero-9', name: 'Local', characterData: { id: 'hero-9' } }]
+    );
+    expect(compared.characters[0]?.state).toBe('newer');
+  });
+});
+
+describe('createBrowserPlayerBackupCloudPreview', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('returns null when neither read capability is enabled', () => {
+    const createClient = vi.spyOn(
+      supabaseBrowser,
+      'createSupabaseBrowserClient'
+    );
+    expect(
+      createBrowserPlayerBackupCloudPreview({
+        manualRead: false,
+        automaticRead: false,
+      })
+    ).toBeNull();
+    expect(createClient).not.toHaveBeenCalled();
+  });
+
+  it('returns null when no browser client is available', () => {
+    vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue(
+      null
+    );
+    expect(
+      createBrowserPlayerBackupCloudPreview({
+        manualRead: true,
+        automaticRead: false,
+      })
+    ).toBeNull();
+  });
+
+  it('wires auth and the list gateway when a client exists', () => {
+    const client = { auth: { getUser: vi.fn() } };
+    const gateway = { list: vi.fn() };
+    vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue(
+      client as never
+    );
+    vi.spyOn(
+      characterCloudGateway,
+      'createSupabaseCharacterCloudGateway'
+    ).mockReturnValue(gateway as never);
+
+    expect(
+      createBrowserPlayerBackupCloudPreview({
+        manualRead: false,
+        automaticRead: true,
+      })
+    ).toEqual({ auth: client.auth, gateway });
+    expect(
+      characterCloudGateway.createSupabaseCharacterCloudGateway
+    ).toHaveBeenCalledWith(client);
   });
 });
