@@ -206,6 +206,48 @@ describe('projectPlayerBackupManagement', () => {
     });
   });
 
+  it('does not let a stale protected result hide a current future-format row', () => {
+    const management = projectPlayerBackupManagement({
+      characters: [
+        {
+          ...CHARACTERS[0]!,
+          statusLabel: 'Review needed first',
+          note: COPY.conflict.futureDescription,
+          tone: 'warn',
+          cloudState: 'future',
+        },
+      ],
+      cloudLegacyIds: ['aveline'],
+      result: {
+        ...EMPTY_RESULT,
+        rows: [
+          {
+            id: 'aveline',
+            name: 'Sister Aveline',
+            statusLabel: 'Protected',
+            note: 'Read back and matched.',
+            tone: 'ok',
+          },
+        ],
+      },
+      futureDefaultOn: false,
+      manualMutation: true,
+    });
+
+    expect(management.summary).toContain('1 needs attention');
+    expect(management.rows[0]).toMatchObject({
+      statusLabel: 'Review needed first',
+      note: expect.stringContaining('newer RollKeeper version'),
+      tone: 'warn',
+    });
+    expect(management.rows[0]?.actions).toEqual([
+      expect.objectContaining({
+        action: 'download-recovery',
+        enabled: true,
+      }),
+    ]);
+  });
+
   it('merges online-only copies and disables cloud actions without a cloud row', () => {
     const management = projectPlayerBackupManagement({
       characters: CHARACTERS,

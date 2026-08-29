@@ -50,6 +50,48 @@ describe('character persistence authority router', () => {
     expect(openDatabase).not.toHaveBeenCalled();
   });
 
+  it('routes an existing legacy adapter after the wizard activates account-scoped authority', async () => {
+    const backing = {
+      getItem: vi.fn(() => null),
+      setItem: vi.fn(),
+      removeItem: vi.fn(),
+    } as unknown as Storage;
+    const commit = vi.fn().mockResolvedValue({
+      saved: true,
+      idbAck: true,
+      mirrorAck: true,
+      mirrorPending: false,
+    });
+    const storage = createCharacterFamilyStateStorage({
+      backing,
+      participant: false,
+      openDatabase: vi.fn().mockResolvedValue({ close: vi.fn() }),
+      commit,
+      randomId: () => 'write-account',
+      now: () => 'now',
+    });
+    setCharacterRuntimeAuthority({
+      authority: 'indexedDB',
+      namespace: 'user:account-a',
+      family: 'character',
+      generation: 'account-generation',
+      epoch: 1,
+      committedAt: 'now',
+    });
+
+    await storage.setItem('rollkeeper-player-data', 'account-edit');
+
+    expect(commit).toHaveBeenCalledWith(
+      expect.anything(),
+      backing,
+      expect.objectContaining({
+        namespace: 'user:account-a',
+        rawValue: 'account-edit',
+      })
+    );
+    expect(backing.setItem).not.toHaveBeenCalled();
+  });
+
   it('commits active writes before the tracked durability promise resolves', async () => {
     const backing = {
       getItem: vi.fn(() => null),

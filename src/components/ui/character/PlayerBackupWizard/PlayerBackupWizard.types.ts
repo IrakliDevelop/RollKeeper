@@ -35,6 +35,14 @@ export interface PlayerBackupCharacterRow {
   statusLabel: string;
   note: string;
   tone: PlayerBackupTone;
+  cloudState?:
+    | 'missing'
+    | 'identical'
+    | 'newer'
+    | 'different'
+    | 'removed'
+    | 'future'
+    | 'unavailable';
 }
 
 export interface PlayerBackupResultRow {

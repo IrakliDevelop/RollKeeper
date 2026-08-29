@@ -64,6 +64,7 @@ export default function PlayerDashboardPage() {
 
   const [showSettings, setShowSettings] = useState(false);
   const [joinDialogOpen, setJoinDialogOpen] = useState(false);
+  const [hasMounted, setHasMounted] = useState(false);
   const { toasts, addToast, dismissToast } = useToast();
 
   const activeCharacters = getActiveCharacters();
@@ -98,6 +99,10 @@ export default function PlayerDashboardPage() {
   );
 
   // Check for migration on component mount
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
   useEffect(() => {
     if (characters.length === 0) {
       const migrated = migrateFromOldStorage();
@@ -407,6 +412,8 @@ export default function PlayerDashboardPage() {
       </div>
     </div>
   );
+
+  if (!hasMounted) return null;
 
   return (
     <div className="bg-surface min-h-screen">

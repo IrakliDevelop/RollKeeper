@@ -10,6 +10,11 @@ interface SelectionStorage {
   getItem(key: string): string | null;
 }
 
+interface EnumerableSelectionStorage extends SelectionStorage {
+  readonly length: number;
+  key(index: number): string | null;
+}
+
 interface WritableSelectionStorage extends SelectionStorage {
   setItem(key: string, value: string): void;
 }
@@ -322,11 +327,43 @@ export function isSelectedCharacterCutoverProfile(
   );
 }
 
+export function resolveCharacterCutoverNamespace(
+  storage: EnumerableSelectionStorage
+): StorageNamespace | null {
+  if (hasCharacterCutoverSelection(storage, 'guest')) return 'guest';
+  const namespaces = new Set<StorageNamespace>();
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (
+      !key?.startsWith(CHARACTER_CUTOVER_SELECTION_PREFIX) ||
+      !key.endsWith(':character')
+    ) {
+      continue;
+    }
+    const namespace = key.slice(
+      CHARACTER_CUTOVER_SELECTION_PREFIX.length,
+      -':character'.length
+    ) as StorageNamespace;
+    if (hasCharacterCutoverSelection(storage, namespace)) {
+      namespaces.add(namespace);
+    }
+  }
+  return namespaces.size === 1 ? [...namespaces][0]! : null;
+}
+
 export function isBrowserCharacterCutoverParticipant(
-  namespace: StorageNamespace = 'guest'
+  namespace?: StorageNamespace
 ): boolean {
+  if (
+    !isCharacterCutoverDeploymentEnabled() ||
+    typeof localStorage === 'undefined'
+  ) {
+    return false;
+  }
+  const selectedNamespace =
+    namespace ?? resolveCharacterCutoverNamespace(localStorage);
   return isSelectedCharacterCutoverProfile(
-    typeof localStorage === 'undefined' ? undefined : localStorage,
-    namespace
+    localStorage,
+    selectedNamespace ?? 'guest'
   );
 }

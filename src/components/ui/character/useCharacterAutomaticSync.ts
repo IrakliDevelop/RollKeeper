@@ -21,6 +21,7 @@ import { createBrowserAutomaticCharacterSync } from '@/lib/supabase/browserAutom
 import { subscribeBrowserAutomaticCharacterAccountChanges } from '@/lib/supabase/browserAutomaticCharacterSync';
 import { AUTOMATIC_SYNC_STATUS_CHANGED_EVENT } from '@/lib/supabase/automaticCharacterSyncCoordinator';
 import {
+  AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT,
   clearAutomaticCharacterSyncRuntime,
   configureAutomaticCharacterSyncRuntime,
 } from '@/lib/supabase/automaticCharacterSyncRuntime';
@@ -160,6 +161,23 @@ function useCharacterAutomaticSyncController(
     await applyCloudDocuments();
     setStatuses(await context.statuses(charactersRef.current));
   }, [applyCloudDocuments]);
+
+  useEffect(() => {
+    if (!isAutomaticCharacterSyncEnabled()) return;
+    const rebuildForAuthority = () => {
+      setAccountGeneration(current => current + 1);
+    };
+    window.addEventListener(
+      AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT,
+      rebuildForAuthority
+    );
+    return () => {
+      window.removeEventListener(
+        AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT,
+        rebuildForAuthority
+      );
+    };
+  }, []);
 
   useEffect(() => {
     if (!isAutomaticCharacterSyncEnabled()) return;

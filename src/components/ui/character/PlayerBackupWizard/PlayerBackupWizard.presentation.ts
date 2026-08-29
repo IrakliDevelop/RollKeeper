@@ -1,5 +1,8 @@
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
-import { confirmationCopy } from '@/lib/playerBackup/playerBackupCopy';
+import {
+  confirmationCopy,
+  degradedCharacterCopy,
+} from '@/lib/playerBackup/playerBackupCopy';
 import type { PlayerBackupCapabilities } from '@/lib/playerBackup/playerBackupFlags';
 
 import type {
@@ -258,9 +261,20 @@ export function projectPlayerBackupManagement(input: {
   const localIds = new Set(input.characters.map(character => character.id));
   const localRows = input.characters.map(character => {
     const conflicted = conflictIds.has(character.id);
-    const heldAside = heldAsideIds.has(character.id);
+    const heldAside =
+      heldAsideIds.has(character.id) || character.cloudState === 'future';
     const resultRow = input.result.rows.find(row => row.id === character.id);
-    const statusLabel = resultRow?.statusLabel ?? character.statusLabel;
+    const currentCloudAttention =
+      character.cloudState !== undefined &&
+      !['missing', 'identical'].includes(character.cloudState);
+    const currentCloudCopy = currentCloudAttention
+      ? degradedCharacterCopy(
+          character.cloudState as Parameters<typeof degradedCharacterCopy>[0]
+        )
+      : null;
+    const statusLabel = currentCloudAttention
+      ? character.statusLabel
+      : (resultRow?.statusLabel ?? character.statusLabel);
     const paused = statusLabel === COPY.selection.paused;
     const savedOnce = statusLabel === COPY.selection.oneTimeProtected;
     const protectedOngoing =
@@ -271,8 +285,12 @@ export function projectPlayerBackupManagement(input: {
       id: character.id,
       name: character.name,
       statusLabel,
-      note: resultRow?.note ?? character.note,
-      tone: resultRow?.tone ?? character.tone,
+      note: currentCloudAttention
+        ? (currentCloudCopy?.description ?? character.note)
+        : (resultRow?.note ?? character.note),
+      tone: currentCloudAttention
+        ? 'warn'
+        : (resultRow?.tone ?? character.tone),
       actions: conflicted
         ? [
             {

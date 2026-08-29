@@ -6,10 +6,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
 import { verifyDownloadedDeviceBackup } from '@/lib/deviceRecovery';
-import { PlayerBackupReadOnlyCoordinator } from '@/lib/playerBackup/playerBackupCoordinator';
+import {
+  confirmPlayerBackupConsent,
+  PlayerBackupReadOnlyCoordinator,
+} from '@/lib/playerBackup/playerBackupCoordinator';
 import { listPlayerBackupConflicts } from '@/lib/playerBackup/playerBackupConflictCoordinator';
 import { derivePlayerBackupRunResult } from '@/lib/playerBackup/playerBackupOnlineExecution';
-import type { PlayerBackupRunV1 } from '@/lib/playerBackup/playerBackupRunRepository';
+import {
+  PlayerBackupRunReplacedError,
+  readActivePlayerBackupRun,
+  type PlayerBackupRunV1,
+} from '@/lib/playerBackup/playerBackupRunRepository';
+import { usePlayerStore } from '@/store/playerStore';
 
 import { usePlayerBackupWizard } from './PlayerBackupWizard.hooks';
 
@@ -84,6 +92,10 @@ const conflictApis = vi.hoisted(() => ({
   applyPlayerBackupPendingApplication: vi.fn(),
 }));
 
+const coordinatorApis = vi.hoisted(() => ({
+  confirmPlayerBackupConsent: vi.fn(),
+}));
+
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: vi.fn(), push: vi.fn() }),
 }));
@@ -108,6 +120,17 @@ vi.mock('@/lib/playerBackup/playerBackupSafety', async importOriginal => {
   return {
     ...actual,
     savePlayerBackupSafetyFiles: safety.savePlayerBackupSafetyFiles,
+  };
+});
+
+vi.mock('@/lib/playerBackup/playerBackupCoordinator', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('@/lib/playerBackup/playerBackupCoordinator')
+    >();
+  return {
+    ...actual,
+    confirmPlayerBackupConsent: coordinatorApis.confirmPlayerBackupConsent,
   };
 });
 
@@ -339,6 +362,12 @@ function Probe() {
       <button type="button" onClick={actions.onCheckNow}>
         check-now
       </button>
+      <button type="button" onClick={actions.onNext}>
+        next
+      </button>
+      <button type="button" onClick={actions.onConfirm}>
+        confirm
+      </button>
     </div>
   );
 }
@@ -359,6 +388,18 @@ beforeEach(() => {
     configurable: true,
     value: { request: vi.fn() },
   });
+  vi.mocked(readActivePlayerBackupRun).mockImplementation(
+    async ({ accountId }) =>
+      accountId === 'acc-a'
+        ? {
+            ...FAKE_RUN,
+            accountId,
+            namespace: `user:${accountId}`,
+          }
+        : null
+  );
+  coordinatorApis.confirmPlayerBackupConsent.mockReset();
+  usePlayerStore.setState({ characters: [] });
 });
 
 async function signIn(id: string, email: string) {
@@ -654,6 +695,80 @@ describe('usePlayerBackupWizard', () => {
     expect(
       vi.mocked(derivePlayerBackupRunResult).mock.calls.at(-1)?.[0].repository
     ).toBeDefined();
+  });
+
+  it('reloads the winning run when another tab replaces confirmation', async () => {
+    const user = userEvent.setup();
+    let activeRun: PlayerBackupRunV1 | null = null;
+    const winningRun = {
+      ...FAKE_RUN,
+      runId: 'run-winning',
+      mode: 'ongoing' as const,
+    };
+    vi.mocked(readActivePlayerBackupRun).mockImplementation(
+      async () => activeRun
+    );
+    vi.mocked(verifyDownloadedDeviceBackup).mockResolvedValue({
+      format: 'rollkeeper-device-backup',
+      formatVersion: 1,
+      appVersion: 'test',
+      runId: 'safety',
+      createdAt: 'now',
+      entries: [],
+      manifestHash: 'hash',
+      validation: {
+        entryCount: 0,
+        totalBytes: 0,
+        validJsonCount: 0,
+        malformedJsonCount: 0,
+        futureVersionCount: 0,
+        retainedOnlyCount: 0,
+      },
+    });
+    vi.mocked(confirmPlayerBackupConsent).mockImplementation(async () => {
+      activeRun = winningRun;
+      throw new PlayerBackupRunReplacedError();
+    });
+    vi.mocked(listPlayerBackupConflicts).mockRejectedValueOnce(
+      new Error('winning run is still preparing')
+    );
+    usePlayerStore.setState({
+      characters: [
+        {
+          id: 'hero-a',
+          name: 'Hero A',
+          class: 'Fighter',
+        } as never,
+      ],
+    });
+
+    await signIn('acc-a', 'a@example.com');
+    await user.click(screen.getByRole('button', { name: 'next' }));
+    await user.click(screen.getByRole('button', { name: 'save-safety' }));
+    await waitFor(() => {
+      expect(safety.savePlayerBackupSafetyFiles).toHaveBeenCalled();
+    });
+    safety.finishSave();
+    await waitFor(() => {
+      expect(screen.getByTestId('receipt')).toHaveTextContent(
+        'download-started'
+      );
+    });
+    await user.click(screen.getByRole('button', { name: 'choose-safety' }));
+    await waitFor(() => {
+      expect(screen.getByTestId('receipt')).toHaveTextContent('checked');
+    });
+    await user.click(screen.getByRole('button', { name: 'next' }));
+    await user.click(screen.getByRole('button', { name: 'confirm' }));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('step')).toHaveTextContent('result');
+      expect(screen.getByTestId('action-error')).toHaveTextContent('');
+    });
+    expect(confirmPlayerBackupConsent).toHaveBeenCalledTimes(1);
+    expect(readActivePlayerBackupRun).toHaveBeenCalledWith(
+      expect.objectContaining({ accountId: 'acc-a' })
+    );
   });
 
   it('keeps stale manage intent on setup until durable evidence exists', async () => {
