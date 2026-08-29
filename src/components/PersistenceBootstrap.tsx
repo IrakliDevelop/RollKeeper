@@ -5,6 +5,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import {
   isBrowserCharacterCutoverParticipant,
   readCharacterCutoverSelection,
+  resolveCharacterCutoverNamespace,
 } from '@/lib/indexeddb/characterCutoverSelection';
 import { resolvePersistenceBootstrapMode } from '@/lib/indexeddb/characterBootstrapRouting';
 import {
@@ -60,8 +61,12 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
   const [recoveryRequired, setRecoveryRequired] = useState(false);
 
   useEffect(() => {
+    const characterParticipant = isBrowserCharacterCutoverParticipant();
+    const characterNamespace =
+      resolveCharacterCutoverNamespace(window.localStorage) ??
+      (characterParticipant ? 'guest' : null);
     const mode = resolvePersistenceBootstrapMode({
-      characterParticipant: isBrowserCharacterCutoverParticipant(),
+      characterParticipant,
       slice7Enabled,
     });
     if (mode === 'legacy') return;
@@ -121,7 +126,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
     let stopMonitor: (() => void) | undefined;
     const selection = readCharacterCutoverSelection(
       window.localStorage,
-      'guest'
+      characterNamespace ?? 'guest'
     );
     void (async () => {
       const [{ bootstrapCharacterPersistence }, { browserRecoveryRepository }] =
@@ -152,7 +157,7 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
       const result = await bootstrapCharacterPersistence({
         factory: window.indexedDB,
         storage: window.localStorage,
-        namespace: 'guest',
+        namespace: characterNamespace ?? 'guest',
         runId: crypto.randomUUID(),
         ownerId: crypto.randomUUID(),
         now: () => new Date().toISOString(),
@@ -178,7 +183,10 @@ export function PersistenceBootstrap({ children }: { children: ReactNode }) {
           import('@/lib/indexeddb/characterStaleMirror'),
           import('@/lib/indexeddb/characterPersistenceRuntime'),
         ]);
-        stopMonitor = installCharacterStaleMirrorMonitor(window, 'guest');
+        stopMonitor = installCharacterStaleMirrorMonitor(
+          window,
+          characterNamespace ?? 'guest'
+        );
         await hydrateCharacterStores();
         finishCharacterPersistenceBootstrap();
       } else {

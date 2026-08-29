@@ -121,10 +121,10 @@ export function pickFresherCharacter(
 export function createPerCharacterStorage(): StateStorage {
   const participant = isBrowserCharacterCutoverParticipant();
   const routed =
-    participant && typeof window !== 'undefined'
+    typeof window !== 'undefined'
       ? createCharacterFamilyStateStorage({
           backing: window.localStorage,
-          participant: true,
+          participant,
         })
       : null;
   return {

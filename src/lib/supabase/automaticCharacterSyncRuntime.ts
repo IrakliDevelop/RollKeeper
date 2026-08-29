@@ -1,5 +1,8 @@
 import type { AutomaticSyncLocalCharacter } from './automaticCharacterSyncService';
 
+export const AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT =
+  'rollkeeper:automatic-character-authority-changed';
+
 interface AutomaticCharacterSyncRuntime {
   accountId: string;
   recordEdit(

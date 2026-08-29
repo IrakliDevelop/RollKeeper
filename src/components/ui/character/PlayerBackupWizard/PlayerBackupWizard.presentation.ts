@@ -1,5 +1,8 @@
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
-import { confirmationCopy } from '@/lib/playerBackup/playerBackupCopy';
+import {
+  confirmationCopy,
+  degradedCharacterCopy,
+} from '@/lib/playerBackup/playerBackupCopy';
 import type { PlayerBackupCapabilities } from '@/lib/playerBackup/playerBackupFlags';
 
 import type {
@@ -203,9 +206,15 @@ export const EMPTY_MANAGEMENT: PlayerBackupWizardView['management'] = {
   futureDefaultEnabled: false,
 };
 
+const CURRENT_CLOUD_ATTENTION_STATES = new Set<
+  NonNullable<PlayerBackupCharacterRow['cloudState']>
+>(['newer', 'removed', 'future', 'unavailable']);
+
 function cloudManagementActions(options: {
   hasCloudRow: boolean;
   manual: boolean;
+  /** An already-removed online copy can be restored, not removed again. */
+  removed?: boolean;
 }): PlayerBackupWizardView['management']['rows'][number]['actions'] {
   const mutate = options.manual && options.hasCloudRow;
   return [
@@ -226,7 +235,7 @@ function cloudManagementActions(options: {
     },
     {
       label: COPY.management.remove,
-      enabled: mutate,
+      enabled: mutate && options.removed !== true,
       action: 'remove',
     },
   ];
@@ -258,21 +267,46 @@ export function projectPlayerBackupManagement(input: {
   const localIds = new Set(input.characters.map(character => character.id));
   const localRows = input.characters.map(character => {
     const conflicted = conflictIds.has(character.id);
-    const heldAside = heldAsideIds.has(character.id);
+    const heldAside =
+      heldAsideIds.has(character.id) || character.cloudState === 'future';
     const resultRow = input.result.rows.find(row => row.id === character.id);
-    const statusLabel = resultRow?.statusLabel ?? character.statusLabel;
-    const paused = statusLabel === COPY.selection.paused;
-    const savedOnce = statusLabel === COPY.selection.oneTimeProtected;
+    // A current online read that a durable result cannot explain wins over the
+    // stale result label. `different` is excluded on purpose: local edits made
+    // after a one-time copy read as `different` (local ahead), which is the
+    // ordinary "later changes stay here until you choose Back up now" state.
+    const currentCloudAttention =
+      character.cloudState !== undefined &&
+      CURRENT_CLOUD_ATTENTION_STATES.has(character.cloudState);
+    const currentCloudCopy = currentCloudAttention
+      ? degradedCharacterCopy(
+          character.cloudState as Parameters<typeof degradedCharacterCopy>[0]
+        )
+      : null;
+    // Actions always derive from durable evidence so a transient online read
+    // cannot hide Back up now or offer ongoing-only controls.
+    const durableLabel = resultRow?.statusLabel ?? character.statusLabel;
+    const removedOnline = character.cloudState === 'removed';
+    const statusLabel = removedOnline
+      ? COPY.selection.removed
+      : currentCloudAttention
+        ? character.statusLabel
+        : durableLabel;
+    const paused = durableLabel === COPY.selection.paused;
+    const savedOnce = durableLabel === COPY.selection.oneTimeProtected;
     const protectedOngoing =
-      statusLabel === COPY.selection.alreadyProtected ||
+      durableLabel === COPY.selection.alreadyProtected ||
       resultRow?.tone === 'ok';
     const hasCloudRow = cloudLegacyIds.has(character.id);
     return {
       id: character.id,
       name: character.name,
       statusLabel,
-      note: resultRow?.note ?? character.note,
-      tone: resultRow?.tone ?? character.tone,
+      note: currentCloudAttention
+        ? (currentCloudCopy?.description ?? character.note)
+        : (resultRow?.note ?? character.note),
+      tone: currentCloudAttention
+        ? 'warn'
+        : (resultRow?.tone ?? character.tone),
       actions: conflicted
         ? [
             {
@@ -313,7 +347,11 @@ export function projectPlayerBackupManagement(input: {
                     },
                   ]
                 : []),
-              ...cloudManagementActions({ hasCloudRow, manual }),
+              ...cloudManagementActions({
+                hasCloudRow,
+                manual,
+                removed: removedOnline,
+              }),
             ],
     };
   });

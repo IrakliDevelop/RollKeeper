@@ -87,6 +87,28 @@ describe('automatic character sync feature flag', () => {
       ).toBe(false);
     }
   });
+
+  it('accepts a fully activated account-scoped cutover selection for that account', () => {
+    const prerequisite = {
+      version: 1,
+      namespace: NAMESPACE,
+      family: 'character',
+      activatedEpoch: 3,
+      activatedGeneration: 'generation-account',
+    };
+    expect(
+      hasAutomaticCharacterSyncLocalPrerequisite(
+        { getItem: () => JSON.stringify(prerequisite) },
+        NAMESPACE
+      )
+    ).toBe(true);
+    expect(
+      hasAutomaticCharacterSyncLocalPrerequisite(
+        { getItem: () => JSON.stringify(prerequisite) },
+        'user:account-b'
+      )
+    ).toBe(false);
+  });
 });
 
 describe('AutomaticCharacterSyncService', () => {

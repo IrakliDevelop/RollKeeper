@@ -444,9 +444,13 @@ async function verifiedReceiptEntries(
   const receipt = await receipts.readVerifiedDownloadReceipt(
     run.broadSafetyReceipt.manifestHash
   );
+  // The receipt store holds one record per manifest hash, so a later download
+  // of the same bytes (another tab, or "Save safety file" twice) replaces the
+  // download id the run recorded. The proof consent rests on is the verified
+  // entry vector for this exact manifest, not which download produced it.
   if (
     !receipt ||
-    receipt.runId !== run.broadSafetyReceipt.runId ||
+    receipt.manifestHash !== run.broadSafetyReceipt.manifestHash ||
     !receipt.entries
   ) {
     throw new Error('Verified broad safety receipt entries are missing');

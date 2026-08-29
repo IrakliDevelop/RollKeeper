@@ -13,7 +13,10 @@ import {
   transactionComplete,
 } from './localDatabase';
 import { createSafeStorage } from '../safeStorage';
-import { readCharacterCutoverSelection } from './characterCutoverSelection';
+import {
+  readCharacterCutoverSelection,
+  resolveCharacterCutoverNamespace,
+} from './characterCutoverSelection';
 import type { StorageNamespace } from './shadowJournal';
 
 type RuntimeAuthority =
@@ -94,7 +97,11 @@ function initializeActivatedRuntimeFromSelection(): void {
   ) {
     return;
   }
-  if (applyActivatedRuntimeFromSelection(localStorage, 'guest')) {
+  const namespace = resolveCharacterCutoverNamespace(localStorage);
+  if (
+    namespace &&
+    applyActivatedRuntimeFromSelection(localStorage, namespace)
+  ) {
     activeBootstrapPending = true;
   }
 }
@@ -165,8 +172,7 @@ export function createCharacterFamilyStateStorage(
   options: RuntimeStorageOptions
 ): StateStorage {
   const legacy = createSafeStorage(options.backing);
-  if (!options.participant) return legacy;
-  initializeActivatedRuntimeFromSelection();
+  if (options.participant) initializeActivatedRuntimeFromSelection();
 
   return {
     getItem: key => {
@@ -207,6 +213,7 @@ export function createCharacterFamilyStateStorage(
       }
       if (runtimeAuthority.authority === 'localStorage') {
         legacy.setItem(key, value);
+        if (!options.participant) return;
         const shadow =
           options.shadowLegacyWrite ??
           (async (shadowKey: string, shadowValue: string) => {

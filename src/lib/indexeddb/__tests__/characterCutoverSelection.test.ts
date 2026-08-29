@@ -10,6 +10,7 @@ import {
   markCharacterCutoverActivated,
   readCharacterCutoverSelection,
   repairRecoveredCharacterSelectionFromEvidence,
+  resolveCharacterCutoverNamespace,
   selectCharacterCutover,
   writeRecoveredCharacterSelectionMarker,
 } from '@/lib/indexeddb/characterCutoverSelection';
@@ -101,6 +102,20 @@ describe('character cutover opt-in', () => {
     expect(isSelectedCharacterCutoverProfile(localStorage, 'guest')).toBe(true);
     expect(isBrowserCharacterCutoverParticipant()).toBe(true);
     vi.stubEnv('NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED', 'false');
+    expect(isBrowserCharacterCutoverParticipant()).toBe(false);
+  });
+
+  it('routes a browser profile through its sole account-scoped selection', () => {
+    vi.stubEnv('NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED', 'true');
+    localStorage.clear();
+    selectCharacterCutover(localStorage, 'user:account-a', true, () => 'now');
+    expect(resolveCharacterCutoverNamespace(localStorage)).toBe(
+      'user:account-a'
+    );
+    expect(isBrowserCharacterCutoverParticipant()).toBe(true);
+
+    selectCharacterCutover(localStorage, 'user:account-b', true, () => 'later');
+    expect(resolveCharacterCutoverNamespace(localStorage)).toBeNull();
     expect(isBrowserCharacterCutoverParticipant()).toBe(false);
   });
 

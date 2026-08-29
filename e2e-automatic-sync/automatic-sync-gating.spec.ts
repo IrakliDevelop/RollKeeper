@@ -44,6 +44,26 @@ test('deployment flag alone leaves the control profile local-only and makes zero
   ).toBeDisabled();
 
   const secondPage = await context.newPage();
+  const hydrationErrors: string[] = [];
+  secondPage.on('console', message => {
+    if (
+      message.type() === 'error' &&
+      /hydration failed because the server rendered html didn't match/i.test(
+        message.text()
+      )
+    ) {
+      hydrationErrors.push(message.text());
+    }
+  });
+  secondPage.on('pageerror', error => {
+    if (
+      /hydration failed because the server rendered html didn't match/i.test(
+        error.message
+      )
+    ) {
+      hydrationErrors.push(error.message);
+    }
+  });
   await secondPage.goto('/player');
   await expect(
     secondPage.getByRole('heading', { name: 'Slice 9 Control' })
@@ -68,6 +88,7 @@ test('deployment flag alone leaves the control profile local-only and makes zero
     characterPresent: true,
     dmRaw: DM_RAW,
   });
+  expect(hydrationErrors).toEqual([]);
   expect(automaticRpcRequests).toEqual([]);
   await context.close();
 });

@@ -212,6 +212,44 @@ describe('browser automatic character sync authority routing', () => {
     });
   });
 
+  it("starts from the wizard's account-scoped activated selection", async () => {
+    const accountNamespace = 'user:account-a' as const;
+    localStorage.setItem(
+      characterCutoverSelectionKey(accountNamespace),
+      JSON.stringify({ ...selection, namespace: accountNamespace })
+    );
+    vi.mocked(createSupabaseBrowserClient).mockReturnValue({
+      auth: {
+        getUser: vi.fn(async () => ({
+          data: {
+            user: { id: 'account-a', email: 'synthetic@localhost' },
+          },
+          error: null,
+        })),
+      },
+    } as never);
+    vi.mocked(readCharacterAuthority).mockResolvedValueOnce({
+      namespace: accountNamespace,
+      family: 'character',
+      authority: 'indexedDB',
+      epoch: 1,
+      generation: 'generation-a',
+      committedAt: '2026-02-01T00:00:00.000Z',
+    });
+
+    const context = await createBrowserAutomaticCharacterSync();
+
+    expect(context).toMatchObject({
+      accountId: 'account-a',
+      indexedDbPrimary: true,
+    });
+    expect(readCharacterAuthority).toHaveBeenCalledWith(
+      expect.anything(),
+      accountNamespace
+    );
+    context!.close();
+  });
+
   it('keeps the automatic runtime disabled when the offline session cannot be read', async () => {
     localStorage.setItem(
       characterCutoverSelectionKey('guest'),

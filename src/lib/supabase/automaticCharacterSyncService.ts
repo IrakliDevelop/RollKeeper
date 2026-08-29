@@ -2,6 +2,7 @@ import type { Json } from '@/types/database.generated';
 
 import type { IndexedDbAutomaticCharacterSyncRepository } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { characterCutoverSelectionKey } from '@/lib/indexeddb/characterCutoverSelection';
+import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 
 import {
   type AccountEnablePreview,
@@ -72,15 +73,16 @@ export function isAutomaticCharacterSyncEnabled(): boolean {
 }
 
 export function hasAutomaticCharacterSyncLocalPrerequisite(
-  storage: Pick<Storage, 'getItem'>
+  storage: Pick<Storage, 'getItem'>,
+  namespace: StorageNamespace = 'guest'
 ): boolean {
-  const raw = storage.getItem(characterCutoverSelectionKey('guest'));
+  const raw = storage.getItem(characterCutoverSelectionKey(namespace));
   if (!raw) return false;
   try {
     const value = JSON.parse(raw) as Record<string, unknown>;
     return (
       value.version === 1 &&
-      value.namespace === 'guest' &&
+      value.namespace === namespace &&
       value.family === 'character' &&
       typeof value.activatedEpoch === 'number' &&
       typeof value.activatedGeneration === 'string'

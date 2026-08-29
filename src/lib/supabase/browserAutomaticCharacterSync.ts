@@ -4,8 +4,12 @@ import {
   type AutomaticCharacterDocument,
 } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import { readCharacterAuthority } from '@/lib/indexeddb/characterAuthority';
-import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterCutoverSelection';
+import {
+  CHARACTER_CUTOVER_SELECTION_PREFIX,
+  isBrowserCharacterCutoverParticipant,
+} from '@/lib/indexeddb/characterCutoverSelection';
 import { openRollkeeperDatabase } from '@/lib/indexeddb/localDatabase';
+import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 import { isPlayerBackupWizardVisible } from '@/lib/playerBackup/playerBackupFlags';
 import { createPlayerBackupDispatchGuard } from '@/lib/playerBackup/playerBackupOngoingExecution';
 
@@ -44,13 +48,36 @@ export interface BrowserAutomaticCharacterSyncContext {
   close(): void;
 }
 
+function selectedAutomaticCharacterNamespace(
+  storage: Storage,
+  accountId?: string
+): StorageNamespace | null {
+  const candidates: StorageNamespace[] = accountId
+    ? ([`user:${accountId}`, 'guest'] as const)
+    : [
+        'guest',
+        ...Object.keys(storage)
+          .filter(key => key.startsWith(CHARACTER_CUTOVER_SELECTION_PREFIX))
+          .map(key => {
+            const suffix = key.slice(CHARACTER_CUTOVER_SELECTION_PREFIX.length);
+            return suffix.slice(0, -':character'.length) as StorageNamespace;
+          }),
+      ];
+  return (
+    candidates.find(
+      namespace =>
+        isBrowserCharacterCutoverParticipant(namespace) &&
+        hasAutomaticCharacterSyncLocalPrerequisite(storage, namespace)
+    ) ?? null
+  );
+}
+
 export function subscribeBrowserAutomaticCharacterAccountChanges(
   listener: (accountId: string | null) => void
 ): () => void {
   if (
     typeof window === 'undefined' ||
-    !isBrowserCharacterCutoverParticipant() ||
-    !hasAutomaticCharacterSyncLocalPrerequisite(window.localStorage)
+    selectedAutomaticCharacterNamespace(window.localStorage) === null
   ) {
     return () => undefined;
   }
@@ -87,10 +114,7 @@ function isOfflineAuthenticationError(error: unknown): boolean {
 }
 
 export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAutomaticCharacterSyncContext | null> {
-  if (
-    !isBrowserCharacterCutoverParticipant() ||
-    !hasAutomaticCharacterSyncLocalPrerequisite(window.localStorage)
-  ) {
+  if (selectedAutomaticCharacterNamespace(window.localStorage) === null) {
     return null;
   }
   const client = createSupabaseBrowserClient();
@@ -107,8 +131,14 @@ export async function createBrowserAutomaticCharacterSync(): Promise<BrowserAuto
   }
   if (!account) return null;
 
+  const authorityNamespace = selectedAutomaticCharacterNamespace(
+    window.localStorage,
+    account.id
+  );
+  if (!authorityNamespace) return null;
+
   const database = await openRollkeeperDatabase();
-  const authority = await readCharacterAuthority(database, 'guest');
+  const authority = await readCharacterAuthority(database, authorityNamespace);
   const indexedDbPrimary = authority.authority === 'indexedDB';
   const accountId = account.id;
   const namespace = `user:${accountId}` as const;

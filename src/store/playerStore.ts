@@ -524,11 +524,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
       name: PLAYER_STORAGE_KEY,
       skipHydration: isBrowserCharacterCutoverParticipant(),
       storage: createJSONStorage(() =>
-        typeof localStorage !== 'undefined' &&
-        isBrowserCharacterCutoverParticipant()
+        typeof localStorage !== 'undefined'
           ? createCharacterFamilyStateStorage({
               backing: localStorage,
-              participant: true,
+              participant: isBrowserCharacterCutoverParticipant(),
             })
           : createSafeStorage()
       ),

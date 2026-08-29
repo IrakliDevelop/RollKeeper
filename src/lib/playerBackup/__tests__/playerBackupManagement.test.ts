@@ -146,7 +146,11 @@ describe('player backup management', () => {
   });
 
   it('backs up one character through the fenced manual service', async () => {
-    const row = { id: 'cloud-a', legacy_client_id: 'hero-a' };
+    const row = {
+      id: 'cloud-a',
+      legacy_client_id: 'hero-a',
+      server_version: 2,
+    };
     const backup = vi.fn().mockResolvedValue({
       status: 'verified',
       row,
@@ -159,6 +163,7 @@ describe('player backup management', () => {
       expectedActiveRunId: RUN_ID,
       character: HERO,
       service: { backup },
+      now: () => '2026-08-26T12:00:00.000Z',
     });
     expect(backup).toHaveBeenCalledOnce();
     expect(backup.mock.calls[0][0]).toBe(HERO);
@@ -171,12 +176,32 @@ describe('player backup management', () => {
       originPlayerBackupRunId: RUN_ID,
     });
     expect(result).toEqual({ status: 'verified', row, fingerprint: 'fp' });
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    const stored = (await new Promise(resolve => {
+      const request = database
+        .transaction('meta', 'readonly')
+        .objectStore('meta')
+        .get(`player-backup-run:${RUN_ID}`);
+      request.onsuccess = () => resolve(request.result);
+    })) as PlayerBackupRunV1;
+    database.close();
+    expect(stored.characterCheckpoints['hero-a'].online).toMatchObject({
+      state: 'protected',
+      cloudId: 'cloud-a',
+      serverVersion: 2,
+      contentFingerprint: 'fp',
+      verifiedAt: '2026-08-26T12:00:00.000Z',
+    });
   });
 
   it('serializes rapid repeats through the account lock', async () => {
     const backup = vi.fn().mockResolvedValue({
       status: 'verified',
-      row: { id: 'cloud-a' },
+      row: {
+        id: 'cloud-a',
+        legacy_client_id: 'hero-a',
+        server_version: 2,
+      },
       fingerprint: 'fp',
     });
     const service = { backup, archive: vi.fn(), prepareRestore: vi.fn() };
@@ -327,6 +352,25 @@ describe('player backup management', () => {
   });
 
   it('soft-archives through the fenced manual service', async () => {
+    const database = await openRollkeeperDatabase({ factory: indexedDB });
+    const transaction = database.transaction('documents', 'readwrite');
+    transaction.objectStore('documents').put({
+      namespace: NAMESPACE,
+      family: 'character',
+      legacyId: 'hero-a',
+      cloudId: 'cloud-a',
+      operation: 'replace',
+      payload: HERO,
+      schemaVersion: 1,
+      localRevision: 5,
+      baseServerVersion: 3,
+      contentFingerprint: 'fp',
+      deletedAt: null,
+      syncPolicy: 'on',
+      updatedAt: '2026-08-26T12:00:00.000Z',
+    });
+    await transactionComplete(transaction);
+    database.close();
     const archive = vi.fn().mockResolvedValue({
       serverVersion: 4,
       deletedAt: '2026-08-27T00:00:00.000Z',
@@ -341,6 +385,16 @@ describe('player backup management', () => {
       service: { archive },
     });
     expect(archive).toHaveBeenCalledWith('cloud-a', { id: ACCOUNT }, 3);
+    const afterDatabase = await openRollkeeperDatabase({ factory: indexedDB });
+    const repository = new IndexedDbAutomaticCharacterSyncRepository(
+      afterDatabase
+    );
+    expect(await repository.getDocument(NAMESPACE, 'hero-a')).toMatchObject({
+      baseServerVersion: 4,
+      deletedAt: '2026-08-27T00:00:00.000Z',
+      payload: HERO,
+    });
+    afterDatabase.close();
   });
 
   it('commits restore inside the fence and honors attachCloudLink', async () => {

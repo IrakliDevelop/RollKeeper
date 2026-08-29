@@ -1,7 +1,10 @@
 import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { recordAutomaticCharacterEdit } from '@/lib/supabase/automaticCharacterSyncRuntime';
+import {
+  AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT,
+  recordAutomaticCharacterEdit,
+} from '@/lib/supabase/automaticCharacterSyncRuntime';
 import type { AutomaticCharacterDocument } from '@/lib/indexeddb/automaticCharacterSyncRepository';
 import type { AutomaticCharacterCloudStatus } from '@/lib/supabase/automaticCharacterSyncService';
 import { createBrowserAutomaticCharacterSync } from '@/lib/supabase/browserAutomaticCharacterSync';
@@ -76,6 +79,34 @@ describe('CharacterAutomaticSyncProvider', () => {
 
     view.unmount();
     expect(context.close).toHaveBeenCalledOnce();
+  });
+
+  it('rebuilds after the wizard activates IndexedDB authority in the mounted profile', async () => {
+    process.env.NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED = 'true';
+    const context = automaticContext();
+    vi.mocked(createBrowserAutomaticCharacterSync)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(context);
+
+    render(
+      <CharacterAutomaticSyncProvider>
+        <Probe />
+      </CharacterAutomaticSyncProvider>
+    );
+    await vi.waitFor(() =>
+      expect(createBrowserAutomaticCharacterSync).toHaveBeenCalledOnce()
+    );
+    expect(screen.getByText('none')).toBeVisible();
+
+    act(() =>
+      window.dispatchEvent(
+        new Event(AUTOMATIC_CHARACTER_AUTHORITY_CHANGED_EVENT)
+      )
+    );
+
+    expect(await screen.findByText('Synthetic account')).toBeVisible();
+    expect(createBrowserAutomaticCharacterSync).toHaveBeenCalledTimes(2);
+    expect(context.coordinator.start).toHaveBeenCalledOnce();
   });
 
   it('reauthentication retry resumes auth-required work before waking the worker', async () => {

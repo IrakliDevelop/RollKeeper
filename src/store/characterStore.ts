@@ -3959,6 +3959,7 @@ export const useCharacterStore = create<CharacterStore>()(
 
         // Campaign tracking
         updateDaysSpent: (days: number) => {
+          if (!Number.isFinite(days)) return;
           set(state => ({
             character: {
               ...state.character,
@@ -3970,10 +3971,13 @@ export const useCharacterStore = create<CharacterStore>()(
         },
 
         incrementDaysSpent: (amount = 1) => {
+          // Callers may hand this straight to an onClick, so the argument can
+          // be an event object; never let that turn daysSpent into NaN.
+          const step = Number.isFinite(amount) ? amount : 1;
           set(state => ({
             character: {
               ...state.character,
-              daysSpent: Math.max(0, (state.character.daysSpent || 0) + amount),
+              daysSpent: Math.max(0, (state.character.daysSpent || 0) + step),
             },
             hasUnsavedChanges: true,
             saveStatus: 'saving' as SaveStatus,

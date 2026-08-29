@@ -8,11 +8,19 @@ import type {
 import type { CharacterCloudLink } from '@/lib/supabase/characterCloudLinks';
 import type { RestoreMode } from '@/lib/supabase/characterCloudCodec';
 
-import { withExistingDatabase } from './playerBackupOnlineExecution';
+import {
+  onlineCheckpoint,
+  withExistingDatabase,
+} from './playerBackupOnlineExecution';
 import {
   type PlayerBackupExclusiveLockProvider,
   mutatePlayerBackupWithFence,
+  runPlayerBackupTransaction,
 } from './playerBackupRunFence';
+import {
+  readPlayerBackupRunInTransaction,
+  updatePlayerBackupCharacterCheckpoint,
+} from './playerBackupRunRepository';
 
 export interface PlayerBackupManagementService {
   backup: ManualCharacterCloudService['backup'];
@@ -39,6 +47,7 @@ export async function backupPlayerBackupCharacterNow(
   options: PlayerBackupManagementBase & {
     character: unknown;
     service: Pick<PlayerBackupManagementService, 'backup'>;
+    now?: () => string;
   }
 ): Promise<VerifiedCharacterBackup> {
   return mutatePlayerBackupWithFence({
@@ -46,8 +55,8 @@ export async function backupPlayerBackupCharacterNow(
     expectedActiveRunId: options.expectedActiveRunId,
     locks: options.locks,
     factory: options.factory,
-    mutateAndAcknowledge: () =>
-      options.service.backup(
+    mutateAndAcknowledge: async () => {
+      const verified = await options.service.backup(
         options.character,
         account(options.accountId),
         {
@@ -55,7 +64,44 @@ export async function backupPlayerBackupCharacterNow(
           confirmedTargetAccountId: options.accountId,
         },
         { originPlayerBackupRunId: options.expectedActiveRunId }
-      ),
+      );
+      const recordedAt = (options.now ?? (() => new Date().toISOString()))();
+      await withExistingDatabase(options.factory, database =>
+        runPlayerBackupTransaction({
+          database,
+          accountId: options.accountId,
+          expectedActiveRunId: options.expectedActiveRunId,
+          stores: [],
+          task: async transaction => {
+            const meta = transaction.objectStore('meta');
+            const run = await readPlayerBackupRunInTransaction(
+              meta,
+              options.accountId,
+              options.expectedActiveRunId
+            );
+            const previous =
+              run.characterCheckpoints[verified.row.legacy_client_id]?.online;
+            await updatePlayerBackupCharacterCheckpoint(meta, {
+              accountId: options.accountId,
+              expectedActiveRunId: options.expectedActiveRunId,
+              legacyId: verified.row.legacy_client_id,
+              online: onlineCheckpoint({
+                state: 'protected',
+                cloudId: verified.row.id,
+                mutationId: previous?.mutationId ?? null,
+                recordedAt,
+                verified: {
+                  serverVersion: verified.row.server_version,
+                  contentFingerprint: verified.fingerprint,
+                  verifiedAt: recordedAt,
+                },
+              }),
+            });
+          },
+        })
+      );
+      return verified;
+    },
   });
 }
 
@@ -144,12 +190,32 @@ export async function archivePlayerBackupOnlineCopy(
     expectedActiveRunId: options.expectedActiveRunId,
     locks: options.locks,
     factory: options.factory,
-    mutateAndAcknowledge: () =>
-      options.service.archive(
+    mutateAndAcknowledge: async () => {
+      const archived = await options.service.archive(
         options.cloudId,
         account(options.accountId),
         options.expectedServerVersion
-      ),
+      );
+      await withExistingDatabase(options.factory, async database => {
+        const repository = new IndexedDbAutomaticCharacterSyncRepository(
+          database
+        );
+        const document = (
+          await repository.listDocuments(namespaceFor(options.accountId))
+        ).find(candidate => candidate.cloudId === options.cloudId);
+        if (!document) return;
+        await repository.adoptCloudCandidate(document, {
+          payload: document.payload,
+          schemaVersion: document.schemaVersion,
+          localRevision: document.localRevision,
+          serverVersion: archived.serverVersion,
+          contentFingerprint: document.contentFingerprint,
+          deletedAt: archived.deletedAt,
+          updatedAt: archived.deletedAt,
+        });
+      });
+      return archived;
+    },
   });
 }
 
