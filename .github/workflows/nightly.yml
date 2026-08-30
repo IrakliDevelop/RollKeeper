@@ -1,0 +1,209 @@
+name: Nightly
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: true
+
+jobs:
+  integration-families:
+    name: Durable family integration suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Start local Supabase stack
+        run: npm run db:start >/dev/null
+
+      - name: Calendar documents integration
+        run: npm run test:calendar:integration
+
+      - name: Campaign settings integration
+        run: npm run test:campaign-settings:integration
+
+      - name: Campaign settings HTTP
+        run: npm run test:campaign-settings:http
+
+      - name: NPC documents integration
+        run: npm run test:npc:integration
+
+      - name: Magic item documents integration
+        run: npm run test:magic-item:integration
+
+      - name: Encounter documents integration
+        run: npm run test:encounter:integration
+
+      - name: Combat log archive documents integration
+        run: npm run test:combat-log-archive:integration
+
+      - name: Guest HTTP
+        run: npm run test:guest:http
+
+      - name: Calendar Redis
+        run: npm run test:calendar:redis
+
+      - name: Campaign settings Redis
+        run: npm run test:campaign-settings:redis
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup
+
+  reconnect-stress:
+    name: Reconnect stress test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      # TODO(nightly-roadmap): add firefox/webkit projects once a cross-browser flake budget exists (deliberately skipped).
+      - name: Reconnect and roster durability with repeat
+        run: npm run test:reconnect:nightly
+
+      - name: Upload reconnect failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-reconnect-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  checkpoint-matrix:
+    name: Checkpoint matrix durability
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Checkpoint matrix nightly
+        run: npm run test:checkpoint-matrix:nightly
+
+      - name: Upload checkpoint failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-checkpoint-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+  backup-restore-drill:
+    name: Backup and restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start local Supabase stack
+        run: npm run db:start >/dev/null
+
+      - name: Backup and restore integration
+        run: npm run test:db:backup-restore
+
+      - name: Player backup recovery with repeat
+        run: npx playwright test --config playwright.player-backup-recovery.config.ts --repeat-each=2
+
+      - name: Upload backup-restore failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-backup-restore-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup
+
+  rollback-drill:
+    name: Rollback drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start local Supabase stack
+        run: npm run db:start >/dev/null
+
+      - name: Rollback drill
+        run: npm run test:rollback:drill
+
+      - name: Upload rollback failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-rollback-failure-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Stop local Supabase stack
+        if: always()
+        run: npx supabase stop --no-backup
+
+# TODO(nightly-roadmap): staging OTP through Resend — deliberately skipped until a staging Supabase project and RESEND secrets exist.
