@@ -115,6 +115,17 @@ describe('projectDashboardCharacterStatus', () => {
       })
     ).toBe('saved-once');
   });
+
+  it('keeps a verified one-time copy acknowledged after an ordinary local edit', () => {
+    expect(
+      projectDashboardCharacterStatus({
+        outcome: 'protected',
+        cloudState: 'different',
+        mode: 'one-time',
+        preference: 'off',
+      })
+    ).toBe('saved-once');
+  });
 });
 
 describe('projectPlayerBackupDashboard', () => {
