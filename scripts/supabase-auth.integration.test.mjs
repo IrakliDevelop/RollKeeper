@@ -36,8 +36,14 @@ async function waitForOtp(config, email) {
       const serialized = JSON.stringify(detail);
       if (!serialized.includes(email)) continue;
 
-      const match = serialized.match(/RollKeeper sign-in code[^0-9]*(\d{6})/u);
-      if (match) return match[1];
+      const branded = serialized.match(/rk-code[^>]*>\s*(\d{6})/);
+      if (branded) return branded[1];
+      const nearExpiry = serialized.match(
+        /(\d{6})[\s\S]{0,240}Expires in 10 minutes/
+      );
+      if (nearExpiry) return nearExpiry[1];
+      const legacy = serialized.match(/RollKeeper sign-in code[^0-9]*(\d{6})/u);
+      if (legacy) return legacy[1];
     }
 
     await new Promise(resolve => setTimeout(resolve, 100));

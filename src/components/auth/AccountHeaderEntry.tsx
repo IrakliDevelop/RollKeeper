@@ -19,8 +19,12 @@ export function accountInitials(email: string): string {
 }
 
 export function AccountHeaderEntry() {
+  if (getPublicAuthConfig() === null) return null;
+  return <AccountHeaderSession />;
+}
+
+function AccountHeaderSession() {
   const router = useRouter();
-  const authEnabled = getPublicAuthConfig() !== null;
   const menuRef = useRef<HTMLDivElement>(null);
   const [email, setEmail] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -30,11 +34,6 @@ export function AccountHeaderEntry() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!authEnabled) {
-      setReady(true);
-      return;
-    }
-
     const client = createSupabaseBrowserClient();
     if (!client) {
       setReady(true);
@@ -49,7 +48,7 @@ export function AccountHeaderEntry() {
     });
 
     return () => subscription.unsubscribe();
-  }, [authEnabled]);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -77,7 +76,6 @@ export function AccountHeaderEntry() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  if (!authEnabled) return null;
   if (!ready) return <div className="h-9 w-24" aria-hidden="true" />;
 
   const handleSignOut = async (switchAccount: boolean) => {

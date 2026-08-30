@@ -21,6 +21,17 @@ afterEach(() => {
 });
 
 describe('PlayerDashboardPage', () => {
+  it('renders without a Next app router when account sign-in is disabled', async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_AUTH_ENABLED;
+    delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
+    const { container } = render(<PlayerDashboardPage />);
+    await screen.findByRole('heading', { name: /player dashboard/i });
+    expect(
+      screen.queryByRole('button', { name: 'Sign in' })
+    ).not.toBeInTheDocument();
+    expectCloudProductVocabulary(container);
+  });
+
   it('renders the "Full browser recovery" heading with R17-clean product vocabulary', async () => {
     delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
     const { container } = render(<PlayerDashboardPage />);
