@@ -62,6 +62,17 @@ jobs:
       - name: Player backup wizard coverage contract
         run: npm run test:player-backup-wizard:coverage
 
+      - name: Durable family coverage contracts
+        run: |
+          npm run test:slice10a2:coverage
+          npm run test:slice11a:coverage
+          npm run test:slice11b:coverage
+          npm run test:slice11c:coverage
+          npm run test:slice11d:coverage
+          npm run test:slice11e:coverage
+          npm run test:slice11f:coverage
+          npm run test:slice11g:coverage
+
   production-build:
     name: Production build
     runs-on: ubuntu-latest
