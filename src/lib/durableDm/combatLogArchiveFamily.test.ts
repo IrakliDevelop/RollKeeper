@@ -157,15 +157,21 @@ function payloadOfExactBytes(targetBytes: number): CombatLogArchivePayload {
     });
   // Marginal cost of one *additional* pad event (the first also pays no comma).
   payload.events.push(padEvent(PAD_MAX));
-  const before = payloadBytes(payload);
+  let currentBytes = payloadBytes(payload);
   payload.events.push(padEvent(PAD_MAX));
-  const overhead = payloadBytes(payload) - before - PAD_MAX;
+  const nextBytes = payloadBytes(payload);
+  const overhead = nextBytes - currentBytes - PAD_MAX;
+  const maxPaddedEventBytes = overhead + PAD_MAX;
+  currentBytes = nextBytes;
 
-  while (payloadBytes(payload) + overhead + PAD_MAX <= targetBytes)
+  while (currentBytes + maxPaddedEventBytes <= targetBytes) {
     payload.events.push(padEvent(PAD_MAX));
+    currentBytes += maxPaddedEventBytes;
+  }
   payload.events.pop();
+  currentBytes -= maxPaddedEventBytes;
 
-  const rest = targetBytes - payloadBytes(payload) - 2 * overhead;
+  const rest = targetBytes - currentBytes - 2 * overhead;
   const first = Math.min(PAD_MAX, rest);
   payload.events.push(padEvent(first));
   payload.events.push(padEvent(rest - first));
