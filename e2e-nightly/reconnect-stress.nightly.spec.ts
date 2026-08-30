@@ -15,7 +15,9 @@ import {
  * `npm run test:reconnect:nightly`, which also repeats the core single-writer
  * regression matrix (e2e/single-writer-sync.spec.ts and friends) 3x before
  * running this file. This spec adds scenarios that matrix doesn't cover:
- * repeated leader churn (tab close + reopen) and concurrent full-page
+ * repeated real leader failover (closing the actual writer-lock holder, not
+ * just any tab — see the leader-churn loop's comments for how the lock's
+ * strict FIFO/no-preemption semantics are tracked) and concurrent full-page
  * reloads, both hammering the same character across many cycles and
  * asserting the surviving/reopened tabs always converge with no lost
  * writes. Reuses the same store/envelope helpers as
@@ -40,9 +42,15 @@ test('leader-churn x5 + reload-storm x3: cumulative damage converges with no los
 
   const context = await browser.newContext();
 
-  // Setup: create a character in tab1, open tab2 on the same sheet URL.
-  let tab1 = await context.newPage();
-  const url = await createCharacter(tab1, 'ReconnectStressHero');
+  // Setup: create a character in leaderTab (the first tab to request the
+  // writer lock — it wins it immediately, see
+  // src/lib/characterWriterLock.ts:37-56: `navigator.locks.request(...,
+  // {mode: 'exclusive'})`, a strict FIFO queue with NO preemption). Open
+  // followerTab on the same sheet URL — it requests the same lock second,
+  // so it queues behind leaderTab and stays a follower (forwarding CANONICAL
+  // actions as intents) until leaderTab actually releases the lock.
+  let leaderTab = await context.newPage();
+  const url = await createCharacter(leaderTab, 'ReconnectStressHero');
   const characterId = characterIdFromUrl(url);
 
   // The default new-character HP pool (max 8, from level 1 + d8 hit die) is
@@ -55,7 +63,7 @@ test('leader-churn x5 + reload-storm x3: cumulative damage converges with no los
   // effect calls, then set a comfortably large `current`. This is
   // deterministic across remounts: the formula recomputes the same max each
   // time since level/CON don't change again.
-  await tab1.evaluate(() => {
+  await leaderTab.evaluate(() => {
     const store = window.__rkStores!.character.getState();
     store.updateCharacter({
       level: 10,
@@ -65,61 +73,82 @@ test('leader-churn x5 + reload-storm x3: cumulative damage converges with no los
     window.__rkStores!.character.getState().updateHitPoints({ current: 100 });
   });
 
-  const tab2 = await openTabOnUrl(context, url, characterId);
+  let followerTab = await openTabOnUrl(context, url, characterId);
 
   // Baseline is the `current` HP set above (100), not `max` (which the
   // formula in the setup evaluate() above pads well past it) — damage is
   // tracked against how much HP the character actually started with.
-  const { current: startingHp } = await storeHp(tab1);
+  const { current: startingHp } = await storeHp(leaderTab);
   let totalDamage = 0;
 
-  // Leader-churn loop x5: close the current leader tab, apply a mutation in
-  // the surviving tab, open a fresh tab on the same URL, apply a second
-  // distinct mutation there, then assert both tabs converge on the
-  // cumulative state.
+  // Leader-churn loop x5: each iteration closes `leaderTab` — the tab that
+  // ACTUALLY holds the writer lock — never a follower, so every cycle is a
+  // genuine failover (closing a follower tab triggers no promotion at all;
+  // only closing the real lock-holder does, per the FIFO-no-preemption
+  // model above). The invariant that makes this safe: `leaderTab` always
+  // holds the lock and `followerTab` is the sole queued waiter, because the
+  // only lock-affecting operations this loop performs are (a) closing
+  // `leaderTab` — which promotes the queued `followerTab` — and (b) opening
+  // one new tab per iteration, which queues behind whichever tab just got
+  // promoted. Rotating `leaderTab = followerTab` (the just-promoted tab)
+  // and `followerTab = freshTab` (the newly queued tab) at the end of each
+  // iteration preserves that invariant into the next iteration, so the
+  // *next* close also targets a real leader.
   for (let i = 0; i < 5; i++) {
-    // tab1 is the current leader (it was either the original creator or the
-    // freshly-opened tab from the previous iteration).
-    await tab1.close();
+    // Close the real leader — the only tab holding the Web Lock.
+    await leaderTab.close();
 
-    // Survivor applies a mutation while it promotes to leader.
-    await damageCharacter(tab2, 1);
+    // The queued follower is promoted; mutate it as it takes over.
+    await damageCharacter(followerTab, 1);
     totalDamage += 1;
 
-    // Open a fresh tab on the same URL and apply a second, distinct
-    // mutation there.
+    // Open a fresh tab on the same URL — it queues behind the newly
+    // promoted leader as the next (and only) follower — and apply a
+    // second, distinct mutation there (forwarded to the leader as an
+    // intent, since this tab never holds the lock itself).
     const freshTab = await openTabOnUrl(context, url, characterId);
     await damageCharacter(freshTab, 2);
     totalDamage += 2;
 
-    for (const tab of [tab2, freshTab]) {
+    for (const tab of [followerTab, freshTab]) {
       await expect
         .poll(async () => (await storeHp(tab)).current, { timeout: 15_000 })
         .toBe(startingHp - totalDamage);
     }
 
-    // Rotate: freshTab becomes tab1 for the next iteration's close, tab2
-    // remains the long-lived survivor.
-    tab1 = freshTab;
+    // Rotate: the just-promoted tab is the real leader for the next
+    // iteration's close; the fresh tab is the new sole queued follower.
+    leaderTab = followerTab;
+    followerTab = freshTab;
   }
 
   // Reload storm x3: reload both tabs in parallel, wait for stores ready,
-  // mutate concurrently in both tabs, assert convergence.
+  // mutate concurrently in both tabs, assert convergence. (A reload doesn't
+  // change which tab holds the lock — Web Locks releases are tied to page
+  // lifetime, and both tabs survive the reload — so leaderTab/followerTab
+  // stay accurate labels here too, though this section doesn't depend on
+  // which one is which.)
   for (let i = 0; i < 3; i++) {
     await Promise.all([
-      tab1.reload({ waitUntil: 'networkidle' }),
-      tab2.reload({ waitUntil: 'networkidle' }),
+      leaderTab.reload({ waitUntil: 'networkidle' }),
+      followerTab.reload({ waitUntil: 'networkidle' }),
     ]);
-    await Promise.all([waitForStoresReady(tab1), waitForStoresReady(tab2)]);
     await Promise.all([
-      waitForCharacterLoaded(tab1, characterId),
-      waitForCharacterLoaded(tab2, characterId),
+      waitForStoresReady(leaderTab),
+      waitForStoresReady(followerTab),
+    ]);
+    await Promise.all([
+      waitForCharacterLoaded(leaderTab, characterId),
+      waitForCharacterLoaded(followerTab, characterId),
     ]);
 
-    await Promise.all([damageCharacter(tab1, 1), damageCharacter(tab2, 1)]);
+    await Promise.all([
+      damageCharacter(leaderTab, 1),
+      damageCharacter(followerTab, 1),
+    ]);
     totalDamage += 2;
 
-    for (const tab of [tab1, tab2]) {
+    for (const tab of [leaderTab, followerTab]) {
       await expect
         .poll(async () => (await storeHp(tab)).current, { timeout: 15_000 })
         .toBe(startingHp - totalDamage);
@@ -129,7 +158,7 @@ test('leader-churn x5 + reload-storm x3: cumulative damage converges with no los
   // Final: assert the localStorage envelope state equals in-store state in
   // both tabs and that total applied damage equals the sum (no lost
   // writes).
-  for (const tab of [tab1, tab2]) {
+  for (const tab of [leaderTab, followerTab]) {
     const inStore = (await storeHp(tab)).current;
     expect(inStore).toBe(startingHp - totalDamage);
     await expect
