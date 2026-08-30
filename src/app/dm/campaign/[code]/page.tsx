@@ -36,7 +36,7 @@ import {
   CardDescription,
   CardContent,
 } from '@/components/ui/layout/card';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { PlayerSummaryCard } from '@/components/ui/campaign/PlayerSummaryCard';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { SendMessageDialog } from '@/components/ui/campaign/SendMessageDialog';
@@ -401,7 +401,7 @@ export default function CampaignViewPage() {
                   Battle Maps
                 </Button>
               </Link>
-              <ThemeToggle showSystemOption />
+              <HeaderTrailing showSystemOption />
             </div>
           </div>
         </div>

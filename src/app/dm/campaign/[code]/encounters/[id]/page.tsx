@@ -3,7 +3,7 @@
 import React from 'react';
 import { useParams } from 'next/navigation';
 import { Swords } from 'lucide-react';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { EncounterView } from '@/components/ui/encounter/EncounterView';
 import { useHydration } from '@/hooks/useHydration';
 
@@ -32,7 +32,7 @@ export default function EncounterPage() {
                 Encounter Tracker
               </h1>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

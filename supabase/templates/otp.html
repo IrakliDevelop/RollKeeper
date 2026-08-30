@@ -1,4 +1,334 @@
-<p>Your RollKeeper sign-in code is:</p>
-<p><strong>{{ .Token }}</strong></p>
-<p>This code expires in 10 minutes.</p>
-<p>If you did not request this code, you can ignore this email.</p>
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="supported-color-schemes" content="light dark" />
+    <title>Your RollKeeper sign-in code</title>
+    <!--[if mso]>
+      <style>
+        body,
+        table,
+        td,
+        p,
+        a {
+          font-family: Arial, Helvetica, sans-serif !important;
+        }
+      </style>
+    <![endif]-->
+    <style>
+      @media only screen and (max-width: 480px) {
+        .rk-pad {
+          padding-left: 22px !important;
+          padding-right: 22px !important;
+        }
+        .rk-code {
+          font-size: 32px !important;
+          letter-spacing: 8px !important;
+        }
+        .rk-title {
+          font-size: 22px !important;
+        }
+      }
+    </style>
+  </head>
+  <body style="margin: 0; padding: 0; background-color: #eef2f6">
+    <span
+      style="
+        display: none !important;
+        visibility: hidden;
+        opacity: 0;
+        color: transparent;
+        height: 0;
+        width: 0;
+        overflow: hidden;
+        mso-hide: all;
+      "
+      >Your RollKeeper sign-in code is inside. It works once, and only for 10
+      minutes.</span
+    >
+
+    <table
+      role="presentation"
+      cellpadding="0"
+      cellspacing="0"
+      border="0"
+      width="100%"
+      style="background-color: #eef2f6"
+    >
+      <tr>
+        <td align="center" style="padding: 32px 12px 40px 12px">
+          <table
+            role="presentation"
+            cellpadding="0"
+            cellspacing="0"
+            border="0"
+            width="600"
+            style="width: 600px; max-width: 600px"
+          >
+            <tr>
+              <td
+                align="left"
+                style="
+                  padding: 0 4px 14px 4px;
+                  font-family: Arial, Helvetica, sans-serif;
+                  font-size: 15px;
+                  font-weight: bold;
+                  color: #334155;
+                  letter-spacing: 0.02em;
+                "
+              >
+                RollKeeper
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                style="
+                  background-color: #ffffff;
+                  border: 1px solid #cbd5e1;
+                  border-radius: 14px;
+                "
+              >
+                <table
+                  role="presentation"
+                  cellpadding="0"
+                  cellspacing="0"
+                  border="0"
+                  width="100%"
+                  style="width: 100%"
+                >
+                  <tr>
+                    <td
+                      style="
+                        background-color: #065f46;
+                        border-radius: 13px 13px 0 0;
+                        padding: 22px 34px;
+                        font-family: Arial, Helvetica, sans-serif;
+                        font-size: 13px;
+                        line-height: 18px;
+                        mso-line-height-rule: exactly;
+                        color: #d1fae5;
+                        letter-spacing: 0.09em;
+                        text-transform: uppercase;
+                        font-weight: bold;
+                      "
+                    >
+                      Sign-in code
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td
+                      class="rk-pad"
+                      style="
+                        padding: 30px 34px 8px 34px;
+                        font-family: Arial, Helvetica, sans-serif;
+                      "
+                    >
+                      <p
+                        class="rk-title"
+                        style="
+                          margin: 0 0 10px 0;
+                          font-size: 25px;
+                          line-height: 32px;
+                          mso-line-height-rule: exactly;
+                          font-weight: bold;
+                          color: #0f172a;
+                          letter-spacing: -0.01em;
+                        "
+                      >
+                        Here is your code
+                      </p>
+                      <p
+                        style="
+                          margin: 0;
+                          font-size: 15px;
+                          line-height: 24px;
+                          mso-line-height-rule: exactly;
+                          color: #475569;
+                        "
+                      >
+                        Type these six digits into RollKeeper to finish signing
+                        in. The code works once, and only for the browser that
+                        asked for it.
+                      </p>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td class="rk-pad" style="padding: 22px 34px 6px 34px">
+                      <table
+                        role="presentation"
+                        cellpadding="0"
+                        cellspacing="0"
+                        border="0"
+                        width="100%"
+                        style="width: 100%"
+                      >
+                        <tr>
+                          <td
+                            align="center"
+                            bgcolor="#f0fdf4"
+                            style="
+                              background-color: #f0fdf4;
+                              border: 2px solid #a7f3d0;
+                              border-radius: 12px;
+                              padding: 24px 12px 22px 12px;
+                            "
+                          >
+                            <div
+                              class="rk-code"
+                              style="
+                                font-family: 'Courier New', Courier, monospace;
+                                font-size: 40px;
+                                line-height: 46px;
+                                mso-line-height-rule: exactly;
+                                font-weight: bold;
+                                color: #065f46;
+                                letter-spacing: 12px;
+                                text-indent: 12px;
+                              "
+                            >
+                              {{ .Token }}
+                            </div>
+                            <div
+                              style="
+                                font-family: Arial, Helvetica, sans-serif;
+                                font-size: 12px;
+                                line-height: 18px;
+                                mso-line-height-rule: exactly;
+                                color: #047857;
+                                padding-top: 12px;
+                                letter-spacing: 0.05em;
+                                text-transform: uppercase;
+                                font-weight: bold;
+                              "
+                            >
+                              Expires in 10 minutes
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td
+                      class="rk-pad"
+                      style="
+                        padding: 18px 34px 2px 34px;
+                        font-family: Arial, Helvetica, sans-serif;
+                        font-size: 14px;
+                        line-height: 22px;
+                        mso-line-height-rule: exactly;
+                        color: #475569;
+                      "
+                    >
+                      Type the digits into the sign-in screen you already have
+                      open. The boxes fill as you go and submit themselves once
+                      you enter the last one.
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td class="rk-pad" style="padding: 24px 34px 6px 34px">
+                      <table
+                        role="presentation"
+                        cellpadding="0"
+                        cellspacing="0"
+                        border="0"
+                        width="100%"
+                        style="width: 100%"
+                      >
+                        <tr>
+                          <td
+                            bgcolor="#f8fafc"
+                            style="
+                              background-color: #f8fafc;
+                              border: 1px solid #e2e8f0;
+                              border-radius: 12px;
+                              padding: 18px 20px;
+                              font-family: Arial, Helvetica, sans-serif;
+                            "
+                          >
+                            <p
+                              style="
+                                margin: 0 0 8px 0;
+                                font-size: 13px;
+                                line-height: 19px;
+                                mso-line-height-rule: exactly;
+                                font-weight: bold;
+                                color: #0f172a;
+                              "
+                            >
+                              Your characters are not affected
+                            </p>
+                            <p
+                              style="
+                                margin: 0;
+                                font-size: 13px;
+                                line-height: 21px;
+                                mso-line-height-rule: exactly;
+                                color: #475569;
+                              "
+                            >
+                              Signing in only confirms who you are. The
+                              characters, campaigns and maps saved on your
+                              computer stay exactly where they are, and nothing
+                              is uploaded unless you ask for it.
+                            </p>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td
+                      class="rk-pad"
+                      style="
+                        padding: 22px 34px 30px 34px;
+                        font-family: Arial, Helvetica, sans-serif;
+                        font-size: 13px;
+                        line-height: 21px;
+                        mso-line-height-rule: exactly;
+                        color: #64748b;
+                        border-top: 1px solid #e2e8f0;
+                      "
+                    >
+                      <span style="display: block; padding-top: 20px"
+                        >Didn&rsquo;t ask for this code? You can safely ignore
+                        this email. Nobody can sign in without it, and no one
+                        has access to your account.</span
+                      >
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+
+            <tr>
+              <td
+                align="center"
+                style="
+                  padding: 20px 16px 0 16px;
+                  font-family: Arial, Helvetica, sans-serif;
+                  font-size: 12px;
+                  line-height: 19px;
+                  mso-line-height-rule: exactly;
+                  color: #64748b;
+                "
+              >
+                Sent by RollKeeper because someone asked for a sign-in code for
+                this address.<br />
+                This is a one-time security message, not a newsletter.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

@@ -15,7 +15,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { Card, CardContent } from '@/components/ui/layout/card';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 
 interface ResourceItem {
   title: string;
@@ -113,7 +113,7 @@ export default function ResourcesPage() {
                 <Link href="/dm">DM Tools</Link>
               </Button>
               <div className="bg-divider mx-1 h-5 w-px sm:mx-2" />
-              <ThemeToggle />
+              <HeaderTrailing />
             </nav>
           </div>
         </div>

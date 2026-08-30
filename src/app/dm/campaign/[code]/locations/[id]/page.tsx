@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { useLocationStore } from '@/store/locationStore';
 import { useHydration } from '@/hooks/useHydration';
@@ -76,7 +76,7 @@ export default function LocationEditorPage() {
                 </h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

@@ -17,7 +17,7 @@ import {
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CreateCampaignDialog } from '@/components/ui/campaign/CreateCampaignDialog';
 import { DmCloudWorkspaceControls } from '@/components/ui/campaign/DmCloudWorkspaceControls';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
@@ -218,7 +218,7 @@ export default function DmDashboardPage() {
                 <h1 className="text-heading text-xl font-bold">DM Dashboard</h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

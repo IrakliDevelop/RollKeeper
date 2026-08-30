@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/forms/button';
 
@@ -59,6 +60,9 @@ export function AccountControls({
         <p className="text-heading font-medium break-all">{email}</p>
       </div>
       <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" asChild>
+          <Link href="/player/backup">Character backups</Link>
+        </Button>
         <Button
           type="button"
           variant="outline"
@@ -76,6 +80,9 @@ export function AccountControls({
           Switch account
         </Button>
       </div>
+      <p className="text-muted text-sm">
+        Signing out leaves every character right where it is.
+      </p>
       {error && (
         <p role="alert" className="text-accent-red-text text-sm">
           {error}

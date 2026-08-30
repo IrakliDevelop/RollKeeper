@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
@@ -117,7 +117,7 @@ export default function BattleMapEditorPage() {
                   Play
                 </Button>
               </div>
-              <ThemeToggle showSystemOption />
+              <HeaderTrailing showSystemOption />
             </div>
           </div>
         </div>

@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
-import { AccountIndicator } from '@/components/auth/AccountIndicator';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
 
@@ -109,10 +108,7 @@ export default function RootLayout({
       >
         <ThemeProviderWrapper>
           <PersistenceBootstrap>
-            <ErrorBoundary>
-              {children}
-              <AccountIndicator />
-            </ErrorBoundary>
+            <ErrorBoundary>{children}</ErrorBoundary>
           </PersistenceBootstrap>
         </ThemeProviderWrapper>
       </body>

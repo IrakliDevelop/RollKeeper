@@ -33,16 +33,15 @@ describe('AuthForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 
-    await screen.findByLabelText(/^Six-digit code/);
+    await screen.findByLabelText('Digit 1 of 6');
     expect(signInWithOtp).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('button', { name: /Resend in 60s/i })
     ).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/^Six-digit code/), {
+    fireEvent.change(screen.getByLabelText('Digit 1 of 6'), {
       target: { value: '123456' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify code' }));
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
     expect(verifyOtp).toHaveBeenCalledWith({

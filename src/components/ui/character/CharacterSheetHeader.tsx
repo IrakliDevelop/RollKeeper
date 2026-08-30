@@ -13,7 +13,7 @@ import {
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
 import { Badge } from '@/components/ui/layout/badge';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
@@ -161,7 +161,7 @@ export default function CharacterSheetHeader({
 
               {extraHeaderContent}
 
-              <ThemeToggle />
+              <HeaderTrailing />
 
               {/* File Operations */}
               <div className="flex items-center space-x-2">

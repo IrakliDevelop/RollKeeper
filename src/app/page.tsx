@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Card, CardContent } from '@/components/ui/layout/card';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import {
   fadeVariants,
   animationTransitions,
@@ -221,7 +221,7 @@ export default function LandingPage() {
                 Resources
               </Link>
               <div className="bg-divider mx-2 h-5 w-px" />
-              <ThemeToggle />
+              <HeaderTrailing />
               <div className="w-2" />
               <Button
                 variant="secondary"
@@ -234,7 +234,7 @@ export default function LandingPage() {
             </nav>
 
             <div className="flex items-center gap-2 md:hidden">
-              <ThemeToggle />
+              <HeaderTrailing />
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
                 className="text-heading hover:bg-surface-hover rounded-lg p-2 transition-colors"

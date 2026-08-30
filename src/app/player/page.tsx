@@ -25,7 +25,7 @@ import { usePlayerStore, PlayerCharacter } from '@/store/playerStore';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
@@ -438,7 +438,7 @@ export default function PlayerDashboardPage() {
                 </h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

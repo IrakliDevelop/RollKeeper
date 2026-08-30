@@ -918,3 +918,21 @@ form select {
 .animate-float-slow {
   animation: float-slow 8s ease-in-out infinite 1s;
 }
+
+@keyframes rk-otp-shake {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  30%,
+  70% {
+    transform: translateX(3px);
+  }
+  50% {
+    transform: translateX(-3px);
+  }
+}
+
+.animate-rk-otp-shake {
+  animation: rk-otp-shake 420ms ease-in-out;
+}
