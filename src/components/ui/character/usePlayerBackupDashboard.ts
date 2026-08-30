@@ -47,6 +47,7 @@ function deriveBrowserResult(options: {
 export function usePlayerBackupDashboard(): {
   view: PlayerBackupDashboardView;
   liveStatus: string | null;
+  ready: boolean;
 } {
   const coordinatorRef = useRef(new PlayerBackupReadOnlyCoordinator());
   const generation = useRef(0);
@@ -57,6 +58,7 @@ export function usePlayerBackupDashboard(): {
   const [policies, setPolicies] = useState<Record<string, 'on' | 'off'>>({});
   const [liveStatus, setLiveStatus] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+  const [durableStateLoaded, setDurableStateLoaded] = useState(false);
   const roster = usePlayerStore(state => state.characters);
   const lockAvailable = hasPlayerBackupExclusiveLockCapability(
     typeof navigator === 'undefined' ? null : navigator.locks
@@ -74,6 +76,7 @@ export function usePlayerBackupDashboard(): {
       setSnapshot(coordinatorRef.current.snapshot());
       setPolicies({});
       setLiveStatus(null);
+      setDurableStateLoaded(nextId === null);
       return nextId;
     });
   }, []);
@@ -86,6 +89,7 @@ export function usePlayerBackupDashboard(): {
     const client = createSupabaseBrowserClient();
     if (!client) {
       applyAccount(null);
+      setDurableStateLoaded(true);
       return undefined;
     }
     let cancelled = false;
@@ -93,17 +97,23 @@ export function usePlayerBackupDashboard(): {
       if (cancelled) return;
       if (error && isAuthSessionMissingError(error)) {
         applyAccount(null);
+        setDurableStateLoaded(true);
         return;
       }
       if (error) {
         setLiveStatus(mapPlayerBackupError('account', error));
         applyAccount(null);
+        setDurableStateLoaded(true);
         return;
       }
       applyAccount(data.user?.id ?? null);
     });
     const { data } = client.auth.onAuthStateChange((_event, session) => {
-      if (!cancelled) applyAccount(session?.user?.id ?? null);
+      if (!cancelled) {
+        const nextAccountId = session?.user?.id ?? null;
+        applyAccount(nextAccountId);
+        if (nextAccountId === null) setDurableStateLoaded(true);
+      }
     });
     return () => {
       cancelled = true;
@@ -170,6 +180,7 @@ export function usePlayerBackupDashboard(): {
       } finally {
         if (!cancelled && token === generation.current) {
           setSnapshot(coordinator.snapshot());
+          setDurableStateLoaded(true);
         }
       }
     })();
@@ -235,5 +246,5 @@ export function usePlayerBackupDashboard(): {
     });
   }, [accountId, capabilities, hydrated, policies, roster, snapshot]);
 
-  return { view, liveStatus };
+  return { view, liveStatus, ready: hydrated && durableStateLoaded };
 }

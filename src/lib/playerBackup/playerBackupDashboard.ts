@@ -159,7 +159,8 @@ export function projectDashboardCharacterStatus(input: {
   if (input.outcome === 'auth-required') evidence.authRequired = true;
   if (
     input.outcome === 'needs-attention' ||
-    input.cloudState === 'different' ||
+    (input.cloudState === 'different' &&
+      !(input.outcome === 'protected' && input.mode === 'one-time')) ||
     input.cloudState === 'newer'
   ) {
     evidence.conflict = true;
@@ -306,7 +307,10 @@ export function projectPlayerBackupDashboard(
         ? [
             {
               value: savedOnceCount,
-              label: COPY.dashboard.counts.copiesSaved,
+              label:
+                savedOnceCount === 1
+                  ? COPY.dashboard.counts.copySaved
+                  : COPY.dashboard.counts.copiesSaved,
             },
           ]
         : []),

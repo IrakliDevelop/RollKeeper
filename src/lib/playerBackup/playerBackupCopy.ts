@@ -42,6 +42,7 @@ export const PLAYER_BACKUP_COPY = {
       paused: 'paused',
       waiting: 'backing up',
       attention: 'needs attention',
+      copySaved: 'copy saved',
       copiesSaved: 'copies saved',
       thisBrowserOnly: 'this browser only',
     },
@@ -220,6 +221,9 @@ export const PLAYER_BACKUP_COPY = {
       'These backup changes are not available right now. Your characters were not changed.',
   },
   recovery: {
+    routineTitle: 'Restore characters',
+    routineDescription:
+      'Your characters in this browser have not changed. Use a safety file to restore missing characters or review other copies.',
     title: 'Your characters need recovery',
     description:
       'RollKeeper could not safely open the current saved copy and did not fall back to an older one. Download the available recovery files before trying another action.',
