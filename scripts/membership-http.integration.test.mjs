@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
@@ -7,21 +6,14 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
 import { getLocalSupabaseTestConfig } from './local-supabase-env.mjs';
+import {
+  spawnNextDev,
+  stopNextDev,
+  waitForNextReady,
+} from './spawn-next-dev.mjs';
 
 const PORT = 3123;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
-
-async function waitForServer() {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${ORIGIN}/membership`);
-      if (response.status < 500) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  throw new Error('Membership HTTP integration server did not become ready');
-}
 
 async function authenticatedCookie(config, email, password) {
   const values = new Map();
@@ -123,9 +115,9 @@ test('real HTTP membership routes enforce cookies, CSRF, hash-only issuance, rep
   const player = await authenticatedCookie(config, playerEmail, password);
   const other = await authenticatedCookie(config, otherEmail, password);
 
-  const child = spawn('npm', ['run', 'dev', '--', '--port', String(PORT)], {
+  const server = spawnNextDev({
+    port: PORT,
     env: {
-      ...process.env,
       NEXT_PUBLIC_SUPABASE_URL: config.apiUrl,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.publishableKey,
       NEXT_PUBLIC_SUPABASE_AUTH_ENABLED: 'true',
@@ -133,10 +125,12 @@ test('real HTTP membership routes enforce cookies, CSRF, hash-only issuance, rep
       SUPABASE_CAMPAIGN_MEMBERSHIP_ENABLED: 'true',
       NEXT_PUBLIC_SUPABASE_CAMPAIGN_MEMBERSHIP_UI_ENABLED: 'true',
     },
-    stdio: 'ignore',
   });
-  t.after(() => child.kill('SIGTERM'));
-  await waitForServer();
+  t.after(() => stopNextDev(server));
+  await waitForNextReady(`${ORIGIN}/membership`, {
+    logs: server.logs,
+    label: 'Membership HTTP integration server',
+  });
 
   const workspace = await rpc(
     config,

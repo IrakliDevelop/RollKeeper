@@ -48,7 +48,7 @@
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
     "test:all": "vitest run",
-    "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs",
+    "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs scripts/spawn-next-dev.test.mjs",
     "test:db:integration": "node --test scripts/supabase-integration.test.mjs",
     "test:db:backup-restore": "node --test scripts/backup-restore-drill.test.mjs",
     "test:guest:http": "node --test scripts/guest-http.integration.test.mjs",

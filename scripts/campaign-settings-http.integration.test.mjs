@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
@@ -7,6 +6,11 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 
 import { getLocalSupabaseTestConfig } from './local-supabase-env.mjs';
+import {
+  spawnNextDev,
+  stopNextDev,
+  waitForNextReady,
+} from './spawn-next-dev.mjs';
 
 const PORT = 3125;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -25,20 +29,6 @@ function fingerprint(value) {
   return createHash('sha256')
     .update(JSON.stringify(canonical(value)))
     .digest('hex');
-}
-
-async function waitForServer() {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${ORIGIN}/dm`);
-      if (response.status < 500) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  throw new Error(
-    'Campaign settings HTTP integration server did not become ready'
-  );
 }
 
 async function authenticatedCookie(config, email, password) {
@@ -128,9 +118,9 @@ test('real HTTP Slice 11A routes enforce cookie owner auth, Origin/CSRF, replay,
   const owner = await authenticatedCookie(config, ownerEmail, password);
   const other = await authenticatedCookie(config, otherEmail, password);
 
-  const child = spawn('npm', ['run', 'dev', '--', '--port', String(PORT)], {
+  const server = spawnNextDev({
+    port: PORT,
     env: {
-      ...process.env,
       NEXT_PUBLIC_SUPABASE_URL: config.apiUrl,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.publishableKey,
       NEXT_PUBLIC_SUPABASE_AUTH_ENABLED: 'true',
@@ -142,10 +132,12 @@ test('real HTTP Slice 11A routes enforce cookie owner auth, Origin/CSRF, replay,
       UPSTASH_REDIS_REST_TOKEN: 'synthetic-local-disabled-worker',
       NEXT_PUBLIC_RELAY_URL: 'ws://127.0.0.1:6398',
     },
-    stdio: 'ignore',
   });
-  t.after(() => child.kill('SIGTERM'));
-  await waitForServer();
+  t.after(() => stopNextDev(server));
+  await waitForNextReady(`${ORIGIN}/dm`, {
+    logs: server.logs,
+    label: 'Campaign settings HTTP integration server',
+  });
 
   const workspace = await rpc(
     config,

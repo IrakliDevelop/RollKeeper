@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
 import { createHash, createHmac, randomUUID } from 'node:crypto';
 import test from 'node:test';
 
 import { getLocalSupabaseTestConfig } from './local-supabase-env.mjs';
+import {
+  spawnNextDev,
+  stopNextDev,
+  waitForNextReady,
+} from './spawn-next-dev.mjs';
 
 const PORT = 3122;
 const ORIGIN = `http://127.0.0.1:${PORT}`;
@@ -47,27 +51,15 @@ async function rpc(config, name, token, body) {
   return { body: await response.json(), response };
 }
 
-async function waitForServer() {
-  const deadline = Date.now() + 60_000;
-  while (Date.now() < deadline) {
-    try {
-      const response = await fetch(`${ORIGIN}/guest`);
-      if (response.status < 500) return;
-    } catch {}
-    await new Promise(resolve => setTimeout(resolve, 200));
-  }
-  throw new Error('Guest HTTP integration server did not become ready');
-}
-
 function cookiePair(setCookie) {
   return setCookie.slice(0, setCookie.indexOf(';'));
 }
 
 test('real HTTP redemption uses an opaque rotating cookie and enforces Origin/CSRF', async t => {
   const config = getLocalSupabaseTestConfig();
-  const child = spawn('npm', ['run', 'dev', '--', '--port', String(PORT)], {
+  const server = spawnNextDev({
+    port: PORT,
     env: {
-      ...process.env,
       NEXT_PUBLIC_SUPABASE_URL: config.apiUrl,
       NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: config.publishableKey,
       SUPABASE_SERVICE_ROLE_KEY: config.serviceRoleKey,
@@ -75,10 +67,12 @@ test('real HTTP redemption uses an opaque rotating cookie and enforces Origin/CS
       NEXT_PUBLIC_SUPABASE_HYBRID_GUEST_UI_ENABLED: 'true',
       GUEST_SESSION_PEPPER: PEPPER,
     },
-    stdio: 'ignore',
   });
-  t.after(() => child.kill('SIGTERM'));
-  await waitForServer();
+  t.after(() => stopNextDev(server));
+  await waitForNextReady(`${ORIGIN}/guest`, {
+    logs: server.logs,
+    label: 'Guest HTTP integration server',
+  });
 
   const token = userJwt(config.jwtSecret);
   const workspace = await rpc(config, 'create_campaign_workspace', token, {
