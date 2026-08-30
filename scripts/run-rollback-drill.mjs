@@ -1,4 +1,4 @@
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -40,9 +40,32 @@ const PHASE_B_ENV = {
 };
 
 let serverChild = null;
+let playwrightChild = null;
 
 function log(message) {
   process.stdout.write(`[rollback-drill] ${message}\n`);
+}
+
+/** Terminates `child` (SIGTERM, then SIGKILL after SHUTDOWN_TIMEOUT_MS if it
+ * hasn't exited) and resolves once it has. No-op if already exited. */
+function killChild(child) {
+  if (!child || child.exitCode !== null || child.killed) {
+    return Promise.resolve();
+  }
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      try {
+        child.kill('SIGKILL');
+      } catch {
+        // already gone
+      }
+    }, SHUTDOWN_TIMEOUT_MS);
+    child.once('exit', () => {
+      clearTimeout(timer);
+      resolve();
+    });
+    child.kill('SIGTERM');
+  });
 }
 
 async function waitForServer() {
@@ -64,21 +87,13 @@ async function waitForServer() {
 async function stopServer() {
   const child = serverChild;
   serverChild = null;
-  if (!child || child.exitCode !== null || child.killed) return;
-  await new Promise(resolve => {
-    const timer = setTimeout(() => {
-      try {
-        child.kill('SIGKILL');
-      } catch {
-        // already gone
-      }
-    }, SHUTDOWN_TIMEOUT_MS);
-    child.once('exit', () => {
-      clearTimeout(timer);
-      resolve();
-    });
-    child.kill('SIGTERM');
-  });
+  await killChild(child);
+}
+
+async function stopPlaywright() {
+  const child = playwrightChild;
+  playwrightChild = null;
+  await killChild(child);
 }
 
 async function startServer(env) {
@@ -89,28 +104,43 @@ async function startServer(env) {
   await waitForServer();
 }
 
+/** Runs the Playwright phase with async `spawn` (not `spawnSync`): a
+ * blocking spawnSync freezes Node's event loop for the whole phase, so a
+ * SIGTERM/SIGINT arriving mid-run (most of the drill's wall time) would
+ * never reach the process.on() handlers below until the child exits on its
+ * own — leaking the dev server and profile dir on CI cancellation. Async
+ * spawn keeps the event loop free so signals are handled promptly. */
 function runPlaywrightPhase(grep) {
-  const result = spawnSync(
-    'npx',
-    [
-      'playwright',
-      'test',
-      '--config',
-      'playwright.rollback-drill.config.ts',
-      '--grep',
-      grep,
-    ],
-    { env: process.env, stdio: 'inherit' }
-  );
-  if (result.error) throw result.error;
-  return result.status ?? 1;
+  return new Promise((resolve, reject) => {
+    const child = spawn(
+      'npx',
+      [
+        'playwright',
+        'test',
+        '--config',
+        'playwright.rollback-drill.config.ts',
+        '--grep',
+        grep,
+      ],
+      { env: process.env, stdio: 'inherit' }
+    );
+    playwrightChild = child;
+    child.once('error', error => {
+      playwrightChild = null;
+      reject(error);
+    });
+    child.once('exit', (code, signal) => {
+      playwrightChild = null;
+      resolve(signal ? 1 : (code ?? 1));
+    });
+  });
 }
 
 async function runPhase(name, env, grep) {
   log(`starting phase ${name} server on port ${PORT}`);
   await startServer(env);
   log(`server ready; running "${grep}"`);
-  const status = runPlaywrightPhase(grep);
+  const status = await runPlaywrightPhase(grep);
   await stopServer();
   return status;
 }
@@ -135,6 +165,7 @@ async function main() {
 }
 
 async function cleanup() {
+  await stopPlaywright();
   await stopServer();
   try {
     rmSync(profileDir, { recursive: true, force: true });

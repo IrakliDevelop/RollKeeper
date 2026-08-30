@@ -1,3 +1,6 @@
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { chromium, expect, test, type Page } from '@playwright/test';
 
 /**
@@ -29,6 +32,16 @@ function requireProfileDir(): string {
     );
   }
   return dir;
+}
+
+/** Phase A and phase B run as separate `playwright test` processes (spawned
+ * fresh per phase by scripts/run-rollback-drill.mjs), so phase A's record
+ * of the character-authority pointer has to be handed to phase B through a
+ * file rather than in-memory state. ROLLBACK_PROFILE_DIR survives across
+ * both phases (only removed by the driver after phase B finishes), so it
+ * doubles as that scratch location. */
+function authorityRecordPath(): string {
+  return join(requireProfileDir(), 'phase-a-character-authority.json');
 }
 
 /** Mailpit keeps mail across drill runs, so a stale message from an earlier
@@ -147,45 +160,80 @@ async function completeSafetyFileStep(page: Page) {
   });
 }
 
+interface CharacterAuthorityPointerRecord {
+  key: string;
+  authority?: string;
+  namespace?: string;
+  family?: string;
+  generation?: string;
+  epoch?: number;
+  committedAt?: string;
+}
+
+interface CharacterAuthorityReading {
+  hasDatabase: boolean;
+  pointer: CharacterAuthorityPointerRecord | null;
+}
+
+/** Reads the `meta` store's `active-generation:<namespace>:character`
+ * record straight out of the `rollkeeper-local` IndexedDB database — the
+ * pointer `src/lib/indexeddb/characterAuthority.ts` (`scopedCharacterAuthorityKeys`)
+ * writes to declare which storage tier (`authority: 'indexedDB' |
+ * 'localStorage'`, see characterAuthority.ts:19-37) currently owns the
+ * character family. Matched generically (key prefix/suffix) rather than by
+ * hardcoding the namespace, since the local character-cutover namespace
+ * (always 'guest' — see task-5-report.md) is a different concept from the
+ * player-backup wizard's own 'user:<id>' | 'guest' namespace. */
 async function readActiveCharacterGenerationAuthority(
   page: Page
-): Promise<{
-  hasDatabase: boolean;
-  authority: string | null;
-  key: string | null;
-}> {
+): Promise<CharacterAuthorityReading> {
   return page.evaluate(async () => {
     const names = (await indexedDB.databases()).flatMap(item =>
       item.name ? [item.name] : []
     );
     if (!names.includes('rollkeeper-local')) {
-      return { hasDatabase: false, authority: null, key: null };
+      return { hasDatabase: false, pointer: null };
     }
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('rollkeeper-local');
       request.onsuccess = () => resolve(request.result);
       request.onerror = () => reject(request.error);
     });
-    const rows = await new Promise<Array<{ key: string; authority?: string }>>(
-      (resolve, reject) => {
-        const transaction = database.transaction('meta', 'readonly');
-        const request = transaction.objectStore('meta').getAll();
-        request.onsuccess = () =>
-          resolve(request.result as Array<{ key: string; authority?: string }>);
-        request.onerror = () => reject(request.error);
-      }
-    );
+    const rows = await new Promise<
+      Array<{
+        key: string;
+        authority?: string;
+        namespace?: string;
+        family?: string;
+        generation?: string;
+        epoch?: number;
+        committedAt?: string;
+      }>
+    >((resolve, reject) => {
+      const transaction = database.transaction('meta', 'readonly');
+      const request = transaction.objectStore('meta').getAll();
+      request.onsuccess = () =>
+        resolve(
+          request.result as Array<{
+            key: string;
+            authority?: string;
+            namespace?: string;
+            family?: string;
+            generation?: string;
+            epoch?: number;
+            committedAt?: string;
+          }>
+        );
+      request.onerror = () => reject(request.error);
+    });
     database.close();
-    const pointer = rows.find(
-      row =>
-        row.key.startsWith('active-generation:') &&
-        row.key.endsWith(':character')
-    );
-    return {
-      hasDatabase: true,
-      authority: pointer?.authority ?? null,
-      key: pointer?.key ?? null,
-    };
+    const pointer =
+      rows.find(
+        row =>
+          row.key.startsWith('active-generation:') &&
+          row.key.endsWith(':character')
+      ) ?? null;
+    return { hasDatabase: true, pointer };
   });
 }
 
@@ -232,7 +280,16 @@ test('phase A: activate ongoing backup', async () => {
         timeout: 30_000,
         message: 'waiting for indexedDB authority on the character pointer',
       })
-      .toMatchObject({ hasDatabase: true, authority: 'indexedDB' });
+      .toMatchObject({
+        hasDatabase: true,
+        pointer: { authority: 'indexedDB' },
+      });
+
+    // Persist the exact pointer record so phase B (a separate `playwright
+    // test` process against a separate `next dev` process) can prove the
+    // rollback left it byte-for-byte untouched, not just "still present".
+    const reading = await readActiveCharacterGenerationAuthority(page);
+    writeFileSync(authorityRecordPath(), JSON.stringify(reading.pointer));
   } finally {
     await context.close();
   }
@@ -274,8 +331,19 @@ test('phase B: flags rolled back', async () => {
     }, CHARACTER_NAME);
     expect(localStorageHasCharacter).toBe(true);
 
+    // 'rollkeeper-local' must not just still exist — the character-authority
+    // pointer phase A established must be exactly what phase A wrote: still
+    // claiming 'indexedDB' authority, and identical (same generation/
+    // epoch/committedAt/key), proving the rollback never touched it.
+    const phaseAPointer = JSON.parse(
+      readFileSync(authorityRecordPath(), 'utf8')
+    ) as CharacterAuthorityPointerRecord;
+    expect(phaseAPointer.authority).toBe('indexedDB');
+
     const indexedDbState = await readActiveCharacterGenerationAuthority(page);
     expect(indexedDbState.hasDatabase).toBe(true);
+    expect(indexedDbState.pointer?.authority).toBe('indexedDB');
+    expect(indexedDbState.pointer).toEqual(phaseAPointer);
 
     expect(pageErrors).toEqual([]);
   } finally {
