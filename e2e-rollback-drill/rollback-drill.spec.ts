@@ -205,6 +205,36 @@ interface CharacterPersistenceSnapshot {
   activeGenerationRow: Record<string, unknown> | null;
 }
 
+/** Durable rollback proof: payload bytes, pointer identity, and localStorage
+ * mirror. `committedAt` is excluded because the live generation row can stamp
+ * a new timestamp after cutover without changing character data. */
+function durableCharacterPersistence(snapshot: CharacterPersistenceSnapshot) {
+  const row = snapshot.activeGenerationRow;
+  return {
+    hasDatabase: snapshot.hasDatabase,
+    pointer: snapshot.pointer
+      ? {
+          authority: snapshot.pointer.authority,
+          namespace: snapshot.pointer.namespace,
+          family: snapshot.pointer.family,
+          generation: snapshot.pointer.generation,
+          epoch: snapshot.pointer.epoch,
+        }
+      : null,
+    localStorageRaw: snapshot.localStorageRaw,
+    activeGenerationRow: row
+      ? {
+          namespace: row.namespace,
+          generation: row.generation,
+          key: row.key,
+          presence: row.presence,
+          rawValue: row.rawValue,
+          cutoverEpoch: row.cutoverEpoch,
+        }
+      : null,
+  };
+}
+
 /** Reads the complete durable character snapshot used by the rollback proof:
  * the localStorage mirror, the `meta` store's active-generation pointer, and
  * that pointer's exact `kvGenerations` row. The pointer is matched generically
@@ -339,7 +369,7 @@ test('phase A: activate ongoing backup', async () => {
     await expect
       .poll(() => readCharacterPersistenceSnapshot(page), {
         timeout: 30_000,
-        message: 'waiting for indexedDB authority on the character pointer',
+        message: 'waiting for live indexedDB generation payload',
       })
       .toMatchObject({
         hasDatabase: true,
@@ -348,11 +378,13 @@ test('phase A: activate ongoing backup', async () => {
         activeGenerationRow: {
           presence: true,
           rawValue: expect.stringContaining(PERSISTENCE_MARKER),
+          committedAt: expect.any(String),
+          cutoverEpoch: expect.any(Number),
         },
       });
 
-    // Persist the complete snapshot so phase B can prove that the pointer,
-    // localStorage mirror, and active IndexedDB payload are all byte-for-byte
+    // Persist the live generation snapshot so phase B can prove that the
+    // pointer, localStorage mirror, and active IndexedDB payload bytes are
     // unchanged, including distinctive non-name character data.
     const reading = await readCharacterPersistenceSnapshot(page);
     writeFileSync(persistenceSnapshotPath(), JSON.stringify(reading));
@@ -390,8 +422,18 @@ test('phase B: flags rolled back', async () => {
       PERSISTENCE_MARKER
     );
 
-    const indexedDbState = await readCharacterPersistenceSnapshot(page);
-    expect(indexedDbState).toEqual(phaseASnapshot);
+    await expect
+      .poll(
+        async () =>
+          durableCharacterPersistence(
+            await readCharacterPersistenceSnapshot(page)
+          ),
+        {
+          timeout: 30_000,
+          message: 'waiting for phase B persistence to match phase A payload',
+        }
+      )
+      .toEqual(durableCharacterPersistence(phaseASnapshot));
 
     expect(pageErrors).toEqual([]);
   } finally {
