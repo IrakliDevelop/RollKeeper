@@ -23,6 +23,7 @@ const BASE_URL = 'http://localhost:3111';
 const MAILPIT_URL = 'http://127.0.0.1:54324';
 const EMAIL = 'rollback-drill@example.test';
 const CHARACTER_NAME = 'Rollback Hero';
+const PERSISTENCE_MARKER = 'rollback-drill-complete-payload-marker';
 
 function requireProfileDir(): string {
   const dir = process.env.ROLLBACK_PROFILE_DIR;
@@ -35,13 +36,13 @@ function requireProfileDir(): string {
 }
 
 /** Phase A and phase B run as separate `playwright test` processes (spawned
- * fresh per phase by scripts/run-rollback-drill.mjs), so phase A's record
- * of the character-authority pointer has to be handed to phase B through a
- * file rather than in-memory state. ROLLBACK_PROFILE_DIR survives across
- * both phases (only removed by the driver after phase B finishes), so it
- * doubles as that scratch location. */
-function authorityRecordPath(): string {
-  return join(requireProfileDir(), 'phase-a-character-authority.json');
+ * fresh per phase by scripts/run-rollback-drill.mjs), so phase A's complete
+ * persistence snapshot has to be handed to phase B through a file rather
+ * than in-memory state. ROLLBACK_PROFILE_DIR survives across both phases
+ * (only removed by the driver after phase B finishes), so it doubles as that
+ * scratch location. */
+function persistenceSnapshotPath(): string {
+  return join(requireProfileDir(), 'phase-a-character-persistence.json');
 }
 
 /** Mailpit keeps mail across drill runs, so a stale message from an earlier
@@ -103,18 +104,45 @@ async function createCharacterViaStore(page: Page, name: string) {
         ?.player
     )
   );
-  await page.evaluate(characterName => {
-    const stores = (
-      window as unknown as {
-        __rkStores?: {
-          player: {
-            getState: () => { createCharacter: (name: string) => string };
+  await page.evaluate(
+    ({ characterName, persistenceMarker }) => {
+      const stores = (
+        window as unknown as {
+          __rkStores?: {
+            player: {
+              getState: () => {
+                createCharacter: (
+                  name: string,
+                  characterData: Record<string, unknown>
+                ) => string;
+              };
+            };
           };
-        };
-      }
-    ).__rkStores;
-    stores?.player.getState().createCharacter(characterName);
-  }, name);
+        }
+      ).__rkStores;
+      stores?.player.getState().createCharacter(characterName, {
+        hitPoints: {
+          current: 37,
+          max: 42,
+          temporary: 5,
+          calculationMode: 'manual',
+          manualMaxOverride: 42,
+        },
+        notes: [
+          {
+            id: 'rollback-drill-note',
+            title: 'Rollback persistence marker',
+            content: `<p>${persistenceMarker}</p>`,
+            category: 'note',
+            order: 0,
+            createdAt: '2026-08-30T00:00:00.000Z',
+            updatedAt: '2026-08-30T00:00:00.000Z',
+          },
+        ],
+      });
+    },
+    { characterName: name, persistenceMarker: PERSISTENCE_MARKER }
+  );
   await page.reload();
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible({
     timeout: 15_000,
@@ -170,29 +198,31 @@ interface CharacterAuthorityPointerRecord {
   committedAt?: string;
 }
 
-interface CharacterAuthorityReading {
+interface CharacterPersistenceSnapshot {
   hasDatabase: boolean;
   pointer: CharacterAuthorityPointerRecord | null;
+  localStorageRaw: string | null;
+  activeGenerationRow: Record<string, unknown> | null;
 }
 
-/** Reads the `meta` store's `active-generation:<namespace>:character`
- * record straight out of the `rollkeeper-local` IndexedDB database — the
- * pointer `src/lib/indexeddb/characterAuthority.ts` (`scopedCharacterAuthorityKeys`)
- * writes to declare which storage tier (`authority: 'indexedDB' |
- * 'localStorage'`, see characterAuthority.ts:19-37) currently owns the
- * character family. Matched generically (key prefix/suffix) rather than by
- * hardcoding the namespace, since the local character-cutover namespace
- * (always 'guest' — see task-5-report.md) is a different concept from the
- * player-backup wizard's own 'user:<id>' | 'guest' namespace. */
-async function readActiveCharacterGenerationAuthority(
+/** Reads the complete durable character snapshot used by the rollback proof:
+ * the localStorage mirror, the `meta` store's active-generation pointer, and
+ * that pointer's exact `kvGenerations` row. The pointer is matched generically
+ * rather than by hardcoding its namespace. */
+async function readCharacterPersistenceSnapshot(
   page: Page
-): Promise<CharacterAuthorityReading> {
+): Promise<CharacterPersistenceSnapshot> {
   return page.evaluate(async () => {
     const names = (await indexedDB.databases()).flatMap(item =>
       item.name ? [item.name] : []
     );
     if (!names.includes('rollkeeper-local')) {
-      return { hasDatabase: false, pointer: null };
+      return {
+        hasDatabase: false,
+        pointer: null,
+        localStorageRaw: localStorage.getItem('rollkeeper-player-data'),
+        activeGenerationRow: null,
+      };
     }
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = indexedDB.open('rollkeeper-local');
@@ -226,14 +256,45 @@ async function readActiveCharacterGenerationAuthority(
         );
       request.onerror = () => reject(request.error);
     });
-    database.close();
     const pointer =
       rows.find(
         row =>
           row.key.startsWith('active-generation:') &&
           row.key.endsWith(':character')
       ) ?? null;
-    return { hasDatabase: true, pointer };
+    const pointerNamespace = pointer?.namespace;
+    const pointerGeneration = pointer?.generation;
+    const activeGenerationRow =
+      pointerNamespace && pointerGeneration
+        ? await new Promise<Record<string, unknown> | null>(
+            (resolve, reject) => {
+              const transaction = database.transaction(
+                'kvGenerations',
+                'readonly'
+              );
+              const request = transaction
+                .objectStore('kvGenerations')
+                .get([
+                  pointerNamespace,
+                  pointerGeneration,
+                  'rollkeeper-player-data',
+                ]);
+              request.onsuccess = () =>
+                resolve(
+                  (request.result as Record<string, unknown> | undefined) ??
+                    null
+                );
+              request.onerror = () => reject(request.error);
+            }
+          )
+        : null;
+    database.close();
+    return {
+      hasDatabase: true,
+      pointer,
+      localStorageRaw: localStorage.getItem('rollkeeper-player-data'),
+      activeGenerationRow,
+    };
   });
 }
 
@@ -276,20 +337,25 @@ test('phase A: activate ongoing backup', async () => {
     // `active-generation:${namespace}:character`, namespace 'guest' for the
     // local character IndexedDB cutover — see task-5-report.md).
     await expect
-      .poll(() => readActiveCharacterGenerationAuthority(page), {
+      .poll(() => readCharacterPersistenceSnapshot(page), {
         timeout: 30_000,
         message: 'waiting for indexedDB authority on the character pointer',
       })
       .toMatchObject({
         hasDatabase: true,
         pointer: { authority: 'indexedDB' },
+        localStorageRaw: expect.stringContaining(PERSISTENCE_MARKER),
+        activeGenerationRow: {
+          presence: true,
+          rawValue: expect.stringContaining(PERSISTENCE_MARKER),
+        },
       });
 
-    // Persist the exact pointer record so phase B (a separate `playwright
-    // test` process against a separate `next dev` process) can prove the
-    // rollback left it byte-for-byte untouched, not just "still present".
-    const reading = await readActiveCharacterGenerationAuthority(page);
-    writeFileSync(authorityRecordPath(), JSON.stringify(reading.pointer));
+    // Persist the complete snapshot so phase B can prove that the pointer,
+    // localStorage mirror, and active IndexedDB payload are all byte-for-byte
+    // unchanged, including distinctive non-name character data.
+    const reading = await readCharacterPersistenceSnapshot(page);
+    writeFileSync(persistenceSnapshotPath(), JSON.stringify(reading));
   } finally {
     await context.close();
   }
@@ -315,35 +381,17 @@ test('phase B: flags rolled back', async () => {
       page.getByRole('heading', { name: CHARACTER_NAME, exact: true })
     ).toBeVisible();
 
-    const localStorageHasCharacter = await page.evaluate(name => {
-      const raw = localStorage.getItem('rollkeeper-player-data');
-      if (!raw) return false;
-      try {
-        const parsed = JSON.parse(raw) as {
-          state?: { characters?: Array<{ name?: string }> };
-        };
-        return Boolean(
-          parsed.state?.characters?.some(character => character.name === name)
-        );
-      } catch {
-        return false;
-      }
-    }, CHARACTER_NAME);
-    expect(localStorageHasCharacter).toBe(true);
+    const phaseASnapshot = JSON.parse(
+      readFileSync(persistenceSnapshotPath(), 'utf8')
+    ) as CharacterPersistenceSnapshot;
+    expect(phaseASnapshot.pointer?.authority).toBe('indexedDB');
+    expect(phaseASnapshot.localStorageRaw).toContain(PERSISTENCE_MARKER);
+    expect(phaseASnapshot.activeGenerationRow?.rawValue).toContain(
+      PERSISTENCE_MARKER
+    );
 
-    // 'rollkeeper-local' must not just still exist — the character-authority
-    // pointer phase A established must be exactly what phase A wrote: still
-    // claiming 'indexedDB' authority, and identical (same generation/
-    // epoch/committedAt/key), proving the rollback never touched it.
-    const phaseAPointer = JSON.parse(
-      readFileSync(authorityRecordPath(), 'utf8')
-    ) as CharacterAuthorityPointerRecord;
-    expect(phaseAPointer.authority).toBe('indexedDB');
-
-    const indexedDbState = await readActiveCharacterGenerationAuthority(page);
-    expect(indexedDbState.hasDatabase).toBe(true);
-    expect(indexedDbState.pointer?.authority).toBe('indexedDB');
-    expect(indexedDbState.pointer).toEqual(phaseAPointer);
+    const indexedDbState = await readCharacterPersistenceSnapshot(page);
+    expect(indexedDbState).toEqual(phaseASnapshot);
 
     expect(pageErrors).toEqual([]);
   } finally {

@@ -45,31 +45,40 @@ Settings &rarr; Environment Variables) and require a redeploy to take effect
 every Vercel environment.
 
 **Stage 1 — internal soak (Preview only).** Set all five flags to `true` on a
-Vercel **Preview** deployment, scoped to owner accounts only. Duration: 1
-week. Watch the observability list in section 4 continuously. Do not touch
-Production env vars in this stage.
+Vercel **Preview** deployment protected by Vercel access controls so only the
+internal review group can open it. Duration: 1 week. Watch the observability
+list in section 4 continuously. Do not touch Production env vars in this
+stage.
 
-**Stage 2 — small cohort (Production).** Set all five flags to `true` in
-Production. Announce to a handful of named users (not a public rollout).
-Keep watching the observability list. Gate on Stage 1 completing clean.
+**Stage 2 — one-time backup (Production, global).** Set W, A, and M to `true`
+and leave C and S `false` in Production. This is deliberately a
+capability-limited global rollout: every production user can see the wizard,
+but only one-time backup is available (`setup: 'degraded-manual'`). Keep
+watching the observability list. Gate on Stage 1 completing clean.
 
-**Stage 3 — default-on for everyone.** Same flag values as Stage 2, but no
-longer cohort-gated by communication — every production user now sees the
-wizard. Gate on Stage 2 completing clean and on the pre-flip checklist
-(section 5) being fully closed.
+These build-time flags cannot target named accounts. Do not describe any
+Production flag flip as a small-cohort rollout unless account-level targeting
+is implemented and separately verified.
+
+**Stage 3 — ongoing backup default-on for everyone.** Set all five flags to
+`true`, enabling IndexedDB cutover and automatic sync in addition to the
+one-time mode from Stage 2. Gate on Stage 2 completing clean and on the
+pre-flip checklist (section 5) being fully closed.
 
 ## 3. Rollback
 
-**Full rollback:** set `NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE=false` and
-redeploy. The capability reducer's `!input.wizardVisible` branch immediately
-reverts `surfaceOwner` to `'legacy'` and disables every wizard call
-(`NO_WIZARD_CALLS`). Local IndexedDB authority and the localStorage mirror
-are untouched by a flag rollback — flipping W back off does not delete or
-migrate any local data, it only hides the surface. This exact path is
-rehearsed nightly by the `rollback-drill` job in
-`.github/workflows/nightly.yml` (that drill flips W, M, C, and S all off
-together, a superset of this W-only path) — cite a green `rollback-drill`
-run as proof the rollback is safe, not just theoretical.
+**Full rollback:** set W, M, C, and S to `false`, leave A unchanged, and
+redeploy. W restores the legacy surface and disables wizard calls; M disables
+manual backup mutations; S stops the independently mounted automatic-sync
+provider; and C returns the application to legacy persistence routing. Local
+IndexedDB data and the localStorage mirror are not deleted by these flag
+changes. This exact four-flag rollback is rehearsed nightly by the
+`rollback-drill` job in `.github/workflows/nightly.yml` — cite a green
+`rollback-drill` run as proof the rollback is safe, not just theoretical.
+
+Setting only W to `false` is a **surface-only rollback**, not a full rollback:
+it hides the wizard, but automatic synchronization continues while S remains
+`true`.
 
 **Partial rollbacks** (keep the wizard visible, narrow what it can do):
 
