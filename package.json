@@ -49,6 +49,7 @@
     "test:all": "vitest run",
     "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs",
     "test:db:integration": "node --test scripts/supabase-integration.test.mjs",
+    "test:db:backup-restore": "node --test scripts/backup-restore-drill.test.mjs",
     "test:guest:http": "node --test scripts/guest-http.integration.test.mjs",
     "test:membership:integration": "node --test scripts/membership-cutover.integration.test.mjs",
     "test:membership:http": "node --test scripts/membership-http.integration.test.mjs",
