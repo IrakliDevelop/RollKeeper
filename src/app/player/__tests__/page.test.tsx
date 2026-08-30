@@ -5,6 +5,7 @@ import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy'
 import { expectCloudProductVocabulary } from '@/test/helpers';
 import { expectPlayerBackupVocabulary } from '@/test/helpers';
 import * as coordinator from '@/lib/playerBackup/playerBackupCoordinator';
+import { usePlayerStore, type PlayerCharacter } from '@/store/playerStore';
 
 import PlayerDashboardPage from '../page';
 
@@ -13,6 +14,7 @@ const originalWizard = process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
 afterEach(() => {
   cleanup();
   document.body.replaceChildren();
+  usePlayerStore.setState({ characters: [], activeCharacterId: null });
   if (originalWizard === undefined) {
     delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
   } else {
@@ -54,6 +56,20 @@ describe('PlayerDashboardPage', () => {
     render(<PlayerDashboardPage />);
     expect(ctor).not.toHaveBeenCalled();
     ctor.mockRestore();
+  });
+
+  it('renders a roster entry that is missing tags instead of crashing', async () => {
+    delete process.env.NEXT_PUBLIC_SUPABASE_AUTH_ENABLED;
+    delete process.env.NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE;
+    usePlayerStore.setState({
+      characters: [{ id: 'legacy' } as PlayerCharacter],
+      activeCharacterId: null,
+    });
+    render(<PlayerDashboardPage />);
+    await screen.findByRole('heading', { name: /player dashboard/i });
+    expect(
+      screen.getByRole('heading', { name: /active characters/i })
+    ).toBeInTheDocument();
   });
 
   it('hides legacy backup surfaces when the wizard flag is on', async () => {
