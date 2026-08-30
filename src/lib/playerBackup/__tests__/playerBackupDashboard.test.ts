@@ -260,9 +260,40 @@ describe('projectPlayerBackupDashboard', () => {
     );
     expect(view.scenario).toBe('one-time-complete');
     expect(view.counts).toEqual([
-      { value: 1, label: COPY.dashboard.counts.copiesSaved },
+      { value: 1, label: COPY.dashboard.counts.copySaved },
       { value: 1, label: COPY.dashboard.counts.paused },
       { value: 1, label: COPY.dashboard.counts.thisBrowserOnly },
+    ]);
+  });
+
+  it('uses a singular chip label when exactly one copy is saved', () => {
+    const view = projectPlayerBackupDashboard(
+      input({
+        characterCount: 1,
+        hasAcknowledgedCurrentAccountCopy: true,
+        characters: characters([['a', 'saved-once']]),
+      })
+    );
+    expect(view.scenario).toBe('one-time-complete');
+    expect(view.counts).toEqual([
+      { value: 1, label: COPY.dashboard.counts.copySaved },
+    ]);
+  });
+
+  it('keeps the plural chip label for more than one saved copy', () => {
+    const view = projectPlayerBackupDashboard(
+      input({
+        characterCount: 2,
+        hasAcknowledgedCurrentAccountCopy: true,
+        characters: characters([
+          ['a', 'saved-once'],
+          ['b', 'saved-once'],
+        ]),
+      })
+    );
+    expect(view.scenario).toBe('one-time-complete');
+    expect(view.counts).toEqual([
+      { value: 2, label: COPY.dashboard.counts.copiesSaved },
     ]);
   });
 
@@ -329,7 +360,7 @@ describe('projectPlayerBackupDashboard', () => {
     );
     expect(view.scenario).toBe('one-time-complete');
     expect(view.counts).toEqual([
-      { value: 1, label: COPY.dashboard.counts.copiesSaved },
+      { value: 1, label: COPY.dashboard.counts.copySaved },
       { value: 1, label: COPY.dashboard.counts.thisBrowserOnly },
     ]);
   });

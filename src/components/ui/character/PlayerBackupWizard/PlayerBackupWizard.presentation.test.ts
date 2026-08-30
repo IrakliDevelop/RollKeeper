@@ -4,6 +4,7 @@ import { derivePlayerBackupCapabilities } from '@/lib/playerBackup/playerBackupF
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
 
 import {
+  EMPTY_RECOVERY,
   EMPTY_RESULT,
   EMPTY_SAFETY,
   projectPlayerBackupManagement,
@@ -460,5 +461,14 @@ describe('projectPlayerBackupManagement', () => {
         expect.objectContaining({ action: 'remove', enabled: false }),
       ])
     );
+  });
+});
+
+describe('EMPTY_RECOVERY', () => {
+  it('describes routine restore without claiming recovery is required', () => {
+    expect(EMPTY_RECOVERY.title).toBe(COPY.recovery.routineTitle);
+    expect(EMPTY_RECOVERY.description).toBe(COPY.recovery.routineDescription);
+    expect(EMPTY_RECOVERY.title).not.toBe(COPY.recovery.title);
+    expect(EMPTY_RECOVERY.description).not.toContain('could not safely open');
   });
 });

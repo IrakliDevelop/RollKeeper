@@ -405,9 +405,13 @@ export function projectPlayerBackupManagement(input: {
   };
 }
 
+// The recovery surface is reached through routine actions (restore a
+// character, save a safety file), so its default view must not claim that
+// recovery is required. COPY.recovery.title/description stay reserved for the
+// genuine unopenable-authority state surfaced by PersistenceBootstrap.
 export const EMPTY_RECOVERY: PlayerBackupWizardView['recovery'] = {
-  title: COPY.recovery.title,
-  description: COPY.recovery.description,
+  title: COPY.recovery.routineTitle,
+  description: COPY.recovery.routineDescription,
 };
 
 export const EMPTY_SAFETY: PlayerBackupWizardView['safety'] = {

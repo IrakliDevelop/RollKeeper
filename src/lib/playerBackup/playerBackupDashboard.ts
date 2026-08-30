@@ -307,7 +307,10 @@ export function projectPlayerBackupDashboard(
         ? [
             {
               value: savedOnceCount,
-              label: COPY.dashboard.counts.copiesSaved,
+              label:
+                savedOnceCount === 1
+                  ? COPY.dashboard.counts.copySaved
+                  : COPY.dashboard.counts.copiesSaved,
             },
           ]
         : []),
