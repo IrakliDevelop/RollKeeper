@@ -39,15 +39,10 @@ const RESEND_COOLDOWN_SECONDS = 60;
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 
 type AuthStep = 'email' | 'code' | 'success';
-type CodeStatus = 'idle' | 'wrong' | 'expired';
+type CodeStatus = 'idle' | 'invalid';
 
 function isValidEmail(value: string): boolean {
   return EMAIL_PATTERN.test(value.trim());
-}
-
-function classifyCodeError(message: string): CodeStatus {
-  if (/expired|already been used/i.test(message)) return 'expired';
-  return 'wrong';
 }
 
 export function AuthForm({
@@ -134,7 +129,7 @@ export function AuthForm({
           ? verificationError.message
           : 'Could not verify the sign-in code.';
       setError(message);
-      setCodeStatus(classifyCodeError(message));
+      setCodeStatus('invalid');
       setCode('');
     } finally {
       verifyingRef.current = false;
@@ -257,18 +252,16 @@ export function AuthForm({
             onChange={setCode}
             onComplete={handleVerifyCode}
             disabled={pending}
-            error={codeStatus === 'wrong'}
+            error={codeStatus === 'invalid'}
           />
 
           <div
             className={
               pending
                 ? 'border-accent-emerald-border bg-accent-emerald-bg flex min-h-[42px] items-center gap-2.5 rounded-[10px] border px-3 py-2.5'
-                : codeStatus === 'wrong'
+                : codeStatus === 'invalid'
                   ? 'border-accent-red-border bg-accent-red-bg flex min-h-[42px] items-center gap-2.5 rounded-[10px] border px-3 py-2.5'
-                  : codeStatus === 'expired'
-                    ? 'border-accent-amber-border bg-accent-amber-bg flex min-h-[42px] items-center gap-2.5 rounded-[10px] border px-3 py-2.5'
-                    : 'border-divider bg-surface-secondary flex min-h-[42px] items-center gap-2.5 rounded-[10px] border px-3 py-2.5'
+                  : 'border-divider bg-surface-secondary flex min-h-[42px] items-center gap-2.5 rounded-[10px] border px-3 py-2.5'
             }
           >
             {pending && (
@@ -279,26 +272,22 @@ export function AuthForm({
               className={
                 pending
                   ? 'text-accent-emerald-text text-[12.5px] leading-snug'
-                  : codeStatus === 'wrong'
+                  : codeStatus === 'invalid'
                     ? 'text-accent-red-text text-[12.5px] leading-snug'
-                    : codeStatus === 'expired'
-                      ? 'text-accent-amber-text text-[12.5px] leading-snug'
-                      : 'text-body text-[12.5px] leading-snug'
+                    : 'text-body text-[12.5px] leading-snug'
               }
             >
               {pending
                 ? 'Checking your code…'
-                : codeStatus === 'wrong'
-                  ? 'That code did not match. Open the newest email and try the six digits again.'
-                  : codeStatus === 'expired'
-                    ? 'This code has expired. Send yourself a new one. Nothing on this browser was changed.'
-                    : 'Type the 6-digit code from your email. It sends itself once the last box is filled.'}
+                : codeStatus === 'invalid'
+                  ? 'That code is invalid or has expired. Open the newest email and try again.'
+                  : 'Type the 6-digit code from your email. It sends itself once the last box is filled.'}
             </p>
           </div>
 
           <div className="border-divider flex items-center justify-between gap-3 border-t pt-3">
             <span className="text-muted text-[12.5px]">
-              {codeStatus === 'expired'
+              {codeStatus === 'invalid'
                 ? 'Codes last 10 minutes'
                 : 'Code expires in 10 minutes'}
             </span>

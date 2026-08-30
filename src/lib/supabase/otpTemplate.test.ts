@@ -15,5 +15,7 @@ describe('Supabase OTP email template', () => {
 
     const delivered = html.replaceAll('{{ .Token }}', '424242');
     expect(extractEmailOtp(delivered)).toBe('424242');
+    expect(html).not.toMatch(/only for the browser/i);
+    expect(html).toContain('Never share this code');
   });
 });

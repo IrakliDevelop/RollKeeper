@@ -13,6 +13,11 @@ import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 
 import { SignInDialog } from './SignInDialog';
 
+interface AccountFeedback {
+  message: string;
+  tone: 'success' | 'error';
+}
+
 export function accountInitials(email: string): string {
   const local = email.split('@')[0] ?? email;
   return local.slice(0, 2).toUpperCase();
@@ -31,7 +36,7 @@ function AccountHeaderSession() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [signInOpen, setSignInOpen] = useState(false);
   const [pending, setPending] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<AccountFeedback | null>(null);
 
   useEffect(() => {
     const client = createSupabaseBrowserClient();
@@ -71,10 +76,10 @@ function AccountHeaderSession() {
   }, [menuOpen]);
 
   useEffect(() => {
-    if (!toast) return;
-    const timer = window.setTimeout(() => setToast(null), 3200);
+    if (!feedback) return;
+    const timer = window.setTimeout(() => setFeedback(null), 3200);
     return () => window.clearTimeout(timer);
-  }, [toast]);
+  }, [feedback]);
 
   if (!ready) return <div className="h-9 w-24" aria-hidden="true" />;
 
@@ -84,6 +89,7 @@ function AccountHeaderSession() {
 
     setPending(true);
     setMenuOpen(false);
+    setFeedback(null);
     try {
       await signOutWithoutTouchingLegacyStorage(client);
       setEmail(null);
@@ -91,8 +97,17 @@ function AccountHeaderSession() {
       if (switchAccount) {
         setSignInOpen(true);
       } else {
-        setToast('Signed out. All your characters are still here.');
+        setFeedback({
+          message: 'Signed out. All your characters are still here.',
+          tone: 'success',
+        });
       }
+    } catch {
+      setFeedback({
+        message:
+          'RollKeeper could not confirm sign-out with the account service. Check your connection before continuing.',
+        tone: 'error',
+      });
     } finally {
       setPending(false);
     }
@@ -190,9 +205,17 @@ function AccountHeaderSession() {
 
       <SignInDialog open={signInOpen} onOpenChange={setSignInOpen} />
 
-      {toast && (
-        <div className="border-divider bg-heading text-surface pointer-events-none fixed bottom-6 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2.5 rounded-full border px-[18px] py-2.5 shadow-xl">
-          <span className="text-[13px]">{toast}</span>
+      {feedback && (
+        <div
+          role={feedback.tone === 'error' ? 'alert' : 'status'}
+          aria-label={feedback.message}
+          className={`pointer-events-none fixed bottom-6 left-1/2 z-[70] flex -translate-x-1/2 items-center gap-2.5 rounded-full border px-[18px] py-2.5 shadow-xl ${
+            feedback.tone === 'error'
+              ? 'border-accent-red-border bg-accent-red-bg text-accent-red-text'
+              : 'border-divider bg-heading text-surface'
+          }`}
+        >
+          <span className="text-[13px]">{feedback.message}</span>
         </div>
       )}
     </div>

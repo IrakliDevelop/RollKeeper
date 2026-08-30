@@ -48,6 +48,8 @@ describe('AccountHeaderEntry', () => {
   afterEach(() => {
     cleanup();
     authListener = undefined;
+    signOut.mockReset();
+    signOut.mockResolvedValue({ error: null });
   });
 
   it('derives initials from the local part of the email', () => {
@@ -90,5 +92,24 @@ describe('AccountHeaderEntry', () => {
     expect(localStorage.getItem('rollkeeper-player-data')).toBe(
       '{"state":{"characters":[]}}'
     );
+  });
+
+  it('shows an accessible sign-out confirmation error', async () => {
+    signOut.mockResolvedValueOnce({
+      error: { message: 'Network request failed' },
+    });
+    render(<AccountHeaderEntry />);
+    authListener?.('SIGNED_IN', { user: { email: 'lyra@example.com' } });
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /lyra@example.com/i })
+    );
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Sign out' }));
+
+    expect(
+      await screen.findByRole('alert', {
+        name: 'RollKeeper could not confirm sign-out with the account service. Check your connection before continuing.',
+      })
+    ).toBeInTheDocument();
   });
 });

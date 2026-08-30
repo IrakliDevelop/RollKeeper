@@ -77,4 +77,34 @@ describe('AuthForm', () => {
       'exact legacy bytes'
     );
   });
+
+  it('does not claim a combined invalid-or-expired OTP error is definitely expired', async () => {
+    const signInWithOtp = vi.fn().mockResolvedValue({ error: null });
+    const verifyOtp = vi.fn().mockResolvedValue({
+      error: { message: 'Token has expired or is invalid' },
+    });
+
+    render(
+      <AuthForm auth={{ signInWithOtp, verifyOtp }} requireTurnstile={false} />
+    );
+
+    fireEvent.change(screen.getByLabelText(/^Email address/), {
+      target: { value: 'player@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+    await screen.findByLabelText('Digit 1 of 6');
+
+    fireEvent.change(screen.getByLabelText('Digit 1 of 6'), {
+      target: { value: '000000' },
+    });
+
+    expect(
+      await screen.findByText(
+        'That code is invalid or has expired. Open the newest email and try again.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('This code has expired.')
+    ).not.toBeInTheDocument();
+  });
 });
