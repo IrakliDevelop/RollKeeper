@@ -128,7 +128,7 @@ test('opening recovery without a file leaves a fresh profile database absent', a
   const page = await context.newPage();
   await page.goto('/player/backup?intent=recovery');
   await expect(
-    page.getByRole('heading', { name: 'Your characters need recovery' })
+    page.getByRole('heading', { name: 'Restore characters' })
   ).toBeVisible();
   expect(await databaseNames(page)).not.toContain('rollkeeper-local');
   await page.getByLabel('Restore from a safety file').setInputFiles({
@@ -152,7 +152,7 @@ test('downloads the current-character safety file, restores those exact bytes, a
   const page = await context.newPage();
   await seedActiveProfile(page);
   await expect(
-    page.getByRole('heading', { name: 'Your characters need recovery' })
+    page.getByRole('heading', { name: 'Restore characters' })
   ).toBeVisible();
   await expect(page.getByText('Stale Mirror')).toHaveCount(0);
 
