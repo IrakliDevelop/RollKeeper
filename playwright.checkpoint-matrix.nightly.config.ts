@@ -12,14 +12,20 @@ export default defineConfig({
         ['github'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/indexeddb' },
+          {
+            open: 'never',
+            outputFolder: 'playwright-report/checkpoint-matrix',
+          },
         ],
       ]
     : [
         ['list'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/indexeddb' },
+          {
+            open: 'never',
+            outputFolder: 'playwright-report/checkpoint-matrix',
+          },
         ],
       ],
   use: {
@@ -40,7 +46,6 @@ export default defineConfig({
     {
       name: 'chromium-indexeddb',
       use: { browserName: 'chromium' },
-      testIgnore: /player-backup-current-character-recovery/,
     },
   ],
 });

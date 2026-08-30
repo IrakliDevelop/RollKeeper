@@ -9,8 +9,26 @@ export default defineConfig({
   retries: 0,
   workers: 1,
   reporter: process.env.CI
-    ? [['github'], ['html', { open: 'never' }]]
-    : [['list'], ['html', { open: 'never' }]],
+    ? [
+        ['github'],
+        [
+          'html',
+          {
+            open: 'never',
+            outputFolder: 'playwright-report/reconnect-nightly',
+          },
+        ],
+      ]
+    : [
+        ['list'],
+        [
+          'html',
+          {
+            open: 'never',
+            outputFolder: 'playwright-report/reconnect-nightly',
+          },
+        ],
+      ],
   use: {
     baseURL: 'http://localhost:3000',
     screenshot: 'only-on-failure',

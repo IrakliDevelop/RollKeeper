@@ -67,8 +67,9 @@ reverts `surfaceOwner` to `'legacy'` and disables every wizard call
 are untouched by a flag rollback — flipping W back off does not delete or
 migrate any local data, it only hides the surface. This exact path is
 rehearsed nightly by the `rollback-drill` job in
-`.github/workflows/nightly.yml` — cite a green `rollback-drill` run as proof
-the rollback is safe, not just theoretical.
+`.github/workflows/nightly.yml` (that drill flips W, M, C, and S all off
+together, a superset of this W-only path) — cite a green `rollback-drill`
+run as proof the rollback is safe, not just theoretical.
 
 **Partial rollbacks** (keep the wizard visible, narrow what it can do):
 

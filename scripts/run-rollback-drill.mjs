@@ -47,24 +47,38 @@ function log(message) {
 }
 
 /** Terminates `child` (SIGTERM, then SIGKILL after SHUTDOWN_TIMEOUT_MS if it
- * hasn't exited) and resolves once it has. No-op if already exited. */
+ * hasn't exited) and resolves once it has. No-op if already exited.
+ *
+ * `child` is spawned detached (its own process group, leader pid ==
+ * child.pid), so signals target the whole group via the negative-pid form —
+ * killing the npm wrapper alone would leave its `next dev` grandchild
+ * running and orphan the dev server port on a stuck shutdown. Falls back to
+ * signaling just the child's pid if the group kill throws (e.g. the group
+ * is already gone). */
 function killChild(child) {
   if (!child || child.exitCode !== null || child.killed) {
     return Promise.resolve();
   }
-  return new Promise(resolve => {
-    const timer = setTimeout(() => {
+  const signalGroup = sig => {
+    try {
+      process.kill(-child.pid, sig);
+    } catch {
       try {
-        child.kill('SIGKILL');
+        child.kill(sig);
       } catch {
         // already gone
       }
+    }
+  };
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      signalGroup('SIGKILL');
     }, SHUTDOWN_TIMEOUT_MS);
     child.once('exit', () => {
       clearTimeout(timer);
       resolve();
     });
-    child.kill('SIGTERM');
+    signalGroup('SIGTERM');
   });
 }
 
@@ -100,6 +114,7 @@ async function startServer(env) {
   serverChild = spawn('npm', ['run', 'dev', '--', '--port', String(PORT)], {
     env,
     stdio: 'inherit',
+    detached: true,
   });
   await waitForServer();
 }

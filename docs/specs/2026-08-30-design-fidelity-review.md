@@ -56,7 +56,7 @@ unzip "docs/specs/Rollkeeper Cloud Migration Wizard.zip" -d /tmp/design-fidelity
   monitors), scenario by scenario, using the mapping in section 2.
 - For 390 px checks: the dashboard stories have dedicated narrow story
   exports using Storybook's built-in `mobile1` viewport, which defaults to
-  **375 px**, not 390 px — use the viewport toolbar's custom-size input to
+  **320 px**, not 390 px — use the viewport toolbar's custom-size input to
   set exactly 390 px rather than relying on `mobile1` alone. The wizard
   stories have **no dedicated narrow exports at all**; for every wizard
   scenario that needs a 390 px check, open its normal (desktop) story and

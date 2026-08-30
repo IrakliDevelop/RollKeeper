@@ -123,11 +123,12 @@ test('leader-churn x5 + reload-storm x3: cumulative damage converges with no los
   }
 
   // Reload storm x3: reload both tabs in parallel, wait for stores ready,
-  // mutate concurrently in both tabs, assert convergence. (A reload doesn't
-  // change which tab holds the lock — Web Locks releases are tied to page
-  // lifetime, and both tabs survive the reload — so leaderTab/followerTab
-  // stay accurate labels here too, though this section doesn't depend on
-  // which one is which.)
+  // mutate concurrently in both tabs, assert convergence. (A reload destroys
+  // the document, so Web Locks releases the lock and it gets re-queued —
+  // leadership can actually change hands here. leaderTab/followerTab are
+  // just labels for "the tab that acquires the lock now" vs. "the one that
+  // doesn't"; this section doesn't depend on which physical tab ends up
+  // holding it.)
   for (let i = 0; i < 3; i++) {
     await Promise.all([
       leaderTab.reload({ waitUntil: 'networkidle' }),

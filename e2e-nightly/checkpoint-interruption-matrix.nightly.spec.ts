@@ -433,6 +433,13 @@ test.describe('cold-interrupt rows', () => {
 
       await expectNoFalseIdbPrimary(page);
 
+      // Explicit meta-state assertion: every cold row's forward-driven
+      // recovery-gate failure converges on RECOVERY_REQUIRED (see the
+      // describe-block header comment for why), not just "stays off
+      // IDB_PRIMARY".
+      const meta = await readMigrationMeta(page);
+      expect(meta.state).toBe('RECOVERY_REQUIRED');
+
       await context.close();
     });
   }
