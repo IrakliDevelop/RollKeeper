@@ -28,6 +28,7 @@
     "test:e2e": "playwright test",
     "test:indexeddb:e2e": "playwright test --config playwright.indexeddb.config.ts && playwright test --config playwright.player-backup-recovery.config.ts",
     "test:automatic-sync:e2e": "playwright test --config playwright.automatic-sync.config.ts",
+    "test:reconnect:nightly": "playwright test e2e/single-writer-sync.spec.ts e2e/cross-tab-character.spec.ts e2e/cross-tab-encounter.spec.ts e2e/roster-clobber.spec.ts --repeat-each=3 && playwright test --config playwright.reconnect.nightly.config.ts",
     "test:player-backup-wizard:coverage": "vitest run --config config/vitest/playerBackupWizard.config.ts",
     "test:slice8:coverage": "vitest run --config config/vitest/slice8.config.ts",
     "test:slice9:coverage": "vitest run --config config/vitest/slice9.config.ts",
