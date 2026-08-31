@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { ArrowLeft, Swords } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CombatLogArchiveSyncControls } from '@/components/ui/campaign/CombatLogArchiveSyncControls';
 import { EncounterSyncControls } from '@/components/ui/campaign/EncounterSyncControls';
 import { EncounterList } from '@/components/ui/encounter/EncounterList';
@@ -47,7 +47,7 @@ export default function CampaignEncountersPage() {
                 <h1 className="text-heading text-xl font-bold">Encounters</h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

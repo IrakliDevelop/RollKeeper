@@ -6,7 +6,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, MapPinned, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import {
   Dialog,
   DialogContent,
@@ -236,7 +236,7 @@ export default function CampaignLocationsPage() {
                   </form>
                 </DialogContent>
               </Dialog>
-              <ThemeToggle showSystemOption />
+              <HeaderTrailing showSystemOption />
             </div>
           </div>
         </div>

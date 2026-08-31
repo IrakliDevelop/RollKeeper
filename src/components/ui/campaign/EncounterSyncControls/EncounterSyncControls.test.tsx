@@ -901,9 +901,8 @@ describe('EncounterSyncControls gates', () => {
       useEncounterStore
         .getState()
         .updateEncounter('enc-1', { name: 'Edited after reload' });
-      await new Promise(resolve => setTimeout(resolve, 10));
     });
-    expect(commit).toHaveBeenCalled();
+    await waitFor(() => expect(commit).toHaveBeenCalled());
     const database = await openRollkeeperDatabase();
     try {
       const document = await new IndexedDbEncounterRepository(

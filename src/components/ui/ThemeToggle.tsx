@@ -3,7 +3,7 @@
 import { Sun, Moon, Monitor, Scroll } from 'lucide-react';
 import { useTheme, type Theme } from '@/hooks/useTheme';
 
-interface ThemeToggleProps {
+export interface ThemeToggleProps {
   /** Show the 4-way toggle (light / parchment / system / dark) instead of simple toggle. */
   showSystemOption?: boolean;
   className?: string;

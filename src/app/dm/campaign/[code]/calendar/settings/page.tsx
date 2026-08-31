@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CalendarSettingsPanel } from '@/components/ui/calendar/CalendarSettingsPanel';
 import { useCalendarStore } from '@/store/calendarStore';
 import type { CalendarConfig } from '@/types/calendar';
@@ -59,7 +59,7 @@ export default function CalendarSettingsPage() {
                 </h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

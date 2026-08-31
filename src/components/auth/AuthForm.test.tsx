@@ -33,16 +33,15 @@ describe('AuthForm', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
 
-    await screen.findByLabelText(/^Six-digit code/);
+    await screen.findByLabelText('Digit 1 of 6');
     expect(signInWithOtp).toHaveBeenCalledTimes(1);
     expect(
       screen.getByRole('button', { name: /Resend in 60s/i })
     ).toBeDisabled();
 
-    fireEvent.change(screen.getByLabelText(/^Six-digit code/), {
+    fireEvent.change(screen.getByLabelText('Digit 1 of 6'), {
       target: { value: '123456' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify code' }));
 
     await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
     expect(verifyOtp).toHaveBeenCalledWith({
@@ -77,5 +76,35 @@ describe('AuthForm', () => {
     expect(localStorage.getItem('rollkeeper-character')).toBe(
       'exact legacy bytes'
     );
+  });
+
+  it('does not claim a combined invalid-or-expired OTP error is definitely expired', async () => {
+    const signInWithOtp = vi.fn().mockResolvedValue({ error: null });
+    const verifyOtp = vi.fn().mockResolvedValue({
+      error: { message: 'Token has expired or is invalid' },
+    });
+
+    render(
+      <AuthForm auth={{ signInWithOtp, verifyOtp }} requireTurnstile={false} />
+    );
+
+    fireEvent.change(screen.getByLabelText(/^Email address/), {
+      target: { value: 'player@example.com' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Email me a code' }));
+    await screen.findByLabelText('Digit 1 of 6');
+
+    fireEvent.change(screen.getByLabelText('Digit 1 of 6'), {
+      target: { value: '000000' },
+    });
+
+    expect(
+      await screen.findByText(
+        'That code is invalid or has expired. Open the newest email and try again.'
+      )
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('This code has expired.')
+    ).not.toBeInTheDocument();
   });
 });

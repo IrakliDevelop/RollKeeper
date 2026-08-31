@@ -1,5 +1,7 @@
 import { expect, test, type APIRequestContext } from '@playwright/test';
 
+import { enterEmailOtp, extractEmailOtp } from '../helpers';
+
 const MAILPIT_URL = 'http://127.0.0.1:54324';
 const LEGACY_DATA = {
   'rollkeeper-character': '{"name":"Aster","unknown":null}',
@@ -23,10 +25,8 @@ async function waitForOtp(request: APIRequestContext, email: string) {
           if (!detailResponse.ok()) continue;
           const serialized = JSON.stringify(await detailResponse.json());
           if (!serialized.includes(email)) continue;
-          const match = serialized.match(
-            /RollKeeper sign-in code[^0-9]*(\d{6})/u
-          );
-          if (match) return match[1];
+          const code = extractEmailOtp(serialized);
+          if (code) return code;
         }
         return null;
       },
@@ -45,8 +45,8 @@ async function waitForOtp(request: APIRequestContext, email: string) {
     ).json();
     const serialized = JSON.stringify(detail);
     if (!serialized.includes(email)) continue;
-    const match = serialized.match(/RollKeeper sign-in code[^0-9]*(\d{6})/u);
-    if (match) return match[1];
+    const code = extractEmailOtp(serialized);
+    if (code) return code;
   }
   throw new Error('Mailpit OTP was not available');
 }
@@ -66,8 +66,7 @@ async function signIn(
   await page.getByLabel(/^Email address/).fill(email);
   await page.getByRole('button', { name: 'Email me a code' }).click();
   const code = await waitForOtp(request, email);
-  await page.getByLabel(/^Six-digit code/).fill(code);
-  await page.getByRole('button', { name: 'Verify code' }).click();
+  await enterEmailOtp(page, code);
   await expect(
     page.getByRole('main').getByText(email, { exact: true })
   ).toBeVisible();

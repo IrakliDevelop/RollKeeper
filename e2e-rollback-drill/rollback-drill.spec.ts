@@ -3,6 +3,8 @@ import { join } from 'node:path';
 
 import { chromium, expect, test, type Page } from '@playwright/test';
 
+import { enterEmailOtp, extractEmailOtp } from '../e2e/helpers';
+
 /**
  * Nightly "feature rollback drill" (roadmap item): proves that flipping the
  * player-backup NEXT_PUBLIC_* flags off after real data went through the
@@ -62,8 +64,8 @@ async function findOtp(
     ).json();
     const serialized = JSON.stringify(detail);
     if (!serialized.includes(email)) continue;
-    const match = serialized.match(/RollKeeper sign-in code[^0-9]*(\d{6})/u);
-    if (match) return match[1];
+    const code = extractEmailOtp(serialized);
+    if (code) return code;
   }
   return null;
 }
@@ -86,8 +88,7 @@ async function signIn(page: Page, email: string) {
   const sentAfter = Date.now() - 2_000;
   await page.getByRole('button', { name: 'Email me a code' }).click();
   const code = await waitForOtp(email, sentAfter);
-  await page.getByLabel(/^Six-digit code/).fill(code);
-  await page.getByRole('button', { name: 'Verify code' }).click();
+  await enterEmailOtp(page, code);
   await expect(
     page.getByRole('main').getByText(email, { exact: true })
   ).toBeVisible({ timeout: 15_000 });

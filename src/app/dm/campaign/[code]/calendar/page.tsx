@@ -11,7 +11,7 @@ import {
   CardTitle,
   CardContent,
 } from '@/components/ui/layout/card';
-import { ThemeToggle } from '@/components/ui/ThemeToggle';
+import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CalendarView } from '@/components/ui/calendar/CalendarView';
 import { CalendarSyncControls } from '@/components/ui/calendar/CalendarSyncControls';
 import { useCalendarStore } from '@/store/calendarStore';
@@ -80,7 +80,7 @@ export default function CalendarPage() {
                 <h1 className="text-heading text-xl font-bold">Calendar</h1>
               </div>
             </div>
-            <ThemeToggle showSystemOption />
+            <HeaderTrailing showSystemOption />
           </div>
         </div>
       </header>

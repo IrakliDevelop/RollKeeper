@@ -1,5 +1,14 @@
 import { Page } from '@playwright/test';
 
+import { extractEmailOtp } from '../src/lib/supabase/extractEmailOtp';
+
+export { extractEmailOtp };
+
+/** Types or pastes a six-digit code into the redesigned OTP boxes. */
+export async function enterEmailOtp(page: Page, code: string): Promise<void> {
+  await page.getByLabel('Digit 1 of 6').fill(code);
+}
+
 /** Waits until the dev-only `__rkStores.character` handle exists and the
  * character store has finished rehydrating from localStorage. */
 export async function waitForStoresReady(page: Page): Promise<void> {
