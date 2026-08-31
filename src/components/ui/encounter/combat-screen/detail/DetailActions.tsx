@@ -111,9 +111,12 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
             statBlock={entity.monsterStatBlock}
             spellcasting={entity.spellcasting}
             resources={entity.resources}
+            inventory={entity.inventory}
             abilities={entity.abilities}
             onUseEntry={(entry: StatBlockEntry) => {
-              if (entry.resourceCost) {
+              if (entry.inventoryCost && entry.id) {
+                actions.onUseInventoryEntry?.(entity.id, entry.id);
+              } else if (entry.resourceCost) {
                 actions.onSpendResource(
                   entity.id,
                   entry.resourceCost.resourceId,

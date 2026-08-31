@@ -31,6 +31,8 @@ interface WeaponRowProps {
   onExpendChargePoolAbility?: (weaponId: string, abilityId: string) => void;
   onRestoreChargePool?: (weaponId: string, amount: number) => void;
   onSetChargePoolUsed?: (weaponId: string, usedCount: number) => void;
+  onUse?: (weaponId: string) => boolean;
+  inventoryItems?: Array<{ id: string; name: string; quantity: number }>;
 }
 
 export function WeaponRow({
@@ -44,9 +46,17 @@ export function WeaponRow({
   onExpendChargePoolAbility,
   onRestoreChargePool,
   onSetChargePoolUsed,
+  onUse,
+  inventoryItems,
 }: WeaponRowProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const pool = weapon.chargePool;
+  const linkedItem = weapon.inventoryCost
+    ? inventoryItems?.find(i => i.id === weapon.inventoryCost!.inventoryItemId)
+    : undefined;
+  const useBlocked =
+    !!weapon.inventoryCost &&
+    (!linkedItem || linkedItem.quantity < weapon.inventoryCost.quantity);
 
   const hasCharges = !!weapon.charges && weapon.charges.length > 0;
 
@@ -205,6 +215,24 @@ export function WeaponRow({
           )}
 
           <div className="border-divider flex flex-wrap items-center gap-2 border-t pt-3">
+            {weapon.inventoryCost && (
+              <Button
+                onClick={() => onUse?.(weapon.id)}
+                variant="primary"
+                size="sm"
+                disabled={useBlocked}
+                title={
+                  useBlocked
+                    ? 'Linked inventory item is missing or out of stock'
+                    : 'Use weapon and consume its linked inventory item'
+                }
+              >
+                <Swords size={14} className="mr-1" />
+                Attack · {weapon.inventoryCost.quantity}×{' '}
+                {linkedItem?.name ?? 'Missing item'} (
+                {linkedItem?.quantity ?? 0})
+              </Button>
+            )}
             <Button
               onClick={() => onToggleEquip(weapon.id, !weapon.isEquipped)}
               variant={weapon.isEquipped ? 'success' : 'outline'}

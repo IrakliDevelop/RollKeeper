@@ -1520,30 +1520,35 @@ export function NPCFormDialog({
                     items={traits}
                     onChange={setTraits}
                     resources={resources}
+                    inventoryItems={inventoryItems}
                   />
                   <AbilityListEditor
                     label="Actions"
                     items={actions}
                     onChange={setActions}
                     resources={resources}
+                    inventoryItems={inventoryItems}
                   />
                   <AbilityListEditor
                     label="Bonus Actions"
                     items={bonusActions}
                     onChange={setBonusActions}
                     resources={resources}
+                    inventoryItems={inventoryItems}
                   />
                   <AbilityListEditor
                     label="Reactions"
                     items={reactions}
                     onChange={setReactions}
                     resources={resources}
+                    inventoryItems={inventoryItems}
                   />
                   <AbilityListEditor
                     label="Lair Actions"
                     items={lairActions}
                     onChange={setLairActions}
                     resources={resources}
+                    inventoryItems={inventoryItems}
                   />
                 </>
               )}

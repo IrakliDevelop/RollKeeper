@@ -154,6 +154,11 @@ interface EncounterStoreState {
     entityId: string,
     abilityId: string
   ) => void;
+  useInventoryEntry: (
+    encounterId: string,
+    entityId: string,
+    entryId: string
+  ) => boolean;
   restoreAbility: (
     encounterId: string,
     entityId: string,
@@ -995,6 +1000,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
           const fresh = useNPCStore.getState().getNPC(npc.campaignCode, npc.id);
           const freshUsed = fresh?.abilityUsage?.[abilityId] ?? 0;
           const freshResources = fresh?.resources;
+          const freshInventory = fresh?.inventory;
           set(state => ({
             encounters: updateEntityInEncounter(
               state.encounters,
@@ -1012,6 +1018,9 @@ export const useEncounterStore = create<EncounterStoreState>()(
                         return nr ? { ...r, usesExpended: nr.usesExpended } : r;
                       }),
                     }
+                  : {}),
+                ...(npcEntry.inventoryCost && freshInventory
+                  ? { inventory: freshInventory.map(item => ({ ...item })) }
                   : {}),
               })
             ),
@@ -1040,6 +1049,23 @@ export const useEncounterStore = create<EncounterStoreState>()(
               : r
           );
         }
+        const inventoryCost = entry?.inventoryCost;
+        let nextInventory = entity.inventory;
+        if (inventoryCost) {
+          if (!isValidResourceAmount(inventoryCost.quantity)) return;
+          const item = entity.inventory?.find(
+            candidate => candidate.id === inventoryCost.inventoryItemId
+          );
+          if (!item || item.quantity < inventoryCost.quantity) return;
+          nextInventory = entity.inventory!.map(candidate =>
+            candidate.id === inventoryCost.inventoryItemId
+              ? {
+                  ...candidate,
+                  quantity: candidate.quantity - inventoryCost.quantity,
+                }
+              : candidate
+          );
+        }
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -1051,9 +1077,67 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 a.id === abilityId ? { ...a, usedUses: a.usedUses + 1 } : a
               ),
               resources: nextResources,
+              inventory: nextInventory,
             })
           ),
         }));
+      },
+
+      useInventoryEntry: (encounterId, entityId, entryId) => {
+        const encounter = get().encounters.find(e => e.id === encounterId);
+        const entity = encounter?.entities.find(e => e.id === entityId);
+        if (!entity) return false;
+        const entry = findEntryById(entity.monsterStatBlock, entryId);
+        const cost = entry?.inventoryCost;
+        if (!entry || !cost || !isValidResourceAmount(cost.quantity))
+          return false;
+
+        const linked = resolveLinkedNpc(entity);
+        if (linked?.npc) {
+          const success = useNPCStore
+            .getState()
+            .useNpcAbility(linked.npc.campaignCode, linked.npc.id, entryId);
+          if (!success) return false;
+          const fresh = useNPCStore
+            .getState()
+            .getNPC(linked.npc.campaignCode, linked.npc.id);
+          set(state => ({
+            encounters: updateEntityInEncounter(
+              state.encounters,
+              encounterId,
+              entityId,
+              current => ({
+                ...current,
+                inventory: fresh?.inventory?.map(item => ({ ...item })),
+              })
+            ),
+          }));
+          return true;
+        }
+
+        const item = entity.inventory?.find(
+          candidate => candidate.id === cost.inventoryItemId
+        );
+        if (!item || item.quantity < cost.quantity) return false;
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            current => ({
+              ...current,
+              inventory: current.inventory?.map(candidate =>
+                candidate.id === cost.inventoryItemId
+                  ? {
+                      ...candidate,
+                      quantity: candidate.quantity - cost.quantity,
+                    }
+                  : candidate
+              ),
+            })
+          ),
+        }));
+        return true;
       },
 
       restoreAbility: (encounterId, entityId, abilityId) => {

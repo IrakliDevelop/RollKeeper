@@ -8,6 +8,8 @@
 export type ActionClass = 'CANONICAL' | 'LOCAL_UI' | 'EXTERNAL_APPLY' | 'QUERY';
 
 export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
+  consumeInventoryCost: 'CANONICAL',
+  useWeapon: 'CANONICAL',
   // — core sheet edits —
   updateCharacter: 'CANONICAL',
   updateAbilityScore: 'CANONICAL',

@@ -285,6 +285,7 @@ export interface Spell {
   tags?: string[];
   aoe?: SpellAoe | null; // undefined = never detected; null = no AoE (detected-none or user-cleared)
   damageScaling?: Record<number, string> | null; // undefined = never enriched; null = user-customized damage (scaling off); object = character-level threshold → dice, e.g. { 1: '1d8', 5: '2d8', 11: '3d8', 17: '4d8' }
+  inventoryCost?: InventoryCost;
   createdAt: string;
   updatedAt: string;
 }
@@ -403,8 +404,15 @@ export interface Weapon {
   bonusSpellSaveDc?: number;
   weight?: number;
   value?: number; // In copper pieces
+  inventoryCost?: InventoryCost;
   createdAt: string;
   updatedAt: string;
+}
+
+/** An inventory stack consumed when a spell, weapon, or NPC entry is used. */
+export interface InventoryCost {
+  inventoryItemId: string;
+  quantity: number;
 }
 
 // Magic item categories and types

@@ -8,6 +8,7 @@ import type {
   MonsterStatBlock,
   MonsterSpellcasting,
   NpcResource,
+  NPCInventoryItem,
   StatBlockEntry,
 } from '@/types/encounter';
 
@@ -15,6 +16,7 @@ interface TraitBlockProps {
   title: string;
   entries: StatBlockEntry[];
   resources?: NpcResource[];
+  inventory?: NPCInventoryItem[];
   abilities?: MonsterAbility[];
   onUseEntry?: (entry: StatBlockEntry) => void;
   onUseAbilityEntry?: (entry: StatBlockEntry) => void;
@@ -25,6 +27,7 @@ function TraitBlock({
   title,
   entries,
   resources,
+  inventory,
   abilities,
   onUseEntry,
   onUseAbilityEntry,
@@ -44,6 +47,7 @@ function TraitBlock({
             entry.id ? abilities?.find(a => a.id === entry.id) : undefined
           }
           resources={resources}
+          inventory={inventory}
           onUseAbility={onUseAbilityEntry}
           onRestoreAbility={onRestoreAbilityEntry}
           onSpendCost={onUseEntry}
@@ -104,6 +108,7 @@ interface StatBlockTraitsProps {
   statBlock: MonsterStatBlock;
   spellcasting?: MonsterSpellcasting;
   resources?: NpcResource[];
+  inventory?: NPCInventoryItem[];
   abilities?: MonsterAbility[];
   onUseEntry?: (entry: StatBlockEntry) => void;
   onUseAbilityEntry?: (entry: StatBlockEntry) => void;
@@ -114,6 +119,7 @@ export function StatBlockTraits({
   statBlock,
   spellcasting,
   resources,
+  inventory,
   abilities,
   onUseEntry,
   onUseAbilityEntry,
@@ -135,6 +141,7 @@ export function StatBlockTraits({
         title="Traits"
         entries={statBlock.traits}
         resources={resources}
+        inventory={inventory}
         abilities={abilities}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -144,6 +151,7 @@ export function StatBlockTraits({
         title="Actions"
         entries={statBlock.actions}
         resources={resources}
+        inventory={inventory}
         abilities={abilities}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -153,6 +161,7 @@ export function StatBlockTraits({
         title="Bonus Actions"
         entries={statBlock.bonusActions}
         resources={resources}
+        inventory={inventory}
         abilities={abilities}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -162,6 +171,7 @@ export function StatBlockTraits({
         title="Reactions"
         entries={statBlock.reactions}
         resources={resources}
+        inventory={inventory}
         abilities={abilities}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -171,6 +181,7 @@ export function StatBlockTraits({
         title="Lair Actions"
         entries={statBlock.lairActions}
         resources={resources}
+        inventory={inventory}
         abilities={abilities}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}

@@ -18,6 +18,7 @@ export interface EntityActions {
     rounds: number | null
   ) => void;
   onUseAbility: (entityId: string, abilityId: string) => void;
+  onUseInventoryEntry?: (entityId: string, entryId: string) => boolean;
   onRestoreAbility: (entityId: string, abilityId: string) => void;
   /** Atomic resource spend; false = rejected (insufficient/deleted). */
   onSpendResource: (

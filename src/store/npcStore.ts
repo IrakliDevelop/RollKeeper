@@ -141,7 +141,7 @@ interface NPCStoreState {
   ) => void;
   /** Restores class resources per their shortRestReset rule. Touches nothing else. */
   shortRestNPC: (campaignCode: string, npcId: string) => void;
-  /** Atomic ability use: increments abilityUsage AND spends the entry's resourceCost (if any) — or neither. */
+  /** Atomic entry use: spends linked resources/inventory and increments usage when limited. */
   useNpcAbility: (
     campaignCode: string,
     npcId: string,
@@ -605,9 +605,9 @@ export const useNPCStore = create<NPCStoreState>()(
         const entry = findEntryById(npc.monsterStatBlock, entryId);
         if (!entry) return false;
         const config = getEntryAbilityConfig(entry);
-        if (!config) return false; // untrackable → no-op
+        if (!config && !entry.inventoryCost) return false;
         const used = npc.abilityUsage?.[entryId] ?? 0;
-        if (used >= config.maxUses) return false; // at max — no expenditure mutation
+        if (config && used >= config.maxUses) return false;
 
         // Atomic combined cost: validate and resolve BEFORE mutating anything.
         const cost = entry.resourceCost;
@@ -626,6 +626,24 @@ export const useNPCStore = create<NPCStoreState>()(
           );
         }
 
+        const inventoryCost = entry.inventoryCost;
+        let nextInventory = npc.inventory;
+        if (inventoryCost) {
+          if (!isValidResourceAmount(inventoryCost.quantity)) return false;
+          const item = npc.inventory?.find(
+            candidate => candidate.id === inventoryCost.inventoryItemId
+          );
+          if (!item || item.quantity < inventoryCost.quantity) return false;
+          nextInventory = npc.inventory!.map(candidate =>
+            candidate.id === inventoryCost.inventoryItemId
+              ? {
+                  ...candidate,
+                  quantity: candidate.quantity - inventoryCost.quantity,
+                }
+              : candidate
+          );
+        }
+
         set(state => {
           const existing = state.npcsByCampaign[campaignCode] ?? [];
           return {
@@ -635,11 +653,16 @@ export const useNPCStore = create<NPCStoreState>()(
                 n.id === npcId
                   ? {
                       ...n,
-                      abilityUsage: {
-                        ...(n.abilityUsage ?? {}),
-                        [entryId]: used + 1,
-                      },
+                      ...(config
+                        ? {
+                            abilityUsage: {
+                              ...(n.abilityUsage ?? {}),
+                              [entryId]: used + 1,
+                            },
+                          }
+                        : {}),
                       resources: nextResources,
+                      inventory: nextInventory,
                       updatedAt: new Date().toISOString(),
                     }
                   : n

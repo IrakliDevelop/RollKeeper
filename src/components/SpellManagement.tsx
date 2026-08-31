@@ -618,6 +618,7 @@ export const SpellManagement: React.FC = () => {
     stopConcentration,
     toggleReaction,
     addSummon,
+    consumeInventoryCost,
   } = useCharacterStore();
   const totalLevel = getTotalLevel(character);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -903,6 +904,12 @@ export const SpellManagement: React.FC = () => {
     isRitual?: boolean
   ) => {
     if (!selectedSpell) return;
+    if (!consumeInventoryCost(selectedSpell.inventoryCost)) {
+      window.alert(
+        'Not enough of the linked inventory item to cast this spell.'
+      );
+      return;
+    }
 
     if (selectedSpell.concentration) {
       if (character.concentration.isConcentrating) {
@@ -1414,6 +1421,7 @@ export const SpellManagement: React.FC = () => {
               <SpellFormFields
                 formData={formData}
                 onChange={setFormData}
+                inventoryItems={character.inventoryItems}
                 showPreparedOptions
               />
 

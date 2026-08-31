@@ -36,6 +36,7 @@ export function WeaponsTab() {
     expendWeaponChargePoolAbility,
     restoreWeaponChargePool,
     setWeaponChargePoolUsed,
+    useWeapon,
   } = useCharacterStore();
 
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -163,6 +164,8 @@ export function WeaponsTab() {
               onExpendChargePoolAbility={expendWeaponChargePoolAbility}
               onRestoreChargePool={restoreWeaponChargePool}
               onSetChargePoolUsed={setWeaponChargePoolUsed}
+              onUse={useWeapon}
+              inventoryItems={character.inventoryItems}
             />
           )}
         />

@@ -7,6 +7,7 @@ import type {
   NpcResource,
   StatBlockEntry,
   MonsterAbility,
+  NPCInventoryItem,
 } from '@/types/encounter';
 import { getEntryAbilityConfig } from '@/utils/statBlockAbilities';
 import { StatBlockEntryRow } from '@/components/ui/encounter/combat-screen/detail/StatBlockEntryRow';
@@ -16,6 +17,7 @@ interface MonsterStatBlockPanelProps {
   onUpdate?: (updates: Partial<MonsterStatBlock>) => void;
   /** When provided, entries with resourceCost render a cost badge + Use button. */
   resources?: NpcResource[];
+  inventory?: NPCInventoryItem[];
   /** entryId → usedUses (from CampaignNPC.abilityUsage). */
   abilityUsage?: Record<string, number>;
   onUseEntry?: (entry: StatBlockEntry) => void;
@@ -51,6 +53,7 @@ function TraitBlock({
   title,
   entries,
   resources,
+  inventory,
   abilityUsage,
   onUseEntry,
   onUseAbilityEntry,
@@ -60,6 +63,7 @@ function TraitBlock({
   title: string;
   entries: StatBlockEntry[];
   resources?: NpcResource[];
+  inventory?: NPCInventoryItem[];
   abilityUsage?: Record<string, number>;
   onUseEntry?: (entry: StatBlockEntry) => void;
   onUseAbilityEntry?: (entry: StatBlockEntry) => void;
@@ -96,6 +100,7 @@ function TraitBlock({
             entry={entry}
             ability={onUseAbilityEntry || readOnly ? ability : undefined}
             resources={resources}
+            inventory={inventory}
             onUseAbility={onUseAbilityEntry}
             onRestoreAbility={onRestoreAbilityEntry}
             onSpendCost={onUseEntry}
@@ -111,6 +116,7 @@ export function MonsterStatBlockPanel({
   statBlock,
   onUpdate,
   resources,
+  inventory,
   abilityUsage,
   onUseEntry,
   onUseAbilityEntry,
@@ -201,6 +207,7 @@ export function MonsterStatBlockPanel({
         title="Traits"
         entries={statBlock.traits}
         resources={resources}
+        inventory={inventory}
         abilityUsage={abilityUsage}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -213,6 +220,7 @@ export function MonsterStatBlockPanel({
         title="Actions"
         entries={statBlock.actions}
         resources={resources}
+        inventory={inventory}
         abilityUsage={abilityUsage}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -225,6 +233,7 @@ export function MonsterStatBlockPanel({
         title="Bonus Actions"
         entries={statBlock.bonusActions}
         resources={resources}
+        inventory={inventory}
         abilityUsage={abilityUsage}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -237,6 +246,7 @@ export function MonsterStatBlockPanel({
         title="Reactions"
         entries={statBlock.reactions}
         resources={resources}
+        inventory={inventory}
         abilityUsage={abilityUsage}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}
@@ -249,6 +259,7 @@ export function MonsterStatBlockPanel({
         title="Lair Actions"
         entries={statBlock.lairActions}
         resources={resources}
+        inventory={inventory}
         abilityUsage={abilityUsage}
         onUseEntry={onUseEntry}
         onUseAbilityEntry={onUseAbilityEntry}

@@ -17,6 +17,8 @@ import { Checkbox } from '@/components/ui/forms/checkbox';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import { Badge } from '@/components/ui/layout/badge';
 import type { ChargePoolFormData } from '@/utils/magicItemConversion';
+import { InventoryCostFields } from '@/components/shared/InventoryCostFields';
+import { useCharacterStore } from '@/store/characterStore';
 
 // Form data version of WeaponCharge (without requiring id for new entries)
 export interface WeaponChargeFormData {
@@ -55,6 +57,7 @@ export interface WeaponFormData {
   bonusSpellSaveDc?: number;
   weight?: number;
   value?: number;
+  inventoryCost?: import('@/types/character').InventoryCost;
 }
 
 interface WeaponFormProps {
@@ -122,6 +125,7 @@ export function WeaponForm({
   isEditing,
   autocompleteSlot,
 }: WeaponFormProps) {
+  const inventoryItems = useCharacterStore(s => s.character.inventoryItems);
   const toggleWeaponType = (type: WeaponType) => {
     setFormData(prev => ({
       ...prev,
@@ -850,6 +854,14 @@ export function WeaponForm({
           )}
         </div>
       </div>
+
+      <InventoryCostFields
+        items={inventoryItems}
+        value={formData.inventoryCost}
+        onChange={inventoryCost =>
+          setFormData(previous => ({ ...previous, inventoryCost }))
+        }
+      />
 
       {/* Form Actions */}
       <div className="border-divider flex justify-end gap-3 border-t-2 pt-4">

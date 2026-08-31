@@ -106,6 +106,7 @@ export function buildNpcEntity(
     campaignCode: opts.campaignCode,
     spellcasting: buildNpcSpellcasting(npc),
     resources: npc.resources?.map(r => ({ ...r })),
+    inventory: npc.inventory?.map(item => ({ ...item })),
     avatarUrl: npc.avatarUrl,
   };
 }

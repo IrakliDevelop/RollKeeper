@@ -8,6 +8,8 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import type { NpcResourceDraft } from '@/utils/npcResources';
 import type { StatBlockEntry } from '@/types/encounter';
+import { InventoryCostFields } from '@/components/shared/InventoryCostFields';
+import type { NPCInventoryItem } from '@/types/encounter';
 
 const NO_COST = '__none__';
 
@@ -16,12 +18,14 @@ export function AbilityListEditor({
   items,
   onChange,
   resources,
+  inventoryItems = [],
 }: {
   label: string;
   items: StatBlockEntry[];
   onChange: (items: StatBlockEntry[]) => void;
   /** When present and non-empty, each entry gets a "Costs" resource link. */
   resources?: NpcResourceDraft[];
+  inventoryItems?: NPCInventoryItem[];
 }) {
   const handleAdd = () => {
     onChange([...items, { name: '', text: '' }]);
@@ -178,6 +182,23 @@ export function AbilityListEditor({
                       title="Uses spent per activation"
                     />
                   )}
+                </div>
+              )}
+              {(inventoryItems.length > 0 || item.inventoryCost) && (
+                <div className="mb-1">
+                  <InventoryCostFields
+                    items={inventoryItems}
+                    value={item.inventoryCost}
+                    onChange={inventoryCost =>
+                      onChange(
+                        items.map((candidate, i) =>
+                          i === index
+                            ? { ...candidate, inventoryCost }
+                            : candidate
+                        )
+                      )
+                    }
+                  />
                 </div>
               )}
               <CompactRichTextEditor

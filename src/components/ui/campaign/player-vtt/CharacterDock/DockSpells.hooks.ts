@@ -70,7 +70,14 @@ export function useDockSpellCasting({
 
   const handleCastClick = (spell: Spell) => {
     if (spell.level === 0) {
-      castSpell(spell, { level: spell.level });
+      if (!castSpell(spell, { level: spell.level })) {
+        addToast({
+          type: 'error',
+          title: `Cannot cast ${spell.name}`,
+          message: 'The linked inventory item is missing or out of stock.',
+        });
+        return;
+      }
       finishCast(spell, spell.level);
       return;
     }
@@ -84,7 +91,14 @@ export function useDockSpellCasting({
     usePact?: boolean
   ) => {
     if (!castingSpell) return;
-    castSpell(castingSpell, { level, useFreecast, isRitual, usePact });
+    if (!castSpell(castingSpell, { level, useFreecast, isRitual, usePact })) {
+      addToast({
+        type: 'error',
+        title: `Cannot cast ${castingSpell.name}`,
+        message: 'The linked inventory item is missing or out of stock.',
+      });
+      return;
+    }
     finishCast(castingSpell, level, useFreecast, isRitual, usePact);
   };
 

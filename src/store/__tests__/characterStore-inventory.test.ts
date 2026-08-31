@@ -90,6 +90,58 @@ const cloakOfElvenkind = {
   isAttuned: false,
 };
 
+describe('inventory costs', () => {
+  beforeEach(() =>
+    resetStore({
+      inventoryItems: [
+        {
+          id: 'bolts',
+          name: 'Crossbow Bolts',
+          category: 'consumable',
+          quantity: 2,
+          tags: [],
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+      weapons: [
+        {
+          ...sword,
+          id: 'crossbow',
+          inventoryCost: { inventoryItemId: 'bolts', quantity: 1 },
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      ],
+    })
+  );
+
+  it('consumes the linked stack when a weapon is used', () => {
+    expect(useCharacterStore.getState().useWeapon('crossbow')).toBe(true);
+    expect(
+      useCharacterStore.getState().character.inventoryItems[0].quantity
+    ).toBe(1);
+  });
+
+  it('rejects missing or insufficient costs without changing inventory', () => {
+    expect(
+      useCharacterStore.getState().consumeInventoryCost({
+        inventoryItemId: 'bolts',
+        quantity: 3,
+      })
+    ).toBe(false);
+    expect(
+      useCharacterStore.getState().consumeInventoryCost({
+        inventoryItemId: 'missing',
+        quantity: 1,
+      })
+    ).toBe(false);
+    expect(
+      useCharacterStore.getState().character.inventoryItems[0].quantity
+    ).toBe(2);
+  });
+});
+
 const healingPotion = {
   name: 'Potion of Healing',
   category: 'consumable',

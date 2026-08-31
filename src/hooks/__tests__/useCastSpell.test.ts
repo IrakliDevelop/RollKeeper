@@ -65,6 +65,38 @@ describe('useCastSpell', () => {
     expect(getChar().pactMagic?.slots.used).toBe(0);
   });
 
+  it('consumes a linked item and rejects the cast atomically when empty', () => {
+    useCharacterStore.getState().updateCharacter({
+      inventoryItems: [
+        {
+          id: 'bolts',
+          name: 'Bolts',
+          category: 'consumable',
+          quantity: 1,
+          tags: [],
+          createdAt: '2025-01-01T00:00:00.000Z',
+          updatedAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+    });
+    const spell = makeSpell({
+      inventoryCost: { inventoryItemId: 'bolts', quantity: 1 },
+    });
+    const { result } = renderHook(() => useCastSpell());
+
+    let first: boolean | undefined;
+    let second: boolean | undefined;
+    act(() => {
+      first = result.current.castSpell(spell, { level: 3 });
+      second = result.current.castSpell(spell, { level: 3 });
+    });
+
+    expect(first).toBe(true);
+    expect(second).toBe(false);
+    expect(getChar().inventoryItems[0].quantity).toBe(0);
+    expect(getChar().spellSlots[3].used).toBe(1);
+  });
+
   it('ritual casts spend no slot (fixes the ignored-isRitual bug)', () => {
     const { result } = renderHook(() => useCastSpell());
     act(() =>

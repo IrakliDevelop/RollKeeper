@@ -107,6 +107,7 @@ export default function EquipmentModal({
     expendWeaponChargePoolAbility,
     restoreWeaponChargePool,
     setWeaponChargePoolUsed,
+    useWeapon,
   } = useCharacterStore();
 
   const { items: magicItemsDb, loading: magicItemsLoading } =
@@ -380,6 +381,7 @@ export default function EquipmentModal({
       chargePool: chargePoolData,
       bonusSpellAttack: weapon.bonusSpellAttack,
       bonusSpellSaveDc: weapon.bonusSpellSaveDc,
+      inventoryCost: weapon.inventoryCost,
     });
     setEditingWeapon(weapon);
     setShowWeaponForm(true);
@@ -518,6 +520,8 @@ export default function EquipmentModal({
                           }
                           onRestoreWeaponChargePool={restoreWeaponChargePool}
                           onSetWeaponChargePoolUsed={setWeaponChargePoolUsed}
+                          onUse={useWeapon}
+                          inventoryItems={character.inventoryItems}
                         />
                       )}
                     />

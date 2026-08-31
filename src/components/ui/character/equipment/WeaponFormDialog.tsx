@@ -121,6 +121,7 @@ export function WeaponFormDialog({
         bonusSpellSaveDc: editingWeapon.bonusSpellSaveDc,
         weight: editingWeapon.weight,
         value: editingWeapon.value,
+        inventoryCost: editingWeapon.inventoryCost,
       });
     } else {
       setFormData(initialWeaponData);

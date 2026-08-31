@@ -49,6 +49,8 @@ export interface StatBlockEntry {
     resourceId: string; // NpcResource.id (instance id)
     amount: number; // positive integer, default 1
   };
+  /** Optional inventory stack consumed whenever this entry is used. */
+  inventoryCost?: import('./character').InventoryCost;
 }
 
 /**
@@ -179,6 +181,8 @@ export interface EncounterEntity {
   spellcasting?: MonsterSpellcasting;
   /** Snapshot of the source NPC's class resources (ids preserved). */
   resources?: NpcResource[];
+  /** Snapshot of NPC inventory; authoritative NPC actions resync it after use. */
+  inventory?: NPCInventoryItem[];
 
   // Monster source reference
   monsterSourceId?: string; // ProcessedMonster id for stat block lookup

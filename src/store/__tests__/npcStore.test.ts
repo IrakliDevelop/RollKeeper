@@ -965,6 +965,42 @@ function createAbilityNpc(): string {
   });
 }
 
+describe('npc inventory costs', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('atomically consumes inventory for an unlimited action', () => {
+    const block = statBlockFixture();
+    block.actions[1] = {
+      ...block.actions[1],
+      inventoryCost: { inventoryItemId: 'arrows', quantity: 1 },
+    };
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Archer',
+      armorClass: '14',
+      maxHp: 12,
+      speed: '30 ft.',
+      monsterStatBlock: block,
+      inventory: [{ id: 'arrows', name: 'Arrows', quantity: 1 }],
+    });
+
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-bite')
+    ).toBe(true);
+    expect(
+      useNPCStore.getState().getNPC(CAMPAIGN, id)?.inventory?.[0].quantity
+    ).toBe(0);
+    expect(
+      useNPCStore.getState().useNpcAbility(CAMPAIGN, id, 'entry-bite')
+    ).toBe(false);
+    expect(
+      useNPCStore.getState().getNPC(CAMPAIGN, id)?.inventory?.[0].quantity
+    ).toBe(0);
+  });
+});
+
 describe('npcStore — entry id enforcement', () => {
   beforeEach(() => {
     useNPCStore.setState({ npcsByCampaign: {} });
