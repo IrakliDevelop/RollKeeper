@@ -3,10 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AvatarUpload } from '../AvatarUpload';
 
 vi.mock('next/image', () => ({
-  default: (props: Record<string, unknown>) => {
-    const { fill, ...rest } = props;
-    return <img {...rest} />;
-  },
+  default: ({ alt }: { alt: string }) => <span role="img" aria-label={alt} />,
 }));
 
 describe('AvatarUpload portrait preview', () => {
