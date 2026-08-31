@@ -18,6 +18,12 @@ const TONE_VARIANT = {
   none: 'neutral',
 } as const;
 
+const RECOVERY_ROW_ACTIONS = new Set([
+  'restore-here',
+  'restore-copy',
+  'download-recovery',
+]);
+
 interface RecoveryPanelProps {
   view: PlayerBackupWizardView;
   actions: PlayerBackupWizardActions;
@@ -66,27 +72,29 @@ export function RecoveryPanel({ view, actions }: RecoveryPanelProps) {
                   ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {row.actions.map(action => (
-                    <Button
-                      key={action.action}
-                      variant="outline"
-                      size="sm"
-                      disabled={!action.enabled || view.busy}
-                      onClick={() => {
-                        if (action.action === 'restore-here') {
-                          actions.onRestoreHere(row.id);
-                        }
-                        if (action.action === 'restore-copy') {
-                          actions.onRestoreCopy(row.id);
-                        }
-                        if (action.action === 'download-recovery') {
-                          actions.onDownloadRecoveryCopy(row.id);
-                        }
-                      }}
-                    >
-                      {action.label}
-                    </Button>
-                  ))}
+                  {row.actions
+                    .filter(action => RECOVERY_ROW_ACTIONS.has(action.action))
+                    .map(action => (
+                      <Button
+                        key={action.action}
+                        variant="outline"
+                        size="sm"
+                        disabled={!action.enabled || view.busy}
+                        onClick={() => {
+                          if (action.action === 'restore-here') {
+                            actions.onRestoreHere(row.id);
+                          }
+                          if (action.action === 'restore-copy') {
+                            actions.onRestoreCopy(row.id);
+                          }
+                          if (action.action === 'download-recovery') {
+                            actions.onDownloadRecoveryCopy(row.id);
+                          }
+                        }}
+                      >
+                        {action.label}
+                      </Button>
+                    ))}
                 </div>
               </div>
             ))}

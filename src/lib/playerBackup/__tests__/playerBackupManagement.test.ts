@@ -467,8 +467,10 @@ describe('player backup management', () => {
       service: { prepareRestore },
       assertCurrent: vi.fn(),
       has,
+      get: vi.fn(),
       add,
       replace,
+      remove: vi.fn(),
       persistRoster,
       attachLink,
     };
@@ -558,6 +560,8 @@ describe('player backup management', () => {
         if (!current) throw new PlayerBackupRunReplacedError();
       },
       has: () => false,
+      get: vi.fn(),
+      remove: vi.fn(),
       add,
       replace: vi.fn().mockReturnValue(true),
       persistRoster: vi.fn().mockResolvedValue({ saved: true }),
@@ -588,6 +592,70 @@ describe('player backup management', () => {
     });
     await expect(restore).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
     expect(add).not.toHaveBeenCalled();
+  });
+
+  it('rolls back a restore-original when the account changes while persist is pending', async () => {
+    let finishPersist!: (value: { saved: boolean }) => void;
+    const persistRoster = vi.fn(() =>
+      persistRoster.mock.calls.length === 1
+        ? new Promise<{ saved: boolean }>(resolve => {
+            finishPersist = resolve;
+          })
+        : Promise.resolve({ saved: true })
+    );
+    let current = true;
+    const add = vi.fn().mockReturnValue(true);
+    const remove = vi.fn();
+    const attachLink = vi.fn();
+    const restore = restorePlayerBackupCharacter({
+      factory: indexedDB,
+      locks: new QueuedLocks(),
+      accountId: ACCOUNT,
+      expectedActiveRunId: RUN_ID,
+      cloudId: 'cloud-a',
+      localCharacters: [],
+      mode: 'original',
+      service: {
+        prepareRestore: vi.fn().mockResolvedValue({
+          plan: {
+            kind: 'restore-original',
+            character: {
+              id: 'hero-a',
+              name: 'Hero A',
+              characterData: { id: 'hero-a' },
+            },
+            attachCloudLink: true,
+            reason: null,
+          },
+          link: {
+            accountId: ACCOUNT,
+            legacyId: 'hero-a',
+            cloudId: 'cloud-a',
+            serverVersion: 1,
+            contentFingerprint: 'fp',
+            pendingMutation: null,
+          },
+        }),
+      },
+      assertCurrent: () => {
+        if (!current) throw new PlayerBackupRunReplacedError();
+      },
+      has: () => false,
+      get: vi.fn(),
+      add,
+      replace: vi.fn(),
+      remove,
+      persistRoster,
+      attachLink,
+    });
+    await vi.waitFor(() => expect(add).toHaveBeenCalledOnce());
+    await vi.waitFor(() => expect(persistRoster).toHaveBeenCalledOnce());
+    current = false;
+    finishPersist({ saved: true });
+    await expect(restore).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+    expect(remove).toHaveBeenCalledWith('hero-a');
+    expect(persistRoster).toHaveBeenCalledTimes(2);
+    expect(attachLink).not.toHaveBeenCalled();
   });
 
   it('fails closed when the roster or local persist refuses the restored character', async () => {
@@ -626,6 +694,8 @@ describe('player backup management', () => {
       restorePlayerBackupCharacter({
         ...base,
         has: () => true,
+        get: vi.fn(),
+        remove: vi.fn(),
         add: vi.fn(),
         replace: vi.fn().mockReturnValue(false),
         persistRoster: vi.fn(),
@@ -637,6 +707,8 @@ describe('player backup management', () => {
       restorePlayerBackupCharacter({
         ...base,
         has: () => false,
+        get: vi.fn(),
+        remove: vi.fn(),
         add: vi.fn().mockReturnValue(true),
         replace: vi.fn(),
         persistRoster: vi.fn().mockResolvedValue({ saved: false }),
@@ -675,6 +747,8 @@ describe('player backup management', () => {
         },
         assertCurrent: vi.fn(),
         has: () => false,
+        get: vi.fn(),
+        remove: vi.fn(),
         add: vi.fn(),
         replace: vi.fn(),
         persistRoster: vi.fn(),
@@ -729,6 +803,8 @@ describe('player backup management', () => {
         service: { prepareRestore: vi.fn().mockResolvedValue(originalPlan()) },
         assertCurrent: vi.fn(),
         has: () => false,
+        get: vi.fn(),
+        remove: vi.fn(),
         add,
         replace,
         persistRoster,
@@ -756,6 +832,8 @@ describe('player backup management', () => {
           service: { prepareRestore },
           assertCurrent: vi.fn(),
           has: () => false,
+          get: vi.fn(),
+          remove: vi.fn(),
           add,
           replace: vi.fn(),
           persistRoster: vi.fn(),
@@ -793,6 +871,8 @@ describe('player backup management', () => {
         service: { prepareRestore: vi.fn().mockResolvedValue(copy) },
         assertCurrent: vi.fn(),
         has: id => id === 'hero-a',
+        get: vi.fn(),
+        remove: vi.fn(),
         add,
         replace,
         persistRoster: vi.fn().mockResolvedValue({ saved: true }),
@@ -835,6 +915,8 @@ describe('player backup management', () => {
         service: { prepareRestore },
         assertCurrent: vi.fn(),
         has: () => false,
+        get: vi.fn(),
+        remove: vi.fn(),
         add,
         replace: vi.fn(),
         persistRoster: vi.fn(),
@@ -874,6 +956,8 @@ describe('player backup management', () => {
           service: { prepareRestore },
           assertCurrent: vi.fn(),
           has: () => false,
+          get: vi.fn(),
+          remove: vi.fn(),
           add,
           replace: vi.fn(),
           persistRoster: vi.fn(),
@@ -906,6 +990,8 @@ describe('player backup management', () => {
           service: { prepareRestore: vi.fn() },
           assertCurrent: vi.fn(),
           has: () => false,
+          get: vi.fn(),
+          remove: vi.fn(),
           add,
           replace: vi.fn(),
           persistRoster: vi.fn(),
@@ -937,6 +1023,8 @@ describe('player backup management', () => {
           service: { prepareRestore: vi.fn() },
           assertCurrent: vi.fn(),
           has: () => false,
+          get: vi.fn(),
+          remove: vi.fn(),
           add,
           replace: vi.fn(),
           persistRoster: vi.fn(),
@@ -970,6 +1058,8 @@ describe('player backup management', () => {
           if (!current) throw new PlayerBackupRunReplacedError();
         },
         has: () => false,
+        get: vi.fn(),
+        remove: vi.fn(),
         add,
         replace: vi.fn().mockReturnValue(true),
         persistRoster,
@@ -983,6 +1073,112 @@ describe('player backup management', () => {
       );
       expect(add).not.toHaveBeenCalled();
       expect(persistRoster).not.toHaveBeenCalled();
+      expect(attachLink).not.toHaveBeenCalled();
+    });
+
+    it('rolls back a restore-copy when the account changes while persist is pending', async () => {
+      let finishPersist!: (value: { saved: boolean }) => void;
+      const persistRoster = vi.fn(() =>
+        persistRoster.mock.calls.length === 1
+          ? new Promise<{ saved: boolean }>(resolve => {
+              finishPersist = resolve;
+            })
+          : Promise.resolve({ saved: true })
+      );
+      let current = true;
+      const add = vi.fn().mockReturnValue(true);
+      const remove = vi.fn();
+      const attachLink = vi.fn();
+      const restore = restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [],
+        mode: 'copy',
+        service: {
+          prepareRestore: vi.fn().mockResolvedValue({
+            plan: {
+              kind: 'restore-copy',
+              character: {
+                id: 'hero-copy',
+                name: 'Hero A (Cloud Copy)',
+                characterData: { id: 'hero-copy' },
+              },
+              attachCloudLink: false,
+              reason: null,
+            },
+            link: { ...LINK, legacyId: 'hero-copy' },
+            recovery: {} as never,
+          }),
+        },
+        assertCurrent: () => {
+          if (!current) throw new PlayerBackupRunReplacedError();
+        },
+        has: () => false,
+        get: vi.fn(),
+        add,
+        replace: vi.fn(),
+        remove,
+        persistRoster,
+        attachLink,
+      });
+      await vi.waitFor(() => expect(add).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(persistRoster).toHaveBeenCalledOnce());
+      current = false;
+      finishPersist({ saved: true });
+      await expect(restore).rejects.toBeInstanceOf(
+        PlayerBackupRunReplacedError
+      );
+      expect(remove).toHaveBeenCalledWith('hero-copy');
+      expect(persistRoster).toHaveBeenCalledTimes(2);
+      expect(attachLink).not.toHaveBeenCalled();
+    });
+
+    it('restores the previous local character when a replace persist is superseded', async () => {
+      let finishPersist!: (value: { saved: boolean }) => void;
+      const persistRoster = vi.fn(() =>
+        persistRoster.mock.calls.length === 1
+          ? new Promise<{ saved: boolean }>(resolve => {
+              finishPersist = resolve;
+            })
+          : Promise.resolve({ saved: true })
+      );
+      let current = true;
+      const replace = vi.fn().mockReturnValue(true);
+      const remove = vi.fn();
+      const attachLink = vi.fn();
+      const restore = restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [HERO],
+        mode: 'original',
+        service: {
+          prepareRestore: vi.fn().mockResolvedValue(originalPlan()),
+        },
+        assertCurrent: () => {
+          if (!current) throw new PlayerBackupRunReplacedError();
+        },
+        has: () => true,
+        get: () => HERO,
+        add: vi.fn(),
+        replace,
+        remove,
+        persistRoster,
+        attachLink,
+      });
+      await vi.waitFor(() => expect(replace).toHaveBeenCalledOnce());
+      await vi.waitFor(() => expect(persistRoster).toHaveBeenCalledOnce());
+      current = false;
+      finishPersist({ saved: true });
+      await expect(restore).rejects.toBeInstanceOf(
+        PlayerBackupRunReplacedError
+      );
+      expect(replace).toHaveBeenNthCalledWith(2, HERO);
+      expect(remove).not.toHaveBeenCalled();
+      expect(persistRoster).toHaveBeenCalledTimes(2);
       expect(attachLink).not.toHaveBeenCalled();
     });
 
@@ -1003,6 +1199,8 @@ describe('player backup management', () => {
           },
           assertCurrent: vi.fn(),
           has: () => false,
+          get: vi.fn(),
+          remove: vi.fn(),
           add,
           replace: vi.fn(),
           persistRoster,

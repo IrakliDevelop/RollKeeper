@@ -231,8 +231,10 @@ type PlayerBackupRestoreIO = {
   service: Pick<PlayerBackupManagementService, 'prepareRestore'>;
   assertCurrent: () => void;
   has: (legacyId: string) => boolean;
+  get: (legacyId: string) => unknown | undefined;
   add: (character: unknown) => boolean;
   replace: (character: unknown) => boolean;
+  remove: (legacyId: string) => void;
   persistRoster: () => Promise<{ saved: boolean }>;
   attachLink: (link: CharacterCloudLink) => void;
 };
@@ -253,6 +255,7 @@ async function applyPreparedRestore(
     throw new Error(plan.reason ?? 'Cloud restore is not supported');
   }
   if (plan.character) {
+    const previous = options.get(plan.character.id);
     const accepted =
       plan.kind === 'restore-copy' || !options.has(plan.character.id)
         ? options.add(plan.character)
@@ -261,6 +264,17 @@ async function applyPreparedRestore(
       throw new Error('Roster write was not accepted');
     }
     const persisted = await options.persistRoster();
+    try {
+      options.assertCurrent();
+    } catch (cause) {
+      if (previous === undefined) {
+        options.remove(plan.character.id);
+      } else {
+        options.replace(previous);
+      }
+      await options.persistRoster();
+      throw cause;
+    }
     if (!persisted.saved) {
       throw new Error('Restored character was not saved in this browser');
     }

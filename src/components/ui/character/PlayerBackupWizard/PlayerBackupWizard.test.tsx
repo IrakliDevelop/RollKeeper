@@ -283,6 +283,95 @@ describe('PlayerBackupWizard', () => {
     expectPlayerBackupVocabulary(baseElement);
   });
 
+  it('does not render backup, remove, or conflict actions on the recovery surface', () => {
+    const onBackupNow = vi.fn();
+    const onRemoveOnlineCopy = vi.fn();
+    const onPauseCharacter = vi.fn();
+    const onResumeCharacter = vi.fn();
+    const view = createPlayerBackupWizardFixture('recovery-required');
+    view.management = {
+      ...view.management,
+      rows: [
+        {
+          id: 'nyx',
+          name: 'Nyx Emberveil',
+          statusLabel: COPY.selection.oneTimeProtected,
+          note: '',
+          tone: 'info',
+          actions: [
+            {
+              label: COPY.management.backupNow,
+              enabled: true,
+              action: 'backup-now',
+            },
+            {
+              label: COPY.management.remove,
+              enabled: true,
+              action: 'remove',
+            },
+            {
+              label: COPY.management.pause,
+              enabled: true,
+              action: 'pause',
+            },
+            {
+              label: COPY.management.resume,
+              enabled: true,
+              action: 'resume',
+            },
+            {
+              label: COPY.conflict.title,
+              enabled: true,
+              action: 'choose',
+            },
+            {
+              label: COPY.management.restoreHere,
+              enabled: true,
+              action: 'restore-here',
+            },
+            {
+              label: COPY.conflict.downloadRecovery,
+              enabled: true,
+              action: 'download-recovery',
+            },
+          ],
+        },
+      ],
+    };
+    renderWizard(
+      view,
+      createIdlePlayerBackupWizardActions({
+        onBackupNow,
+        onRemoveOnlineCopy,
+        onPauseCharacter,
+        onResumeCharacter,
+      })
+    );
+    expect(
+      screen.queryByRole('button', { name: COPY.management.backupNow })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: COPY.management.remove })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: COPY.management.pause })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: COPY.management.resume })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: COPY.conflict.title })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: COPY.management.restoreHere })
+    ).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: COPY.conflict.downloadRecovery })
+    ).toBeEnabled();
+    expect(onBackupNow).not.toHaveBeenCalled();
+    expect(onRemoveOnlineCopy).not.toHaveBeenCalled();
+  });
+
   it('names the safety file input and exposes mismatch as an alert', () => {
     renderWizard('wrong-file');
     expect(screen.getByLabelText(COPY.safety.fileInput)).toBeInTheDocument();

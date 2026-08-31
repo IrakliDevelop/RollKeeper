@@ -932,6 +932,8 @@ export function usePlayerBackupWizard(
         usePlayerStore
           .getState()
           .characters.some(character => character.id === id),
+      get: (id: string) =>
+        usePlayerStore.getState().getCharacterById(id) ?? undefined,
       add: (character: unknown) => {
         const store = usePlayerStore.getState();
         return store.addCloudRecoveredCharacter(
@@ -947,6 +949,21 @@ export function usePlayerBackupWizard(
             typeof store.replaceCloudRecoveredCharacter
           >[0]
         );
+      },
+      remove: (legacyId: string) => {
+        usePlayerStore.setState(state => ({
+          characters: state.characters.filter(
+            character => character.id !== legacyId
+          ),
+          activeCharacterId:
+            state.activeCharacterId === legacyId
+              ? null
+              : state.activeCharacterId,
+          lastSelectedCharacterId:
+            state.lastSelectedCharacterId === legacyId
+              ? null
+              : state.lastSelectedCharacterId,
+        }));
       },
       persistRoster: awaitCharacterPersistenceResult,
       attachLink: (link: Parameters<typeof cloud.service.attachLink>[0]) =>
