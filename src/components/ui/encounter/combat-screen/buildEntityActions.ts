@@ -42,6 +42,11 @@ interface Store {
     entityId: string,
     abilityId: string
   ) => void;
+  useInventoryEntry?: (
+    encounterId: string,
+    entityId: string,
+    entryId: string
+  ) => boolean;
   restoreAbility: (
     encounterId: string,
     entityId: string,
@@ -208,6 +213,8 @@ export function buildEntityActions(
 
     onUseAbility: (entityId, abilityId) =>
       store.useAbility(encounterId, entityId, abilityId),
+    onUseInventoryEntry: (entityId, entryId) =>
+      store.useInventoryEntry?.(encounterId, entityId, entryId) ?? false,
     onRestoreAbility: (entityId, abilityId) =>
       store.restoreAbility(encounterId, entityId, abilityId),
     onSpendResource: (entityId, resourceId, amount) =>

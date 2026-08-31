@@ -861,13 +861,22 @@ export function NPCDetailDialog({
                 <MonsterStatBlockPanel
                   statBlock={statBlock}
                   resources={npc.resources}
+                  inventory={npc.inventory}
                   abilityUsage={npc.abilityUsage}
                   readOnly={readOnly}
                   onUseEntry={
                     readOnly
                       ? undefined
                       : (entry: StatBlockEntry) => {
-                          if (entry.resourceCost) {
+                          if (entry.inventoryCost && entry.id) {
+                            useNPCStore
+                              .getState()
+                              .useNpcAbility(
+                                npc.campaignCode,
+                                npc.id,
+                                entry.id
+                              );
+                          } else if (entry.resourceCost) {
                             useNPCStore
                               .getState()
                               .spendNpcResource(

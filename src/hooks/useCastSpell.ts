@@ -26,9 +26,11 @@ export function useCastSpell() {
   const startConcentration = useCharacterStore(s => s.startConcentration);
   const stopConcentration = useCharacterStore(s => s.stopConcentration);
   const toggleReaction = useCharacterStore(s => s.toggleReaction);
+  const consumeInventoryCost = useCharacterStore(s => s.consumeInventoryCost);
 
   const castSpell = useCallback(
     (spell: Spell, options: CastSpellOptions) => {
+      if (!consumeInventoryCost(spell.inventoryCost)) return false;
       if (spell.concentration) {
         if (character.concentration.isConcentrating) {
           stopConcentration();
@@ -68,6 +70,7 @@ export function useCastSpell() {
       ) {
         toggleReaction();
       }
+      return true;
     },
     [
       character,
@@ -77,6 +80,7 @@ export function useCastSpell() {
       startConcentration,
       stopConcentration,
       toggleReaction,
+      consumeInventoryCost,
     ]
   );
 

@@ -616,12 +616,18 @@ export function QuickSpells({
     usePact?: boolean
   ) => {
     if (!selectedSpell) return;
-    castSpell(selectedSpell, {
+    const cast = castSpell(selectedSpell, {
       level: spellLevel,
       useFreecast,
       isRitual,
       usePact,
     });
+    if (!cast) {
+      window.alert(
+        'Not enough of the linked inventory item to cast this spell.'
+      );
+      return;
+    }
     setCastModalOpen(false);
     setSelectedSpell(null);
   };

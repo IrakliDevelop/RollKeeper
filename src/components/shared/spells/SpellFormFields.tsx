@@ -18,6 +18,10 @@ import {
 } from '@/utils/spellConstants';
 import { useSpellAoeAutofill } from './SpellFormFields.hooks';
 import type { SpellFormData, FreeCastMode } from '@/utils/spellConversion';
+import {
+  InventoryCostFields,
+  type InventoryCostOption,
+} from '@/components/shared/InventoryCostFields';
 import type { SpellActionType } from '@/types/character';
 import type { AoeShape } from '@/types/spellAoe';
 
@@ -39,6 +43,7 @@ export interface SpellFormFieldsProps {
   onTagsChange?: (tags: string[]) => void;
   /** Existing tags on the NPC for autocomplete suggestions */
   existingTags?: string[];
+  inventoryItems?: InventoryCostOption[];
 }
 
 export function SpellFormFields({
@@ -48,6 +53,7 @@ export function SpellFormFields({
   tags,
   onTagsChange,
   existingTags = [],
+  inventoryItems,
 }: SpellFormFieldsProps) {
   const set = (patch: Partial<SpellFormData>) =>
     onChange({ ...formData, ...patch });
@@ -348,6 +354,14 @@ export function SpellFormFields({
           tags={tags}
           onTagsChange={onTagsChange}
           existingTags={existingTags}
+        />
+      )}
+
+      {inventoryItems && (
+        <InventoryCostFields
+          items={inventoryItems}
+          value={formData.inventoryCost}
+          onChange={inventoryCost => set({ inventoryCost })}
         />
       )}
 

@@ -57,6 +57,7 @@ export interface SpellFormData {
   aoe: SpellAoe | null;
   /** Cantrip scaling table. undefined = none/never enriched; null = user-custom (scaling off). */
   damageScaling?: CantripDamageScaling | null;
+  inventoryCost?: Spell['inventoryCost'];
 }
 
 /**
@@ -399,5 +400,6 @@ export function spellToFormData(spell: Spell): SpellFormData {
     freeCastMax,
     aoe: spell.aoe ?? null,
     damageScaling: spell.damageScaling,
+    inventoryCost: spell.inventoryCost,
   };
 }

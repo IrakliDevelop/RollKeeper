@@ -17,6 +17,8 @@ interface WeaponCardProps {
   ) => void;
   onRestoreWeaponChargePool?: (weaponId: string, amount: number) => void;
   onSetWeaponChargePoolUsed?: (weaponId: string, usedCount: number) => void;
+  onUse?: (weaponId: string) => boolean;
+  inventoryItems?: Array<{ id: string; name: string; quantity: number }>;
 }
 
 export function WeaponCard({
@@ -27,9 +29,14 @@ export function WeaponCard({
   onExpendWeaponChargePoolAbility,
   onRestoreWeaponChargePool,
   onSetWeaponChargePoolUsed,
+  onUse,
+  inventoryItems,
 }: WeaponCardProps) {
   const pool = weapon.chargePool;
   const remaining = pool ? pool.maxCharges - pool.usedCharges : 0;
+  const linkedItem = weapon.inventoryCost
+    ? inventoryItems?.find(i => i.id === weapon.inventoryCost!.inventoryItemId)
+    : undefined;
 
   return (
     <div
@@ -101,6 +108,22 @@ export function WeaponCard({
 
           {weapon.description && (
             <p className="text-body mt-2 text-sm">{weapon.description}</p>
+          )}
+
+          {weapon.inventoryCost && (
+            <Button
+              onClick={() => onUse?.(weapon.id)}
+              disabled={
+                !linkedItem ||
+                linkedItem.quantity < weapon.inventoryCost.quantity
+              }
+              variant="primary"
+              size="sm"
+              className="mt-2"
+            >
+              Attack · {weapon.inventoryCost.quantity}×{' '}
+              {linkedItem?.name ?? 'Missing item'} ({linkedItem?.quantity ?? 0})
+            </Button>
           )}
 
           {/* Charge Pool UI */}

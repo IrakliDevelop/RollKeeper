@@ -743,6 +743,10 @@ interface CharacterStore {
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   updateItemQuantity: (id: string, quantity: number) => void;
+  consumeInventoryCost: (
+    cost?: import('@/types/character').InventoryCost
+  ) => boolean;
+  useWeapon: (weaponId: string) => boolean;
   reorderInventoryItems: (
     sourceIndex: number,
     destinationIndex: number
@@ -4751,6 +4755,39 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           }));
+        },
+
+        consumeInventoryCost: cost => {
+          if (!cost) return true;
+          if (!Number.isInteger(cost.quantity) || cost.quantity < 1)
+            return false;
+          const item = get().character.inventoryItems.find(
+            candidate => candidate.id === cost.inventoryItemId
+          );
+          if (!item || item.quantity < cost.quantity) return false;
+          set(state => ({
+            character: {
+              ...state.character,
+              inventoryItems: state.character.inventoryItems.map(candidate =>
+                candidate.id === cost.inventoryItemId
+                  ? {
+                      ...candidate,
+                      quantity: candidate.quantity - cost.quantity,
+                      updatedAt: new Date().toISOString(),
+                    }
+                  : candidate
+              ),
+            },
+            hasUnsavedChanges: true,
+            saveStatus: 'saving',
+          }));
+          return true;
+        },
+
+        useWeapon: weaponId => {
+          const weapon = get().character.weapons.find(w => w.id === weaponId);
+          if (!weapon) return false;
+          return get().consumeInventoryCost(weapon.inventoryCost);
         },
 
         deleteInventoryItem: id => {

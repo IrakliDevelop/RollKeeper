@@ -10,6 +10,7 @@ import type {
   MonsterAbility,
   NpcResource,
   StatBlockEntry,
+  NPCInventoryItem,
 } from '@/types/encounter';
 
 const USE_BUTTON_ENABLED =
@@ -21,6 +22,7 @@ export interface StatBlockEntryRowProps {
   entry: StatBlockEntry;
   ability?: MonsterAbility;
   resources?: NpcResource[];
+  inventory?: NPCInventoryItem[];
   onUseAbility?: (entry: StatBlockEntry) => void;
   onRestoreAbility?: (entry: StatBlockEntry) => void;
   onSpendCost?: (entry: StatBlockEntry) => void;
@@ -38,6 +40,7 @@ export function StatBlockEntryRow({
   entry,
   ability,
   resources,
+  inventory,
   onUseAbility,
   onRestoreAbility,
   onSpendCost,
@@ -57,6 +60,13 @@ export function StatBlockEntryRow({
     ? formatAbilityUsageLabel(ability)
     : formatUsesLabel(entry.name, entry.uses);
   const cost = entry.resourceCost;
+  const inventoryCost = entry.inventoryCost;
+  const inventoryItem =
+    inventoryCost &&
+    inventory?.find(item => item.id === inventoryCost.inventoryItemId);
+  const inventoryInsufficient =
+    inventoryCost != null &&
+    (!inventoryItem || inventoryItem.quantity < inventoryCost.quantity);
   const resource = cost && resources?.find(r => r.id === cost.resourceId);
   const remaining = resource
     ? Math.max(0, resource.maxUses - resource.usesExpended)
@@ -72,7 +82,7 @@ export function StatBlockEntryRow({
   const trackable = ability != null && entry.id != null;
   const max = trackable ? (ability.maxUses ?? 1) : 0;
   const used = trackable ? ability.usedUses : 0;
-  const useBlocked = costInsufficient; // pips can't spend when the cost can't be covered
+  const useBlocked = costInsufficient || inventoryInsufficient;
 
   return (
     <div className="text-sm">
@@ -85,6 +95,13 @@ export function StatBlockEntryRow({
         {costLabel && (
           <span className="bg-accent-purple-bg text-accent-purple-text rounded px-1.5 py-0.5 text-[10px] font-semibold">
             {costLabel}
+          </span>
+        )}
+        {inventoryCost && (
+          <span className="bg-accent-amber-bg text-accent-amber-text rounded px-1.5 py-0.5 text-[10px] font-semibold">
+            {inventoryCost.quantity > 1 ? `${inventoryCost.quantity}× ` : ''}
+            {inventoryItem?.name ?? 'Missing item'} ·{' '}
+            {inventoryItem?.quantity ?? 0}
           </span>
         )}
         {trackable && (
@@ -134,10 +151,10 @@ export function StatBlockEntryRow({
             })}
           </span>
         )}
-        {!trackable && cost && !readOnly && onSpendCost && (
+        {!trackable && (cost || inventoryCost) && !readOnly && onSpendCost && (
           <button
             onClick={() => onSpendCost(entry)}
-            disabled={costInsufficient}
+            disabled={useBlocked}
             title={
               !resource
                 ? 'Resource removed'
@@ -145,9 +162,7 @@ export function StatBlockEntryRow({
                   ? `Not enough ${resource.name} uses`
                   : `Spend ${cost.amount} ${resource.name}`
             }
-            className={
-              costInsufficient ? USE_BUTTON_DISABLED : USE_BUTTON_ENABLED
-            }
+            className={useBlocked ? USE_BUTTON_DISABLED : USE_BUTTON_ENABLED}
           >
             Use
           </button>
