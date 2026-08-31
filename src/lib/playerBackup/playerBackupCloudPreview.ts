@@ -103,6 +103,16 @@ async function readAccount(
   };
 }
 
+export function hasRecoverableCloudRows(cloud: {
+  characters: ReadonlyArray<{ row: unknown | null }>;
+  onlineOnly: ReadonlyArray<{ row: unknown }>;
+}): boolean {
+  return (
+    cloud.onlineOnly.some(entry => Boolean(entry.row)) ||
+    cloud.characters.some(entry => Boolean(entry.row))
+  );
+}
+
 /**
  * Decodes cloud rows, drops duplicated legacy identities, and compares each
  * local character against its cloud copy. Shared by the read-only preview and

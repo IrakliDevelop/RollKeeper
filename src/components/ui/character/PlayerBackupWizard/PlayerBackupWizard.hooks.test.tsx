@@ -6,20 +6,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
 import { verifyDownloadedDeviceBackup } from '@/lib/deviceRecovery';
+import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
 import {
   confirmPlayerBackupConsent,
   PlayerBackupReadOnlyCoordinator,
 } from '@/lib/playerBackup/playerBackupCoordinator';
 import { listPlayerBackupConflicts } from '@/lib/playerBackup/playerBackupConflictCoordinator';
 import { derivePlayerBackupRunResult } from '@/lib/playerBackup/playerBackupOnlineExecution';
+import { previewPlayerBackupCloud } from '@/lib/playerBackup/playerBackupCloudPreview';
 import {
+  PlayerBackupActiveRunPointerCorruptError,
   PlayerBackupRunReplacedError,
   readActivePlayerBackupRun,
   type PlayerBackupRunV1,
 } from '@/lib/playerBackup/playerBackupRunRepository';
-import { usePlayerStore } from '@/store/playerStore';
+import { usePlayerStore, type PlayerCharacter } from '@/store/playerStore';
+import { PLAYER_STORAGE_KEY } from '@/utils/constants';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 import { usePlayerBackupWizard } from './PlayerBackupWizard.hooks';
+import type { PlayerBackupRouteIntent } from '@/lib/playerBackup/playerBackupDashboard';
 
 const auth = vi.hoisted(() => {
   let user: { id: string; email?: string } | null = null;
@@ -163,6 +169,24 @@ vi.mock(
   }
 );
 
+const restoreApis = vi.hoisted(() => ({
+  restorePlayerBackupCharacter: vi.fn(),
+  restorePlayerBackupCharacterWithoutRun: vi.fn(),
+}));
+
+vi.mock('@/lib/playerBackup/playerBackupManagement', async importOriginal => {
+  const actual =
+    await importOriginal<
+      typeof import('@/lib/playerBackup/playerBackupManagement')
+    >();
+  return {
+    ...actual,
+    restorePlayerBackupCharacter: restoreApis.restorePlayerBackupCharacter,
+    restorePlayerBackupCharacterWithoutRun:
+      restoreApis.restorePlayerBackupCharacterWithoutRun,
+  };
+});
+
 vi.mock('@/lib/playerBackup/playerBackupCloudPreview', async importOriginal => {
   const actual =
     await importOriginal<
@@ -300,6 +324,81 @@ vi.mock(
   }
 );
 
+function decodedOnlineOnly(options: {
+  id: string;
+  legacyId: string;
+  name: string;
+  deletedAt?: string | null;
+  status?: 'supported' | 'quarantined';
+}) {
+  const row = {
+    id: options.id,
+    legacy_client_id: options.legacyId,
+    name: options.name,
+    payload: { id: options.legacyId, name: options.name },
+    schema_version: 1,
+    client_revision: 1,
+    server_version: 1,
+    deleted_at: options.deletedAt ?? null,
+    created_at: '2026-08-26T00:00:00.000Z',
+    updated_at: '2026-08-26T00:00:00.000Z',
+  };
+  return {
+    status: options.status ?? ('supported' as const),
+    row,
+    rawPayload: row.payload,
+    localCharacter: {
+      id: options.legacyId,
+      name: options.name,
+      characterData: { id: options.legacyId, name: options.name },
+    },
+    contentFingerprint: 'fp',
+    quarantineReason: null,
+  };
+}
+
+function CloudRestoreProbe({
+  intent,
+}: {
+  intent?: PlayerBackupRouteIntent | null;
+}) {
+  const { view, actions } = usePlayerBackupWizard({ intent });
+  return (
+    <div>
+      <span data-testid="surface">{view.surface}</span>
+      <span data-testid="step">{view.step}</span>
+      <span data-testid="signed-in">{String(view.account.signedIn)}</span>
+      <span data-testid="recovery-title">{view.recovery.title}</span>
+      <span data-testid="action-error">{view.actionError ?? ''}</span>
+      <ul data-testid="management-rows">
+        {view.management.rows.map(row => (
+          <li key={row.id}>
+            <span data-testid={`row-${row.id}-name`}>{row.name}</span>
+            {row.actions.map(action => (
+              <button
+                key={action.action}
+                type="button"
+                data-testid={`row-${row.id}-${action.action}`}
+                disabled={!action.enabled || view.busy}
+                onClick={() => {
+                  if (action.action === 'restore-here') {
+                    actions.onRestoreHere(row.id);
+                  }
+                  if (action.action === 'restore-copy') {
+                    actions.onRestoreCopy(row.id);
+                  }
+                }}
+              >
+                {action.label}
+              </button>
+            ))}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function Probe() {
   const { view, actions } = usePlayerBackupWizard();
   return (
@@ -399,7 +498,17 @@ beforeEach(() => {
         : null
   );
   coordinatorApis.confirmPlayerBackupConsent.mockReset();
-  usePlayerStore.setState({ characters: [] });
+  restoreApis.restorePlayerBackupCharacter.mockReset();
+  restoreApis.restorePlayerBackupCharacterWithoutRun.mockReset();
+  restoreApis.restorePlayerBackupCharacter.mockResolvedValue({
+    plan: { kind: 'attach-link', character: null, attachCloudLink: false },
+    link: {},
+  });
+  restoreApis.restorePlayerBackupCharacterWithoutRun.mockResolvedValue({
+    plan: { kind: 'attach-link', character: null, attachCloudLink: false },
+    link: {},
+  });
+  usePlayerStore.setState({ characters: [], characterTombstones: {} });
 });
 
 async function signIn(id: string, email: string) {
@@ -811,6 +920,175 @@ describe('usePlayerBackupWizard', () => {
     expect(screen.getByTestId('surface')).toHaveTextContent('wizard');
   });
 
+  it('exposes restore actions for online-only copies on the recovery surface without a local run', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('recovery');
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    expect(screen.getByTestId('row-nyx-name')).toHaveTextContent(
+      'Nyx Emberveil'
+    );
+    expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    expect(screen.getByTestId('row-nyx-restore-copy')).toBeEnabled();
+  });
+
+  it('honors manage intent for recoverable online-only copies without a local run', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="manage" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('manage');
+    });
+    expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    expect(screen.getByTestId('row-nyx-remove')).toBeDisabled();
+  });
+
+  it('routes a no-run differing same-ID cloud row onto recovery and manage', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    const local = {
+      id: 'hero-a',
+      name: 'Local Diverged',
+      race: 'Elf',
+      class: 'Wizard',
+      level: 4,
+      createdAt: new Date('2024-01-01T00:00:00.000Z'),
+      updatedAt: new Date('2024-01-02T00:00:00.000Z'),
+      lastPlayed: new Date('2024-01-03T00:00:00.000Z'),
+      characterData: { id: 'hero-a', name: 'Local Diverged' },
+      tags: [],
+      isArchived: false,
+    };
+    usePlayerStore.setState({
+      characters: [local as unknown as PlayerCharacter],
+    });
+    const decoded = decodedOnlineOnly({
+      id: 'cloud-hero',
+      legacyId: 'hero-a',
+      name: 'Aria',
+    });
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [
+        {
+          legacyId: 'hero-a',
+          name: 'Aria',
+          state: 'different',
+          row: decoded.row,
+          decoded,
+        },
+      ],
+      onlineOnly: [],
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    const { unmount } = render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-hero-a-restore-here')).toBeEnabled();
+    });
+    expect(screen.getByTestId('surface')).toHaveTextContent('recovery');
+    unmount();
+    render(<CloudRestoreProbe intent="manage" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('manage');
+    });
+    expect(screen.getByTestId('row-hero-a-restore-copy')).toBeEnabled();
+  });
+
+  it('clears the previous account cloud restore rows before showing the next account', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockImplementation(async options => {
+      const id = (await options.auth.getUser()).data.user?.id;
+      if (id === 'acc-a') {
+        return {
+          account: { id: 'acc-a', email: 'a@example.com' },
+          characters: [],
+          onlineOnly: [
+            decodedOnlineOnly({
+              id: 'cloud-a',
+              legacyId: 'nyx',
+              name: 'Nyx Emberveil',
+            }),
+          ],
+        };
+      }
+      return {
+        account: { id: 'acc-b', email: 'b@example.com' },
+        characters: [],
+        onlineOnly: [
+          decodedOnlineOnly({
+            id: 'cloud-b',
+            legacyId: 'bramble',
+            name: 'Bramblewick Sable',
+          }),
+        ],
+      };
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-name')).toHaveTextContent(
+        'Nyx Emberveil'
+      );
+    });
+    auth.emit({ id: 'acc-b', email: 'b@example.com' });
+    await waitFor(() => {
+      expect(screen.queryByTestId('row-nyx-name')).not.toBeInTheDocument();
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId('row-bramble-name')).toHaveTextContent(
+        'Bramblewick Sable'
+      );
+    });
+  });
+
+  it('keeps future and unavailable cloud rows from offering restore', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    const future = decodedOnlineOnly({
+      id: 'cloud-future',
+      legacyId: 'future-hero',
+      name: 'Future Hero',
+      status: 'quarantined',
+    });
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [future],
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-future-hero-name')).toHaveTextContent(
+        'Future Hero'
+      );
+    });
+    expect(screen.getByTestId('row-future-hero-restore-here')).toBeDisabled();
+    expect(screen.getByTestId('row-future-hero-restore-copy')).toBeDisabled();
+  });
+
   it('honors manage intent after durable protection exists', async () => {
     vi.mocked(derivePlayerBackupRunResult).mockResolvedValueOnce({
       runId: 'run-1',
@@ -839,5 +1117,246 @@ describe('usePlayerBackupWizard', () => {
     await waitFor(() => {
       expect(screen.getByTestId('surface')).toHaveTextContent('manage');
     });
+  });
+
+  it('restores a no-run online copy under its original ID and reloads cloud preview', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    restoreApis.restorePlayerBackupCharacterWithoutRun.mockImplementation(
+      async options => {
+        const character = {
+          id: 'nyx',
+          name: 'Nyx Emberveil',
+          characterData: { id: 'nyx', name: 'Nyx Emberveil' },
+        };
+        expect(options.add(character)).toBe(true);
+        return {
+          plan: {
+            kind: 'restore-original',
+            character,
+            attachCloudLink: false,
+            reason: null,
+          },
+          link: {},
+        };
+      }
+    );
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    const previewCalls = vi.mocked(previewPlayerBackupCloud).mock.calls.length;
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(
+        usePlayerStore
+          .getState()
+          .characters.some(character => character.id === 'nyx')
+      ).toBe(true);
+    });
+    expect(restoreApis.restorePlayerBackupCharacter).not.toHaveBeenCalled();
+    await waitFor(() => {
+      expect(
+        vi.mocked(previewPlayerBackupCloud).mock.calls.length
+      ).toBeGreaterThan(previewCalls);
+    });
+    expect(derivePlayerBackupRunResult).not.toHaveBeenCalled();
+  });
+
+  it('uses the fenced restore whenever a valid local run exists', async () => {
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(restoreApis.restorePlayerBackupCharacter).toHaveBeenCalledOnce();
+    });
+    expect(
+      restoreApis.restorePlayerBackupCharacter.mock.calls[0][0]
+    ).toMatchObject({ expectedActiveRunId: 'run-1', cloudId: 'cloud-nyx' });
+    expect(
+      restoreApis.restorePlayerBackupCharacterWithoutRun
+    ).not.toHaveBeenCalled();
+  });
+
+  it('retries only through the fenced restore after a valid-present pointer', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    restoreApis.restorePlayerBackupCharacterWithoutRun.mockImplementation(
+      async () => {
+        vi.mocked(readActivePlayerBackupRun).mockResolvedValue({
+          ...FAKE_RUN,
+          accountId: 'acc-a',
+          namespace: 'user:acc-a',
+        });
+        throw new PlayerBackupRunReplacedError();
+      }
+    );
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(restoreApis.restorePlayerBackupCharacter).toHaveBeenCalledOnce();
+    });
+    expect(
+      restoreApis.restorePlayerBackupCharacterWithoutRun
+    ).toHaveBeenCalledOnce();
+    expect(
+      restoreApis.restorePlayerBackupCharacter.mock.calls[0][0]
+    ).toMatchObject({ expectedActiveRunId: 'run-1' });
+  });
+
+  it('fails closed into recovery on a corrupt pointer without a fenced retry', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    restoreApis.restorePlayerBackupCharacterWithoutRun.mockRejectedValue(
+      new PlayerBackupActiveRunPointerCorruptError()
+    );
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="manage" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('manage');
+    });
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(screen.getByTestId('surface')).toHaveTextContent('recovery');
+    });
+    expect(screen.getByTestId('action-error')).toHaveTextContent(
+      COPY.errors.online
+    );
+    expect(restoreApis.restorePlayerBackupCharacter).not.toHaveBeenCalled();
+    expect(usePlayerStore.getState().characters).toEqual([]);
+  });
+
+  it('tombstones a rolled-back restore so a sibling tab does not keep the other account’s character', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    let characters: PlayerCharacter[] = [];
+    let characterTombstones: Record<
+      string,
+      { id: string; deletedAt: number; beforeImage: PlayerCharacter }
+    > = {};
+    const sibling = {
+      getState: () => ({ characters, characterTombstones }),
+      setState: (partial: {
+        characters: PlayerCharacter[];
+        characterTombstones: typeof characterTombstones;
+      }) => {
+        characters = partial.characters;
+        characterTombstones = partial.characterTombstones;
+      },
+    };
+    const stop = initCrossTabRosterSync(sibling);
+    const broadcast = () => {
+      const state = usePlayerStore.getState();
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: PLAYER_STORAGE_KEY,
+          newValue: JSON.stringify({
+            state: {
+              characters: state.characters,
+              characterTombstones: state.characterTombstones,
+            },
+            version: 1,
+          }),
+          storageArea: window.localStorage,
+        })
+      );
+    };
+    restoreApis.restorePlayerBackupCharacterWithoutRun.mockImplementation(
+      async options => {
+        const character: PlayerCharacter = {
+          id: 'nyx',
+          name: 'Nyx Emberveil',
+          race: 'Tiefling',
+          class: 'Warlock',
+          level: 5,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+          lastPlayed: new Date('2026-01-03T00:00:00.000Z'),
+          characterData: makeCharacter({ id: 'nyx', name: 'Nyx Emberveil' }),
+          tags: [],
+          isArchived: false,
+        };
+        expect(options.add(character)).toBe(true);
+        broadcast();
+        expect(characters.map(entry => entry.id)).toContain('nyx');
+        options.remove('nyx');
+        await options.persistRoster();
+        broadcast();
+        expect(characters.map(entry => entry.id)).not.toContain('nyx');
+        throw new Error('account-switched');
+      }
+    );
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(
+        restoreApis.restorePlayerBackupCharacterWithoutRun
+      ).toHaveBeenCalledOnce();
+    });
+    expect(characters.map(entry => entry.id)).not.toContain('nyx');
+    stop();
   });
 });

@@ -36,6 +36,7 @@ export interface PlayerCharacter {
 export interface CharacterDeletionTombstone {
   id: string;
   deletedAt: number;
+  resolvedAt?: number;
   beforeImage: PlayerCharacter;
 }
 
@@ -89,6 +90,7 @@ interface PlayerStoreState {
   duplicateCharacter: (characterId: string, newName: string) => string;
   addCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
   replaceCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
+  discardCloudRecoveredCharacter: (characterId: string) => void;
 
   // Character selection
   setActiveCharacter: (characterId: string | null) => void;
@@ -142,6 +144,70 @@ const createPlayerCharacter = (
     isArchived: false,
   };
 };
+
+function tombstoneCharacterFromRoster(
+  state: {
+    characters: PlayerCharacter[];
+    characterTombstones: Record<string, CharacterDeletionTombstone>;
+    activeCharacterId: string | null;
+    lastSelectedCharacterId: string | null;
+  },
+  characterId: string
+) {
+  const character = state.characters.find(c => c.id === characterId);
+  const existingMarker = state.characterTombstones[characterId];
+  const deletedAt = nextCharacterMarkerTime(existingMarker);
+  return {
+    characters: state.characters.filter(c => c.id !== characterId),
+    characterTombstones: character
+      ? {
+          ...state.characterTombstones,
+          [characterId]: {
+            id: characterId,
+            deletedAt,
+            beforeImage: structuredClone(character),
+          },
+        }
+      : state.characterTombstones,
+    activeCharacterId:
+      state.activeCharacterId === characterId ? null : state.activeCharacterId,
+    lastSelectedCharacterId:
+      state.lastSelectedCharacterId === characterId
+        ? null
+        : state.lastSelectedCharacterId,
+  };
+}
+
+function nextCharacterMarkerTime(
+  marker: CharacterDeletionTombstone | undefined
+): number {
+  return Math.max(
+    Date.now(),
+    (marker?.deletedAt ?? 0) + 1,
+    (marker?.resolvedAt ?? 0) + 1
+  );
+}
+
+function resolvedCharacterMarker(
+  state: {
+    characters: PlayerCharacter[];
+    characterTombstones: Record<string, CharacterDeletionTombstone>;
+  },
+  character: PlayerCharacter
+): CharacterDeletionTombstone {
+  const existingMarker = state.characterTombstones[character.id];
+  const existingCharacter = state.characters.find(
+    candidate => candidate.id === character.id
+  );
+  return {
+    id: character.id,
+    deletedAt: existingMarker?.deletedAt ?? 0,
+    resolvedAt: nextCharacterMarkerTime(existingMarker),
+    beforeImage: structuredClone(
+      existingMarker?.beforeImage ?? existingCharacter ?? character
+    ),
+  };
+}
 
 // Migration function
 const migrateOldCharacterData = (): PlayerCharacter | null => {
@@ -332,27 +398,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
             }
           ).catch(() => {});
         }
-        set(state => ({
-          characters: state.characters.filter(c => c.id !== characterId),
-          characterTombstones: character
-            ? {
-                ...state.characterTombstones,
-                [characterId]: {
-                  id: characterId,
-                  deletedAt: Date.now(),
-                  beforeImage: structuredClone(character),
-                },
-              }
-            : state.characterTombstones,
-          activeCharacterId:
-            state.activeCharacterId === characterId
-              ? null
-              : state.activeCharacterId,
-          lastSelectedCharacterId:
-            state.lastSelectedCharacterId === characterId
-              ? null
-              : state.lastSelectedCharacterId,
-        }));
+        set(state => tombstoneCharacterFromRoster(state, characterId));
       },
 
       archiveCharacter: characterId => {
@@ -409,6 +455,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
         const recovered = structuredClone(character);
         set(state => ({
           characters: [...state.characters, recovered],
+          characterTombstones: {
+            ...state.characterTombstones,
+            [recovered.id]: resolvedCharacterMarker(state, recovered),
+          },
         }));
         return true;
       },
@@ -424,8 +474,16 @@ export const usePlayerStore = create<PlayerStoreState>()(
           characters: state.characters.map(candidate =>
             candidate.id === recovered.id ? recovered : candidate
           ),
+          characterTombstones: {
+            ...state.characterTombstones,
+            [recovered.id]: resolvedCharacterMarker(state, recovered),
+          },
         }));
         return true;
+      },
+
+      discardCloudRecoveredCharacter: characterId => {
+        set(state => tombstoneCharacterFromRoster(state, characterId));
       },
 
       // Character selection

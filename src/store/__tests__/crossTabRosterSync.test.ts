@@ -32,9 +32,15 @@ function makePlayerCharacter(
   };
 }
 
-function simulateOtherTabPersist(characters: PlayerCharacter[]) {
+function simulateOtherTabPersist(
+  characters: PlayerCharacter[],
+  characterTombstones: Record<
+    string,
+    { id: string; deletedAt: number; beforeImage: PlayerCharacter }
+  > = {}
+) {
   const persisted = JSON.stringify({
-    state: { characters },
+    state: { characters, characterTombstones },
     version: 1,
   });
   const oldValue = window.localStorage.getItem(PLAYER_STORAGE_KEY);
@@ -142,6 +148,28 @@ describe('cross-tab roster sync (multi-character clobber)', () => {
     expect(
       characters.find(c => c.id === 'char-a')?.characterData.revision
     ).toBe(3);
+  });
+
+  it('drops an adopted restore when the other tab publishes a deletion tombstone', () => {
+    usePlayerStore.setState({
+      characters: [],
+      characterTombstones: {},
+    });
+    const restored = makePlayerCharacter(
+      'nyx',
+      makeCharacter({ id: 'nyx', revision: 1, hitPoints: hp(10) })
+    );
+    simulateOtherTabPersist([restored]);
+    expect(usePlayerStore.getState().characters.map(c => c.id)).toContain(
+      'nyx'
+    );
+
+    simulateOtherTabPersist([], {
+      nyx: { id: 'nyx', deletedAt: Date.now(), beforeImage: restored },
+    });
+    expect(usePlayerStore.getState().characters.map(c => c.id)).not.toContain(
+      'nyx'
+    );
   });
 
   it('ignores malformed payloads and other keys', () => {

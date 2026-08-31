@@ -213,19 +213,21 @@ const CURRENT_CLOUD_ATTENTION_STATES = new Set<
 function cloudManagementActions(options: {
   hasCloudRow: boolean;
   manual: boolean;
+  runScoped?: boolean;
   /** An already-removed online copy can be restored, not removed again. */
   removed?: boolean;
 }): PlayerBackupWizardView['management']['rows'][number]['actions'] {
-  const mutate = options.manual && options.hasCloudRow;
+  const restore = options.manual && options.hasCloudRow;
+  const runMutate = restore && options.runScoped === true;
   return [
     {
       label: COPY.management.restoreHere,
-      enabled: mutate,
+      enabled: restore,
       action: 'restore-here',
     },
     {
       label: COPY.management.restoreCopy,
-      enabled: mutate,
+      enabled: restore,
       action: 'restore-copy',
     },
     {
@@ -235,7 +237,7 @@ function cloudManagementActions(options: {
     },
     {
       label: COPY.management.remove,
-      enabled: mutate && options.removed !== true,
+      enabled: runMutate && options.removed !== true,
       action: 'remove',
     },
   ];
@@ -254,6 +256,7 @@ export function projectPlayerBackupManagement(input: {
   futureDefaultEnabled?: boolean;
   manualMutation?: boolean;
   automaticMutation?: boolean;
+  runScoped?: boolean;
 }): PlayerBackupWizardView['management'] {
   const conflictIds = new Set(
     input.result.conflicts.map(conflict => conflict.legacyId)
@@ -264,6 +267,7 @@ export function projectPlayerBackupManagement(input: {
   const cloudLegacyIds = new Set(input.cloudLegacyIds ?? []);
   const manual = input.manualMutation === true;
   const automatic = input.automaticMutation === true;
+  const runScoped = input.runScoped === true;
   const localIds = new Set(input.characters.map(character => character.id));
   const localRows = input.characters.map(character => {
     const conflicted = conflictIds.has(character.id);
@@ -328,7 +332,7 @@ export function projectPlayerBackupManagement(input: {
                 ? [
                     {
                       label: COPY.management.pause,
-                      enabled: automatic,
+                      enabled: automatic && runScoped,
                       action: 'pause' as const,
                     },
                   ]
@@ -337,12 +341,12 @@ export function projectPlayerBackupManagement(input: {
                 ? [
                     {
                       label: COPY.management.resume,
-                      enabled: automatic,
+                      enabled: automatic && runScoped,
                       action: 'resume' as const,
                     },
                     {
                       label: COPY.management.backupNow,
-                      enabled: manual,
+                      enabled: manual && runScoped,
                       action: 'backup-now' as const,
                     },
                   ]
@@ -350,6 +354,7 @@ export function projectPlayerBackupManagement(input: {
               ...cloudManagementActions({
                 hasCloudRow,
                 manual,
+                runScoped,
                 removed: removedOnline,
               }),
             ],
@@ -359,16 +364,19 @@ export function projectPlayerBackupManagement(input: {
     .filter(entry => !localIds.has(entry.id))
     .map(entry => {
       const hasCloudRow = cloudLegacyIds.has(entry.id);
-      const actions = cloudManagementActions({ hasCloudRow, manual }).map(
-        action =>
-          entry.state === 'future'
-            ? {
-                ...action,
-                enabled: action.action === 'download-recovery' && hasCloudRow,
-              }
-            : entry.state === 'removed' && action.action === 'remove'
-              ? { ...action, enabled: false }
-              : action
+      const actions = cloudManagementActions({
+        hasCloudRow,
+        manual,
+        runScoped,
+      }).map(action =>
+        entry.state === 'future'
+          ? {
+              ...action,
+              enabled: action.action === 'download-recovery' && hasCloudRow,
+            }
+          : entry.state === 'removed' && action.action === 'remove'
+            ? { ...action, enabled: false }
+            : action
       );
       return {
         id: entry.id,
@@ -401,7 +409,7 @@ export function projectPlayerBackupManagement(input: {
     ),
     rows,
     futureDefaultOn: input.futureDefaultOn,
-    futureDefaultEnabled: input.futureDefaultEnabled === true,
+    futureDefaultEnabled: input.futureDefaultEnabled === true && runScoped,
   };
 }
 
