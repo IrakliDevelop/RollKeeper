@@ -10,14 +10,22 @@ import {
 } from '@/lib/indexeddb/localDatabase';
 import { AutomaticCharacterSyncPreferences } from '@/lib/supabase/automaticCharacterSyncPreferences';
 import type { PlayerBackupExclusiveLockProvider } from '../playerBackupRunFence';
-import { PlayerBackupLockUnavailableError } from '../playerBackupRunFence';
-import { PlayerBackupRunReplacedError } from '../playerBackupRunRepository';
+import {
+  PlayerBackupLockUnavailableError,
+  playerBackupAccountLockName,
+} from '../playerBackupRunFence';
+import {
+  PlayerBackupActiveRunPointerCorruptError,
+  PlayerBackupRunReplacedError,
+} from '../playerBackupRunRepository';
 import type { PlayerBackupRunV1 } from '../playerBackupRunRepository';
+import { playerBackupActiveRunKey } from '../playerBackupRunRepository';
 import {
   archivePlayerBackupOnlineCopy,
   backupPlayerBackupCharacterNow,
   pausePlayerBackupCharacter,
   restorePlayerBackupCharacter,
+  restorePlayerBackupCharacterWithoutRun,
   resumePlayerBackupCharacter,
   setPlayerBackupFutureDefault,
 } from '../playerBackupManagement';
@@ -673,5 +681,337 @@ describe('player backup management', () => {
         attachLink: vi.fn(),
       })
     ).rejects.toThrow('Cloud restore is not supported');
+  });
+
+  describe('restore without an active run', () => {
+    const LINK = {
+      accountId: ACCOUNT,
+      legacyId: 'hero-a',
+      cloudId: 'cloud-a',
+      serverVersion: 1,
+      contentFingerprint: 'fp',
+      pendingMutation: null,
+    };
+
+    beforeEach(async () => {
+      await deleteRollkeeperDatabaseForTests(indexedDB);
+    });
+
+    function originalPlan(characterId = 'hero-a') {
+      return {
+        plan: {
+          kind: 'restore-original' as const,
+          character: {
+            id: characterId,
+            name: 'Hero A',
+            characterData: { id: characterId },
+          },
+          attachCloudLink: true,
+          reason: null,
+        },
+        link: { ...LINK, legacyId: characterId },
+        recovery: {} as never,
+      };
+    }
+
+    it('restores the original ID when no local run exists', async () => {
+      const add = vi.fn().mockReturnValue(true);
+      const replace = vi.fn();
+      const persistRoster = vi.fn().mockResolvedValue({ saved: true });
+      const attachLink = vi.fn();
+      await restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [],
+        mode: 'original',
+        service: { prepareRestore: vi.fn().mockResolvedValue(originalPlan()) },
+        assertCurrent: vi.fn(),
+        has: () => false,
+        add,
+        replace,
+        persistRoster,
+        attachLink,
+      });
+      expect(add).toHaveBeenCalledOnce();
+      expect(add.mock.calls[0][0]).toMatchObject({ id: 'hero-a' });
+      expect(replace).not.toHaveBeenCalled();
+      expect(persistRoster).toHaveBeenCalledOnce();
+      expect(attachLink).toHaveBeenCalledOnce();
+    });
+
+    it('throws replaced when a valid run already exists', async () => {
+      await seedRun();
+      const prepareRestore = vi.fn();
+      const add = vi.fn();
+      await expect(
+        restorePlayerBackupCharacterWithoutRun({
+          factory: indexedDB,
+          locks: new QueuedLocks(),
+          accountId: ACCOUNT,
+          cloudId: 'cloud-a',
+          localCharacters: [],
+          mode: 'original',
+          service: { prepareRestore },
+          assertCurrent: vi.fn(),
+          has: () => false,
+          add,
+          replace: vi.fn(),
+          persistRoster: vi.fn(),
+          attachLink: vi.fn(),
+        })
+      ).rejects.toBeInstanceOf(PlayerBackupRunReplacedError);
+      expect(prepareRestore).not.toHaveBeenCalled();
+      expect(add).not.toHaveBeenCalled();
+    });
+
+    it('adds a colliding restore as a distinct unsynced copy', async () => {
+      const copy = {
+        plan: {
+          kind: 'restore-copy' as const,
+          character: {
+            id: 'hero-a-copy',
+            name: 'Hero A',
+            characterData: { id: 'hero-a-copy' },
+          },
+          attachCloudLink: false,
+          reason: null,
+        },
+        link: LINK,
+        recovery: {} as never,
+      };
+      const add = vi.fn().mockReturnValue(true);
+      const replace = vi.fn();
+      await restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [HERO],
+        mode: 'original',
+        service: { prepareRestore: vi.fn().mockResolvedValue(copy) },
+        assertCurrent: vi.fn(),
+        has: id => id === 'hero-a',
+        add,
+        replace,
+        persistRoster: vi.fn().mockResolvedValue({ saved: true }),
+        attachLink: vi.fn(),
+      });
+      expect(add).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'hero-a-copy' })
+      );
+      expect(replace).not.toHaveBeenCalled();
+    });
+
+    it('sees a run created by a queued lock holder and does not write unfenced', async () => {
+      const locks = new QueuedLocks();
+      let releaseHolder!: () => void;
+      let holderReady!: () => void;
+      const holderStarted = new Promise<void>(resolve => {
+        holderReady = resolve;
+      });
+      const holder = locks.request(
+        playerBackupAccountLockName(ACCOUNT),
+        { mode: 'exclusive' },
+        async () => {
+          await seedRun();
+          holderReady();
+          await new Promise<void>(resolve => {
+            releaseHolder = resolve;
+          });
+        }
+      );
+      await holderStarted;
+      const prepareRestore = vi.fn().mockResolvedValue(originalPlan());
+      const add = vi.fn();
+      const restore = restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks,
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [],
+        mode: 'original',
+        service: { prepareRestore },
+        assertCurrent: vi.fn(),
+        has: () => false,
+        add,
+        replace: vi.fn(),
+        persistRoster: vi.fn(),
+        attachLink: vi.fn(),
+      });
+      await Promise.resolve();
+      expect(prepareRestore).not.toHaveBeenCalled();
+      releaseHolder();
+      await expect(restore).rejects.toBeInstanceOf(
+        PlayerBackupRunReplacedError
+      );
+      expect(prepareRestore).not.toHaveBeenCalled();
+      expect(add).not.toHaveBeenCalled();
+      await holder;
+    });
+
+    it('fails closed into recovery for a dangling pointer', async () => {
+      const database = await openRollkeeperDatabase({ factory: indexedDB });
+      const transaction = database.transaction('meta', 'readwrite');
+      transaction.objectStore('meta').put({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 'run-missing',
+        accountId: ACCOUNT,
+      });
+      await transactionComplete(transaction);
+      database.close();
+      const prepareRestore = vi.fn();
+      const add = vi.fn();
+      await expect(
+        restorePlayerBackupCharacterWithoutRun({
+          factory: indexedDB,
+          locks: new QueuedLocks(),
+          accountId: ACCOUNT,
+          cloudId: 'cloud-a',
+          localCharacters: [],
+          mode: 'original',
+          service: { prepareRestore },
+          assertCurrent: vi.fn(),
+          has: () => false,
+          add,
+          replace: vi.fn(),
+          persistRoster: vi.fn(),
+          attachLink: vi.fn(),
+        })
+      ).rejects.toBeInstanceOf(PlayerBackupActiveRunPointerCorruptError);
+      expect(prepareRestore).not.toHaveBeenCalled();
+      expect(add).not.toHaveBeenCalled();
+    });
+
+    it('fails closed into recovery for a malformed pointer', async () => {
+      const database = await openRollkeeperDatabase({ factory: indexedDB });
+      const transaction = database.transaction('meta', 'readwrite');
+      transaction.objectStore('meta').put({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 12,
+        accountId: ACCOUNT,
+      });
+      await transactionComplete(transaction);
+      database.close();
+      const add = vi.fn();
+      await expect(
+        restorePlayerBackupCharacterWithoutRun({
+          factory: indexedDB,
+          locks: new QueuedLocks(),
+          accountId: ACCOUNT,
+          cloudId: 'cloud-a',
+          localCharacters: [],
+          mode: 'original',
+          service: { prepareRestore: vi.fn() },
+          assertCurrent: vi.fn(),
+          has: () => false,
+          add,
+          replace: vi.fn(),
+          persistRoster: vi.fn(),
+          attachLink: vi.fn(),
+        })
+      ).rejects.toBeInstanceOf(PlayerBackupActiveRunPointerCorruptError);
+      expect(add).not.toHaveBeenCalled();
+    });
+
+    it('fails closed into recovery for a wrong-account pointer', async () => {
+      const database = await openRollkeeperDatabase({ factory: indexedDB });
+      const transaction = database.transaction('meta', 'readwrite');
+      transaction.objectStore('meta').put({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 'run-a',
+        accountId: 'account-b',
+      });
+      await transactionComplete(transaction);
+      database.close();
+      const add = vi.fn();
+      await expect(
+        restorePlayerBackupCharacterWithoutRun({
+          factory: indexedDB,
+          locks: new QueuedLocks(),
+          accountId: ACCOUNT,
+          cloudId: 'cloud-a',
+          localCharacters: [],
+          mode: 'original',
+          service: { prepareRestore: vi.fn() },
+          assertCurrent: vi.fn(),
+          has: () => false,
+          add,
+          replace: vi.fn(),
+          persistRoster: vi.fn(),
+          attachLink: vi.fn(),
+        })
+      ).rejects.toBeInstanceOf(PlayerBackupActiveRunPointerCorruptError);
+      expect(add).not.toHaveBeenCalled();
+    });
+
+    it('rejects a no-run restore when the account changes before the local commit', async () => {
+      let finishRestore!: (value: ReturnType<typeof originalPlan>) => void;
+      const prepareRestore = vi.fn(
+        () =>
+          new Promise<ReturnType<typeof originalPlan>>(resolve => {
+            finishRestore = resolve;
+          })
+      );
+      let current = true;
+      const add = vi.fn().mockReturnValue(true);
+      const persistRoster = vi.fn().mockResolvedValue({ saved: true });
+      const attachLink = vi.fn();
+      const restore = restorePlayerBackupCharacterWithoutRun({
+        factory: indexedDB,
+        locks: new QueuedLocks(),
+        accountId: ACCOUNT,
+        cloudId: 'cloud-a',
+        localCharacters: [],
+        mode: 'original',
+        service: { prepareRestore },
+        assertCurrent: () => {
+          if (!current) throw new PlayerBackupRunReplacedError();
+        },
+        has: () => false,
+        add,
+        replace: vi.fn().mockReturnValue(true),
+        persistRoster,
+        attachLink,
+      });
+      await vi.waitFor(() => expect(prepareRestore).toHaveBeenCalledOnce());
+      current = false;
+      finishRestore(originalPlan());
+      await expect(restore).rejects.toBeInstanceOf(
+        PlayerBackupRunReplacedError
+      );
+      expect(add).not.toHaveBeenCalled();
+      expect(persistRoster).not.toHaveBeenCalled();
+      expect(attachLink).not.toHaveBeenCalled();
+    });
+
+    it('leaves storage unchanged when prepareRestore fails', async () => {
+      const add = vi.fn();
+      const persistRoster = vi.fn();
+      const attachLink = vi.fn();
+      await expect(
+        restorePlayerBackupCharacterWithoutRun({
+          factory: indexedDB,
+          locks: new QueuedLocks(),
+          accountId: ACCOUNT,
+          cloudId: 'cloud-a',
+          localCharacters: [],
+          mode: 'original',
+          service: {
+            prepareRestore: vi.fn().mockRejectedValue(new Error('auth')),
+          },
+          assertCurrent: vi.fn(),
+          has: () => false,
+          add,
+          replace: vi.fn(),
+          persistRoster,
+          attachLink,
+        })
+      ).rejects.toThrow('auth');
+      expect(add).not.toHaveBeenCalled();
+      expect(persistRoster).not.toHaveBeenCalled();
+      expect(attachLink).not.toHaveBeenCalled();
+    });
   });
 });

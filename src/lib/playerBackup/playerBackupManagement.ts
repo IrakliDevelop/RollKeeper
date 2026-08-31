@@ -16,8 +16,12 @@ import {
   type PlayerBackupExclusiveLockProvider,
   mutatePlayerBackupWithFence,
   runPlayerBackupTransaction,
+  withPlayerBackupAccountLock,
 } from './playerBackupRunFence';
 import {
+  inspectActivePlayerBackupRunPointer,
+  PlayerBackupActiveRunPointerCorruptError,
+  PlayerBackupRunReplacedError,
   readPlayerBackupRunInTransaction,
   updatePlayerBackupCharacterCheckpoint,
 } from './playerBackupRunRepository';
@@ -219,56 +223,88 @@ export async function archivePlayerBackupOnlineCopy(
   });
 }
 
-export async function restorePlayerBackupCharacter(
-  options: PlayerBackupManagementBase & {
-    cloudId: string;
-    localCharacters: readonly unknown[];
-    mode: RestoreMode;
-    service: Pick<PlayerBackupManagementService, 'prepareRestore'>;
-    assertCurrent: () => void;
-    has: (legacyId: string) => boolean;
-    add: (character: unknown) => boolean;
-    replace: (character: unknown) => boolean;
-    persistRoster: () => Promise<{ saved: boolean }>;
-    attachLink: (link: CharacterCloudLink) => void;
+type PlayerBackupRestoreIO = {
+  accountId: string;
+  cloudId: string;
+  localCharacters: readonly unknown[];
+  mode: RestoreMode;
+  service: Pick<PlayerBackupManagementService, 'prepareRestore'>;
+  assertCurrent: () => void;
+  has: (legacyId: string) => boolean;
+  add: (character: unknown) => boolean;
+  replace: (character: unknown) => boolean;
+  persistRoster: () => Promise<{ saved: boolean }>;
+  attachLink: (link: CharacterCloudLink) => void;
+};
+
+async function applyPreparedRestore(
+  options: PlayerBackupRestoreIO
+): Promise<Awaited<ReturnType<ManualCharacterCloudService['prepareRestore']>>> {
+  options.assertCurrent();
+  const prepared = await options.service.prepareRestore(
+    options.cloudId,
+    account(options.accountId),
+    options.localCharacters,
+    options.mode
+  );
+  options.assertCurrent();
+  const { plan, link } = prepared;
+  if (plan.kind === 'quarantined') {
+    throw new Error(plan.reason ?? 'Cloud restore is not supported');
   }
+  if (plan.character) {
+    const accepted =
+      plan.kind === 'restore-copy' || !options.has(plan.character.id)
+        ? options.add(plan.character)
+        : options.replace(plan.character);
+    if (!accepted) {
+      throw new Error('Roster write was not accepted');
+    }
+    const persisted = await options.persistRoster();
+    if (!persisted.saved) {
+      throw new Error('Restored character was not saved in this browser');
+    }
+  }
+  if (plan.attachCloudLink) {
+    options.assertCurrent();
+    options.attachLink(link);
+  }
+  return prepared;
+}
+
+export async function restorePlayerBackupCharacter(
+  options: PlayerBackupManagementBase & PlayerBackupRestoreIO
 ): Promise<Awaited<ReturnType<ManualCharacterCloudService['prepareRestore']>>> {
   return mutatePlayerBackupWithFence({
     accountId: options.accountId,
     expectedActiveRunId: options.expectedActiveRunId,
     locks: options.locks,
     factory: options.factory,
-    mutateAndAcknowledge: async () => {
-      options.assertCurrent();
-      const prepared = await options.service.prepareRestore(
-        options.cloudId,
-        account(options.accountId),
-        options.localCharacters,
-        options.mode
-      );
-      options.assertCurrent();
-      const { plan, link } = prepared;
-      if (plan.kind === 'quarantined') {
-        throw new Error(plan.reason ?? 'Cloud restore is not supported');
-      }
-      if (plan.character) {
-        const accepted =
-          plan.kind === 'restore-copy' || !options.has(plan.character.id)
-            ? options.add(plan.character)
-            : options.replace(plan.character);
-        if (!accepted) {
-          throw new Error('Roster write was not accepted');
-        }
-        const persisted = await options.persistRoster();
-        if (!persisted.saved) {
-          throw new Error('Restored character was not saved in this browser');
-        }
-      }
-      if (plan.attachCloudLink) {
-        options.assertCurrent();
-        options.attachLink(link);
-      }
-      return prepared;
-    },
+    mutateAndAcknowledge: () => applyPreparedRestore(options),
   });
+}
+
+export async function restorePlayerBackupCharacterWithoutRun(
+  options: {
+    factory: IDBFactory;
+    locks: PlayerBackupExclusiveLockProvider | null | undefined;
+    accountId: string;
+  } & PlayerBackupRestoreIO
+): Promise<Awaited<ReturnType<ManualCharacterCloudService['prepareRestore']>>> {
+  return withPlayerBackupAccountLock(
+    { accountId: options.accountId, locks: options.locks },
+    async () => {
+      const inspection = await inspectActivePlayerBackupRunPointer({
+        accountId: options.accountId,
+        factory: options.factory,
+      });
+      if (inspection.status === 'present') {
+        throw new PlayerBackupRunReplacedError();
+      }
+      if (inspection.status === 'corrupt') {
+        throw new PlayerBackupActiveRunPointerCorruptError();
+      }
+      return applyPreparedRestore(options);
+    }
+  );
 }

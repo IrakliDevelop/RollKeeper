@@ -16,7 +16,9 @@ import {
   PlayerBackupRunReplacedError,
   advancePlayerBackupRunToLocalReady,
   assertPlayerBackupRunLocalReady,
+  inspectActivePlayerBackupRunPointer,
   isPlayerBackupRun,
+  playerBackupActiveRunKey,
   playerBackupExecutionPath,
   readActivePlayerBackupRun,
   readPlayerBackupRunInTransaction,
@@ -536,6 +538,104 @@ describe('player backup durable consent', () => {
       characterCheckpoints: {
         'hero-a': { localPreparation: 'ready', online: pending },
       },
+    });
+  });
+
+  describe('inspectActivePlayerBackupRunPointer', () => {
+    async function putPointer(value: unknown) {
+      const transaction = database.transaction('meta', 'readwrite');
+      transaction.objectStore('meta').put(value);
+      await transactionComplete(transaction);
+    }
+
+    it('reports absent when the database does not exist', async () => {
+      database.close();
+      await deleteRollkeeperDatabaseForTests(indexedDB);
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'absent' });
+    });
+
+    it('reports absent when the account has no active-run key', async () => {
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'absent' });
+      await expect(
+        readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+      ).resolves.toBeNull();
+    });
+
+    it('reports present when the pointer and run are valid for this account', async () => {
+      const confirmed = run();
+      const preferences = new AutomaticCharacterSyncPreferences(database);
+      await preferences.applyConfirmedSelection({
+        expectedActiveRunId: null,
+        run: confirmed,
+        confirmed: true,
+      });
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'present', run: confirmed });
+    });
+
+    it('reports dangling when the pointer names a missing run', async () => {
+      await putPointer({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 'run-missing',
+        accountId: ACCOUNT,
+      });
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'corrupt', reason: 'dangling' });
+      await expect(
+        readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+      ).resolves.toBeNull();
+    });
+
+    it('reports malformed when the pointer is not a valid active-run record', async () => {
+      await putPointer({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 12,
+        accountId: ACCOUNT,
+      });
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'corrupt', reason: 'malformed' });
+      await expect(
+        readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+      ).resolves.toBeNull();
+    });
+
+    it('reports wrong-account when the pointer belongs to another account', async () => {
+      await putPointer({
+        key: playerBackupActiveRunKey(ACCOUNT),
+        runId: 'run-a',
+        accountId: 'account-b',
+      });
+      await expect(
+        inspectActivePlayerBackupRunPointer({
+          accountId: ACCOUNT,
+          factory: indexedDB,
+        })
+      ).resolves.toEqual({ status: 'corrupt', reason: 'wrong-account' });
+      await expect(
+        readActivePlayerBackupRun({ accountId: ACCOUNT, factory: indexedDB })
+      ).resolves.toBeNull();
     });
   });
 });

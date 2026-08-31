@@ -44,7 +44,7 @@
     "test:slice11e:coverage": "vitest run --config config/vitest/slice11e.config.ts",
     "test:slice11f:coverage": "vitest run --config config/vitest/slice11f.config.ts",
     "test:slice11g:coverage": "vitest run --config config/vitest/slice11g.config.ts",
-    "test:auth:e2e": "playwright test --config playwright.auth.config.ts",
+    "test:auth:e2e": "playwright test --config playwright.auth.config.ts && playwright test --config playwright.auth.wizard.config.ts",
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
     "test:all": "vitest run",

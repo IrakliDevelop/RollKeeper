@@ -125,6 +125,18 @@ export class PlayerBackupRunReplacedError extends Error {
   }
 }
 
+export class PlayerBackupActiveRunPointerCorruptError extends Error {
+  constructor() {
+    super('The active player backup run pointer is corrupt');
+    this.name = 'PlayerBackupActiveRunPointerCorruptError';
+  }
+}
+
+export type ActivePlayerBackupRunPointerInspection =
+  | { status: 'absent' }
+  | { status: 'present'; run: PlayerBackupRunV1 }
+  | { status: 'corrupt'; reason: 'malformed' | 'dangling' | 'wrong-account' };
+
 export function playerBackupRunKey(runId: string): string {
   return `player-backup-run:${runId}`;
 }
@@ -165,6 +177,22 @@ export async function listPlayerBackupPendingApplicationsInTransaction(
       typeof candidate.recordedAt === 'string'
     );
   });
+}
+
+function isActiveRunPointer(value: unknown): value is ActiveRunPointer {
+  if (typeof value !== 'object' || value === null) return false;
+  const pointer = value as Partial<ActiveRunPointer>;
+  return (
+    isNonEmptyString(pointer.key) &&
+    isNonEmptyString(pointer.runId) &&
+    isNonEmptyString(pointer.accountId)
+  );
+}
+
+function clonePlayerBackupRun(run: PlayerBackupRunV1): PlayerBackupRunV1 {
+  const record = structuredClone(run) as PlayerBackupRunV1 & { key?: string };
+  delete record.key;
+  return record;
 }
 
 function isNonEmptyString(value: unknown): value is string {
@@ -574,6 +602,56 @@ export async function readActivePlayerBackupRun(options: {
     };
     delete record.key;
     return record;
+  } finally {
+    database.close();
+  }
+}
+
+/**
+ * Non-creating pointer inspection. Distinguishes proven absence from a
+ * present valid run and from a corrupt/dangling/wrong-account pointer.
+ * `readActivePlayerBackupRun` collapses the last two to null.
+ */
+export async function inspectActivePlayerBackupRunPointer(options: {
+  accountId: string;
+  factory?: IDBFactory | null;
+}): Promise<ActivePlayerBackupRunPointerInspection> {
+  const database = await openExistingRollkeeperDatabase({
+    factory: options.factory,
+  });
+  if (!database) return { status: 'absent' };
+  try {
+    const transaction = database.transaction('meta', 'readonly');
+    const store = transaction.objectStore('meta');
+    const pointer = await requestResult(
+      store.get(playerBackupActiveRunKey(options.accountId))
+    );
+    if (pointer === undefined) {
+      await transactionComplete(transaction);
+      return { status: 'absent' };
+    }
+    if (!isActiveRunPointer(pointer)) {
+      await transactionComplete(transaction);
+      return { status: 'corrupt', reason: 'malformed' };
+    }
+    if (pointer.accountId !== options.accountId) {
+      await transactionComplete(transaction);
+      return { status: 'corrupt', reason: 'wrong-account' };
+    }
+    const run = await requestResult(
+      store.get(playerBackupRunKey(pointer.runId))
+    );
+    await transactionComplete(transaction);
+    if (run === undefined) {
+      return { status: 'corrupt', reason: 'dangling' };
+    }
+    if (isPlayerBackupRun(run) && run.accountId !== options.accountId) {
+      return { status: 'corrupt', reason: 'wrong-account' };
+    }
+    if (!isPlayerBackupRun(run, options.accountId)) {
+      return { status: 'corrupt', reason: 'dangling' };
+    }
+    return { status: 'present', run: clonePlayerBackupRun(run) };
   } finally {
     database.close();
   }

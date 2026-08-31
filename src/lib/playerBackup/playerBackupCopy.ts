@@ -223,7 +223,8 @@ export const PLAYER_BACKUP_COPY = {
   recovery: {
     routineTitle: 'Restore characters',
     routineDescription:
-      'Your characters in this browser have not changed. Use a safety file to restore missing characters or review other copies.',
+      'Your characters in this browser have not changed. Restore an online copy for this account, or use a safety file.',
+    onlineCopiesTitle: 'Online copies',
     title: 'Your characters need recovery',
     description:
       'RollKeeper could not safely open the current saved copy and did not fall back to an older one. Download the available recovery files before trying another action.',

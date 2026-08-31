@@ -20,6 +20,7 @@ import {
 } from '@/lib/playerBackup/playerBackupCoordinator';
 import { classifyDegradedEligibility } from '@/lib/playerBackup/playerBackupEligibility';
 import {
+  PlayerBackupActiveRunPointerCorruptError,
   PlayerBackupRunReplacedError,
   type PlayerBackupAuthoritySnapshot,
 } from '@/lib/playerBackup/playerBackupRunRepository';
@@ -34,6 +35,7 @@ import {
 import { listPlayerBackupConflicts } from '@/lib/playerBackup/playerBackupConflictCoordinator';
 import {
   createBrowserPlayerBackupCloudPreview,
+  hasRecoverableCloudRows,
   previewPlayerBackupCloud,
 } from '@/lib/playerBackup/playerBackupCloudPreview';
 import {
@@ -75,6 +77,7 @@ import {
   backupPlayerBackupCharacterNow,
   pausePlayerBackupCharacter,
   restorePlayerBackupCharacter,
+  restorePlayerBackupCharacterWithoutRun,
   resumePlayerBackupCharacter,
   setPlayerBackupFutureDefault,
 } from '@/lib/playerBackup/playerBackupManagement';
@@ -147,6 +150,15 @@ function cloudRowForLegacyId(
     cloud.onlineOnly.find(entry => entry.row.legacy_client_id === legacyId)
       ?.row ??
     null
+  );
+}
+
+function shouldOpenManage(
+  snapshot: ReturnType<PlayerBackupReadOnlyCoordinator['snapshot']>
+): boolean {
+  return (
+    hasPlayerBackupManagementEvidence(snapshot) ||
+    hasRecoverableCloudRows(snapshot.cloud)
   );
 }
 
@@ -367,10 +379,7 @@ export function usePlayerBackupWizard(
           );
           if (!cancelled) {
             const loaded = coordinator.snapshot();
-            if (
-              options.intent === 'manage' &&
-              hasPlayerBackupManagementEvidence(loaded)
-            ) {
+            if (shouldOpenManage(loaded) && options.intent === 'manage') {
               setSurface('manage');
             } else if (options.intent === 'manage') {
               setSurface('wizard');
@@ -384,7 +393,9 @@ export function usePlayerBackupWizard(
         } else if (!cancelled && options.intent === 'recovery') {
           setSurface('recovery');
         } else if (!cancelled && options.intent === 'manage') {
-          setSurface('wizard');
+          setSurface(
+            shouldOpenManage(coordinator.snapshot()) ? 'manage' : 'wizard'
+          );
         }
       } catch (cause) {
         if (!cancelled) {
@@ -736,6 +747,7 @@ export function usePlayerBackupWizard(
       futureDefaultEnabled: capabilities.calls.automaticMutation,
       manualMutation: capabilities.calls.manualMutation,
       automaticMutation: capabilities.calls.automaticMutation,
+      runScoped: Boolean(snapshot.run),
     }),
     recovery: EMPTY_RECOVERY,
     liveStatus,
@@ -785,6 +797,29 @@ export function usePlayerBackupWizard(
     if (generation !== mutationGeneration.current) return;
     setPolicies(nextPolicies.characterPolicies);
     setFutureDefault(nextPolicies.futureDefault);
+    publishSnapshot(coordinatorRef.current, setSnapshot);
+  };
+
+  const reloadCloudPreview = async (
+    accountId: string,
+    generation: number
+  ): Promise<void> => {
+    const preview = createBrowserPlayerBackupCloudPreview({
+      manualRead: capabilities.calls.manualRead,
+      automaticRead: capabilities.calls.automaticRead,
+    });
+    if (preview) {
+      await coordinatorRef.current.loadCloud(accountId, () =>
+        previewPlayerBackupCloud({
+          auth: preview.auth,
+          gateway: preview.gateway,
+          localCharacters: usePlayerStore.getState().characters,
+        })
+      );
+    }
+    if (generation !== mutationGeneration.current) return;
+    await coordinatorRef.current.discoverRun(indexedDB);
+    if (generation !== mutationGeneration.current) return;
     publishSnapshot(coordinatorRef.current, setSnapshot);
   };
 
@@ -877,30 +912,27 @@ export function usePlayerBackupWizard(
       | undefined;
     const cloud = createManualCharacterCloud(window.localStorage);
     const cloudId = cloudRowForLegacyId(snapshot.cloud, legacyId)?.id;
-    if (!run || !accountId || !cloud || !cloudId) return;
+    if (!accountId || !cloud || !cloudId) return;
     const generation = mutationGeneration.current;
     const assertCurrent = () => {
       if (generation !== mutationGeneration.current) {
         throw new PlayerBackupRunReplacedError();
       }
     };
-    setBusy(true);
-    setActionError(null);
-    void restorePlayerBackupCharacter({
+    const restoreInput = {
       factory: indexedDB,
       locks,
       accountId,
-      expectedActiveRunId: run.runId,
       cloudId,
       localCharacters: usePlayerStore.getState().characters,
       mode,
       service: cloud.service,
       assertCurrent,
-      has: id =>
+      has: (id: string) =>
         usePlayerStore
           .getState()
           .characters.some(character => character.id === id),
-      add: character => {
+      add: (character: unknown) => {
         const store = usePlayerStore.getState();
         return store.addCloudRecoveredCharacter(
           character as unknown as Parameters<
@@ -908,7 +940,7 @@ export function usePlayerBackupWizard(
           >[0]
         );
       },
-      replace: character => {
+      replace: (character: unknown) => {
         const store = usePlayerStore.getState();
         return store.replaceCloudRecoveredCharacter(
           character as unknown as Parameters<
@@ -917,14 +949,56 @@ export function usePlayerBackupWizard(
         );
       },
       persistRoster: awaitCharacterPersistenceResult,
-      attachLink: link => cloud.service.attachLink(link),
-    })
+      attachLink: (link: Parameters<typeof cloud.service.attachLink>[0]) =>
+        cloud.service.attachLink(link),
+    };
+    setBusy(true);
+    setActionError(null);
+    const restore = run
+      ? restorePlayerBackupCharacter({
+          ...restoreInput,
+          expectedActiveRunId: run.runId,
+        })
+      : restorePlayerBackupCharacterWithoutRun(restoreInput);
+    void restore
       .then(async () => {
         if (generation !== mutationGeneration.current) return;
-        await reloadDurableEvidence(accountId, run.runId, generation);
+        if (run) {
+          await reloadDurableEvidence(accountId, run.runId, generation);
+          return;
+        }
+        await reloadCloudPreview(accountId, generation);
       })
-      .catch(cause => {
+      .catch(async cause => {
         if (generation !== mutationGeneration.current) return;
+        if (cause instanceof PlayerBackupActiveRunPointerCorruptError) {
+          setSurface('recovery');
+          reportError('online', cause);
+          return;
+        }
+        if (!run && cause instanceof PlayerBackupRunReplacedError) {
+          await coordinatorRef.current.discoverRun(indexedDB);
+          if (generation !== mutationGeneration.current) return;
+          const nextRun = coordinatorRef.current.snapshot().run;
+          publishSnapshot(coordinatorRef.current, setSnapshot);
+          if (!nextRun) {
+            setSurface('recovery');
+            reportError('online', cause);
+            return;
+          }
+          try {
+            await restorePlayerBackupCharacter({
+              ...restoreInput,
+              expectedActiveRunId: nextRun.runId,
+            });
+            if (generation !== mutationGeneration.current) return;
+            await reloadDurableEvidence(accountId, nextRun.runId, generation);
+          } catch (retryCause) {
+            if (generation !== mutationGeneration.current) return;
+            reportError('online', retryCause);
+          }
+          return;
+        }
         reportError('online', cause);
       })
       .finally(() => {

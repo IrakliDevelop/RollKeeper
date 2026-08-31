@@ -162,6 +162,7 @@ describe('projectPlayerBackupManagement', () => {
       futureDefaultEnabled: true,
       manualMutation: true,
       automaticMutation: true,
+      runScoped: true,
       cloudLegacyIds: ['aveline'],
     });
     expect(management.futureDefaultEnabled).toBe(true);
@@ -280,6 +281,7 @@ describe('projectPlayerBackupManagement', () => {
       futureDefaultOn: false,
       manualMutation: true,
       automaticMutation: true,
+      runScoped: true,
     });
 
     expect(management.summary).toContain('1 protected');
@@ -325,6 +327,7 @@ describe('projectPlayerBackupManagement', () => {
       futureDefaultOn: false,
       manualMutation: true,
       automaticMutation: true,
+      runScoped: true,
     });
 
     expect(management.summary).toContain('1 needs attention');
@@ -400,6 +403,7 @@ describe('projectPlayerBackupManagement', () => {
       futureDefaultOn: false,
       manualMutation: true,
       automaticMutation: true,
+      runScoped: true,
     });
     const local = management.rows.find(row => row.id === 'aveline');
     const online = management.rows.find(row => row.id === 'cloud-only');

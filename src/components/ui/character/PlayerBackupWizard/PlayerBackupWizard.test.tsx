@@ -209,6 +209,80 @@ describe('PlayerBackupWizard', () => {
     expectPlayerBackupVocabulary(baseElement);
   });
 
+  it('lists restore actions for online copies on the recovery surface', () => {
+    const onRestoreHere = vi.fn();
+    const view = createPlayerBackupWizardFixture('recovery-required');
+    view.management = {
+      ...view.management,
+      rows: [
+        {
+          id: 'nyx',
+          name: 'Nyx Emberveil',
+          statusLabel: COPY.selection.oneTimeProtected,
+          note: '',
+          tone: 'info',
+          actions: [
+            {
+              label: COPY.management.restoreHere,
+              enabled: true,
+              action: 'restore-here',
+            },
+            {
+              label: COPY.management.restoreCopy,
+              enabled: true,
+              action: 'restore-copy',
+            },
+            {
+              label: COPY.conflict.downloadRecovery,
+              enabled: true,
+              action: 'download-recovery',
+            },
+            {
+              label: COPY.management.remove,
+              enabled: false,
+              action: 'remove',
+            },
+          ],
+        },
+        {
+          id: 'archived',
+          name: 'Archived Hero',
+          statusLabel: COPY.selection.removed,
+          note: '',
+          tone: 'warn',
+          actions: [
+            {
+              label: COPY.management.restoreHere,
+              enabled: true,
+              action: 'restore-here',
+            },
+            {
+              label: COPY.management.remove,
+              enabled: false,
+              action: 'remove',
+            },
+          ],
+        },
+      ],
+    };
+    const { baseElement } = renderWizard(
+      view,
+      createIdlePlayerBackupWizardActions({ onRestoreHere })
+    );
+    const restoreHere = screen.getAllByRole('button', {
+      name: COPY.management.restoreHere,
+    });
+    expect(restoreHere).toHaveLength(2);
+    expect(restoreHere[0]).toBeEnabled();
+    expect(restoreHere[1]).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: COPY.management.restoreCopy })
+    ).toBeEnabled();
+    expect(screen.getByText('Nyx Emberveil')).toBeInTheDocument();
+    expect(screen.getByText('Archived Hero')).toBeInTheDocument();
+    expectPlayerBackupVocabulary(baseElement);
+  });
+
   it('names the safety file input and exposes mismatch as an alert', () => {
     renderWizard('wrong-file');
     expect(screen.getByLabelText(COPY.safety.fileInput)).toBeInTheDocument();
