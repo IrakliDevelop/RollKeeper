@@ -78,6 +78,35 @@ describe('IndexedDbCampaignSettingsRepository', () => {
     await transactionComplete(transaction);
   });
 
+  it('supersedes retryable work when a newer local revision replaces it', async () => {
+    const repo = repository();
+    const first = await repo.commit(mutation());
+    if (!first.saved) throw new Error('expected first local save');
+    await repo.updateWork(first.mutationId, {
+      state: 'retry',
+      lastError: 'cloud-unavailable',
+    });
+
+    const replacement = await repo.commit(
+      mutation({ localRevision: 2, contentFingerprint: 'b'.repeat(64) })
+    );
+    if (!replacement.saved) throw new Error('expected replacement save');
+
+    await expect(repo.listOutbox(NAMESPACE, 'campaign-a')).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          mutationId: first.mutationId,
+          state: 'superseded',
+          lastError: null,
+        }),
+        expect.objectContaining({
+          mutationId: replacement.mutationId,
+          state: 'queued',
+        }),
+      ])
+    );
+  });
+
   it('returns unsaved and leaves no partial row after an aborted transaction', async () => {
     await expect(
       repository().commit(mutation(), { abortTransaction: true })

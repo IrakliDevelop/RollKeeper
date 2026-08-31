@@ -133,9 +133,13 @@ export class IndexedDbMagicItemRepository {
       this.options.beforeCommit?.();
       for (const entry of pending) {
         if (
-          // Under IndexedDB authority every commit pauses the outbox, so a
-          // paused predecessor must be superseded exactly like a queued one.
-          (entry.state === 'queued' || entry.state === 'paused') &&
+          // A newer revision is the user's explicit replacement for any
+          // unsent predecessor. Keep inflight and conflict work visible, but
+          // do not let a recoverable network/auth failure poison hydration.
+          (entry.state === 'queued' ||
+            entry.state === 'retry' ||
+            entry.state === 'auth-required' ||
+            entry.state === 'paused') &&
           entry.namespace === mutation.namespace &&
           entry.campaignId === mutation.campaignId &&
           entry.legacyId === mutation.legacyId &&
