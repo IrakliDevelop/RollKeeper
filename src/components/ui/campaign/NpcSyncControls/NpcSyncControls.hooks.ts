@@ -327,10 +327,26 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     const client = createSupabaseBrowserClient();
     if (!client) return;
     const hide = () => {
+      setContext(null);
       setScope(null);
+      setWorkspaces([]);
+      setWorkspace(null);
+      setManifest(null);
+      setRecovery(null);
+      setRecoveryVerified(false);
+      setNpcsSelected(false);
+      setPreparedGeneration(null);
       setAuthority(null);
+      setHistoryLegacyId(null);
+      setVersions([]);
+      setComparison(null);
+      setEnrollmentPreview(null);
+      setStatus(null);
+      setError(null);
       setHydrated(false);
+      lastFingerprints.current = null;
       hydrationSignature.current = null;
+      rollbackMutationId.current = null;
       hideNpcs(campaignCode);
     };
     const hydrate = async (accountId: string | null) => {

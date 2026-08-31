@@ -519,6 +519,39 @@ describe('CalendarSyncControls gates', () => {
     );
   });
 
+  it('clears account-scoped workspace controls after an account switch', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
+    mockOwnerWorkspaceWithMemory().push(workspace);
+    const fireAuthEvent = mockOwnerSessionCapturingListener();
+    await seedLocalIndexedDbAuthority();
+    useCalendarStore.setState(oneCalendarState());
+    seedCalendarEnvelope();
+
+    render(<CalendarSyncControls campaign={campaign} />);
+    await screen.findByText(
+      'Calendar loaded from the verified local IndexedDB generation.'
+    );
+    expect(
+      screen.getByRole('button', { name: 'Preview cloud enrollment' })
+    ).toBeVisible();
+
+    await act(async () => {
+      fireAuthEvent('SIGNED_IN', {
+        user: { id: '33333333-3333-4333-8333-333333333333' },
+      });
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Find owner workspaces' })
+      ).toBeVisible()
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Preview cloud enrollment' })
+    ).toBeNull();
+  });
+
   it('does not upload the local candidate after enrollment until the cloud generation is applied', async () => {
     vi.stubEnv('NEXT_PUBLIC_CALENDAR_SYNC_VISIBLE', 'true');
     mockOwnerWorkspaceWithMemory();
