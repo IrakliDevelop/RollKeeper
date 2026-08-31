@@ -89,6 +89,7 @@ interface PlayerStoreState {
   duplicateCharacter: (characterId: string, newName: string) => string;
   addCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
   replaceCloudRecoveredCharacter: (character: PlayerCharacter) => boolean;
+  discardCloudRecoveredCharacter: (characterId: string) => void;
 
   // Character selection
   setActiveCharacter: (characterId: string | null) => void;
@@ -142,6 +143,37 @@ const createPlayerCharacter = (
     isArchived: false,
   };
 };
+
+function tombstoneCharacterFromRoster(
+  state: {
+    characters: PlayerCharacter[];
+    characterTombstones: Record<string, CharacterDeletionTombstone>;
+    activeCharacterId: string | null;
+    lastSelectedCharacterId: string | null;
+  },
+  characterId: string
+) {
+  const character = state.characters.find(c => c.id === characterId);
+  return {
+    characters: state.characters.filter(c => c.id !== characterId),
+    characterTombstones: character
+      ? {
+          ...state.characterTombstones,
+          [characterId]: {
+            id: characterId,
+            deletedAt: Date.now(),
+            beforeImage: structuredClone(character),
+          },
+        }
+      : state.characterTombstones,
+    activeCharacterId:
+      state.activeCharacterId === characterId ? null : state.activeCharacterId,
+    lastSelectedCharacterId:
+      state.lastSelectedCharacterId === characterId
+        ? null
+        : state.lastSelectedCharacterId,
+  };
+}
 
 // Migration function
 const migrateOldCharacterData = (): PlayerCharacter | null => {
@@ -332,27 +364,7 @@ export const usePlayerStore = create<PlayerStoreState>()(
             }
           ).catch(() => {});
         }
-        set(state => ({
-          characters: state.characters.filter(c => c.id !== characterId),
-          characterTombstones: character
-            ? {
-                ...state.characterTombstones,
-                [characterId]: {
-                  id: characterId,
-                  deletedAt: Date.now(),
-                  beforeImage: structuredClone(character),
-                },
-              }
-            : state.characterTombstones,
-          activeCharacterId:
-            state.activeCharacterId === characterId
-              ? null
-              : state.activeCharacterId,
-          lastSelectedCharacterId:
-            state.lastSelectedCharacterId === characterId
-              ? null
-              : state.lastSelectedCharacterId,
-        }));
+        set(state => tombstoneCharacterFromRoster(state, characterId));
       },
 
       archiveCharacter: characterId => {
@@ -426,6 +438,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
           ),
         }));
         return true;
+      },
+
+      discardCloudRecoveredCharacter: characterId => {
+        set(state => tombstoneCharacterFromRoster(state, characterId));
       },
 
       // Character selection

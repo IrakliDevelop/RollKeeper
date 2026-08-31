@@ -279,6 +279,37 @@ describe('playerStore', () => {
     });
   });
 
+  describe('discardCloudRecoveredCharacter', () => {
+    it('removes the character and publishes a deletion tombstone without campaign DELETE', () => {
+      const fetchFn = mockFetchResponse(200, { success: true });
+      usePlayerStore.getState().addCloudRecoveredCharacter({
+        id: 'nyx',
+        name: 'Nyx Emberveil',
+        race: 'Tiefling',
+        class: 'Warlock',
+        level: 5,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+        lastPlayed: new Date('2026-01-03T00:00:00.000Z'),
+        characterData: makeCharacter({ id: 'nyx', name: 'Nyx Emberveil' }),
+        tags: [],
+        isArchived: false,
+        campaignCode: 'ABC123',
+      });
+
+      usePlayerStore.getState().discardCloudRecoveredCharacter('nyx');
+
+      expect(fetchFn).not.toHaveBeenCalled();
+      expect(usePlayerStore.getState().characters).toHaveLength(0);
+      expect(usePlayerStore.getState().characterTombstones.nyx).toEqual(
+        expect.objectContaining({
+          id: 'nyx',
+          beforeImage: expect.objectContaining({ id: 'nyx' }),
+        })
+      );
+    });
+  });
+
   describe('setActiveCharacter', () => {
     it('sets the active character ID', () => {
       const id = usePlayerStore.getState().createCharacter('Hero');

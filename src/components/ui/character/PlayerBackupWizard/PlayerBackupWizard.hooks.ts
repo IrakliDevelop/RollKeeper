@@ -951,19 +951,7 @@ export function usePlayerBackupWizard(
         );
       },
       remove: (legacyId: string) => {
-        usePlayerStore.setState(state => ({
-          characters: state.characters.filter(
-            character => character.id !== legacyId
-          ),
-          activeCharacterId:
-            state.activeCharacterId === legacyId
-              ? null
-              : state.activeCharacterId,
-          lastSelectedCharacterId:
-            state.lastSelectedCharacterId === legacyId
-              ? null
-              : state.lastSelectedCharacterId,
-        }));
+        usePlayerStore.getState().discardCloudRecoveredCharacter(legacyId);
       },
       persistRoster: awaitCharacterPersistenceResult,
       attachLink: (link: Parameters<typeof cloud.service.attachLink>[0]) =>

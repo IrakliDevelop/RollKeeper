@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PLAYER_BACKUP_COPY as COPY } from '@/lib/playerBackup/playerBackupCopy';
 import { verifyDownloadedDeviceBackup } from '@/lib/deviceRecovery';
+import { initCrossTabRosterSync } from '@/lib/crossTabRosterSync';
 import {
   confirmPlayerBackupConsent,
   PlayerBackupReadOnlyCoordinator,
@@ -20,6 +21,8 @@ import {
   type PlayerBackupRunV1,
 } from '@/lib/playerBackup/playerBackupRunRepository';
 import { usePlayerStore, type PlayerCharacter } from '@/store/playerStore';
+import { PLAYER_STORAGE_KEY } from '@/utils/constants';
+import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 import { usePlayerBackupWizard } from './PlayerBackupWizard.hooks';
 import type { PlayerBackupRouteIntent } from '@/lib/playerBackup/playerBackupDashboard';
@@ -505,7 +508,7 @@ beforeEach(() => {
     plan: { kind: 'attach-link', character: null, attachCloudLink: false },
     link: {},
   });
-  usePlayerStore.setState({ characters: [] });
+  usePlayerStore.setState({ characters: [], characterTombstones: {} });
 });
 
 async function signIn(id: string, email: string) {
@@ -1270,5 +1273,90 @@ describe('usePlayerBackupWizard', () => {
     );
     expect(restoreApis.restorePlayerBackupCharacter).not.toHaveBeenCalled();
     expect(usePlayerStore.getState().characters).toEqual([]);
+  });
+
+  it('tombstones a rolled-back restore so a sibling tab does not keep the other account’s character', async () => {
+    vi.mocked(readActivePlayerBackupRun).mockResolvedValue(null);
+    vi.mocked(previewPlayerBackupCloud).mockResolvedValue({
+      account: { id: 'acc-a', email: 'a@example.com' },
+      characters: [],
+      onlineOnly: [
+        decodedOnlineOnly({
+          id: 'cloud-nyx',
+          legacyId: 'nyx',
+          name: 'Nyx Emberveil',
+        }),
+      ],
+    });
+    let characters: PlayerCharacter[] = [];
+    let characterTombstones: Record<
+      string,
+      { id: string; deletedAt: number; beforeImage: PlayerCharacter }
+    > = {};
+    const sibling = {
+      getState: () => ({ characters, characterTombstones }),
+      setState: (partial: {
+        characters: PlayerCharacter[];
+        characterTombstones: typeof characterTombstones;
+      }) => {
+        characters = partial.characters;
+        characterTombstones = partial.characterTombstones;
+      },
+    };
+    const stop = initCrossTabRosterSync(sibling);
+    const broadcast = () => {
+      const state = usePlayerStore.getState();
+      window.dispatchEvent(
+        new StorageEvent('storage', {
+          key: PLAYER_STORAGE_KEY,
+          newValue: JSON.stringify({
+            state: {
+              characters: state.characters,
+              characterTombstones: state.characterTombstones,
+            },
+            version: 1,
+          }),
+          storageArea: window.localStorage,
+        })
+      );
+    };
+    restoreApis.restorePlayerBackupCharacterWithoutRun.mockImplementation(
+      async options => {
+        const character: PlayerCharacter = {
+          id: 'nyx',
+          name: 'Nyx Emberveil',
+          race: 'Tiefling',
+          class: 'Warlock',
+          level: 5,
+          createdAt: new Date('2026-01-01T00:00:00.000Z'),
+          updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+          lastPlayed: new Date('2026-01-03T00:00:00.000Z'),
+          characterData: makeCharacter({ id: 'nyx', name: 'Nyx Emberveil' }),
+          tags: [],
+          isArchived: false,
+        };
+        expect(options.add(character)).toBe(true);
+        broadcast();
+        expect(characters.map(entry => entry.id)).toContain('nyx');
+        options.remove('nyx');
+        await options.persistRoster();
+        broadcast();
+        expect(characters.map(entry => entry.id)).not.toContain('nyx');
+        throw new Error('account-switched');
+      }
+    );
+    auth.emit({ id: 'acc-a', email: 'a@example.com' });
+    render(<CloudRestoreProbe intent="recovery" />);
+    await waitFor(() => {
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
+    });
+    await userEvent.click(screen.getByTestId('row-nyx-restore-here'));
+    await waitFor(() => {
+      expect(
+        restoreApis.restorePlayerBackupCharacterWithoutRun
+      ).toHaveBeenCalledOnce();
+    });
+    expect(characters.map(entry => entry.id)).not.toContain('nyx');
+    stop();
   });
 });
