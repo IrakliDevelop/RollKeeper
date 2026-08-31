@@ -101,6 +101,31 @@ describe('PlayerSummaryCard', () => {
     render(<PlayerSummaryCard player={mockPlayer} />);
     expect(screen.getAllByText('Dwarf').length).toBeGreaterThan(0);
   });
+
+  it('opens the character image full size without triggering the card action', () => {
+    const onClick = vi.fn();
+    const playerWithAvatar: CampaignPlayerData = {
+      ...mockPlayer,
+      characterData: makeCharacter({
+        ...mockPlayer.characterData,
+        avatar: 'data:image/png;base64,cG9ydHJhaXQ=',
+      }),
+    };
+
+    render(<PlayerSummaryCard player={playerWithAvatar} onClick={onClick} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: /view thorin image full size/i })
+    );
+
+    expect(
+      screen.getByRole('dialog', { name: /thorin full-size image/i })
+    ).toBeInTheDocument();
+    expect(onClick).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: /close image/i }));
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(onClick).not.toHaveBeenCalled();
+  });
 });
 
 describe('PlayerSummaryCard remove action', () => {

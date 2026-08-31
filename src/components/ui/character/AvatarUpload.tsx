@@ -11,6 +11,7 @@ import React, { useRef, useState } from 'react';
 import Image from 'next/image';
 import { Upload, X, User } from 'lucide-react';
 import { Button } from '@/components/ui/forms';
+import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { cn } from '@/utils/cn';
 import { MAX_AVATAR_SIZE_MB, MAX_AVATAR_SIZE_BYTES } from '@/utils/constants';
 
@@ -50,6 +51,7 @@ export function AvatarUpload({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showFullImage, setShowFullImage] = useState(false);
 
   const handleFileSelect = async (
     event: React.ChangeEvent<HTMLInputElement>
@@ -146,15 +148,30 @@ export function AvatarUpload({
     <div className={cn('flex flex-col items-center gap-3', className)}>
       <div className="relative">
         {/* Avatar Display */}
-        <div
+        <button
+          type="button"
           className={cn(
             'border-border-secondary from-surface-secondary to-surface-inset relative overflow-hidden rounded-full border-2 bg-gradient-to-br',
             sizeClasses[size],
-            editable &&
+            avatar &&
               'hover:border-accent-blue-border-strong cursor-pointer transition-colors',
             isLoading && 'opacity-50'
           )}
-          onClick={editable ? handleUploadClick : undefined}
+          onClick={event => {
+            event.stopPropagation();
+            if (editable) handleUploadClick();
+            else if (avatar) setShowFullImage(true);
+          }}
+          aria-label={
+            editable
+              ? avatar
+                ? `Change ${characterName} avatar`
+                : `Upload ${characterName} avatar`
+              : avatar
+                ? `View ${characterName} image full size`
+                : `${characterName} has no avatar`
+          }
+          disabled={!editable && !avatar}
         >
           {avatar ? (
             <Image
@@ -175,7 +192,7 @@ export function AvatarUpload({
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-white border-t-transparent" />
             </div>
           )}
-        </div>
+        </button>
 
         {/* Remove Button (only show if avatar exists and is editable) */}
         {avatar && editable && !isLoading && (
@@ -223,6 +240,14 @@ export function AvatarUpload({
         <p className="text-muted text-center text-xs">
           Max {MAX_AVATAR_SIZE_MB}MB • Uploaded to cloud storage
         </p>
+      )}
+
+      {showFullImage && avatar && (
+        <ImageLightbox
+          src={avatar}
+          alt={`${characterName} avatar`}
+          onClose={() => setShowFullImage(false)}
+        />
       )}
     </div>
   );

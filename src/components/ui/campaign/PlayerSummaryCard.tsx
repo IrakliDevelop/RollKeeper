@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import Image from 'next/image';
 import {
   Shield,
@@ -18,6 +18,7 @@ import {
   UserX,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { CampaignPlayerData } from '@/types/campaign';
 import {
   calculateCharacterArmorClass,
@@ -136,6 +137,8 @@ export function PlayerSummaryCard({
   const passiveInvestigation = calculatePassiveInvestigation(char);
 
   const avatarSrc = char.avatar?.trim();
+  const [showFullImage, setShowFullImage] = useState(false);
+  const characterName = char.name || player.characterName || 'Character';
 
   return (
     <div
@@ -158,16 +161,24 @@ export function PlayerSummaryCard({
         {/* Header: optional avatar + name, race, class, level */}
         <div className="mb-3 flex gap-3">
           {avatarSrc ? (
-            <div className="border-divider relative h-14 w-14 shrink-0 overflow-hidden rounded-full border-2">
+            <button
+              type="button"
+              className="border-divider hover:border-accent-blue-border-strong relative h-14 w-14 shrink-0 cursor-pointer overflow-hidden rounded-full border-2 transition-colors"
+              onClick={event => {
+                event.stopPropagation();
+                setShowFullImage(true);
+              }}
+              aria-label={`View ${characterName} image full size`}
+            >
               <Image
                 src={avatarSrc}
-                alt={char.name || player.characterName || 'Character'}
+                alt={characterName}
                 fill
                 className="object-cover"
                 sizes="56px"
                 unoptimized={avatarSrc.startsWith('data:')}
               />
-            </div>
+            </button>
           ) : null}
           <div className="min-w-0 flex-1">
             <div className="mb-2 flex items-start justify-between gap-2">
@@ -410,6 +421,13 @@ export function PlayerSummaryCard({
           )}
         </div>
       </div>
+      {showFullImage && avatarSrc && (
+        <ImageLightbox
+          src={avatarSrc}
+          alt={characterName}
+          onClose={() => setShowFullImage(false)}
+        />
+      )}
     </div>
   );
 }
