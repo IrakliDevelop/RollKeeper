@@ -120,6 +120,7 @@ function AccountHeaderSession() {
           <button
             type="button"
             className="border-divider bg-surface-raised text-heading hover:bg-surface-hover inline-flex h-9 items-center gap-2 rounded-full border py-0 pr-2 pl-1 text-sm font-medium"
+            aria-label={`Account menu for ${email}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(open => !open)}
@@ -127,9 +128,11 @@ function AccountHeaderSession() {
             <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 text-xs font-bold text-white">
               {accountInitials(email)}
             </span>
-            <span className="max-w-[168px] truncate">{email}</span>
+            <span className="hidden max-w-[168px] truncate sm:block">
+              {email}
+            </span>
             <ChevronDown
-              className={`text-muted mr-1 h-4 w-4 transition-transform duration-150 ${
+              className={`text-muted mr-1 hidden h-4 w-4 transition-transform duration-150 sm:block ${
                 menuOpen ? 'rotate-180' : ''
               }`}
             />
