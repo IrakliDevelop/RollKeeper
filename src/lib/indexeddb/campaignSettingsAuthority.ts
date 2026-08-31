@@ -289,6 +289,9 @@ export async function markCampaignSettingsCloudAuthority(
     const document = (await requestResult(documents.get(key))) as
       | CampaignSettingsDocument
       | undefined;
+    const workingCopyMatchesAccepted =
+      document?.contentFingerprint ===
+      options.acceptedVersion.payloadFingerprint;
     if (document)
       documents.put({
         ...document,
@@ -304,12 +307,14 @@ export async function markCampaignSettingsCloudAuthority(
         entry.namespace === options.namespace &&
         entry.campaignId === options.campaignId &&
         entry.family === 'campaign_settings' &&
+        entry.legacyId === options.acceptedVersion.legacyId &&
         entry.state !== 'acknowledged' &&
         entry.state !== 'superseded'
       ) {
         if (
+          workingCopyMatchesAccepted ||
           entry.contentFingerprint ===
-          options.acceptedVersion.payloadFingerprint
+            options.acceptedVersion.payloadFingerprint
         ) {
           outbox.put({
             ...entry,

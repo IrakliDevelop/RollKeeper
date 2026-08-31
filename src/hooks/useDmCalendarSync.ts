@@ -32,6 +32,14 @@ export function useDmCalendarSync(
       startTime: number;
       weather?: SharedCalendar['weather'];
     }) => {
+      if (
+        typeof localStorage !== 'undefined' &&
+        !legacyCalendarProjectionAllowed(localStorage, campaignCode)
+      ) {
+        pendingCalendarRef.current = null;
+        setError(null);
+        return;
+      }
       const data: SharedCalendar = {
         config: calendar.config,
         currentTime: calendar.currentTime,

@@ -5,6 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogBody,
@@ -70,7 +71,9 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
           </div>
         </DialogHeader>
         <DialogBody>
-          <p className="text-body leading-relaxed">{message}</p>
+          <DialogDescription className="leading-relaxed">
+            {message}
+          </DialogDescription>
         </DialogBody>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>

@@ -46,6 +46,7 @@ import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignS
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { useDmCounterSync } from '@/hooks/useDmCounterSync';
 import { useDmSettingsSync } from '@/hooks/useDmSettingsSync';
+import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { BannerUpload } from '@/components/ui/campaign/BannerUpload';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
@@ -80,6 +81,7 @@ function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
 export default function CampaignViewPage() {
   const params = useParams();
   const code = params.code as string;
+  const hasHydrated = useHydration();
 
   const {
     dmId,
@@ -315,6 +317,14 @@ export default function CampaignViewPage() {
     setCustomCounterLabel(code, label);
     setEditingCounterLabel(false);
   };
+
+  if (!hasHydrated) {
+    return (
+      <div className="bg-surface flex min-h-screen items-center justify-center">
+        <div className="text-muted animate-pulse">Loading...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="bg-surface min-h-screen">
