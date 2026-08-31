@@ -36,6 +36,7 @@ export interface PlayerCharacter {
 export interface CharacterDeletionTombstone {
   id: string;
   deletedAt: number;
+  resolvedAt?: number;
   beforeImage: PlayerCharacter;
 }
 
@@ -154,6 +155,8 @@ function tombstoneCharacterFromRoster(
   characterId: string
 ) {
   const character = state.characters.find(c => c.id === characterId);
+  const existingMarker = state.characterTombstones[characterId];
+  const deletedAt = nextCharacterMarkerTime(existingMarker);
   return {
     characters: state.characters.filter(c => c.id !== characterId),
     characterTombstones: character
@@ -161,7 +164,7 @@ function tombstoneCharacterFromRoster(
           ...state.characterTombstones,
           [characterId]: {
             id: characterId,
-            deletedAt: Date.now(),
+            deletedAt,
             beforeImage: structuredClone(character),
           },
         }
@@ -172,6 +175,37 @@ function tombstoneCharacterFromRoster(
       state.lastSelectedCharacterId === characterId
         ? null
         : state.lastSelectedCharacterId,
+  };
+}
+
+function nextCharacterMarkerTime(
+  marker: CharacterDeletionTombstone | undefined
+): number {
+  return Math.max(
+    Date.now(),
+    (marker?.deletedAt ?? 0) + 1,
+    (marker?.resolvedAt ?? 0) + 1
+  );
+}
+
+function resolvedCharacterMarker(
+  state: {
+    characters: PlayerCharacter[];
+    characterTombstones: Record<string, CharacterDeletionTombstone>;
+  },
+  character: PlayerCharacter
+): CharacterDeletionTombstone {
+  const existingMarker = state.characterTombstones[character.id];
+  const existingCharacter = state.characters.find(
+    candidate => candidate.id === character.id
+  );
+  return {
+    id: character.id,
+    deletedAt: existingMarker?.deletedAt ?? 0,
+    resolvedAt: nextCharacterMarkerTime(existingMarker),
+    beforeImage: structuredClone(
+      existingMarker?.beforeImage ?? existingCharacter ?? character
+    ),
   };
 }
 
@@ -421,6 +455,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
         const recovered = structuredClone(character);
         set(state => ({
           characters: [...state.characters, recovered],
+          characterTombstones: {
+            ...state.characterTombstones,
+            [recovered.id]: resolvedCharacterMarker(state, recovered),
+          },
         }));
         return true;
       },
@@ -436,6 +474,10 @@ export const usePlayerStore = create<PlayerStoreState>()(
           characters: state.characters.map(candidate =>
             candidate.id === recovered.id ? recovered : candidate
           ),
+          characterTombstones: {
+            ...state.characterTombstones,
+            [recovered.id]: resolvedCharacterMarker(state, recovered),
+          },
         }));
         return true;
       },

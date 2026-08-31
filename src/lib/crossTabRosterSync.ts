@@ -17,14 +17,26 @@ interface PlayerStoreLike {
   }) => void;
 }
 
+function markerVersion(marker: CharacterDeletionTombstone | undefined): number {
+  if (!marker) return 0;
+  return Math.max(marker.deletedAt, marker.resolvedAt ?? 0);
+}
+
+function isActiveTombstone(
+  marker: CharacterDeletionTombstone | undefined
+): boolean {
+  return Boolean(marker && marker.deletedAt >= (marker.resolvedAt ?? 0));
+}
+
 /**
  * Cross-tab roster convergence. Each tab persists its WHOLE roster, so a tab
  * holding character B used to write back a stale copy of character A over
  * A's fresh entry (multi-tab clobber). Merge per entry by (revision,
  * lastMutatedAt, lastMutatedBy) — strictly fresher wins; unknown ids are
- * adopted (created elsewhere); local-only entries are kept (deletion sync is
- * out of scope). setState only on change, so the echo event the other tab
- * receives finds equal revisions and terminates.
+ * adopted (created elsewhere). Ordered tombstone markers override ordinary
+ * freshness for explicit deletion, restore, and account-switch rollback;
+ * candidates coupled to an older marker cannot resurrect stale data. setState
+ * only on change, so the echo event the other tab receives terminates.
  */
 export function initCrossTabRosterSync(store: PlayerStoreLike): () => void {
   if (typeof window === 'undefined') return () => {};
@@ -52,23 +64,35 @@ export function initCrossTabRosterSync(store: PlayerStoreLike): () => void {
 
     const current = store.getState();
     const characterTombstones = { ...current.characterTombstones };
+    const authoritativeResolutions = new Set<string>();
     let changed = false;
     for (const [id, tombstone] of Object.entries(incomingTombstones)) {
       const local = characterTombstones[id];
-      if (!local || tombstone.deletedAt > local.deletedAt) {
+      if (markerVersion(tombstone) > markerVersion(local)) {
         characterTombstones[id] = tombstone;
+        if (!isActiveTombstone(tombstone)) {
+          authoritativeResolutions.add(id);
+        }
         changed = true;
       }
     }
     const incomingById = new Map(
       incoming
         .filter(entry => entry && typeof entry.id === 'string')
-        .filter(entry => !characterTombstones[entry.id])
+        .filter(entry => !isActiveTombstone(characterTombstones[entry.id]))
+        .filter(entry => {
+          const localMarker = current.characterTombstones[entry.id];
+          if (!localMarker) return true;
+          return (
+            markerVersion(incomingTombstones[entry.id]) >=
+            markerVersion(localMarker)
+          );
+        })
         .map(entry => [entry.id, entry])
     );
     const merged = current.characters
       .filter(entry => {
-        const keep = !characterTombstones[entry.id];
+        const keep = !isActiveTombstone(characterTombstones[entry.id]);
         if (!keep) changed = true;
         return keep;
       })
@@ -76,6 +100,10 @@ export function initCrossTabRosterSync(store: PlayerStoreLike): () => void {
         const candidate = incomingById.get(entry.id);
         incomingById.delete(entry.id);
         if (!candidate) return entry;
+        if (authoritativeResolutions.has(entry.id)) {
+          changed = true;
+          return candidate;
+        }
         if (
           isStrictlyFresher(
             candidate.characterData ?? {},
