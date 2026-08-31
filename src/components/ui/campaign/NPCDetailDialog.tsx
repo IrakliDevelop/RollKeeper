@@ -9,7 +9,6 @@ import {
   Footprints,
   BookOpen,
   ScrollText,
-  X,
   Package,
   Plus,
   Minus,
@@ -31,6 +30,7 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { ImageLightbox } from '@/components/ui/feedback/ImageLightbox';
 import { Badge } from '@/components/ui/layout/badge';
 import {
   AppIcon,
@@ -1071,28 +1071,11 @@ export function NPCDetailDialog({
       </DialogContent>
 
       {showFullImage && npc.avatarUrl && (
-        <div
-          className="fixed inset-0 z-200 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setShowFullImage(false)}
-        >
-          <button
-            type="button"
-            onClick={() => setShowFullImage(false)}
-            className="absolute top-4 right-4 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
-            aria-label="Close image"
-          >
-            <X className="h-6 w-6" />
-          </button>
-          <img
-            src={npc.avatarUrl}
-            alt={npc.name}
-            className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
-            onClick={e => e.stopPropagation()}
-          />
-          <p className="absolute bottom-4 text-center text-sm text-white/60">
-            Right-click image to copy or save
-          </p>
-        </div>
+        <ImageLightbox
+          src={npc.avatarUrl}
+          alt={npc.name}
+          onClose={() => setShowFullImage(false)}
+        />
       )}
 
       {/* Stacked Item View modal */}
