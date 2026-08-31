@@ -933,9 +933,9 @@ describe('usePlayerBackupWizard', () => {
     auth.emit({ id: 'acc-a', email: 'a@example.com' });
     render(<CloudRestoreProbe intent="recovery" />);
     await waitFor(() => {
-      expect(screen.getByTestId('signed-in')).toHaveTextContent('true');
+      expect(screen.getByTestId('surface')).toHaveTextContent('recovery');
+      expect(screen.getByTestId('row-nyx-restore-here')).toBeEnabled();
     });
-    expect(screen.getByTestId('surface')).toHaveTextContent('recovery');
     expect(screen.getByTestId('row-nyx-name')).toHaveTextContent(
       'Nyx Emberveil'
     );
