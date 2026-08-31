@@ -4,7 +4,6 @@ import {
   Download,
   Upload,
   RotateCcw,
-  FileText,
   ArrowLeft,
   Pencil,
   Eye,
@@ -17,7 +16,6 @@ import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
-import { exportCharacterToFile } from '@/utils/fileOperations';
 import { useState, useEffect } from 'react';
 import { Button, Input } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
@@ -134,8 +132,8 @@ export default function CharacterSheetHeader({
         onMouseLeave={() => setIsHovering(false)}
       >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
+          <div className="flex min-h-16 items-center justify-between gap-4 py-2">
+            <div className="flex min-w-0 items-center">
               <Link href="/player">
                 <Button
                   variant="ghost"
@@ -145,122 +143,23 @@ export default function CharacterSheetHeader({
                   Back to Characters
                 </Button>
               </Link>
-              <div className="ml-6">
-                <h1 className="text-heading text-xl font-bold">
+              <div className="ml-4 min-w-0">
+                <h1 className="text-heading truncate text-xl font-bold">
                   {characterName}
                 </h1>
-                <p className="text-body text-sm">
+                <p className="text-body truncate text-sm">
                   {characterRace} {characterClass || 'Unknown Class'} • Level{' '}
                   {characterLevel}
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-4">
+            <div className="flex shrink-0 items-center gap-3">
               <SaveIndicator lastSaved={lastSaved} status={saveStatus} />
 
               {extraHeaderContent}
 
               <HeaderTrailing />
-
-              {/* File Operations */}
-              <div className="flex items-center space-x-2">
-                <Button
-                  onClick={() => {
-                    try {
-                      const exportData = exportCharacter();
-                      exportCharacterToFile(exportData);
-                      onAddToast({
-                        type: 'success',
-                        title: 'Export Successful',
-                        message: 'Character exported successfully!',
-                      });
-                    } catch (error) {
-                      console.error('Export failed:', error);
-                      onAddToast({
-                        type: 'error',
-                        title: 'Export Failed',
-                        message: 'Failed to export character.',
-                      });
-                    }
-                  }}
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Download size={16} />}
-                  title="Export Character"
-                >
-                  Export
-                </Button>
-
-                <Button
-                  onClick={() => setShareOpen(true)}
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Share2 size={16} />}
-                  title="Share Character via QR"
-                >
-                  Share
-                </Button>
-
-                <Button asChild variant="outline" size="sm">
-                  <label className="cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <Upload size={16} />
-                      Import
-                    </span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={async e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          try {
-                            const text = await file.text();
-                            const data = JSON.parse(text);
-
-                            // Use the player store's import function
-                            const { importCharacter: importToPlayerStore } =
-                              usePlayerStore.getState();
-                            const newCharacterId = importToPlayerStore(data);
-
-                            onAddToast({
-                              type: 'success',
-                              title: 'Import Successful',
-                              message:
-                                'Character imported successfully! Redirecting to new character...',
-                            });
-
-                            // Redirect to the newly imported character after a brief delay
-                            setTimeout(() => {
-                              window.location.href = `/player/characters/${newCharacterId}`;
-                            }, 1500);
-                          } catch (error) {
-                            console.error('Import failed:', error);
-                            onAddToast({
-                              type: 'error',
-                              title: 'Import Failed',
-                              message:
-                                'Failed to import character. Please check the file format.',
-                            });
-                          }
-                        }
-                        e.target.value = '';
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </Button>
-
-                <Button
-                  onClick={onShowResetModal}
-                  variant="danger"
-                  size="sm"
-                  leftIcon={<RotateCcw size={16} />}
-                  title="Reset Character"
-                >
-                  Reset
-                </Button>
-              </div>
             </div>
           </div>
         </div>
@@ -281,8 +180,8 @@ export default function CharacterSheetHeader({
             />
 
             {/* Name Input and Buttons - side by side */}
-            <div className="flex flex-1 items-start justify-between gap-4">
-              <div className="flex-1">
+            <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
+              <div className="min-w-64 flex-1">
                 {isEditMode ? (
                   <Input
                     type="text"
@@ -333,7 +232,7 @@ export default function CharacterSheetHeader({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex shrink-0 gap-2">
+              <div className="flex flex-wrap justify-end gap-2">
                 {/* Edit/View Mode Toggle */}
                 <Button
                   onClick={() => setIsEditMode(!isEditMode)}
@@ -387,15 +286,53 @@ export default function CharacterSheetHeader({
 
                 <Button
                   asChild
-                  variant="secondary"
+                  variant="outline"
                   size="sm"
                   className="shadow-sm"
-                  title="Try the new Notes module prototype"
                 >
-                  <Link href="/prototype" className="flex items-center gap-2">
-                    <FileText size={16} />
-                    Notes Prototype
-                  </Link>
+                  <label className="cursor-pointer">
+                    <span className="flex items-center gap-2">
+                      <Upload size={16} />
+                      Import
+                    </span>
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={async e => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const text = await file.text();
+                            const data = JSON.parse(text);
+                            const { importCharacter: importToPlayerStore } =
+                              usePlayerStore.getState();
+                            const newCharacterId = importToPlayerStore(data);
+
+                            onAddToast({
+                              type: 'success',
+                              title: 'Import Successful',
+                              message:
+                                'Character imported successfully! Redirecting to new character...',
+                            });
+
+                            setTimeout(() => {
+                              window.location.href = `/player/characters/${newCharacterId}`;
+                            }, 1500);
+                          } catch (error) {
+                            console.error('Import failed:', error);
+                            onAddToast({
+                              type: 'error',
+                              title: 'Import Failed',
+                              message:
+                                'Failed to import character. Please check the file format.',
+                            });
+                          }
+                        }
+                        e.target.value = '';
+                      }}
+                      className="hidden"
+                    />
+                  </label>
                 </Button>
 
                 <Button
