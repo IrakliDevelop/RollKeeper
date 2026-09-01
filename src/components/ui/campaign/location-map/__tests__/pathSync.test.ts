@@ -232,6 +232,33 @@ describe('attachPathBroadcast', () => {
     });
   });
 
+  // Task 7 review, addition (a): a direct getElement-null gate test that
+  // does NOT go through a Map lookup miss (Case 5/6 below both reach null
+  // via `map.get(id) ?? null`) — `getElement` itself simply returns null
+  // outright, so this holds even if `movableTokenIdentity` were hardened to
+  // accept a null argument: `anchorBroadcastable`'s `!el ||` short-circuits
+  // before `movableTokenIdentity` is ever called.
+  it('getElement itself returning null gates the broadcast closed: one cleared frame, no broadcast, independent of movableTokenIdentity', () => {
+    const tool = emitter();
+    const conn = connection();
+    const getElement = vi.fn(() => null);
+    const handle = attachPathBroadcast(tool, conn, {
+      role: 'dm',
+      isDmOnlyElement: () => false,
+      getElement,
+    });
+    handle.setSharing(true);
+
+    tool.emit(activeEmission('e-1'));
+    expect(conn.sent).toEqual([]);
+    expect(getElement).toHaveBeenCalledWith('e-1');
+
+    // No frame was ever active, so a further null-anchor emission stays
+    // silent too (nothing to clear).
+    tool.emit(activeEmission('e-1'));
+    expect(conn.sent).toEqual([]);
+  });
+
   // Case 6
   it('deleted anchor fails closed: next emission clears once, then nothing', () => {
     const map = new Map<string, CanvasElement>();
@@ -256,6 +283,41 @@ describe('attachPathBroadcast', () => {
 
     tool.emit(activeEmission(token.id));
     expect(conn.sent).toHaveLength(2);
+  });
+
+  // Task 7 review, addition (b): recovery — a deleted anchor RESTORED
+  // (same id, re-added) broadcasts again on the next emission, proving the
+  // gate re-reads live state every time rather than latching closed once an
+  // anchor has ever failed the check.
+  it('a deleted anchor that is RESTORED (same id, re-added) broadcasts again on the next emission', () => {
+    const map = new Map<string, CanvasElement>();
+    const token = makeToken('e-1');
+    map.set(token.id, token);
+    const tool = emitter();
+    const conn = connection();
+    const handle = attachPathBroadcast(tool, conn, {
+      role: 'dm',
+      isDmOnlyElement: () => false,
+      getElement: id => map.get(id) ?? null,
+    });
+    handle.setSharing(true);
+
+    const emission = activeEmission(token.id);
+    tool.emit(emission);
+    expect(conn.sent).toEqual([toPathPresence(emission)]);
+
+    map.delete(token.id);
+    tool.emit(activeEmission(token.id));
+    expect(conn.sent).toEqual([toPathPresence(emission), clearedPayload]);
+
+    map.set(token.id, makeToken('e-1'));
+    const restoredEmission = activeEmission(token.id);
+    tool.emit(restoredEmission);
+    expect(conn.sent).toEqual([
+      toPathPresence(emission),
+      clearedPayload,
+      toPathPresence(restoredEmission),
+    ]);
   });
 
   // Case 7

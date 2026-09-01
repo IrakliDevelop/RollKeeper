@@ -282,6 +282,43 @@ describe('applyMovementCommit', () => {
     container.remove();
   });
 
+  it('logs the LIVE anchor centre as `from`, not the stale emission.waypoints[0], when the token moved after the emission was built', () => {
+    // Discriminating case (Task 6 review): build the emission anchored at
+    // the token's ORIGINAL centre, then move the token (e.g. another client's
+    // concurrent edit) BEFORE the commit is applied. `from` must reflect
+    // where the anchor actually is at commit time, not the path's own
+    // (now-stale) first waypoint.
+    const { vp, container } = makeViewport();
+    const token = tokenAt(80, 80, 'e-1');
+    vp.store.add(token);
+    const emission = commitEmission(token.id, DESTINATION);
+    // Move the token after the emission was built but before it commits —
+    // its live centre is now (300,300), not the emission's stale (100,100)
+    // waypoints[0].
+    vp.store.update(token.id, { position: { x: 280, y: 280 } });
+    const logMovement = vi.fn();
+    const ctx: MovementCommitContext = {
+      viewport: vp,
+      role: 'dm',
+      resolveMovement: () => ({ name: 'Goblin', walkFeet: 30 }),
+      logMovement,
+    };
+
+    const result = applyMovementCommit(emission, ctx);
+
+    expect(result).toBe(true);
+    expect(logMovement).toHaveBeenCalledTimes(1);
+    expect(logMovement).toHaveBeenCalledWith(
+      expect.objectContaining({ from: { x: 300, y: 300 } })
+    );
+    expect(logMovement).not.toHaveBeenCalledWith(
+      expect.objectContaining({ from: ORIGIN_CENTRE })
+    );
+
+    vp.destroy();
+    container.remove();
+  });
+
   it('unrelated identity check: a stamped player token is unreachable when tokenKind mismatches', () => {
     // Guards the identity re-resolution branch: PLAYER_TOKEN_KIND import is
     // exercised so a future rename of the constant is caught here too.
