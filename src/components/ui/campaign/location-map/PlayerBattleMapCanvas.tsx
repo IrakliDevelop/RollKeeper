@@ -294,14 +294,21 @@ export function PlayerBattleMapCanvas({
     setMovementDash(enabled);
   }, []);
   // Own-character speed source (spec decision 3): character.speed + buffs,
-  // fallback 30 ft when no character is loaded. Read live per path.
+  // fallback 30 ft when no character is loaded. Read live per path. Gated on
+  // IDENTITY, not mere presence: `character` from `useCharacterStore` is
+  // never null once a character has ever loaded, so during a roster switch
+  // it can briefly still hold the PREVIOUS character's name/speed while
+  // `characterId` (this route's prop) has already moved on — resolving to
+  // null (→ the tool's own 30 ft default) until the store catches up avoids
+  // stamping a path with the wrong character's name/speed.
   const ownMovementRef = useRef<MovementResolution | null>(null);
   const character = useCharacterStore(s => s.character);
   useEffect(() => {
-    ownMovementRef.current = character
-      ? { name: character.name, walkFeet: characterWalkingSpeed(character) }
-      : null;
-  }, [character]);
+    ownMovementRef.current =
+      character && character.id === characterId
+        ? { name: character.name, walkFeet: characterWalkingSpeed(character) }
+        : null;
+  }, [character, characterId]);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later after the connection is already established.
@@ -370,7 +377,16 @@ export function PlayerBattleMapCanvas({
       createMovementPathTool({
         getViewport: () => viewportRef.current,
         role: 'player',
-        characterId,
+        // `characterIdRef.current`, not the bare `characterId` closed over
+        // here: this file's convention (see `characterIdRef` above) is to
+        // read identity through the ref, not a construction-time capture.
+        // `MovementToolConfig.characterId` is a plain string, not a live
+        // getter, so this still freezes at whatever the ref holds THIS
+        // render — a full fix (characterId tracking a route change with no
+        // remount) needs an SDK-type change (a function instead of a
+        // string) and is out of scope here; `movableTokenMatch` reads it
+        // once per tool construction either way.
+        characterId: characterIdRef.current ?? undefined,
         resolveMovement: () => ownMovementRef.current,
         isDashActive: () => movementDashRef.current,
       }),
@@ -506,7 +522,11 @@ export function PlayerBattleMapCanvas({
         applyMovementCommit(emission, {
           viewport: vp,
           role: 'player',
-          characterId,
+          // Built fresh inside this per-commit callback, reading the LIVE
+          // ref rather than closing over `handleReady`'s `characterId` —
+          // `handleReady` itself only runs once (passed as `onReady`), so a
+          // bare `characterId` here would freeze at mount-time forever.
+          characterId: characterIdRef.current ?? undefined,
           resolveMovement: () => ownMovementRef.current,
           // No combat log on the player surface this cycle (locked decision 2).
         });
