@@ -216,12 +216,23 @@ test('desktop: move tool drags a token along a path and commits on tap-last', as
     await page.mouse.click(sx(DEST.x), sy(DEST.y)); // waypoint
     await page.mouse.click(sx(DEST.x), sy(DEST.y)); // tap-last -> commit
 
+    // DEST (600,460) snaps to the grid's even-footprint cell centre before
+    // commit: x = round(600/40)*40 = 600, y = round(460/40)*40 = 480
+    // (snapToCellCenter/snapAxisToCell, cellSize 40, 2x2 footprint). The
+    // committed waypoint is used as an ABSOLUTE destination for the token's
+    // centre (movementCommit.ts: `position = dest - size/2`), so the token
+    // centre moves from (360,300) to exactly (600,480) -> a delta of
+    // (+240, +180). A ±2px tolerance absorbs DPR/subpixel rounding of the
+    // decoration's boundingBox.
     await expect
-      .poll(async () => (await hpBar.boundingBox())?.x ?? null)
-      .toBeGreaterThan(before.x + 140);
-    await expect
-      .poll(async () => (await hpBar.boundingBox())?.y ?? null)
-      .toBeGreaterThan(before.y + 90);
+      .poll(async () => {
+        const box = await hpBar.boundingBox();
+        if (!box) return false;
+        const dx = box.x - before.x;
+        const dy = box.y - before.y;
+        return Math.abs(dx - 240) <= 2 && Math.abs(dy - 180) <= 2;
+      })
+      .toBe(true);
   } finally {
     await context.close();
   }
@@ -283,8 +294,17 @@ test('desktop: Escape cancels an open path and the token does not move', async (
     await page.mouse.click(sx(DEST.x), sy(DEST.y)); // open waypoint, no commit yet
     await page.keyboard.press('Escape');
 
-    // No commit fired, so nothing to await: assert immediately and again
-    // after a beat to also catch a late/erroneous commit.
+    // Discriminating check: tap the SAME destination point again. If Escape
+    // actually cancelled the path (PathTool.cancel), it is closed and this
+    // click lands on empty space -> resolveStart finds no token there, so
+    // it's a no-op. If Escape were broken (key swallowed without cancelling
+    // the path), the path would still be open with DEST as its last
+    // waypoint, and this click would be a tap-on-last-waypoint commit that
+    // MOVES the token -- exactly what a disabled-Escape mutant produces.
+    await page.mouse.click(sx(DEST.x), sy(DEST.y));
+
+    // No commit should ever fire, so nothing to await: assert immediately
+    // and again after a beat to also catch a late/erroneous commit.
     expect(await hpBar.boundingBox()).toEqual(before);
     await expect.poll(async () => hpBar.boundingBox()).toEqual(before);
   } finally {
