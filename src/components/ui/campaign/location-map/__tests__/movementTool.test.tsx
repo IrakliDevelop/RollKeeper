@@ -207,4 +207,40 @@ describe('createMovementPathTool', () => {
     vp.destroy();
     container.remove();
   });
+
+  it('player anchors on their own player token (unlocked layer)', () => {
+    const { vp, container } = makeViewport();
+    const ownToken = {
+      ...createShape({
+        position: { x: 80, y: 80 },
+        size: { w: 40, h: 40 },
+        shape: 'ellipse',
+        strokeColor: '#000',
+        strokeWidth: 1,
+        fillColor: '#2980b9',
+      }),
+      zIndex: 1000,
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'c-9',
+    };
+    vp.store.add(ownToken);
+    const playerTool = createMovementPathTool({
+      getViewport: () => vp,
+      role: 'player',
+      characterId: 'c-9',
+      resolveMovement: () => ({ name: 'Hero', walkFeet: 30 }),
+      isDashActive: () => false,
+    });
+    const anchor = playerTool.getOptions().resolveStart!(
+      { x: 100, y: 100 },
+      ctx
+    );
+    expect(anchor).toEqual({
+      origin: { x: 100, y: 100 },
+      footprint: { w: 1, h: 1 },
+      anchorKey: ownToken.id,
+    });
+    vp.destroy();
+    container.remove();
+  });
 });

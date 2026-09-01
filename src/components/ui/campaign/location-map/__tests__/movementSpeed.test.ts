@@ -42,6 +42,9 @@ describe('parseWalkingSpeed', () => {
       kind: 'no-walk',
     });
   });
+  it('recognizes bare "can hover" as no-walk via the CAN_HOVER branch alone (no fly segment present)', () => {
+    expect(parseWalkingSpeed('can hover')).toEqual({ kind: 'no-walk' });
+  });
   it('returns unknown for empty/undefined/garbage', () => {
     expect(parseWalkingSpeed('')).toEqual({ kind: 'unknown' });
     expect(parseWalkingSpeed(undefined)).toEqual({ kind: 'unknown' });

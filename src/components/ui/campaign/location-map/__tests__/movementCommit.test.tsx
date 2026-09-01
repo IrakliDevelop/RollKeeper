@@ -319,6 +319,50 @@ describe('applyMovementCommit', () => {
     container.remove();
   });
 
+  it('player commits a move of their own token', () => {
+    const { vp, container } = makeViewport();
+    const ownToken = {
+      ...createShape({
+        position: { x: 80, y: 80 },
+        size: { w: 40, h: 40 },
+        shape: 'ellipse',
+        strokeColor: '#000',
+        strokeWidth: 1,
+        fillColor: '#2980b9',
+      }),
+      zIndex: 1000,
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'c-9',
+    };
+    vp.store.add(ownToken);
+    const logMovement = vi.fn();
+    const ctx: MovementCommitContext = {
+      viewport: vp,
+      role: 'player',
+      characterId: 'c-9',
+      resolveMovement: () => ({ name: 'Hero', walkFeet: 30 }),
+      logMovement,
+    };
+
+    const result = applyMovementCommit(
+      commitEmission(ownToken.id, DESTINATION),
+      ctx
+    );
+
+    expect(result).toBe(true);
+    expect(vp.store.getById(ownToken.id)?.position).toEqual({
+      x: 240,
+      y: 160,
+    });
+    expect(logMovement).toHaveBeenCalledTimes(1);
+    expect(logMovement).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'c-9' })
+    );
+
+    vp.destroy();
+    container.remove();
+  });
+
   it('unrelated identity check: a stamped player token is unreachable when tokenKind mismatches', () => {
     // Guards the identity re-resolution branch: PLAYER_TOKEN_KIND import is
     // exercised so a future rename of the constant is caught here too.
