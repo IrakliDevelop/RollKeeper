@@ -9,6 +9,7 @@ import {
   snapTokenCenter,
   TOKEN_ELEMENT_ZINDEX,
 } from '@/components/ui/campaign/location-map/tokenSnap';
+import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/location-map/tokenIdentity';
 
 import type {
   CanvasElement,
@@ -20,7 +21,10 @@ import type {
 } from '@fieldnotes/core';
 import type { EncounterEntity, TokenCellSize } from '@/types/encounter';
 
-export const COMBATANT_TOKEN_KIND = 'combatant';
+/** Re-exported from tokenIdentity.ts (single source of truth — location-map
+ * must not import from dm-vtt, so the constant lives there and this file
+ * imports it, not the reverse). */
+export { COMBATANT_TOKEN_KIND };
 
 /** Re-exported from tokenSnap.ts (single source of truth — location-map
  * must not import from dm-vtt, so the constant lives there and this file
