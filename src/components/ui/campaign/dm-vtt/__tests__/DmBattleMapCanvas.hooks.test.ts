@@ -60,6 +60,14 @@ vi.mock('@/components/ui/campaign/location-map/measureSync', () => ({
   attachRemoteMeasurements: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 
+vi.mock('@/components/ui/campaign/location-map/pathSync', () => ({
+  attachPathBroadcast: vi.fn(() => ({
+    setSharing: vi.fn(),
+    dispose: vi.fn(),
+  })),
+  attachRemotePaths: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+}));
+
 vi.mock('@/components/ui/campaign/location-map/layerContract', () => ({
   migrateCanvasToContract: vi.fn(() => false),
   subscribePinCanonicalLayers: vi.fn(() => vi.fn()),

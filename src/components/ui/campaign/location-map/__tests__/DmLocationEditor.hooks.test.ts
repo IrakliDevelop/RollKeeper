@@ -67,10 +67,15 @@ function makeStubViewport() {
     layerManager,
     domLayer,
     toolManager: {
-      getTool: vi.fn(() => ({
-        name: 'select',
-        selectedIds: selectionState.selectedIds,
-      })),
+      // Only 'select' resolves to a fake tool; other names (e.g. 'path',
+      // requested unconditionally by the movement-commit wiring in
+      // battlemap mode) return undefined, same as a real ToolManager when
+      // that tool was never registered/requested in this stub.
+      getTool: vi.fn((name: string) =>
+        name === 'select'
+          ? { name: 'select', selectedIds: selectionState.selectedIds }
+          : undefined
+      ),
       onChange: vi.fn(),
       activeTool: { name: 'select' },
     },

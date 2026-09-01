@@ -16,6 +16,7 @@ import {
   Pencil,
   MoveUpRight,
   Ruler,
+  Footprints,
   Circle,
   Trash2,
   Eye,
@@ -36,6 +37,7 @@ import {
   PencilTool,
   MeasureTool,
   type ElementActivationEvent,
+  type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -75,6 +77,13 @@ import {
   SpellTemplateTool,
   type SpellTemplateConfig,
 } from '@/components/ui/campaign/player-vtt/SpellTemplateTool';
+import { createMovementPathTool } from './movementTool';
+import { applyMovementCommit } from './movementCommit';
+import { attachPathBroadcast, attachRemotePaths } from './pathSync';
+import { characterWalkingSpeed } from './movementSpeed';
+import { useCharacterStore } from '@/store/characterStore';
+
+import type { MovementResolution } from './movementTool';
 
 interface PlayerBattleMapCanvasProps {
   campaignCode: string;
@@ -125,6 +134,7 @@ const PLAYER_TOOLS: {
   { name: 'pencil', label: 'Draw', Icon: Pencil },
   { name: 'arrow', label: 'Arrow', Icon: MoveUpRight },
   { name: 'measure', label: 'Measure', Icon: Ruler },
+  { name: 'path', label: 'Move', Icon: Footprints },
   { name: 'template', label: 'Spell template', Icon: Circle },
 ];
 
@@ -273,6 +283,25 @@ export function PlayerBattleMapCanvas({
   >(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  // `viewport` is state, so a plain closure over it would be null inside a
+  // tool built on the first render (mirrors DmBattleMapCanvas.hooks.ts).
+  const viewportRef = useRef<Viewport | null>(null);
+  const movementCommitUnsubRef = useRef<(() => void) | null>(null);
+  const [movementDash, setMovementDash] = useState(false);
+  const movementDashRef = useRef(false);
+  const handleSetMovementDash = useCallback((enabled: boolean) => {
+    movementDashRef.current = enabled;
+    setMovementDash(enabled);
+  }, []);
+  // Own-character speed source (spec decision 3): character.speed + buffs,
+  // fallback 30 ft when no character is loaded. Read live per path.
+  const ownMovementRef = useRef<MovementResolution | null>(null);
+  const character = useCharacterStore(s => s.character);
+  useEffect(() => {
+    ownMovementRef.current = character
+      ? { name: character.name, walkFeet: characterWalkingSpeed(character) }
+      : null;
+  }, [character]);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later after the connection is already established.
@@ -338,6 +367,13 @@ export function PlayerBattleMapCanvas({
       new PencilTool({ color, width: 3 }),
       new ArrowTool({ color, width: 2 }),
       new MeasureTool({ feetPerCell: 5 }),
+      createMovementPathTool({
+        getViewport: () => viewportRef.current,
+        role: 'player',
+        characterId,
+        resolveMovement: () => ownMovementRef.current,
+        isDashActive: () => movementDashRef.current,
+      }),
       new PlayerTemplateTool({
         templateShape: 'circle',
         feetPerCell: 5,
@@ -433,6 +469,7 @@ export function PlayerBattleMapCanvas({
 
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
+    viewportRef.current = vp;
 
     // Canonical bands: map (locked) at the bottom, DM annotations (locked
     // for players) above it, this player's own layer in the player band on
@@ -458,6 +495,23 @@ export function PlayerBattleMapCanvas({
         active ? (selectTool?.selectedIds.length ?? 0) > 0 : false
       );
     });
+
+    // Movement commit: connection-independent — moving a token needs no
+    // relay connection at all, so this runs unconditionally, before the
+    // relay-gated block below.
+    movementCommitUnsubRef.current?.();
+    const movementTool = vp.toolManager.getTool<PathTool>('path');
+    if (movementTool) {
+      movementCommitUnsubRef.current = movementTool.onCommit(emission => {
+        applyMovementCommit(emission, {
+          viewport: vp,
+          role: 'player',
+          characterId,
+          resolveMovement: () => ownMovementRef.current,
+          // No combat log on the player surface this cycle (locked decision 2).
+        });
+      });
+    }
 
     const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     if (!relayUrl) return;
@@ -508,6 +562,21 @@ export function PlayerBattleMapCanvas({
       attachRemotePings(vp, connection).dispose,
       attachRemoteMeasurements(vp, connection).dispose,
       attachFocusReceiver(vp, connection, PLAYER_FOCUS_OPTIONS).dispose,
+      attachRemotePaths(vp, connection).dispose,
+      // Player self-paths always broadcast (spec decision 5) — no sharing
+      // toggle on this surface.
+      ...(movementTool
+        ? [
+            attachPathBroadcast(movementTool, connection, {
+              role: 'player',
+              // Players hold no dmOnlyElements state; DM-only elements never
+              // reach them (relay canRead), so an own-token anchor cannot be
+              // DM-only from this client's view.
+              isDmOnlyElement: () => false,
+              getElement: id => vp.store.getById(id) ?? null,
+            }).dispose,
+          ]
+        : []),
     ];
     laserCleanupRef.current = () => {
       for (const cleanup of presenceCleanups) cleanup();
@@ -528,6 +597,7 @@ export function PlayerBattleMapCanvas({
   useEffect(
     () => () => {
       laserCleanupRef.current?.();
+      movementCommitUnsubRef.current?.();
       connectionRef.current?.stop();
     },
     []
@@ -561,7 +631,15 @@ export function PlayerBattleMapCanvas({
         )}
         {viewport && (
           <div className="border-divider absolute top-16 left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
-            <DmLocationToolOptions mode="battlemap" />
+            <DmLocationToolOptions
+              mode="battlemap"
+              movementControls={{
+                dash: {
+                  enabled: movementDash,
+                  onChange: handleSetMovementDash,
+                },
+              }}
+            />
           </div>
         )}
         {!hideBackButton && (

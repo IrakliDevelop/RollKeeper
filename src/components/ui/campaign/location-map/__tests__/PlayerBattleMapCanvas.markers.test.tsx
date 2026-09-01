@@ -167,7 +167,7 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     unmount();
   });
 
-  it('has no marker tool: the functional tool list omits MARKER_TOOL_NAME (select is present, ruling out an empty list), and the toolbar button list is exhaustively the seven non-marker tools', () => {
+  it('has no marker tool: the functional tool list omits MARKER_TOOL_NAME (select is present, ruling out an empty list), and the toolbar button list is exhaustively the eight non-marker tools', () => {
     stubCanvas();
     const vp = makeViewport();
 
@@ -196,6 +196,7 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
       'Draw',
       'Arrow',
       'Measure',
+      'Move',
       'Spell template',
     ]);
 

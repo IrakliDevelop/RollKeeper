@@ -16,6 +16,7 @@ import {
   type CameraView,
   type ElementActivationEvent,
   type FocusAudience,
+  type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
@@ -57,6 +58,18 @@ import {
   createLocalCameraAnimator,
   type FocusBroadcastHandle,
 } from '@/components/ui/campaign/location-map/focusSync';
+import { createMovementPathTool } from '@/components/ui/campaign/location-map/movementTool';
+import { applyMovementCommit } from '@/components/ui/campaign/location-map/movementCommit';
+import {
+  attachPathBroadcast,
+  attachRemotePaths,
+  type PathBroadcastHandle,
+} from '@/components/ui/campaign/location-map/pathSync';
+import {
+  resolveDmMovement,
+  logDmMovement,
+} from '@/components/ui/campaign/location-map/movementLogging';
+import type { MovableTokenIdentity } from '@/components/ui/campaign/location-map/tokenIdentity';
 import {
   DmMarkerTool,
   type PlaceMarkerRequest,
@@ -126,6 +139,10 @@ export interface DmBattleMapCanvasState {
   handleToggleSelectedDmOnly: () => void;
   measureSharing: boolean;
   handleSetMeasureSharing: (enabled: boolean) => void;
+  pathSharing: boolean;
+  handleSetPathSharing: (enabled: boolean) => void;
+  movementDash: boolean;
+  handleSetMovementDash: (enabled: boolean) => void;
   handleGoToCameraView: (view: CameraView) => void;
   handleSendCameraView: (view: CameraView, audience: FocusAudience) => void;
 
@@ -195,6 +212,35 @@ export function useDmBattleMapCanvas({
     setMeasureSharing(enabled);
     measureBroadcastRef.current?.setSharing(enabled);
   }, []);
+
+  const [pathSharing, setPathSharing] = useState(false);
+  const pathSharingRef = useRef(false);
+  const pathBroadcastRef = useRef<PathBroadcastHandle | null>(null);
+  const [movementDash, setMovementDash] = useState(false);
+  const movementDashRef = useRef(false);
+  const movementCommitUnsubRef = useRef<(() => void) | null>(null);
+
+  const handleSetPathSharing = useCallback((enabled: boolean) => {
+    pathSharingRef.current = enabled;
+    setPathSharing(enabled);
+    pathBroadcastRef.current?.setSharing(enabled);
+  }, []);
+  const handleSetMovementDash = useCallback((enabled: boolean) => {
+    movementDashRef.current = enabled;
+    setMovementDash(enabled);
+  }, []);
+
+  const linkedEncounterIdsLive = useCallback(
+    () =>
+      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
+        ?.linkedEncounterIds ?? [],
+    [campaignCode, battleMapId]
+  );
+  const resolveMovement = useCallback(
+    (identity: MovableTokenIdentity) =>
+      resolveDmMovement(identity, linkedEncounterIdsLive()),
+    [linkedEncounterIdsLive]
+  );
 
   const hiddenElementCount = useBattleMapStore(
     state =>
@@ -485,6 +531,12 @@ export function useDmBattleMapCanvas({
       new TextTool(),
       new NoteTool(),
       new MeasureTool({ feetPerCell: 5 }),
+      createMovementPathTool({
+        getViewport: () => viewportRef.current,
+        role: 'dm',
+        resolveMovement,
+        isDashActive: () => movementDashRef.current,
+      }),
       new TemplateTool({
         templateShape: 'circle',
         feetPerCell: 5,
@@ -502,7 +554,7 @@ export function useDmBattleMapCanvas({
         handlePlaceMarkerRef.current(request)
       ),
     ];
-  }, [tokenConfigRef]);
+  }, [tokenConfigRef, resolveMovement]);
 
   const handleReady = useCallback(
     (vp: Viewport) => {
@@ -639,6 +691,23 @@ export function useDmBattleMapCanvas({
       const localAnimator = createLocalCameraAnimator(vp);
       localAnimatorRef.current = localAnimator;
 
+      // Movement commit: connection-independent — moving a token needs no
+      // relay connection at all, so this is registered unconditionally here,
+      // not inside the `if (relayUrl)` guard below.
+      movementCommitUnsubRef.current?.();
+      const movementTool = vp.toolManager.getTool<PathTool>('path');
+      if (movementTool) {
+        movementCommitUnsubRef.current = movementTool.onCommit(emission => {
+          applyMovementCommit(emission, {
+            viewport: vp,
+            role: 'dm',
+            resolveMovement,
+            logMovement: payload =>
+              logDmMovement(linkedEncounterIdsLive(), payload),
+          });
+        });
+      }
+
       // Live sync — resolver reads Zustand LIVE via getState() (a captured
       // snapshot would go stale after the first dm-only toggle).
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
@@ -685,10 +754,12 @@ export function useDmBattleMapCanvas({
         laserCleanupRef.current?.();
         const remotePings = attachRemotePings(vp, connection);
         const remoteMeasures = attachRemoteMeasurements(vp, connection);
+        const remotePaths = attachRemotePaths(vp, connection);
         const laserCleanups = [
           attachRemoteLaserTrails(vp, connection),
           remotePings.dispose,
           remoteMeasures.dispose,
+          remotePaths.dispose,
         ];
         const laserTool = vp.toolManager.getTool<LaserTool>('laser');
         if (laserTool) {
@@ -725,6 +796,25 @@ export function useDmBattleMapCanvas({
           focusBroadcastRef.current = null;
           focusBroadcast.dispose();
         });
+        if (movementTool) {
+          const pathBroadcast = attachPathBroadcast(movementTool, connection, {
+            role: 'dm',
+            isDmOnlyElement: id =>
+              !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
+                battleMapId
+              ]?.dmOnlyElements[id],
+            getElement: id => vp.store.getById(id) ?? null,
+          });
+          // Reattachment must not silently revert to private while the
+          // toggle still says shared — apply the latest value now (measure
+          // precedent).
+          pathBroadcast.setSharing(pathSharingRef.current);
+          pathBroadcastRef.current = pathBroadcast;
+          laserCleanups.push(() => {
+            pathBroadcastRef.current = null;
+            pathBroadcast.dispose();
+          });
+        }
 
         // Always-available DM pings: long-press with any tool + "P" at the
         // cursor, self-pulse through the shared receive overlay. The veto
@@ -752,6 +842,8 @@ export function useDmBattleMapCanvas({
       onStatusProp,
       onViewportReady,
       onSelectionChange,
+      resolveMovement,
+      linkedEncounterIdsLive,
     ]
   );
 
@@ -759,6 +851,7 @@ export function useDmBattleMapCanvas({
     return () => {
       autoSaveRef.current?.stop();
       laserCleanupRef.current?.();
+      movementCommitUnsubRef.current?.();
       // Disposed after laserCleanupRef (which tears down focusBroadcast) and
       // before the connection stops, matching the pre-existing teardown
       // order tests — even though the animator is no longer connection-
@@ -866,6 +959,10 @@ export function useDmBattleMapCanvas({
     handleToggleSelectedDmOnly,
     measureSharing,
     handleSetMeasureSharing,
+    pathSharing,
+    handleSetPathSharing,
+    movementDash,
+    handleSetMovementDash,
     handleGoToCameraView,
     handleSendCameraView,
     markerControls,
