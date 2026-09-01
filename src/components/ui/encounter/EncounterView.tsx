@@ -94,19 +94,32 @@ export function startCombatLogArchiveForCombat(
 }
 
 /**
- * End-combat combat-log wiring, extracted for unit testability. Ends the
- * currently active archive (if any) and clears `activeArchiveId` via the
- * store's own setter — `endArchive` stamps `endedAt` but does not itself
- * clear the active pointer. No active archive is a silent no-op.
+ * End-combat combat-log wiring, extracted for unit testability. Resolves
+ * *this* encounter's own archive via `getLatestArchiveForEncounter` rather
+ * than trusting the store's global `activeArchiveId` — two encounters can be
+ * `isActive` concurrently (e.g. combat started on encounter X, then on Y
+ * before X was ended), and `activeArchiveId` is a single device-local
+ * pointer that only ever names whichever encounter started combat *last*.
+ * Ending X while Y holds the pointer must never stamp Y's archive, and must
+ * still close X's own (now orphaned, non-active) archive. `endArchive` is
+ * called on X's archive whether or not it happens to be the active one;
+ * `activeArchiveId` is cleared only when the archive just ended IS the one
+ * it points to, so ending X leaves Y's active pointer — and Y's logging —
+ * untouched. No archive for this encounter is a silent no-op.
  */
 export function endCombatLogArchiveForCombat(
+  encounterId: string,
   activeArchiveId: string | null,
+  getLatestArchiveForEncounter: (
+    encounterId: string
+  ) => { archiveId: string } | null,
   endArchive: (archiveId: string) => void,
   setActiveArchive: (archiveId: string | null) => void
 ): void {
-  if (!activeArchiveId) return;
-  endArchive(activeArchiveId);
-  setActiveArchive(null);
+  const archive = getLatestArchiveForEncounter(encounterId);
+  if (!archive) return;
+  endArchive(archive.archiveId);
+  if (activeArchiveId === archive.archiveId) setActiveArchive(null);
 }
 
 export function EncounterView({
@@ -182,6 +195,7 @@ export function EncounterView({
     startArchive,
     endArchive,
     setActiveArchive,
+    getLatestArchiveForEncounter,
     activeArchiveId: activeLogArchiveId,
   } = useCombatLogStore();
 
@@ -399,7 +413,9 @@ export function EncounterView({
   const handleEndCombat = useCallback(() => {
     endCombat(encounterId);
     endCombatLogArchiveForCombat(
+      encounterId,
       activeLogArchiveId,
+      getLatestArchiveForEncounter,
       endArchive,
       setActiveArchive
     );
@@ -407,6 +423,7 @@ export function EncounterView({
     encounterId,
     endCombat,
     activeLogArchiveId,
+    getLatestArchiveForEncounter,
     endArchive,
     setActiveArchive,
   ]);
