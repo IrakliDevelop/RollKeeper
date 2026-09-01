@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
+import { useCombatLogStore } from '@/store/combatLogStore';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
@@ -75,6 +76,37 @@ export function pushLinkedMapLive(
 ): void {
   const linked = findLinkedBattleMap(battleMaps, encounterId);
   if (linked) void pushActive(linked.id, linked.name);
+}
+
+/**
+ * Start-combat combat-log wiring, extracted for unit testability (same
+ * pattern as `handleEncounterPoke`/`pushLinkedMapLive`). `startArchive`
+ * admits and activates a new archive for this encounter; a null return
+ * (admission rejected — e.g. the campaign already sits at the archive-count
+ * cap) is an expected, silent outcome that must not interrupt combat start.
+ */
+export function startCombatLogArchiveForCombat(
+  encounterId: string,
+  campaignCode: string,
+  startArchive: (encounterId: string, campaignCode?: string) => string | null
+): void {
+  startArchive(encounterId, campaignCode);
+}
+
+/**
+ * End-combat combat-log wiring, extracted for unit testability. Ends the
+ * currently active archive (if any) and clears `activeArchiveId` via the
+ * store's own setter — `endArchive` stamps `endedAt` but does not itself
+ * clear the active pointer. No active archive is a silent no-op.
+ */
+export function endCombatLogArchiveForCombat(
+  activeArchiveId: string | null,
+  endArchive: (archiveId: string) => void,
+  setActiveArchive: (archiveId: string | null) => void
+): void {
+  if (!activeArchiveId) return;
+  endArchive(activeArchiveId);
+  setActiveArchive(null);
 }
 
 export function EncounterView({
@@ -145,6 +177,13 @@ export function EncounterView({
 
   const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
   const getBattleMaps = useBattleMapStore(state => state.getBattleMaps);
+
+  const {
+    startArchive,
+    endArchive,
+    setActiveArchive,
+    activeArchiveId: activeLogArchiveId,
+  } = useCombatLogStore();
 
   useTurnRequestSync({
     campaignCode,
@@ -343,6 +382,7 @@ export function EncounterView({
       }).catch(() => {});
     }
     startCombat(encounterId);
+    startCombatLogArchiveForCombat(encounterId, campaignCode, startArchive);
     pushLinkedMapLive(getBattleMaps(campaignCode), encounterId, pushActive);
   }, [
     encounter?.pendingInitiativeRequest,
@@ -351,8 +391,24 @@ export function EncounterView({
     pushInitiativeRequest,
     setPendingInitiativeRequest,
     startCombat,
+    startArchive,
     getBattleMaps,
     pushActive,
+  ]);
+
+  const handleEndCombat = useCallback(() => {
+    endCombat(encounterId);
+    endCombatLogArchiveForCombat(
+      activeLogArchiveId,
+      endArchive,
+      setActiveArchive
+    );
+  }, [
+    encounterId,
+    endCombat,
+    activeLogArchiveId,
+    endArchive,
+    setActiveArchive,
   ]);
 
   if (!encounter || !actions) {
@@ -377,7 +433,7 @@ export function EncounterView({
         playerCounterValues={campaign?.playerCounters}
         actions={actions}
         onStartCombat={handleStartCombat}
-        onEndCombat={() => endCombat(encounterId)}
+        onEndCombat={handleEndCombat}
         onNextTurn={() => nextTurn(encounterId)}
         onPrevTurn={() => prevTurn(encounterId)}
         onRollAllInitiatives={() => rollAllInitiatives(encounterId)}
