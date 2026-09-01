@@ -357,6 +357,13 @@ function isEventFieldValid(value: unknown, spec: EventFieldSpec): boolean {
     case 'coordinates': {
       if (typeof value !== 'object' || value === null) return false;
       const obj = value as Record<string, unknown>;
+      const keys = Object.keys(obj);
+      if (
+        keys.length !== 2 ||
+        !Object.hasOwn(obj, 'x') ||
+        !Object.hasOwn(obj, 'y')
+      )
+        return false;
       return isFiniteNumber(obj.x) && isFiniteNumber(obj.y);
     }
   }
