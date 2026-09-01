@@ -220,10 +220,27 @@ export function CalendarSyncControls({ campaign }: Props) {
     const client = createSupabaseBrowserClient();
     if (!client) return;
     const hide = () => {
+      setContext(null);
       setScope(null);
+      setWorkspaces([]);
+      setWorkspace(null);
+      setManifest(null);
+      setRecovery(null);
+      setRecoveryVerified(false);
+      setCalendarSelected(false);
+      setPreparedGeneration(null);
       setAuthority(null);
+      setVersions([]);
+      setComparison(null);
+      setEnrollmentPreview(null);
+      setProjectionStatus(null);
+      setProjectionIncidents([]);
+      setStatus(null);
+      setError(null);
       setHydrated(false);
+      lastFingerprint.current = null;
       hydrationSignature.current = null;
+      rollbackMutationId.current = null;
       hideCalendar(campaign.code);
     };
     const hydrate = async (accountId: string | null) => {

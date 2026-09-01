@@ -287,6 +287,9 @@ export async function markCalendarCloudAuthority(
     const document = (await requestResult(documents.get(key))) as
       | CalendarDocument
       | undefined;
+    const workingCopyMatchesAccepted =
+      document?.contentFingerprint ===
+      options.acceptedVersion.payloadFingerprint;
     if (document)
       documents.put({
         ...document,
@@ -302,12 +305,14 @@ export async function markCalendarCloudAuthority(
         entry.namespace === options.namespace &&
         entry.campaignId === options.campaignId &&
         entry.family === 'calendar' &&
+        entry.legacyId === options.acceptedVersion.legacyId &&
         entry.state !== 'acknowledged' &&
         entry.state !== 'superseded'
       ) {
         if (
+          workingCopyMatchesAccepted ||
           entry.contentFingerprint ===
-          options.acceptedVersion.payloadFingerprint
+            options.acceptedVersion.payloadFingerprint
         ) {
           outbox.put({
             ...entry,

@@ -456,6 +456,89 @@ describe('campaign_settings local authority', () => {
     database.close();
   });
 
+  it('supersedes stale intermediates when the accepted version matches the current working copy', async () => {
+    const database = await openRollkeeperDatabase();
+    await seedReady(database);
+    await commitCampaignSettingsLocalCutover(database, {
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN,
+      generation: GENERATION,
+      confirmed: true,
+      gates,
+      now: () => 'local',
+      initialDocument: {
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN,
+        legacyId: 'ABC123',
+        family: 'campaign_settings',
+        cutoverEpoch: 1,
+        operation: 'replace',
+        payload: { stackableInspiration: true },
+        schemaVersion: 1,
+        localRevision: 3,
+        baseServerVersion: 0,
+        contentFingerprint: 'a'.repeat(64),
+        updatedAt: 'current',
+        deletedAt: null,
+      },
+    });
+    const pending = database.transaction('outbox', 'readwrite');
+    const outbox = pending.objectStore('outbox');
+    for (const [mutationId, fingerprint, localRevision] of [
+      ['intermediate', 'b'.repeat(64), 2],
+      ['accepted', 'a'.repeat(64), 3],
+    ] as const) {
+      outbox.put({
+        namespace: NAMESPACE,
+        campaignId: CAMPAIGN,
+        legacyId: 'ABC123',
+        family: 'campaign_settings',
+        cutoverEpoch: 1,
+        operation: 'replace',
+        payload: { stackableInspiration: fingerprint.startsWith('a') },
+        schemaVersion: 1,
+        localRevision,
+        baseServerVersion: 0,
+        contentFingerprint: fingerprint,
+        updatedAt: mutationId,
+        mutationId,
+        state: 'queued',
+        attemptCount: 0,
+        nextAttemptAt: 0,
+        inflightAt: null,
+        lastError: null,
+      });
+    }
+    await transactionComplete(pending);
+
+    await markCampaignSettingsCloudAuthority(database, {
+      namespace: NAMESPACE,
+      campaignId: CAMPAIGN,
+      expectedLocalEpoch: 1,
+      cloudEpoch: 1,
+      now: () => 'cloud',
+      acceptedVersion: {
+        legacyId: 'ABC123',
+        serverVersion: 1,
+        payloadFingerprint: 'a'.repeat(64),
+      },
+    });
+
+    const verification = database.transaction('outbox', 'readonly');
+    const entries = await requestResult(
+      verification.objectStore('outbox').getAll()
+    );
+    expect(entries).toEqual([
+      expect.objectContaining({ mutationId: 'accepted', state: 'superseded' }),
+      expect.objectContaining({
+        mutationId: 'intermediate',
+        state: 'superseded',
+      }),
+    ]);
+    await transactionComplete(verification);
+    database.close();
+  });
+
   it('rejects unsafe enrollment states and supports an exact tombstone hydration', async () => {
     const database = await openRollkeeperDatabase();
     const base = {

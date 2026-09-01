@@ -197,10 +197,25 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     const client = createSupabaseBrowserClient();
     if (!client) return;
     const hide = () => {
+      setContext(null);
       setScope(null);
+      setWorkspaces([]);
+      setWorkspace(null);
+      setManifest(null);
+      setRecovery(null);
+      setPreparedGeneration(null);
       setAuthority(null);
+      setVersions([]);
+      setComparison(null);
+      setEnrollmentPreview(null);
+      setProjectionStatus(null);
+      setProjectionIncidents([]);
+      setStatus(null);
+      setError(null);
       setHydrated(false);
+      lastFingerprint.current = null;
       hydrationSignature.current = null;
+      rollbackMutationId.current = null;
       useDmStore.getState().updateCampaign(campaign.code, {
         bannerUrl: undefined,
         playerColors: undefined,

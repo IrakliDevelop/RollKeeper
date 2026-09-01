@@ -56,6 +56,19 @@ describe('AccountHeaderEntry', () => {
     expect(accountInitials('lyra@example.com')).toBe('LY');
   });
 
+  it('keeps the account menu compact and labelled on narrow headers', async () => {
+    render(<AccountHeaderEntry />);
+    authListener?.('SIGNED_IN', { user: { email: 'lyra@example.com' } });
+
+    await screen.findByRole('button', {
+      name: 'Account menu for lyra@example.com',
+    });
+    expect(screen.getByText('lyra@example.com')).toHaveClass(
+      'hidden',
+      'sm:block'
+    );
+  });
+
   it('opens sign-in from the header chip and shows the signed-in menu', async () => {
     render(<AccountHeaderEntry />);
 
