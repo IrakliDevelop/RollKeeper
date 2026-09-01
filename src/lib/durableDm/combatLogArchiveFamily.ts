@@ -219,7 +219,13 @@ function isAbsent(value: unknown) {
   return value === undefined || value === null;
 }
 
-type EventFieldKind = 'id' | 'text' | 'number' | 'boolean' | 'textArray';
+type EventFieldKind =
+  | 'id'
+  | 'text'
+  | 'number'
+  | 'boolean'
+  | 'textArray'
+  | 'coordinates';
 
 interface EventFieldSpec {
   kind: EventFieldKind;
@@ -310,6 +316,13 @@ const EVENT_FIELD_SPECS = {
   death: NAMED_ENTITY_FIELDS,
   revived: NAMED_ENTITY_FIELDS,
   stabilized: NAMED_ENTITY_FIELDS,
+  movement: {
+    ...NAMED_ENTITY_FIELDS,
+    feet: { kind: 'number' },
+    cells: { kind: 'number' },
+    from: { kind: 'coordinates' },
+    to: { kind: 'coordinates' },
+  },
 } as const satisfies Record<
   CombatLogEvent['type'],
   Record<string, EventFieldSpec>
@@ -341,6 +354,11 @@ function isEventFieldValid(value: unknown, spec: EventFieldSpec): boolean {
     case 'text':
       if (!isBoundedString(value, MAX_TEXT_BYTES)) return false;
       return spec.values ? spec.values.includes(value) : true;
+    case 'coordinates': {
+      if (typeof value !== 'object' || value === null) return false;
+      const obj = value as Record<string, unknown>;
+      return isFiniteNumber(obj.x) && isFiniteNumber(obj.y);
+    }
   }
 }
 

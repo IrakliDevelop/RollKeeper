@@ -21,6 +21,7 @@ import type {
   CombatStatusEvent,
   DeathEvent,
   ConditionEvent,
+  MovementEvent,
 } from '@/types/combatLog';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -1385,5 +1386,46 @@ describe('migrateCombatLogPersistedState (Slice 11F)', () => {
         COMBAT_LOG_ARCHIVE_PERSIST_VERSION
       )
     ).toEqual(current);
+  });
+});
+
+function makeMovementPayload(): Omit<MovementEvent, 'id' | 'timestamp'> {
+  return {
+    type: 'movement',
+    encounterId: ENC_A,
+    round: 2,
+    turn: 1,
+    entityId: 'ent-1',
+    entityName: 'Goblin',
+    feet: 30,
+    cells: 6,
+    from: { x: 100, y: 100 },
+    to: { x: 220, y: 180 },
+  };
+}
+
+describe('movement events', () => {
+  beforeEach(resetStore);
+
+  it('logs and filters movement by entityId', () => {
+    const id = useCombatLogStore.getState().startArchive(ENC_A)!;
+    useCombatLogStore.getState().logEvent(id, makeMovementPayload());
+    const events = useCombatLogStore.getState().encounters[id].events;
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe('movement');
+    const filtered = useCombatLogStore
+      .getState()
+      .getFilteredEvents(id, { entityId: 'ent-1' });
+    expect(filtered).toHaveLength(1);
+    expect(
+      useCombatLogStore.getState().getFilteredEvents(id, { entityId: 'nope' })
+    ).toHaveLength(0);
+  });
+
+  it('exports a movement text line', () => {
+    const id = useCombatLogStore.getState().startArchive(ENC_A)!;
+    useCombatLogStore.getState().logEvent(id, makeMovementPayload());
+    const text = useCombatLogStore.getState().exportArchive(id, 'text');
+    expect(text).toBe('[R2] Goblin moved 30 ft (6 cells)');
   });
 });
