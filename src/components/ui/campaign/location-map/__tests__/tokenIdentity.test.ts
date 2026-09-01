@@ -27,19 +27,17 @@ describe('movableTokenIdentity', () => {
 
   it('rejects plain elements, empty ids, and wrong-typed ids', () => {
     expect(movableTokenIdentity(shape())).toBeNull();
-    expect(
-      movableTokenIdentity({
-        ...shape(),
-        tokenKind: COMBATANT_TOKEN_KIND,
-        entityId: '',
-      })
-    ).toBeNull();
-    expect(
-      movableTokenIdentity({
-        ...shape(),
-        tokenKind: PLAYER_TOKEN_KIND,
-        characterId: 7,
-      })
-    ).toBeNull();
+    const emptyEntityIdEl = {
+      ...shape(),
+      tokenKind: COMBATANT_TOKEN_KIND,
+      entityId: '',
+    };
+    expect(movableTokenIdentity(emptyEntityIdEl)).toBeNull();
+    const wrongTypeCharacterIdEl = {
+      ...shape(),
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 7,
+    };
+    expect(movableTokenIdentity(wrongTypeCharacterIdEl)).toBeNull();
   });
 });
