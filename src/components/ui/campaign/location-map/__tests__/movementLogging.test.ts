@@ -49,7 +49,7 @@ describe('resolveDmMovement', () => {
       'enc-1',
     ]);
 
-    expect(result).toEqual({ name: 'Goblin', walkFeet: 25 });
+    expect(result).toEqual({ name: 'Goblin', walkFeet: 25, entityId: 'e-1' });
   });
 
   it('distinguishes no-walk (fly-only) speed from unknown/malformed speed', () => {
@@ -79,14 +79,14 @@ describe('resolveDmMovement', () => {
 
     expect(
       resolveDmMovement({ key: 'e-flyer', kind: 'combatant' }, ['enc-1'])
-    ).toEqual({ name: 'Bat Swarm', walkFeet: 0 });
+    ).toEqual({ name: 'Bat Swarm', walkFeet: 0, entityId: 'e-flyer' });
 
     expect(
       resolveDmMovement({ key: 'e-gibberish', kind: 'combatant' }, ['enc-1'])
-    ).toEqual({ name: 'Mystery', walkFeet: 30 });
+    ).toEqual({ name: 'Mystery', walkFeet: 30, entityId: 'e-gibberish' });
   });
 
-  it('finds a player entity by playerCharacterId with the default speed', () => {
+  it('finds a player entity by playerCharacterId with the default speed, and returns the entity id (not the characterId) as entityId', () => {
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -107,7 +107,7 @@ describe('resolveDmMovement', () => {
       'enc-1',
     ]);
 
-    expect(result).toEqual({ name: 'Aria', walkFeet: 30 });
+    expect(result).toEqual({ name: 'Aria', walkFeet: 30, entityId: 'e-2' });
   });
 
   it('returns null for an entity in a non-linked encounter', () => {
@@ -143,10 +143,15 @@ describe('logDmMovement', () => {
     resetCombatLogStore();
   });
 
-  it('writes one event with the active encounter round/currentTurn when the archive is linked', () => {
+  it("writes one event with the active encounter round/currentTurn when the archive belongs to the entity's own encounter", () => {
     useEncounterStore.setState({
       encounters: [
-        createMockEncounter({ id: 'enc-1', round: 3, currentTurn: 2 }),
+        createMockEncounter({
+          id: 'enc-1',
+          round: 3,
+          currentTurn: 2,
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
       ],
     });
     const archiveId = useCombatLogStore.getState().startArchive('enc-1')!;
@@ -166,7 +171,12 @@ describe('logDmMovement', () => {
 
   it('no-ops when there is no active archive', () => {
     useEncounterStore.setState({
-      encounters: [createMockEncounter({ id: 'enc-1' })],
+      encounters: [
+        createMockEncounter({
+          id: 'enc-1',
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
+      ],
     });
     const archiveId = useCombatLogStore.getState().startArchive('enc-1')!;
     useCombatLogStore.getState().setActiveArchive(null);
@@ -188,5 +198,56 @@ describe('logDmMovement', () => {
     logDmMovement(['enc-1'], PAYLOAD);
 
     expect(useCombatLogStore.getState().getEvents(archiveId)).toHaveLength(0);
+  });
+
+  // Wrong-encounter attribution guard: the OLD gate only checked that the
+  // active archive's encounter was somewhere in the linked list, so an
+  // entity that actually lives in linked encounter B could log into an
+  // archive active for linked encounter A, stamped with A's round/turn.
+  // The gate must key off the moved entity's OWN containing encounter.
+  it('multi-encounter map: active archive for enc-A logs nothing when the moved entity lives in enc-B', () => {
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({ id: 'enc-A', round: 1, currentTurn: 0 }),
+        createMockEncounter({
+          id: 'enc-B',
+          round: 5,
+          currentTurn: 3,
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
+      ],
+    });
+    const archiveId = useCombatLogStore.getState().startArchive('enc-A')!;
+
+    logDmMovement(['enc-A', 'enc-B'], PAYLOAD);
+
+    expect(useCombatLogStore.getState().getEvents(archiveId)).toHaveLength(0);
+  });
+
+  it("multi-encounter map: active archive for enc-B (the entity's own encounter) logs with enc-B's round/turn", () => {
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({ id: 'enc-A', round: 1, currentTurn: 0 }),
+        createMockEncounter({
+          id: 'enc-B',
+          round: 5,
+          currentTurn: 3,
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
+      ],
+    });
+    const archiveId = useCombatLogStore.getState().startArchive('enc-B')!;
+
+    logDmMovement(['enc-A', 'enc-B'], PAYLOAD);
+
+    const events = useCombatLogStore.getState().getEvents(archiveId);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'movement',
+      encounterId: 'enc-B',
+      round: 5,
+      turn: 3,
+      ...PAYLOAD,
+    });
   });
 });

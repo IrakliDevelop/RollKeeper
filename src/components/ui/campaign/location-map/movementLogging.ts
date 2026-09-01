@@ -36,6 +36,7 @@ export function resolveDmMovement(
                   parseWalkingSpeed(entity.monsterStatBlock?.speed)
                 )
               : MOVEMENT_DEFAULT_WALK_FEET,
+          entityId: entity.id,
         };
       }
     }
@@ -44,11 +45,15 @@ export function resolveDmMovement(
 }
 
 /**
- * Writes a movement event into the ACTIVE combat-log archive, but only
- * when that archive belongs to one of this map's linked encounters —
- * events must not leak into an unrelated encounter's log. No active
- * archive, or an unrelated one, is a silent no-op (matching logEvent's own
- * Ruling 7 posture). This is the first production logEvent call site.
+ * Writes a movement event into the ACTIVE combat-log archive, but only when
+ * that archive belongs to the moved entity's OWN containing encounter —
+ * not merely to some encounter linked to the map. An entity that lives in
+ * linked encounter B must not log into an archive active for linked
+ * encounter A with A's round/turn; that would misattribute the event. The
+ * search is scoped to `linkedEncounterIds` (a map's own encounters only).
+ * No active archive, no containing encounter among the linked ones, or an
+ * archive for a different encounter than the entity's own, is a silent
+ * no-op (matching logEvent's own Ruling 7 posture).
  */
 export function logDmMovement(
   linkedEncounterIds: readonly string[],
@@ -58,15 +63,21 @@ export function logDmMovement(
   const archiveId = logStore.activeArchiveId;
   if (!archiveId) return;
   const archive = logStore.encounters[archiveId];
-  if (!archive || !linkedEncounterIds.includes(archive.encounterId)) return;
-  const encounter = useEncounterStore
+  if (!archive) return;
+
+  const linkedEncounters = useEncounterStore
     .getState()
-    .encounters.find(e => e.id === archive.encounterId);
+    .encounters.filter(e => linkedEncounterIds.includes(e.id));
+  const ownEncounter = linkedEncounters.find(e =>
+    e.entities.some(entity => entity.id === payload.entityId)
+  );
+  if (!ownEncounter || archive.encounterId !== ownEncounter.id) return;
+
   logStore.logEvent(archiveId, {
     type: 'movement',
     encounterId: archive.encounterId,
-    round: encounter?.round ?? 0,
-    turn: encounter?.currentTurn ?? 0,
+    round: ownEncounter.round ?? 0,
+    turn: ownEncounter.currentTurn ?? 0,
     ...payload,
   });
 }

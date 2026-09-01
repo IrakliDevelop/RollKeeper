@@ -363,6 +363,56 @@ describe('applyMovementCommit', () => {
     container.remove();
   });
 
+  it("logs the resolution's canonical encounter-entity id, not the characterId, for a player token moved by the DM", () => {
+    // A DM moving a player token: `identity.key` is the token's
+    // characterId, but the combat log must record the canonical
+    // encounter-entity id (the entity's `playerCharacterId` matches the
+    // token's characterId, but its own `id` is different).
+    const { vp, container } = makeViewport();
+    const ownToken = {
+      ...createShape({
+        position: { x: 80, y: 80 },
+        size: { w: 40, h: 40 },
+        shape: 'ellipse',
+        strokeColor: '#000',
+        strokeWidth: 1,
+        fillColor: '#2980b9',
+      }),
+      zIndex: 1000,
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'c-9',
+    };
+    vp.store.add(ownToken);
+    const logMovement = vi.fn();
+    const ctx: MovementCommitContext = {
+      viewport: vp,
+      role: 'dm',
+      resolveMovement: () => ({
+        name: 'Aria',
+        walkFeet: 30,
+        entityId: 'enc-entity-42',
+      }),
+      logMovement,
+    };
+
+    const result = applyMovementCommit(
+      commitEmission(ownToken.id, DESTINATION),
+      ctx
+    );
+
+    expect(result).toBe(true);
+    expect(logMovement).toHaveBeenCalledTimes(1);
+    expect(logMovement).toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'enc-entity-42' })
+    );
+    expect(logMovement).not.toHaveBeenCalledWith(
+      expect.objectContaining({ entityId: 'c-9' })
+    );
+
+    vp.destroy();
+    container.remove();
+  });
+
   it('unrelated identity check: a stamped player token is unreachable when tokenKind mismatches', () => {
     // Guards the identity re-resolution branch: PLAYER_TOKEN_KIND import is
     // exercised so a future rename of the constant is caught here too.

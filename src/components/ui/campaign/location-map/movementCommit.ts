@@ -69,7 +69,7 @@ export function applyMovementCommit(
 
   const resolution = ctx.resolveMovement(identity);
   ctx.logMovement?.({
-    entityId: identity.key,
+    entityId: resolution?.entityId ?? identity.key,
     entityName: resolution?.name ?? 'Unknown',
     feet: Math.round(emission.totalFeet),
     cells: Math.round(emission.totalCells),

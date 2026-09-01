@@ -18,6 +18,12 @@ export const MOVEMENT_TOOL_NAME = 'path';
 export interface MovementResolution {
   name: string;
   walkFeet: number;
+  /**
+   * Canonical encounter-entity id, when the moved token resolves to one.
+   * Absent on the player surface's own-movement resolution (no encounter
+   * entity involved there).
+   */
+  entityId?: string;
 }
 
 export interface MovementToolConfig {
