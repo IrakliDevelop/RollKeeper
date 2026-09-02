@@ -45,35 +45,35 @@ export function resolveDmMovement(
 }
 
 /**
- * Writes a movement event into the ACTIVE combat-log archive, but only when
- * that archive belongs to the moved entity's OWN containing encounter —
- * not merely to some encounter linked to the map. An entity that lives in
- * linked encounter B must not log into an archive active for linked
- * encounter A with A's round/turn; that would misattribute the event. The
+ * Writes a movement event into the moved entity's OWN containing encounter's
+ * OPEN combat-log archive — resolved PER ENCOUNTER, never through the
+ * store's global `activeArchiveId` pointer. That pointer names at most one
+ * encounter's archive device-wide; with two concurrently active encounters
+ * (combat started on X, then on Y, before X was ended) it names Y, and
+ * ending Y correctly clears it — but X is still in combat with an open
+ * archive of its own, and X's movements must keep logging into it. The
  * search is scoped to `linkedEncounterIds` (a map's own encounters only).
- * No active archive, no containing encounter among the linked ones, or an
- * archive for a different encounter than the entity's own, is a silent
- * no-op (matching logEvent's own Ruling 7 posture).
+ * No containing encounter among the linked ones, or no OPEN archive
+ * (`endedAt` unset) for that encounter, is a silent no-op (matching
+ * logEvent's own Ruling 7 posture).
  */
 export function logDmMovement(
   linkedEncounterIds: readonly string[],
   payload: MovementLogPayload
 ): void {
-  const logStore = useCombatLogStore.getState();
-  const archiveId = logStore.activeArchiveId;
-  if (!archiveId) return;
-  const archive = logStore.encounters[archiveId];
-  if (!archive) return;
-
   const linkedEncounters = useEncounterStore
     .getState()
     .encounters.filter(e => linkedEncounterIds.includes(e.id));
   const ownEncounter = linkedEncounters.find(e =>
     e.entities.some(entity => entity.id === payload.entityId)
   );
-  if (!ownEncounter || archive.encounterId !== ownEncounter.id) return;
+  if (!ownEncounter) return;
 
-  logStore.logEvent(archiveId, {
+  const logStore = useCombatLogStore.getState();
+  const archive = logStore.getLatestArchiveForEncounter(ownEncounter.id);
+  if (!archive || archive.endedAt) return;
+
+  logStore.logEvent(archive.archiveId, {
     type: 'movement',
     encounterId: archive.encounterId,
     round: ownEncounter.round ?? 0,

@@ -169,7 +169,10 @@ describe('logDmMovement', () => {
     });
   });
 
-  it('no-ops when there is no active archive', () => {
+  // Ended-encounter guard: an encounter whose only archive has already been
+  // ended must not accept further movement logging, even though it's still
+  // the entity's own containing encounter and would otherwise resolve.
+  it("no-ops when the entity's own encounter has only an ENDED archive", () => {
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -179,14 +182,91 @@ describe('logDmMovement', () => {
       ],
     });
     const archiveId = useCombatLogStore.getState().startArchive('enc-1')!;
-    useCombatLogStore.getState().setActiveArchive(null);
+    useCombatLogStore.getState().endArchive(archiveId);
 
     logDmMovement(['enc-1'], PAYLOAD);
 
     expect(useCombatLogStore.getState().getEvents(archiveId)).toHaveLength(0);
   });
 
-  it('no-ops when the active archive belongs to an unlinked encounter', () => {
+  // Restart case: an old ended archive for the encounter must not shadow a
+  // newer open one — logging must land in the NEW (latest, still-open)
+  // archive, not silently no-op and not write into the ended one.
+  it('logs into the NEW open archive when the encounter has an old ended archive and a new open one', () => {
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({
+          id: 'enc-1',
+          round: 4,
+          currentTurn: 2,
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
+      ],
+    });
+    const oldArchiveId = useCombatLogStore.getState().startArchive('enc-1')!;
+    useCombatLogStore.getState().endArchive(oldArchiveId);
+    const newArchiveId = useCombatLogStore.getState().startArchive('enc-1')!;
+    expect(newArchiveId).not.toBe(oldArchiveId);
+
+    logDmMovement(['enc-1'], PAYLOAD);
+
+    expect(useCombatLogStore.getState().getEvents(oldArchiveId)).toHaveLength(
+      0
+    );
+    const events = useCombatLogStore.getState().getEvents(newArchiveId);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'movement',
+      encounterId: 'enc-1',
+      round: 4,
+      turn: 2,
+      ...PAYLOAD,
+    });
+  });
+
+  // Reported P1: two concurrently active encounters (combat started on X,
+  // then on Y). Y owns the global `activeArchiveId` pointer, and ending Y
+  // correctly clears it (Y's archive IS the active one) — but X is still in
+  // combat with an OPEN archive of its own. Movement logging must resolve
+  // PER ENCOUNTER, not via the now-null global pointer, or every X movement
+  // silently no-ops for the rest of X's combat.
+  it("start X then Y, end Y (pointer cleared): a movement of an X entity still logs into X's open archive with X's round/turn", () => {
+    useEncounterStore.setState({
+      encounters: [
+        createMockEncounter({
+          id: 'enc-x',
+          round: 2,
+          currentTurn: 1,
+          entities: [createMockEncounterEntity({ id: 'e-1', name: 'Goblin' })],
+        }),
+        createMockEncounter({ id: 'enc-y', round: 9, currentTurn: 9 }),
+      ],
+    });
+    const archiveX = useCombatLogStore.getState().startArchive('enc-x')!;
+    const archiveY = useCombatLogStore.getState().startArchive('enc-y')!;
+    expect(useCombatLogStore.getState().activeArchiveId).toBe(archiveY);
+
+    // End Y: EncounterView clears the pointer since Y IS the active archive.
+    useCombatLogStore.getState().endArchive(archiveY);
+    useCombatLogStore.getState().setActiveArchive(null);
+    expect(useCombatLogStore.getState().activeArchiveId).toBeNull();
+
+    // X is still open — a movement for an X entity must still log, even
+    // though the global pointer no longer names anything.
+    logDmMovement(['enc-x', 'enc-y'], PAYLOAD);
+
+    const events = useCombatLogStore.getState().getEvents(archiveX);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: 'movement',
+      encounterId: 'enc-x',
+      round: 2,
+      turn: 1,
+      ...PAYLOAD,
+    });
+  });
+
+  it('no-ops when the entity has no open archive for its own linked encounter', () => {
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({ id: 'enc-1' }),
