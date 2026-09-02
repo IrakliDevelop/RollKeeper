@@ -60,6 +60,21 @@ vi.mock('@/components/ui/campaign/location-map/measureSync', () => ({
   attachRemoteMeasurements: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 
+vi.mock('@/components/ui/campaign/location-map/pathSync', () => ({
+  attachPathBroadcast: vi.fn(() => ({
+    setSharing: vi.fn(),
+    dispose: () => {
+      callOrder.push('pathBroadcast.dispose');
+    },
+  })),
+  attachRemotePaths: vi.fn(() => ({
+    dispose: () => {
+      callOrder.push('remotePaths.dispose');
+    },
+    overlay: {},
+  })),
+}));
+
 vi.mock('@/components/ui/campaign/location-map/layerContract', () => ({
   migrateCanvasToContract: vi.fn(() => false),
   subscribePinCanonicalLayers: vi.fn(() => vi.fn()),
@@ -92,15 +107,28 @@ import {
   attachFocusBroadcast,
   createLocalCameraAnimator,
 } from '@/components/ui/campaign/location-map/focusSync';
+import { attachPathBroadcast } from '@/components/ui/campaign/location-map/pathSync';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
 
+/** A minimal stand-in for the registered movement `PathTool` — truthy so
+ * `getTool<PathTool>('path')` resolves and the hook's movement-commit and
+ * path-broadcast wiring actually run (both are gated on it being present). */
+function makeFakeMovementTool() {
+  return { onPath: vi.fn(() => vi.fn()), onCommit: vi.fn(() => vi.fn()) };
+}
+
 function makeVp(): Viewport {
+  const fakeMovementTool = makeFakeMovementTool();
   return {
-    store: { on: vi.fn() },
+    store: { on: vi.fn(), getById: vi.fn(() => undefined) },
     layerManager: {},
     camera: {},
     domLayer: document.createElement('div'),
-    toolManager: { getTool: vi.fn(() => undefined) },
+    toolManager: {
+      getTool: vi.fn((name: string) =>
+        name === 'path' ? fakeMovementTool : undefined
+      ),
+    },
     onSelectionChange: vi.fn(() => vi.fn()),
     getSelectedIds: vi.fn(() => []),
     loadJSON: vi.fn(),
@@ -248,13 +276,56 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     unmount();
 
     // The unmount effect runs laserCleanupRef.current?.() (which carries the
-    // focus teardown, pushed alongside measureBroadcast's) BEFORE
-    // connectionRef.current?.stop() — cleanup ordering rides the live
+    // focus teardown, pushed alongside measureBroadcast's, and — with a
+    // registered movement tool — the path broadcast/receiver teardown too)
+    // BEFORE connectionRef.current?.stop() — cleanup ordering rides the live
     // connection, matching the measure handle's own final clear.
     expect(callOrder).toEqual([
+      'remotePaths.dispose',
       'focusBroadcast.dispose',
+      'pathBroadcast.dispose',
       'localAnimator.dispose',
       'connection.stop',
     ]);
+  });
+
+  it('attachPathBroadcast receives OPTION FUNCTIONS that re-read live state — isDmOnlyElement is not a snapshot taken at attach time', () => {
+    useBattleMapStore.setState({
+      battleMaps: {
+        TEST01: {
+          'bm-1': {
+            id: 'bm-1',
+            campaignCode: 'TEST01',
+            name: 'Map',
+            mapImageUrl: '',
+            mapImageSize: { w: 0, h: 0 },
+            canvasState: '',
+            dmOnlyElements: {},
+            gridEnabled: false,
+            linkedEncounterIds: [],
+            createdAt: '2026-01-01T00:00:00.000Z',
+            updatedAt: '2026-01-01T00:00:00.000Z',
+          },
+        },
+      },
+    });
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+
+    act(() => {
+      result.current.handleReady(vp);
+    });
+
+    expect(attachPathBroadcast).toHaveBeenCalledTimes(1);
+    const options = vi.mocked(attachPathBroadcast).mock.calls[0]?.[2] as {
+      isDmOnlyElement: (id: string) => boolean;
+    };
+    expect(options.isDmOnlyElement('tok-1')).toBe(false);
+
+    useBattleMapStore.getState().toggleDmOnly('TEST01', 'bm-1', 'tok-1');
+
+    // Same function reference, called again — the answer changed because it
+    // re-reads the store live, not because a new closure was built.
+    expect(options.isDmOnlyElement('tok-1')).toBe(true);
   });
 });

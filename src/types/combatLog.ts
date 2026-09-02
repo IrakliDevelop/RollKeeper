@@ -84,6 +84,18 @@ export interface DeathEvent extends BaseCombatLogEvent {
   entityName: string;
 }
 
+export interface MovementEvent extends BaseCombatLogEvent {
+  type: 'movement';
+  entityId: string;
+  entityName: string;
+  /** Path distance, sender-computed (grid metric + diagonal rule). */
+  feet: number;
+  cells: number;
+  /** World-space token centres, for replay/analysis; not rendered today. */
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+}
+
 export type CombatLogEvent =
   | DamageEvent
   | HealingEvent
@@ -93,7 +105,8 @@ export type CombatLogEvent =
   | AbilityUseEvent
   | RoundEvent
   | CombatStatusEvent
-  | DeathEvent;
+  | DeathEvent
+  | MovementEvent;
 
 export interface CombatLogFilters {
   types?: CombatLogEvent['type'][];

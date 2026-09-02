@@ -69,6 +69,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     publishLayerRemove,
     measureSharing,
     handleSetMeasureSharing,
+    pathSharing,
+    handleSetPathSharing,
+    movementDash,
+    handleSetMovementDash,
     handleGoToCameraView,
     handleSendCameraView,
     getViewport,
@@ -195,6 +199,16 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               onChange: handleSetMeasureSharing,
             }}
             markerControls={markerControls}
+            movementControls={{
+              sharing: {
+                enabled: pathSharing,
+                onChange: handleSetPathSharing,
+              },
+              dash: {
+                enabled: movementDash,
+                onChange: handleSetMovementDash,
+              },
+            }}
           />
         )}
 

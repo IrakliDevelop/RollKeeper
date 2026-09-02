@@ -62,6 +62,26 @@ const turnEvent = (id: string): CombatLogEvent => ({
   entityName: 'Cultist',
 });
 
+const movementEvent = (
+  id: string,
+  overrides: Record<string, unknown> = {}
+): CombatLogEvent =>
+  ({
+    id,
+    timestamp: '2026-01-01T00:00:01.000Z',
+    round: 1,
+    turn: 1,
+    encounterId: ENC_A,
+    type: 'movement',
+    entityId: 'ent-1',
+    entityName: 'Cultist',
+    feet: 30,
+    cells: 6,
+    from: { x: 0, y: 0 },
+    to: { x: 5, y: 5 },
+    ...overrides,
+  }) as unknown as CombatLogEvent;
+
 /** A closed archive payload: `endedAt` present. */
 const archivePayload = (
   overrides: Partial<CombatLogArchivePayload> = {}
@@ -686,6 +706,64 @@ describe('Slice 11F combat log archive family', () => {
     });
   });
 
+  // ── movement events: `from`/`to` coordinates ────────────────────────────
+
+  it('accepts a fully valid movement event', () => {
+    const payload = archivePayload();
+    payload.events = [movementEvent('evt-move')];
+    expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+      ok: true,
+    });
+  });
+
+  const invalidCoordinateCases: Array<[string, Record<string, unknown>]> = [
+    ['a non-finite from.x', { from: { x: Number.NaN, y: 0 } }],
+    ['a non-finite from.y', { from: { x: 0, y: Number.POSITIVE_INFINITY } }],
+    ['a missing from.x', { from: { y: 0 } }],
+    ['a missing from.y', { from: { x: 0 } }],
+    ['a non-finite to.x', { to: { x: Number.NEGATIVE_INFINITY, y: 5 } }],
+    ['a non-finite to.y', { to: { x: 5, y: Number.NaN } }],
+    ['a missing to.x', { to: { y: 5 } }],
+    ['a missing to.y', { to: { x: 5 } }],
+  ];
+
+  it.each(invalidCoordinateCases)(
+    'rejects a movement event with %s',
+    (_label, overrides) => {
+      const payload = archivePayload();
+      payload.events = [movementEvent('evt-move', overrides)];
+      expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+        ok: false,
+        kind: 'invalid-archive',
+      });
+    }
+  );
+
+  it.each(['from', 'to'] as const)(
+    'rejects a movement event with an extra key inside %s',
+    field => {
+      const payload = archivePayload();
+      payload.events = [
+        movementEvent('evt-move', { [field]: { x: 0, y: 0, evil: 'payload' } }),
+      ];
+      expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+        ok: false,
+        kind: 'invalid-archive',
+      });
+    }
+  );
+
+  it('rejects an unclassified top-level field on a movement event', () => {
+    const payload = archivePayload();
+    payload.events = [
+      movementEvent('evt-move', { provokesOpportunityAttack: true }),
+    ];
+    expect(validateCombatLogArchivePayload(payload)).toMatchObject({
+      ok: false,
+      kind: 'unclassified-field',
+    });
+  });
+
   it('accepts every event discriminator in the union', () => {
     const base = {
       timestamp: '2026-01-01T00:00:00.000Z',
@@ -794,6 +872,7 @@ describe('Slice 11F combat log archive family', () => {
         entityId: 'ent-2',
         entityName: 'Aria',
       },
+      movementEvent('evt-movement'),
     ] as unknown as CombatLogEvent[];
 
     expect(

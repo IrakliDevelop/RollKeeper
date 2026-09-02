@@ -266,6 +266,8 @@ function formatEventToText(event: CombatLogEvent): string {
       return `${prefix} ${event.entityName} was revived!`;
     case 'stabilized':
       return `${prefix} ${event.entityName} was stabilized`;
+    case 'movement':
+      return `${prefix} ${event.entityName} moved ${event.feet} ft (${event.cells} cells)`;
   }
 }
 

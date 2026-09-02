@@ -1,14 +1,16 @@
-import { createImage, createShape } from '@fieldnotes/core';
+import {
+  createImage,
+  createShape,
+  snapFootprintCenter,
+} from '@fieldnotes/core';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 import {
   buildCircularTokenUrl,
   tokenAvatarUrl,
 } from '@/components/ui/campaign/location-map/PlayerTokenTool';
-import {
-  snapTokenCenter,
-  TOKEN_ELEMENT_ZINDEX,
-} from '@/components/ui/campaign/location-map/tokenSnap';
+import { TOKEN_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
+import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/location-map/tokenIdentity';
 
 import type {
   CanvasElement,
@@ -20,7 +22,10 @@ import type {
 } from '@fieldnotes/core';
 import type { EncounterEntity, TokenCellSize } from '@/types/encounter';
 
-export const COMBATANT_TOKEN_KIND = 'combatant';
+/** Re-exported from tokenIdentity.ts (single source of truth — location-map
+ * must not import from dm-vtt, so the constant lives there and this file
+ * imports it, not the reverse). */
+export { COMBATANT_TOKEN_KIND };
 
 /** Re-exported from tokenSnap.ts (single source of truth — location-map
  * must not import from dm-vtt, so the constant lives there and this file
@@ -92,7 +97,7 @@ export function stampCombatantToken(
   ctx: ToolContext
 ): CanvasElement {
   const cells = config.tokenSize ?? 1;
-  const center = snapTokenCenter(world, cells, ctx);
+  const center = snapFootprintCenter(world, cells, ctx);
   const size = cells * cellUnit(ctx);
   const position = { x: center.x - size / 2, y: center.y - size / 2 };
   const layerId = ctx.activeLayerId ?? '';
@@ -204,7 +209,7 @@ export function restampCombatantTokens(
       x: rect.position.x + oldSize.w / 2,
       y: rect.position.y + oldSize.h / 2,
     };
-    const center = snapTokenCenter(oldCenter, cells, ctx);
+    const center = snapFootprintCenter(oldCenter, cells, ctx);
     const position = { x: center.x - size / 2, y: center.y - size / 2 };
     const wantsImage = src !== null;
     const isImage = rect.type === 'image';

@@ -21,6 +21,7 @@ import {
   Maximize,
   Map as MapIcon,
   Move,
+  Footprints,
   Eye,
   EyeOff,
   Zap,
@@ -46,6 +47,7 @@ const BASE_TOOL_DEFS = [
 
 const BATTLEMAP_TOOL_DEFS = [
   { name: 'measure', icon: Ruler, label: 'Measure' },
+  { name: 'path', icon: Footprints, label: 'Move' },
   { name: 'template', icon: Sparkles, label: 'Template' },
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
   { name: 'laser', icon: Zap, label: 'Laser pointer' },

@@ -47,6 +47,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleToggleSelectedDmOnly,
     measureSharing,
     handleSetMeasureSharing,
+    pathSharing,
+    handleSetPathSharing,
+    movementDash,
+    handleSetMovementDash,
     handleGoToCameraView,
     handleSendCameraView,
     markerControls,
@@ -94,6 +98,16 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             measureSharing={{
               enabled: measureSharing,
               onChange: handleSetMeasureSharing,
+            }}
+            movementControls={{
+              sharing: {
+                enabled: pathSharing,
+                onChange: handleSetPathSharing,
+              },
+              dash: {
+                enabled: movementDash,
+                onChange: handleSetMovementDash,
+              },
             }}
             exportControl={
               <BattleMapExportControl

@@ -6,6 +6,7 @@ import {
   Pencil,
   MoveUpRight,
   Ruler,
+  Footprints,
   Circle,
   Type,
   StickyNote,
@@ -25,6 +26,7 @@ import { Button } from '@/components/ui/forms/button';
 import DmLocationToolOptions, {
   type MarkerToolControls,
   type MeasureSharingControl,
+  type MovementControls,
 } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { markerAudienceToggleTitle } from '@/components/ui/campaign/location-map/markerAudienceCopy';
@@ -42,6 +44,7 @@ const DM_TOOLS: { name: string; label: string; Icon: typeof Hand }[] = [
   { name: 'text', label: 'Text', Icon: Type },
   { name: 'note', label: 'Sticky Note', Icon: StickyNote },
   { name: 'measure', label: 'Measure', Icon: Ruler },
+  { name: 'path', label: 'Move', Icon: Footprints },
   { name: 'template', label: 'Template', Icon: Circle },
   { name: 'eraser', label: 'Eraser', Icon: Eraser },
   { name: 'laser', label: 'Laser pointer', Icon: Zap },
@@ -77,6 +80,7 @@ export interface DmVttToolbarProps {
   /** Kind + colour for the marker tool; threaded to the shared options bar. */
   markerControls?: MarkerToolControls;
   measureSharing?: MeasureSharingControl;
+  movementControls?: MovementControls;
   exportControl?: ReactNode;
   viewsControl?: ReactNode;
 }
@@ -117,6 +121,7 @@ export function DmVttToolbar({
   markerAudienceNotice,
   markerControls,
   measureSharing,
+  movementControls,
   exportControl,
   viewsControl,
 }: DmVttToolbarProps) {
@@ -277,6 +282,7 @@ export function DmVttToolbar({
           selectionControls
           measureSharing={measureSharing}
           markerControls={markerControls}
+          movementControls={movementControls}
         />
       </div>
     </div>

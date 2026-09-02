@@ -1,11 +1,12 @@
 'use client';
 
-import type { ShapeKind } from '@fieldnotes/core';
+import type { DiagonalRule, ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
   LaserToolOptions,
   MeasureToolOptions,
   NoteToolOptions,
+  PathToolOptions,
   PencilToolOptions,
   PingToolOptions,
   ShapeToolOptions,
@@ -73,6 +74,11 @@ export interface MeasureSharingControl {
   onChange: (enabled: boolean) => void;
 }
 
+export interface MovementControls {
+  sharing?: MeasureSharingControl; // DM surfaces only
+  dash: { enabled: boolean; onChange: (enabled: boolean) => void };
+}
+
 /**
  * Marker kind + colour, owned by each DM surface's hook and mirrored into the
  * refs `DmMarkerTool` reads at placement time. `DmMarkerTool` is not an SDK
@@ -92,6 +98,8 @@ interface DmLocationToolOptionsProps {
   selectionControls?: boolean;
   /** Enables the marker kind + colour branch (battlemap mode only). */
   markerControls?: MarkerToolControls;
+  /** Enables the movement (path) tool's diagonal rule / dash / sharing branch. */
+  movementControls?: MovementControls;
 }
 
 export default function DmLocationToolOptions({
@@ -99,6 +107,7 @@ export default function DmLocationToolOptions({
   measureSharing,
   selectionControls,
   markerControls,
+  movementControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -124,6 +133,9 @@ export default function DmLocationToolOptions({
   const [measureOpts, setMeasureOpts] = useToolOptions<
     MeasureToolOptions & Record<string, unknown>
   >('measure');
+  const [pathOpts, setPathOpts] = useToolOptions<
+    PathToolOptions & Record<string, unknown>
+  >('path');
   const [templateOpts, setTemplateOpts] = useToolOptions<
     TemplateToolOptions & Record<string, unknown>
   >('template');
@@ -159,6 +171,7 @@ export default function DmLocationToolOptions({
     activeTool === 'shape' ||
     (mode === 'battlemap' &&
       (activeTool === 'measure' ||
+        activeTool === 'path' ||
         activeTool === 'template' ||
         (activeTool === 'laser' && laserOpts !== undefined) ||
         (activeTool === 'ping' && pingOpts !== undefined)));
@@ -486,6 +499,47 @@ export default function DmLocationToolOptions({
                   checked={measureSharing.enabled}
                   onCheckedChange={measureSharing.onChange}
                   aria-label="Share with players"
+                />
+              </label>
+            </>
+          )}
+        </>
+      )}
+
+      {mode === 'battlemap' && activeTool === 'path' && (
+        <>
+          <div className="bg-divider h-6 w-px" />
+          <span className="text-muted text-xs font-medium">Diagonals</span>
+          <select
+            value={(pathOpts?.diagonalRule as string) ?? 'chebyshev'}
+            onChange={e =>
+              setPathOpts({ diagonalRule: e.target.value as DiagonalRule })
+            }
+            className="border-divider bg-surface text-body rounded border px-1 py-0.5 text-xs"
+            aria-label="Diagonal rule"
+          >
+            <option value="chebyshev">5-5-5</option>
+            <option value="alternate">5-10-5</option>
+          </select>
+          {movementControls && (
+            <label className="text-muted flex items-center gap-2 text-xs font-medium">
+              Dash
+              <Switch
+                checked={movementControls.dash.enabled}
+                onCheckedChange={movementControls.dash.onChange}
+                aria-label="Dash"
+              />
+            </label>
+          )}
+          {movementControls?.sharing && (
+            <>
+              <div className="bg-divider h-6 w-px" />
+              <label className="text-muted flex items-center gap-2 text-xs font-medium">
+                Share with players
+                <Switch
+                  checked={movementControls.sharing.enabled}
+                  onCheckedChange={movementControls.sharing.onChange}
+                  aria-label="Share movement with players"
                 />
               </label>
             </>

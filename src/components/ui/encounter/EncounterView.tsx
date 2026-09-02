@@ -12,6 +12,7 @@ import Link from 'next/link';
 import { useEncounterStore } from '@/store/encounterStore';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
+import { useCombatLogStore } from '@/store/combatLogStore';
 import { useCampaignSync } from '@/hooks/useCampaignSync';
 import { applyPlayersToEncounter } from '@/utils/encounterSync';
 import { useDmEffectsSync } from '@/hooks/useDmEffectsSync';
@@ -75,6 +76,50 @@ export function pushLinkedMapLive(
 ): void {
   const linked = findLinkedBattleMap(battleMaps, encounterId);
   if (linked) void pushActive(linked.id, linked.name);
+}
+
+/**
+ * Start-combat combat-log wiring, extracted for unit testability (same
+ * pattern as `handleEncounterPoke`/`pushLinkedMapLive`). `startArchive`
+ * admits and activates a new archive for this encounter; a null return
+ * (admission rejected — e.g. the campaign already sits at the archive-count
+ * cap) is an expected, silent outcome that must not interrupt combat start.
+ */
+export function startCombatLogArchiveForCombat(
+  encounterId: string,
+  campaignCode: string,
+  startArchive: (encounterId: string, campaignCode?: string) => string | null
+): void {
+  startArchive(encounterId, campaignCode);
+}
+
+/**
+ * End-combat combat-log wiring, extracted for unit testability. Resolves
+ * *this* encounter's own archive via `getLatestArchiveForEncounter` rather
+ * than trusting the store's global `activeArchiveId` — two encounters can be
+ * `isActive` concurrently (e.g. combat started on encounter X, then on Y
+ * before X was ended), and `activeArchiveId` is a single device-local
+ * pointer that only ever names whichever encounter started combat *last*.
+ * Ending X while Y holds the pointer must never stamp Y's archive, and must
+ * still close X's own (now orphaned, non-active) archive. `endArchive` is
+ * called on X's archive whether or not it happens to be the active one;
+ * `activeArchiveId` is cleared only when the archive just ended IS the one
+ * it points to, so ending X leaves Y's active pointer — and Y's logging —
+ * untouched. No archive for this encounter is a silent no-op.
+ */
+export function endCombatLogArchiveForCombat(
+  encounterId: string,
+  activeArchiveId: string | null,
+  getLatestArchiveForEncounter: (
+    encounterId: string
+  ) => { archiveId: string } | null,
+  endArchive: (archiveId: string) => void,
+  setActiveArchive: (archiveId: string | null) => void
+): void {
+  const archive = getLatestArchiveForEncounter(encounterId);
+  if (!archive) return;
+  endArchive(archive.archiveId);
+  if (activeArchiveId === archive.archiveId) setActiveArchive(null);
 }
 
 export function EncounterView({
@@ -145,6 +190,14 @@ export function EncounterView({
 
   const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
   const getBattleMaps = useBattleMapStore(state => state.getBattleMaps);
+
+  const {
+    startArchive,
+    endArchive,
+    setActiveArchive,
+    getLatestArchiveForEncounter,
+    activeArchiveId: activeLogArchiveId,
+  } = useCombatLogStore();
 
   useTurnRequestSync({
     campaignCode,
@@ -343,6 +396,7 @@ export function EncounterView({
       }).catch(() => {});
     }
     startCombat(encounterId);
+    startCombatLogArchiveForCombat(encounterId, campaignCode, startArchive);
     pushLinkedMapLive(getBattleMaps(campaignCode), encounterId, pushActive);
   }, [
     encounter?.pendingInitiativeRequest,
@@ -351,8 +405,27 @@ export function EncounterView({
     pushInitiativeRequest,
     setPendingInitiativeRequest,
     startCombat,
+    startArchive,
     getBattleMaps,
     pushActive,
+  ]);
+
+  const handleEndCombat = useCallback(() => {
+    endCombat(encounterId);
+    endCombatLogArchiveForCombat(
+      encounterId,
+      activeLogArchiveId,
+      getLatestArchiveForEncounter,
+      endArchive,
+      setActiveArchive
+    );
+  }, [
+    encounterId,
+    endCombat,
+    activeLogArchiveId,
+    getLatestArchiveForEncounter,
+    endArchive,
+    setActiveArchive,
   ]);
 
   if (!encounter || !actions) {
@@ -377,7 +450,7 @@ export function EncounterView({
         playerCounterValues={campaign?.playerCounters}
         actions={actions}
         onStartCombat={handleStartCombat}
-        onEndCombat={() => endCombat(encounterId)}
+        onEndCombat={handleEndCombat}
         onNextTurn={() => nextTurn(encounterId)}
         onPrevTurn={() => prevTurn(encounterId)}
         onRollAllInitiatives={() => rollAllInitiatives(encounterId)}

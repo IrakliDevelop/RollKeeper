@@ -61,6 +61,14 @@ vi.mock('../measureSync', () => ({
   attachRemoteMeasurements: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 
+vi.mock('../pathSync', () => ({
+  attachPathBroadcast: vi.fn(() => ({
+    setSharing: vi.fn(),
+    dispose: vi.fn(),
+  })),
+  attachRemotePaths: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+}));
+
 vi.mock('../layerSync', () => ({
   makeApplyRemoteLayer: vi.fn(() => vi.fn()),
   publishOwnedLayers: vi.fn(),

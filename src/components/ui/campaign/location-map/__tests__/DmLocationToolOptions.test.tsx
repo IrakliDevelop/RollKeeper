@@ -194,6 +194,47 @@ describe('DmLocationToolOptions measure sharing control', () => {
   });
 });
 
+describe('DmLocationToolOptions movement sharing control', () => {
+  beforeEach(() => {
+    mockActiveTool = 'path';
+    mockToolOptions = { path: { diagonalRule: 'chebyshev' } };
+    for (const key of Object.keys(setOptionsSpies)) delete setOptionsSpies[key];
+  });
+
+  afterEach(() => cleanup());
+
+  it('renders no movement share switch when movementControls has no sharing (the player mount shape)', () => {
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        movementControls={{ dash: { enabled: false, onChange: vi.fn() } }}
+      />
+    );
+
+    expect(
+      screen.queryByLabelText('Share movement with players')
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the movement share switch when movementControls.sharing is provided (the DM mount shape)', () => {
+    const onChange = vi.fn();
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        movementControls={{
+          dash: { enabled: false, onChange: vi.fn() },
+          sharing: { enabled: false, onChange },
+        }}
+      />
+    );
+
+    const toggle = screen.getByLabelText('Share movement with players');
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
+    expect(onChange).toHaveBeenCalledWith(true);
+  });
+});
+
 describe('DmLocationToolOptions selection branch reachability', () => {
   beforeEach(() => {
     mockActiveTool = 'select';
