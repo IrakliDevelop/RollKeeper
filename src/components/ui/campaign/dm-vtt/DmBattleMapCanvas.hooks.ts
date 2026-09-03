@@ -65,6 +65,11 @@ import {
   attachRemotePaths,
   type PathBroadcastHandle,
 } from '@/components/ui/campaign/location-map/pathSync';
+import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
+import type { AwarenessSyncHandle } from '@/components/ui/campaign/location-map/awarenessSync';
+import { attachConnectionScope } from '@/components/ui/campaign/location-map/connectionScope';
+import { useDmStore } from '@/store/dmStore';
+import type { PeerRoster } from '@fieldnotes/core';
 import {
   resolveDmMovement,
   logDmMovement,
@@ -143,6 +148,15 @@ export interface DmBattleMapCanvasState {
   handleSetPathSharing: (enabled: boolean) => void;
   movementDash: boolean;
   handleSetMovementDash: (enabled: boolean) => void;
+  /** Who-is-viewing roster from the shared-presence attachment (null before
+   *  handleReady/relay attach). */
+  awarenessRoster: PeerRoster | null;
+  /** DM's own cursor-share session switch — default OFF. */
+  cursorSharing: boolean;
+  handleSetCursorSharing: (enabled: boolean) => void;
+  /** Viewer-side render switch for PLAYER cursors — default ON. */
+  showPlayerCursors: boolean;
+  handleSetShowPlayerCursors: (enabled: boolean) => void;
   handleGoToCameraView: (view: CameraView) => void;
   handleSendCameraView: (view: CameraView, audience: FocusAudience) => void;
 
@@ -228,6 +242,30 @@ export function useDmBattleMapCanvas({
   const handleSetMovementDash = useCallback((enabled: boolean) => {
     movementDashRef.current = enabled;
     setMovementDash(enabled);
+  }, []);
+
+  // Shared presence (core 0.65.0 awareness). Session-scoped like measure/
+  // path sharing: the DM's cursor is published only while this switch is on
+  // (default OFF); identity heartbeats run regardless so players' "who is
+  // viewing" sees the DM. `showPlayerCursors` is the viewer-side render
+  // switch for PLAYER cursors (other DMs' cursors always draw).
+  const [cursorSharing, setCursorSharing] = useState(false);
+  const cursorSharingRef = useRef(false);
+  const [showPlayerCursors, setShowPlayerCursors] = useState(true);
+  const showPlayerCursorsRef = useRef(true);
+  const awarenessRef = useRef<AwarenessSyncHandle | null>(null);
+  const [awarenessRoster, setAwarenessRoster] = useState<PeerRoster | null>(
+    null
+  );
+  const handleSetCursorSharing = useCallback((enabled: boolean) => {
+    cursorSharingRef.current = enabled;
+    setCursorSharing(enabled);
+    awarenessRef.current?.setShareCursor(enabled);
+  }, []);
+  const handleSetShowPlayerCursors = useCallback((enabled: boolean) => {
+    showPlayerCursorsRef.current = enabled;
+    setShowPlayerCursors(enabled);
+    awarenessRef.current?.setShowPlayerCursors(enabled);
   }, []);
 
   const linkedEncounterIdsLive = useCallback(
@@ -712,7 +750,14 @@ export function useDmBattleMapCanvas({
       // snapshot would go stale after the first dm-only toggle).
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
       if (relayUrl) {
+        // Re-attach: tear down the OLD connection-scoped handles BEFORE
+        // stopping the old connection, so their final frames (awareness
+        // `cleared`, measure/path clears) ride the still-live socket —
+        // the same order the unmount effect uses.
+        laserCleanupRef.current?.();
+        laserCleanupRef.current = null;
         connectionRef.current?.stop();
+        connectionRef.current = null;
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
@@ -737,6 +782,10 @@ export function useDmBattleMapCanvas({
           onStatus: s => {
             setStatus(s);
             onStatusProp?.(s);
+            // Managed sendPresence drops while not live, so the attach-time
+            // frame may be lost; announce on every live transition (first
+            // connect AND reconnect) — the heartbeat self-heals otherwise.
+            if (s === 'live') awarenessRef.current?.announce();
           },
           onPoke: feature => {
             if (feature === 'markers') void refreshMarkerClaimsRef.current();
@@ -750,87 +799,124 @@ export function useDmBattleMapCanvas({
         publishOwnedLayers(vp, 'dm', def => connection.publishLayerUpsert(def));
 
         // Laser pointer + map pings: broadcast this DM's, render everyone
-        // else's.
-        laserCleanupRef.current?.();
-        const remotePings = attachRemotePings(vp, connection);
-        const remoteMeasures = attachRemoteMeasurements(vp, connection);
-        const remotePaths = attachRemotePaths(vp, connection);
-        const laserCleanups = [
-          attachRemoteLaserTrails(vp, connection),
-          remotePings.dispose,
-          remoteMeasures.dispose,
-          remotePaths.dispose,
-        ];
-        const laserTool = vp.toolManager.getTool<LaserTool>('laser');
-        if (laserTool) {
-          laserCleanups.push(attachLaserBroadcast(laserTool, connection));
-        }
-        const pingTool = vp.toolManager.getTool<PingTool>('ping');
-        if (pingTool) {
-          laserCleanups.push(attachPingBroadcast(pingTool, connection));
-        }
-        const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
-        if (measureTool) {
-          const measureBroadcast = attachMeasureBroadcast(
-            measureTool,
-            connection
-          );
-          // Reattachment (viewport/connection rebuild) must not silently
-          // revert to private while the toggle still says shared — apply the
-          // latest value now.
-          measureBroadcast.setSharing(measureSharingRef.current);
-          measureBroadcastRef.current = measureBroadcast;
-          laserCleanups.push(() => {
-            measureBroadcastRef.current = null;
-            measureBroadcast.dispose();
-          });
-        }
-        // Camera focus requests ("bring them here"): broadcast this DM's
-        // sends over presence. Stateless by design — see attachFocusBroadcast
-        // — so there is no re-apply after (re)attach, unlike measureBroadcast.
-        // Broadcast genuinely needs the connection (unlike the local animator
-        // above, which is set up unconditionally), so it stays gated here.
-        const focusBroadcast = attachFocusBroadcast(connection);
-        focusBroadcastRef.current = focusBroadcast;
-        laserCleanups.push(() => {
-          focusBroadcastRef.current = null;
-          focusBroadcast.dispose();
-        });
-        if (movementTool) {
-          const pathBroadcast = attachPathBroadcast(movementTool, connection, {
-            role: 'dm',
-            isDmOnlyElement: id =>
-              !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
-                battleMapId
-              ]?.dmOnlyElements[id],
-            getElement: id => vp.store.getById(id) ?? null,
-          });
-          // Reattachment must not silently revert to private while the
-          // toggle still says shared — apply the latest value now (measure
-          // precedent).
-          pathBroadcast.setSharing(pathSharingRef.current);
-          pathBroadcastRef.current = pathBroadcast;
-          laserCleanups.push(() => {
-            pathBroadcastRef.current = null;
-            pathBroadcast.dispose();
-          });
-        }
+        // else's. The whole attach sequence runs inside a connection scope:
+        // if any helper below throws, everything already created is
+        // unwound (in push order) and the NEW connection is stopped before
+        // the error surfaces — no half-attached handles, no orphaned
+        // socket. On success the returned composite cleanup is what
+        // laserCleanupRef carries forward (unmount and re-attach both call
+        // it before connection.stop()).
+        try {
+          laserCleanupRef.current = attachConnectionScope(connection, scope => {
+            const remotePings = attachRemotePings(vp, connection);
+            const remoteMeasures = attachRemoteMeasurements(vp, connection);
+            const remotePaths = attachRemotePaths(vp, connection);
+            scope.push(attachRemoteLaserTrails(vp, connection));
+            scope.push(remotePings.dispose);
+            scope.push(remoteMeasures.dispose);
+            scope.push(remotePaths.dispose);
+            const laserTool = vp.toolManager.getTool<LaserTool>('laser');
+            if (laserTool) {
+              scope.push(attachLaserBroadcast(laserTool, connection));
+            }
+            const pingTool = vp.toolManager.getTool<PingTool>('ping');
+            if (pingTool) {
+              scope.push(attachPingBroadcast(pingTool, connection));
+            }
+            const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
+            if (measureTool) {
+              const measureBroadcast = attachMeasureBroadcast(
+                measureTool,
+                connection
+              );
+              // Reattachment (viewport/connection rebuild) must not silently
+              // revert to private while the toggle still says shared — apply
+              // the latest value now.
+              measureBroadcast.setSharing(measureSharingRef.current);
+              measureBroadcastRef.current = measureBroadcast;
+              scope.push(() => {
+                measureBroadcastRef.current = null;
+                measureBroadcast.dispose();
+              });
+            }
+            // Camera focus requests ("bring them here"): broadcast this DM's
+            // sends over presence. Stateless by design — see
+            // attachFocusBroadcast — so there is no re-apply after
+            // (re)attach, unlike measureBroadcast. Broadcast genuinely needs
+            // the connection (unlike the local animator above, which is set
+            // up unconditionally), so it stays gated here.
+            const focusBroadcast = attachFocusBroadcast(connection);
+            focusBroadcastRef.current = focusBroadcast;
+            scope.push(() => {
+              focusBroadcastRef.current = null;
+              focusBroadcast.dispose();
+            });
+            if (movementTool) {
+              const pathBroadcast = attachPathBroadcast(
+                movementTool,
+                connection,
+                {
+                  role: 'dm',
+                  isDmOnlyElement: id =>
+                    !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
+                      battleMapId
+                    ]?.dmOnlyElements[id],
+                  getElement: id => vp.store.getById(id) ?? null,
+                }
+              );
+              // Reattachment must not silently revert to private while the
+              // toggle still says shared — apply the latest value now
+              // (measure precedent).
+              pathBroadcast.setSharing(pathSharingRef.current);
+              pathBroadcastRef.current = pathBroadcast;
+              scope.push(() => {
+                pathBroadcastRef.current = null;
+                pathBroadcast.dispose();
+              });
+            }
 
-        // Always-available DM pings: long-press with any tool + "P" at the
-        // cursor, self-pulse through the shared receive overlay. The veto
-        // skips the ping tool, whose own tap already pinged on pointer down.
-        laserCleanups.push(
-          attachPingInput(vp, remotePings.overlay, connection, {
-            color: '#F4C430',
-            // Options-bar swatch changes restyle long-press/hotkey pings too.
-            ...(pingTool ? { followTool: pingTool } : {}),
-            hotkey: 'p',
-            shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
-          })
-        );
-        laserCleanupRef.current = () => {
-          for (const cleanup of laserCleanups) cleanup();
-        };
+            // Always-available DM pings: long-press with any tool + "P" at
+            // the cursor, self-pulse through the shared receive overlay. The
+            // veto skips the ping tool, whose own tap already pinged on
+            // pointer down.
+            scope.push(
+              attachPingInput(vp, remotePings.overlay, connection, {
+                color: '#F4C430',
+                // Options-bar swatch changes restyle long-press/hotkey pings
+                // too.
+                ...(pingTool ? { followTool: pingTool } : {}),
+                hotkey: 'p',
+                shouldPing: () => vp.toolManager.activeTool?.name !== 'ping',
+              })
+            );
+
+            // Shared presence: identity always, cursor behind the session
+            // switch, selection/tool never (see awarenessSync.ts). Re-attach
+            // re-applies the switch state (measure precedent). Pushed into
+            // the connection scope so the `cleared` frame rides the live
+            // socket before connection.stop().
+            const awareness = attachAwarenessSync(vp, connection, {
+              identity: { id: dmId, name: 'DM', role: 'dm' },
+              shareCursor: cursorSharingRef.current,
+              showPlayerCursors: showPlayerCursorsRef.current,
+              colorFor: peer =>
+                useDmStore.getState().getPlayerColor(campaignCode, peer.id),
+            });
+            awarenessRef.current = awareness;
+            setAwarenessRoster(awareness.roster);
+            scope.push(() => {
+              awarenessRef.current = null;
+              setAwarenessRoster(null);
+              awareness.dispose();
+            });
+          });
+        } catch (error) {
+          // attachConnectionScope already disposed every helper it saw and
+          // stopped `connection`; drop the dead reference so unmount and the
+          // next re-attach do not stop it twice, then surface the error.
+          connectionRef.current = null;
+          throw error;
+        }
       }
 
       onViewportReady?.(vp);
@@ -963,6 +1049,11 @@ export function useDmBattleMapCanvas({
     handleSetPathSharing,
     movementDash,
     handleSetMovementDash,
+    awarenessRoster,
+    cursorSharing,
+    handleSetCursorSharing,
+    showPlayerCursors,
+    handleSetShowPlayerCursors,
     handleGoToCameraView,
     handleSendCameraView,
     markerControls,

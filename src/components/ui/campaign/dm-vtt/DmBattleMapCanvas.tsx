@@ -5,6 +5,7 @@ import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
 import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/BattleMapViewsControl';
+import { PresenceControl } from '@/components/ui/campaign/location-map/PresenceControl';
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -51,6 +52,11 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleSetPathSharing,
     movementDash,
     handleSetMovementDash,
+    awarenessRoster,
+    cursorSharing,
+    handleSetCursorSharing,
+    showPlayerCursors,
+    handleSetShowPlayerCursors,
     handleGoToCameraView,
     handleSendCameraView,
     markerControls,
@@ -162,6 +168,16 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                       cameraViews: next,
                     });
                 }}
+              />
+            }
+            presenceControl={
+              <PresenceControl
+                campaignCode={campaignCode}
+                roster={awarenessRoster}
+                cursorSharing={cursorSharing}
+                onCursorSharingChange={handleSetCursorSharing}
+                showPlayerCursors={showPlayerCursors}
+                onShowPlayerCursorsChange={handleSetShowPlayerCursors}
               />
             }
           />

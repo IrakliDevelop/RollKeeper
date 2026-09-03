@@ -80,6 +80,21 @@ vi.mock('@/components/ui/campaign/location-map/layerContract', () => ({
   subscribePinCanonicalLayers: vi.fn(() => vi.fn()),
 }));
 
+const awarenessHandle = {
+  roster: {} as never,
+  cursorPeers: vi.fn(() => []),
+  announce: vi.fn(),
+  setShareCursor: vi.fn(),
+  setShowPlayerCursors: vi.fn(),
+  setIdentity: vi.fn(),
+  dispose: () => {
+    callOrder.push('awareness.dispose');
+  },
+};
+vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
+  attachAwarenessSync: vi.fn(() => awarenessHandle),
+}));
+
 vi.mock('@/components/ui/campaign/location-map/layerSync', () => ({
   makeApplyRemoteLayer: vi.fn(() => vi.fn()),
   publishOwnedLayers: vi.fn(),
@@ -108,6 +123,9 @@ import {
   createLocalCameraAnimator,
 } from '@/components/ui/campaign/location-map/focusSync';
 import { attachPathBroadcast } from '@/components/ui/campaign/location-map/pathSync';
+import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
+import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
+import { useDmStore } from '@/store/dmStore';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
 
 /** A minimal stand-in for the registered movement `PathTool` — truthy so
@@ -163,6 +181,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     useBattleMapStore.setState({ battleMaps: {} });
+    useDmStore.setState({ campaigns: [] });
     callOrder.length = 0;
     vi.clearAllMocks();
   });
@@ -276,14 +295,16 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     unmount();
 
     // The unmount effect runs laserCleanupRef.current?.() (which carries the
-    // focus teardown, pushed alongside measureBroadcast's, and — with a
-    // registered movement tool — the path broadcast/receiver teardown too)
-    // BEFORE connectionRef.current?.stop() — cleanup ordering rides the live
-    // connection, matching the measure handle's own final clear.
+    // focus teardown, pushed alongside measureBroadcast's, the path
+    // broadcast/receiver teardown, and — pushed last — awareness's own
+    // `cleared` frame) BEFORE connectionRef.current?.stop() — cleanup
+    // ordering rides the live connection, matching the measure handle's own
+    // final clear.
     expect(callOrder).toEqual([
       'remotePaths.dispose',
       'focusBroadcast.dispose',
       'pathBroadcast.dispose',
+      'awareness.dispose',
       'localAnimator.dispose',
       'connection.stop',
     ]);
@@ -327,5 +348,127 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     // Same function reference, called again — the answer changed because it
     // re-reads the store live, not because a new closure was built.
     expect(options.isDmOnlyElement('tok-1')).toBe(true);
+  });
+
+  it('attaches awareness as DM with cursor OFF, players shown, and disposes it BEFORE connection.stop on unmount', () => {
+    const vp = makeVp();
+    const { result, unmount } = renderHook(() =>
+      useDmBattleMapCanvas(baseProps())
+    );
+    act(() => result.current.handleReady(vp));
+    const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
+    expect(options.identity).toEqual({
+      id: baseProps().dmId,
+      name: 'DM',
+      role: 'dm',
+    });
+    expect(options.shareCursor).toBe(false);
+    expect(options.showPlayerCursors).toBe(true);
+    expect(result.current.awarenessRoster).toBe(awarenessHandle.roster);
+    unmount();
+    expect(callOrder.indexOf('awareness.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('awareness.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+  });
+
+  it('RE-ATTACH: a second handleReady disposes the OLD attachment BEFORE stopping the OLD connection', () => {
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    act(() => result.current.handleReady(makeVp()));
+    callOrder.length = 0;
+    act(() => result.current.handleReady(makeVp()));
+    // Old cleanup (awareness + path/focus handles) must precede the old stop —
+    // the `cleared` frames ride the still-live socket.
+    expect(callOrder.indexOf('awareness.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('pathBroadcast.dispose')).toBeGreaterThanOrEqual(
+      0
+    );
+    expect(callOrder.indexOf('awareness.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.indexOf('pathBroadcast.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1); // the new one is not stopped
+    expect(vi.mocked(attachAwarenessSync)).toHaveBeenCalledTimes(2);
+  });
+
+  it('announces on every live status and forwards the two switches; re-attach re-applies both', () => {
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    act(() => result.current.handleReady(vp));
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    act(() => onStatus('connecting'));
+    act(() => onStatus('live'));
+    expect(awarenessHandle.announce).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.handleSetCursorSharing(true));
+    expect(awarenessHandle.setShareCursor).toHaveBeenCalledWith(true);
+    expect(result.current.cursorSharing).toBe(true);
+    act(() => result.current.handleSetShowPlayerCursors(false));
+    expect(awarenessHandle.setShowPlayerCursors).toHaveBeenCalledWith(false);
+    expect(result.current.showPlayerCursors).toBe(false);
+
+    act(() => result.current.handleReady(makeVp())); // viewport rebuild
+    const [, , again] = vi.mocked(attachAwarenessSync).mock.calls.at(-1)!;
+    expect(again.shareCursor).toBe(true);
+    expect(again.showPlayerCursors).toBe(false);
+  });
+
+  it('colorFor reads playerColors LIVE from the DM store', () => {
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    act(() => result.current.handleReady(vp));
+    const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
+    const peer = {
+      from: 'c1',
+      id: 'char-a',
+      cursor: null,
+      selection: [],
+      tool: null,
+    };
+    expect(options.colorFor?.(peer)).toBeUndefined();
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: baseProps().campaignCode,
+          name: 'x',
+          createdAt: '',
+          playerColors: { 'char-a': '#abcdef' },
+        },
+      ],
+    });
+    expect(options.colorFor?.(peer)).toBe('#abcdef');
+  });
+
+  it('ATTACH FAULT: when awareness construction throws, every earlier helper is disposed, the NEW connection is stopped, the error surfaces, and unmount does not double-tear-down', () => {
+    vi.mocked(attachAwarenessSync).mockImplementationOnce(() => {
+      throw new Error('awareness boom');
+    });
+    const { result, unmount } = renderHook(() =>
+      useDmBattleMapCanvas(baseProps())
+    );
+    expect(() => {
+      act(() => result.current.handleReady(makeVp()));
+    }).toThrow('awareness boom');
+    // Helpers created BEFORE awareness were unwound, then the new socket stopped.
+    expect(callOrder.indexOf('remotePaths.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('focusBroadcast.dispose')).toBeGreaterThanOrEqual(
+      0
+    );
+    expect(callOrder.indexOf('pathBroadcast.dispose')).toBeGreaterThanOrEqual(
+      0
+    );
+    expect(callOrder.indexOf('pathBroadcast.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1);
+    callOrder.length = 0;
+    unmount();
+    // Nothing connection-scoped is left to tear down: no second stop, no re-dispose.
+    expect(callOrder).not.toContain('connection.stop');
+    expect(callOrder).not.toContain('pathBroadcast.dispose');
   });
 });
