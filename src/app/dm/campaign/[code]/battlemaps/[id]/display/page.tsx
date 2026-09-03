@@ -17,6 +17,9 @@ import { attachRemotePings } from '@/components/ui/campaign/location-map/pingSyn
 import { attachRemoteMeasurements } from '@/components/ui/campaign/location-map/measureSync';
 import { attachFocusReceiver } from '@/components/ui/campaign/location-map/focusSync';
 import { attachRemotePaths } from '@/components/ui/campaign/location-map/pathSync';
+import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
+import type { AwarenessSyncHandle } from '@/components/ui/campaign/location-map/awarenessSync';
+import { attachConnectionScope } from '@/components/ui/campaign/location-map/connectionScope';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 
 function DisplayCanvas() {
@@ -29,6 +32,7 @@ function DisplayCanvas() {
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  const awarenessRef = useRef<AwarenessSyncHandle | null>(null);
   const viewportRef = useRef<Viewport | null>(null);
   // `useMarkerRegistration` is keyed on the viewport VALUE (not a ref), so it
   // needs its own state slot even though nothing else on this page reads
@@ -57,7 +61,13 @@ function DisplayCanvas() {
     // 'player' lock stance is irrelevant here.
     ensureCanonicalLayers(vp, 'player');
     if (!relayUrl || !displayKey) return;
+    // Re-attach: tear down the OLD connection-scoped handles BEFORE stopping
+    // the old connection, so their final frames (awareness `cleared`, etc.)
+    // ride the still-live socket — the same order the unmount effect uses.
+    laserCleanupRef.current?.();
+    laserCleanupRef.current = null;
     connectionRef.current?.stop();
+    connectionRef.current = null;
     const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode: code,
@@ -75,22 +85,57 @@ function DisplayCanvas() {
         if (s === 'live') {
           // frame the map once the snapshot has been applied
           requestAnimationFrame(() => vp.fitToContent(60));
+          // Managed sendPresence drops while not live, so the attach-time
+          // frame may be lost; announce on every live transition (first
+          // connect AND reconnect) — the heartbeat self-heals otherwise.
+          awarenessRef.current?.announce();
         }
       },
     });
     connectionRef.current = connection;
     // Render remote laser trails + map pings (DM pointer) on the TV view.
-    laserCleanupRef.current?.();
-    const presenceCleanups = [
-      attachRemoteLaserTrails(vp, connection),
-      attachRemotePings(vp, connection).dispose,
-      attachRemoteMeasurements(vp, connection).dispose,
-      attachFocusReceiver(vp, connection, DISPLAY_FOCUS_OPTIONS).dispose,
-      attachRemotePaths(vp, connection).dispose,
-    ];
-    laserCleanupRef.current = () => {
-      for (const cleanup of presenceCleanups) cleanup();
-    };
+    //
+    // The whole attach sequence runs inside a connection scope: if any
+    // helper below throws, everything already created is unwound (in push
+    // order) and the NEW connection is stopped before the error surfaces —
+    // no half-attached handles, no orphaned socket. On success the returned
+    // composite cleanup is what laserCleanupRef carries forward (unmount and
+    // re-attach both call it before connection.stop()).
+    try {
+      laserCleanupRef.current = attachConnectionScope(connection, scope => {
+        scope.push(attachRemoteLaserTrails(vp, connection));
+        scope.push(attachRemotePings(vp, connection).dispose);
+        scope.push(attachRemoteMeasurements(vp, connection).dispose);
+        scope.push(
+          attachFocusReceiver(vp, connection, DISPLAY_FOCUS_OPTIONS).dispose
+        );
+        scope.push(attachRemotePaths(vp, connection).dispose);
+
+        // Shared presence, identity only: the DM's "who is viewing" shows the
+        // TV as connected; the TV draws the DM's cursor when the DM shares it
+        // and never players' (awarenessSync CURSOR_RULES.display).
+        const awareness = attachAwarenessSync(vp, connection, {
+          identity: {
+            id: `display-${code}`,
+            name: 'TV display',
+            role: 'display',
+          },
+          shareCursor: false,
+          showPlayerCursors: true,
+        });
+        awarenessRef.current = awareness;
+        scope.push(() => {
+          awarenessRef.current = null;
+          awareness.dispose();
+        });
+      });
+    } catch (error) {
+      // attachConnectionScope already disposed every helper it saw and
+      // stopped `connection`; drop the dead reference so unmount and the
+      // next re-attach do not stop it twice, then surface the error.
+      connectionRef.current = null;
+      throw error;
+    }
   };
 
   useEffect(
