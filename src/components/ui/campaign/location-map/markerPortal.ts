@@ -20,11 +20,9 @@
 
 import type { MarkerPortalTargetV1 } from '@/types/battlemap';
 
-import { capCodePoints } from './markerData';
-
 export type { MarkerPortalTargetV1 } from '@/types/battlemap';
 
-/** Maximum id length, in Unicode code points (see `capCodePoints`). */
+/** Maximum id length, in Unicode code points. */
 export const MARKER_PORTAL_ID_MAX_CODE_POINTS = 200;
 
 export const MARKER_PORTAL_KINDS = ['battlemap', 'location'] as const;
@@ -91,10 +89,24 @@ export function parseMarkerPortalTarget(
     };
   }
 
-  if (typeof id !== 'string' || id.trim() === '') {
+  if (typeof id !== 'string' || id === '' || id.trim() === '') {
     return {
       status: 'invalid',
       reason: 'portal target id is missing, not a string, or blank',
+    };
+  }
+
+  if (id !== id.trim()) {
+    return {
+      status: 'invalid',
+      reason: 'portal target id has leading or trailing whitespace',
+    };
+  }
+
+  if (Array.from(id).length > MARKER_PORTAL_ID_MAX_CODE_POINTS) {
+    return {
+      status: 'invalid',
+      reason: 'portal target id exceeds 200 code points',
     };
   }
 
@@ -103,7 +115,7 @@ export function parseMarkerPortalTarget(
     target: {
       v: 1,
       kind,
-      id: capCodePoints(id.trim(), MARKER_PORTAL_ID_MAX_CODE_POINTS),
+      id,
     },
   };
 }

@@ -63,12 +63,14 @@ describe('parseMarkerPortalTarget — valid targets', () => {
     });
   });
 
-  it('trims a valid id', () => {
+  it('rejects an id with leading/trailing whitespace', () => {
     const result = parseMarkerPortalTarget(fixture({ id: '  map-1  ' }));
-    expect(result).toEqual({
-      status: 'valid',
-      target: { v: 1, kind: 'battlemap', id: 'map-1' },
-    });
+    expect(result.status).toBe('invalid');
+  });
+
+  it('rejects an id with leading whitespace only', () => {
+    const result = parseMarkerPortalTarget(fixture({ id: ' map-1' }));
+    expect(result.status).toBe('invalid');
   });
 
   it('returns a fresh object, not the caller input', () => {
@@ -131,24 +133,16 @@ describe('parseMarkerPortalTarget — id rule', () => {
     expect(result.status).toBe('invalid');
   });
 
-  it('caps a 201-code-point id to exactly 200 code points', () => {
+  it('rejects a 201-code-point id', () => {
     const id = 'a'.repeat(201);
-    const expected = 'a'.repeat(200);
     const result = parseMarkerPortalTarget(fixture({ id }));
-    expect(result).toEqual({
-      status: 'valid',
-      target: { v: 1, kind: 'battlemap', id: expected },
-    });
+    expect(result.status).toBe('invalid');
   });
 
-  it('caps a 300-code-point astral-plane id to exactly 200 code points', () => {
-    const id = '😀'.repeat(300); // 300 code points, 600 UTF-16 units
-    const expected = '😀'.repeat(200);
+  it('rejects a 300-code-point astral-plane id', () => {
+    const id = '😀'.repeat(300);
     const result = parseMarkerPortalTarget(fixture({ id }));
-    expect(result).toEqual({
-      status: 'valid',
-      target: { v: 1, kind: 'battlemap', id: expected },
-    });
+    expect(result.status).toBe('invalid');
   });
 });
 
