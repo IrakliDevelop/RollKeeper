@@ -82,6 +82,9 @@ import { applyMovementCommit } from './movementCommit';
 import { attachPathBroadcast, attachRemotePaths } from './pathSync';
 import { characterWalkingSpeed } from './movementSpeed';
 import { useCharacterStore } from '@/store/characterStore';
+import { attachAwarenessSync } from './awarenessSync';
+import type { AwarenessSyncHandle } from './awarenessSync';
+import { attachConnectionScope } from './connectionScope';
 
 import type { MovementResolution } from './movementTool';
 
@@ -89,7 +92,11 @@ interface PlayerBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
   characterId: string;
-  /** Unused internally today — reserved for a future map-name/self pill. */
+  /**
+   * Fallback display name for this client's own awareness identity, used
+   * only while `character.playerName` (the character-store field) is
+   * empty — see the identity effect in the component body.
+   */
   characterName?: string;
   characterAvatar?: string;
   /** Chrome rendered INSIDE the ViewportContext.Provider (may use useActiveTool). */
@@ -263,6 +270,7 @@ export function PlayerBattleMapCanvas({
   campaignCode,
   battleMapId,
   characterId,
+  characterName,
   characterAvatar,
   children,
   onStatus: onStatusProp,
@@ -309,6 +317,23 @@ export function PlayerBattleMapCanvas({
         ? { name: character.name, walkFeet: characterWalkingSpeed(character) }
         : null;
   }, [character, characterId]);
+  // Awareness identity name: same identity gate as `ownMovementRef` above —
+  // during a roster switch `character` can briefly still hold the PREVIOUS
+  // character until the store catches up, so it only counts when its id
+  // matches this route's `characterId`. Falls back to the `characterName`
+  // prop when the character store has no `playerName` yet.
+  const awarenessNameRef = useRef<string>(characterName ?? '');
+  const awarenessRef = useRef<AwarenessSyncHandle | null>(null);
+  useEffect(() => {
+    const own = character && character.id === characterId ? character : null;
+    const name = (own?.playerName || characterName || '').trim();
+    awarenessNameRef.current = name;
+    awarenessRef.current?.setIdentity({
+      id: characterId,
+      name,
+      role: 'player',
+    });
+  }, [character, characterId, characterName]);
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later after the connection is already established.
@@ -535,7 +560,13 @@ export function PlayerBattleMapCanvas({
 
     const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     if (!relayUrl) return;
+    // Re-attach: tear down the OLD connection-scoped handles BEFORE stopping
+    // the old connection, so their final frames (awareness `cleared`, etc.)
+    // ride the still-live socket — the same order the unmount effect uses.
+    laserCleanupRef.current?.();
+    laserCleanupRef.current = null;
     connectionRef.current?.stop();
+    connectionRef.current = null;
     const ownLayerId = playerLayerId(characterId);
     const connection = createManagedBattleMapConnection({
       relayUrl,
@@ -557,7 +588,13 @@ export function PlayerBattleMapCanvas({
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
-        if (s === 'live') requestAnimationFrame(() => vp.fitToContent(60));
+        if (s === 'live') {
+          requestAnimationFrame(() => vp.fitToContent(60));
+          // Managed sendPresence drops while not live, so the attach-time
+          // frame may be lost; announce on every live transition (first
+          // connect AND reconnect) — the heartbeat self-heals otherwise.
+          awarenessRef.current?.announce();
+        }
       },
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkers();
@@ -576,17 +613,26 @@ export function PlayerBattleMapCanvas({
     // Render remote laser trails + map pings (DM pointer). Players do not
     // broadcast — product policy today; the wiring is role-based so enabling
     // them later is configuration, not code.
-    laserCleanupRef.current?.();
-    const presenceCleanups = [
-      attachRemoteLaserTrails(vp, connection),
-      attachRemotePings(vp, connection).dispose,
-      attachRemoteMeasurements(vp, connection).dispose,
-      attachFocusReceiver(vp, connection, PLAYER_FOCUS_OPTIONS).dispose,
-      attachRemotePaths(vp, connection).dispose,
-      // Player self-paths always broadcast (spec decision 5) — no sharing
-      // toggle on this surface.
-      ...(movementTool
-        ? [
+    //
+    // The whole attach sequence runs inside a connection scope: if any
+    // helper below throws, everything already created is unwound (in push
+    // order) and the NEW connection is stopped before the error surfaces —
+    // no half-attached handles, no orphaned socket. On success the returned
+    // composite cleanup is what laserCleanupRef carries forward (unmount and
+    // re-attach both call it before connection.stop()).
+    try {
+      laserCleanupRef.current = attachConnectionScope(connection, scope => {
+        scope.push(attachRemoteLaserTrails(vp, connection));
+        scope.push(attachRemotePings(vp, connection).dispose);
+        scope.push(attachRemoteMeasurements(vp, connection).dispose);
+        scope.push(
+          attachFocusReceiver(vp, connection, PLAYER_FOCUS_OPTIONS).dispose
+        );
+        scope.push(attachRemotePaths(vp, connection).dispose);
+        // Player self-paths always broadcast (spec decision 5) — no sharing
+        // toggle on this surface.
+        if (movementTool) {
+          scope.push(
             attachPathBroadcast(movementTool, connection, {
               role: 'player',
               // Players hold no dmOnlyElements state; DM-only elements never
@@ -594,13 +640,38 @@ export function PlayerBattleMapCanvas({
               // DM-only from this client's view.
               isDmOnlyElement: () => false,
               getElement: id => vp.store.getById(id) ?? null,
-            }).dispose,
-          ]
-        : []),
-    ];
-    laserCleanupRef.current = () => {
-      for (const cleanup of presenceCleanups) cleanup();
-    };
+            }).dispose
+          );
+        }
+
+        // Shared presence: players publish their cursor always (path
+        // precedent — quiet-by-default is the DM's viewer switch), no
+        // colour on the wire, never selection/tool; they draw the DM's
+        // cursor only (awarenessSync CURSOR_RULES.player). No share or
+        // viewer control on this surface. Pushed last so the `cleared`
+        // frame rides the live socket before connection.stop().
+        const awareness = attachAwarenessSync(vp, connection, {
+          identity: {
+            id: characterId,
+            name: awarenessNameRef.current,
+            role: 'player',
+          },
+          shareCursor: true,
+          showPlayerCursors: true,
+        });
+        awarenessRef.current = awareness;
+        scope.push(() => {
+          awarenessRef.current = null;
+          awareness.dispose();
+        });
+      });
+    } catch (error) {
+      // attachConnectionScope already disposed every helper it saw and
+      // stopped `connection`; drop the dead reference so unmount and the
+      // next re-attach do not stop it twice, then surface the error.
+      connectionRef.current = null;
+      throw error;
+    }
   };
 
   const handleDeleteSelected = useCallback(() => {
