@@ -11,6 +11,20 @@ export interface SavedCameraView {
 }
 
 /**
+ * A DM-authored map-to-map navigation link attached to a marker's detail
+ * record. Persisted shape is exactly `{ v, kind, id }` — no pathname,
+ * absolute URL, campaign code, target name, or return URL is ever
+ * persisted. See `src/components/ui/campaign/location-map/markerPortal.ts`
+ * for the parser, builder, and DM-route resolution logic built on this
+ * type; this is the canonical declaration, re-exported from there.
+ */
+export interface MarkerPortalTargetV1 {
+  v: 1;
+  kind: 'battlemap' | 'location';
+  id: string;
+}
+
+/**
  * The product-state record behind a map marker pin. Lives in DM product state
  * only — it is NEVER part of the canvas element payload and therefore never
  * travels the canvas wire (spec §6.3). `id` equals the `ref` carried in the
@@ -33,6 +47,9 @@ export interface MarkerDetail {
   trap?: MarkerTrapMechanics;
   /** Copied loot definitions. Library edits never rewrite prepared markers. */
   loot?: MarkerLootEntry[];
+  /** Private map-to-map navigation link. Never included in
+   *  PublicMarkerDetail. */
+  portal?: MarkerPortalTargetV1;
   deletedAt?: string;
 }
 
@@ -128,6 +145,9 @@ export interface PublicMarkerDetail {
    * fix the call site instead, with an explicit field pick.
    */
   dmNotes?: never;
+  /** Same structural refusal as `dmNotes?: never` — a portal target is
+   *  DM-only navigation data and must never ride through to players. */
+  portal?: never;
 }
 
 export interface BattleMap {

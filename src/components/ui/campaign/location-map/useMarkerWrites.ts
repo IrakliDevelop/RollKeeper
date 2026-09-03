@@ -45,7 +45,7 @@ import type {
 
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useLocationStore } from '@/store/locationStore';
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, MarkerPortalTargetV1 } from '@/types/battlemap';
 
 /** The slice of `Viewport` the marker writes need. */
 export interface MarkerWritesViewport {
@@ -75,6 +75,7 @@ export interface MarkerWrites {
       discovery?: MarkerDetail['discovery'];
       trap?: MarkerDetail['trap'];
       loot?: MarkerDetail['loot'];
+      portal?: MarkerPortalTargetV1 | null;
     }
   ): boolean;
   setMarkerAudienceForRef(
@@ -329,6 +330,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
         discovery?: MarkerDetail['discovery'];
         trap?: MarkerDetail['trap'];
         loot?: MarkerDetail['loot'];
+        portal?: MarkerPortalTargetV1 | null;
       }
     ): boolean => editMarkerDetailWrite(depsFor(null), ref, patch),
     [depsFor]

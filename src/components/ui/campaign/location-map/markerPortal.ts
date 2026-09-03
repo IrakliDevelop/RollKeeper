@@ -6,10 +6,9 @@
  * This module owns the shape of that field and the pure logic needed to
  * turn it into a clickable DM route: `{ v, kind, id }` in, `{ href, name }`
  * out. It is pure data/logic: no React, no Zustand, no store or SDK side
- * effects, no network calls. `MarkerPortalTargetV1` is intentionally
- * duplicated here rather than imported from `src/types/battlemap.ts` — a
- * later task moves the canonical declaration there once the write path
- * lands; keeping it local for now avoids coupling this task to that one.
+ * effects, no network calls. `MarkerPortalTargetV1` is the canonical
+ * declaration on `MarkerDetail` (`src/types/battlemap.ts`), imported and
+ * re-exported here so existing consumers of this module keep working.
  *
  * Persisted shape is exactly `{ v, kind, id }` — no pathname, absolute URL,
  * campaign code, target name, or return URL is ever persisted. A target's
@@ -19,19 +18,17 @@
  * persisted target (see the "target rename" test below).
  */
 
+import type { MarkerPortalTargetV1 } from '@/types/battlemap';
+
 import { capCodePoints } from './markerData';
+
+export type { MarkerPortalTargetV1 } from '@/types/battlemap';
 
 /** Maximum id length, in Unicode code points (see `capCodePoints`). */
 export const MARKER_PORTAL_ID_MAX_CODE_POINTS = 200;
 
 export const MARKER_PORTAL_KINDS = ['battlemap', 'location'] as const;
 export type MarkerPortalKind = (typeof MARKER_PORTAL_KINDS)[number];
-
-export interface MarkerPortalTargetV1 {
-  v: 1;
-  kind: MarkerPortalKind;
-  id: string;
-}
 
 export type MarkerPortalTargetResult =
   | { status: 'valid'; target: MarkerPortalTargetV1 }

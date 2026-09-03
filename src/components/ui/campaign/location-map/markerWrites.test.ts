@@ -27,7 +27,7 @@ import {
 } from './markerWrites';
 import type { MarkerElementStoreLike, MarkerWriteDeps } from './markerWrites';
 
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, MarkerPortalTargetV1 } from '@/types/battlemap';
 
 const FIXED_NOW = '2026-02-03T04:05:06.000Z';
 
@@ -533,6 +533,176 @@ describe('editMarkerDetail', () => {
 
     expect(applied).toBe(true);
     expect(harness.state.markers[0]?.title).toBe('Now live');
+  });
+});
+
+describe('editMarkerDetail — portal', () => {
+  it('a freshly created marker has no portal', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+
+    expect(harness.state.markers[0]?.id).toBe(created.ref);
+    expect(harness.state.markers[0]?.portal).toBeUndefined();
+  });
+
+  it('adds a destination', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const target: MarkerPortalTargetV1 = {
+      v: 1,
+      kind: 'battlemap',
+      id: 'map-2',
+    };
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      portal: target,
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.portal).toEqual(target);
+  });
+
+  it('changes an existing destination to a new one', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    editMarkerDetail(harness.deps, created.ref, {
+      portal: { v: 1, kind: 'battlemap', id: 'map-2' },
+    });
+
+    const second: MarkerPortalTargetV1 = {
+      v: 1,
+      kind: 'location',
+      id: 'loc-9',
+    };
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      portal: second,
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.portal).toEqual(second);
+  });
+
+  it('removes the destination with an explicit null, deleting the property', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    editMarkerDetail(harness.deps, created.ref, {
+      portal: { v: 1, kind: 'battlemap', id: 'map-2' },
+    });
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      portal: null,
+    });
+
+    expect(applied).toBe(true);
+    expect('portal' in (harness.state.markers[0] as object)).toBe(false);
+  });
+
+  it('an omitted patch leaves an existing destination untouched', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const target: MarkerPortalTargetV1 = {
+      v: 1,
+      kind: 'battlemap',
+      id: 'map-2',
+    };
+    editMarkerDetail(harness.deps, created.ref, { portal: target });
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      title: 'Only the title changes',
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.title).toBe('Only the title changes');
+    expect(harness.state.markers[0]?.portal).toEqual(target);
+  });
+
+  it('an invalid target (unrecognized kind) is not persisted', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      portal: {
+        v: 1,
+        kind: 'invalid' as MarkerPortalTargetV1['kind'],
+        id: 'x',
+      },
+    });
+
+    // The edit as a whole still succeeds (the record was found and other
+    // fields, if any, still apply) — only the portal write is refused.
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.portal).toBeUndefined();
+  });
+
+  it('an unsupported target (future version) is not persisted', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      portal: {
+        v: 2 as MarkerPortalTargetV1['v'],
+        kind: 'battlemap',
+        id: 'x',
+      },
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.portal).toBeUndefined();
+  });
+
+  it('an unrelated save preserves a raw invalid persisted portal value byte-for-byte', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const rawInvalid = { v: 99, kind: 'unknown', id: 'x' };
+    harness.state.markers = harness.state.markers.map(marker =>
+      marker.id === created.ref
+        ? ({ ...marker, portal: rawInvalid } as MarkerDetail)
+        : marker
+    );
+
+    const applied = editMarkerDetail(harness.deps, created.ref, {
+      title: 'Unrelated change',
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.title).toBe('Unrelated change');
+    // Not re-validated, not stripped, not normalized — the exact raw object.
+    expect(harness.state.markers[0]?.portal).toEqual(rawInvalid);
+  });
+
+  it('sibling pins sharing a ref observe the same destination', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const sibling = seedMarkerElement(harness, created.ref);
+    const target: MarkerPortalTargetV1 = {
+      v: 1,
+      kind: 'location',
+      id: 'loc-1',
+    };
+
+    editMarkerDetail(harness.deps, created.ref, { portal: target });
+
+    const pins = [harness.state.elements.get(created.elementId), sibling];
+    for (const pin of pins) {
+      const parsed = parseMarkerData((pin as HtmlElement).data);
+      expect(parsed.status).toBe('valid');
+      if (parsed.status !== 'valid') continue;
+      const found = findMarkerDetail(harness.state.markers, parsed.data.ref);
+      expect(found?.portal).toEqual(target);
+    }
+    expect(harness.state.markers).toHaveLength(1);
+  });
+
+  it('a portal edit performs no viewport transaction and no canvas-store write', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    harness.calls.length = 0;
+
+    editMarkerDetail(harness.deps, created.ref, {
+      portal: { v: 1, kind: 'battlemap', id: 'map-2' },
+    });
+
+    expect(harness.calls).toEqual(['setMarkers']);
   });
 });
 
@@ -1149,6 +1319,68 @@ describe('cloneMarkerForMap / cloneMarkerToMap', () => {
       data: { ...buildMarkerData({ kind: 'trap', ref: 'src-ref' }) },
     });
     expect(cloneMarkerForMap(isAMarker, [], () => 'new-ref')).not.toBeNull();
+  });
+
+  it('carries a valid portal target as a FRESH object, not the same reference', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const target: MarkerPortalTargetV1 = {
+      v: 1,
+      kind: 'battlemap',
+      id: 'map-2',
+    };
+    harness.state.markers = harness.state.markers.map(marker =>
+      marker.id === created.ref ? { ...marker, portal: target } : marker
+    );
+    const element = harness.state.elements.get(
+      created.elementId
+    ) as HtmlElement;
+
+    const clone = cloneMarkerForMap(
+      element,
+      harness.state.markers,
+      () => 'new-ref'
+    );
+
+    expect(clone).not.toBeNull();
+    expect(clone?.detail.portal).toEqual(target);
+    expect(clone?.detail.portal).not.toBe(target);
+  });
+
+  it('drops an invalid portal target silently rather than propagating it', () => {
+    const harness = makeHarness();
+    const created = createMarker(harness.deps, CREATE_INPUT);
+    const rawInvalid = { v: 99, kind: 'unknown', id: 'x' };
+    harness.state.markers = harness.state.markers.map(marker =>
+      marker.id === created.ref
+        ? ({ ...marker, portal: rawInvalid } as MarkerDetail)
+        : marker
+    );
+    const element = harness.state.elements.get(
+      created.elementId
+    ) as HtmlElement;
+
+    const clone = cloneMarkerForMap(
+      element,
+      harness.state.markers,
+      () => 'new-ref'
+    );
+
+    expect(clone).not.toBeNull();
+    expect(clone?.detail.portal).toBeUndefined();
+  });
+
+  it('a source with no portal produces a clone with no portal', () => {
+    const { source, element } = seedSourceMarker();
+
+    const clone = cloneMarkerForMap(
+      element,
+      source.state.markers,
+      () => 'new-ref'
+    );
+
+    expect(clone).not.toBeNull();
+    expect(clone?.detail.portal).toBeUndefined();
   });
 });
 

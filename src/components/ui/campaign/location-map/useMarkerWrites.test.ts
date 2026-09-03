@@ -570,6 +570,47 @@ describe('useMarkerWrites — no render-time snapshots', () => {
       { id: 'late-ref', title: 'After', body: 'b', dmNotes: 'n' },
     ]);
   });
+
+  it('editMarkerDetail accepts a portal patch and persists it through to the store', () => {
+    const viewport = makeViewport();
+    const { result } = renderHook(() =>
+      useMarkerWrites({
+        mode: 'battlemap',
+        campaignCode: CODE,
+        mapId: MAP_ID,
+        getViewport: () => viewport,
+      })
+    );
+
+    let applied: boolean | undefined;
+    act(() => {
+      useBattleMapStore.setState({
+        battleMaps: {
+          [CODE]: {
+            [MAP_ID]: battleMapFixture({
+              markers: [
+                { id: 'portal-ref', title: 'Door', body: '', dmNotes: '' },
+              ],
+            }),
+          },
+        },
+      });
+      applied = result.current.editMarkerDetail('portal-ref', {
+        portal: { v: 1, kind: 'battlemap', id: 'map-2' },
+      });
+    });
+
+    expect(applied).toBe(true);
+    expect(readBattleMap()?.markers).toEqual([
+      {
+        id: 'portal-ref',
+        title: 'Door',
+        body: '',
+        dmNotes: '',
+        portal: { v: 1, kind: 'battlemap', id: 'map-2' },
+      },
+    ]);
+  });
 });
 
 describe('useMarkerWrites — delete', () => {

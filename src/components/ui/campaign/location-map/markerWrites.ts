@@ -31,10 +31,11 @@ import {
   parseMarkerData,
 } from './markerData';
 import type { MarkerColorKey, MarkerKind } from './markerData';
+import { parseMarkerPortalTarget } from './markerPortal';
 import type { MarkerRemovalTracker } from './markerRemovalTracker';
 import { MARKER_ELEMENT_ZINDEX } from './tokenSnap';
 
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, MarkerPortalTargetV1 } from '@/types/battlemap';
 
 /** The slice of `ElementStore` these helpers use. Narrow on purpose: tests
  *  need no `Viewport`, and nothing here can reach the rest of the store. */
@@ -359,6 +360,17 @@ export function editMarkerDetail(
     discovery?: MarkerDetail['discovery'];
     trap?: MarkerDetail['trap'];
     loot?: MarkerDetail['loot'];
+    /**
+     * Nullable, unlike every other field here: `undefined` (omitted) leaves
+     * whatever `portal` value already exists on the record UNTOUCHED — the
+     * `{ ...marker }` spread below already does that, so this branch must
+     * never run for an omitted patch. `null` removes the field. A
+     * `MarkerPortalTargetV1` is re-validated through
+     * `parseMarkerPortalTarget` and only persisted on `valid`; `invalid`/
+     * `unsupported` fails closed — nothing is persisted and the existing
+     * value (if any) is left alone.
+     */
+    portal?: MarkerPortalTargetV1 | null;
   }
 ): boolean {
   const markers = deps.getMarkers();
@@ -386,6 +398,16 @@ export function editMarkerDetail(
     }
     if (patch.trap !== undefined) updated.trap = sanitizeTrap(patch.trap);
     if (patch.loot !== undefined) updated.loot = sanitizeLoot(patch.loot);
+    if (patch.portal === null) {
+      delete updated.portal;
+    } else if (patch.portal !== undefined) {
+      const parsed = parseMarkerPortalTarget(patch.portal);
+      if (parsed.status === 'valid') {
+        updated.portal = parsed.target;
+      }
+      // invalid/unsupported: fail closed — don't persist, don't touch the
+      // existing value.
+    }
     return updated;
   });
 
@@ -623,17 +645,29 @@ export function cloneMarkerForMap(
     },
   });
 
-  return {
-    element: cloned,
-    // Explicit field pick, never a spread of the source record: `deletedAt`
-    // must not ride along and neither may any unknown persisted field.
-    detail: buildDetail({
-      id: ref,
-      title: source?.title,
-      body: source?.body,
-      dmNotes: source?.dmNotes,
-    }),
-  };
+  // Explicit field pick, never a spread of the source record: `deletedAt`
+  // must not ride along and neither may any unknown persisted field.
+  const detail = buildDetail({
+    id: ref,
+    title: source?.title,
+    body: source?.body,
+    dmNotes: source?.dmNotes,
+  });
+
+  // Portal is copied separately, and only after RE-PARSING through
+  // `parseMarkerPortalTarget` — never a spread of `source.portal`. A clone
+  // must carry a fresh, freshly-validated object, and a source record
+  // holding a stale/invalid/unsupported target (e.g. hand-edited, or
+  // written by an older/newer client) must not propagate it into the new
+  // record; it is silently dropped instead.
+  if (source?.portal !== undefined) {
+    const parsed = parseMarkerPortalTarget(source.portal);
+    if (parsed.status === 'valid') {
+      detail.portal = parsed.target;
+    }
+  }
+
+  return { element: cloned, detail };
 }
 
 /**
