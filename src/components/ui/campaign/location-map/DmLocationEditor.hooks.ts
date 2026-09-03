@@ -890,13 +890,11 @@ export function useDmLocationEditor(
         // it before connection.stop()).
         try {
           laserCleanupRef.current = attachConnectionScope(connection, scope => {
-            const remotePings = attachRemotePings(vp, connection);
-            const remoteMeasures = attachRemoteMeasurements(vp, connection);
-            const remotePaths = attachRemotePaths(vp, connection);
             scope.push(attachRemoteLaserTrails(vp, connection));
+            const remotePings = attachRemotePings(vp, connection);
             scope.push(remotePings.dispose);
-            scope.push(remoteMeasures.dispose);
-            scope.push(remotePaths.dispose);
+            scope.push(attachRemoteMeasurements(vp, connection).dispose);
+            scope.push(attachRemotePaths(vp, connection).dispose);
             const laserTool = vp.toolManager.getTool<LaserTool>('laser');
             if (laserTool) {
               scope.push(attachLaserBroadcast(laserTool, connection));

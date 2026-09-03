@@ -49,7 +49,12 @@ vi.mock('@/components/ui/campaign/location-map/laserSync', () => ({
 vi.mock('@/components/ui/campaign/location-map/pingSync', () => ({
   attachPingBroadcast: vi.fn(() => vi.fn()),
   attachPingInput: vi.fn(() => vi.fn()),
-  attachRemotePings: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+  attachRemotePings: vi.fn(() => ({
+    dispose: () => {
+      callOrder.push('remotePings.dispose');
+    },
+    overlay: {},
+  })),
 }));
 
 vi.mock('@/components/ui/campaign/location-map/measureSync', () => ({
@@ -124,6 +129,7 @@ import {
 } from '@/components/ui/campaign/location-map/focusSync';
 import { attachPathBroadcast } from '@/components/ui/campaign/location-map/pathSync';
 import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
+import { attachRemoteMeasurements } from '@/components/ui/campaign/location-map/measureSync';
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
@@ -301,6 +307,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     // ordering rides the live connection, matching the measure handle's own
     // final clear.
     expect(callOrder).toEqual([
+      'remotePings.dispose',
       'remotePaths.dispose',
       'focusBroadcast.dispose',
       'pathBroadcast.dispose',
@@ -470,5 +477,26 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     // Nothing connection-scoped is left to tear down: no second stop, no re-dispose.
     expect(callOrder).not.toContain('connection.stop');
     expect(callOrder).not.toContain('pathBroadcast.dispose');
+  });
+
+  it('EARLY RECEIVER FAULT: when a receiver constructor throws, earlier receivers are disposed before connection.stop', () => {
+    vi.mocked(attachRemoteMeasurements).mockImplementationOnce(() => {
+      throw new Error('measurements boom');
+    });
+    const { result, unmount } = renderHook(() =>
+      useDmBattleMapCanvas(baseProps())
+    );
+    expect(() => {
+      act(() => result.current.handleReady(makeVp()));
+    }).toThrow('measurements boom');
+    expect(callOrder).toContain('remotePings.dispose');
+    expect(callOrder.indexOf('remotePings.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder).not.toContain('remotePaths.dispose');
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1);
+    callOrder.length = 0;
+    unmount();
+    expect(callOrder).not.toContain('connection.stop');
   });
 });

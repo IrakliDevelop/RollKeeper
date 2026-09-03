@@ -50,7 +50,12 @@ vi.mock('../laserSync', () => ({
 vi.mock('../pingSync', () => ({
   attachPingBroadcast: vi.fn(() => vi.fn()),
   attachPingInput: vi.fn(() => vi.fn()),
-  attachRemotePings: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+  attachRemotePings: vi.fn(() => ({
+    dispose: () => {
+      callOrder.push('remotePings.dispose');
+    },
+    overlay: {},
+  })),
 }));
 
 vi.mock('../measureSync', () => ({
@@ -116,6 +121,7 @@ vi.mock('../focusSync', () => ({
 
 import { attachFocusBroadcast, createLocalCameraAnimator } from '../focusSync';
 import { attachAwarenessSync } from '../awarenessSync';
+import { attachRemoteMeasurements } from '../measureSync';
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
@@ -299,6 +305,7 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     // connection scope — awareness's own `cleared` frame, all BEFORE
     // connection.stop.
     expect(callOrder).toEqual([
+      'remotePings.dispose',
       'remotePaths.dispose',
       'focusBroadcast.dispose',
       'awareness.dispose',
@@ -471,5 +478,39 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
       await result.current.handleReady(vp);
     });
     expect(attachAwarenessSync).not.toHaveBeenCalled();
+  });
+
+  it('EARLY RECEIVER FAULT: when a receiver constructor throws, earlier receivers are disposed before connection.stop', async () => {
+    vi.mocked(attachRemoteMeasurements).mockImplementationOnce(() => {
+      throw new Error('measurements boom');
+    });
+    const vp = makeStubViewport();
+    const { result, unmount } = renderHook(() =>
+      useDmLocationEditor({
+        location: baseBattleMap,
+        campaignCode: 'TEST01',
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: vp,
+    } as unknown as FieldNotesCanvasRef;
+    await expect(
+      act(async () => {
+        await result.current.handleReady(vp);
+      })
+    ).rejects.toThrow('measurements boom');
+    expect(callOrder).toContain('remotePings.dispose');
+    expect(callOrder.indexOf('remotePings.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder).not.toContain('remotePaths.dispose');
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1);
+    callOrder.length = 0;
+    unmount();
+    expect(callOrder).not.toContain('connection.stop');
   });
 });
