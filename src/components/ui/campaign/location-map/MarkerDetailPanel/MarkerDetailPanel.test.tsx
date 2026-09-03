@@ -908,7 +908,6 @@ describe('MarkerDetailPanel portal destination', () => {
   });
 
   it('shows target picker when a destination kind is selected', async () => {
-    const user = userEvent.setup();
     render(
       <MarkerDetailPanel
         open

@@ -2142,8 +2142,7 @@ describe('useDmLocationEditor — location publication-dirty seam', () => {
   });
 
   it('audience change (toggle DM-only via toolbar) marks dirty', async () => {
-    const { vp, store, result, select, emitActivate } =
-      await setupLocationSynced();
+    const { vp, store, result, select } = await setupLocationSynced();
 
     act(() => {
       tapMarkerTool(result.current.tools, vp);

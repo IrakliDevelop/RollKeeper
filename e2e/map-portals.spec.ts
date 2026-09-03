@@ -24,61 +24,13 @@ const BM1_URL = `/dm/campaign/${CAMPAIGN_CODE}/battlemaps/${BM1_ID}`;
 const BM2_URL = `/dm/campaign/${CAMPAIGN_CODE}/battlemaps/${BM2_ID}`;
 const LOC_URL = `/dm/campaign/${CAMPAIGN_CODE}/locations/${LOC_ID}`;
 
-// Marker element / detail refs — one per map
-const BM1_MARKER_REF = 'ref-bm1-portal';
-const BM2_MARKER_REF = 'ref-bm2-portal';
-const LOC_MARKER_REF = 'ref-loc-portal';
-
-// Marker element world position — identical on every map for simplicity.
-const MARKER_POS = { x: 400, y: 300 };
-const MARKER_SIZE = { w: 40, h: 40 };
+// Marker element / detail refs live inside the seeding function.
 
 const NOW = '2026-08-20T00:00:00.000Z';
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                           */
 /* ------------------------------------------------------------------ */
-
-function buildMarkerElement(elementId: string, ref: string) {
-  return {
-    id: elementId,
-    type: 'html',
-    htmlType: 'rk-marker',
-    position: MARKER_POS,
-    size: MARKER_SIZE,
-    zIndex: 500,
-    locked: false,
-    layerId: 'layer-annotations',
-    data: { v: 1, kind: 'note', ref, label: 'Portal', color: 'blue' },
-  };
-}
-
-function buildCanvasState(elementId: string, ref: string): string {
-  return JSON.stringify({
-    version: 2,
-    camera: { position: { x: 0, y: 0 }, zoom: 1 },
-    elements: [buildMarkerElement(elementId, ref)],
-    layers: [
-      {
-        id: 'layer-map',
-        name: 'Map',
-        visible: true,
-        locked: true,
-        order: 0,
-        opacity: 1,
-      },
-      {
-        id: 'layer-annotations',
-        name: 'Annotations',
-        visible: true,
-        locked: false,
-        order: 100,
-        opacity: 1,
-      },
-    ],
-    activeLayerId: 'layer-annotations',
-  });
-}
 
 /**
  * Seeds localStorage with DM store, battle-map store (2 maps), and
