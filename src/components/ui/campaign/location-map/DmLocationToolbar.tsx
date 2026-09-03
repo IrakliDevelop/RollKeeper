@@ -113,6 +113,7 @@ export default function DmLocationToolbar({
   onToggleArrangeMaps,
   exportControl,
   viewsControl,
+  presenceControl,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -328,6 +329,7 @@ export default function DmLocationToolbar({
           )}
           {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && viewsControl}
+          {mode === 'battlemap' && presenceControl}
           {mode === 'battlemap' && (
             <span
               className={`rounded-full px-2 py-0.5 text-xs ${

@@ -107,6 +107,30 @@ describe('DmLocationToolbar', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('renders presenceControl next to viewsControl in battlemap mode', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="battlemap"
+        viewsControl={<div data-testid="views-control-marker" />}
+        presenceControl={<div data-testid="presence-slot" />}
+      />
+    );
+    expect(screen.getByTestId('views-control-marker')).toBeInTheDocument();
+    expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
+  });
+
+  it('does not render presenceControl in location mode', () => {
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="location"
+        presenceControl={<div data-testid="presence-slot" />}
+      />
+    );
+    expect(screen.queryByTestId('presence-slot')).not.toBeInTheDocument();
+  });
+
   it('shows hidden-placement state and reveals all hidden elements', () => {
     const onToggle = vi.fn();
     const onRevealAll = vi.fn();
