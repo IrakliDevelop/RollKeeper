@@ -50,7 +50,12 @@ vi.mock('../laserSync', () => ({
 vi.mock('../pingSync', () => ({
   attachPingBroadcast: vi.fn(() => vi.fn()),
   attachPingInput: vi.fn(() => vi.fn()),
-  attachRemotePings: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+  attachRemotePings: vi.fn(() => ({
+    dispose: () => {
+      callOrder.push('remotePings.dispose');
+    },
+    overlay: {},
+  })),
 }));
 
 vi.mock('../measureSync', () => ({
@@ -64,9 +69,31 @@ vi.mock('../measureSync', () => ({
 vi.mock('../pathSync', () => ({
   attachPathBroadcast: vi.fn(() => ({
     setSharing: vi.fn(),
-    dispose: vi.fn(),
+    dispose: () => {
+      callOrder.push('pathBroadcast.dispose');
+    },
   })),
-  attachRemotePaths: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
+  attachRemotePaths: vi.fn(() => ({
+    dispose: () => {
+      callOrder.push('remotePaths.dispose');
+    },
+    overlay: {},
+  })),
+}));
+
+const awarenessHandle = {
+  roster: {} as never,
+  cursorPeers: vi.fn(() => []),
+  announce: vi.fn(),
+  setShareCursor: vi.fn(),
+  setShowPlayerCursors: vi.fn(),
+  setIdentity: vi.fn(),
+  dispose: () => {
+    callOrder.push('awareness.dispose');
+  },
+};
+vi.mock('../awarenessSync', () => ({
+  attachAwarenessSync: vi.fn(() => awarenessHandle),
 }));
 
 vi.mock('../layerSync', () => ({
@@ -93,6 +120,10 @@ vi.mock('../focusSync', () => ({
 }));
 
 import { attachFocusBroadcast, createLocalCameraAnimator } from '../focusSync';
+import { attachAwarenessSync } from '../awarenessSync';
+import { attachRemoteMeasurements } from '../measureSync';
+import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
+import { useDmStore } from '@/store/dmStore';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
 
 /** Trimmed from DmLocationEditor.hooks.test.ts's makeStubViewport — real
@@ -185,6 +216,7 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
+    useDmStore.setState({ campaigns: [] });
     useBattleMapStore.setState({ battleMaps: {} });
     callOrder.length = 0;
     vi.clearAllMocks();
@@ -268,10 +300,217 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
 
     unmount();
 
+    // Cleanup ordering rides the live connection: remotePaths (pushed first
+    // among laserCleanups), focusBroadcast, and — pushed last, inside the
+    // connection scope — awareness's own `cleared` frame, all BEFORE
+    // connection.stop.
     expect(callOrder).toEqual([
+      'remotePings.dispose',
+      'remotePaths.dispose',
       'focusBroadcast.dispose',
+      'awareness.dispose',
       'localAnimator.dispose',
       'connection.stop',
     ]);
+  });
+
+  it('attaches awareness as DM with cursor OFF, players shown, and disposes it BEFORE connection.stop on unmount', async () => {
+    const vp = makeStubViewport();
+    const { result, unmount } = renderHook(() =>
+      useDmLocationEditor({
+        location: baseBattleMap,
+        campaignCode: 'TEST01',
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(vp);
+    });
+
+    const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
+    expect(options.identity).toEqual({
+      id: 'dm-1',
+      name: 'DM',
+      role: 'dm',
+    });
+    expect(options.shareCursor).toBe(false);
+    expect(options.showPlayerCursors).toBe(true);
+    expect(result.current.awarenessRoster).toBe(awarenessHandle.roster);
+
+    unmount();
+    expect(callOrder.indexOf('awareness.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('awareness.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+  });
+
+  it('RE-ATTACH: a second handleReady disposes the OLD attachment BEFORE stopping the OLD connection', async () => {
+    const { result } = await setup();
+    callOrder.length = 0;
+    await act(async () => {
+      await result.current.handleReady(makeStubViewport());
+    });
+    // Old cleanup (awareness + remotePaths handles) must precede the old
+    // stop — the `cleared` frames ride the still-live socket.
+    expect(callOrder.indexOf('awareness.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('remotePaths.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('awareness.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.indexOf('remotePaths.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1); // the new one is not stopped
+    expect(vi.mocked(attachAwarenessSync)).toHaveBeenCalledTimes(2);
+  });
+
+  it('announces on every live status and forwards the two switches; re-attach re-applies both', async () => {
+    const { result } = await setup();
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    act(() => onStatus('connecting'));
+    act(() => onStatus('live'));
+    expect(awarenessHandle.announce).toHaveBeenCalledTimes(2);
+
+    act(() => result.current.handleSetCursorSharing(true));
+    expect(awarenessHandle.setShareCursor).toHaveBeenCalledWith(true);
+    expect(result.current.cursorSharing).toBe(true);
+    act(() => result.current.handleSetShowPlayerCursors(false));
+    expect(awarenessHandle.setShowPlayerCursors).toHaveBeenCalledWith(false);
+    expect(result.current.showPlayerCursors).toBe(false);
+
+    await act(async () => {
+      await result.current.handleReady(makeStubViewport()); // viewport rebuild
+    });
+    const [, , again] = vi.mocked(attachAwarenessSync).mock.calls.at(-1)!;
+    expect(again.shareCursor).toBe(true);
+    expect(again.showPlayerCursors).toBe(false);
+  });
+
+  it('colorFor reads playerColors LIVE from the DM store', async () => {
+    await setup();
+    const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
+    const peer = {
+      from: 'c1',
+      id: 'char-a',
+      cursor: null,
+      selection: [],
+      tool: null,
+    };
+    expect(options.colorFor?.(peer)).toBeUndefined();
+    useDmStore.setState({
+      campaigns: [
+        {
+          code: 'TEST01',
+          name: 'x',
+          createdAt: '',
+          playerColors: { 'char-a': '#abcdef' },
+        },
+      ],
+    });
+    expect(options.colorFor?.(peer)).toBe('#abcdef');
+  });
+
+  it('ATTACH FAULT: when awareness construction throws, every earlier helper is disposed, the NEW connection is stopped, the error surfaces, and unmount does not double-tear-down', async () => {
+    vi.mocked(attachAwarenessSync).mockImplementationOnce(() => {
+      throw new Error('awareness boom');
+    });
+    const vp = makeStubViewport();
+    const { result, unmount } = renderHook(() =>
+      useDmLocationEditor({
+        location: baseBattleMap,
+        campaignCode: 'TEST01',
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: vp,
+    } as unknown as FieldNotesCanvasRef;
+
+    await expect(
+      act(async () => {
+        await result.current.handleReady(vp);
+      })
+    ).rejects.toThrow('awareness boom');
+
+    // Helpers created BEFORE awareness were unwound, then the new socket stopped.
+    expect(callOrder.indexOf('remotePaths.dispose')).toBeGreaterThanOrEqual(0);
+    expect(callOrder.indexOf('focusBroadcast.dispose')).toBeGreaterThanOrEqual(
+      0
+    );
+    expect(callOrder.indexOf('focusBroadcast.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1);
+    callOrder.length = 0;
+    unmount();
+    // Nothing connection-scoped is left to tear down: no second stop, no re-dispose.
+    expect(callOrder).not.toContain('connection.stop');
+    expect(callOrder).not.toContain('focusBroadcast.dispose');
+  });
+
+  it('never attaches awareness in location mode (no relay connection at all)', async () => {
+    const vp = makeStubViewport();
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: baseBattleMap,
+        campaignCode: 'TEST01',
+        dmId: 'dm-1',
+        mode: 'location',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(vp);
+    });
+    expect(attachAwarenessSync).not.toHaveBeenCalled();
+  });
+
+  it('EARLY RECEIVER FAULT: when a receiver constructor throws, earlier receivers are disposed before connection.stop', async () => {
+    vi.mocked(attachRemoteMeasurements).mockImplementationOnce(() => {
+      throw new Error('measurements boom');
+    });
+    const vp = makeStubViewport();
+    const { result, unmount } = renderHook(() =>
+      useDmLocationEditor({
+        location: baseBattleMap,
+        campaignCode: 'TEST01',
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: vp,
+    } as unknown as FieldNotesCanvasRef;
+    await expect(
+      act(async () => {
+        await result.current.handleReady(vp);
+      })
+    ).rejects.toThrow('measurements boom');
+    expect(callOrder).toContain('remotePings.dispose');
+    expect(callOrder.indexOf('remotePings.dispose')).toBeLessThan(
+      callOrder.indexOf('connection.stop')
+    );
+    expect(callOrder).not.toContain('remotePaths.dispose');
+    expect(callOrder.filter(c => c === 'connection.stop')).toHaveLength(1);
+    callOrder.length = 0;
+    unmount();
+    expect(callOrder).not.toContain('connection.stop');
   });
 });

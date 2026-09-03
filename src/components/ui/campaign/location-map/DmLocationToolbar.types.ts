@@ -53,4 +53,6 @@ export interface DmLocationToolbarProps {
   exportControl?: ReactNode;
   /** Saved-camera-views popover + focus-broadcast controls (battlemap mode only). */
   viewsControl?: ReactNode;
+  /** Shared-presence "who is viewing" + cursor-sharing switches (battlemap mode only). */
+  presenceControl?: ReactNode;
 }

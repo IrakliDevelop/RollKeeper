@@ -9,6 +9,7 @@ import DmLocationLayersPanel from './DmLocationLayersPanel';
 import MarkerDetailPanel from './MarkerDetailPanel';
 import { BattleMapExportControl } from './BattleMapExportControl';
 import { BattleMapViewsControl } from './BattleMapViewsControl';
+import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -73,6 +74,11 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSetPathSharing,
     movementDash,
     handleSetMovementDash,
+    awarenessRoster,
+    cursorSharing,
+    handleSetCursorSharing,
+    showPlayerCursors,
+    handleSetShowPlayerCursors,
     handleGoToCameraView,
     handleSendCameraView,
     getViewport,
@@ -185,6 +191,16 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                     cameraViews: next,
                   });
                 }}
+              />
+            }
+            presenceControl={
+              <PresenceControl
+                campaignCode={props.campaignCode}
+                roster={awarenessRoster}
+                cursorSharing={cursorSharing}
+                onCursorSharingChange={handleSetCursorSharing}
+                showPlayerCursors={showPlayerCursors}
+                onShowPlayerCursorsChange={handleSetShowPlayerCursors}
               />
             }
           />

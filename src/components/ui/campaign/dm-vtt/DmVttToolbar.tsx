@@ -83,6 +83,8 @@ export interface DmVttToolbarProps {
   movementControls?: MovementControls;
   exportControl?: ReactNode;
   viewsControl?: ReactNode;
+  /** Shared-presence "who is viewing" + cursor-sharing switches. */
+  presenceControl?: ReactNode;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -124,6 +126,7 @@ export function DmVttToolbar({
   movementControls,
   exportControl,
   viewsControl,
+  presenceControl,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -274,6 +277,7 @@ export function DmVttToolbar({
           </Button>
           {exportControl}
           {viewsControl}
+          {presenceControl}
         </div>
       </div>
       <div className="border-divider w-full border-t empty:hidden">

@@ -121,6 +121,27 @@ describe('DmVttToolbar', () => {
     expect(screen.getByTestId('views-control-marker')).toBeInTheDocument();
   });
 
+  it('renders presenceControl next to viewsControl', () => {
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+        viewsControl={<div data-testid="views-control-marker" />}
+        presenceControl={<div data-testid="presence-slot" />}
+      />
+    );
+
+    expect(screen.getByTestId('views-control-marker')).toBeInTheDocument();
+    expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
+  });
+
   it('wires selectionControls into the shared tool options bar', () => {
     render(
       <DmVttToolbar
