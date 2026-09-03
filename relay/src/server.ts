@@ -2,7 +2,12 @@ import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createClient } from 'redis';
 import { createSyncServer } from '@fieldnotes/sync-server';
-import type { HubBackend, HubFanout, SyncHub } from '@fieldnotes/sync-server';
+import type {
+  Authenticate,
+  HubBackend,
+  HubFanout,
+  SyncHub,
+} from '@fieldnotes/sync-server';
 import { RedisHubFanout } from '@fieldnotes/sync-redis';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
@@ -17,6 +22,18 @@ export interface StartRelayOptions {
   backend?: HubBackend;
   /** Cross-instance ephemeral and durable-operation fan-out. */
   fanout?: HubFanout;
+  /**
+   * Hub presence throttle window in ms. Test-only seam: production
+   * (`main()`) never sets it, so the sync-server default applies.
+   */
+  presenceThrottleMs?: number;
+  /**
+   * Manual-gate observation seam (env `RELAY_GATE_LOG=1`): logs admitted
+   * connections and, per inbound presence envelope, the payload `kind` and
+   * the SORTED TOP-LEVEL FIELD NAMES of `data` — never values. Off in
+   * production.
+   */
+  gateLog?: boolean;
 }
 
 export interface RelayHandle {
@@ -55,12 +72,60 @@ export async function startRelay(
   });
 
   const policies = makePolicies(opts.secret);
+
+  // `Authenticate` may return `AuthResult | null | Promise<AuthResult | null>`
+  // (sync-server 0.13 `index.d.ts:164`); the wrapper awaits so both shapes
+  // type-check and log correctly.
+  const authenticate: Authenticate = opts.gateLog
+    ? async info => {
+        const identity = await policies.authenticate(info);
+        if (identity) {
+          console.log(
+            `[gate] admitted role=${identity.role} userId=${identity.userId} room=${info.room}`
+          );
+        }
+        return identity;
+      }
+    : policies.authenticate;
+
   const { hub, wss, close } = createSyncServer({
     server,
     ...policies,
+    authenticate,
     ...(opts.backend ? { backend: opts.backend } : {}),
     ...(opts.fanout ? { fanout: opts.fanout } : {}),
+    ...(opts.presenceThrottleMs !== undefined
+      ? { presenceThrottleMs: opts.presenceThrottleMs }
+      : {}),
   });
+
+  if (opts.gateLog) {
+    wss.on('connection', socket => {
+      socket.on('message', raw => {
+        let env: { op?: { kind?: unknown; data?: unknown } };
+        try {
+          env = JSON.parse(String(raw)) as typeof env;
+        } catch {
+          return;
+        }
+        if (env?.op?.kind !== 'presence') return;
+        const data = env.op.data;
+        const kind =
+          data &&
+          typeof data === 'object' &&
+          typeof (data as { kind?: unknown }).kind === 'string'
+            ? (data as { kind: string }).kind
+            : '-';
+        const fields =
+          data && typeof data === 'object'
+            ? Object.keys(data as object)
+                .sort()
+                .join(',')
+            : '-';
+        console.log(`[gate] presence kind=${kind} fields=${fields}`);
+      });
+    });
+  }
 
   pokeHandler = (req, res) =>
     void handlePokeRequest(hub, opts.secret, req, res).catch(err => {
@@ -129,6 +194,7 @@ async function main(): Promise<void> {
     port,
     backend,
     fanout: fanout ? new EphemeralHubFanout(fanout) : undefined,
+    gateLog: process.env.RELAY_GATE_LOG === '1',
   });
   console.log(`[relay] listening on :${port}`);
 
