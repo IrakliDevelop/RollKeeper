@@ -179,6 +179,36 @@ describe('sanitizePublicMarkers — validation', () => {
   });
 });
 
+describe('PublicMarkerDetail — portal is structurally unassignable (type-level)', () => {
+  it('rejects a portal value at compile time; a stripped runtime shape still type-checks (positive control)', () => {
+    const smuggled: PublicMarkerDetail = {
+      id: 'marker-1',
+      title: 'Chest',
+      body: 'body',
+      // @ts-expect-error PublicMarkerDetail.portal is `never` — DM-only
+      // portal navigation data must never type-check onto the public
+      // projection. If a future edit widens `portal` back to an optional
+      // type, this directive stops being an error and `npm run type-check`
+      // fails with "Unused '@ts-expect-error' directive" — a loud,
+      // build-breaking signal rather than a silent regression. See
+      // markerPortal.ts's "Deferred follow-ups" note and
+      // src/types/battlemap.ts's `portal?: never` doc comment.
+      portal: { v: 1, kind: 'battlemap', id: 'SMUGGLED-MAP-ID' },
+    };
+    expect(smuggled).toBeDefined();
+
+    // Positive control: proves the assignment above fails BECAUSE of
+    // `portal`, not for some unrelated reason (e.g. a missing required
+    // field) — the identical object minus `portal` type-checks cleanly.
+    const clean: PublicMarkerDetail = {
+      id: 'marker-1',
+      title: 'Chest',
+      body: 'body',
+    };
+    expect(clean).toBeDefined();
+  });
+});
+
 describe('applyCanonicalRemaining', () => {
   it('re-derives remainingQuantity from the ledger and never emits portal or dmNotes', () => {
     const markers: PublicMarkerDetail[] = [

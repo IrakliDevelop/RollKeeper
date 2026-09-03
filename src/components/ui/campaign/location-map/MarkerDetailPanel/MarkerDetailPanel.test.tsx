@@ -1216,6 +1216,34 @@ describe('MarkerDetailPanel portal destination', () => {
     ).toBeNull();
   });
 
+  it('Task 7: renders no destination section, link, or href even when the underlying detail record carries a portal target (no portalState prop supplied — the player surface never resolves or passes one)', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail({
+            portal: { v: 1, kind: 'battlemap', id: 'SMUGGLED-MAP-ID' },
+          }),
+        }}
+        onClose={() => {}}
+      />
+    );
+
+    const dialog = screen.getByRole('dialog');
+    expect(screen.queryByTestId('portal-destination-section')).toBeNull();
+    expect(
+      screen.queryByRole('combobox', { name: 'Destination type' })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('link', { name: /open destination/i })
+    ).toBeNull();
+    // No leak of the target id into any href, text, or attribute.
+    expect(dialog.innerHTML).not.toContain('SMUGGLED-MAP-ID');
+  });
+
   it('does not call onSave when clicking "Open destination"', async () => {
     const user = userEvent.setup();
     const onSave = vi.fn();

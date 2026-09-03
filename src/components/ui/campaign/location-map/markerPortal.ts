@@ -222,3 +222,31 @@ export function resolveDmPortalDestination(
     name: record.name,
   };
 }
+
+/**
+ * Deferred follow-ups (Task 7 — non-DM portal isolation lockdown).
+ *
+ * This module, `PublicMarkerDetail.portal?: never`, and the sanitizer/panel
+ * tests around them are today's complete, intentional scope: a DM-only
+ * navigation aid with no player-, display-, or cross-client-facing
+ * counterpart. The following are recorded here as deliberately deferred
+ * product surfaces — NOT dormant controls, flags, or partially-wired code
+ * paths waiting to be flipped on. Each would need its own design pass
+ * (most importantly, server-enforced authorization — a portal target must
+ * never be trusted from a client) before any code lands:
+ *
+ *   - Player portal travel: a player-triggered map/location jump would need
+ *     the destination validated and applied server-side (the relay or an
+ *     API route), never a bare client-side navigation off a DM-authored
+ *     target, so a compromised or stale client cannot smuggle a player into
+ *     an unauthorized map.
+ *   - Stable deep linking to campaign locations from inside the player
+ *     character-sheet (e.g. "view on map" from an NPC/location reference).
+ *   - Coordinated active-map handoff: today each connected player's client
+ *     independently decides what it renders; moving "the table" to a new
+ *     battle map together (DM-initiated) is unbuilt.
+ *   - Display navigation for the TV surface: `useMarkerRegistration`'s
+ *     `gesture: null` keeps the display non-interactive by design (see
+ *     `display/page.tsx`); a DM-remote-controlled TV map switch is a
+ *     separate, unbuilt feature, not a gap in this lockdown.
+ */

@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
-import { Viewport } from '@fieldnotes/core';
+import { Viewport, createHtmlElement } from '@fieldnotes/core';
 
 import BattleMapDisplayPage from '../page';
 import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
-import { MARKER_HTML_TYPE } from '@/components/ui/campaign/location-map/markerData';
+import {
+  MARKER_HTML_TYPE,
+  buildMarkerData,
+} from '@/components/ui/campaign/location-map/markerData';
 
 // Task B11 — the negative property under test ("the display page never
 // activates") and its positive control ("the player canvas DOES, with
@@ -164,6 +167,60 @@ describe('marker activation: the display page never activates; the player canvas
 
     expect(activationSpy).toHaveBeenCalledTimes(1);
     expect(activationSpy.mock.calls[0]?.[0]?.gesture).toBe('single');
+
+    vp.destroy();
+  });
+
+  // Task 7 — non-DM portal isolation lockdown. `gesture: null` (asserted
+  // above via "setActivation is never called") is the primary guard, but
+  // `useMarkerRegistration` still subscribes `onElementActivate`
+  // unconditionally (only `setActivation` is gated on `gesture`). This test
+  // covers the residual path: if that listener were ever invoked anyway —
+  // by a future regression, a shared/misrouted event source, anything — the
+  // display page wires no `onActivateMarker` and renders no marker panel at
+  // all, so a portal-bearing marker cannot produce a destination link,
+  // dialog, or navigation on the TV surface.
+  it('portal metadata cannot cause navigation or activation on the display page, even if its onElementActivate listener fires directly', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activationSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const { container } = render(<BattleMapDisplayPage />);
+    fireReady(vp);
+
+    const listener = activationSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+
+    // A marker whose (DM-only) detail record would carry a portal target —
+    // the display page never resolves or receives detail records, so the
+    // portal id below exists purely as a canary: it must never surface
+    // anywhere in the rendered output.
+    const markerEl = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'door', ref: 'ref-portal-canary' }) },
+    });
+    act(() => {
+      vp.store.add(markerEl);
+    });
+    act(() => {
+      listener({
+        element: markerEl,
+        world: { x: 0, y: 0 },
+        pointerType: 'mouse',
+        gesture: 'single',
+      });
+    });
+
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(container.querySelectorAll('a[href]').length).toBe(0);
+    expect(container.innerHTML).not.toContain('ref-portal-canary');
+    expect(container.innerHTML).not.toContain('/dm/campaign/');
 
     vp.destroy();
   });
