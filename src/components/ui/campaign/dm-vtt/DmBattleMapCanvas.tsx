@@ -69,6 +69,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
+    portalState,
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
   // Session-scoped only — pure UI state, no connection dependency. Off by
@@ -196,6 +197,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             campaignCode={props.campaignCode}
             dmId={props.dmId}
             state={markerPanelState}
+            portalState={portalState}
             onClose={handleCloseMarkerPanel}
             onSave={patch => {
               handleSaveMarkerDetail(patch);

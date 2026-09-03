@@ -26,6 +26,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useLocationStore } from '@/store/locationStore';
 import {
   DmTokenTool,
   isCombatantToken,
@@ -98,11 +99,20 @@ import {
 import { useCloseMarkerPanelOnRemove } from '@/components/ui/campaign/location-map/useCloseMarkerPanelOnRemove';
 import { useMarkerWrites } from '@/components/ui/campaign/location-map/useMarkerWrites';
 import { resolveMarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.utils';
-import type { MarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
+import type {
+  MarkerPanelState,
+  PortalTargetChoice,
+  ResolvedPortalState,
+} from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
+import { resolveDmPortalDestination } from '@/components/ui/campaign/location-map/markerPortal';
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
-import type { BattleMap } from '@/types/battlemap';
+import type {
+  BattleMap,
+  MarkerDetail,
+  MarkerPortalTargetV1,
+} from '@/types/battlemap';
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -124,6 +134,10 @@ export interface DmBattleMapCanvasProps {
   /** Surfaces export-control failures (e.g. no viewport, blob export threw). */
   onExportError: (message: string) => void;
 }
+
+/** Stable identity for an empty campaign record — avoids a fresh `{}` on each
+ *  selector call that would defeat Zustand's referential equality check. */
+const EMPTY_RECORD: Record<string, { id: string; name: string }> = {};
 
 const DRAWING_TYPES = new Set(['stroke', 'arrow', 'template']);
 
@@ -179,8 +193,13 @@ export interface DmBattleMapCanvasState {
     status?: import('@/types/battlemap').MarkerStatus;
     discovery?: import('@/types/battlemap').MarkerDiscovery;
     trap?: import('@/types/battlemap').MarkerTrapMechanics;
+    loot?: import('@/types/battlemap').MarkerLootEntry[];
+    portal?: MarkerPortalTargetV1 | null;
   }) => void;
   handleDeleteMarker: () => void;
+
+  /** Resolved portal destination state for the active marker panel. */
+  portalState?: ResolvedPortalState;
 }
 
 /**
@@ -298,6 +317,32 @@ export function useDmBattleMapCanvas({
   const battleMap = useBattleMapStore(
     state => state.battleMaps[campaignCode]?.[battleMapId]
   );
+  // ─── Portal target choices ────────────────────────────────────
+  // Subscribe to the backing RECORD references (not `getBattleMaps()` /
+  // `getLocations()` results — those produce fresh arrays and defeat Zustand's
+  // referential equality check, causing every unrelated write to rerender).
+  const campaignBattleMaps = useBattleMapStore(
+    s => s.battleMaps[campaignCode] ?? EMPTY_RECORD
+  );
+  const campaignLocations = useLocationStore(
+    s => s.locations[campaignCode] ?? EMPTY_RECORD
+  );
+
+  const portalBattleMapChoices = useMemo((): PortalTargetChoice[] => {
+    // VTT is always a battle map, so exclude self from battle map choices.
+    return Object.values(campaignBattleMaps)
+      .filter(bm => bm.id !== battleMapId)
+      .map(bm => ({ id: bm.id, name: bm.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [campaignBattleMaps, battleMapId]);
+
+  const portalLocationChoices = useMemo((): PortalTargetChoice[] => {
+    // VTT source is always a battle map, so locations never exclude self.
+    return Object.values(campaignLocations)
+      .map(loc => ({ id: loc.id, name: loc.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [campaignLocations]);
+
   // The connection is created once inside the fire-once `handleReady`
   // callback; a plain closure over `onPoke` would go stale if the prop's
   // identity changes later (e.g. encounterId change) after the connection
@@ -459,6 +504,50 @@ export function useDmBattleMapCanvas({
     activeMarkerElementId !== null &&
     battleMap?.dmOnlyElements[activeMarkerElementId] === true;
 
+  const portalState = useMemo((): ResolvedPortalState | undefined => {
+    if (markerPanelState.kind !== 'ready') return undefined;
+    const detail = markerPanelState.detail as MarkerDetail;
+    // Only resolve for DM details (which carry the portal field).
+    if (!('dmNotes' in detail)) return undefined;
+
+    const state: ResolvedPortalState = {
+      target: detail.portal,
+      battleMapChoices: portalBattleMapChoices,
+      locationChoices: portalLocationChoices,
+    };
+
+    if (detail.portal) {
+      state.resolved = resolveDmPortalDestination(
+        detail.portal,
+        campaignCode,
+        battleMapId,
+        'battlemap',
+        {
+          battleMaps: {
+            getBattleMap: (_cc, id) =>
+              campaignBattleMaps[id] as
+                | { id: string; name: string }
+                | undefined,
+          },
+          locations: {
+            getLocation: (_cc, id) =>
+              campaignLocations[id] as { id: string; name: string } | undefined,
+          },
+        }
+      );
+    }
+
+    return state;
+  }, [
+    markerPanelState,
+    portalBattleMapChoices,
+    portalLocationChoices,
+    campaignBattleMaps,
+    campaignLocations,
+    campaignCode,
+    battleMapId,
+  ]);
+
   // The relay transports canvas elements, not product-state marker details.
   // Publish the explicit player projection separately, together with the
   // private server-only definitions needed for authoritative loot claims.
@@ -530,6 +619,8 @@ export function useDmBattleMapCanvas({
       status?: import('@/types/battlemap').MarkerStatus;
       discovery?: import('@/types/battlemap').MarkerDiscovery;
       trap?: import('@/types/battlemap').MarkerTrapMechanics;
+      loot?: import('@/types/battlemap').MarkerLootEntry[];
+      portal?: MarkerPortalTargetV1 | null;
     }) => {
       if (activeMarkerRef === null) return;
       markerWrites.editMarkerDetail(activeMarkerRef, patch);
@@ -1066,5 +1157,6 @@ export function useDmBattleMapCanvas({
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
+    portalState,
   };
 }

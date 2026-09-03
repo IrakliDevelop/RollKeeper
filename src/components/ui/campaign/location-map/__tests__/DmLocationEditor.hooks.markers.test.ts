@@ -45,7 +45,10 @@ import {
 import type { MarkerElementDataV1 } from '../markerData';
 import { ANNOTATIONS_LAYER_ID } from '../layerContract';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useLocationStore } from '@/store/locationStore';
 import type { BattleMap, MarkerDetail } from '@/types/battlemap';
+import type { LocationMap } from '@/types/location';
+import { buildMarkerPortalTarget } from '../markerPortal';
 
 const CODE = 'TEST01';
 const MAP_ID = 'bm-1';
@@ -1426,5 +1429,339 @@ describe('useDmLocationEditor — the add guard does not depend on the viewport 
     const clonedRef = markerDataOf(store.getById(clone.id) as HtmlElement).ref;
     expect(clonedRef).not.toBe(originalRef);
     expect(findDetail(clonedRef)).toBeDefined();
+  });
+});
+
+// ─── Portal state wiring ───────────────────────────────────────
+
+const TARGET_BM_ID = 'bm-target';
+const TARGET_LOC_ID = 'loc-target';
+
+function locationFixture(overrides: Partial<LocationMap> = {}): LocationMap {
+  return {
+    id: TARGET_LOC_ID,
+    campaignCode: CODE,
+    name: 'Haunted Library',
+    mapImageUrl: '',
+    mapImageSize: { w: 100, h: 100 },
+    canvasState: '',
+    dmOnlyElements: {},
+    gridEnabled: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function seedPortalStores() {
+  useBattleMapStore.setState({
+    battleMaps: {
+      [CODE]: {
+        [MAP_ID]: battleMapFixture(),
+        [TARGET_BM_ID]: battleMapFixture({
+          id: TARGET_BM_ID,
+          name: 'Dragon Lair',
+        }),
+      },
+    },
+  });
+  useLocationStore.setState({
+    locations: {
+      [CODE]: {
+        [TARGET_LOC_ID]: locationFixture(),
+      },
+    },
+  });
+}
+
+describe('useDmLocationEditor — portal state is wired to the marker panel', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    seedPortalStores();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    useLocationStore.setState({ locations: {} });
+    vi.clearAllMocks();
+  });
+
+  it('portalState includes choices from stores, excluding self', async () => {
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    // Self (MAP_ID) is excluded from battle map choices.
+    expect(ps!.battleMapChoices.find(c => c.id === MAP_ID)).toBeUndefined();
+    expect(ps!.battleMapChoices.find(c => c.id === TARGET_BM_ID)).toMatchObject(
+      {
+        id: TARGET_BM_ID,
+        name: 'Dragon Lair',
+      }
+    );
+    // Locations are included (source is a battle map, not a location).
+    expect(ps!.locationChoices.find(c => c.id === TARGET_LOC_ID)).toMatchObject(
+      {
+        id: TARGET_LOC_ID,
+        name: 'Haunted Library',
+      }
+    );
+  });
+
+  it('portal resolves to ready for a valid target', async () => {
+    // Pre-seed a marker detail with a portal pointing at the target battle map.
+    const ref = 'portal-ref-1';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    expect(ps!.resolved?.status).toBe('ready');
+    if (ps!.resolved?.status === 'ready') {
+      expect(ps!.resolved.name).toBe('Dragon Lair');
+      expect(ps!.resolved.href).toContain(TARGET_BM_ID);
+    }
+  });
+
+  it('missing target resolves correctly', async () => {
+    const ref = 'portal-ref-missing';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Broken Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', 'nonexistent-id'),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('missing');
+  });
+
+  it('rename reflected live: renaming the target in the store updates portalState.resolved.name', async () => {
+    const ref = 'portal-ref-rename';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+    if (result.current.portalState?.resolved?.status === 'ready') {
+      expect(result.current.portalState.resolved.name).toBe('Dragon Lair');
+    }
+
+    // Rename the target in the store.
+    act(() => {
+      useBattleMapStore.getState().updateBattleMap(CODE, TARGET_BM_ID, {
+        name: 'Ancient Dragon Lair',
+      });
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+    if (result.current.portalState?.resolved?.status === 'ready') {
+      expect(result.current.portalState.resolved.name).toBe(
+        'Ancient Dragon Lair'
+      );
+    }
+  });
+
+  it('delete target makes portal non-navigable', async () => {
+    const ref = 'portal-ref-delete';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    // Positive control: starts ready.
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+
+    // Delete the target from the store.
+    act(() => {
+      useBattleMapStore.getState().removeBattleMap(CODE, TARGET_BM_ID);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('missing');
+  });
+
+  it('self-link detection: portal targeting same map resolves to self', async () => {
+    const ref = 'portal-ref-self';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Self Link',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', MAP_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('self');
+  });
+
+  it('relay-disabled mode still provides portal state', async () => {
+    // Relay is already disabled via the env stub above.
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    // Portal state is present even without a relay URL.
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    expect(ps!.battleMapChoices).toBeDefined();
+    expect(ps!.locationChoices).toBeDefined();
+    // No portal target set, so resolved is undefined.
+    expect(ps!.resolved).toBeUndefined();
   });
 });

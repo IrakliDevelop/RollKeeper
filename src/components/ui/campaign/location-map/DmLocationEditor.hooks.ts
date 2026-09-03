@@ -87,7 +87,12 @@ import {
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { useMarkerWrites } from './useMarkerWrites';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
-import type { MarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.types';
+import type {
+  MarkerPanelState,
+  PortalTargetChoice,
+  ResolvedPortalState,
+} from './MarkerDetailPanel/MarkerDetailPanel.types';
+import { resolveDmPortalDestination } from './markerPortal';
 import type { MarkerToolControls } from './DmLocationToolOptions';
 import { pinGridToMapLayer } from './gridPin';
 import { nextMapImagePosition } from './mapImagePlacement';
@@ -98,7 +103,15 @@ import {
 } from './arrangeMaps';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import type { GridSettings, LocationMap } from '@/types/location';
-import type { BattleMap } from '@/types/battlemap';
+import type {
+  BattleMap,
+  MarkerDetail,
+  MarkerPortalTargetV1,
+} from '@/types/battlemap';
+
+/** Stable identity for an empty campaign record — avoids a fresh `{}` on each
+ *  selector call that would defeat Zustand's referential equality check. */
+const EMPTY_RECORD: Record<string, { id: string; name: string }> = {};
 
 /** `_fitCameraToMap` — retry when the viewport has zero size (layout not ready). */
 const FIT_CAMERA_VIEWPORT_RETRY_MAX = 5;
@@ -262,8 +275,13 @@ export interface DmLocationEditorState {
     status?: import('@/types/battlemap').MarkerStatus;
     discovery?: import('@/types/battlemap').MarkerDiscovery;
     trap?: import('@/types/battlemap').MarkerTrapMechanics;
+    loot?: import('@/types/battlemap').MarkerLootEntry[];
+    portal?: MarkerPortalTargetV1 | null;
   }) => void;
   handleDeleteMarker: () => void;
+
+  /** Resolved portal destination state for the active marker panel. */
+  portalState?: ResolvedPortalState;
 
   // Battle-map export control
   getViewport: () => Viewport | null;
@@ -409,6 +427,33 @@ export function useDmLocationEditor(
     setShowPlayerCursors(enabled);
     awarenessRef.current?.setShowPlayerCursors(enabled);
   }, []);
+
+  // ─── Portal target choices ────────────────────────────────────
+  // Subscribe to the backing RECORD references (not `getBattleMaps()` /
+  // `getLocations()` results — those produce fresh arrays and defeat Zustand's
+  // referential equality check, causing every unrelated write to rerender).
+  const campaignBattleMaps = useBattleMapStore(
+    s => s.battleMaps[campaignCode] ?? EMPTY_RECORD
+  );
+  const campaignLocations = useLocationStore(
+    s => s.locations[campaignCode] ?? EMPTY_RECORD
+  );
+
+  const portalBattleMapChoices = useMemo((): PortalTargetChoice[] => {
+    const sourceIsBattleMap = mode === 'battlemap';
+    return Object.values(campaignBattleMaps)
+      .filter(bm => !(sourceIsBattleMap && bm.id === location.id))
+      .map(bm => ({ id: bm.id, name: bm.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [campaignBattleMaps, location.id, mode]);
+
+  const portalLocationChoices = useMemo((): PortalTargetChoice[] => {
+    const sourceIsLocation = mode === 'location';
+    return Object.values(campaignLocations)
+      .filter(loc => !(sourceIsLocation && loc.id === location.id))
+      .map(loc => ({ id: loc.id, name: loc.name }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [campaignLocations, location.id, mode]);
 
   const linkedEncounterIdsLive = useCallback(
     () =>
@@ -613,6 +658,53 @@ export function useDmLocationEditor(
     activeMarkerElementId !== null &&
     markerDmOnlyElements?.[activeMarkerElementId] === true;
 
+  const sourceKind = mode === 'battlemap' ? 'battlemap' : 'location';
+
+  const portalState = useMemo((): ResolvedPortalState | undefined => {
+    if (markerPanelState.kind !== 'ready') return undefined;
+    const detail = markerPanelState.detail as MarkerDetail;
+    // Only resolve for DM details (which carry the portal field).
+    if (!('dmNotes' in detail)) return undefined;
+
+    const state: ResolvedPortalState = {
+      target: detail.portal,
+      battleMapChoices: portalBattleMapChoices,
+      locationChoices: portalLocationChoices,
+    };
+
+    if (detail.portal) {
+      state.resolved = resolveDmPortalDestination(
+        detail.portal,
+        campaignCode,
+        location.id,
+        sourceKind,
+        {
+          battleMaps: {
+            getBattleMap: (_cc, id) =>
+              campaignBattleMaps[id] as
+                | { id: string; name: string }
+                | undefined,
+          },
+          locations: {
+            getLocation: (_cc, id) =>
+              campaignLocations[id] as { id: string; name: string } | undefined,
+          },
+        }
+      );
+    }
+
+    return state;
+  }, [
+    markerPanelState,
+    portalBattleMapChoices,
+    portalLocationChoices,
+    campaignBattleMaps,
+    campaignLocations,
+    campaignCode,
+    location.id,
+    sourceKind,
+  ]);
+
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
   }, []);
@@ -651,6 +743,7 @@ export function useDmLocationEditor(
       discovery?: import('@/types/battlemap').MarkerDiscovery;
       trap?: import('@/types/battlemap').MarkerTrapMechanics;
       loot?: import('@/types/battlemap').MarkerLootEntry[];
+      portal?: MarkerPortalTargetV1 | null;
     }) => {
       if (activeMarkerRef === null) return;
       markerWrites.editMarkerDetail(activeMarkerRef, patch);
@@ -1611,5 +1704,6 @@ export function useDmLocationEditor(
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
+    portalState,
   };
 }
