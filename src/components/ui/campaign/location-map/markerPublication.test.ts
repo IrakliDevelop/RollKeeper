@@ -11,7 +11,7 @@ import {
 import type { MarkerKind } from './markerData';
 import { buildPublicMarkerDetails } from './markerPublication';
 
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, MarkerPortalTargetV1 } from '@/types/battlemap';
 
 /**
  * Fixtures use the REAL `createHtmlElement` and the REAL `buildMarkerData`, and
@@ -447,6 +447,85 @@ describe('buildPublicMarkerDetails — the projection is the security boundary',
     expect(Object.keys(result[0]).sort()).toEqual(['body', 'id', 'title']);
     expect('futureSecretField' in result[0]).toBe(false);
     expect(JSON.stringify(result)).not.toContain('SMUGGLED-PAYLOAD');
+  });
+
+  it('never emits portal, for any published marker with a portal target', () => {
+    const pins = [pin({ ref: 'r1' }), pin({ ref: 'r2' })];
+    const portalTargets: MarkerPortalTargetV1[] = [
+      { v: 1, kind: 'battlemap', id: 'SMUGGLED-BATTLEMAP-TARGET' },
+      { v: 1, kind: 'location', id: 'SMUGGLED-LOCATION-TARGET' },
+    ];
+    const markers = [
+      detail('r1', { portal: portalTargets[0] }),
+      detail('r2', { portal: portalTargets[1] }),
+    ];
+
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas(pins),
+      markers,
+      dmOnlyElements: {},
+    });
+
+    // Positive control first: both really did publish, so the absence
+    // assertions below are about the projection and not an empty result.
+    expect(result.map(r => r.id)).toEqual(['r1', 'r2']);
+
+    const serialized = JSON.stringify(result);
+    for (const [index, marker] of markers.entries()) {
+      expect('portal' in result[index]).toBe(false);
+      expect(serialized).not.toContain(marker.portal!.id);
+    }
+    expect(serialized).not.toContain('SMUGGLED-BATTLEMAP-TARGET');
+    expect(serialized).not.toContain('SMUGGLED-LOCATION-TARGET');
+  });
+
+  it('strips portal, dmNotes, and unknown fields together without leaking or mutating the input', () => {
+    const el = pin({ ref: 'ref-1' });
+    const input: MarkerDetail = Object.freeze({
+      ...detail('ref-1', {
+        dmNotes: 'SECRET-NOTES-PAYLOAD',
+        portal: { v: 1, kind: 'battlemap', id: 'SMUGGLED-PORTAL-ID' },
+      }),
+      // Cast lets the fixture carry a field the type does not declare, the
+      // same way an older or adversarial writer might.
+      unknownFutureField: 'SMUGGLED-UNKNOWN-PAYLOAD',
+    } as MarkerDetail);
+
+    // Mutation-check: calling the projection must not throw against a frozen
+    // input, proving no field is ever written back onto the caller's object.
+    expect(() =>
+      buildPublicMarkerDetails({
+        canvasState: canvas([el]),
+        markers: [input],
+        dmOnlyElements: {},
+      })
+    ).not.toThrow();
+
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([el]),
+      markers: [input],
+      dmOnlyElements: {},
+    });
+
+    expect(result).toHaveLength(1);
+    expect(Object.keys(result[0]).sort()).toEqual(['body', 'id', 'title']);
+    expect('portal' in result[0]).toBe(false);
+    expect('dmNotes' in result[0]).toBe(false);
+    expect('unknownFutureField' in result[0]).toBe(false);
+
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain('SMUGGLED-PORTAL-ID');
+    expect(serialized).not.toContain('SECRET-NOTES-PAYLOAD');
+    expect(serialized).not.toContain('SMUGGLED-UNKNOWN-PAYLOAD');
+
+    // The frozen input itself is untouched — proves the pick reads without
+    // writing back.
+    expect(input.portal).toEqual({
+      v: 1,
+      kind: 'battlemap',
+      id: 'SMUGGLED-PORTAL-ID',
+    });
+    expect(input.dmNotes).toBe('SECRET-NOTES-PAYLOAD');
   });
 });
 

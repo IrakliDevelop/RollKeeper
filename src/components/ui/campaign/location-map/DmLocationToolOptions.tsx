@@ -96,7 +96,7 @@ interface DmLocationToolOptionsProps {
   measureSharing?: MeasureSharingControl;
   /** Enables the select-tool editing branch (style + arrange controls for the current selection). */
   selectionControls?: boolean;
-  /** Enables the marker kind + colour branch (battlemap mode only). */
+  /** Enables the marker kind + colour branch (both modes). */
   markerControls?: MarkerToolControls;
   /** Enables the movement (path) tool's diagonal rule / dash / sharing branch. */
   movementControls?: MovementControls;
@@ -157,9 +157,7 @@ export default function DmLocationToolOptions({
   // a bordered bar with nothing in it. Same defensive shape as
   // `pencilOpts !== undefined` and `selectedCount > 0` above.
   const showMarkerOptions =
-    mode === 'battlemap' &&
-    activeTool === MARKER_TOOL_NAME &&
-    markerControls !== undefined;
+    activeTool === MARKER_TOOL_NAME && markerControls !== undefined;
 
   const showOptionsBar =
     showSelectionOptions ||

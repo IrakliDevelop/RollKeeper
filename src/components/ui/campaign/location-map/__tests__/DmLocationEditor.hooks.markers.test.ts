@@ -45,7 +45,10 @@ import {
 import type { MarkerElementDataV1 } from '../markerData';
 import { ANNOTATIONS_LAYER_ID } from '../layerContract';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useLocationStore } from '@/store/locationStore';
 import type { BattleMap, MarkerDetail } from '@/types/battlemap';
+import type { LocationMap } from '@/types/location';
+import { buildMarkerPortalTarget } from '../markerPortal';
 
 const CODE = 'TEST01';
 const MAP_ID = 'bm-1';
@@ -334,12 +337,12 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
     expect(vp.getHtmlPainters().canvasTypes.has(MARKER_HTML_TYPE)).toBe(true);
   });
 
-  it('location mode gets no marker TOOL (spec §7.2) even though the painter is registered', async () => {
+  it('location mode gets a marker tool alongside the painter registration', async () => {
     const { result } = await setup('location');
 
     expect(
       result.current.tools.some(tool => tool.name === MARKER_TOOL_NAME)
-    ).toBe(false);
+    ).toBe(true);
   });
 
   it('activating a marker offline opens the panel on a DM edit state', async () => {
@@ -1426,5 +1429,767 @@ describe('useDmLocationEditor — the add guard does not depend on the viewport 
     const clonedRef = markerDataOf(store.getById(clone.id) as HtmlElement).ref;
     expect(clonedRef).not.toBe(originalRef);
     expect(findDetail(clonedRef)).toBeDefined();
+  });
+});
+
+// ─── Portal state wiring ───────────────────────────────────────
+
+const TARGET_BM_ID = 'bm-target';
+const TARGET_LOC_ID = 'loc-target';
+
+function locationFixture(overrides: Partial<LocationMap> = {}): LocationMap {
+  return {
+    id: TARGET_LOC_ID,
+    campaignCode: CODE,
+    name: 'Haunted Library',
+    mapImageUrl: '',
+    mapImageSize: { w: 100, h: 100 },
+    canvasState: '',
+    dmOnlyElements: {},
+    gridEnabled: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function seedPortalStores() {
+  useBattleMapStore.setState({
+    battleMaps: {
+      [CODE]: {
+        [MAP_ID]: battleMapFixture(),
+        [TARGET_BM_ID]: battleMapFixture({
+          id: TARGET_BM_ID,
+          name: 'Dragon Lair',
+        }),
+      },
+    },
+  });
+  useLocationStore.setState({
+    locations: {
+      [CODE]: {
+        [TARGET_LOC_ID]: locationFixture(),
+      },
+    },
+  });
+}
+
+describe('useDmLocationEditor — portal state is wired to the marker panel', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    seedPortalStores();
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    useLocationStore.setState({ locations: {} });
+    vi.clearAllMocks();
+  });
+
+  it('portalState includes choices from stores, excluding self', async () => {
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    // Self (MAP_ID) is excluded from battle map choices.
+    expect(ps!.battleMapChoices.find(c => c.id === MAP_ID)).toBeUndefined();
+    expect(ps!.battleMapChoices.find(c => c.id === TARGET_BM_ID)).toMatchObject(
+      {
+        id: TARGET_BM_ID,
+        name: 'Dragon Lair',
+      }
+    );
+    // Locations are included (source is a battle map, not a location).
+    expect(ps!.locationChoices.find(c => c.id === TARGET_LOC_ID)).toMatchObject(
+      {
+        id: TARGET_LOC_ID,
+        name: 'Haunted Library',
+      }
+    );
+  });
+
+  it('portal resolves to ready for a valid target', async () => {
+    // Pre-seed a marker detail with a portal pointing at the target battle map.
+    const ref = 'portal-ref-1';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    expect(ps!.resolved?.status).toBe('ready');
+    if (ps!.resolved?.status === 'ready') {
+      expect(ps!.resolved.name).toBe('Dragon Lair');
+      expect(ps!.resolved.href).toContain(TARGET_BM_ID);
+    }
+  });
+
+  it('missing target resolves correctly', async () => {
+    const ref = 'portal-ref-missing';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Broken Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', 'nonexistent-id'),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('missing');
+  });
+
+  it('rename reflected live: renaming the target in the store updates portalState.resolved.name', async () => {
+    const ref = 'portal-ref-rename';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+    if (result.current.portalState?.resolved?.status === 'ready') {
+      expect(result.current.portalState.resolved.name).toBe('Dragon Lair');
+    }
+
+    // Rename the target in the store.
+    act(() => {
+      useBattleMapStore.getState().updateBattleMap(CODE, TARGET_BM_ID, {
+        name: 'Ancient Dragon Lair',
+      });
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+    if (result.current.portalState?.resolved?.status === 'ready') {
+      expect(result.current.portalState.resolved.name).toBe(
+        'Ancient Dragon Lair'
+      );
+    }
+  });
+
+  it('delete target makes portal non-navigable', async () => {
+    const ref = 'portal-ref-delete';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Gate',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', TARGET_BM_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    // Positive control: starts ready.
+    expect(result.current.portalState?.resolved?.status).toBe('ready');
+
+    // Delete the target from the store.
+    act(() => {
+      useBattleMapStore.getState().removeBattleMap(CODE, TARGET_BM_ID);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('missing');
+  });
+
+  it('self-link detection: portal targeting same map resolves to self', async () => {
+    const ref = 'portal-ref-self';
+    useBattleMapStore.getState().updateBattleMap(CODE, MAP_ID, {
+      markers: [
+        {
+          id: ref,
+          title: 'Self Link',
+          body: '',
+          dmNotes: '',
+          portal: buildMarkerPortalTarget('battlemap', MAP_ID),
+        },
+      ],
+    });
+
+    const harness = makeStubViewport();
+    const pin = seedMarkerPin(harness.store, ref);
+    const { result } = renderHook(() =>
+      useDmLocationEditor({
+        location: battleMapFixture(),
+        campaignCode: CODE,
+        dmId: 'dm-1',
+        mode: 'battlemap',
+        onSave: vi.fn(),
+        onSyncToPlayers: vi.fn(),
+      })
+    );
+    result.current.canvasRef.current = {
+      viewport: harness.vp,
+    } as unknown as FieldNotesCanvasRef;
+    await act(async () => {
+      await result.current.handleReady(harness.vp);
+    });
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.portalState?.resolved?.status).toBe('self');
+  });
+
+  it('relay-disabled mode still provides portal state', async () => {
+    // Relay is already disabled via the env stub above.
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    // Portal state is present even without a relay URL.
+    const ps = result.current.portalState;
+    expect(ps).toBeDefined();
+    expect(ps!.battleMapChoices).toBeDefined();
+    expect(ps!.locationChoices).toBeDefined();
+    // No portal target set, so resolved is undefined.
+    expect(ps!.resolved).toBeUndefined();
+  });
+});
+
+// ── Location-mode marker anchors ──────────────────────────────────────────
+
+/**
+ * Location-mode setup that seeds `useLocationStore` and resets
+ * `hasUnsyncedChanges` to `false` via a mock-fetched sync, so dirty-seam
+ * tests begin from the task brief's "completed sync" baseline.
+ */
+async function setupLocationSynced(
+  overrides: Partial<LocationMap> = {}
+): Promise<
+  ReturnType<typeof makeStubViewport> & {
+    result: ReturnType<
+      typeof renderHook<ReturnType<typeof useDmLocationEditor>, unknown>
+    >['result'];
+  }
+> {
+  const loc: LocationMap = {
+    id: MAP_ID,
+    campaignCode: CODE,
+    name: 'Test Location',
+    mapImageUrl: '',
+    mapImageSize: { w: 100, h: 100 },
+    canvasState: '',
+    dmOnlyElements: {},
+    gridEnabled: false,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    updatedAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+  useLocationStore.getState().addLocation(CODE, loc);
+
+  const harness = makeStubViewport();
+  const { result } = renderHook(() =>
+    useDmLocationEditor({
+      location: loc,
+      campaignCode: CODE,
+      dmId: 'dm-1',
+      mode: 'location',
+      onSave: vi.fn(),
+      onSyncToPlayers: vi.fn(),
+    })
+  );
+  result.current.canvasRef.current = {
+    viewport: harness.vp,
+  } as unknown as FieldNotesCanvasRef;
+  await act(async () => {
+    await result.current.handleReady(harness.vp);
+  });
+
+  // Drive `hasUnsyncedChanges` to `false` by running a successful sync.
+  const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+  vi.stubGlobal('fetch', fetchMock);
+  await act(async () => {
+    await result.current.handleSyncToPlayers();
+  });
+  // Verify baseline: tests MUST start from synced state.
+  expect(result.current.hasUnsyncedChanges).toBe(false);
+
+  return { ...harness, result };
+}
+
+describe('useDmLocationEditor — location-mode marker tool availability', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useLocationStore.setState({ locations: {} });
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    useLocationStore.setState({ locations: {} });
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('location markers persist through the location store', async () => {
+    const { vp, store, result } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+
+    const pins = markerElements(store);
+    expect(pins).toHaveLength(1);
+
+    // Verify stored in location store (not battlemap store).
+    const loc = useLocationStore.getState().getLocation(CODE, MAP_ID);
+    expect(loc?.markers).toBeDefined();
+    expect(loc!.markers!.length).toBe(1);
+  });
+
+  it('location markers reopen after reload (detail survives rehydration)', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+
+    // Open the panel, save a title.
+    act(() => {
+      emitActivate(pin);
+    });
+    expect(result.current.markerPanelOpen).toBe(true);
+    const panelState = result.current.markerPanelState;
+    expect(panelState.kind).toBe('ready');
+
+    // Save a title.
+    const ref = (panelState as { data: { ref: string } }).data.ref;
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Ancient Portal',
+        body: 'A shimmering archway.',
+        dmNotes: 'DC 15 Arcana to activate.',
+      });
+    });
+
+    // Verify detail persisted.
+    const loc = useLocationStore.getState().getLocation(CODE, MAP_ID);
+    const detail = loc?.markers?.find(m => m.id === ref);
+    expect(detail?.title).toBe('Ancient Portal');
+    expect(detail?.body).toBe('A shimmering archway.');
+    expect(detail?.dmNotes).toBe('DC 15 Arcana to activate.');
+  });
+
+  it('location markers can link to both target kinds (battlemap and location)', async () => {
+    // Seed portal targets.
+    const targetBmId = 'target-bm-2';
+    const targetLocId = 'target-loc-2';
+    useBattleMapStore.setState({
+      battleMaps: {
+        [CODE]: {
+          [MAP_ID]: battleMapFixture(),
+          [targetBmId]: battleMapFixture({
+            id: targetBmId,
+            name: 'Dragon Lair',
+          }),
+        },
+      },
+    });
+    useLocationStore.getState().addLocation(CODE, {
+      id: targetLocId,
+      campaignCode: CODE,
+      name: 'Secret Garden',
+      mapImageUrl: '',
+      mapImageSize: { w: 100, h: 100 },
+      canvasState: '',
+      dmOnlyElements: {},
+      gridEnabled: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    });
+
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    // Save with a battlemap portal.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Gate',
+        body: '',
+        dmNotes: '',
+        portal: buildMarkerPortalTarget('battlemap', targetBmId),
+      });
+    });
+    const ps1 = result.current.portalState;
+    expect(ps1?.target).toBeDefined();
+
+    // Switch to a location portal.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Gate',
+        body: '',
+        dmNotes: '',
+        portal: buildMarkerPortalTarget('location', targetLocId),
+      });
+    });
+    const ps2 = result.current.portalState;
+    expect(ps2?.target).toBeDefined();
+  });
+
+  it('DM-only-first ordering: location marker is DM-only before element enters canvas', async () => {
+    const { vp, store, result } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pins = markerElements(store);
+    expect(pins).toHaveLength(1);
+
+    // The marker element must be DM-only in the location store.
+    const loc = useLocationStore.getState().getLocation(CODE, MAP_ID);
+    expect(loc?.dmOnlyElements[pins[0].id]).toBe(true);
+  });
+});
+
+describe('useDmLocationEditor — location publication-dirty seam', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useLocationStore.setState({ locations: {} });
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    useLocationStore.setState({ locations: {} });
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('tests begin from synced state (hasUnsyncedChanges === false)', async () => {
+    const { result } = await setupLocationSynced();
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+  });
+
+  it('public field edit (title) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    // Place and activate a marker.
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    // Reset sync state after the canvas add (which marks dirty).
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Edit a public field.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'New Title',
+        body: '',
+        dmNotes: '',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('public field edit (body) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: 'The door creaks open.',
+        dmNotes: '',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('public field edit (status) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: '',
+        dmNotes: '',
+        status: 'active',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('portal-only edit stays synced', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Edit only the portal — a DM-only field that never publishes.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: '',
+        dmNotes: '',
+        portal: buildMarkerPortalTarget('battlemap', 'target-bm-99'),
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+  });
+
+  it('dmNotes-only edit stays synced', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Edit only dmNotes — never published.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: '',
+        dmNotes: 'Secret trap: DC 18 Perception.',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+  });
+
+  it('audience change (toggle DM-only via toolbar) marks dirty', async () => {
+    const { vp, store, result, select } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+
+    // Select the marker in the canvas so handleToggleDmOnly can act.
+    act(() => {
+      select([pin.id]);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Toggle audience via the DM-only toolbar button.
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('audience change (panel audience control) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Toggle audience to shared (marker starts DM-only).
+    act(() => {
+      result.current.handleSetMarkerAudience(false);
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
   });
 });

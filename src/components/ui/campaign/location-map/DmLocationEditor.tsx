@@ -94,6 +94,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleCloseMarkerPanel,
     handleSaveMarkerDetail,
     handleDeleteMarker,
+    portalState,
   } = useDmLocationEditor(props);
 
   return (
@@ -238,6 +239,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             campaignCode={props.campaignCode}
             dmId={props.dmId}
             state={markerPanelState}
+            portalState={portalState}
             onClose={handleCloseMarkerPanel}
             onSave={patch => {
               handleSaveMarkerDetail(patch);

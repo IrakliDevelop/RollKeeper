@@ -156,13 +156,13 @@ describe('DmLocationToolbar', () => {
 describe('DmLocationToolbar marker chrome', () => {
   afterEach(() => cleanup());
 
-  it('offers a Marker tool in battlemap mode but not in location mode (spec §7.2)', () => {
+  it('offers a Marker tool in both battlemap and location mode', () => {
     const { unmount } = render(<DmLocationToolbar {...baseProps} />);
     expect(screen.getByTitle('Marker')).toBeInTheDocument();
     unmount();
 
     render(<DmLocationToolbar {...baseProps} mode="location" />);
-    expect(screen.queryByTitle('Marker')).not.toBeInTheDocument();
+    expect(screen.getByTitle('Marker')).toBeInTheDocument();
   });
 
   it('surfaces the mixed-audience refusal next to the DM-only toggle', () => {

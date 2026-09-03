@@ -43,6 +43,7 @@ const BASE_TOOL_DEFS = [
   { name: 'shape', icon: Shapes, label: 'Shape' },
   { name: 'image', icon: ImageIcon, label: 'Image' },
   { name: 'arrow', icon: ArrowRight, label: 'Arrow' },
+  { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
 
 const BATTLEMAP_TOOL_DEFS = [
@@ -52,8 +53,6 @@ const BATTLEMAP_TOOL_DEFS = [
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
   { name: 'laser', icon: Zap, label: 'Laser pointer' },
   { name: 'ping', icon: MapPin, label: 'Ping (look here)' },
-  // Battlemap only (spec §7.2): location mode gets no marker tool.
-  { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
 
 /**

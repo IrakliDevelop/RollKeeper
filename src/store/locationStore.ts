@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { createSafeStorage } from '@/lib/safeStorage';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import type { LocationMap } from '@/types/location';
 
 const LOCATION_STORAGE_KEY = 'rollkeeper-location-data';
@@ -169,6 +170,8 @@ export const useLocationStore = create<LocationStoreState>()(
     }
   )
 );
+
+exposeStoreForE2E('location', useLocationStore);
 
 export { generateLocationId };
 export default useLocationStore;
