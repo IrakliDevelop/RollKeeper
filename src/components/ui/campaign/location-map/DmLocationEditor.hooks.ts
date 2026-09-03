@@ -592,8 +592,15 @@ export function useDmLocationEditor(
       // Ephemeral "look here" pulse; taps broadcast as presence while the
       // battlemap room connection is up (see attachPingBroadcast).
       baseTools.push(new PingTool({ color: '#F4C430' }));
-      // Battlemap only (spec §7.2): location mode gets no marker tool, even
-      // though its painter and activation ARE registered below.
+      baseTools.push(
+        new DmMarkerTool(markerKindRef, markerColorRef, request =>
+          handlePlaceMarkerRef.current(request)
+        )
+      );
+    }
+
+    // Both modes: marker anchors are available on all DM map surfaces.
+    if (mode !== 'battlemap') {
       baseTools.push(
         new DmMarkerTool(markerKindRef, markerColorRef, request =>
           handlePlaceMarkerRef.current(request)
@@ -622,9 +629,9 @@ export function useDmLocationEditor(
 
   // OUTSIDE the relay guard in `handleReady`, and NOT part of `laserCleanups`
   // or any other connection-scoped cleanup: painter registration and
-  // activation are connection-independent (spec §7.2). Also unconditional
-  // with respect to `mode` — only the marker TOOL is battlemap-only, because
-  // a location map loaded with markers must still paint them.
+  // activation are connection-independent (spec §7.2). Unconditional with
+  // respect to `mode` — both modes support the marker tool and must paint
+  // markers.
   useMarkerRegistration({
     viewport,
     gesture: 'double',
@@ -722,8 +729,14 @@ export function useDmLocationEditor(
           ? MARKER_MIXED_AUDIENCE_MESSAGE
           : null
       );
+      // Every successful audience change affects publication (§6.4 — the
+      // public projection depends on `dmOnlyElements`). A refusal means
+      // nothing moved, so it does not dirty the sync state.
+      if (mode === 'location' && transition.status !== 'refused') {
+        setHasUnsyncedChanges(true);
+      }
     },
-    [activeMarkerRef, markerWrites]
+    [activeMarkerRef, markerWrites, mode]
   );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
@@ -746,9 +759,38 @@ export function useDmLocationEditor(
       portal?: MarkerPortalTargetV1 | null;
     }) => {
       if (activeMarkerRef === null) return;
+
+      // Snapshot public-facing fields before the edit so we can compare
+      // after. Only location mode needs this — battlemap syncs via the relay.
+      const beforeDetail =
+        mode === 'location'
+          ? markerWrites.findMarkerDetail(activeMarkerRef)
+          : undefined;
+
       markerWrites.editMarkerDetail(activeMarkerRef, patch);
+
+      // Location mode publication-dirty seam: mark dirty ONLY when a field
+      // that reaches `buildPublicMarkerDetails` changed. `dmNotes`, `portal`,
+      // `discovery`, and `trap` are never published (§6.4), so edits to
+      // those alone leave the sync indicator untouched.
+      if (mode === 'location' && beforeDetail) {
+        const afterDetail = markerWrites.findMarkerDetail(activeMarkerRef);
+        if (afterDetail) {
+          const publicChanged =
+            beforeDetail.title !== afterDetail.title ||
+            beforeDetail.body !== afterDetail.body ||
+            beforeDetail.status !== afterDetail.status ||
+            // Loot is a reference array — a cheap JSON snapshot comparison is
+            // acceptable here because the array is small (usually < 10 items).
+            JSON.stringify(beforeDetail.loot ?? []) !==
+              JSON.stringify(afterDetail.loot ?? []);
+          if (publicChanged) {
+            setHasUnsyncedChanges(true);
+          }
+        }
+      }
     },
-    [activeMarkerRef, markerWrites]
+    [activeMarkerRef, markerWrites, mode]
   );
 
   const handleDeleteMarker = useCallback(() => {
@@ -1333,16 +1375,27 @@ export function useDmLocationEditor(
     });
     if (outcome.handled) {
       setMarkerAudienceNotice(outcome.notice);
+      // The sibling-marker branch returns before touching the canvas, so
+      // `saveAndMarkDirty` never fires. In location mode every audience
+      // change affects the public projection (§6.4), so mark dirty here
+      // unless the toggle was refused (nothing moved).
+      if (mode === 'location' && outcome.notice === null) {
+        setHasUnsyncedChanges(true);
+      }
       return;
     }
 
     setMarkerAudienceNotice(null);
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
+    // Location mode: audience affects publication (§6.4). The non-marker
+    // branch does not touch the canvas store, so mark dirty explicitly.
+    if (mode === 'location') {
+      setHasUnsyncedChanges(true);
+      return;
+    }
     // Battlemap only: re-emit the element so the sync client re-stamps its
     // audience (hide → relay sends players/display a remove; reveal → an
-    // upsert). Location mode has no relay — touching there would just fire
-    // saveAndMarkDirty and flip the sync indicator on a pure visibility toggle.
-    if (mode !== 'battlemap') return;
+    // upsert).
     const vp = getVp();
     if (vp?.store.getById(selectedElementId)) {
       vp.store.update(selectedElementId, {});

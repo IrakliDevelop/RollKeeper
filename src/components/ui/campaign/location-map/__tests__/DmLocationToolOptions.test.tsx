@@ -449,10 +449,10 @@ describe('DmLocationToolOptions marker kind + colour picker', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders nothing at all outside battlemap mode, even with markerControls supplied', () => {
-    const { container } = render(
+  it('renders the marker picker in location mode when markerControls is supplied', () => {
+    render(
       <DmLocationToolOptions mode="location" markerControls={makeControls()} />
     );
-    expect(container).toBeEmptyDOMElement();
+    expect(screen.getByTestId('marker-tool-options')).toBeInTheDocument();
   });
 });
