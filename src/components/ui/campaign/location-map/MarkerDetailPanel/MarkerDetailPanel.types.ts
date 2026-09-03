@@ -10,9 +10,30 @@ import type {
   MarkerStatus,
   MarkerTrapMechanics,
   MarkerLootEntry,
+  MarkerPortalTargetV1,
 } from '@/types/battlemap';
 
+import type { PortalDestinationResult } from '../markerPortal';
+
 import type { MarkerElementDataV1 } from '../markerData';
+
+/** A selectable target for the destination picker. */
+export interface PortalTargetChoice {
+  id: string;
+  name: string;
+}
+
+/** Resolved portal state passed into the panel from the surface. */
+export interface ResolvedPortalState {
+  /** The raw persisted target, if any. */
+  target?: MarkerPortalTargetV1;
+  /** Resolved destination for display. Computed by the surface from live stores. */
+  resolved?: PortalDestinationResult;
+  /** Available battle maps (excluding self if source is a battle map). */
+  battleMapChoices: PortalTargetChoice[];
+  /** Available campaign locations (excluding self if source is a location). */
+  locationChoices: PortalTargetChoice[];
+}
 
 export type MarkerPanelMode = 'dm' | 'player';
 
@@ -37,6 +58,8 @@ export interface MarkerDetailPanelProps {
   campaignCode?: string;
   dmId?: string;
   onClose: () => void;
+  /** DM mode only. Portal destination state resolved by the surface. */
+  portalState?: ResolvedPortalState;
   /** DM mode only. */
   onSave?: (patch: {
     title: string;
@@ -46,6 +69,7 @@ export interface MarkerDetailPanelProps {
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
     loot?: MarkerLootEntry[];
+    portal?: MarkerPortalTargetV1 | null;
   }) => void;
   /** DM mode only. Background persistence that must not close the dialog. */
   onPersist?: MarkerDetailPanelProps['onSave'];

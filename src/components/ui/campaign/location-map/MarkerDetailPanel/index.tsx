@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import Link from 'next/link';
+import { Eye, EyeOff, Map, MapPin, ExternalLink } from 'lucide-react';
 
 import {
   Dialog,
@@ -15,6 +16,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
 import { cn } from '@/utils/cn';
 
@@ -26,9 +28,11 @@ import type {
   MarkerDetailPanelProps,
   MarkerPanelMode,
   MarkerPanelState,
+  ResolvedPortalState,
 } from './MarkerDetailPanel.types';
 import type { MarkerKind } from '../markerData';
 import { MARKER_KIND_ICONS } from '../markerIcons';
+import { buildMarkerPortalTarget } from '../markerPortal';
 import { LootEditor } from './LootEditor';
 import { MarkerRichText } from './MarkerRichText';
 import type {
@@ -38,6 +42,7 @@ import type {
   MarkerStatus,
   MarkerTrapMechanics,
   MarkerLootEntry,
+  MarkerPortalTargetV1,
   PublicMarkerLootEntry,
 } from '@/types/battlemap';
 
@@ -90,6 +95,7 @@ interface EditFormProps {
   initialDiscovery?: MarkerDiscovery;
   initialTrap?: MarkerTrapMechanics;
   initialLoot?: MarkerLootEntry[];
+  portalState?: ResolvedPortalState;
   campaignCode?: string;
   dmId?: string;
   onSave?: (patch: {
@@ -100,6 +106,7 @@ interface EditFormProps {
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
     loot?: MarkerLootEntry[];
+    portal?: MarkerPortalTargetV1 | null;
   }) => void;
   onPersist?: EditFormProps['onSave'];
   onDelete?: () => void;
@@ -120,6 +127,7 @@ function EditForm({
   initialDiscovery,
   initialTrap,
   initialLoot,
+  portalState,
   campaignCode,
   dmId,
   onSave,
@@ -149,12 +157,27 @@ function EditForm({
   const [damage, setDamage] = useState(initialTrap?.damage ?? '');
   const [loot, setLoot] = useState<MarkerLootEntry[]>(initialLoot ?? []);
 
+  const [portalTouched, setPortalTouched] = useState(false);
+  const [portalDraftKind, setPortalDraftKind] = useState<
+    'none' | 'battlemap' | 'location'
+  >(portalState?.target?.kind ?? 'none');
+  const [portalDraftId, setPortalDraftId] = useState<string>(
+    portalState?.target?.id ?? ''
+  );
+
   const parseDc = (value: string): number | undefined => {
     if (value.trim() === '') return undefined;
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return undefined;
     return Math.min(40, Math.max(0, Math.round(parsed)));
   };
+
+  function buildPortalPatch(): { portal?: MarkerPortalTargetV1 | null } {
+    if (!portalTouched) return {};
+    if (portalDraftKind === 'none') return { portal: null };
+    if (!portalDraftId) return {}; // half-target: omit
+    return { portal: buildMarkerPortalTarget(portalDraftKind, portalDraftId) };
+  }
 
   const buildPatch = (lootValue: MarkerLootEntry[] = loot) => ({
     title,
@@ -181,6 +204,7 @@ function EditForm({
         }
       : {}),
     ...(kind === 'loot' ? { loot: lootValue } : {}),
+    ...buildPortalPatch(),
   });
 
   const handleSave = () => onSave?.(buildPatch());
@@ -317,6 +341,106 @@ function EditForm({
           ariaLabel="DM notes — never shown to players"
         />
       </div>
+      {portalState && (
+        <div data-testid="portal-destination-section">
+          <h4 className="text-heading mb-2 text-sm font-medium">Destination</h4>
+          <div className="space-y-3">
+            <SelectField
+              label="Destination type"
+              value={portalDraftKind}
+              onValueChange={(value: string) => {
+                setPortalTouched(true);
+                setPortalDraftKind(value as 'none' | 'battlemap' | 'location');
+                setPortalDraftId('');
+              }}
+              triggerProps={{
+                'aria-label': 'Destination type',
+                className: MARKER_PANEL_TOUCH_TARGET_CLASS,
+              }}
+            >
+              <SelectItem value="none">No destination</SelectItem>
+              <SelectItem value="battlemap">Battle map</SelectItem>
+              <SelectItem value="location">Campaign location</SelectItem>
+            </SelectField>
+
+            {portalDraftKind !== 'none' && (
+              <SelectField
+                label={
+                  portalDraftKind === 'battlemap'
+                    ? 'Target battle map'
+                    : 'Target location'
+                }
+                value={portalDraftId}
+                onValueChange={(value: string) => {
+                  setPortalTouched(true);
+                  setPortalDraftId(value);
+                }}
+                triggerProps={{
+                  'aria-label':
+                    portalDraftKind === 'battlemap'
+                      ? 'Target battle map'
+                      : 'Target location',
+                  className: MARKER_PANEL_TOUCH_TARGET_CLASS,
+                }}
+              >
+                {(portalDraftKind === 'battlemap'
+                  ? portalState.battleMapChoices
+                  : portalState.locationChoices
+                ).map(choice => (
+                  <SelectItem key={choice.id} value={choice.id}>
+                    {choice.name}
+                  </SelectItem>
+                ))}
+              </SelectField>
+            )}
+
+            {portalState.resolved?.status === 'ready' && (
+              <div className="flex items-center gap-2">
+                {portalState.target?.kind === 'battlemap' ? (
+                  <Map className="text-muted h-4 w-4 flex-shrink-0" />
+                ) : (
+                  <MapPin className="text-muted h-4 w-4 flex-shrink-0" />
+                )}
+                <span className="text-body text-sm">
+                  {portalState.resolved.name}
+                </span>
+              </div>
+            )}
+
+            {portalState.resolved?.status === 'ready' && (
+              <Button
+                variant="outline"
+                size="sm"
+                asChild
+                className={cn('mt-1', MARKER_PANEL_TOUCH_TARGET_CLASS)}
+              >
+                <Link href={portalState.resolved.href}>
+                  Open destination
+                  <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                </Link>
+              </Button>
+            )}
+
+            {portalState.resolved?.status === 'missing' && (
+              <p className="text-muted text-sm">Destination unavailable</p>
+            )}
+
+            {portalState.resolved &&
+              (portalState.resolved.status === 'invalid' ||
+                portalState.resolved.status === 'unsupported') && (
+                <p className="text-accent-amber-text text-sm">
+                  Destination cannot be resolved. Edit to replace or remove it.
+                </p>
+              )}
+
+            {portalState.resolved?.status === 'self' && (
+              <p className="text-muted text-sm">
+                Points to this map (self-link)
+              </p>
+            )}
+          </div>
+        </div>
+      )}
       <DialogFooter>
         <Button
           variant="danger"
@@ -471,7 +595,8 @@ function renderPanelBody(
   audienceNotice: string | null | undefined,
   campaignCode: string | undefined,
   dmId: string | undefined,
-  onClaimLoot: MarkerDetailPanelProps['onClaimLoot']
+  onClaimLoot: MarkerDetailPanelProps['onClaimLoot'],
+  portalState: MarkerDetailPanelProps['portalState']
 ) {
   if (state.kind === 'ready') {
     if (mode === 'dm') {
@@ -524,6 +649,7 @@ function renderPanelBody(
                 ? (state.detail.loot as MarkerLootEntry[])
                 : undefined
             }
+            portalState={portalState}
             campaignCode={campaignCode}
             dmId={dmId}
             onSave={onSave}
@@ -576,6 +702,7 @@ function renderPanelBody(
           initialTitle=""
           initialBody=""
           initialDmNotes=""
+          portalState={portalState}
           campaignCode={campaignCode}
           dmId={dmId}
           onSave={onSave}
@@ -641,6 +768,7 @@ export default function MarkerDetailPanel({
   campaignCode,
   dmId,
   onClaimLoot,
+  portalState,
 }: MarkerDetailPanelProps): React.JSX.Element {
   const handleOpenChange = (next: boolean) => {
     if (!next) onClose();
@@ -675,7 +803,8 @@ export default function MarkerDetailPanel({
             audienceNotice,
             campaignCode,
             dmId,
-            onClaimLoot
+            onClaimLoot,
+            portalState
           )}
         </DialogBody>
       </DialogContent>

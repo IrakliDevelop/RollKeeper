@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  fireEvent,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { createHtmlElement, createNote } from '@fieldnotes/core';
 import type { CanvasElement } from '@fieldnotes/core';
@@ -13,6 +19,7 @@ import {
 import type {
   MarkerPanelMode,
   MarkerPanelState,
+  ResolvedPortalState,
 } from './MarkerDetailPanel.types';
 
 import {
@@ -23,6 +30,22 @@ import {
 } from '../markerData';
 
 import type { MarkerDetail } from '@/types/battlemap';
+
+vi.mock('next/link', () => ({
+  default: ({
+    href,
+    children,
+    ...rest
+  }: {
+    href: string;
+    children: React.ReactNode;
+    [key: string]: unknown;
+  }) => (
+    <a href={href} {...rest}>
+      {children}
+    </a>
+  ),
+}));
 
 vi.mock('@/components/ui/forms/CompactRichTextEditor', () => ({
   CompactRichTextEditor: ({
@@ -840,5 +863,412 @@ describe('MarkerDetailPanel', () => {
     expect(
       RAW_TAILWIND_COLOR_RE.test(dialogHtmlForColorScan(playerDialog))
     ).toBe(false);
+  });
+});
+
+function makePortalState(
+  overrides?: Partial<ResolvedPortalState>
+): ResolvedPortalState {
+  return {
+    battleMapChoices: [
+      { id: 'map-2', name: 'Cave Map' },
+      { id: 'map-3', name: 'Forest Map' },
+    ],
+    locationChoices: [
+      { id: 'loc-1', name: 'Town Square' },
+      { id: 'loc-2', name: 'Castle' },
+    ],
+    ...overrides,
+  };
+}
+
+describe('MarkerDetailPanel portal destination', () => {
+  it('renders destination kind selector in DM mode with portalState', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState()}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByTestId('portal-destination-section')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('combobox', { name: 'Destination type' })
+    ).toBeInTheDocument();
+  });
+
+  it('shows target picker when a destination kind is selected', async () => {
+    const user = userEvent.setup();
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'map-2' },
+        })}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    // The target picker should be visible because portalState has a battlemap target
+    expect(
+      screen.getByRole('combobox', { name: 'Target battle map' })
+    ).toBeInTheDocument();
+  });
+
+  it('omits portal from patch when destination is untouched', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState()}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const patch = onSave.mock.calls[0][0];
+    expect('portal' in patch).toBe(false);
+  });
+
+  it('submits portal: null when "No destination" is explicitly chosen', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'map-2' },
+        })}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    // Open the destination kind dropdown and select "No destination"
+    const kindTrigger = screen.getByRole('combobox', {
+      name: 'Destination type',
+    });
+    await user.click(kindTrigger);
+
+    await waitFor(() => {
+      const option = screen.getByRole('option', { name: 'No destination' });
+      expect(option).toBeInTheDocument();
+      fireEvent.click(option);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].portal).toBeNull();
+  });
+
+  it('submits a complete target when kind and id are both selected', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState()}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    // Select "Battle map" kind
+    const kindTrigger = screen.getByRole('combobox', {
+      name: 'Destination type',
+    });
+    await user.click(kindTrigger);
+
+    await waitFor(() => {
+      const option = screen.getByRole('option', { name: 'Battle map' });
+      expect(option).toBeInTheDocument();
+      fireEvent.click(option);
+    });
+
+    // Now select a target
+    await waitFor(() => {
+      expect(
+        screen.getByRole('combobox', { name: 'Target battle map' })
+      ).toBeInTheDocument();
+    });
+
+    const targetTrigger = screen.getByRole('combobox', {
+      name: 'Target battle map',
+    });
+    await user.click(targetTrigger);
+
+    await waitFor(() => {
+      const option = screen.getByRole('option', { name: 'Cave Map' });
+      expect(option).toBeInTheDocument();
+      fireEvent.click(option);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    expect(onSave.mock.calls[0][0].portal).toEqual({
+      v: 1,
+      kind: 'battlemap',
+      id: 'map-2',
+    });
+  });
+
+  it('omits portal from patch when kind is selected but no target (half-target)', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState()}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    // Select "Battle map" kind but do NOT select a target
+    const kindTrigger = screen.getByRole('combobox', {
+      name: 'Destination type',
+    });
+    await user.click(kindTrigger);
+
+    await waitFor(() => {
+      const option = screen.getByRole('option', { name: 'Battle map' });
+      expect(option).toBeInTheDocument();
+      fireEvent.click(option);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(onSave).toHaveBeenCalledTimes(1);
+    const patch = onSave.mock.calls[0][0];
+    expect('portal' in patch).toBe(false);
+  });
+
+  it('renders a link for a valid saved destination', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'map-2' },
+          resolved: {
+            status: 'ready',
+            href: '/dm/campaign/abc/battlemaps/map-2',
+            name: 'Cave Map',
+          },
+        })}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    const link = screen.getByRole('link', { name: /Open destination/ });
+    expect(link).toBeInTheDocument();
+    expect(link).toHaveAttribute('href', '/dm/campaign/abc/battlemaps/map-2');
+    // The resolved name appears in the destination display (and also in the
+    // select trigger as the current value); verify the name is visible.
+    expect(screen.getAllByText('Cave Map').length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('renders "Destination unavailable" for a missing target', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'gone-map' },
+          resolved: { status: 'missing' },
+        })}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(screen.getByText('Destination unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Open destination/ })).toBeNull();
+  });
+
+  it('renders a warning for an invalid or unsupported target', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'bad-id' },
+          resolved: { status: 'invalid' },
+        })}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText(/Destination cannot be resolved/)
+    ).toBeInTheDocument();
+  });
+
+  it('renders self-link message for a self-referencing target', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'self-map' },
+          resolved: { status: 'self' },
+        })}
+        onClose={() => {}}
+        onSave={() => {}}
+      />
+    );
+
+    expect(
+      screen.getByText('Points to this map (self-link)')
+    ).toBeInTheDocument();
+  });
+
+  it('does not render destination controls in player mode', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        onClose={() => {}}
+      />
+    );
+
+    expect(screen.queryByTestId('portal-destination-section')).toBeNull();
+    expect(
+      screen.queryByRole('combobox', { name: 'Destination type' })
+    ).toBeNull();
+  });
+
+  it('does not call onSave when clicking "Open destination"', async () => {
+    const user = userEvent.setup();
+    const onSave = vi.fn();
+
+    render(
+      <MarkerDetailPanel
+        open
+        mode="dm"
+        state={{
+          kind: 'ready',
+          data: buildMarkerData({ kind: 'door', ref: 'ref-1' }),
+          detail: detail(),
+        }}
+        portalState={makePortalState({
+          target: { v: 1, kind: 'battlemap', id: 'map-2' },
+          resolved: {
+            status: 'ready',
+            href: '/dm/campaign/abc/battlemaps/map-2',
+            name: 'Cave Map',
+          },
+        })}
+        onClose={() => {}}
+        onSave={onSave}
+      />
+    );
+
+    const link = screen.getByRole('link', { name: /Open destination/ });
+    await user.click(link);
+
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
+  it('works for all marker kinds, not just doors', () => {
+    for (const kind of MARKER_KINDS) {
+      const { unmount } = render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind, ref: 'ref-1' }),
+            detail: detail(),
+          }}
+          portalState={makePortalState()}
+          onClose={() => {}}
+          onSave={() => {}}
+        />
+      );
+
+      expect(
+        screen.getByTestId('portal-destination-section')
+      ).toBeInTheDocument();
+      unmount();
+    }
   });
 });
