@@ -599,9 +599,9 @@ describe('canvas undo/redo does not touch portal (product state, not canvas hist
 
     // Type-level guard: assigning a `portal` key to `MarkerElementDataV1`
     // must not type-check. Not executed — a compile-time check only.
-    // @ts-expect-error portal is not part of the canvas element data schema
     const invalid: MarkerElementDataV1 = {
       ...data,
+      // @ts-expect-error portal is not part of the canvas element data schema
       portal: { v: 1, kind: 'battlemap', id: 'x' },
     };
     void invalid;
