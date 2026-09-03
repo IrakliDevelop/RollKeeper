@@ -95,8 +95,6 @@ function frameOf(peer: Peer): AwarenessPresence {
     ...(peer.color !== undefined ? { color: peer.color } : {}),
     ...(peer.role !== undefined ? { role: peer.role } : {}),
     ...(peer.cursor !== null ? { cursor: peer.cursor } : {}),
-    ...(peer.tool !== null ? { tool: peer.tool } : {}),
-    ...(peer.selection.length > 0 ? { selection: peer.selection } : {}),
   };
 }
 
