@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import {
   SelectTool,
   PencilTool,
@@ -220,6 +221,9 @@ export function useDmBattleMapCanvas({
   onSelectionChange,
 }: DmBattleMapCanvasProps): DmBattleMapCanvasState {
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  useEffect(() => {
+    if (viewport) exposeStoreForE2E('viewport', viewport);
+  }, [viewport]);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);

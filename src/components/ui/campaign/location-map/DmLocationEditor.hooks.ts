@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 import {
   HandTool,
   SelectTool,
@@ -327,6 +328,12 @@ export function useDmLocationEditor(
   const vpRef = useRef<Viewport | null>(null);
 
   const [viewport, setViewport] = useState<Viewport | null>(null);
+  // E2E test handle — exposes the Fieldnotes viewport so Playwright can
+  // query the camera and element store without reverse-engineering the
+  // camera fit on every test run.
+  useEffect(() => {
+    if (viewport) exposeStoreForE2E('viewport', viewport);
+  }, [viewport]);
 
   const [layersPanelOpen, setLayersPanelOpen] = useState(true);
 
