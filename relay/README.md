@@ -13,6 +13,7 @@ Auth = short-lived HMAC tokens minted by the Next.js app (`/api/campaign/[code]/
 | `REDIS_URL` | no | Upstash TCP URL; enables buffered persistence and cross-instance ephemeral presence/poke fan-out |
 | `FLUSH_INTERVAL_MS` | no | default 3000 |
 | `ROOM_TTL_SECONDS` | no | default 172800 (2 days) |
+| `RELAY_GATE_LOG` | no | `1` logs admitted identities and presence kinds + field names — manual verification only, never in production |
 
 When Redis is enabled, the relay opens one backend connection plus dedicated publish and subscribe
 connections. Fan-out is intentionally limited to presence traffic because the buffered backend is
@@ -34,3 +35,8 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
+5. Version coupling: the app's shared-presence cursors (`@fieldnotes/core` ≥ 0.65.0) assume the
+   relay runs `@fieldnotes/sync-server` ≥ 0.13.0 (per-kind presence throttle lanes). Deploy the
+   relay BEFORE releasing an app build that publishes cursors. The relay tree intentionally carries
+   two `@fieldnotes/sync` copies (0.11.0 for sync-server, 0.10.0 nested under sync-redis 0.4.0);
+   fan-out is string pub/sub, so the duplicate is harmless.
