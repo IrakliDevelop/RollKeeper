@@ -664,6 +664,64 @@ test.describe('map-portals', () => {
     }
   });
 
+  test('touch: drag/pan gesture does not navigate or open a panel', async ({
+    browser,
+  }) => {
+    const { context, page } = await openSeededMap(
+      browser,
+      BM1_URL,
+      devices['iPad Pro 11']
+    );
+    try {
+      // Get the marker screen coordinates so the drag path crosses directly
+      // over it — a pan gesture starting/passing through the marker must
+      // still not be mistaken for a tap-activation.
+      const coords = await page.evaluate(() => {
+        const vp = window.__rkStores!.viewport!;
+        const el = vp.store.getById('el-bm1-portal');
+        if (!el) throw new Error('Element not in store');
+        const center = {
+          x: el.position.x + el.size.w / 2,
+          y: el.position.y + el.size.h / 2,
+        };
+        const sl = {
+          x: center.x * vp.camera.z + vp.camera.x,
+          y: center.y * vp.camera.z + vp.camera.y,
+        };
+        const canvas = document.querySelector('canvas');
+        const wrapper = canvas?.parentElement;
+        const rect = wrapper?.getBoundingClientRect();
+        if (!rect) throw new Error('No wrapper');
+        return { x: rect.left + sl.x, y: rect.top + sl.y };
+      });
+
+      const urlBefore = page.url();
+
+      // Touch drag/pan: finger down over the marker, move across the
+      // canvas, finger up. In a `hasTouch` context (iPad Pro device
+      // descriptor), Playwright's mouse API dispatches pointer/touch
+      // events, exercising the same pan-vs-tap gesture disambiguation the
+      // canvas uses for real touch input.
+      await page.mouse.move(coords.x, coords.y);
+      await page.mouse.down();
+      await page.mouse.move(coords.x - 200, coords.y, { steps: 10 });
+      await page.mouse.move(coords.x - 200, coords.y - 100, { steps: 5 });
+      await page.mouse.up();
+      await page.waitForTimeout(400);
+
+      // A pan must not be mistaken for marker activation: no navigation,
+      // no marker detail panel.
+      expect(page.url()).toBe(urlBefore);
+      expect(page.url()).toContain(BM1_URL);
+      await expect(markerDialog(page)).toBeHidden();
+      await expect(
+        page.getByTestId('portal-destination-section')
+      ).not.toBeVisible();
+    } finally {
+      await context.close();
+    }
+  });
+
   // NOTE: Player and TV portal isolation tests are deferred to the manual
   // browser acceptance gate. Reasons:
   //
