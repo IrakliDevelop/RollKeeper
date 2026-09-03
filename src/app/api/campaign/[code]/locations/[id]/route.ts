@@ -13,6 +13,7 @@ import {
   isHybridGuestServerEnabled,
 } from '@/lib/guestSessionSecurity';
 import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
+import { sanitizePublicMarkers } from '@/lib/sanitizePublicMarkers';
 
 export async function GET(
   request: NextRequest,
@@ -30,9 +31,11 @@ export async function GET(
     }
     const { code, id } = await params;
     const redis = getRedis();
-    const raw = await redis.get<SyncedLocation>(campaignLocationKey(code, id));
+    const rawValue = await redis.get<SyncedLocation | string>(
+      campaignLocationKey(code, id)
+    );
     await refreshCampaignTTL(redis, code);
-    if (!raw) {
+    if (!rawValue) {
       // Older deployments refreshed only the list key, allowing a detail key
       // to expire while its metadata remained. Return the original map as a
       // degraded fallback until the DM republishes the full location.
@@ -61,7 +64,23 @@ export async function GET(
         { status: 404 }
       );
     }
-    return NextResponse.json({ location: raw });
+    // The Redis client normally auto-deserializes JSON, but a stored value
+    // is not guaranteed to already be an object (client configuration,
+    // legacy writes, or a raw REST proxy response can all hand back a
+    // string) — parse defensively rather than assume, the same pattern used
+    // elsewhere in this route for the metadata list.
+    const raw: SyncedLocation =
+      typeof rawValue === 'string'
+        ? (JSON.parse(rawValue) as SyncedLocation)
+        : rawValue;
+    // Re-sanitize markers on read-back: an old stored record (written before
+    // this boundary existed, or by a compromised/legacy client) could carry
+    // smuggled private fields — `portal`, `dmNotes`, or anything else not in
+    // the explicit public pick. Never trust what is already in Redis.
+    const sanitizedLocation: SyncedLocation = raw.markers
+      ? { ...raw, markers: sanitizePublicMarkers(raw.markers) ?? undefined }
+      : raw;
+    return NextResponse.json({ location: sanitizedLocation });
   } catch (error) {
     console.error('Failed to fetch location:', error);
     return NextResponse.json(
@@ -102,8 +121,20 @@ export async function POST(
       );
     }
 
+    // Sanitize markers before they ever reach Redis. `location` is the DM
+    // client's JSON body — an adversarial or stale client could include
+    // `portal`, `dmNotes`, or other private fields on those marker objects,
+    // and this is the last point before they would be persisted and synced
+    // to players. Never store the caller's markers object directly.
+    const sanitizedLocation: SyncedLocation = location.markers
+      ? {
+          ...location,
+          markers: sanitizePublicMarkers(location.markers) ?? undefined,
+        }
+      : location;
+
     // Store the canvas state for this location
-    await redis.set(campaignLocationKey(code, id), location, {
+    await redis.set(campaignLocationKey(code, id), sanitizedLocation, {
       ex: SLIDING_TTL_SECONDS,
     });
 

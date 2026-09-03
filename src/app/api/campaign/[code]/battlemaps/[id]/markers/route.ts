@@ -17,9 +17,12 @@ import {
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
+import {
+  applyCanonicalRemaining,
+  sanitizePublicMarkers,
+} from '@/lib/sanitizePublicMarkers';
 import type {
   MarkerLootLedgerEntry,
-  MarkerStatus,
   PublicMarkerDetail,
 } from '@/types/battlemap';
 import { sendBattleMapPoke } from '@/lib/relayPoke';
@@ -32,110 +35,6 @@ import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 
 const markerDetailsKey = (code: string, mapId: string) =>
   campaignSharedKey(code, `battlemap-markers:${mapId}`);
-
-const STATUSES = new Set<MarkerStatus>([
-  'closed',
-  'open',
-  'locked',
-  'armed',
-  'triggered',
-  'disarmed',
-  'available',
-  'claimed',
-  'active',
-  'defeated',
-  'hidden',
-  'revealed',
-  'resolved',
-]);
-
-function sanitizePublicMarkers(value: unknown): PublicMarkerDetail[] | null {
-  if (!Array.isArray(value) || value.length > 500) return null;
-  const result: PublicMarkerDetail[] = [];
-  for (const raw of value) {
-    if (!raw || typeof raw !== 'object') return null;
-    const marker = raw as Record<string, unknown>;
-    if (
-      typeof marker.id !== 'string' ||
-      marker.id.length === 0 ||
-      marker.id.length > 200 ||
-      typeof marker.title !== 'string' ||
-      marker.title.length > 20_000 ||
-      typeof marker.body !== 'string' ||
-      marker.body.length > 100_000 ||
-      (marker.status !== undefined &&
-        !STATUSES.has(marker.status as MarkerStatus))
-    )
-      return null;
-    result.push({
-      id: marker.id,
-      title: marker.title,
-      body: marker.body,
-      ...(marker.status === undefined
-        ? {}
-        : { status: marker.status as MarkerStatus }),
-      ...(Array.isArray(marker.loot)
-        ? {
-            loot: marker.loot.flatMap(item => {
-              if (!item || typeof item !== 'object') return [];
-              const entry = item as Record<string, unknown>;
-              if (
-                typeof entry.id !== 'string' ||
-                typeof entry.name !== 'string' ||
-                (entry.itemKind !== 'inventory' &&
-                  entry.itemKind !== 'magic') ||
-                !Number.isInteger(entry.quantity) ||
-                !Number.isInteger(entry.remainingQuantity)
-              )
-                return [];
-              return [
-                {
-                  id: entry.id,
-                  name: entry.name,
-                  itemKind: entry.itemKind,
-                  quantity: entry.quantity as number,
-                  remainingQuantity: entry.remainingQuantity as number,
-                  ...(typeof entry.description === 'string'
-                    ? { description: entry.description }
-                    : {}),
-                  ...(typeof entry.rarity === 'string'
-                    ? { rarity: entry.rarity }
-                    : {}),
-                },
-              ];
-            }),
-          }
-        : {}),
-    });
-  }
-  return result;
-}
-
-function applyCanonicalRemaining(
-  markers: PublicMarkerDetail[],
-  ledger: MarkerLootLedgerEntry[]
-): PublicMarkerDetail[] {
-  const remaining = new Map(
-    ledger.map(entry => [
-      `${entry.markerId}:${entry.id}`,
-      Math.max(0, entry.quantity - entry.claimedQuantity),
-    ])
-  );
-  return markers.map(marker => ({
-    id: marker.id,
-    title: marker.title,
-    body: marker.body,
-    ...(marker.status === undefined ? {} : { status: marker.status }),
-    ...(marker.loot === undefined
-      ? {}
-      : {
-          loot: marker.loot.map(entry => ({
-            ...entry,
-            remainingQuantity: remaining.get(`${marker.id}:${entry.id}`) ?? 0,
-          })),
-        }),
-  }));
-}
 
 export async function GET(
   request: NextRequest,
