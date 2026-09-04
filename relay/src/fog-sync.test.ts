@@ -529,6 +529,7 @@ describe('fog authorizeFog policy (unit-level)', () => {
       current: undefined,
     };
     expect(authorizeFog({ ...base, role: 'dm', userId: 'dm-1' })).toBe(true);
+    expect(authorizeFog({ ...base, role: 'dm', userId: '' })).toBe(false);
     expect(authorizeFog({ ...base, role: 'player', userId: 'p1' })).toBe(false);
     expect(authorizeFog({ ...base, role: 'display', userId: 'd1' })).toBe(
       false

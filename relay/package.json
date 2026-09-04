@@ -11,6 +11,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
+    "test:redis": "vitest run src/fog-redis.integration.test.ts",
     "type-check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {

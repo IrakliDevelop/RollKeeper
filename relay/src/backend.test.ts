@@ -87,6 +87,28 @@ describe('BufferedRedisBackend', () => {
     expect(calls.filter(c => c.method === 'expire')[0].args[1]).toBe(99);
   });
 
+  it('refreshes element, fog-meta, and fog-tiles TTLs after element activity', async () => {
+    const { redis, calls } = fakeRedis();
+    const b = new BufferedRedisBackend(redis, {
+      flushIntervalMs: 3000,
+      roomTtlSeconds: 99,
+    });
+
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(600);
+
+    const expiredKeys = calls
+      .filter(c => c.method === 'expire')
+      .map(c => c.args[0]);
+    expect(expiredKeys).toEqual(
+      expect.arrayContaining([
+        'fieldnotes:room:r1',
+        'fieldnotes:room:r1:fog:meta',
+        'fieldnotes:room:r1:fog:tiles',
+      ])
+    );
+  });
+
   it('flushes removals as hDel and drops them from memory immediately', async () => {
     const { redis, calls } = fakeRedis({ a: JSON.stringify(elem('a')) });
     const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });

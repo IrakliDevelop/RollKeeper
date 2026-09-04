@@ -199,6 +199,48 @@ describe('BufferedRedisBackend fog delegation', () => {
     expect(expiredKeys).toContain('fieldnotes:room:r1:fog:tiles');
   });
 
+  it('stopAndFlush retries a transient expiry failure before returning', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    const originalExpire = redis.expire;
+    let failuresRemaining = 1;
+    redis.expire = async (key, seconds) => {
+      if (key.endsWith(':fog:meta') && failuresRemaining > 0) {
+        failuresRemaining -= 1;
+        throw new Error('transient redis failure');
+      }
+      return originalExpire(key, seconds);
+    };
+    const b = new BufferedRedisBackend(redis, {
+      roomTtlSeconds: 99,
+      expiryRetryMs: 10,
+    });
+
+    await b.applyFogMeta('r1', {
+      version: 1,
+      editor: 'dm-1',
+      definition: {
+        version: 1,
+        base: 'covered',
+        bounds: { x: 0, y: 0, w: 512, h: 512 },
+        cellSize: 64,
+        tileCells: 128,
+        generation: 'gen-stop-retry',
+      } as never,
+    });
+
+    const stop = b.stopAndFlush();
+    await vi.advanceTimersByTimeAsync(20);
+    await stop;
+
+    expect(failuresRemaining).toBe(0);
+    expect(
+      calls.filter(
+        c => c.method === 'expire' && c.args[0] === 'fieldnotes:room:r1:fog:meta'
+      )
+    ).toHaveLength(1);
+  });
+
   it('fogSnapshot retrieves stored fog state', async () => {
     const { redis } = fakeRedis();
     const b = new BufferedRedisBackend(redis);

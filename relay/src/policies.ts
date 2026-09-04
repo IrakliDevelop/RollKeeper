@@ -71,10 +71,8 @@ export function makePolicies(secret: string): {
     return userId !== undefined && layerId === `player-${userId}`;
   };
 
-  const authorizeFog: AuthorizeFog = ({ role }) => {
-    if (role === 'dm') return true;
-    return false;
-  };
+  const authorizeFog: AuthorizeFog = ({ role, userId }) =>
+    role === 'dm' && typeof userId === 'string' && userId.length > 0;
 
   return { authenticate, authorize, authorizeFog, authorizeLayer, canRead };
 }

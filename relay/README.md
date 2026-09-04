@@ -40,3 +40,25 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 5. Version coupling: the relay runs `@fieldnotes/sync-server` 0.14.0, `@fieldnotes/sync-redis`
    0.5.0, `@fieldnotes/core` 0.66.0, `@fieldnotes/sync` 0.12.0. The app's fog-of-war UI requires
    this relay version. Deploy the relay BEFORE releasing an app build with fog support.
+
+## Fog rollout and rollback
+
+Keep the feature dark until every compatibility gate is in place. The release order is:
+
+1. Fieldnotes #153 (`c07f928`) and core 0.66.0, sync 0.12.0, sync-server 0.14.0, and sync-redis 0.5.0 must be published. Completed 2026-09-04.
+2. Merge and Railway-deploy the relay fog compatibility PR while both web flags remain off. Record the deployed commit and verify `/healthz`.
+3. Deploy the fog-capable web app, still with `NEXT_PUBLIC_FOG_OF_WAR_ENABLED=false` and `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false`.
+4. Set `BATTLEMAP_FOG_PROTOCOL_REQUIRED=true` and verify stale token requests receive HTTP 426 while current DM, player, and display clients reconnect.
+5. Wait at least five minutes (the token lifetime), or rotate `BATTLEMAP_RELAY_SECRET` on both services and verify reconnect, so no pre-gate tokens remain.
+6. Set `NEXT_PUBLIC_FOG_OF_WAR_ENABLED=true`, redeploy the web app, and run the DM/player/display/location smoke matrix.
+
+To roll back, turn the public UI flag off first. Keep the fog-capable relay and the 0.66 client deployed so existing Redis fog records and CanvasState v3 remain readable. Do not downgrade a client that may persist CanvasState v3 to core 0.65. If the capability gate itself causes an incident, turn it off only after the UI is dark; retain the upgraded relay/backend throughout.
+
+Useful release evidence:
+
+```sh
+curl -fsS https://<relay-host>/healthz
+git rev-parse HEAD
+```
+
+The optional real-Redis acceptance suite can be run against an isolated Redis database with `REDIS_TEST_URL=redis://127.0.0.1:6379 npm run test:redis` from `relay/`.

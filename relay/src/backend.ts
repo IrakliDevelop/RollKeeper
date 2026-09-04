@@ -33,6 +33,8 @@ export interface BufferedRedisBackendOptions {
   flushIntervalMs?: number; // default 3000
   roomTtlSeconds?: number; // default 172800 (2 days)
   idleEvictMs?: number; // default 21600000 (6 hours)
+  /** Retry delay for non-authoritative TTL maintenance. Primarily a test seam. */
+  expiryRetryMs?: number; // default 2000
 }
 
 interface RoomState {
@@ -68,6 +70,7 @@ export class BufferedRedisBackend implements HubBackend {
   private readonly fogBackend: RedisHubBackend;
   private pendingExpires = new Set<string>();
   private expiryTimer: NodeJS.Timeout | null = null;
+  private stopping = false;
 
   constructor(
     private redis: BackendRedis,
@@ -146,11 +149,13 @@ export class BufferedRedisBackend implements HubBackend {
       st.dirty.add(op.element.id);
       st.removed.delete(op.element.id);
       this.schedule();
+      this.refreshRoomTtl(room);
     } else if (op.kind === 'remove') {
       st.elements.delete(op.id);
       st.dirty.delete(op.id);
       st.removed.add(op.id);
       this.schedule();
+      this.refreshRoomTtl(room);
     } else if (op.kind === 'clear') {
       st.elements.clear();
       st.dirty.clear();
@@ -163,6 +168,9 @@ export class BufferedRedisBackend implements HubBackend {
         this.schedule();
         console.error('[backend] clear failed, will retry:', err);
       }
+      // Clearing elements does not disable fog. Keep every surviving room key
+      // on the same lifecycle even though the element hash may now be absent.
+      this.refreshRoomTtl(room);
     }
   }
 
@@ -223,11 +231,11 @@ export class BufferedRedisBackend implements HubBackend {
         ]);
       } catch (err) {
         this.pendingExpires.add(room);
-        if (!this.expiryTimer) {
+        if (!this.stopping && !this.expiryTimer) {
           this.expiryTimer = setTimeout(() => {
             this.expiryTimer = null;
             void this.flushExpires();
-          }, 2000);
+          }, this.opts.expiryRetryMs ?? 2000);
         }
         console.error('[backend] TTL refresh failed, will retry:', err);
       }
@@ -306,6 +314,7 @@ export class BufferedRedisBackend implements HubBackend {
   }
 
   async stopAndFlush(): Promise<void> {
+    this.stopping = true;
     if (this.timer) {
       clearTimeout(this.timer);
       this.timer = null;
@@ -316,6 +325,16 @@ export class BufferedRedisBackend implements HubBackend {
     }
     if (this.flushPromise) await this.flushPromise;
     await this.flush();
-    if (this.pendingExpires.size > 0) await this.flushExpires();
+    // TTL refreshes are lifecycle maintenance rather than part of accepting a
+    // fog write. During shutdown, however, do not abandon a transient failure:
+    // drain the queue before the Redis connection is closed by the caller.
+    while (this.pendingExpires.size > 0) {
+      await this.flushExpires();
+      if (this.pendingExpires.size > 0) {
+        await new Promise(resolve =>
+          setTimeout(resolve, this.opts.expiryRetryMs ?? 2000)
+        );
+      }
+    }
   }
 }
