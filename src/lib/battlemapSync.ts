@@ -5,7 +5,12 @@ import {
   type RemoteLayerUpdate,
   type ResolveLocalOnly,
 } from '@fieldnotes/sync';
-import type { ElementStore, CanvasElement, Layer } from '@fieldnotes/core';
+import type {
+  ElementStore,
+  CanvasElement,
+  FogManager,
+  Layer,
+} from '@fieldnotes/core';
 import type { BattleMapRole } from '@/lib/battlemapToken';
 
 export type { RemoteLayerUpdate };
@@ -102,6 +107,10 @@ export interface ManagedConnectionOptions {
    * `publishLayerUpsert`/`publishLayerRemove`.
    */
   layers?: { applyLayer: (update: RemoteLayerUpdate) => void };
+  fog?: {
+    manager: FogManager;
+    preserveLocalWhenRemoteMissing?: boolean;
+  };
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
@@ -166,6 +175,7 @@ export function createManagedBattleMapConnection(
     // raw-frame parsing or deferred reseeding is needed.
     resolveLocalOnly: opts.seedLocal ? preserveHubUnknown : undefined,
     layers: opts.layers,
+    fog: opts.fog,
     resolveUrl: async () => {
       const token = await mintBattleMapToken(
         opts.campaignCode,
