@@ -12,6 +12,7 @@ import {
 } from '@fieldnotes/core';
 import {
   createManagedBattleMapConnection,
+  isValidClientId,
   type BattleMapConnectionStatus,
   type BattleMapTransport,
 } from '@/lib/battlemapSync';
@@ -1738,5 +1739,23 @@ describe('createManagedBattleMapConnection — player marker filtering (task B11
     ).toEqual(['dmonly-el', 'shared-el']);
 
     conn.stop();
+  });
+});
+
+describe('isValidClientId', () => {
+  it('accepts printable ASCII 1-128 chars', () => {
+    expect(isValidClientId('dm-abc123')).toBe(true);
+    expect(isValidClientId('player-xyz')).toBe(true);
+    expect(isValidClientId('display-A1B2C3')).toBe(true);
+    expect(isValidClientId('a')).toBe(true);
+    expect(isValidClientId('x'.repeat(128))).toBe(true);
+  });
+
+  it('rejects empty, too long, and non-ASCII', () => {
+    expect(isValidClientId('')).toBe(false);
+    expect(isValidClientId('x'.repeat(129))).toBe(false);
+    expect(isValidClientId('dm-\x00bad')).toBe(false);
+    expect(isValidClientId('dm-\x7fbad')).toBe(false);
+    expect(isValidClientId('emoji-👍')).toBe(false);
   });
 });

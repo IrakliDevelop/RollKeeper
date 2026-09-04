@@ -12,12 +12,19 @@ export type { RemoteLayerUpdate };
 
 export type BattleMapConnectionStatus = ManagedSyncStatus;
 
+const PRINTABLE_ASCII = /^[\x20-\x7e]+$/;
+
+export function isValidClientId(id: string): boolean {
+  return id.length >= 1 && id.length <= 128 && PRINTABLE_ASCII.test(id);
+}
+
 export interface BattleMapTokenRequest {
   role: BattleMapRole;
   battleMapId: string;
   dmId?: string;
   playerId?: string;
   displayKey?: string;
+  protocols?: { fog?: 1 };
 }
 
 export async function mintBattleMapToken(
@@ -28,7 +35,7 @@ export async function mintBattleMapToken(
     const res = await fetch(`/api/campaign/${campaignCode}/battlemap-token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(req),
+      body: JSON.stringify({ ...req, protocols: { fog: 1 } }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as { token?: string };
@@ -141,6 +148,12 @@ export interface BattleMapConnection {
 export function createManagedBattleMapConnection(
   opts: ManagedConnectionOptions
 ): BattleMapConnection {
+  if (!isValidClientId(opts.clientId)) {
+    throw new Error(
+      `Invalid battle map clientId: must be 1-128 printable ASCII characters`
+    );
+  }
+
   const room = `${opts.campaignCode}:${opts.battleMapId}`;
 
   const connection = createManagedSyncConnection({
