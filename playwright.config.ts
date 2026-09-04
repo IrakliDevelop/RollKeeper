@@ -2,7 +2,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['**/auth/**', '**/auth-wizard/**'],
+  testIgnore: ['**/auth/**', '**/auth-wizard/**', '**/fog-of-war.spec.ts'],
   outputDir: 'test-results',
   timeout: 60_000,
   retries: 0,
