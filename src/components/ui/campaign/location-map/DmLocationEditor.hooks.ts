@@ -1516,6 +1516,9 @@ export function useDmLocationEditor(
       let snapshotUrl: string | undefined;
       const filteredState = '';
 
+      const fogState = vp.fog.getState();
+      const fogEnabled = fogState !== null;
+
       let blob: Blob | null = null;
       try {
         blob = await vp.exportImage({
@@ -1526,11 +1529,17 @@ export function useDmLocationEditor(
           format: 'jpeg',
           quality: 0.85,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
+          ...(fogEnabled
+            ? { fog: { state: fogState, mode: 'player' as const } }
+            : {}),
         });
       } catch (error) {
         console.warn('Failed to export image:', error);
-        // exportImage can throw on tainted canvas (cross-origin images
-        // without CORS). Fall through to JSON fallback.
+        if (fogEnabled) {
+          throw new Error(
+            'Cannot publish fog-enabled location: image export failed'
+          );
+        }
       }
 
       if (blob) {
@@ -1562,6 +1571,12 @@ export function useDmLocationEditor(
             reader.readAsDataURL(blob!);
           });
         }
+      }
+
+      if (fogEnabled && !snapshotUrl) {
+        throw new Error(
+          'Cannot publish fog-enabled location without a masked snapshot'
+        );
       }
 
       const syncData = {
