@@ -24,6 +24,51 @@ vi.mock('@/components/ui/campaign/location-map/DmLocationToolOptions', () => ({
 describe('DmVttToolbar', () => {
   afterEach(() => cleanup());
 
+  it('threads the shared fog controller into the button and options bar', () => {
+    const requestActivate = vi.fn();
+    const fogControls = {
+      available: true,
+      initialized: false,
+      disabled: false,
+      operation: 'reveal' as const,
+      shape: 'brush' as const,
+      radius: 40,
+      preview: false,
+      diagnostic: null,
+      pendingAction: null,
+      requestActivate,
+      setOperation: vi.fn(),
+      setShape: vi.fn(),
+      setRadius: vi.fn(),
+      setPreview: vi.fn(),
+      requestAction: vi.fn(),
+      confirmAction: vi.fn(),
+      cancelAction: vi.fn(),
+      reconcileBounds: vi.fn(),
+      reportError: vi.fn(),
+    };
+    render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+        fogControls={fogControls}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fog of war' }));
+    expect(requestActivate).toHaveBeenCalledOnce();
+    expect(vi.mocked(DmLocationToolOptions)).toHaveBeenLastCalledWith(
+      expect.objectContaining({ fogControls }),
+      undefined
+    );
+  });
+
   it('offers a real eraser tool separately from clearing drawings', () => {
     render(
       <DmVttToolbar

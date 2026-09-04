@@ -48,6 +48,47 @@ const baseProps: DmLocationToolbarProps = {
 describe('DmLocationToolbar', () => {
   afterEach(() => cleanup());
 
+  it('offers the shared fog action only when enabled and respects mutation gating', () => {
+    const requestActivate = vi.fn();
+    const fogControls = {
+      available: true,
+      initialized: true,
+      disabled: true,
+      disabledReason: 'Finish arranging map images before editing fog.',
+      operation: 'reveal' as const,
+      shape: 'brush' as const,
+      radius: 40,
+      preview: false,
+      diagnostic: null,
+      pendingAction: null,
+      requestActivate,
+      setOperation: vi.fn(),
+      setShape: vi.fn(),
+      setRadius: vi.fn(),
+      setPreview: vi.fn(),
+      requestAction: vi.fn(),
+      confirmAction: vi.fn(),
+      cancelAction: vi.fn(),
+      reconcileBounds: vi.fn(),
+      reportError: vi.fn(),
+    };
+    const { rerender } = render(
+      <DmLocationToolbar {...baseProps} fogControls={fogControls} />
+    );
+    const button = screen.getByRole('button', { name: 'Fog of war' });
+    expect(button).toBeDisabled();
+    expect(button).toHaveAttribute('title', fogControls.disabledReason);
+
+    rerender(
+      <DmLocationToolbar
+        {...baseProps}
+        fogControls={{ ...fogControls, disabled: false }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Fog of war' }));
+    expect(requestActivate).toHaveBeenCalledOnce();
+  });
+
   it('no longer mounts the selection ops (delete/rotate/align) — consolidated into DmSelectionOptions', () => {
     render(<DmLocationToolbar {...baseProps} />);
     expect(screen.queryByTitle('Delete selected')).not.toBeInTheDocument();

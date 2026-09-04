@@ -27,6 +27,7 @@ import {
   Zap,
   MapPin,
   Flag,
+  CloudFog,
 } from 'lucide-react';
 import { useActiveTool, useHistory } from '@fieldnotes/react';
 import { Button } from '@/components/ui/forms/button';
@@ -113,6 +114,7 @@ export default function DmLocationToolbar({
   exportControl,
   viewsControl,
   presenceControl,
+  fogControls,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
@@ -144,6 +146,28 @@ export default function DmLocationToolbar({
             <Icon size={15} />
           </Button>
         ))}
+        {fogControls?.available && (
+          <>
+            <Button
+              variant={activeTool === 'fog' ? 'primary' : 'ghost'}
+              onClick={fogControls.requestActivate}
+              disabled={fogControls.disabled}
+              title={fogControls.disabledReason ?? 'Fog of war'}
+              aria-label="Fog of war"
+              className="min-h-[44px] min-w-[44px] p-0"
+            >
+              <CloudFog size={15} />
+            </Button>
+            {fogControls.diagnostic && (
+              <span
+                role="alert"
+                className="text-accent-red-text max-w-64 text-xs"
+              >
+                {fogControls.diagnostic}
+              </span>
+            )}
+          </>
+        )}
       </div>
 
       <div className="bg-divider mx-1 h-6 w-px" />

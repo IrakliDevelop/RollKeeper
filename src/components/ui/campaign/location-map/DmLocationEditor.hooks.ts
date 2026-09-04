@@ -16,6 +16,7 @@ import {
   LaserTool,
   PingTool,
   AutoSave,
+  FogTool,
   type CameraAnimator,
   type CameraView,
   type ElementActivationEvent,
@@ -68,6 +69,14 @@ import {
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
+import { isFogOfWarEnabled } from '@/lib/fogOfWar';
+import {
+  attachFogPersistence,
+  configureFogView,
+  reconcileMapFogBounds,
+  resolveMapImageBounds,
+  useDmFogControls,
+} from './fog';
 import { useDmStore } from '@/store/dmStore';
 import type { PeerRoster } from '@fieldnotes/core';
 import { resolveDmMovement, logDmMovement } from './movementLogging';
@@ -205,6 +214,8 @@ export interface DmLocationEditorState {
   hasUnsyncedChanges: boolean;
   lastSyncedAt: string | null;
   syncStatus: BattleMapConnectionStatus | 'disabled';
+  /** Actionable publication failure shown beside the editor controls. */
+  syncError: string | null;
 
   // Share with players (battlemap mode only)
   sharedWithPlayers: boolean;
@@ -281,6 +292,9 @@ export interface DmLocationEditorState {
   }) => void;
   handleDeleteMarker: () => void;
 
+  /** Shared fog authoring state/actions for both DM battle-map surfaces. */
+  fogControls: import('./fog').DmFogControls;
+
   /** Resolved portal destination state for the active marker panel. */
   portalState?: ResolvedPortalState;
 
@@ -311,6 +325,7 @@ export function useDmLocationEditor(
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<BattleMapConnection | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  const fogPersistenceCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
@@ -550,6 +565,7 @@ export function useDmLocationEditor(
   // Sync status
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   // Share with players (battlemap mode only) — hydrated from server truth
   const { sharedWithPlayers, handleToggleShareWithPlayers } =
@@ -619,6 +635,25 @@ export function useDmLocationEditor(
   }, [mode, resolveMovement]);
 
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
+
+  const getFogBounds = useCallback(() => {
+    const current = getVp();
+    if (!current) throw new Error('Map is still loading');
+    return resolveMapImageBounds(current.store, location.mapImageSize);
+  }, [getVp, location.mapImageSize]);
+  const fogControls = useDmFogControls({
+    viewport,
+    available: isFogOfWarEnabled(),
+    getBounds: getFogBounds,
+    disabled: imageUploading || arrangeMapsActive,
+    disabledReason: imageUploading
+      ? 'Wait for the map image upload to finish before editing fog.'
+      : arrangeMapsActive
+        ? 'Finish arranging map images before editing fog.'
+        : undefined,
+  });
+  const fogControlsRef = useRef(fogControls);
+  fogControlsRef.current = fogControls;
 
   const handleMarkerActivate = useCallback((event: ElementActivationEvent) => {
     setActiveMarkerElementId(event.element.id);
@@ -838,10 +873,16 @@ export function useDmLocationEditor(
       syncSelection();
 
       // AutoSave — persist to store
+      if (isFogOfWarEnabled()) {
+        vp.toolManager.register(new FogTool(vp.fog));
+        configureFogView(vp.fog, 'dm', false);
+      }
+
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `location-canvas-${location.id}`,
         debounceMs: 1500,
         layerManager: vp.layerManager,
+        fogManager: vp.fog,
       });
 
       // Load existing canvas state from location, or initialize with map background
@@ -891,6 +932,24 @@ export function useDmLocationEditor(
       vp.store.on('add', saveAndMarkDirty);
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
+
+      fogPersistenceCleanupRef.current?.();
+      fogPersistenceCleanupRef.current = attachFogPersistence(vp.fog, () => {
+        const json = vp.exportJSON();
+        onSave(json);
+        setHasUnsyncedChanges(true);
+      });
+
+      // Reconcile fog bounds after initial load
+      try {
+        const mapBounds = resolveMapImageBounds(
+          vp.store,
+          location.mapImageSize
+        );
+        reconcileMapFogBounds(vp.fog, mapBounds);
+      } catch (error) {
+        fogControlsRef.current.reportError(error);
+      }
 
       // Register before live sync starts so a newly-created local element is
       // marked DM-only before the sync client resolves its audience. Remote
@@ -996,6 +1055,10 @@ export function useDmLocationEditor(
           clientId: dmId,
           tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
           seedLocal: true,
+          fog: {
+            manager: vp.fog,
+            preserveLocalWhenRemoteMissing: true,
+          },
           resolveAudience: el =>
             useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
               ?.dmOnlyElements[el.id]
@@ -1239,6 +1302,7 @@ export function useDmLocationEditor(
         arrangeSessionRef.current = null;
       }
       autoSaveRef.current?.stop();
+      fogPersistenceCleanupRef.current?.();
       laserCleanupRef.current?.();
       movementCommitUnsubRef.current?.();
       // Disposed after laserCleanupRef (which tears down focusBroadcast) and
@@ -1270,13 +1334,14 @@ export function useDmLocationEditor(
         arrangeSessionRef.current = null;
       }
       setArrangeMapsActive(false);
+      fogControls.reconcileBounds();
     } else {
       arrangeActiveRef.current = true;
       arrangeSessionRef.current = enterArrangeMaps(vp);
       vp.setTool('select');
       setArrangeMapsActive(true);
     }
-  }, [getVp]);
+  }, [fogControls, getVp]);
 
   // ─── Handlers ────────────────────────────────────────────────
 
@@ -1447,7 +1512,7 @@ export function useDmLocationEditor(
   const handleClear = useCallback(async () => {
     const vp = getVp();
     if (!vp || vp.store.count === 0) return;
-    if (!confirm('Clear all elements from the canvas?')) return;
+    if (!confirm('Clear all canvas elements? Fog of war will be kept.')) return;
     vp.store.clear();
     await autoSaveRef.current?.clear();
     vp.requestRender();
@@ -1461,6 +1526,7 @@ export function useDmLocationEditor(
     const vp = getVp();
     if (!vp) return;
     setSyncing(true);
+    setSyncError(null);
 
     try {
       // Export canvas as PNG, filtering out DM-only elements
@@ -1487,6 +1553,9 @@ export function useDmLocationEditor(
       let snapshotUrl: string | undefined;
       const filteredState = '';
 
+      const fogState = vp.fog.getState();
+      const fogEnabled = fogState !== null;
+
       let blob: Blob | null = null;
       try {
         blob = await vp.exportImage({
@@ -1497,11 +1566,17 @@ export function useDmLocationEditor(
           format: 'jpeg',
           quality: 0.85,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
+          ...(fogEnabled
+            ? { fog: { state: fogState, mode: 'player' as const } }
+            : {}),
         });
       } catch (error) {
         console.warn('Failed to export image:', error);
-        // exportImage can throw on tainted canvas (cross-origin images
-        // without CORS). Fall through to JSON fallback.
+        if (fogEnabled) {
+          throw new Error(
+            'Cannot publish fog-enabled location: image export failed'
+          );
+        }
       }
 
       if (blob) {
@@ -1517,22 +1592,41 @@ export function useDmLocationEditor(
             body: formData,
           });
 
-          if (uploadRes.ok) {
-            const data = (await uploadRes.json()) as { url: string };
-            snapshotUrl = data.url;
+          if (!uploadRes.ok) {
+            throw new Error(`asset upload returned ${uploadRes.status}`);
           }
-        } catch {
-          // S3 not configured or network error — fall through to base64
+          const data = (await uploadRes.json()) as { url?: string };
+          if (!data.url) throw new Error('asset upload returned no URL');
+          snapshotUrl = data.url;
+        } catch (error) {
+          if (fogEnabled) {
+            throw new Error(
+              `Cannot publish fog-enabled location: masked snapshot upload failed (${error instanceof Error ? error.message : 'network error'})`
+            );
+          }
         }
 
-        // Fall back to base64 data URL if S3 upload didn't work
+        // Legacy non-fog locations may still use the data-URL fallback. A
+        // fog-enabled publication must be a durable asset URL; otherwise the
+        // previous public snapshot remains authoritative.
         if (!snapshotUrl) {
-          snapshotUrl = await new Promise<string>(resolve => {
+          snapshotUrl = await new Promise<string>((resolve, reject) => {
             const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
+            reader.onload = () =>
+              typeof reader.result === 'string'
+                ? resolve(reader.result)
+                : reject(new Error('Could not encode the snapshot'));
+            reader.onerror = () =>
+              reject(new Error('Could not read the snapshot'));
             reader.readAsDataURL(blob!);
           });
         }
+      }
+
+      if (fogEnabled && !snapshotUrl) {
+        throw new Error(
+          'Cannot publish fog-enabled location without a masked snapshot'
+        );
       }
 
       const syncData = {
@@ -1568,6 +1662,9 @@ export function useDmLocationEditor(
       onSyncToPlayers();
     } catch (error) {
       console.error('Failed to sync location to players:', error);
+      setSyncError(
+        error instanceof Error ? error.message : 'Location publication failed'
+      );
     } finally {
       setSyncing(false);
     }
@@ -1654,11 +1751,12 @@ export function useDmLocationEditor(
         }
         vp.requestRender();
         setImageUploading(false);
+        fogControls.reconcileBounds();
       };
       img.onerror = () => setImageUploading(false);
       img.src = proxiedSrc;
     },
-    [getVp]
+    [fogControls, getVp]
   );
 
   const handleOpenTvDisplay = useCallback(
@@ -1719,6 +1817,7 @@ export function useDmLocationEditor(
     hasUnsyncedChanges,
     lastSyncedAt,
     syncStatus,
+    syncError,
     sharedWithPlayers,
     handleToggleShareWithPlayers,
     imageUploading,
@@ -1765,5 +1864,6 @@ export function useDmLocationEditor(
     handleSaveMarkerDetail,
     handleDeleteMarker,
     portalState,
+    fogControls,
   };
 }

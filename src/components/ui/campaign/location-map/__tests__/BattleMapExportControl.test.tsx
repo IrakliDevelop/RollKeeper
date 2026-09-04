@@ -7,6 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { BattleMapExportControl } from '../BattleMapExportControl';
+import type { FogStateV1 } from '@fieldnotes/core';
 
 const vp = { exportImage: vi.fn(), getVisibleRect: vi.fn() };
 
@@ -45,6 +46,27 @@ describe('BattleMapExportControl', () => {
   it('hides the audience radio on player surfaces', () => {
     renderControl();
     expect(screen.queryByText(/player view/i)).not.toBeInTheDocument();
+  });
+
+  it('treats a player surface as player audience and reads live fog state', async () => {
+    const fogState = {
+      version: 1,
+      definition: {
+        bounds: { x: 0, y: 0, w: 100, h: 80 },
+        base: 'covered',
+        cellSize: 16,
+        generation: 'g1',
+      },
+      tiles: [],
+    } as unknown as FogStateV1;
+    const exporter = renderControl({ getFogState: () => fogState });
+    fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
+
+    await waitFor(() => expect(exporter).toHaveBeenCalledOnce());
+    expect(exporter).toHaveBeenCalledWith(
+      vp,
+      expect.objectContaining({ audience: 'player', fogState })
+    );
   });
 
   it('exports with the selected options and live dm-only map', async () => {

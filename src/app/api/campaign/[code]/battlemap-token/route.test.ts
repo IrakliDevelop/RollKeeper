@@ -146,3 +146,113 @@ describe('membership-aware relay authority minting', () => {
     expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
   });
 });
+
+describe('fog protocol capability gate', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
+    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
+  });
+
+  it('accepts any request when the gate is off', async () => {
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
+    const response = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('accepts requests with fog: 1 when the gate is on', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        protocols: { fog: 1 },
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it('rejects missing protocols with 426 when the gate is on', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const response = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(response.status).toBe(426);
+  });
+
+  it('rejects wrong fog version with 426', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        protocols: { fog: 2 },
+      }),
+      params
+    );
+    expect(response.status).toBe(426);
+  });
+
+  it('rejects malformed protocols with 426', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        protocols: 'not-an-object',
+      }),
+      params
+    );
+    expect(response.status).toBe(426);
+  });
+
+  it('gate applies to all roles: dm, player, display', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const dmResp = await POST(
+      request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }),
+      params
+    );
+    expect(dmResp.status).toBe(426);
+
+    const playerResp = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(playerResp.status).toBe(426);
+
+    const displayResp = await POST(
+      request({
+        role: 'display',
+        battleMapId: 'map-a',
+        displayKey: 'display-a',
+      }),
+      params
+    );
+    expect(displayResp.status).toBe(426);
+  });
+
+  it('gate runs before authorization: does not reveal whether a map exists', async () => {
+    process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'not-a-member',
+      }),
+      params
+    );
+    expect(response.status).toBe(426);
+  });
+});

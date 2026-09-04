@@ -19,6 +19,7 @@ import {
   Zap,
   MapPin,
   Flag,
+  CloudFog,
 } from 'lucide-react';
 import { useActiveTool } from '@fieldnotes/react';
 
@@ -28,6 +29,7 @@ import DmLocationToolOptions, {
   type MeasureSharingControl,
   type MovementControls,
 } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
 import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { markerAudienceToggleTitle } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
@@ -85,6 +87,7 @@ export interface DmVttToolbarProps {
   viewsControl?: ReactNode;
   /** Shared-presence "who is viewing" + cursor-sharing switches. */
   presenceControl?: ReactNode;
+  fogControls?: DmFogControls;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -127,6 +130,7 @@ export function DmVttToolbar({
   exportControl,
   viewsControl,
   presenceControl,
+  fogControls,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -182,6 +186,28 @@ export function DmVttToolbar({
               <Icon size={16} />
             </Button>
           ))}
+          {fogControls?.available && (
+            <>
+              <Button
+                variant={activeTool === 'fog' ? 'primary' : 'ghost'}
+                onClick={fogControls.requestActivate}
+                disabled={fogControls.disabled}
+                className="min-h-[44px] min-w-[44px] p-0"
+                title={fogControls.disabledReason ?? 'Fog of war'}
+                aria-label="Fog of war"
+              >
+                <CloudFog size={16} />
+              </Button>
+              {fogControls.diagnostic && (
+                <span
+                  role="alert"
+                  className="text-accent-red-text max-w-64 text-xs"
+                >
+                  {fogControls.diagnostic}
+                </span>
+              )}
+            </>
+          )}
         </div>
         <div className="border-divider flex shrink-0 items-center gap-1 border-l pl-3">
           <Button
@@ -287,6 +313,7 @@ export function DmVttToolbar({
           measureSharing={measureSharing}
           markerControls={markerControls}
           movementControls={movementControls}
+          fogControls={fogControls}
         />
       </div>
     </div>

@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import type { EditorMode } from './DmLocationEditor.types';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
+import type { DmFogControls } from './fog';
 
 export interface DmLocationToolbarProps {
   onPickImage: () => void;
@@ -55,4 +56,6 @@ export interface DmLocationToolbarProps {
   viewsControl?: ReactNode;
   /** Shared-presence "who is viewing" + cursor-sharing switches (battlemap mode only). */
   presenceControl?: ReactNode;
+  /** Fog authoring controls for battle maps and campaign locations. */
+  fogControls?: DmFogControls;
 }

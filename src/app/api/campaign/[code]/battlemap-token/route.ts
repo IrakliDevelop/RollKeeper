@@ -35,13 +35,23 @@ export async function POST(
       dmId?: string;
       playerId?: string;
       displayKey?: string;
+      protocols?: { fog?: number };
     };
-    const { role, battleMapId, dmId, playerId, displayKey } = body;
+    const { role, battleMapId, dmId, playerId, displayKey, protocols } = body;
     if (!role || !battleMapId) {
       return NextResponse.json(
         { error: 'role and battleMapId are required' },
         { status: 400 }
       );
+    }
+
+    if (process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED === 'true') {
+      if (!protocols || typeof protocols !== 'object' || protocols.fog !== 1) {
+        return NextResponse.json(
+          { error: 'Client upgrade required — please refresh your browser' },
+          { status: 426 }
+        );
+      }
     }
 
     const redis = getRedis();

@@ -48,6 +48,7 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import { configureFogView } from './fog';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
@@ -512,6 +513,8 @@ export function PlayerBattleMapCanvas({
     setViewport(vp);
     viewportRef.current = vp;
 
+    configureFogView(vp.fog, 'player', false);
+
     // Canonical bands: map (locked) at the bottom, DM annotations (locked
     // for players) above it, this player's own layer in the player band on
     // top — see layerContract.ts. ensurePlayerLayer runs AFTER ensure so the
@@ -575,6 +578,7 @@ export function PlayerBattleMapCanvas({
       store: vp.store,
       clientId: characterId,
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
+      fog: { manager: vp.fog },
       // Layer definitions sync (replaces the unknown-layer mirror): remote
       // layers apply locked for players — hit-test and marquee skip content
       // they cannot edit (the relay rejects their writes to it anyway) —
@@ -702,6 +706,7 @@ export function PlayerBattleMapCanvas({
           defaultTool="hand"
           onReady={handleReady}
           className="h-full w-full"
+          options={{ fog: {} }}
           snapToGrid
         />
         {viewport && (
@@ -715,6 +720,7 @@ export function PlayerBattleMapCanvas({
               <BattleMapExportControl
                 getViewport={() => viewport}
                 name="battle-map"
+                getFogState={() => viewport.fog.getState()}
                 onError={onExportError}
               />
             }

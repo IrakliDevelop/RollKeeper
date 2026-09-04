@@ -141,8 +141,16 @@ function makeStubViewport() {
     store,
     layerManager,
     domLayer: document.createElement('div'),
+    fog: {
+      on: vi.fn(() => () => {}),
+      getState: vi.fn(() => null),
+      getViewMode: vi.fn(() => 'off'),
+      setViewMode: vi.fn(),
+      setBounds: vi.fn(),
+    },
     toolManager: {
       getTool: vi.fn(() => undefined),
+      register: vi.fn(),
       onChange: vi.fn(),
       activeTool: { name: 'select' },
     },
