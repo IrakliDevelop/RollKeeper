@@ -29,6 +29,19 @@ import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
+import type { DmFogControls } from './fog';
+import {
+  FOG_COVER_ALL_DESCRIPTION,
+  FOG_COVER_ALL_TITLE,
+  FOG_DISABLE_DESCRIPTION,
+  FOG_DISABLE_TITLE,
+  FOG_ENABLE_CONFIRM,
+  FOG_ENABLE_DESCRIPTION,
+  FOG_ENABLE_TITLE,
+  FOG_REVEAL_ALL_DESCRIPTION,
+  FOG_REVEAL_ALL_TITLE,
+  FOG_SECURITY_EXPLANATION,
+} from './fog';
 
 export const COLOR_SWATCHES = [
   '#334155',
@@ -100,6 +113,8 @@ interface DmLocationToolOptionsProps {
   markerControls?: MarkerToolControls;
   /** Enables the movement (path) tool's diagonal rule / dash / sharing branch. */
   movementControls?: MovementControls;
+  /** Shared DM fog controller. Omitted on player and non-battle-map surfaces. */
+  fogControls?: DmFogControls;
 }
 
 export default function DmLocationToolOptions({
@@ -108,6 +123,7 @@ export default function DmLocationToolOptions({
   selectionControls,
   markerControls,
   movementControls,
+  fogControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -158,10 +174,15 @@ export default function DmLocationToolOptions({
   // `pencilOpts !== undefined` and `selectedCount > 0` above.
   const showMarkerOptions =
     activeTool === MARKER_TOOL_NAME && markerControls !== undefined;
+  const showFogOptions =
+    fogControls !== undefined &&
+    fogControls.available &&
+    (activeTool === 'fog' || fogControls.pendingAction !== null);
 
   const showOptionsBar =
     showSelectionOptions ||
     showMarkerOptions ||
+    showFogOptions ||
     (activeTool === 'pencil' && pencilOpts !== undefined) ||
     activeTool === 'arrow' ||
     activeTool === 'note' ||
@@ -294,11 +315,158 @@ export default function DmLocationToolOptions({
         </div>
       )}
 
+      {showFogOptions && fogControls && (
+        <div
+          data-testid="fog-tool-options"
+          role="group"
+          aria-label="Fog of war options"
+          className="flex w-full flex-wrap items-center gap-2"
+        >
+          {fogControls.pendingAction ? (
+            <div
+              role="alertdialog"
+              aria-label={
+                fogControls.pendingAction === 'enable'
+                  ? FOG_ENABLE_TITLE
+                  : fogControls.pendingAction === 'cover-all'
+                    ? FOG_COVER_ALL_TITLE
+                    : fogControls.pendingAction === 'reveal-all'
+                      ? FOG_REVEAL_ALL_TITLE
+                      : FOG_DISABLE_TITLE
+              }
+              className="flex w-full flex-wrap items-center gap-2"
+            >
+              <div className="min-w-56 flex-1 text-xs">
+                <div className="text-body font-semibold">
+                  {fogControls.pendingAction === 'enable'
+                    ? FOG_ENABLE_TITLE
+                    : fogControls.pendingAction === 'cover-all'
+                      ? FOG_COVER_ALL_TITLE
+                      : fogControls.pendingAction === 'reveal-all'
+                        ? FOG_REVEAL_ALL_TITLE
+                        : FOG_DISABLE_TITLE}
+                </div>
+                <div className="text-muted">
+                  {fogControls.pendingAction === 'enable'
+                    ? FOG_ENABLE_DESCRIPTION
+                    : fogControls.pendingAction === 'cover-all'
+                      ? FOG_COVER_ALL_DESCRIPTION
+                      : fogControls.pendingAction === 'reveal-all'
+                        ? FOG_REVEAL_ALL_DESCRIPTION
+                        : FOG_DISABLE_DESCRIPTION}
+                </div>
+              </div>
+              <Button
+                variant="primary"
+                onClick={fogControls.confirmAction}
+                className="min-h-[44px] px-3 text-xs"
+              >
+                {fogControls.pendingAction === 'enable'
+                  ? FOG_ENABLE_CONFIRM
+                  : 'Confirm'}
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={fogControls.cancelAction}
+                className="min-h-[44px] px-3 text-xs"
+              >
+                Cancel
+              </Button>
+            </div>
+          ) : (
+            <>
+              <span className="text-muted text-xs font-semibold">Fog</span>
+              <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+                {(['reveal', 'conceal'] as const).map(value => (
+                  <Button
+                    key={value}
+                    variant={
+                      fogControls.operation === value ? 'primary' : 'ghost'
+                    }
+                    onClick={() => fogControls.setOperation(value)}
+                    aria-pressed={fogControls.operation === value}
+                    className="min-h-[44px] px-3 text-xs capitalize"
+                  >
+                    {value}
+                  </Button>
+                ))}
+              </div>
+              <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+                {(['brush', 'rectangle', 'polygon'] as const).map(value => (
+                  <Button
+                    key={value}
+                    variant={fogControls.shape === value ? 'primary' : 'ghost'}
+                    onClick={() => fogControls.setShape(value)}
+                    aria-pressed={fogControls.shape === value}
+                    className="min-h-[44px] px-3 text-xs capitalize"
+                  >
+                    {value}
+                  </Button>
+                ))}
+              </div>
+              {fogControls.shape === 'brush' && (
+                <label className="text-muted flex min-h-[44px] items-center gap-2 text-xs">
+                  Brush size
+                  <input
+                    aria-label="Fog brush size"
+                    type="range"
+                    min={8}
+                    max={160}
+                    step={4}
+                    value={fogControls.radius}
+                    onChange={event =>
+                      fogControls.setRadius(Number(event.target.value))
+                    }
+                    className="w-24"
+                  />
+                  {fogControls.radius}px
+                </label>
+              )}
+              <Switch
+                checked={fogControls.preview}
+                onCheckedChange={fogControls.setPreview}
+                label="Preview as player"
+                wrapperClassName="min-h-[44px] items-center"
+              />
+              <Button
+                variant="ghost"
+                onClick={() => fogControls.requestAction('cover-all')}
+                className="min-h-[44px] px-3 text-xs"
+              >
+                Cover all
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => fogControls.requestAction('reveal-all')}
+                className="min-h-[44px] px-3 text-xs"
+              >
+                Reveal all
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={() => fogControls.requestAction('disable')}
+                className="text-accent-red-text min-h-[44px] px-3 text-xs"
+              >
+                Disable fog
+              </Button>
+              <span className="text-muted min-w-64 flex-1 text-xs">
+                {FOG_SECURITY_EXPLANATION}
+              </span>
+            </>
+          )}
+          {fogControls.diagnostic && (
+            <span role="alert" className="text-accent-red-text text-xs">
+              {fogControls.diagnostic}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* The shared strip carries CSS colour STRINGS for the SDK tools. The
           marker carries a palette KEY, so its picker above owns colour
           entirely — rendering both would put a dead control (handleColorChange
           has no 'marker' branch) next to the live one. */}
-      {!showMarkerOptions && (
+      {!showMarkerOptions && !showFogOptions && (
         <>
           <span className="text-muted text-xs font-medium">
             {activeTool === 'shape'

@@ -51,6 +51,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     hasUnsyncedChanges,
     lastSyncedAt,
     syncStatus,
+    syncError,
     sharedWithPlayers,
     handleToggleShareWithPlayers,
     imageUploading,
@@ -95,6 +96,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleSaveMarkerDetail,
     handleDeleteMarker,
     portalState,
+    fogControls,
   } = useDmLocationEditor(props);
 
   return (
@@ -148,12 +150,14 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onToggleShareWithPlayers={handleToggleShareWithPlayers}
             arrangeMapsActive={arrangeMapsActive}
             onToggleArrangeMaps={handleToggleArrangeMaps}
+            fogControls={fogControls}
             exportControl={
               <BattleMapExportControl
                 getViewport={getViewport}
                 name={props.location.name}
                 mapImageSize={props.location.mapImageSize}
                 getDmOnlyElements={getDmOnlyElements}
+                getFogState={() => viewport.fog.getState()}
                 onError={message =>
                   addToast({ type: 'error', title: 'Export failed', message })
                 }
@@ -206,6 +210,14 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             }
           />
         )}
+        {syncError && (
+          <div
+            role="alert"
+            className="text-accent-red-text bg-accent-red-bg border-accent-red-border border-b px-3 py-2 text-sm"
+          >
+            {syncError}. The previously published player snapshot was kept.
+          </div>
+        )}
 
         {viewport && (
           <DmLocationToolOptions
@@ -226,6 +238,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 onChange: handleSetMovementDash,
               },
             }}
+            fogControls={fogControls}
           />
         )}
 

@@ -70,6 +70,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     handleSaveMarkerDetail,
     handleDeleteMarker,
     portalState,
+    fogControls,
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
   // Session-scoped only — pure UI state, no connection dependency. Off by
@@ -117,6 +118,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                 onChange: handleSetMovementDash,
               },
             }}
+            fogControls={fogControls}
             exportControl={
               <BattleMapExportControl
                 getViewport={() => viewport}
@@ -128,6 +130,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                     .getBattleMap(campaignCode, battleMapId)?.dmOnlyElements ??
                   {}
                 }
+                getFogState={() => viewport.fog.getState()}
                 onError={onExportError}
               />
             }

@@ -1,5 +1,7 @@
 export { resolveMapImageBounds } from './resolveMapImageBounds';
 export { initializeMapFog } from './initializeMapFog';
+export { useDmFogControls } from './useDmFogControls';
+export type { DmFogControls, FogConfirmationAction } from './useDmFogControls';
 export { reconcileMapFogBounds } from './reconcileMapFogBounds';
 export { configureFogView } from './configureFogView';
 export { attachFogPersistence } from './attachFogPersistence';

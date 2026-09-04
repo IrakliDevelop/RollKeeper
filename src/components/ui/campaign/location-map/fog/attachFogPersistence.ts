@@ -1,7 +1,5 @@
 import type { FogManager, FogStateV1 } from '@fieldnotes/core';
 
-const REMOTE_ORIGIN = 'remote';
-
 export function attachFogPersistence(
   fogManager: FogManager,
   onSave: (state: FogStateV1 | null) => void
@@ -10,7 +8,11 @@ export function attachFogPersistence(
 
   const unsub = fogManager.on('change', event => {
     if (disposed) return;
-    if (event.origin === REMOTE_ORIGIN) return;
+    // The SDK reserves an undefined/local origin for authoring on this
+    // viewport. Any other origin is externally applied sync state and is
+    // already durable at the hub; writing it back to local storage creates
+    // noisy save loops and can race a newer authoritative snapshot.
+    if (event.origin !== undefined && event.origin !== 'local') return;
     onSave(fogManager.getState());
   });
 

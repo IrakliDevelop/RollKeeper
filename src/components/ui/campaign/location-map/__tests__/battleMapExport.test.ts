@@ -77,6 +77,32 @@ describe('exportBattleMap', () => {
     expect(filter({ id: 'secret' })).toBe(false);
     expect(filter({ id: 'revealed' })).toBe(true);
     expect(filter({ id: 'other' })).toBe(true);
+    expect(vp.exportImage.mock.calls[0][0].fog).toBe(false);
+  });
+
+  it('renders a supplied fog state explicitly in player mode', async () => {
+    const vp = fakeVp();
+    const fogState = {
+      version: 1,
+      definition: {
+        bounds: { x: 0, y: 0, w: 100, h: 100 },
+        base: 'covered',
+        cellSize: 16,
+        generation: 'g1',
+      },
+      tiles: [],
+    } as never;
+    await exportBattleMap(vp, {
+      audience: 'player',
+      bounds: 'map',
+      format: 'png',
+      name: 'Cave',
+      fogState,
+    });
+    expect(vp.exportImage.mock.calls[0][0].fog).toEqual({
+      state: fogState,
+      mode: 'player',
+    });
   });
 
   it('plumbs jpeg quality and builds the filename', async () => {

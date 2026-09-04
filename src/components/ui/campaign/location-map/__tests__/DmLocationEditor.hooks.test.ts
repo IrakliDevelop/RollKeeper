@@ -5,6 +5,7 @@ import {
   LayerManager,
   createHtmlElement,
   createShape,
+  FogManager,
 } from '@fieldnotes/core';
 import type { CanvasElement, Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
@@ -66,13 +67,7 @@ function makeStubViewport() {
     store,
     layerManager,
     domLayer,
-    fog: {
-      on: vi.fn(() => () => {}),
-      getState: vi.fn(() => null),
-      getViewMode: vi.fn(() => 'off'),
-      setViewMode: vi.fn(),
-      setBounds: vi.fn(),
-    },
+    fog: new FogManager(),
     toolManager: {
       // Only 'select' resolves to a fake tool; other names (e.g. 'path',
       // requested unconditionally by the movement-commit wiring in
@@ -87,6 +82,7 @@ function makeStubViewport() {
       onChange: vi.fn(),
       activeTool: { name: 'select' },
     },
+    setTool: vi.fn(),
     getSelectedIds: vi.fn(() => selectionState.selectedIds),
     onSelectionChange: vi.fn((listener: () => void) => {
       selectionListeners.add(listener);
@@ -398,5 +394,42 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
     expect(rawBody).toContain('The hinges shriek.');
     // The whole hidden record stays behind, not just its notes.
     expect(rawBody).not.toContain('Hidden Cache');
+  });
+
+  it('keeps the previous publication and reports an error when a fog snapshot upload fails', async () => {
+    vi.stubEnv('NEXT_PUBLIC_FOG_OF_WAR_ENABLED', 'true');
+    useLocationStore.getState().addLocation('TEST01', baseLocation);
+    const { vp, result } = await setup('location');
+    vp.fog.initialize({
+      bounds: { x: 0, y: 0, w: 100, h: 100 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    vi.spyOn(vp, 'exportImage').mockResolvedValue(
+      new Blob(['masked'], { type: 'image/jpeg' })
+    );
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url === '/api/assets/upload') {
+        return { ok: false, status: 503, json: async () => ({}) };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/assets/upload',
+      expect.objectContaining({ method: 'POST' })
+    );
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes('/locations/loc-1')
+      )
+    ).toBe(false);
+    expect(result.current.syncError).toMatch(/masked snapshot upload failed/i);
+    expect(result.current.hasUnsyncedChanges).toBe(true);
   });
 });

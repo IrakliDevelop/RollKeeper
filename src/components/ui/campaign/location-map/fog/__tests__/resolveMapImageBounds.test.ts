@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { ElementStore } from '@fieldnotes/core';
 import type { CanvasElement } from '@fieldnotes/core';
 import { resolveMapImageBounds } from '../resolveMapImageBounds';
+import { MAP_LAYER_ID } from '../../layerContract';
 
 function imageElement(
   id: string,
@@ -17,7 +18,7 @@ function imageElement(
     size: { w, h },
     zIndex: 0,
     locked: false,
-    layerId: 'map',
+    layerId: MAP_LAYER_ID,
     src: 'test.png',
   } as CanvasElement;
 }
@@ -69,5 +70,40 @@ describe('resolveMapImageBounds', () => {
     } as CanvasElement);
     const bounds = resolveMapImageBounds(store, { w: 200, h: 150 });
     expect(bounds).toEqual({ x: 0, y: 0, w: 200, h: 150 });
+  });
+
+  it('ignores images outside the canonical map layer', () => {
+    const store = new ElementStore();
+    const annotation = imageElement('token-image', -500, -500, 2000, 2000);
+    store.add({ ...annotation, layerId: 'layer-annotations' } as CanvasElement);
+    store.add(imageElement('map-image', 10, 20, 100, 80));
+
+    expect(resolveMapImageBounds(store, { w: 800, h: 600 })).toEqual({
+      x: 10,
+      y: 20,
+      w: 100,
+      h: 80,
+    });
+  });
+
+  it('uses the rotated visual bounds of map images', () => {
+    const store = new ElementStore();
+    store.add({
+      ...imageElement('rotated', 0, 0, 100, 50),
+      rotation: Math.PI / 2,
+    } as CanvasElement);
+
+    const bounds = resolveMapImageBounds(store, { w: 800, h: 600 });
+    expect(bounds.x).toBeCloseTo(25);
+    expect(bounds.y).toBeCloseTo(-25);
+    expect(bounds.w).toBeCloseTo(50);
+    expect(bounds.h).toBeCloseTo(100);
+  });
+
+  it('fails closed when neither a map image nor valid fallback exists', () => {
+    const store = new ElementStore();
+    expect(() => resolveMapImageBounds(store, { w: 0, h: 600 })).toThrow(
+      /valid map image/i
+    );
   });
 });

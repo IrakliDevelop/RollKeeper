@@ -6,6 +6,7 @@ import {
   MeasureTool,
   createHtmlElement,
   createShape,
+  FogManager,
   type CanvasElement,
   type Layer,
   type PointerState,
@@ -818,7 +819,11 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       battleMapId: 'map-1',
       store,
       clientId: 'player-1',
-      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-1',
+        playerId: 'player-1',
+      },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
       transportFactory: () => fakeTransport,
@@ -1034,7 +1039,11 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       battleMapId: 'map-1',
       store,
       clientId: 'player-1',
-      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-1',
+        playerId: 'player-1',
+      },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
       transportFactory: () => fakeTransport,
@@ -1343,7 +1352,11 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       battleMapId: 'map-1',
       store,
       clientId: 'player-1',
-      tokenRequest: { role: 'player', battleMapId: 'map-1', playerId: 'p1' },
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-1',
+        playerId: 'player-1',
+      },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
       transportFactory: () => fakeTransport,
@@ -1757,5 +1770,198 @@ describe('isValidClientId', () => {
     expect(isValidClientId('dm-\x00bad')).toBe(false);
     expect(isValidClientId('dm-\x7fbad')).toBe(false);
     expect(isValidClientId('emoji-👍')).toBe(false);
+  });
+});
+
+describe('managed connection identity contract', () => {
+  it.each([
+    {
+      label: 'invalid characters',
+      clientId: 'player-👍',
+      tokenRequest: {
+        role: 'player' as const,
+        battleMapId: 'map-1',
+        playerId: 'player-👍',
+      },
+    },
+    {
+      label: 'client/token mismatch',
+      clientId: 'player-1',
+      tokenRequest: {
+        role: 'player' as const,
+        battleMapId: 'map-1',
+        playerId: 'player-2',
+      },
+    },
+    {
+      label: 'room mismatch',
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm' as const,
+        battleMapId: 'map-2',
+        dmId: 'dm-1',
+      },
+    },
+  ])('reports denied without minting or opening transport: $label', item => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const statuses: BattleMapConnectionStatus[] = [];
+    const diagnostic = vi.fn();
+    const transportFactory = vi.fn();
+
+    const connection = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: item.clientId,
+      tokenRequest: item.tokenRequest,
+      onStatus: status => statuses.push(status),
+      onDiagnostic: diagnostic,
+      transportFactory,
+    });
+
+    expect(statuses).toEqual(['denied']);
+    expect(diagnostic).toHaveBeenCalledWith(expect.stringMatching(/identity/i));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(transportFactory).not.toHaveBeenCalled();
+    expect(() => connection.stop()).not.toThrow();
+    vi.unstubAllGlobals();
+  });
+});
+
+describe('managed connection fog lifecycle with the published SDK', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  function connectionFor(
+    clientId: string,
+    role: 'dm' | 'player',
+    fog: FogManager,
+    transport: FakeTransport,
+    onStatus?: (status: BattleMapConnectionStatus) => void
+  ) {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ token: 'fog-token' }),
+      })
+    );
+    return createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId,
+      tokenRequest:
+        role === 'dm'
+          ? { role, battleMapId: 'map-1', dmId: clientId }
+          : { role, battleMapId: 'map-1', playerId: clientId },
+      fog: {
+        manager: fog,
+        preserveLocalWhenRemoteMissing: role === 'dm',
+      },
+      onStatus,
+      transportFactory: () => transport,
+    });
+  }
+
+  it('applies addressed authoritative fog before reporting live', async () => {
+    const fog = new FogManager();
+    const transport = new FakeTransport();
+    let stateAtLive = null as ReturnType<FogManager['getState']>;
+    const connection = connectionFor(
+      'player-1',
+      'player',
+      fog,
+      transport,
+      status => {
+        if (status === 'live') stateAtLive = fog.getState();
+      }
+    );
+    await flush();
+    const source = new FogManager();
+    const state = source.initialize({
+      bounds: { x: 0, y: 0, w: 640, h: 480 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    transport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: {
+          kind: 'snapshot',
+          to: 'player-1',
+          elements: [],
+          fog: {
+            meta: { version: 3, editor: 'dm-1', definition: state.definition },
+            tiles: [],
+          },
+        },
+      })
+    );
+    await Promise.resolve();
+
+    expect(stateAtLive?.definition).toEqual(state.definition);
+    connection.stop();
+  });
+
+  it('publishes DM changes and rolls a forged player change back to hub authority', async () => {
+    const dmFog = new FogManager();
+    const dmTransport = new FakeTransport();
+    const dmConnection = connectionFor('dm-1', 'dm', dmFog, dmTransport);
+    await flush();
+    dmTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'snapshot', to: 'dm-1', elements: [] },
+      })
+    );
+    dmFog.initialize({
+      bounds: { x: 0, y: 0, w: 320, h: 240 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    expect(
+      dmTransport.sent.some(
+        raw =>
+          (JSON.parse(raw) as { op: { kind: string } }).op.kind === 'fog-meta'
+      )
+    ).toBe(true);
+
+    const playerFog = new FogManager();
+    const playerTransport = new FakeTransport();
+    const playerConnection = connectionFor(
+      'player-1',
+      'player',
+      playerFog,
+      playerTransport
+    );
+    await flush();
+    playerTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: { kind: 'snapshot', to: 'player-1', elements: [] },
+      })
+    );
+    playerFog.initialize({
+      bounds: { x: 0, y: 0, w: 100, h: 100 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    expect(playerFog.getState()).not.toBeNull();
+    playerTransport.emitMessage(
+      JSON.stringify({
+        from: 'hub',
+        op: {
+          kind: 'fog-meta',
+          record: { version: 1, editor: 'hub' },
+        },
+      })
+    );
+    expect(playerFog.getState()).toBeNull();
+
+    dmConnection.stop();
+    playerConnection.stop();
   });
 });

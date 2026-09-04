@@ -78,8 +78,13 @@ export async function exportBattleMap(
   if (req.format === 'jpeg') options.quality = JPEG_QUALITY;
   if (region) options.region = region;
   if (dmOnly) options.filter = el => !dmOnly[el.id];
-  if (req.audience === 'player' && req.fogState) {
-    options.fog = { state: req.fogState, mode: 'player' };
+  if (req.audience === 'player') {
+    // Always make player rendering explicit. On a DM viewport the live mode
+    // is normally `editor`; allowing the renderer to inherit it leaks the
+    // DM preview into an export. A null state means fog is disabled.
+    options.fog = req.fogState
+      ? { state: req.fogState, mode: 'player' }
+      : false;
   } else if (req.audience === 'full') {
     options.fog = false;
   }

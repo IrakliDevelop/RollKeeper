@@ -8,7 +8,7 @@ export const FOG_ENABLE_CONFIRM = 'Enable covered fog';
 
 export const FOG_COVER_ALL_TITLE = 'Cover entire map';
 export const FOG_COVER_ALL_DESCRIPTION =
-  'Replace the current fog with a fully covered mask. This cannot be undone.';
+  'Replace the current fog with a fully covered mask as one undoable action.';
 
 export const FOG_REVEAL_ALL_TITLE = 'Reveal entire map';
 export const FOG_REVEAL_ALL_DESCRIPTION =
@@ -16,4 +16,4 @@ export const FOG_REVEAL_ALL_DESCRIPTION =
 
 export const FOG_DISABLE_TITLE = 'Disable fog of war';
 export const FOG_DISABLE_DESCRIPTION =
-  'Remove all fog from this map. Players will see the full map. This cannot be undone.';
+  'Remove all fog from this map as one undoable action. Players will see the full map.';

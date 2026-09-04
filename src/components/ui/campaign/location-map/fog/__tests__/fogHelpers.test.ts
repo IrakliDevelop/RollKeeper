@@ -45,6 +45,16 @@ describe('reconcileMapFogBounds', () => {
     reconcileMapFogBounds(fm, { x: 0, y: 0, w: 512, h: 512 });
     expect(spy).not.toHaveBeenCalled();
   });
+
+  it('rejects non-finite or empty bounds before calling the SDK', () => {
+    const fm = new FogManager();
+    initializeMapFog(fm, { x: 0, y: 0, w: 512, h: 512 });
+    const spy = vi.spyOn(fm, 'setBounds');
+    expect(() =>
+      reconcileMapFogBounds(fm, { x: 0, y: 0, w: Number.NaN, h: 10 })
+    ).toThrow(/finite, positive/i);
+    expect(spy).not.toHaveBeenCalled();
+  });
 });
 
 describe('configureFogView', () => {

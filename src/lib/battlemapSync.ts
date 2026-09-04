@@ -112,6 +112,8 @@ export interface ManagedConnectionOptions {
     preserveLocalWhenRemoteMissing?: boolean;
   };
   onStatus?: (s: BattleMapConnectionStatus) => void;
+  /** Receives pre-transport configuration failures for operator UI/logging. */
+  onDiagnostic?: (message: string) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */
@@ -154,16 +156,42 @@ export interface BattleMapConnection {
   onPresenceLeave: (handler: (from: string) => void) => () => void;
 }
 
+function inertDeniedConnection(): BattleMapConnection {
+  return {
+    stop: () => {},
+    publishLayerUpsert: () => {},
+    publishLayerRemove: () => {},
+    sendPresence: () => {},
+    onPresence: () => () => {},
+    onPresenceLeave: () => () => {},
+  };
+}
+
+function expectedClientId(opts: ManagedConnectionOptions): string | null {
+  if (opts.tokenRequest.battleMapId !== opts.battleMapId) return null;
+  if (opts.tokenRequest.role === 'dm') return opts.tokenRequest.dmId ?? null;
+  if (opts.tokenRequest.role === 'player') {
+    return opts.tokenRequest.playerId ?? null;
+  }
+  if (opts.tokenRequest.role === 'display')
+    return `display-${opts.campaignCode}`;
+  return null;
+}
+
 export function createManagedBattleMapConnection(
   opts: ManagedConnectionOptions
 ): BattleMapConnection {
-  if (!isValidClientId(opts.clientId)) {
-    throw new Error(
-      `Invalid battle map clientId: must be 1-128 printable ASCII characters`
-    );
+  const expected = expectedClientId(opts);
+  if (!isValidClientId(opts.clientId) || opts.clientId !== expected) {
+    const message =
+      'Live map identity is invalid or does not match the token request. Reopen the map from the campaign.';
+    opts.onDiagnostic?.(message);
+    opts.onStatus?.('denied');
+    return inertDeniedConnection();
   }
 
   const room = `${opts.campaignCode}:${opts.battleMapId}`;
+  let stopped = false;
 
   const connection = createManagedSyncConnection({
     store: opts.store,
@@ -184,7 +212,19 @@ export function createManagedBattleMapConnection(
       if (!token) return null;
       return `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
     },
-    onStatus: opts.onStatus,
+    // The released managed lifecycle observes the snapshot on one transport
+    // subscription and applies it through SyncClient on the next. Defer only
+    // the fog-enabled `live` notification by a microtask so consumers cannot
+    // paint an unmasked frame between those two synchronous handlers.
+    onStatus: status => {
+      if (status === 'live' && opts.fog) {
+        queueMicrotask(() => {
+          if (!stopped) opts.onStatus?.(status);
+        });
+      } else {
+        opts.onStatus?.(status);
+      }
+    },
     onTransportMessage: opts.onPoke
       ? raw => {
           const feature = pokeFeatureFromEnvelope(raw);
@@ -196,6 +236,7 @@ export function createManagedBattleMapConnection(
 
   return {
     stop: (): void => {
+      stopped = true;
       connection.stop();
     },
     publishLayerUpsert: (definition: Layer): void => {

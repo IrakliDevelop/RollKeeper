@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import type { FogStateV1 } from '@fieldnotes/core';
 import {
   downloadBlob,
   exportBattleMap,
@@ -15,6 +16,8 @@ export interface BattleMapExportControlProps {
   mapImageSize?: { w: number; h: number };
   /** Provided on DM surfaces; renders the audience radio. Read live at export time. */
   getDmOnlyElements?: () => Record<string, boolean>;
+  /** Read live so exports include the latest local or relayed fog state. */
+  getFogState?: () => FogStateV1 | null;
   onError: (message: string) => void;
   /** Test seam; defaults to exportBattleMap. */
   exporter?: typeof exportBattleMap;
@@ -25,6 +28,7 @@ export function BattleMapExportControl({
   name,
   mapImageSize,
   getDmOnlyElements,
+  getFogState,
   onError,
   exporter = exportBattleMap,
 }: BattleMapExportControlProps) {
@@ -63,12 +67,15 @@ export function BattleMapExportControl({
     setBusy(true);
     try {
       const { blob, filename } = await exporter(vp, {
-        audience: getDmOnlyElements ? audience : 'full',
+        // A surface without DM-only controls is a player surface, never a
+        // full/DM export. This also makes its filename truthful.
+        audience: getDmOnlyElements ? audience : 'player',
         bounds,
         format,
         name,
         mapImageSize,
         dmOnlyElements: getDmOnlyElements?.(),
+        fogState: getFogState?.() ?? null,
       });
       downloadBlob(blob, filename);
       setOpen(false);

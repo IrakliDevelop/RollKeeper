@@ -720,6 +720,7 @@ export function PlayerBattleMapCanvas({
               <BattleMapExportControl
                 getViewport={() => viewport}
                 name="battle-map"
+                getFogState={() => viewport.fog.getState()}
                 onError={onExportError}
               />
             }
