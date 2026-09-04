@@ -1,9 +1,11 @@
-import type { FogViewMode } from '@fieldnotes/core';
+import type { FogManager, FogViewMode } from '@fieldnotes/core';
 
 export function configureFogView(
+  fogManager: FogManager,
   role: 'dm' | 'player' | 'display',
   preview: boolean
-): FogViewMode {
-  if (role !== 'dm') return 'player';
-  return preview ? 'player' : 'editor';
+): void {
+  const mode: FogViewMode =
+    role !== 'dm' ? 'player' : preview ? 'player' : 'editor';
+  fogManager.setViewMode(mode);
 }

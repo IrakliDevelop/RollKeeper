@@ -48,22 +48,32 @@ describe('reconcileMapFogBounds', () => {
 });
 
 describe('configureFogView', () => {
-  it('returns editor for DM without preview', () => {
-    expect(configureFogView('dm', false)).toBe('editor');
+  it('sets editor for DM without preview', () => {
+    const fm = new FogManager();
+    configureFogView(fm, 'dm', false);
+    expect(fm.getViewMode()).toBe('editor');
   });
 
-  it('returns player for DM with preview', () => {
-    expect(configureFogView('dm', true)).toBe('player');
+  it('sets player for DM with preview', () => {
+    const fm = new FogManager();
+    configureFogView(fm, 'dm', true);
+    expect(fm.getViewMode()).toBe('player');
   });
 
-  it('returns player for player regardless of preview', () => {
-    expect(configureFogView('player', false)).toBe('player');
-    expect(configureFogView('player', true)).toBe('player');
+  it('sets player for player regardless of preview', () => {
+    const fm = new FogManager();
+    configureFogView(fm, 'player', false);
+    expect(fm.getViewMode()).toBe('player');
+    configureFogView(fm, 'player', true);
+    expect(fm.getViewMode()).toBe('player');
   });
 
-  it('returns player for display regardless of preview', () => {
-    expect(configureFogView('display', false)).toBe('player');
-    expect(configureFogView('display', true)).toBe('player');
+  it('sets player for display regardless of preview', () => {
+    const fm = new FogManager();
+    configureFogView(fm, 'display', false);
+    expect(fm.getViewMode()).toBe('player');
+    configureFogView(fm, 'display', true);
+    expect(fm.getViewMode()).toBe('player');
   });
 });
 

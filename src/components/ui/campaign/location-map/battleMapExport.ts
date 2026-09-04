@@ -1,4 +1,4 @@
-import type { ExportImageOptions } from '@fieldnotes/core';
+import type { ExportImageOptions, FogStateV1 } from '@fieldnotes/core';
 
 import { createStandaloneMarkerRegistry } from './markerPainter';
 import { MARKER_HTML_TYPES } from './markerData';
@@ -12,6 +12,7 @@ export interface BattleMapExportRequest {
   mapImageSize?: { w: number; h: number };
   /** DM surfaces only; player surface omits it (store already relay-filtered). */
   dmOnlyElements?: Record<string, boolean>;
+  fogState?: FogStateV1 | null;
 }
 
 export interface BattleMapExportResult {
@@ -77,6 +78,11 @@ export async function exportBattleMap(
   if (req.format === 'jpeg') options.quality = JPEG_QUALITY;
   if (region) options.region = region;
   if (dmOnly) options.filter = el => !dmOnly[el.id];
+  if (req.audience === 'player' && req.fogState) {
+    options.fog = { state: req.fogState, mode: 'player' };
+  } else if (req.audience === 'full') {
+    options.fog = false;
+  }
 
   const blob = await vp.exportImage(options);
   if (!blob) throw new Error('Export produced no image');

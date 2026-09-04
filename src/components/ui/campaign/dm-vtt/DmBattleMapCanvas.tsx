@@ -86,6 +86,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           onReady={handleReady}
           className="h-full w-full"
           snapToGrid
+          options={{ fog: {} }}
         />
         {viewport && (
           <DmVttToolbar

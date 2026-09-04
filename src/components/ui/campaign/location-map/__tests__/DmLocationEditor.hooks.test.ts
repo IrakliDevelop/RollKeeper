@@ -66,6 +66,13 @@ function makeStubViewport() {
     store,
     layerManager,
     domLayer,
+    fog: {
+      on: vi.fn(() => () => {}),
+      getState: vi.fn(() => null),
+      getViewMode: vi.fn(() => 'off'),
+      setViewMode: vi.fn(),
+      setBounds: vi.fn(),
+    },
     toolManager: {
       // Only 'select' resolves to a fake tool; other names (e.g. 'path',
       // requested unconditionally by the movement-commit wiring in
@@ -76,6 +83,7 @@ function makeStubViewport() {
           ? { name: 'select', selectedIds: selectionState.selectedIds }
           : undefined
       ),
+      register: vi.fn(),
       onChange: vi.fn(),
       activeTool: { name: 'select' },
     },

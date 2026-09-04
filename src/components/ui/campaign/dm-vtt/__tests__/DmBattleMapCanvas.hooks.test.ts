@@ -144,7 +144,11 @@ function makeFakeMovementTool() {
 function makeVp(): Viewport {
   const fakeMovementTool = makeFakeMovementTool();
   return {
-    store: { on: vi.fn(), getById: vi.fn(() => undefined) },
+    store: {
+      on: vi.fn(),
+      getById: vi.fn(() => undefined),
+      snapshot: vi.fn(() => []),
+    },
     layerManager: {},
     camera: {},
     domLayer: document.createElement('div'),
@@ -167,6 +171,14 @@ function makeVp(): Viewport {
     setActivation: vi.fn(() => () => {}),
     onElementActivate: vi.fn(() => () => {}),
     transaction: <T>(operation: () => T): T => operation(),
+    fog: {
+      on: vi.fn(() => () => {}),
+      getState: vi.fn(() => null),
+      getViewMode: vi.fn(() => 'off'),
+      setViewMode: vi.fn(),
+      initialize: vi.fn(),
+      setBounds: vi.fn(),
+    },
   } as unknown as Viewport;
 }
 

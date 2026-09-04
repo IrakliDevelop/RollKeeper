@@ -16,6 +16,7 @@ import {
   LaserTool,
   PingTool,
   AutoSave,
+  FogTool,
   type CameraAnimator,
   type CameraView,
   type ElementActivationEvent,
@@ -68,6 +69,12 @@ import {
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
+import { isFogOfWarEnabled } from '@/lib/fogOfWar';
+import {
+  attachFogPersistence,
+  reconcileMapFogBounds,
+  resolveMapImageBounds,
+} from './fog';
 import { useDmStore } from '@/store/dmStore';
 import type { PeerRoster } from '@fieldnotes/core';
 import { resolveDmMovement, logDmMovement } from './movementLogging';
@@ -311,6 +318,7 @@ export function useDmLocationEditor(
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<BattleMapConnection | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  const fogPersistenceCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
   const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
@@ -838,10 +846,15 @@ export function useDmLocationEditor(
       syncSelection();
 
       // AutoSave — persist to store
+      if (isFogOfWarEnabled()) {
+        vp.toolManager.register(new FogTool(vp.fog));
+      }
+
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `location-canvas-${location.id}`,
         debounceMs: 1500,
         layerManager: vp.layerManager,
+        fogManager: vp.fog,
       });
 
       // Load existing canvas state from location, or initialize with map background
@@ -891,6 +904,17 @@ export function useDmLocationEditor(
       vp.store.on('add', saveAndMarkDirty);
       vp.store.on('remove', saveAndMarkDirty);
       vp.store.on('update', saveAndMarkDirty);
+
+      fogPersistenceCleanupRef.current?.();
+      fogPersistenceCleanupRef.current = attachFogPersistence(vp.fog, () => {
+        const json = vp.exportJSON();
+        onSave(json);
+        setHasUnsyncedChanges(true);
+      });
+
+      // Reconcile fog bounds after initial load
+      const mapBounds = resolveMapImageBounds(vp.store, location.mapImageSize);
+      reconcileMapFogBounds(vp.fog, mapBounds);
 
       // Register before live sync starts so a newly-created local element is
       // marked DM-only before the sync client resolves its audience. Remote
@@ -996,6 +1020,10 @@ export function useDmLocationEditor(
           clientId: dmId,
           tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
           seedLocal: true,
+          fog: {
+            manager: vp.fog,
+            preserveLocalWhenRemoteMissing: true,
+          },
           resolveAudience: el =>
             useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
               ?.dmOnlyElements[el.id]
@@ -1239,6 +1267,7 @@ export function useDmLocationEditor(
         arrangeSessionRef.current = null;
       }
       autoSaveRef.current?.stop();
+      fogPersistenceCleanupRef.current?.();
       laserCleanupRef.current?.();
       movementCommitUnsubRef.current?.();
       // Disposed after laserCleanupRef (which tears down focusBroadcast) and

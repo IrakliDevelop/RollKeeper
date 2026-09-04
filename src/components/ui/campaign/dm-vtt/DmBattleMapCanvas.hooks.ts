@@ -13,6 +13,7 @@ import {
   LaserTool,
   PingTool,
   AutoSave,
+  FogTool,
   type CameraAnimator,
   type CameraView,
   type ElementActivationEvent,
@@ -107,6 +108,12 @@ import type {
 } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
 import { resolveDmPortalDestination } from '@/components/ui/campaign/location-map/markerPortal';
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import { isFogOfWarEnabled } from '@/lib/fogOfWar';
+import {
+  attachFogPersistence,
+  reconcileMapFogBounds,
+  resolveMapImageBounds,
+} from '@/components/ui/campaign/location-map/fog';
 
 import type { TokenInfoMode } from '@/components/ui/campaign/token-overlay';
 import type {
@@ -233,6 +240,7 @@ export function useDmBattleMapCanvas({
   const markerAddGuardUnsubRef = useRef<(() => void) | null>(null);
   const markerRemovalTrackUnsubRef = useRef<(() => void) | null>(null);
   const selectionUnsubRef = useRef<(() => void) | null>(null);
+  const fogPersistenceCleanupRef = useRef<(() => void) | null>(null);
   const [hiddenPlacementActive, setHiddenPlacementActive] = useState(false);
   const hiddenPlacementActiveRef = useRef(false);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
@@ -725,10 +733,15 @@ export function useDmBattleMapCanvas({
           });
       }
 
+      if (isFogOfWarEnabled()) {
+        vp.toolManager.register(new FogTool(vp.fog));
+      }
+
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `battlemap-canvas-${battleMapId}`,
         debounceMs: 1500,
         layerManager: vp.layerManager,
+        fogManager: vp.fog,
       });
       autoSave.start();
       autoSaveRef.current = autoSave;
@@ -748,6 +761,26 @@ export function useDmBattleMapCanvas({
       vp.store.on('add', saveOnLocalOps);
       vp.store.on('remove', saveOnLocalOps);
       vp.store.on('update', saveOnLocalOps);
+
+      fogPersistenceCleanupRef.current?.();
+      fogPersistenceCleanupRef.current = attachFogPersistence(vp.fog, () => {
+        useBattleMapStore
+          .getState()
+          .updateBattleMap(campaignCode, battleMapId, {
+            canvasState: vp.exportJSON(),
+            updatedAt: new Date().toISOString(),
+          });
+      });
+
+      // Reconcile fog bounds after loading canvas state
+      const mapImageSize = useBattleMapStore
+        .getState()
+        .getBattleMap(campaignCode, battleMapId)?.mapImageSize;
+      const fogBounds = resolveMapImageBounds(
+        vp.store,
+        mapImageSize ?? { w: 1024, h: 1024 }
+      );
+      reconcileMapFogBounds(vp.fog, fogBounds);
 
       // Attach before live sync so a local addition is marked private before
       // the sync client resolves the audience for its first outbound upsert.
@@ -873,6 +906,10 @@ export function useDmBattleMapCanvas({
             applyLayer: makeApplyRemoteLayer(vp, 'dm', {
               onApplied: () => vp.requestRender(),
             }),
+          },
+          fog: {
+            manager: vp.fog,
+            preserveLocalWhenRemoteMissing: true,
           },
           onStatus: s => {
             setStatus(s);
@@ -1044,6 +1081,7 @@ export function useDmBattleMapCanvas({
       hiddenPlacementUnsubRef.current?.();
       markerAddGuardUnsubRef.current?.();
       markerRemovalTrackUnsubRef.current?.();
+      fogPersistenceCleanupRef.current?.();
       selectionUnsubRef.current?.();
     };
   }, []);

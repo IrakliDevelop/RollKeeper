@@ -20,6 +20,7 @@ import { attachRemotePaths } from '@/components/ui/campaign/location-map/pathSyn
 import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
 import type { AwarenessSyncHandle } from '@/components/ui/campaign/location-map/awarenessSync';
 import { attachConnectionScope } from '@/components/ui/campaign/location-map/connectionScope';
+import { configureFogView } from '@/components/ui/campaign/location-map/fog';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 
 function DisplayCanvas() {
@@ -56,6 +57,7 @@ function DisplayCanvas() {
   const handleReady = (vp: Viewport) => {
     viewportRef.current = vp;
     setViewport(vp);
+    configureFogView(vp.fog, 'display', false);
     // Canonical bands so map/annotation elements stack correctly; custom and
     // player layer definitions arrive over layer sync. Read-only view — the
     // 'player' lock stance is irrelevant here.
@@ -75,6 +77,7 @@ function DisplayCanvas() {
       store: vp.store,
       clientId: `display-${code}`,
       tokenRequest: { role: 'display', battleMapId: id, displayKey },
+      fog: { manager: vp.fog },
       layers: {
         applyLayer: makeApplyRemoteLayer(vp, 'display', {
           onApplied: () => vp.requestRender(),
@@ -177,7 +180,7 @@ function DisplayCanvas() {
         tools={toolsRef.current}
         defaultTool="hand"
         onReady={handleReady}
-        options={{ background: { pattern: 'none' } }}
+        options={{ background: { pattern: 'none' }, fog: {} }}
         style={{ width: '100%', height: '100%' }}
       />
       {overlayMessage && (

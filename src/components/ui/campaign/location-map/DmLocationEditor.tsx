@@ -277,6 +277,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   dotRadius: 1,
                 },
                 camera: { minZoom: 0.1, maxZoom: 5 },
+                fog: {},
               }}
               onReady={handleReady}
               className="h-full w-full"
