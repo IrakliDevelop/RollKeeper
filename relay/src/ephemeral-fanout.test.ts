@@ -5,7 +5,7 @@ import { EphemeralHubFanout } from './ephemeral-fanout.js';
 const payload = (kind: string): string => JSON.stringify({ op: { kind } });
 
 describe('EphemeralHubFanout', () => {
-  it('publishes presence and leave while dropping durable and malformed payloads', () => {
+  it('publishes presence, leave, and fog ops while dropping element ops and malformed payloads', () => {
     const inner = new InMemoryHubFanout();
     const fanout = new EphemeralHubFanout(inner);
     const seen = vi.fn();
@@ -13,12 +13,15 @@ describe('EphemeralHubFanout', () => {
 
     fanout.publish(payload('presence'));
     fanout.publish(payload('presence-leave'));
+    fanout.publish(payload('fog-meta'));
+    fanout.publish(payload('fog-patch'));
     fanout.publish(payload('upsert'));
+    fanout.publish(payload('clear'));
     fanout.publish('not json');
 
     expect(
       seen.mock.calls.map(([message]) => JSON.parse(message).op.kind)
-    ).toEqual(['presence', 'presence-leave']);
+    ).toEqual(['presence', 'presence-leave', 'fog-meta', 'fog-patch']);
   });
 
   it('filters inbound payloads before notifying hub subscribers', () => {
@@ -29,10 +32,14 @@ describe('EphemeralHubFanout', () => {
 
     inner.publish(payload('clear'));
     inner.publish(payload('presence'));
+    inner.publish(payload('fog-meta'));
 
-    expect(seen).toHaveBeenCalledTimes(1);
+    expect(seen).toHaveBeenCalledTimes(2);
     expect(JSON.parse(seen.mock.calls[0]?.[0] as string).op.kind).toBe(
       'presence'
+    );
+    expect(JSON.parse(seen.mock.calls[1]?.[0] as string).op.kind).toBe(
+      'fog-meta'
     );
   });
 });

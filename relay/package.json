@@ -11,13 +11,14 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/server.js",
     "test": "vitest run",
+    "test:redis": "vitest run src/fog-redis.integration.test.ts",
     "type-check": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@fieldnotes/core": "0.65.0",
-    "@fieldnotes/sync": "0.11.0",
-    "@fieldnotes/sync-redis": "0.4.0",
-    "@fieldnotes/sync-server": "0.13.0",
+    "@fieldnotes/core": "0.66.0",
+    "@fieldnotes/sync": "0.12.0",
+    "@fieldnotes/sync-redis": "0.5.0",
+    "@fieldnotes/sync-server": "0.14.0",
     "redis": "^4.7.0"
   },
   "devDependencies": {

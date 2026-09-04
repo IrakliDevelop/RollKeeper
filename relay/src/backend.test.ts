@@ -9,11 +9,17 @@ function fakeRedis(seed: Record<string, string> = {}) {
       calls.push({ method: 'hGetAll', args: [key] });
       return seed;
     },
+    hGet: async (key, field) => {
+      calls.push({ method: 'hGet', args: [key, field] });
+      return seed[field] ?? null;
+    },
     hSet: async (key, fv) => calls.push({ method: 'hSet', args: [key, fv] }),
     hDel: async (key, fields) =>
       calls.push({ method: 'hDel', args: [key, fields] }),
     del: async key => calls.push({ method: 'del', args: [key] }),
     expire: async (key, s) => calls.push({ method: 'expire', args: [key, s] }),
+    eval: async (script, opts) =>
+      calls.push({ method: 'eval', args: [script, opts] }),
   };
   return { redis, calls };
 }
@@ -79,6 +85,28 @@ describe('BufferedRedisBackend', () => {
       Object.keys(hsets[0].args[1] as Record<string, string>).sort()
     ).toEqual(['a', 'b']);
     expect(calls.filter(c => c.method === 'expire')[0].args[1]).toBe(99);
+  });
+
+  it('refreshes element, fog-meta, and fog-tiles TTLs after element activity', async () => {
+    const { redis, calls } = fakeRedis();
+    const b = new BufferedRedisBackend(redis, {
+      flushIntervalMs: 3000,
+      roomTtlSeconds: 99,
+    });
+
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(600);
+
+    const expiredKeys = calls
+      .filter(c => c.method === 'expire')
+      .map(c => c.args[0]);
+    expect(expiredKeys).toEqual(
+      expect.arrayContaining([
+        'fieldnotes:room:r1',
+        'fieldnotes:room:r1:fog:meta',
+        'fieldnotes:room:r1:fog:tiles',
+      ])
+    );
   });
 
   it('flushes removals as hDel and drops them from memory immediately', async () => {
