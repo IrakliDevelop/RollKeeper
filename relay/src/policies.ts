@@ -1,6 +1,7 @@
 import type {
   Authenticate,
   Authorize,
+  AuthorizeFog,
   AuthorizeLayer,
   CanRead,
   OwnedElement,
@@ -18,6 +19,7 @@ export const DM_AUDIENCE = 'dm';
 export function makePolicies(secret: string): {
   authenticate: Authenticate;
   authorize: Authorize;
+  authorizeFog: AuthorizeFog;
   authorizeLayer: AuthorizeLayer;
   canRead: CanRead;
 } {
@@ -69,5 +71,10 @@ export function makePolicies(secret: string): {
     return userId !== undefined && layerId === `player-${userId}`;
   };
 
-  return { authenticate, authorize, authorizeLayer, canRead };
+  const authorizeFog: AuthorizeFog = ({ role }) => {
+    if (role === 'dm') return true;
+    return false;
+  };
+
+  return { authenticate, authorize, authorizeFog, authorizeLayer, canRead };
 }

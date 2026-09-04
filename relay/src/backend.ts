@@ -1,14 +1,31 @@
 import type { CanvasElement } from '@fieldnotes/core';
-import type { HubBackend } from '@fieldnotes/sync-server';
-import type { SyncOp } from '@fieldnotes/sync';
+import type {
+  HubBackend,
+  FogApplyResult,
+  FogPatchApplyResult,
+} from '@fieldnotes/sync-server';
+import type {
+  SyncOp,
+  FogSnapshot,
+  FogMetaRecord,
+  FogTileRecord,
+} from '@fieldnotes/sync';
+import { RedisHubBackend, type RedisHashClient } from '@fieldnotes/sync-redis';
 
 /** Minimal Redis surface — node-redis v4 satisfies this directly. */
 export interface BackendRedis {
   hGetAll(key: string): Promise<Record<string, string>>;
+  hGet(key: string, field: string): Promise<string | null | undefined>;
   hSet(key: string, fieldValues: Record<string, string>): Promise<unknown>;
+  hSet(key: string, field: string, value: string): Promise<unknown>;
   hDel(key: string, fields: string[]): Promise<unknown>;
+  hDel(key: string, field: string): Promise<unknown>;
   del(key: string): Promise<unknown>;
   expire(key: string, seconds: number): Promise<unknown>;
+  eval(
+    script: string,
+    options: { keys: string[]; arguments: string[] }
+  ): Promise<unknown>;
 }
 
 export interface BufferedRedisBackendOptions {
@@ -34,6 +51,10 @@ interface RoomState {
  * Rationale: Upstash bills per command; the stock sync-redis backend issues
  * 1-2 commands per drag-frame op. Single-instance only (state lives here).
  *
+ * Fog operations are delegated synchronously to a `RedisHubBackend` from
+ * `@fieldnotes/sync-redis` — they use its atomic LWW/generation/cap Lua
+ * scripts and are never buffered.
+ *
  * Idle rooms are evicted opportunistically: whenever a flush runs, rooms with
  * no pending writes whose last access is older than `idleEvictMs` are dropped
  * from memory (they re-hydrate from Redis on next access). A fully idle
@@ -44,14 +65,38 @@ export class BufferedRedisBackend implements HubBackend {
   private timer: NodeJS.Timeout | null = null;
   private flushing = false;
   private flushPromise: Promise<void> | null = null;
+  private readonly fogBackend: RedisHubBackend;
+  private pendingExpires = new Set<string>();
+  private expiryTimer: NodeJS.Timeout | null = null;
 
   constructor(
     private redis: BackendRedis,
     private opts: BufferedRedisBackendOptions = {}
-  ) {}
+  ) {
+    const adapter: RedisHashClient = {
+      hGetAll: key => redis.hGetAll(key),
+      hGet: async (key, field) => (await redis.hGet(key, field)) ?? null,
+      hSet: (key: string, field: string, value: string) =>
+        redis.hSet(key, field, value),
+      hDel: (key: string, field: string) => redis.hDel(key, field),
+      del: key => redis.del(key),
+      eval: (script, options) => redis.eval(script, options),
+    };
+    this.fogBackend = new RedisHubBackend(adapter, {
+      keyPrefix: opts.keyPrefix ?? 'fieldnotes:room:',
+    });
+  }
 
   private key(room: string): string {
     return (this.opts.keyPrefix ?? 'fieldnotes:room:') + room;
+  }
+
+  private fogMetaKey(room: string): string {
+    return this.key(room) + ':fog:meta';
+  }
+
+  private fogTilesKey(room: string): string {
+    return this.key(room) + ':fog:tiles';
   }
 
   private async ensure(room: string): Promise<RoomState> {
@@ -69,11 +114,6 @@ export class BufferedRedisBackend implements HubBackend {
     }
     st.lastAccess = Date.now();
     if (!st.hydrated) {
-      // Hub serializes calls per room, so there is no concurrent-caller race
-      // to guard against here. Only latch `hydrated` AFTER hGetAll succeeds:
-      // if it rejects, the room must stay un-hydrated so the failing op
-      // propagates its error and the next access retries the hydration
-      // instead of silently latching on an empty map.
       const raw = await this.redis.hGetAll(this.key(room));
       for (const [id, json] of Object.entries(raw)) {
         if (!st.elements.has(id) && !st.removed.has(id)) {
@@ -119,14 +159,82 @@ export class BufferedRedisBackend implements HubBackend {
         await this.redis.del(this.key(room));
         st.pendingClear = false;
       } catch (err) {
-        // memory is already cleared; retry the DEL on the next flush so a
-        // stale Redis hash cannot resurrect elements after a restart
         st.pendingClear = true;
         this.schedule();
         console.error('[backend] clear failed, will retry:', err);
       }
     }
   }
+
+  // ── Fog delegation ──────────────────────────────────────────────────
+
+  async fogSnapshot(room: string): Promise<FogSnapshot | undefined> {
+    return this.fogBackend.fogSnapshot(room);
+  }
+
+  async applyFogMeta(
+    room: string,
+    record: FogMetaRecord
+  ): Promise<FogApplyResult<FogMetaRecord>> {
+    const result = await this.fogBackend.applyFogMeta(room, record);
+    if (result.accepted) this.refreshRoomTtl(room);
+    return result;
+  }
+
+  async applyFogTile(
+    room: string,
+    record: FogTileRecord
+  ): Promise<FogApplyResult<FogTileRecord>> {
+    const result = await this.fogBackend.applyFogTile(room, record);
+    if (result.accepted) this.refreshRoomTtl(room);
+    return result;
+  }
+
+  async applyFogPatch(
+    room: string,
+    records: readonly FogTileRecord[]
+  ): Promise<FogPatchApplyResult> {
+    const result = await this.fogBackend.applyFogPatch(room, records);
+    if (result.accepted.length > 0) this.refreshRoomTtl(room);
+    return result;
+  }
+
+  // ── TTL maintenance ─────────────────────────────────────────────────
+
+  private refreshRoomTtl(room: string): void {
+    this.pendingExpires.add(room);
+    if (this.expiryTimer) return;
+    this.expiryTimer = setTimeout(() => {
+      this.expiryTimer = null;
+      void this.flushExpires();
+    }, 500);
+  }
+
+  private async flushExpires(): Promise<void> {
+    const rooms = [...this.pendingExpires];
+    this.pendingExpires.clear();
+    const ttl = this.opts.roomTtlSeconds ?? 172800;
+    for (const room of rooms) {
+      try {
+        await Promise.all([
+          this.redis.expire(this.key(room), ttl),
+          this.redis.expire(this.fogMetaKey(room), ttl),
+          this.redis.expire(this.fogTilesKey(room), ttl),
+        ]);
+      } catch (err) {
+        this.pendingExpires.add(room);
+        if (!this.expiryTimer) {
+          this.expiryTimer = setTimeout(() => {
+            this.expiryTimer = null;
+            void this.flushExpires();
+          }, 2000);
+        }
+        console.error('[backend] TTL refresh failed, will retry:', err);
+      }
+    }
+  }
+
+  // ── Element flush ───────────────────────────────────────────────────
 
   private schedule(): void {
     if (this.timer) return;
@@ -138,7 +246,6 @@ export class BufferedRedisBackend implements HubBackend {
 
   async flush(): Promise<void> {
     if (this.flushing) {
-      // a slow flush is still in-flight; don't overlap — try next interval
       this.schedule();
       return;
     }
@@ -151,8 +258,6 @@ export class BufferedRedisBackend implements HubBackend {
       for (const [room, st] of this.rooms) {
         const key = this.key(room);
         if (st.pendingClear) {
-          // the DEL must land before any post-clear writes, otherwise a later
-          // successful DEL would wipe them; skip the room until it succeeds
           try {
             await this.redis.del(key);
             st.pendingClear = false;
@@ -176,8 +281,6 @@ export class BufferedRedisBackend implements HubBackend {
           if (toDel.length > 0) await this.redis.hDel(key, toDel);
           await this.redis.expire(key, this.opts.roomTtlSeconds ?? 172800);
         } catch (err) {
-          // put them back and retry on the next flush; the retry rebuilds
-          // payloads from live elements, so interim writes are never lost
           for (const id of Object.keys(toSet)) st.dirty.add(id);
           for (const id of toDel) st.removed.add(id);
           this.schedule();
@@ -207,10 +310,12 @@ export class BufferedRedisBackend implements HubBackend {
       clearTimeout(this.timer);
       this.timer = null;
     }
-    // wait out any flush already in progress before running the final one,
-    // otherwise flush() would see `flushing` still true and no-op immediately,
-    // letting SIGTERM exit with unflushed writes.
+    if (this.expiryTimer) {
+      clearTimeout(this.expiryTimer);
+      this.expiryTimer = null;
+    }
     if (this.flushPromise) await this.flushPromise;
     await this.flush();
+    if (this.pendingExpires.size > 0) await this.flushExpires();
   }
 }

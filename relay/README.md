@@ -16,9 +16,11 @@ Auth = short-lived HMAC tokens minted by the Next.js app (`/api/campaign/[code]/
 | `RELAY_GATE_LOG` | no | `1` logs admitted identities and presence kinds + field names — manual verification only, never in production |
 
 When Redis is enabled, the relay opens one backend connection plus dedicated publish and subscribe
-connections. Fan-out is intentionally limited to presence traffic because the buffered backend is
-memory-first and not a shared canonical backend. Durable canvas operations remain instance-local;
-server pokes, client presence, and disconnect presence leave events cross relay instances.
+connections. Element ops remain buffered in memory and instance-local. Fog-of-war ops are delegated
+synchronously to a `RedisHubBackend` from `@fieldnotes/sync-redis` for atomic LWW persistence.
+Fan-out carries presence, leave events, and fog ops across relay instances; element ops stay
+instance-local. Only `role === 'dm'` may write fog (`authorizeFog` policy); player and display
+fog writes are rejected with authoritative corrections.
 
 ## Local dev
 
@@ -35,8 +37,6 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
-5. Version coupling: the app's shared-presence cursors (`@fieldnotes/core` ≥ 0.65.0) assume the
-   relay runs `@fieldnotes/sync-server` ≥ 0.13.0 (per-kind presence throttle lanes). Deploy the
-   relay BEFORE releasing an app build that publishes cursors. The relay tree intentionally carries
-   two `@fieldnotes/sync` copies (0.11.0 for sync-server, 0.10.0 nested under sync-redis 0.4.0);
-   fan-out is string pub/sub, so the duplicate is harmless.
+5. Version coupling: the relay runs `@fieldnotes/sync-server` 0.14.0, `@fieldnotes/sync-redis`
+   0.5.0, `@fieldnotes/core` 0.66.0, `@fieldnotes/sync` 0.12.0. The app's fog-of-war UI requires
+   this relay version. Deploy the relay BEFORE releasing an app build with fog support.

@@ -9,11 +9,17 @@ function fakeRedis(seed: Record<string, string> = {}) {
       calls.push({ method: 'hGetAll', args: [key] });
       return seed;
     },
+    hGet: async (key, field) => {
+      calls.push({ method: 'hGet', args: [key, field] });
+      return seed[field] ?? null;
+    },
     hSet: async (key, fv) => calls.push({ method: 'hSet', args: [key, fv] }),
     hDel: async (key, fields) =>
       calls.push({ method: 'hDel', args: [key, fields] }),
     del: async key => calls.push({ method: 'del', args: [key] }),
     expire: async (key, s) => calls.push({ method: 'expire', args: [key, s] }),
+    eval: async (script, opts) =>
+      calls.push({ method: 'eval', args: [script, opts] }),
   };
   return { redis, calls };
 }
