@@ -54,6 +54,14 @@ describe('marker loot atomic scripts', () => {
     expect(evalMock.mock.calls[0][1]).toEqual(['ledger']);
   });
 
+  it('normalizes the Redis Lua empty-table encoding to an empty ledger', async () => {
+    const evalMock = vi.fn().mockResolvedValue('{}');
+
+    await expect(
+      seedMarkerLoot({ eval: evalMock } as unknown as Redis, 'ledger', [], 60)
+    ).resolves.toEqual([]);
+  });
+
   it('returns the idempotent claim receipt produced by the atomic script', async () => {
     const claim = {
       requestId: 'request-1',

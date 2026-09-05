@@ -26,8 +26,9 @@ for _, entry in ipairs(incoming) do
     entry.claimedQuantity = entry.quantity
   end
 end
-redis.call('SET', KEYS[1], cjson.encode(incoming), 'EX', ARGV[2])
-return cjson.encode(incoming)
+local encoded = #incoming == 0 and '[]' or cjson.encode(incoming)
+redis.call('SET', KEYS[1], encoded, 'EX', ARGV[2])
+return encoded
 `;
 
 const CLAIM_SCRIPT = `
@@ -108,6 +109,30 @@ export function validateMarkerLootSeed(
   return keys.size === value.length ? value : null;
 }
 
+/**
+ * Redis Lua cjson encodes an empty table as `{}` unless the script writes the
+ * JSON array literal explicitly. Accept that legacy representation so maps
+ * published before the fix keep working, while rejecting any other malformed
+ * ledger shape.
+ */
+export function parseStoredMarkerLootLedger(
+  raw: string | null
+): MarkerLootLedgerEntry[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    Object.keys(parsed).length === 0
+  ) {
+    return [];
+  }
+  const ledger = validateMarkerLootSeed(parsed);
+  if (!ledger) throw new Error('Invalid marker loot ledger');
+  return ledger;
+}
+
 export async function seedMarkerLoot(
   redis: Redis,
   key: string,
@@ -119,7 +144,7 @@ export async function seedMarkerLoot(
     [key],
     [JSON.stringify(entries), ttlSeconds]
   );
-  return JSON.parse(String(raw)) as MarkerLootLedgerEntry[];
+  return parseStoredMarkerLootLedger(String(raw));
 }
 
 export type ClaimMarkerLootResult =
