@@ -21,7 +21,13 @@ import { attachAwarenessSync } from '@/components/ui/campaign/location-map/aware
 import type { AwarenessSyncHandle } from '@/components/ui/campaign/location-map/awarenessSync';
 import { attachConnectionScope } from '@/components/ui/campaign/location-map/connectionScope';
 import { configureFogView } from '@/components/ui/campaign/location-map/fog';
+import {
+  applyFogAppearanceMetadata,
+  fetchAndApplyFogAppearance,
+  startFogAppearancePoll,
+} from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
+import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -44,6 +50,7 @@ function DisplayCanvas() {
   const toolsRef = useRef([new HandTool()]);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -83,15 +90,28 @@ function DisplayCanvas() {
           onApplied: () => vp.requestRender(),
         }),
       },
+      onTokenMetadata: proceduralFogEnabled
+        ? meta => {
+            applyFogAppearanceMetadata(
+              vp,
+              meta.fogAppearance,
+              meta.fogAppearanceUpdatedAt
+            );
+          }
+        : undefined,
       onStatus: s => {
         setStatus(s);
         if (s === 'live') {
-          // frame the map once the snapshot has been applied
           requestAnimationFrame(() => vp.fitToContent(60));
-          // Managed sendPresence drops while not live, so the attach-time
-          // frame may be lost; announce on every live transition (first
-          // connect AND reconnect) — the heartbeat self-heals otherwise.
           awarenessRef.current?.announce();
+        }
+      },
+      onPoke: feature => {
+        if (proceduralFogEnabled && feature === 'fog-appearance') {
+          fetchAndApplyFogAppearance(
+            vp,
+            `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
+          );
         }
       },
     });
@@ -131,6 +151,15 @@ function DisplayCanvas() {
           awarenessRef.current = null;
           awareness.dispose();
         });
+
+        if (proceduralFogEnabled) {
+          scope.push(
+            startFogAppearancePoll({
+              viewport: vp,
+              url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
+            })
+          );
+        }
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and

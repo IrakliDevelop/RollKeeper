@@ -15,6 +15,7 @@ import type { DmLocationEditorProps } from './DmLocationEditor.types';
 import { parseFogAppearance, resolveFogRendererOptions } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
+import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
 
@@ -105,6 +106,24 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
   const fogAppearance = proceduralFogEnabled
     ? parseFogAppearance(props.location.fogAppearance)
     : 'solid';
+  useFogAppearanceProjection({
+    enabled:
+      proceduralFogEnabled &&
+      mode === 'battlemap' &&
+      Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL),
+    campaignCode: props.campaignCode,
+    battleMapId: props.location.id,
+    dmId: props.dmId,
+    appearance: fogAppearance,
+    onError: () => {
+      addToast({
+        type: 'error',
+        title: 'Fog appearance not shared',
+        message:
+          'Your local choice was saved, but connected viewers may still see the previous appearance. Reopen the map or change the setting to retry.',
+      });
+    },
+  });
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));

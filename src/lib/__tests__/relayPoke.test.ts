@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   sendInitiativePoke,
   sendBattleMapPoke,
+  sendBattleMapPokeToRoom,
   relayHttpUrl,
 } from '@/lib/relayPoke';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
@@ -143,5 +144,63 @@ describe('sendInitiativePoke', () => {
     const [, init] = call as unknown as [string, RequestInit];
     const body = JSON.parse(init.body as string);
     expect(body.feature).toBe('initiative');
+  });
+});
+
+describe('sendBattleMapPokeToRoom', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.example.com');
+    vi.stubEnv('BATTLEMAP_RELAY_SECRET', SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('targets the addressed room directly without reading Redis', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    await sendBattleMapPokeToRoom(CODE, 'map-7', 'fog-appearance', { fetchFn });
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchFn.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe('https://relay.example.com/poke');
+    const body = JSON.parse(init.body as string);
+    expect(body.room).toBe(`${CODE}:map-7`);
+    expect(body.feature).toBe('fog-appearance');
+  });
+
+  it('does nothing when relay URL is not configured', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const fetchFn = vi.fn();
+    await sendBattleMapPokeToRoom(CODE, 'map-1', 'fog-appearance', { fetchFn });
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('does not throw on network failure', async () => {
+    const fetchFn = vi.fn(async () => {
+      throw new Error('network');
+    });
+    await expect(
+      sendBattleMapPokeToRoom(CODE, 'map-1', 'fog-appearance', { fetchFn })
+    ).resolves.toBeUndefined();
+  });
+
+  it('mints a valid token for the addressed room', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    const now = 1700000000000;
+    await sendBattleMapPokeToRoom(CODE, 'map-X', 'fog-appearance', {
+      fetchFn,
+      now,
+    });
+    const body = JSON.parse(
+      (fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1]
+        .body as string
+    );
+    const payload = verifyBattleMapToken(body.token, SECRET, now);
+    expect(payload).not.toBeNull();
+    expect(payload!.room).toBe(`${CODE}:map-X`);
+    expect(payload!.role).toBe('dm');
   });
 });

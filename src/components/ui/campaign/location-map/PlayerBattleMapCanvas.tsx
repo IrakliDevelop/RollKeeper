@@ -49,6 +49,11 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { configureFogView } from './fog';
+import {
+  applyFogAppearanceMetadata,
+  fetchAndApplyFogAppearance,
+  startFogAppearancePoll,
+} from './fog/fogAppearancePoll';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
@@ -86,6 +91,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
+import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 
 import type { MovementResolution } from './movementTool';
 
@@ -286,6 +292,7 @@ export function PlayerBattleMapCanvas({
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
+  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
   const [hasSelection, setHasSelection] = useState(false);
   const [activeMarkerElementId, setActiveMarkerElementId] = useState<
     string | null
@@ -600,8 +607,23 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current?.announce();
         }
       },
+      onTokenMetadata: proceduralFogEnabled
+        ? meta => {
+            applyFogAppearanceMetadata(
+              vp,
+              meta.fogAppearance,
+              meta.fogAppearanceUpdatedAt
+            );
+          }
+        : undefined,
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkers();
+        if (proceduralFogEnabled && feature === 'fog-appearance') {
+          fetchAndApplyFogAppearance(
+            vp,
+            `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
+          );
+        }
         onPokeRef.current?.(feature);
       },
     });
@@ -668,6 +690,15 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current = null;
           awareness.dispose();
         });
+
+        if (proceduralFogEnabled) {
+          scope.push(
+            startFogAppearancePoll({
+              viewport: vp,
+              url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
+            })
+          );
+        }
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and

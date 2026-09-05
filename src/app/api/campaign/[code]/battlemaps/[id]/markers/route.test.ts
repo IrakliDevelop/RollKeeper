@@ -126,6 +126,16 @@ describe('battle-map marker publication', () => {
       0
     );
   });
+
+  it('treats the Redis Lua empty-table encoding as an empty ledger', async () => {
+    redis.get.mockResolvedValue([]);
+    rawRedis.get.mockResolvedValue('{}');
+
+    const response = await GET(new NextRequest('http://localhost/api'), params);
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ markers: [] });
+  });
 });
 
 describe('player marker loot claims', () => {

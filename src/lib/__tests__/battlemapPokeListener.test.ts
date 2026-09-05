@@ -69,7 +69,7 @@ describe('createBattleMapPokeListener', () => {
     vi.stubGlobal('WebSocket', FakeWebSocket as unknown as typeof WebSocket);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.example';
     mockMint.mockReset();
-    mockMint.mockResolvedValue('tok-1');
+    mockMint.mockResolvedValue({ token: 'tok-1' });
   });
 
   afterEach(() => {
@@ -143,7 +143,7 @@ describe('createBattleMapPokeListener', () => {
     expect(mockMint).toHaveBeenCalledTimes(1);
     expect(FakeWebSocket.instances[1].url).toBe(ws1.url);
 
-    mockMint.mockResolvedValue('tok-2');
+    mockMint.mockResolvedValue({ token: 'tok-2' });
     const ws2 = FakeWebSocket.instances[1];
     ws2.triggerClose(1006);
 
@@ -164,7 +164,7 @@ describe('createBattleMapPokeListener', () => {
     await vi.advanceTimersByTimeAsync(0);
     expect(mockMint).toHaveBeenCalledTimes(1);
 
-    mockMint.mockResolvedValue('tok-2');
+    mockMint.mockResolvedValue({ token: 'tok-2' });
     FakeWebSocket.instances[0].triggerClose(4401);
 
     await vi.advanceTimersByTimeAsync(1000);
@@ -180,7 +180,7 @@ describe('createBattleMapPokeListener', () => {
     const stop = createBattleMapPokeListener(opts);
     await vi.advanceTimersByTimeAsync(0);
 
-    mockMint.mockResolvedValue('tok-2');
+    mockMint.mockResolvedValue({ token: 'tok-2' });
     FakeWebSocket.instances[0].triggerClose(4000);
     await vi.advanceTimersByTimeAsync(1000);
 
@@ -197,7 +197,7 @@ describe('createBattleMapPokeListener', () => {
     expect(mockMint).toHaveBeenCalledTimes(1);
     const ws1 = FakeWebSocket.instances[0];
 
-    mockMint.mockResolvedValue('tok-refreshed');
+    mockMint.mockResolvedValue({ token: 'tok-refreshed' });
     await vi.advanceTimersByTimeAsync(4 * 60 * 1000);
 
     expect(ws1.closeCalls).toBe(1);
@@ -265,7 +265,7 @@ describe('createBattleMapPokeListener', () => {
     await vi.advanceTimersByTimeAsync(0);
 
     expect(FakeWebSocket.instances).toHaveLength(0);
-    mockMint.mockResolvedValue('tok-1');
+    mockMint.mockResolvedValue({ token: 'tok-1' });
     await vi.advanceTimersByTimeAsync(1000);
 
     expect(mockMint).toHaveBeenCalledTimes(2);
@@ -334,12 +334,12 @@ describe('createBattleMapPokeListener', () => {
 
   it('10. a proactive rebuild firing while a connect is still awaiting its token mint yields exactly one live socket', async () => {
     mockMint.mockReset();
-    let resolveFirst!: (token: string | null) => void;
-    let resolveSecond!: (token: string | null) => void;
-    const firstMint = new Promise<string | null>(res => {
+    let resolveFirst!: (token: { token: string } | null) => void;
+    let resolveSecond!: (token: { token: string } | null) => void;
+    const firstMint = new Promise<{ token: string } | null>(res => {
       resolveFirst = res;
     });
-    const secondMint = new Promise<string | null>(res => {
+    const secondMint = new Promise<{ token: string } | null>(res => {
       resolveSecond = res;
     });
     mockMint.mockImplementationOnce(() => firstMint);
@@ -359,9 +359,9 @@ describe('createBattleMapPokeListener', () => {
 
     // resolve the stale (first) mint after it has been superseded, then the
     // fresh (second) one
-    resolveFirst('tok-stale');
+    resolveFirst({ token: 'tok-stale' });
     await vi.advanceTimersByTimeAsync(0);
-    resolveSecond('tok-fresh');
+    resolveSecond({ token: 'tok-fresh' });
     await vi.advanceTimersByTimeAsync(0);
 
     expect(FakeWebSocket.instances).toHaveLength(1);

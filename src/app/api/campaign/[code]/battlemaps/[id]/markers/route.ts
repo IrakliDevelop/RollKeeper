@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyDmAuthority } from '@/lib/dmAuth';
 import {
   claimMarkerLoot,
+  parseStoredMarkerLootLedger,
   seedMarkerLoot,
   validateMarkerLootSeed,
 } from '@/lib/markerLootClaims';
@@ -21,10 +22,7 @@ import {
   applyCanonicalRemaining,
   sanitizePublicMarkers,
 } from '@/lib/sanitizePublicMarkers';
-import type {
-  MarkerLootLedgerEntry,
-  PublicMarkerDetail,
-} from '@/types/battlemap';
+import type { PublicMarkerDetail } from '@/types/battlemap';
 import { sendBattleMapPoke } from '@/lib/relayPoke';
 import {
   guestDeniedResponse,
@@ -50,9 +48,7 @@ export async function GET(
       getRawRedis().get<string>(campaignMarkerLootKey(code, id)),
     ]);
     await refreshCampaignTTL(redis, code);
-    const ledger = ledgerRaw
-      ? (JSON.parse(ledgerRaw) as MarkerLootLedgerEntry[])
-      : [];
+    const ledger = parseStoredMarkerLootLedger(ledgerRaw);
     return NextResponse.json({
       markers: applyCanonicalRemaining(markers ?? [], ledger),
     });
@@ -199,7 +195,7 @@ export async function POST(
     ]);
     const updated = applyCanonicalRemaining(
       stored ?? [],
-      ledgerRaw ? (JSON.parse(ledgerRaw) as MarkerLootLedgerEntry[]) : []
+      parseStoredMarkerLootLedger(ledgerRaw)
     );
     await refreshCampaignTTL(redis, code);
     await sendBattleMapPoke(code, redis, 'markers');

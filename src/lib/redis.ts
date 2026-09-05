@@ -118,6 +118,13 @@ export function campaignDisplayKeyKey(code: string): string {
   return `campaign:${code}:displaykey`;
 }
 
+export function campaignFogAppearanceKey(
+  code: string,
+  battleMapId: string
+): string {
+  return `campaign:${code}:fog-appearance:${battleMapId}`;
+}
+
 export function characterShareKey(characterId: string): string {
   return `character:share:${characterId}`;
 }

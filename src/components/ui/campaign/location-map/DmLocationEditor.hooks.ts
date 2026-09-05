@@ -1875,7 +1875,9 @@ export function useDmLocationEditor(
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,
         });
-        if (mode === 'location') setHasUnsyncedChanges(true);
+        if (mode === 'location') {
+          setHasUnsyncedChanges(true);
+        }
       },
       [getVp, storeUpdateLocation, campaignCode, location.id, mode]
     ),

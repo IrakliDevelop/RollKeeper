@@ -119,18 +119,18 @@ export function createBattleMapPokeListener(
     connecting = true;
     const myGeneration = generation;
     try {
-      const token = await mintBattleMapToken(opts.campaignCode, {
+      const result = await mintBattleMapToken(opts.campaignCode, {
         ...opts.tokenRequest,
         battleMapId: opts.battleMapId,
       });
       // Discard a stale result: rebuild()/stop() ran while we were
       // awaiting the mint and superseded this attempt.
       if (stopped || myGeneration !== generation) return;
-      if (!token) {
+      if (!result) {
         scheduleRetry(() => void connect());
         return;
       }
-      const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
+      const url = `${relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(result.token)}`;
       openSocket(url);
     } finally {
       // A stale, superseded attempt (generation bumped by rebuild() while

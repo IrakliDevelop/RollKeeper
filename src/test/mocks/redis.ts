@@ -261,6 +261,8 @@ vi.mock('@/lib/redis', () => ({
   campaignBattleMapKey: (code: string, battleMapId: string) =>
     `campaign:${code}:battlemap:${battleMapId}`,
   campaignDisplayKeyKey: (code: string) => `campaign:${code}:displaykey`,
+  campaignFogAppearanceKey: (code: string, battleMapId: string) =>
+    `campaign:${code}:fog-appearance:${battleMapId}`,
   characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
   SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,

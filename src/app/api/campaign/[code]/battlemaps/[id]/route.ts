@@ -3,6 +3,7 @@ import {
   getRedis,
   campaignBattleMapsKey,
   campaignBattleMapKey,
+  campaignFogAppearanceKey,
   campaignSharedKey,
   refreshCampaignTTL,
   SLIDING_TTL_SECONDS,
@@ -144,6 +145,7 @@ export async function DELETE(
       );
     }
     await redis.del(campaignBattleMapKey(code, id));
+    await redis.del(campaignFogAppearanceKey(code, id));
 
     // The shared "live map" pointer is sticky — never cleared by a relink or
     // delete. If it still references the map being deleted, clear it so players
