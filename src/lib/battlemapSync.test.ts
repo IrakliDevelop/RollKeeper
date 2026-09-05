@@ -212,6 +212,44 @@ describe('createManagedBattleMapConnection', () => {
     conn.stop();
   });
 
+  it('does not expose token metadata after the connection is stopped', async () => {
+    let resolveToken!: (response: Response) => void;
+    fetchMock.mockImplementationOnce(
+      () =>
+        new Promise<Response>(resolve => {
+          resolveToken = resolve;
+        })
+    );
+    const onTokenMetadata = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      onTokenMetadata,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+
+    conn.stop();
+    resolveToken({
+      ok: true,
+      json: async () => ({
+        token: 'test-token',
+        fogAppearance: 'cloudy',
+        fogAppearanceUpdatedAt: '2026-09-05T00:00:00.000Z',
+      }),
+    } as Response);
+    await flush();
+
+    expect(onTokenMetadata).not.toHaveBeenCalled();
+    expect(transportUrls).toEqual([]);
+  });
+
   it('goes live and synchronously re-pushes hub-unknown seed elements on the bootstrap snapshot', async () => {
     const store = new ElementStore();
     store.add(el('a'));

@@ -238,7 +238,7 @@ export function createManagedBattleMapConnection(
         opts.campaignCode,
         opts.tokenRequest
       );
-      if (!result) return null;
+      if (stopped || !result) return null;
       if (opts.onTokenMetadata) {
         opts.onTokenMetadata({
           fogAppearance: result.fogAppearance,

@@ -11,6 +11,10 @@ interface FogAppearancePollOptions {
   url: string;
 }
 
+function invalidateFogAppearanceRequests(viewport: Viewport): void {
+  requestVersions.set(viewport, (requestVersions.get(viewport) ?? 0) + 1);
+}
+
 export function applyFogAppearanceMetadata(
   viewport: Viewport,
   raw: unknown,
@@ -69,6 +73,7 @@ export function startFogAppearancePoll(
 
   return () => {
     clearInterval(timer);
+    invalidateFogAppearanceRequests(viewport);
     if (typeof document !== 'undefined') {
       document.removeEventListener('visibilitychange', handleVisibility);
     }

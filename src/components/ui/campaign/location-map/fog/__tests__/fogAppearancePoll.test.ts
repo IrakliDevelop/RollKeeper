@@ -136,6 +136,28 @@ describe('startFogAppearancePoll', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('ignores an in-flight response after cleanup', async () => {
+    let resolveResponse!: (response: Response) => void;
+    vi.mocked(fetch).mockImplementationOnce(
+      () =>
+        new Promise<Response>(resolve => {
+          resolveResponse = resolve;
+        })
+    );
+    const vp = fakeViewport();
+    const stop = startFogAppearancePoll({ viewport: vp, url: '/test' });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    stop();
+    resolveResponse({
+      ok: true,
+      json: () => Promise.resolve({ fogAppearance: 'cloudy' }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(vp.setFogStyle).not.toHaveBeenCalled();
+  });
+
   it('skips poll when document is hidden', async () => {
     Object.defineProperty(document, 'hidden', {
       value: true,
