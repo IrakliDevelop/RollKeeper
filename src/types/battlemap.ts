@@ -150,6 +150,9 @@ export interface PublicMarkerDetail {
   portal?: never;
 }
 
+/** Fog presentation preset. Absence or unknown values resolve to `'solid'`. */
+export type FogAppearanceV1 = 'solid' | 'cloudy';
+
 export interface BattleMap {
   id: string;
   campaignCode: string;
@@ -162,6 +165,7 @@ export interface BattleMap {
   gridSettings?: GridSettings;
   linkedEncounterIds: string[];
   cameraViews?: SavedCameraView[];
+  fogAppearance?: FogAppearanceV1;
   /** Marker detail records keyed by their `ref` (see `MarkerDetail.id`).
    * DM product state — the public projection is added separately in B8. */
   markers?: MarkerDetail[];

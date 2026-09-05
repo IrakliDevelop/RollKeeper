@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
@@ -8,7 +8,9 @@ import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/Bat
 import { PresenceControl } from '@/components/ui/campaign/location-map/PresenceControl';
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import { resolveFogRendererOptions } from '@/components/ui/campaign/location-map/fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import type { FogAppearanceV1 } from '@/types/battlemap';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -73,6 +75,13 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     fogControls,
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
+  const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const handleFogAppearanceChange = useCallback(
+    (appearance: FogAppearanceV1) => {
+      updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
+    },
+    [updateBattleMap, campaignCode, battleMapId]
+  );
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
   // anyone else's camera.
@@ -87,7 +96,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           onReady={handleReady}
           className="h-full w-full"
           snapToGrid
-          options={{ fog: {} }}
+          options={{
+            fog: resolveFogRendererOptions(battleMap?.fogAppearance ?? 'solid'),
+          }}
         />
         {viewport && (
           <DmVttToolbar
@@ -119,6 +130,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               },
             }}
             fogControls={fogControls}
+            fogAppearance={battleMap?.fogAppearance}
+            onFogAppearanceChange={handleFogAppearanceChange}
             exportControl={
               <BattleMapExportControl
                 getViewport={() => viewport}

@@ -30,6 +30,7 @@ import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
 import type { DmFogControls } from './fog';
+import type { FogAppearanceV1 } from '@/types/battlemap';
 import {
   FOG_COVER_ALL_DESCRIPTION,
   FOG_COVER_ALL_TITLE,
@@ -115,6 +116,8 @@ interface DmLocationToolOptionsProps {
   movementControls?: MovementControls;
   /** Shared DM fog controller. Omitted on player and non-battle-map surfaces. */
   fogControls?: DmFogControls;
+  fogAppearance?: FogAppearanceV1;
+  onFogAppearanceChange?: (appearance: FogAppearanceV1) => void;
 }
 
 export default function DmLocationToolOptions({
@@ -124,6 +127,8 @@ export default function DmLocationToolOptions({
   markerControls,
   movementControls,
   fogControls,
+  fogAppearance,
+  onFogAppearanceChange,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -428,6 +433,30 @@ export default function DmLocationToolOptions({
                 label="Preview as player"
                 wrapperClassName="min-h-[44px] items-center"
               />
+              {onFogAppearanceChange && (
+                <>
+                  <span className="text-muted text-xs font-semibold">
+                    Appearance
+                  </span>
+                  <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+                    {(['solid', 'cloudy'] as const).map(value => (
+                      <Button
+                        key={value}
+                        variant={
+                          (fogAppearance ?? 'solid') === value
+                            ? 'primary'
+                            : 'ghost'
+                        }
+                        onClick={() => onFogAppearanceChange(value)}
+                        aria-pressed={(fogAppearance ?? 'solid') === value}
+                        className="min-h-[44px] px-3 text-xs capitalize"
+                      >
+                        {value === 'solid' ? 'Solid (classic)' : 'Cloudy'}
+                      </Button>
+                    ))}
+                  </div>
+                </>
+              )}
               <Button
                 variant="ghost"
                 onClick={() => fogControls.requestAction('cover-all')}

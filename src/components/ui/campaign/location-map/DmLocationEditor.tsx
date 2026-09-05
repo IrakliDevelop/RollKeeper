@@ -12,6 +12,7 @@ import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
+import { resolveFogRendererOptions } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
@@ -97,6 +98,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleDeleteMarker,
     portalState,
     fogControls,
+    handleFogAppearanceChange,
   } = useDmLocationEditor(props);
 
   return (
@@ -239,6 +241,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               },
             }}
             fogControls={fogControls}
+            fogAppearance={props.location.fogAppearance}
+            onFogAppearanceChange={handleFogAppearanceChange}
           />
         )}
 
@@ -290,7 +294,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   dotRadius: 1,
                 },
                 camera: { minZoom: 0.1, maxZoom: 5 },
-                fog: {},
+                fog: resolveFogRendererOptions(
+                  props.location.fogAppearance ?? 'solid'
+                ),
               }}
               onReady={handleReady}
               className="h-full w-full"
