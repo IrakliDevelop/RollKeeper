@@ -15,6 +15,18 @@ export function isProceduralFogAppearanceEnabled(): boolean {
   return process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED === 'true';
 }
 
+/**
+ * Rollout gate for the campaign fog preset library. Additive on top of the
+ * procedural gate: nothing in the library can be visible while the
+ * Solid/Cloudy control itself is hidden.
+ */
+export function isFogPresetLibraryEnabled(): boolean {
+  return (
+    isProceduralFogAppearanceEnabled() &&
+    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED === 'true'
+  );
+}
+
 export interface BattleMapFogAppearanceProjectionV1 {
   v: 1;
   appearance: FogAppearanceV1;

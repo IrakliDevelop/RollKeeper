@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   isFogAppearanceV1,
   isFogOfWarEnabled,
+  isFogPresetLibraryEnabled,
   isProceduralFogAppearanceEnabled,
   normalizeFogAppearance,
   normalizeFogAppearanceProjectionTimestamp,
@@ -27,6 +28,19 @@ describe('fog feature flags', () => {
 
     vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'TRUE');
     expect(isProceduralFogAppearanceEnabled()).toBe(false);
+  });
+
+  it('enables the preset library only when both exact flags are true', () => {
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
+    expect(isFogPresetLibraryEnabled()).toBe(true);
+
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', '');
+    expect(isFogPresetLibraryEnabled()).toBe(false);
+
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'TRUE');
+    expect(isFogPresetLibraryEnabled()).toBe(false);
   });
 });
 
