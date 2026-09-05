@@ -11,6 +11,7 @@ import {
   MARKER_KINDS,
 } from '@/components/ui/campaign/location-map/markerData';
 import { MARKER_COLOR_CSS } from '@/components/ui/campaign/location-map/markerPainter';
+import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
 
 let mockActiveTool = 'pencil';
 let mockToolOptions: Record<string, Record<string, unknown> | undefined> = {};
@@ -129,6 +130,55 @@ describe('DmLocationToolOptions pencil options', () => {
     mockToolOptions = { ping: { color: '#F4C430' } };
     const { container } = render(<DmLocationToolOptions mode="location" />);
     expect(container).toBeEmptyDOMElement();
+  });
+});
+
+describe('DmLocationToolOptions fog appearance', () => {
+  const fogControls: DmFogControls = {
+    available: true,
+    initialized: true,
+    disabled: false,
+    operation: 'reveal',
+    shape: 'brush',
+    radius: 40,
+    preview: false,
+    diagnostic: null,
+    pendingAction: null,
+    requestActivate: vi.fn(),
+    setOperation: vi.fn(),
+    setShape: vi.fn(),
+    setRadius: vi.fn(),
+    setPreview: vi.fn(),
+    requestAction: vi.fn(),
+    confirmAction: vi.fn(),
+    cancelAction: vi.fn(),
+    reconcileBounds: vi.fn(),
+    reportError: vi.fn(),
+  };
+
+  beforeEach(() => {
+    mockActiveTool = 'fog';
+  });
+
+  afterEach(() => cleanup());
+
+  it('presents malformed persisted values as the solid fallback', () => {
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={fogControls}
+        fogAppearance={'misty' as never}
+        onFogAppearanceChange={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Solid (classic)' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Cloudy' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
   });
 });
 

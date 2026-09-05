@@ -74,6 +74,7 @@ import {
   attachFogPersistence,
   configureFogView,
   reconcileMapFogBounds,
+  resolveFogRendererOptions,
   resolveMapImageBounds,
   useDmFogControls,
 } from './fog';
@@ -294,6 +295,9 @@ export interface DmLocationEditorState {
 
   /** Shared fog authoring state/actions for both DM battle-map surfaces. */
   fogControls: import('./fog').DmFogControls;
+  handleFogAppearanceChange: (
+    appearance: import('@/types/battlemap').FogAppearanceV1
+  ) => void;
 
   /** Resolved portal destination state for the active marker panel. */
   portalState?: ResolvedPortalState;
@@ -1865,5 +1869,15 @@ export function useDmLocationEditor(
     handleDeleteMarker,
     portalState,
     fogControls,
+    handleFogAppearanceChange: useCallback(
+      (appearance: import('@/types/battlemap').FogAppearanceV1) => {
+        getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
+        storeUpdateLocation(campaignCode, location.id, {
+          fogAppearance: appearance,
+        });
+        if (mode === 'location') setHasUnsyncedChanges(true);
+      },
+      [getVp, storeUpdateLocation, campaignCode, location.id, mode]
+    ),
   };
 }
