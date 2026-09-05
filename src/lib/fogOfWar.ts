@@ -10,3 +10,9 @@ export function isFogOfWarEnabled(): boolean {
 export function isProceduralFogAppearanceEnabled(): boolean {
   return process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED === 'true';
 }
+
+export interface BattleMapFogAppearanceProjectionV1 {
+  v: 1;
+  appearance: import('@/types/battlemap').FogAppearanceV1;
+  updatedAt: string;
+}

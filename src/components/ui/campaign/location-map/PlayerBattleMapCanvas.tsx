@@ -48,7 +48,8 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
-import { configureFogView } from './fog';
+import { configureFogView, resolveFogRendererOptions } from './fog';
+import { parseFogAppearance } from './fog/fogAppearance';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
@@ -600,8 +601,27 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current?.announce();
         }
       },
+      onTokenMetadata: meta => {
+        const appearance = parseFogAppearance(meta.fogAppearance);
+        vp.setFogStyle(resolveFogRendererOptions(appearance));
+      },
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkers();
+        if (feature === 'fog-appearance') {
+          void fetch(
+            `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
+          )
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && typeof data === 'object' && 'fogAppearance' in data) {
+                const appearance = parseFogAppearance(
+                  (data as { fogAppearance: unknown }).fogAppearance
+                );
+                vp.setFogStyle(resolveFogRendererOptions(appearance));
+              }
+            })
+            .catch(() => {});
+        }
         onPokeRef.current?.(feature);
       },
     });

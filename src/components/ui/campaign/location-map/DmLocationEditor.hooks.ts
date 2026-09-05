@@ -1875,9 +1875,20 @@ export function useDmLocationEditor(
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,
         });
-        if (mode === 'location') setHasUnsyncedChanges(true);
+        if (mode === 'location') {
+          setHasUnsyncedChanges(true);
+        } else {
+          void fetch(
+            `/api/campaign/${campaignCode}/battlemaps/${location.id}/fog-appearance`,
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ dmId, appearance }),
+            }
+          ).catch(() => {});
+        }
       },
-      [getVp, storeUpdateLocation, campaignCode, location.id, mode]
+      [getVp, storeUpdateLocation, campaignCode, location.id, mode, dmId]
     ),
   };
 }

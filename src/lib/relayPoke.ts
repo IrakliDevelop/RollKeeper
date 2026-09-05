@@ -17,7 +17,11 @@ interface RedisReader {
   get<T = unknown>(key: string): Promise<T | null>;
 }
 
-export type BattleMapPokeFeature = 'initiative' | 'players' | 'markers';
+export type BattleMapPokeFeature =
+  | 'initiative'
+  | 'players'
+  | 'markers'
+  | 'fog-appearance';
 
 /**
  * Best-effort WS poke after a write: tells clients in the active battle-map
@@ -61,6 +65,43 @@ export async function sendBattleMapPoke(
     });
   } catch (err) {
     console.warn('[relayPoke] poke failed (poll remains fallback):', err);
+  }
+}
+
+/**
+ * Poke a specific battle-map room directly, without looking up the active map.
+ * Used for per-map metadata (fog appearance) that must reach a TV display
+ * opened on an inactive map.
+ */
+export async function sendBattleMapPokeToRoom(
+  code: string,
+  battleMapId: string,
+  feature: BattleMapPokeFeature,
+  deps: { fetchFn?: typeof fetch; now?: number } = {}
+): Promise<void> {
+  const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const secret = process.env.BATTLEMAP_RELAY_SECRET;
+  if (!relayUrl || !secret) return;
+  try {
+    const room = `${code}:${battleMapId}`;
+    const token = signBattleMapToken(
+      {
+        userId: '@server',
+        role: 'dm',
+        room,
+        exp: (deps.now ?? Date.now()) + POKE_TOKEN_TTL_MS,
+      },
+      secret
+    );
+    const fetchFn = deps.fetchFn ?? fetch;
+    await fetchFn(`${relayHttpUrl(relayUrl)}/poke`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ room, feature, token }),
+      signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
+    });
+  } catch (err) {
+    console.warn('[relayPoke] room poke failed (poll remains fallback):', err);
   }
 }
 

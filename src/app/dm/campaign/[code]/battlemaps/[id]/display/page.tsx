@@ -20,7 +20,11 @@ import { attachRemotePaths } from '@/components/ui/campaign/location-map/pathSyn
 import { attachAwarenessSync } from '@/components/ui/campaign/location-map/awarenessSync';
 import type { AwarenessSyncHandle } from '@/components/ui/campaign/location-map/awarenessSync';
 import { attachConnectionScope } from '@/components/ui/campaign/location-map/connectionScope';
-import { configureFogView } from '@/components/ui/campaign/location-map/fog';
+import {
+  configureFogView,
+  resolveFogRendererOptions,
+} from '@/components/ui/campaign/location-map/fog';
+import { parseFogAppearance } from '@/components/ui/campaign/location-map/fog/fogAppearance';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 
 function DisplayCanvas() {
@@ -83,15 +87,32 @@ function DisplayCanvas() {
           onApplied: () => vp.requestRender(),
         }),
       },
+      onTokenMetadata: meta => {
+        const appearance = parseFogAppearance(meta.fogAppearance);
+        vp.setFogStyle(resolveFogRendererOptions(appearance));
+      },
       onStatus: s => {
         setStatus(s);
         if (s === 'live') {
-          // frame the map once the snapshot has been applied
           requestAnimationFrame(() => vp.fitToContent(60));
-          // Managed sendPresence drops while not live, so the attach-time
-          // frame may be lost; announce on every live transition (first
-          // connect AND reconnect) — the heartbeat self-heals otherwise.
           awarenessRef.current?.announce();
+        }
+      },
+      onPoke: feature => {
+        if (feature === 'fog-appearance') {
+          void fetch(
+            `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
+          )
+            .then(r => (r.ok ? r.json() : null))
+            .then(data => {
+              if (data && typeof data === 'object' && 'fogAppearance' in data) {
+                const appearance = parseFogAppearance(
+                  (data as { fogAppearance: unknown }).fogAppearance
+                );
+                vp.setFogStyle(resolveFogRendererOptions(appearance));
+              }
+            })
+            .catch(() => {});
         }
       },
     });

@@ -32,10 +32,15 @@ export interface BattleMapTokenRequest {
   protocols?: { fog?: 1 };
 }
 
+export interface BattleMapTokenResult {
+  token: string;
+  fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+}
+
 export async function mintBattleMapToken(
   campaignCode: string,
   req: BattleMapTokenRequest
-): Promise<string | null> {
+): Promise<BattleMapTokenResult | null> {
   try {
     const res = await fetch(`/api/campaign/${campaignCode}/battlemap-token`, {
       method: 'POST',
@@ -43,8 +48,17 @@ export async function mintBattleMapToken(
       body: JSON.stringify({ ...req, protocols: { fog: 1 } }),
     });
     if (!res.ok) return null;
-    const data = (await res.json()) as { token?: string };
-    return data.token ?? null;
+    const data = (await res.json()) as {
+      token?: string;
+      fogAppearance?: string;
+    };
+    if (!data.token) return null;
+    return {
+      token: data.token,
+      fogAppearance: data.fogAppearance as
+        | import('@/types/battlemap').FogAppearanceV1
+        | undefined,
+    };
   } catch {
     return null;
   }
@@ -116,6 +130,10 @@ export interface ManagedConnectionOptions {
   onDiagnostic?: (message: string) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
+  /** Called with session metadata from each token mint (initial + refreshes). */
+  onTokenMetadata?: (meta: {
+    fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+  }) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */
   transportFactory?: (url: string) => BattleMapTransport;
 }
@@ -205,12 +223,15 @@ export function createManagedBattleMapConnection(
     layers: opts.layers,
     fog: opts.fog,
     resolveUrl: async () => {
-      const token = await mintBattleMapToken(
+      const result = await mintBattleMapToken(
         opts.campaignCode,
         opts.tokenRequest
       );
-      if (!token) return null;
-      return `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(token)}`;
+      if (!result) return null;
+      if (opts.onTokenMetadata) {
+        opts.onTokenMetadata({ fogAppearance: result.fogAppearance });
+      }
+      return `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(result.token)}`;
     },
     // The released managed lifecycle observes the snapshot on one transport
     // subscription and applies it through SyncClient on the next. Defer only
