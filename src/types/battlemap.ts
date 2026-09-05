@@ -1,5 +1,9 @@
 import type { CameraView } from '@fieldnotes/core';
 import type { InventoryItem, MagicItem } from './character';
+import type {
+  AppliedCustomFogAppearanceV2,
+  ProjectedCustomFogAppearanceV2,
+} from './fogMaterial';
 
 import type { GridSettings } from './location';
 
@@ -153,6 +157,14 @@ export interface PublicMarkerDetail {
 /** Fog presentation preset. Absence or unknown values resolve to `'solid'`. */
 export type FogAppearanceV1 = 'solid' | 'cloudy';
 
+/** DM-side stored value: a legacy string or a copied custom snapshot. */
+export type FogAppearance = FogAppearanceV1 | AppliedCustomFogAppearanceV2;
+
+/** Viewer-side value: never carries a preset id. */
+export type ProjectedFogAppearance =
+  | FogAppearanceV1
+  | ProjectedCustomFogAppearanceV2;
+
 export interface BattleMap {
   id: string;
   campaignCode: string;
@@ -165,7 +177,7 @@ export interface BattleMap {
   gridSettings?: GridSettings;
   linkedEncounterIds: string[];
   cameraViews?: SavedCameraView[];
-  fogAppearance?: FogAppearanceV1;
+  fogAppearance?: FogAppearance;
   /** Marker detail records keyed by their `ref` (see `MarkerDetail.id`).
    * DM product state — the public projection is added separately in B8. */
   markers?: MarkerDetail[];
