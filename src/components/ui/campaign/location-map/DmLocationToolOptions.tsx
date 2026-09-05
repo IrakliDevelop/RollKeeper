@@ -30,7 +30,7 @@ import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
 import { parseFogAppearance, type DmFogControls } from './fog';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { FogAppearance } from '@/types/battlemap';
 import {
   FOG_COVER_ALL_DESCRIPTION,
   FOG_COVER_ALL_TITLE,
@@ -116,8 +116,8 @@ interface DmLocationToolOptionsProps {
   movementControls?: MovementControls;
   /** Shared DM fog controller. Omitted on player and non-battle-map surfaces. */
   fogControls?: DmFogControls;
-  fogAppearance?: FogAppearanceV1;
-  onFogAppearanceChange?: (appearance: FogAppearanceV1) => void;
+  fogAppearance?: FogAppearance;
+  onFogAppearanceChange?: (appearance: FogAppearance) => void;
 }
 
 export default function DmLocationToolOptions({

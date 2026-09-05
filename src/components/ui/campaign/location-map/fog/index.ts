@@ -5,7 +5,11 @@ export type { DmFogControls, FogConfirmationAction } from './useDmFogControls';
 export { reconcileMapFogBounds } from './reconcileMapFogBounds';
 export { configureFogView } from './configureFogView';
 export { attachFogPersistence } from './attachFogPersistence';
-export { parseFogAppearance, resolveFogRendererOptions } from './fogAppearance';
+export {
+  parseFogAppearance,
+  resolveFogRendererOptions,
+  resolvePlayerFogStyle,
+} from './fogAppearance';
 export {
   FOG_SECURITY_EXPLANATION,
   FOG_ENABLE_TITLE,

@@ -26,6 +26,10 @@ import {
   fingerprintCampaignSettingsPayload,
   type CampaignSettingsManifest,
 } from '@/lib/durableDm/campaignSettingsFamily';
+import {
+  CLEARED_CAMPAIGN_SETTINGS_FIELDS,
+  campaignInfoFromCampaignSettingsPayload,
+} from '@/lib/durableDm/campaignSettingsPayloadCodec';
 import { blockerKindReferenceLabel } from '@/lib/durableDm/blockerReferenceLabel';
 import { campaignSettingsApi } from '@/lib/durableDm/campaignSettingsApi';
 import { CampaignSettingsHttpGateway } from '@/lib/durableDm/campaignSettingsHttpGateway';
@@ -216,14 +220,9 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       lastFingerprint.current = null;
       hydrationSignature.current = null;
       rollbackMutationId.current = null;
-      useDmStore.getState().updateCampaign(campaign.code, {
-        bannerUrl: undefined,
-        playerColors: undefined,
-        dmDashboardUi: undefined,
-        stackableInspiration: false,
-        customCounterLabel: undefined,
-        playerCounters: undefined,
-      });
+      useDmStore
+        .getState()
+        .updateCampaign(campaign.code, CLEARED_CAMPAIGN_SETTINGS_FIELDS);
     };
     const hydrate = async (accountId: string | null) => {
       if (cancelled) return;
@@ -295,29 +294,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
           return;
         }
         const payload = (document.payload ?? {}) as Record<string, unknown>;
-        useDmStore.getState().updateCampaign(campaign.code, {
-          bannerUrl:
-            typeof payload.bannerUrl === 'string'
-              ? payload.bannerUrl
-              : undefined,
-          playerColors:
-            payload.playerColors && typeof payload.playerColors === 'object'
-              ? (payload.playerColors as Record<string, string>)
-              : undefined,
-          dmDashboardUi:
-            payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-              ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-              : undefined,
-          stackableInspiration: payload.stackableInspiration === true,
-          customCounterLabel:
-            typeof payload.customCounterLabel === 'string'
-              ? payload.customCounterLabel
-              : undefined,
-          playerCounters:
-            payload.playerCounters && typeof payload.playerCounters === 'object'
-              ? (payload.playerCounters as Record<string, number>)
-              : undefined,
-        });
+        useDmStore
+          .getState()
+          .updateCampaign(
+            campaign.code,
+            campaignInfoFromCampaignSettingsPayload(payload)
+          );
         lastFingerprint.current = document.contentFingerprint;
         setContext(restoredContext);
         setWorkspaces(restoredWorkspaces);
@@ -954,27 +936,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
   ) => {
     lastFingerprint.current = fingerprint;
     const payload = (source ?? {}) as Record<string, unknown>;
-    useDmStore.getState().updateCampaign(campaign.code, {
-      bannerUrl:
-        typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
-      playerColors:
-        payload.playerColors && typeof payload.playerColors === 'object'
-          ? (payload.playerColors as Record<string, string>)
-          : undefined,
-      dmDashboardUi:
-        payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-          ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-          : undefined,
-      stackableInspiration: payload.stackableInspiration === true,
-      customCounterLabel:
-        typeof payload.customCounterLabel === 'string'
-          ? payload.customCounterLabel
-          : undefined,
-      playerCounters:
-        payload.playerCounters && typeof payload.playerCounters === 'object'
-          ? (payload.playerCounters as Record<string, number>)
-          : undefined,
-    });
+    useDmStore
+      .getState()
+      .updateCampaign(
+        campaign.code,
+        campaignInfoFromCampaignSettingsPayload(payload)
+      );
     // The store now matches the enrolled generation, so autosave is armed.
     setHydrated(true);
   };
@@ -1144,27 +1111,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     }
     lastFingerprint.current = exact.payloadFingerprint;
     const payload = (exact.payload ?? {}) as Record<string, unknown>;
-    useDmStore.getState().updateCampaign(campaign.code, {
-      bannerUrl:
-        typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
-      playerColors:
-        payload.playerColors && typeof payload.playerColors === 'object'
-          ? (payload.playerColors as Record<string, string>)
-          : undefined,
-      dmDashboardUi:
-        payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-          ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-          : undefined,
-      stackableInspiration: payload.stackableInspiration === true,
-      customCounterLabel:
-        typeof payload.customCounterLabel === 'string'
-          ? payload.customCounterLabel
-          : undefined,
-      playerCounters:
-        payload.playerCounters && typeof payload.playerCounters === 'object'
-          ? (payload.playerCounters as Record<string, number>)
-          : undefined,
-    });
+    useDmStore
+      .getState()
+      .updateCampaign(
+        campaign.code,
+        campaignInfoFromCampaignSettingsPayload(payload)
+      );
     // A restore rewrites the store from IndexedDB, so like hydrate,
     // activateLocal, and applyExactCloudVersion it must arm autosave: on an
     // enrolled-but-unapplied device the legacy key is frozen, so a disarmed
@@ -1249,27 +1201,12 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
       string,
       unknown
     >;
-    useDmStore.getState().updateCampaign(campaign.code, {
-      bannerUrl:
-        typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
-      playerColors:
-        payload.playerColors && typeof payload.playerColors === 'object'
-          ? (payload.playerColors as Record<string, string>)
-          : undefined,
-      dmDashboardUi:
-        payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-          ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-          : undefined,
-      stackableInspiration: payload.stackableInspiration === true,
-      customCounterLabel:
-        typeof payload.customCounterLabel === 'string'
-          ? payload.customCounterLabel
-          : undefined,
-      playerCounters:
-        payload.playerCounters && typeof payload.playerCounters === 'object'
-          ? (payload.playerCounters as Record<string, number>)
-          : undefined,
-    });
+    useDmStore
+      .getState()
+      .updateCampaign(
+        campaign.code,
+        campaignInfoFromCampaignSettingsPayload(payload)
+      );
     setHydrated(false);
     hydrationSignature.current = null;
     rollbackMutationId.current = null;
@@ -1327,14 +1264,9 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
         confirmed: true,
         lossConfirmed,
       });
-      useDmStore.getState().updateCampaign(campaign.code, {
-        bannerUrl: undefined,
-        playerColors: undefined,
-        dmDashboardUi: undefined,
-        stackableInspiration: false,
-        customCounterLabel: undefined,
-        playerCounters: undefined,
-      });
+      useDmStore
+        .getState()
+        .updateCampaign(campaign.code, CLEARED_CAMPAIGN_SETTINGS_FIELDS);
       hydrationSignature.current = null;
       setScope(null);
       setAuthority(null);

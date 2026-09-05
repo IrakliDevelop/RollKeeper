@@ -85,7 +85,7 @@ export async function POST(
           campaignFogAppearanceKey(code, battleMapId)
         );
         const projection = parseBattleMapFogAppearanceProjection(raw);
-        if (projection) {
+        if (projection && projection.v === 1) {
           fogAppearance = projection.appearance;
           fogAppearanceUpdatedAt = projection.updatedAt;
         }

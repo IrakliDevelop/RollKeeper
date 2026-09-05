@@ -3,6 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 import { CampaignInfo } from '@/types/campaign';
 import { createCampaignSettingsAwareDmStorage } from '@/lib/durableDm/campaignSettingsAwareStorage';
+import { FOG_PRESET_LIMITS } from '@/lib/fogPreset';
+import type { FogPresetV1 } from '@/types/fogMaterial';
 
 const DM_STORAGE_KEY = 'rollkeeper-dm-data';
 
@@ -39,6 +41,10 @@ interface DmStoreState {
       npcSeparateSpellSlotTracker: boolean;
     }>
   ) => void;
+  /** Replace by id or append (creation order). Appends past the cap are ignored. */
+  upsertFogPreset: (code: string, preset: FogPresetV1) => void;
+  /** Remove by id; an empty library removes the field entirely. */
+  removeFogPreset: (code: string, presetId: string) => void;
 }
 
 function generateDmId(): string {
@@ -145,6 +151,39 @@ export const useDmStore = create<DmStoreState>()(
                 ...partial,
               },
             };
+          }),
+        }));
+      },
+
+      upsertFogPreset: (code, preset) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code) return c;
+            const copy = structuredClone(preset);
+            const current = c.fogPresets ?? [];
+            const index = current.findIndex(p => p.id === copy.id);
+            if (index >= 0) {
+              const next = [...current];
+              next[index] = copy;
+              return { ...c, fogPresets: next };
+            }
+            if (current.length >= FOG_PRESET_LIMITS.maxPresets) return c;
+            return { ...c, fogPresets: [...current, copy] };
+          }),
+        }));
+      },
+
+      removeFogPreset: (code, presetId) => {
+        set(state => ({
+          campaigns: state.campaigns.map(c => {
+            if (c.code !== code || !c.fogPresets) return c;
+            const next = c.fogPresets.filter(p => p.id !== presetId);
+            if (next.length === c.fogPresets.length) return c;
+            if (next.length === 0) {
+              const { fogPresets: _removed, ...rest } = c;
+              return rest;
+            }
+            return { ...c, fogPresets: next };
           }),
         }));
       },

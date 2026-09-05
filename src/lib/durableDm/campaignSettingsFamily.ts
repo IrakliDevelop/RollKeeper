@@ -11,7 +11,7 @@ export const CAMPAIGN_SETTINGS_FAMILY_INVENTORY = {
   stableIdentity: 'campaign.code',
   excludedIdentityFields: ['code', 'name', 'createdAt'],
   excludedEnvelopeFields: ['dmId'],
-  privateFields: ['bannerUrl', 'playerColors', 'dmDashboardUi'],
+  privateFields: ['bannerUrl', 'playerColors', 'dmDashboardUi', 'fogPresets'],
   playerVisibleFields: [
     'stackableInspiration',
     'customCounterLabel',
@@ -25,6 +25,7 @@ export type CampaignSettingsPayload = {
   bannerUrl?: Json;
   playerColors?: Json;
   dmDashboardUi?: Json;
+  fogPresets?: Json;
   stackableInspiration?: Json;
   customCounterLabel?: Json;
   playerCounters?: Json;

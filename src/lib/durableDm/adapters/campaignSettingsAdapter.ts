@@ -18,6 +18,7 @@ import {
   rollbackCampaignSettingsLocalAuthority,
 } from '@/lib/indexeddb/campaignSettingsAuthority';
 import { runCampaignSettingsIndexedDbMigration } from '@/lib/indexeddb/campaignSettingsMigration';
+import { campaignInfoFromCampaignSettingsPayload } from '@/lib/durableDm/campaignSettingsPayloadCodec';
 import {
   IndexedDbCampaignSettingsRepository,
   type CampaignSettingsOutboxEntry,
@@ -37,10 +38,7 @@ import { IndexedDbDmWorkspaceRepository } from '@/lib/indexeddb/dmWorkspaceRepos
 // so a static import would become a live SSR hazard the moment that
 // happens. NOTHING is imported statically from `@/store/dmStore` — not
 // even a type (fix round 3, item 6a corrects the previous, inaccurate
-// claim that a type was). `CampaignInfo` below is a SEPARATE, unrelated
-// static import from `@/types/campaign`, used only to cast
-// `dmDashboardUi`'s shape in `rollback`'s restore.
-import type { CampaignInfo } from '@/types/campaign';
+// claim that a type was).
 import type { Json } from '@/types/database.generated';
 
 import { decideAuthorityRepair } from '../authorityRepair';
@@ -942,27 +940,12 @@ export const campaignSettingsAdapter: DurableFamilyAdapter<CampaignSettingsManif
         string,
         unknown
       >;
-      useDmStore.getState().updateCampaign(context.campaignCode, {
-        bannerUrl:
-          typeof payload.bannerUrl === 'string' ? payload.bannerUrl : undefined,
-        playerColors:
-          payload.playerColors && typeof payload.playerColors === 'object'
-            ? (payload.playerColors as Record<string, string>)
-            : undefined,
-        dmDashboardUi:
-          payload.dmDashboardUi && typeof payload.dmDashboardUi === 'object'
-            ? (payload.dmDashboardUi as CampaignInfo['dmDashboardUi'])
-            : undefined,
-        stackableInspiration: payload.stackableInspiration === true,
-        customCounterLabel:
-          typeof payload.customCounterLabel === 'string'
-            ? payload.customCounterLabel
-            : undefined,
-        playerCounters:
-          payload.playerCounters && typeof payload.playerCounters === 'object'
-            ? (payload.playerCounters as Record<string, number>)
-            : undefined,
-      });
+      useDmStore
+        .getState()
+        .updateCampaign(
+          context.campaignCode,
+          campaignInfoFromCampaignSettingsPayload(payload)
+        );
       return { epoch: result.epoch };
     },
   } satisfies DurableFamilyAdapter<CampaignSettingsManifest>;
