@@ -158,7 +158,13 @@ describe('createManagedBattleMapConnection', () => {
 
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/campaign/CODE/battlemap-token',
-      expect.objectContaining({ method: 'POST' })
+      expect.objectContaining({
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+      })
     );
     expect(transportUrls).toEqual([
       'wss://relay.example?room=CODE%3Amap-1&token=test-token',
@@ -171,6 +177,38 @@ describe('createManagedBattleMapConnection', () => {
     expect(first.from).toBe('dm-1');
     expect(first.op.kind).toBe('request-snapshot');
 
+    conn.stop();
+  });
+
+  it('normalizes additive token metadata before exposing it to viewers', async () => {
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'test-token',
+        fogAppearance: 'future-value',
+        fogAppearanceUpdatedAt: '2026-09-05T00:00:00.000Z',
+      }),
+    });
+    const onTokenMetadata = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      onTokenMetadata,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+    await flush();
+
+    expect(onTokenMetadata).toHaveBeenCalledWith({
+      fogAppearance: 'solid',
+      fogAppearanceUpdatedAt: '2026-09-05T00:00:00.000Z',
+    });
     conn.stop();
   });
 

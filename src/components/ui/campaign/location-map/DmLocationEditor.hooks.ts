@@ -1877,18 +1877,9 @@ export function useDmLocationEditor(
         });
         if (mode === 'location') {
           setHasUnsyncedChanges(true);
-        } else {
-          void fetch(
-            `/api/campaign/${campaignCode}/battlemaps/${location.id}/fog-appearance`,
-            {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ dmId, appearance }),
-            }
-          ).catch(() => {});
         }
       },
-      [getVp, storeUpdateLocation, campaignCode, location.id, mode, dmId]
+      [getVp, storeUpdateLocation, campaignCode, location.id, mode]
     ),
   };
 }

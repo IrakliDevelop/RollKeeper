@@ -18,6 +18,8 @@ vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
 
 import { authorizeBattleMapSession } from '../battleMapSessionAuth';
 import { verifyDmAuthority } from '@/lib/dmAuth';
+import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 import type { NextRequest } from 'next/server';
 
 function fakeRequest(hasCookie = false): NextRequest {
@@ -35,7 +37,12 @@ function fakeRedis(overrides: Record<string, unknown> = {}) {
 }
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.mocked(verifyDmAuthority).mockResolvedValue('ok');
+  vi.mocked(authorizeCampaignMembershipRoute).mockResolvedValue({
+    mode: 'legacy',
+  });
+  vi.mocked(validateCampaignMembershipMutation).mockReturnValue({ ok: true });
 });
 
 describe('authorizeBattleMapSession', () => {
@@ -98,6 +105,60 @@ describe('authorizeBattleMapSession', () => {
       authorized: true,
       role: 'player',
       userId: 'p-1',
+    });
+  });
+
+  it('does not require mutation CSRF for an account-authorized metadata read', async () => {
+    vi.mocked(authorizeCampaignMembershipRoute).mockResolvedValue({
+      mode: 'account',
+      principal: {
+        role: 'player',
+        legacyPlayerId: 'p-1',
+      },
+    } as never);
+    vi.mocked(validateCampaignMembershipMutation).mockReturnValue({
+      ok: false,
+      status: 403,
+      error: 'Request origin or CSRF validation failed',
+    });
+
+    const result = await authorizeBattleMapSession(
+      fakeRedis(),
+      'CODE',
+      fakeRequest(),
+      { role: 'player', playerId: 'p-1' },
+      { mutation: false }
+    );
+
+    expect(result.authorized).toBe(true);
+    expect(validateCampaignMembershipMutation).not.toHaveBeenCalled();
+  });
+
+  it('requires mutation CSRF for an account-authorized write or token mint', async () => {
+    vi.mocked(authorizeCampaignMembershipRoute).mockResolvedValue({
+      mode: 'account',
+      principal: {
+        role: 'owner',
+      },
+    } as never);
+    vi.mocked(validateCampaignMembershipMutation).mockReturnValue({
+      ok: false,
+      status: 403,
+      error: 'Request origin or CSRF validation failed',
+    });
+
+    const result = await authorizeBattleMapSession(
+      fakeRedis(),
+      'CODE',
+      fakeRequest(),
+      { role: 'dm', dmId: 'dm-1' },
+      { mutation: true }
+    );
+
+    expect(result).toEqual({
+      authorized: false,
+      status: 403,
+      error: 'Request origin or CSRF validation failed',
     });
   });
 

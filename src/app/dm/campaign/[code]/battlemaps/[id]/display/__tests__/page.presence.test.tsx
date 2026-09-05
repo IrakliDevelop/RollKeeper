@@ -194,9 +194,11 @@ function fireReady(vp: Viewport): void {
 
 describe('BattleMapDisplayPage: shared presence', () => {
   const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const savedProceduralFlag = process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED;
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
+    delete process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED;
     mockSearchParams = new URLSearchParams({ dk: 'key' });
     callOrder.length = 0;
   });
@@ -210,6 +212,42 @@ describe('BattleMapDisplayPage: shared presence', () => {
     } else {
       process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
     }
+    if (savedProceduralFlag === undefined) {
+      delete process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED;
+    } else {
+      process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = savedProceduralFlag;
+    }
+  });
+
+  it('keeps viewer appearance metadata and polling dormant by default', () => {
+    stubCanvas();
+    const vp = makeViewport();
+
+    const { unmount } = render(<BattleMapDisplayPage />);
+    fireReady(vp);
+
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    expect(options.onTokenMetadata).toBeUndefined();
+
+    unmount();
+    vp.destroy();
+  });
+
+  it('enables viewer appearance metadata only through the rollout flag', () => {
+    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+    stubCanvas();
+    const vp = makeViewport();
+
+    const { unmount } = render(<BattleMapDisplayPage />);
+    fireReady(vp);
+
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    expect(options.onTokenMetadata).toEqual(expect.any(Function));
+
+    unmount();
+    vp.destroy();
   });
 
   it('attaches awareness as display: identity-only (no cursor share), announce on live, no share/viewer UI, dispose before stop on unmount', () => {

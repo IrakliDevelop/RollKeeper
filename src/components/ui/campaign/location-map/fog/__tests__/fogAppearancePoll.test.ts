@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
+  applyFogAppearanceMetadata,
   fetchAndApplyFogAppearance,
   startFogAppearancePoll,
 } from '../fogAppearancePoll';
@@ -29,6 +30,21 @@ afterEach(() => {
 });
 
 describe('fetchAndApplyFogAppearance', () => {
+  it('does not let older token metadata replace a newer projection', () => {
+    const vp = fakeViewport();
+
+    applyFogAppearanceMetadata(vp, 'cloudy', '2026-09-05T12:00:01.000Z');
+    applyFogAppearanceMetadata(vp, 'solid', '2026-09-05T12:00:00.000Z');
+    applyFogAppearanceMetadata(vp, 'solid', null);
+
+    expect(vp.setFogStyle).toHaveBeenCalledTimes(1);
+    expect(vp.setFogStyle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        playerStyle: expect.objectContaining({ kind: 'procedural' }),
+      })
+    );
+  });
+
   it('applies appearance from response', async () => {
     const vp = fakeViewport();
     fetchAndApplyFogAppearance(vp, '/test');
@@ -46,7 +62,35 @@ describe('fetchAndApplyFogAppearance', () => {
     const vp = fakeViewport();
     fetchAndApplyFogAppearance(vp, '/test');
     await vi.advanceTimersByTimeAsync(0);
-    expect(vp.setFogStyle).not.toHaveBeenCalled();
+    expect(vp.setFogStyle).toHaveBeenCalledWith({});
+  });
+
+  it('ignores a stale response that resolves after a newer request', async () => {
+    let resolveFirst!: (response: Response) => void;
+    vi.mocked(fetch)
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>(resolve => {
+            resolveFirst = resolve;
+          })
+      )
+      .mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ fogAppearance: 'solid' }),
+      } as Response);
+    const vp = fakeViewport();
+
+    fetchAndApplyFogAppearance(vp, '/first');
+    fetchAndApplyFogAppearance(vp, '/second');
+    await vi.advanceTimersByTimeAsync(0);
+    resolveFirst({
+      ok: true,
+      json: () => Promise.resolve({ fogAppearance: 'cloudy' }),
+    } as Response);
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(vp.setFogStyle).toHaveBeenCalledTimes(1);
+    expect(vp.setFogStyle).toHaveBeenCalledWith({});
   });
 
   it('does not throw on fetch failure', async () => {

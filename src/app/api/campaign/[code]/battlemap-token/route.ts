@@ -2,8 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
-import { parseFogAppearance } from '@/components/ui/campaign/location-map/fog/fogAppearance';
-import type { BattleMapFogAppearanceProjectionV1 } from '@/lib/fogOfWar';
+import {
+  isProceduralFogAppearanceEnabled,
+  parseBattleMapFogAppearanceProjection,
+  type BattleMapFogAppearanceProjectionV1,
+} from '@/lib/fogOfWar';
 import type { FogAppearanceV1 } from '@/types/battlemap';
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
@@ -48,7 +51,15 @@ export async function POST(
     }
 
     const redis = getRedis();
-    const session = await authorizeBattleMapSession(redis, code, request, body);
+    const session = await authorizeBattleMapSession(
+      redis,
+      code,
+      request,
+      body,
+      {
+        mutation: true,
+      }
+    );
     if (!session.authorized) {
       return NextResponse.json(
         { error: session.error },
@@ -67,18 +78,27 @@ export async function POST(
     );
 
     let fogAppearance: FogAppearanceV1 = 'solid';
-    try {
-      const projection = await redis.get<BattleMapFogAppearanceProjectionV1>(
-        campaignFogAppearanceKey(code, battleMapId)
-      );
-      if (projection && typeof projection === 'object') {
-        fogAppearance = parseFogAppearance(projection.appearance);
+    let fogAppearanceUpdatedAt: string | null = null;
+    if (isProceduralFogAppearanceEnabled()) {
+      try {
+        const raw = await redis.get<BattleMapFogAppearanceProjectionV1>(
+          campaignFogAppearanceKey(code, battleMapId)
+        );
+        const projection = parseBattleMapFogAppearanceProjection(raw);
+        if (projection) {
+          fogAppearance = projection.appearance;
+          fogAppearanceUpdatedAt = projection.updatedAt;
+        }
+      } catch {
+        // Default to solid on read failure.
       }
-    } catch {
-      // Default to solid on read failure.
     }
 
-    return NextResponse.json({ token, fogAppearance });
+    return NextResponse.json({
+      token,
+      fogAppearance,
+      fogAppearanceUpdatedAt,
+    });
   } catch (error) {
     console.error('Error minting battle map token:', error);
     return NextResponse.json(

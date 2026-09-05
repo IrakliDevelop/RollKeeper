@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetRedis, seedRedis, seedRedisSet } from '@/test/mocks/redis';
 
@@ -33,10 +33,15 @@ function request(body: Record<string, unknown>, secure = false) {
 
 const params = { params: Promise.resolve({ code: CODE }) };
 
+afterEach(() => {
+  delete process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED;
+});
+
 describe('membership-aware relay authority minting', () => {
   beforeEach(() => {
     resetRedis();
     vi.clearAllMocks();
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
@@ -254,5 +259,55 @@ describe('fog protocol capability gate', () => {
       params
     );
     expect(response.status).toBe(426);
+  });
+});
+
+describe('fog appearance token metadata', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
+  });
+
+  async function mint() {
+    return POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+  }
+
+  it('keeps token metadata solid while the procedural rollout is disabled', async () => {
+    seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
+      v: 1,
+      appearance: 'cloudy',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    });
+    const response = await mint();
+    expect((await response.json()).fogAppearance).toBe('solid');
+  });
+
+  it('returns a valid projection when the rollout is enabled', async () => {
+    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+    seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
+      v: 1,
+      appearance: 'cloudy',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    });
+    const response = await mint();
+    expect((await response.json()).fogAppearance).toBe('cloudy');
+  });
+
+  it('falls back to solid for a future projection version', async () => {
+    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+    seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
+      v: 2,
+      appearance: 'cloudy',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    });
+    const response = await mint();
+    expect((await response.json()).fogAppearance).toBe('solid');
   });
 });

@@ -12,6 +12,10 @@ import type {
   Layer,
 } from '@fieldnotes/core';
 import type { BattleMapRole } from '@/lib/battlemapToken';
+import {
+  normalizeFogAppearance,
+  normalizeFogAppearanceProjectionTimestamp,
+} from '@/lib/fogOfWar';
 
 export type { RemoteLayerUpdate };
 
@@ -35,6 +39,7 @@ export interface BattleMapTokenRequest {
 export interface BattleMapTokenResult {
   token: string;
   fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+  fogAppearanceUpdatedAt?: string | null;
 }
 
 export async function mintBattleMapToken(
@@ -44,20 +49,25 @@ export async function mintBattleMapToken(
   try {
     const res = await fetch(`/api/campaign/${campaignCode}/battlemap-token`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        'x-rollkeeper-csrf': '1',
+      },
       body: JSON.stringify({ ...req, protocols: { fog: 1 } }),
     });
     if (!res.ok) return null;
     const data = (await res.json()) as {
       token?: string;
       fogAppearance?: string;
+      fogAppearanceUpdatedAt?: unknown;
     };
     if (!data.token) return null;
     return {
       token: data.token,
-      fogAppearance: data.fogAppearance as
-        | import('@/types/battlemap').FogAppearanceV1
-        | undefined,
+      fogAppearance: normalizeFogAppearance(data.fogAppearance),
+      fogAppearanceUpdatedAt: normalizeFogAppearanceProjectionTimestamp(
+        data.fogAppearanceUpdatedAt
+      ),
     };
   } catch {
     return null;
@@ -133,6 +143,7 @@ export interface ManagedConnectionOptions {
   /** Called with session metadata from each token mint (initial + refreshes). */
   onTokenMetadata?: (meta: {
     fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+    fogAppearanceUpdatedAt?: string | null;
   }) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */
   transportFactory?: (url: string) => BattleMapTransport;
@@ -229,7 +240,10 @@ export function createManagedBattleMapConnection(
       );
       if (!result) return null;
       if (opts.onTokenMetadata) {
-        opts.onTokenMetadata({ fogAppearance: result.fogAppearance });
+        opts.onTokenMetadata({
+          fogAppearance: result.fogAppearance,
+          fogAppearanceUpdatedAt: result.fogAppearanceUpdatedAt,
+        });
       }
       return `${opts.relayUrl}?room=${encodeURIComponent(room)}&token=${encodeURIComponent(result.token)}`;
     },

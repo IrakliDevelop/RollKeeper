@@ -1,7 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  isFogAppearanceV1,
   isFogOfWarEnabled,
   isProceduralFogAppearanceEnabled,
+  normalizeFogAppearance,
+  normalizeFogAppearanceProjectionTimestamp,
+  parseBattleMapFogAppearanceProjection,
 } from './fogOfWar';
 
 describe('fog feature flags', () => {
@@ -23,5 +27,46 @@ describe('fog feature flags', () => {
 
     vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'TRUE');
     expect(isProceduralFogAppearanceEnabled()).toBe(false);
+  });
+});
+
+describe('battle-map fog appearance projection', () => {
+  it('accepts only the supported appearance ids', () => {
+    expect(isFogAppearanceV1('solid')).toBe(true);
+    expect(isFogAppearanceV1('cloudy')).toBe(true);
+    expect(isFogAppearanceV1('misty')).toBe(false);
+    expect(isFogAppearanceV1(null)).toBe(false);
+    expect(normalizeFogAppearance('cloudy')).toBe('cloudy');
+    expect(normalizeFogAppearance('misty')).toBe('solid');
+    expect(
+      normalizeFogAppearanceProjectionTimestamp('2026-09-05T00:00:00.000Z')
+    ).toBe('2026-09-05T00:00:00.000Z');
+    expect(normalizeFogAppearanceProjectionTimestamp('later')).toBeNull();
+  });
+
+  it('accepts a complete v1 projection', () => {
+    expect(
+      parseBattleMapFogAppearanceProjection({
+        v: 1,
+        appearance: 'cloudy',
+        updatedAt: '2026-09-05T00:00:00.000Z',
+      })
+    ).toEqual({
+      v: 1,
+      appearance: 'cloudy',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    });
+  });
+
+  it.each([
+    null,
+    {},
+    { v: 2, appearance: 'cloudy', updatedAt: 'now' },
+    { v: 1, appearance: 'misty', updatedAt: 'now' },
+    { v: 1, appearance: 'cloudy' },
+    { v: 1, appearance: 'cloudy', updatedAt: '' },
+    { v: 1, appearance: 'cloudy', updatedAt: 'later' },
+  ])('rejects malformed or future projections: %j', value => {
+    expect(parseBattleMapFogAppearanceProjection(value)).toBeNull();
   });
 });

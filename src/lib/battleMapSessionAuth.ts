@@ -23,7 +23,8 @@ export async function authorizeBattleMapSession(
     dmId?: string;
     playerId?: string;
     displayKey?: string;
-  }
+  },
+  options: { mutation: boolean } = { mutation: true }
 ): Promise<BattleMapSessionResult> {
   const { role, dmId, playerId, displayKey } = body;
   if (!role) {
@@ -52,7 +53,7 @@ export async function authorizeBattleMapSession(
       status: 403,
     };
   }
-  if (membership.mode === 'account') {
+  if (membership.mode === 'account' && options.mutation) {
     const security = validateCampaignMembershipMutation(request);
     if (!security.ok) {
       return {

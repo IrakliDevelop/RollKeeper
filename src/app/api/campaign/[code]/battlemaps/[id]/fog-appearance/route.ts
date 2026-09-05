@@ -6,9 +6,13 @@ import {
   refreshCampaignTTL,
 } from '@/lib/redis';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
-import { parseFogAppearance } from '@/components/ui/campaign/location-map/fog/fogAppearance';
 import { sendBattleMapPokeToRoom } from '@/lib/relayPoke';
-import type { BattleMapFogAppearanceProjectionV1 } from '@/lib/fogOfWar';
+import {
+  isFogAppearanceV1,
+  isProceduralFogAppearanceEnabled,
+  parseBattleMapFogAppearanceProjection,
+  type BattleMapFogAppearanceProjectionV1,
+} from '@/lib/fogOfWar';
 import type { FogAppearanceV1 } from '@/types/battlemap';
 
 const MAX_BATTLE_MAP_ID_LENGTH = 200;
@@ -23,18 +27,27 @@ export async function GET(
 ) {
   try {
     const { code, id } = await params;
+    if (!isProceduralFogAppearanceEnabled()) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     if (!isValidBattleMapId(id)) {
       return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
     }
 
     const redis = getRedis();
     const body = Object.fromEntries(new URL(request.url).searchParams);
-    const session = await authorizeBattleMapSession(redis, code, request, {
-      role: (body.role as 'dm' | 'player' | 'display') ?? undefined,
-      dmId: body.dmId,
-      playerId: body.playerId,
-      displayKey: body.displayKey,
-    });
+    const session = await authorizeBattleMapSession(
+      redis,
+      code,
+      request,
+      {
+        role: (body.role as 'dm' | 'player' | 'display') ?? undefined,
+        dmId: body.dmId,
+        playerId: body.playerId,
+        displayKey: body.displayKey,
+      },
+      { mutation: false }
+    );
     if (!session.authorized) {
       return NextResponse.json(
         { error: session.error },
@@ -43,14 +56,17 @@ export async function GET(
     }
 
     let fogAppearance: FogAppearanceV1 = 'solid';
-    const projection = await redis.get<BattleMapFogAppearanceProjectionV1>(
+    let updatedAt: string | null = null;
+    const raw = await redis.get<BattleMapFogAppearanceProjectionV1>(
       campaignFogAppearanceKey(code, id)
     );
-    if (projection && typeof projection === 'object') {
-      fogAppearance = parseFogAppearance(projection.appearance);
+    const projection = parseBattleMapFogAppearanceProjection(raw);
+    if (projection) {
+      fogAppearance = projection.appearance;
+      updatedAt = projection.updatedAt;
     }
 
-    return NextResponse.json({ fogAppearance });
+    return NextResponse.json({ fogAppearance, updatedAt });
   } catch (error) {
     console.error('Failed to read fog appearance:', error);
     return NextResponse.json(
@@ -66,6 +82,9 @@ export async function PUT(
 ) {
   try {
     const { code, id } = await params;
+    if (!isProceduralFogAppearanceEnabled()) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     if (!isValidBattleMapId(id)) {
       return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
     }
@@ -78,13 +97,25 @@ export async function PUT(
       return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
     }
 
-    const appearance = parseFogAppearance(body.appearance);
+    if (!isFogAppearanceV1(body.appearance)) {
+      return NextResponse.json(
+        { error: 'appearance must be solid or cloudy' },
+        { status: 400 }
+      );
+    }
+    const appearance = body.appearance;
 
     const redis = getRedis();
-    const session = await authorizeBattleMapSession(redis, code, request, {
-      role: 'dm',
-      dmId: body.dmId,
-    });
+    const session = await authorizeBattleMapSession(
+      redis,
+      code,
+      request,
+      {
+        role: 'dm',
+        dmId: body.dmId,
+      },
+      { mutation: true }
+    );
     if (!session.authorized) {
       return NextResponse.json(
         { error: session.error },
@@ -102,9 +133,12 @@ export async function PUT(
     });
     await refreshCampaignTTL(redis, code);
 
-    void sendBattleMapPokeToRoom(code, id, 'fog-appearance');
+    await sendBattleMapPokeToRoom(code, id, 'fog-appearance');
 
-    return NextResponse.json({ fogAppearance: appearance });
+    return NextResponse.json({
+      fogAppearance: appearance,
+      updatedAt: projection.updatedAt,
+    });
   } catch (error) {
     console.error('Failed to write fog appearance:', error);
     return NextResponse.json(

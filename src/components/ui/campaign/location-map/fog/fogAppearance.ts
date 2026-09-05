@@ -1,7 +1,6 @@
 import type { FogRendererOptions } from '@fieldnotes/core';
 import type { FogAppearanceV1 } from '@/types/battlemap';
-
-const VALID_APPEARANCES = new Set<FogAppearanceV1>(['solid', 'cloudy']);
+import { normalizeFogAppearance } from '@/lib/fogOfWar';
 
 const SOLID_PRESET: FogRendererOptions = {};
 
@@ -27,13 +26,7 @@ const CLOUDY_PRESET: FogRendererOptions = {
 };
 
 export function parseFogAppearance(value: unknown): FogAppearanceV1 {
-  if (
-    typeof value === 'string' &&
-    VALID_APPEARANCES.has(value as FogAppearanceV1)
-  ) {
-    return value as FogAppearanceV1;
-  }
-  return 'solid';
+  return normalizeFogAppearance(value);
 }
 
 export function resolveFogRendererOptions(value: unknown): FogRendererOptions {

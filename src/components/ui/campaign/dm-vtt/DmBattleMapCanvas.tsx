@@ -13,6 +13,7 @@ import {
   resolveFogRendererOptions,
 } from '@/components/ui/campaign/location-map/fog';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
+import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { FogAppearanceV1 } from '@/types/battlemap';
 import { DmVttToolbar } from './DmVttToolbar';
@@ -84,6 +85,24 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   const fogAppearance = proceduralFogEnabled
     ? parseFogAppearance(battleMap?.fogAppearance)
     : 'solid';
+  useFogAppearanceProjection({
+    enabled:
+      proceduralFogEnabled &&
+      Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
+      battleMap !== undefined,
+    campaignCode,
+    battleMapId,
+    dmId: props.dmId,
+    appearance: fogAppearance,
+    onError: () => {
+      addToast({
+        type: 'error',
+        title: 'Fog appearance not shared',
+        message:
+          'Your local choice was saved, but connected viewers may still see the previous appearance. Reopen the map or change the setting to retry.',
+      });
+    },
+  });
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
@@ -93,16 +112,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     (appearance: FogAppearanceV1) => {
       viewport?.setFogStyle(resolveFogRendererOptions(appearance));
       updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
-      void fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dmId: props.dmId, appearance }),
-        }
-      ).catch(() => {});
     },
-    [viewport, updateBattleMap, campaignCode, battleMapId, props.dmId]
+    [viewport, updateBattleMap, campaignCode, battleMapId]
   );
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
