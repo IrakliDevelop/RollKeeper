@@ -50,6 +50,10 @@ import {
 } from '@/lib/battlemapSync';
 import { configureFogView, resolveFogRendererOptions } from './fog';
 import { parseFogAppearance } from './fog/fogAppearance';
+import {
+  fetchAndApplyFogAppearance,
+  startFogAppearancePoll,
+} from './fog/fogAppearancePoll';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
@@ -608,19 +612,10 @@ export function PlayerBattleMapCanvas({
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkers();
         if (feature === 'fog-appearance') {
-          void fetch(
+          fetchAndApplyFogAppearance(
+            vp,
             `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
-          )
-            .then(r => (r.ok ? r.json() : null))
-            .then(data => {
-              if (data && typeof data === 'object' && 'fogAppearance' in data) {
-                const appearance = parseFogAppearance(
-                  (data as { fogAppearance: unknown }).fogAppearance
-                );
-                vp.setFogStyle(resolveFogRendererOptions(appearance));
-              }
-            })
-            .catch(() => {});
+          );
         }
         onPokeRef.current?.(feature);
       },
@@ -688,6 +683,13 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current = null;
           awareness.dispose();
         });
+
+        scope.push(
+          startFogAppearancePoll({
+            viewport: vp,
+            url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
+          })
+        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and

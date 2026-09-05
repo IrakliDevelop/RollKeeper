@@ -25,6 +25,10 @@ import {
   resolveFogRendererOptions,
 } from '@/components/ui/campaign/location-map/fog';
 import { parseFogAppearance } from '@/components/ui/campaign/location-map/fog/fogAppearance';
+import {
+  fetchAndApplyFogAppearance,
+  startFogAppearancePoll,
+} from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 
 function DisplayCanvas() {
@@ -100,19 +104,10 @@ function DisplayCanvas() {
       },
       onPoke: feature => {
         if (feature === 'fog-appearance') {
-          void fetch(
+          fetchAndApplyFogAppearance(
+            vp,
             `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
-          )
-            .then(r => (r.ok ? r.json() : null))
-            .then(data => {
-              if (data && typeof data === 'object' && 'fogAppearance' in data) {
-                const appearance = parseFogAppearance(
-                  (data as { fogAppearance: unknown }).fogAppearance
-                );
-                vp.setFogStyle(resolveFogRendererOptions(appearance));
-              }
-            })
-            .catch(() => {});
+          );
         }
       },
     });
@@ -152,6 +147,13 @@ function DisplayCanvas() {
           awarenessRef.current = null;
           awareness.dispose();
         });
+
+        scope.push(
+          startFogAppearancePoll({
+            viewport: vp,
+            url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
+          })
+        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and
