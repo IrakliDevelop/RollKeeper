@@ -68,7 +68,7 @@ function makeHookState(
     canvasRef: { current: null },
     fileInputRef: { current: null },
     mapImageInputRef: { current: null },
-    viewport: {} as Viewport,
+    viewport: { setFogStyle: vi.fn() } as unknown as Viewport,
     tools: [],
     layersPanelOpen: false,
     setLayersPanelOpen: vi.fn(),

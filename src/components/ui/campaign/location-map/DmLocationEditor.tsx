@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Loader2, Layers } from 'lucide-react';
 import { FieldNotesCanvas as Canvas, ViewportContext } from '@fieldnotes/react';
 import DmLocationToolbar from './DmLocationToolbar';
@@ -12,8 +12,9 @@ import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
-import { resolveFogRendererOptions } from './fog';
+import { parseFogAppearance, resolveFogRendererOptions } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
 
@@ -100,6 +101,14 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     fogControls,
     handleFogAppearanceChange,
   } = useDmLocationEditor(props);
+  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
+  const fogAppearance = proceduralFogEnabled
+    ? parseFogAppearance(props.location.fogAppearance)
+    : 'solid';
+
+  useEffect(() => {
+    viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
+  }, [viewport, fogAppearance]);
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -241,8 +250,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={props.location.fogAppearance}
-            onFogAppearanceChange={handleFogAppearanceChange}
+            fogAppearance={fogAppearance}
+            onFogAppearanceChange={
+              proceduralFogEnabled ? handleFogAppearanceChange : undefined
+            }
           />
         )}
 
@@ -294,9 +305,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   dotRadius: 1,
                 },
                 camera: { minZoom: 0.1, maxZoom: 5 },
-                fog: resolveFogRendererOptions(
-                  props.location.fogAppearance ?? 'solid'
-                ),
+                fog: resolveFogRendererOptions(fogAppearance),
               }}
               onReady={handleReady}
               className="h-full w-full"

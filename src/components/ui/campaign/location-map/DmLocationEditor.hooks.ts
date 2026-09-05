@@ -74,6 +74,7 @@ import {
   attachFogPersistence,
   configureFogView,
   reconcileMapFogBounds,
+  resolveFogRendererOptions,
   resolveMapImageBounds,
   useDmFogControls,
 } from './fog';
@@ -1870,12 +1871,13 @@ export function useDmLocationEditor(
     fogControls,
     handleFogAppearanceChange: useCallback(
       (appearance: import('@/types/battlemap').FogAppearanceV1) => {
+        getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,
         });
         if (mode === 'location') setHasUnsyncedChanges(true);
       },
-      [storeUpdateLocation, campaignCode, location.id, mode]
+      [getVp, storeUpdateLocation, campaignCode, location.id, mode]
     ),
   };
 }

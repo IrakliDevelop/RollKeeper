@@ -74,7 +74,7 @@ function makeHookState(
     canvasRef: { current: null },
     fileInputRef: { current: null },
     mapImageInputRef: { current: null },
-    viewport: {} as Viewport,
+    viewport: { setFogStyle: vi.fn() } as unknown as Viewport,
     tools: [],
     layersPanelOpen: false,
     setLayersPanelOpen: vi.fn(),
@@ -125,7 +125,55 @@ function makeHookState(
 }
 
 describe('DmLocationEditor wiring', () => {
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+  });
+
+  it('hides the appearance selector while viewer propagation is gated off', () => {
+    vi.mocked(useDmLocationEditor).mockReturnValue(makeHookState());
+
+    render(
+      <DmLocationEditor
+        location={{ ...baseLocation, fogAppearance: 'cloudy' }}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+
+    const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
+    expect(lastProps?.fogAppearance).toBe('solid');
+    expect(lastProps?.onFogAppearanceChange).toBeUndefined();
+  });
+
+  it('applies and exposes a normalized appearance when the rollout flag is on', () => {
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    const hookState = makeHookState();
+    vi.mocked(useDmLocationEditor).mockReturnValue(hookState);
+
+    render(
+      <DmLocationEditor
+        location={{ ...baseLocation, fogAppearance: 'cloudy' }}
+        campaignCode="TEST01"
+        dmId="dm-1"
+        onSave={vi.fn()}
+        onSyncToPlayers={vi.fn()}
+      />
+    );
+
+    expect(hookState.viewport?.setFogStyle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorStyle: expect.objectContaining({ kind: 'procedural' }),
+      })
+    );
+    const lastProps = vi.mocked(DmLocationToolOptions).mock.calls.at(-1)?.[0];
+    expect(lastProps?.fogAppearance).toBe('cloudy');
+    expect(lastProps?.onFogAppearanceChange).toBe(
+      hookState.handleFogAppearanceChange
+    );
+  });
 
   it('passes selectionControls to the shared tool options bar once a viewport exists', () => {
     vi.mocked(useDmLocationEditor).mockReturnValue(makeHookState());

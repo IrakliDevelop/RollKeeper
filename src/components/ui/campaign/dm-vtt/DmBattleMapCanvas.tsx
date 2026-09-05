@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
 import { BattleMapMinimap } from '@/components/ui/campaign/location-map/BattleMapMinimap';
 import { BattleMapExportControl } from '@/components/ui/campaign/location-map/BattleMapExportControl';
@@ -8,7 +8,11 @@ import { BattleMapViewsControl } from '@/components/ui/campaign/location-map/Bat
 import { PresenceControl } from '@/components/ui/campaign/location-map/PresenceControl';
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
-import { resolveFogRendererOptions } from '@/components/ui/campaign/location-map/fog';
+import {
+  parseFogAppearance,
+  resolveFogRendererOptions,
+} from '@/components/ui/campaign/location-map/fog';
+import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { FogAppearanceV1 } from '@/types/battlemap';
 import { DmVttToolbar } from './DmVttToolbar';
@@ -76,11 +80,21 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
   const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
+  const fogAppearance = proceduralFogEnabled
+    ? parseFogAppearance(battleMap?.fogAppearance)
+    : 'solid';
+
+  useEffect(() => {
+    viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
+  }, [viewport, fogAppearance]);
+
   const handleFogAppearanceChange = useCallback(
     (appearance: FogAppearanceV1) => {
+      viewport?.setFogStyle(resolveFogRendererOptions(appearance));
       updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
     },
-    [updateBattleMap, campaignCode, battleMapId]
+    [viewport, updateBattleMap, campaignCode, battleMapId]
   );
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
@@ -97,7 +111,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           className="h-full w-full"
           snapToGrid
           options={{
-            fog: resolveFogRendererOptions(battleMap?.fogAppearance ?? 'solid'),
+            fog: resolveFogRendererOptions(fogAppearance),
           }}
         />
         {viewport && (
@@ -130,8 +144,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={battleMap?.fogAppearance}
-            onFogAppearanceChange={handleFogAppearanceChange}
+            fogAppearance={fogAppearance}
+            onFogAppearanceChange={
+              proceduralFogEnabled ? handleFogAppearanceChange : undefined
+            }
             exportControl={
               <BattleMapExportControl
                 getViewport={() => viewport}

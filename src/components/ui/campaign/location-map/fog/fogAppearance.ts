@@ -36,9 +36,8 @@ export function parseFogAppearance(value: unknown): FogAppearanceV1 {
   return 'solid';
 }
 
-export function resolveFogRendererOptions(
-  appearance: FogAppearanceV1
-): FogRendererOptions {
+export function resolveFogRendererOptions(value: unknown): FogRendererOptions {
+  const appearance = parseFogAppearance(value);
   if (appearance === 'cloudy') return CLOUDY_PRESET;
   return SOLID_PRESET;
 }

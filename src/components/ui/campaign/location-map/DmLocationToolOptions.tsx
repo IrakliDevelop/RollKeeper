@@ -29,7 +29,7 @@ import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
-import type { DmFogControls } from './fog';
+import { parseFogAppearance, type DmFogControls } from './fog';
 import type { FogAppearanceV1 } from '@/types/battlemap';
 import {
   FOG_COVER_ALL_DESCRIPTION,
@@ -131,6 +131,7 @@ export default function DmLocationToolOptions({
   onFogAppearanceChange,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
+  const resolvedFogAppearance = parseFogAppearance(fogAppearance);
   // Read unconditionally (both DM surfaces render this component inside
   // ViewportContext.Provider) so the select branch's `showOptionsBar` gate
   // below can require a non-empty selection — otherwise activating the
@@ -443,12 +444,10 @@ export default function DmLocationToolOptions({
                       <Button
                         key={value}
                         variant={
-                          (fogAppearance ?? 'solid') === value
-                            ? 'primary'
-                            : 'ghost'
+                          resolvedFogAppearance === value ? 'primary' : 'ghost'
                         }
                         onClick={() => onFogAppearanceChange(value)}
-                        aria-pressed={(fogAppearance ?? 'solid') === value}
+                        aria-pressed={resolvedFogAppearance === value}
                         className="min-h-[44px] px-3 text-xs capitalize"
                       >
                         {value === 'solid' ? 'Solid (classic)' : 'Cloudy'}

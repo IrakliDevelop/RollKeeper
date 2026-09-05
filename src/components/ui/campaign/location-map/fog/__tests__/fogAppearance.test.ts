@@ -47,6 +47,11 @@ describe('resolveFogRendererOptions', () => {
     expect(resolveFogRendererOptions('solid')).toEqual({});
   });
 
+  it('fails closed to solid for malformed and unknown values', () => {
+    expect(resolveFogRendererOptions('misty')).toEqual({});
+    expect(resolveFogRendererOptions({ kind: 'cloudy' })).toEqual({});
+  });
+
   it('returns procedural styles for cloudy', () => {
     const options = resolveFogRendererOptions('cloudy');
     expect(options.editorStyle).toBeDefined();

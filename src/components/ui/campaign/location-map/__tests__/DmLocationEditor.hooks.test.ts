@@ -114,6 +114,7 @@ function makeStubViewport() {
     registerHtmlPainter: vi.fn(() => () => {}),
     setActivation: vi.fn(() => () => {}),
     onElementActivate: vi.fn(() => () => {}),
+    setFogStyle: vi.fn(),
     transaction: <T>(operation: () => T): T => operation(),
     removeElements: vi.fn((ids: Iterable<string>) => {
       let removed = 0;
@@ -218,6 +219,39 @@ describe('useDmLocationEditor — handleToggleDmOnly mode gating', () => {
 
     expect(store.update).toHaveBeenCalledTimes(1);
     expect(store.update).toHaveBeenCalledWith(elementId, {});
+  });
+});
+
+describe('useDmLocationEditor — fog appearance', () => {
+  beforeEach(() => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    useLocationStore.setState({ locations: {} });
+    useLocationStore.getState().addLocation('TEST01', baseLocation);
+  });
+
+  afterEach(() => {
+    useLocationStore.setState({ locations: {} });
+    vi.clearAllMocks();
+  });
+
+  it('applies the style before persisting the location preference', async () => {
+    const { vp, result } = await setup('location');
+
+    act(() => {
+      result.current.handleFogAppearanceChange('cloudy');
+    });
+
+    expect(vp.setFogStyle).toHaveBeenCalledWith(
+      expect.objectContaining({
+        editorStyle: expect.objectContaining({ kind: 'procedural' }),
+        playerStyle: expect.objectContaining({ kind: 'procedural' }),
+      })
+    );
+    expect(
+      useLocationStore.getState().getLocation('TEST01', baseLocation.id)
+        ?.fogAppearance
+    ).toBe('cloudy');
+    expect(result.current.hasUnsyncedChanges).toBe(true);
   });
 });
 
