@@ -1,19 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { redis, rawRedis, verifyDmAuthority, seedMarkerLoot, claimMarkerLoot } =
-  vi.hoisted(() => ({
-    redis: {
-      get: vi.fn(),
-      set: vi.fn(),
-      sismember: vi.fn(),
-      expire: vi.fn(),
-    },
-    rawRedis: { get: vi.fn(), eval: vi.fn() },
-    verifyDmAuthority: vi.fn(),
-    seedMarkerLoot: vi.fn(),
-    claimMarkerLoot: vi.fn(),
-  }));
+const {
+  redis,
+  rawRedis,
+  verifyDmAuthority,
+  seedMarkerLoot,
+  claimMarkerLoot,
+  sendBattleMapPoke,
+  sendBattleMapPokeToRoom,
+} = vi.hoisted(() => ({
+  redis: {
+    get: vi.fn(),
+    set: vi.fn(),
+    sismember: vi.fn(),
+    expire: vi.fn(),
+  },
+  rawRedis: { get: vi.fn(), eval: vi.fn() },
+  verifyDmAuthority: vi.fn(),
+  seedMarkerLoot: vi.fn(),
+  claimMarkerLoot: vi.fn(),
+  sendBattleMapPoke: vi.fn(),
+  sendBattleMapPokeToRoom: vi.fn(),
+}));
 
 vi.mock('@/lib/redis', () => ({
   getRedis: () => redis,
@@ -39,6 +48,10 @@ vi.mock('@/lib/markerLootClaims', async importOriginal => {
     await importOriginal<typeof import('@/lib/markerLootClaims')>();
   return { ...actual, seedMarkerLoot, claimMarkerLoot };
 });
+vi.mock('@/lib/relayPoke', () => ({
+  sendBattleMapPoke,
+  sendBattleMapPokeToRoom,
+}));
 
 import { GET, POST, PUT } from './route';
 
@@ -114,6 +127,12 @@ describe('battle-map marker publication', () => {
     const stored = redis.set.mock.calls[0][1];
     expect(JSON.stringify(stored)).not.toContain('dmNotes');
     expect(stored[0].loot[0].remainingQuantity).toBe(0);
+    expect(sendBattleMapPokeToRoom).toHaveBeenCalledWith(
+      'ABC',
+      'map-1',
+      'markers'
+    );
+    expect(sendBattleMapPoke).not.toHaveBeenCalled();
   });
 
   it('derives fresh remaining quantities from the canonical ledger', async () => {
@@ -186,6 +205,12 @@ describe('player marker loot claims', () => {
     expect(claimMarkerLoot.mock.calls[0][1].receipt).toBe(
       'claim:ABC:map-1:player-1:request-1'
     );
+    expect(sendBattleMapPokeToRoom).toHaveBeenCalledWith(
+      'ABC',
+      'map-1',
+      'markers'
+    );
+    expect(sendBattleMapPoke).not.toHaveBeenCalled();
   });
 
   it('defaults a missing quantity to 1', async () => {
