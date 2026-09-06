@@ -20,7 +20,7 @@ async function openSeededMap(page: Page): Promise<void> {
               { code: campaignCode, name: 'Fog E2E', createdAt: now },
             ],
           },
-          version: 0,
+          version: 1,
         })
       );
       window.localStorage.setItem(
