@@ -13,7 +13,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
-import { FogProceduralFields, HexField } from './FogMaterialFields';
+import {
+  ColorField,
+  FogMaterialPreview,
+  FogProceduralFields,
+} from './FogMaterialFields';
 import type { FogPresetControls } from '../useFogPresetControls';
 
 export function FogMaterialEditor({
@@ -36,32 +40,35 @@ export function FogMaterialEditor({
         if (!open) controls.cancelEditor();
       }}
     >
-      <DialogContent aria-label="Fog material">
+      <DialogContent aria-label="Fog material" size="md">
         <DialogHeader>
           <DialogTitle>Fog material</DialogTitle>
           <DialogDescription>
             Changes preview on this map only until you apply them.
           </DialogDescription>
         </DialogHeader>
-        <DialogBody className="flex flex-col gap-3">
-          <Switch
-            label="Noise texture"
-            checked={draft.kind === 'procedural'}
-            onCheckedChange={checked =>
-              controls.setDraftKind(checked ? 'procedural' : 'solid')
-            }
-            wrapperClassName="min-h-[44px] items-center"
-          />
-          {draft.kind === 'solid' ? (
-            <HexField
-              key="solid"
-              label="Fog color"
-              value={draft.color}
-              onCommit={color => controls.updateDraft({ color })}
+        <DialogBody className="grid gap-5 sm:grid-cols-[minmax(0,1fr)_11rem]">
+          <div className="flex min-w-0 flex-col gap-3">
+            <Switch
+              label="Noise texture"
+              checked={draft.kind === 'procedural'}
+              onCheckedChange={checked =>
+                controls.setDraftKind(checked ? 'procedural' : 'solid')
+              }
+              wrapperClassName="min-h-[44px] items-center"
             />
-          ) : (
-            <FogProceduralFields controls={controls} draft={draft} />
-          )}
+            {draft.kind === 'solid' ? (
+              <ColorField
+                key="solid"
+                label="Fog color"
+                value={draft.color}
+                onCommit={color => controls.updateDraft({ color })}
+              />
+            ) : (
+              <FogProceduralFields controls={controls} draft={draft} />
+            )}
+          </div>
+          <FogMaterialPreview material={draft} />
           <Input
             label="Preset name"
             aria-label="Preset name"
@@ -69,6 +76,7 @@ export function FogMaterialEditor({
             onChange={event => setName(event.target.value)}
             error={error ?? undefined}
             className="min-h-[44px]"
+            wrapperClassName="sm:col-span-2"
           />
         </DialogBody>
         <DialogFooter className="flex flex-wrap gap-2">
