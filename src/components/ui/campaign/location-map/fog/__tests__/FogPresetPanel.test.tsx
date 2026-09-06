@@ -142,14 +142,12 @@ describe('FogMaterialEditor', () => {
     ).toBeNull();
   });
 
-  it('only accepts full hex colors from the text field', () => {
+  it('updates colors from the color picker', () => {
     const c = controls({
       editor: { draft: procedural, sourcePresetId: null, error: null },
     });
     render(<FogPresetPanel controls={c} />);
-    const field = screen.getByRole('textbox', { name: 'Fog color' });
-    fireEvent.change(field, { target: { value: '#12' } });
-    expect(c.updateDraft).not.toHaveBeenCalled();
+    const field = screen.getByLabelText('Fog color');
     fireEvent.change(field, { target: { value: '#ABCDEF' } });
     expect(c.updateDraft).toHaveBeenCalledWith({ baseColor: '#abcdef' });
   });
@@ -167,7 +165,7 @@ describe('FogMaterialEditor', () => {
       return <FogPresetPanel controls={c} />;
     }
     render(<Harness />);
-    const field = screen.getByRole('textbox', { name: 'Fog color' });
+    const field = screen.getByLabelText('Fog color');
     fireEvent.change(field, { target: { value: '#ff0000' } });
     expect(field).toHaveValue('#ff0000');
     fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
@@ -216,10 +214,9 @@ describe('FogMaterialEditor', () => {
       within(dialog).getByRole('textbox', { name: 'Preset name' }),
       { target: { value: 'Crimson' } }
     );
-    fireEvent.change(
-      within(dialog).getByRole('textbox', { name: 'Fog color' }),
-      { target: { value: '#ff0000' } }
-    );
+    fireEvent.change(within(dialog).getByLabelText('Fog color'), {
+      target: { value: '#ff0000' },
+    });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
     expect(cancelEditor).toHaveBeenCalled();
     expect(screen.queryByRole('dialog', { name: 'Fog material' })).toBeNull();
