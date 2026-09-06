@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   cleanup,
   fireEvent,
@@ -149,6 +150,71 @@ describe('FogMaterialEditor', () => {
     expect(c.updateDraft).toHaveBeenCalledWith({ baseColor: '#abcdef' });
   });
 
+  it('resyncs the Fog color field to the draft after Reset', () => {
+    const baseMaterial = { ...preset.material, color: '#102030' };
+    function Harness() {
+      const [draft, setDraft] = useState<typeof baseMaterial>(baseMaterial);
+      const c = controls({
+        editor: { draft, sourcePresetId: null, error: null },
+        updateDraft: patch =>
+          setDraft(prev => ({ ...prev, ...patch }) as typeof baseMaterial),
+        resetDraft: vi.fn(() => setDraft(baseMaterial)),
+      });
+      return <FogPresetPanel controls={c} />;
+    }
+    render(<Harness />);
+    const field = screen.getByRole('textbox', { name: 'Fog color' });
+    fireEvent.change(field, { target: { value: '#ff0000' } });
+    expect(field).toHaveValue('#ff0000');
+    fireEvent.click(screen.getByRole('button', { name: 'Reset' }));
+    expect(field).toHaveValue('#102030');
+  });
+
+  it('Cancel restores without apply', () => {
+    const applyDraft = vi.fn();
+    const saveDraftAsPreset = vi.fn(() => null);
+    const updateSourcePreset = vi.fn(() => null);
+    const cancelEditor = vi.fn();
+    function Harness() {
+      const [editor, setEditor] = useState<FogPresetControls['editor']>({
+        draft: { ...preset.material, color: '#102030' },
+        sourcePresetId: null,
+        error: null,
+      });
+      const c = controls({
+        editor,
+        updateDraft: patch =>
+          setEditor(
+            prev =>
+              prev && {
+                ...prev,
+                draft: { ...prev.draft, ...patch } as typeof prev.draft,
+              }
+          ),
+        cancelEditor: vi.fn(() => {
+          cancelEditor();
+          setEditor(null);
+        }),
+        applyDraft,
+        saveDraftAsPreset,
+        updateSourcePreset,
+      });
+      return <FogPresetPanel controls={c} />;
+    }
+    render(<Harness />);
+    const dialog = screen.getByRole('dialog', { name: 'Fog material' });
+    fireEvent.change(
+      within(dialog).getByRole('textbox', { name: 'Fog color' }),
+      { target: { value: '#ff0000' } }
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(cancelEditor).toHaveBeenCalled();
+    expect(screen.queryByRole('dialog', { name: 'Fog material' })).toBeNull();
+    expect(applyDraft).not.toHaveBeenCalled();
+    expect(saveDraftAsPreset).not.toHaveBeenCalled();
+    expect(updateSourcePreset).not.toHaveBeenCalled();
+  });
+
   it('saves with a name, surfaces errors, and offers Update for a sourced draft', () => {
     const c = controls({
       editor: {
@@ -170,6 +236,9 @@ describe('FogMaterialEditor', () => {
       within(dialog).getByRole('button', { name: 'Save as new preset' })
     );
     expect(c.saveDraftAsPreset).toHaveBeenCalledWith('Crimson');
+    expect(
+      within(dialog).getByRole('textbox', { name: 'Preset name' })
+    ).toHaveValue('');
     fireEvent.click(
       within(dialog).getByRole('button', { name: 'Update preset' })
     );

@@ -1,9 +1,9 @@
 'use client';
 
-import type { FogPresetControls } from '../useFogPresetControls';
 import { FogMaterialEditor } from './FogMaterialEditor';
 import { FogPresetManager } from './FogPresetManager';
 import { FogPresetSelector } from './FogPresetSelector';
+import type { FogPresetControls } from '../useFogPresetControls';
 
 export function FogPresetPanel({ controls }: { controls: FogPresetControls }) {
   if (!controls.enabled) return null;

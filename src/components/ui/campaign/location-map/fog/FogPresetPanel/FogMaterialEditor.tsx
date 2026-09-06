@@ -85,7 +85,9 @@ export function FogMaterialEditor({
           </Button>
           <Button
             variant="secondary"
-            onClick={() => controls.saveDraftAsPreset(name)}
+            onClick={() => {
+              if (controls.saveDraftAsPreset(name) === null) setName('');
+            }}
             className="min-h-[44px] px-3 text-xs"
           >
             Save as new preset

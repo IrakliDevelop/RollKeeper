@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { FOG_MATERIAL_BOUNDS, normalizeHexColor } from '@/lib/fogMaterial';
 import type { FogPresetControls } from '../useFogPresetControls';
+import { FOG_MATERIAL_BOUNDS, normalizeHexColor } from '@/lib/fogMaterial';
 import type { CustomProceduralFogMaterialV1 } from '@/types/fogMaterial';
 
 /** A text field that only commits a hex color once it is a full `#rrggbb`
@@ -20,6 +20,9 @@ export function HexField({
   onCommit(hex: string): void;
 }) {
   const [text, setText] = useState(value);
+  useEffect(() => {
+    setText(value);
+  }, [value]);
   return (
     <Input
       label={label}
