@@ -133,14 +133,15 @@ export function applyCanonicalRemaining(
     title: marker.title,
     body: marker.body,
     ...(marker.status === undefined ? {} : { status: marker.status }),
-    ...(marker.lootLocked === true ? { lootLocked: true } : {}),
-    ...(marker.loot === undefined
-      ? {}
-      : {
-          loot: marker.loot.map(entry => ({
-            ...entry,
-            remainingQuantity: remaining.get(`${marker.id}:${entry.id}`) ?? 0,
-          })),
-        }),
+    ...(marker.lootLocked === true
+      ? { lootLocked: true }
+      : marker.loot === undefined
+        ? {}
+        : {
+            loot: marker.loot.map(entry => ({
+              ...entry,
+              remainingQuantity: remaining.get(`${marker.id}:${entry.id}`) ?? 0,
+            })),
+          }),
   }));
 }

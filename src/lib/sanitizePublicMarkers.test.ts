@@ -324,4 +324,30 @@ describe('lootLocked handling', () => {
     expect(result[0].lootLocked).toBe(true);
     expect(result[0].loot).toBeUndefined();
   });
+
+  it('applyCanonicalRemaining drops loot when a marker carries both lootLocked and a non-empty loot array', () => {
+    const result = applyCanonicalRemaining(
+      [
+        {
+          id: 'ref-1',
+          title: 'Chest',
+          body: '',
+          lootLocked: true,
+          loot: [
+            {
+              id: 'loot-1',
+              name: 'Leaked Sword',
+              itemKind: 'magic',
+              quantity: 1,
+              remainingQuantity: 1,
+            },
+          ],
+        },
+      ],
+      []
+    );
+    expect(result[0].lootLocked).toBe(true);
+    expect(result[0].loot).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('Leaked Sword');
+  });
 });
