@@ -106,9 +106,11 @@ test('DM opts in, authors fog, previews players, and reloads persisted fog', asy
   const options = page.getByRole('group', { name: 'Fog of war options' });
   await expect(options).toContainText('visually covers the map');
   await expect(options).toContainText('does not remove the map image');
-  const cloudy = options.getByRole('button', { name: 'Cloudy' });
-  await cloudy.click();
-  await expect(cloudy).toHaveAttribute('aria-pressed', 'true');
+  const fogAppearance = options.getByRole('combobox', {
+    name: 'Fog appearance',
+  });
+  await fogAppearance.selectOption('cloudy');
+  await expect(fogAppearance).toHaveValue('cloudy');
   await expect
     .poll(async () =>
       page.evaluate(
@@ -159,10 +161,9 @@ test('DM opts in, authors fog, previews players, and reloads persisted fog', asy
   await expect(
     page.getByRole('switch', { name: 'Preview as player' })
   ).toHaveAttribute('aria-checked', 'false');
-  await expect(page.getByRole('button', { name: 'Cloudy' })).toHaveAttribute(
-    'aria-pressed',
-    'true'
-  );
+  await expect(
+    page.getByRole('combobox', { name: 'Fog appearance' })
+  ).toHaveValue('cloudy');
 });
 
 test('fog controls meet the touch target and a touch brush gesture persists', async ({
