@@ -196,11 +196,6 @@ export function LootEditor({
       >
         Loot contents
       </h4>
-      {deliveryMessage && (
-        <p role="status" className="text-muted text-sm">
-          {deliveryMessage}
-        </p>
-      )}
       <div className="flex flex-col gap-1.5">
         <span className="text-heading text-xs font-semibold">
           Player access
@@ -236,6 +231,11 @@ export function LootEditor({
             : "Players can see the contents and claim up to what's left."}
         </p>
       </div>
+      {deliveryMessage && (
+        <p role="status" className="text-muted text-sm">
+          {deliveryMessage}
+        </p>
+      )}
       <AllItemsAutocomplete
         mundaneItems={mundane.items}
         magicItems={magic.items}

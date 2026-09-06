@@ -1366,6 +1366,34 @@ describe('MarkerDetailPanel portal destination', () => {
       ).toBeInTheDocument();
     });
 
+    it('persists lootAccess immediately via onPersist, without a Save click', async () => {
+      stubPlayersFetch();
+      const user = userEvent.setup();
+      const onPersist = vi.fn();
+
+      render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          campaignCode="ABC123"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+            detail: detail({ loot: [] }),
+          }}
+          onClose={() => {}}
+          onSave={() => {}}
+          onPersist={onPersist}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Locked' }));
+
+      expect(onPersist).toHaveBeenCalledWith(
+        expect.objectContaining({ lootAccess: 'locked' })
+      );
+    });
+
     it('explains what locking does', async () => {
       stubPlayersFetch();
       const user = userEvent.setup();

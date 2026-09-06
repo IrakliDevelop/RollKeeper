@@ -290,6 +290,7 @@ export interface DmLocationEditorState {
     discovery?: import('@/types/battlemap').MarkerDiscovery;
     trap?: import('@/types/battlemap').MarkerTrapMechanics;
     loot?: import('@/types/battlemap').MarkerLootEntry[];
+    lootAccess?: import('@/types/battlemap').MarkerDetail['lootAccess'];
     portal?: MarkerPortalTargetV1 | null;
   }) => void;
   handleDeleteMarker: () => void;
@@ -802,6 +803,7 @@ export function useDmLocationEditor(
       discovery?: import('@/types/battlemap').MarkerDiscovery;
       trap?: import('@/types/battlemap').MarkerTrapMechanics;
       loot?: import('@/types/battlemap').MarkerLootEntry[];
+      lootAccess?: import('@/types/battlemap').MarkerDetail['lootAccess'];
       portal?: MarkerPortalTargetV1 | null;
     }) => {
       if (activeMarkerRef === null) return;
@@ -826,6 +828,7 @@ export function useDmLocationEditor(
             beforeDetail.title !== afterDetail.title ||
             beforeDetail.body !== afterDetail.body ||
             beforeDetail.status !== afterDetail.status ||
+            beforeDetail.lootAccess !== afterDetail.lootAccess ||
             // Loot is a reference array — a cheap JSON snapshot comparison is
             // acceptable here because the array is small (usually < 10 items).
             JSON.stringify(beforeDetail.loot ?? []) !==

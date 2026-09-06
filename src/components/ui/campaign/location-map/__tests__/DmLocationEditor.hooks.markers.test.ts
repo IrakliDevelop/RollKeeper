@@ -2090,6 +2090,39 @@ describe('useDmLocationEditor — location publication-dirty seam', () => {
     expect(result.current.hasUnsyncedChanges).toBe(true);
   });
 
+  it('public field edit (lootAccess only) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Toggle ONLY lootAccess — no title/body/status/loot change. This is
+    // exactly what the DM's "Player access" control does: it drives
+    // `lootLocked`/the omission of `loot` from the public projection, so it
+    // must mark dirty on its own.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: '',
+        dmNotes: '',
+        lootAccess: 'locked',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
   it('portal-only edit stays synced', async () => {
     const { vp, store, result, emitActivate } = await setupLocationSynced();
 
