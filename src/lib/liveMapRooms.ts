@@ -1,19 +1,38 @@
-import { campaignLiveMapRoomsKey, SLIDING_TTL_SECONDS } from '@/lib/redis';
+import { campaignLiveMapRoomsKey } from '@/lib/redis';
 
 /**
- * A room is considered live this long after its last token mint.
+ * How far back a battle-map room stays a fan-out candidate: a room is "live"
+ * if it was minted (or re-minted) within this many ms of now.
  *
- * Must stay comfortably above `PROACTIVE_REFRESH_MS` (4 minutes, see
- * `src/lib/battlemapPokeListener.ts`) — that's how often a connected client
- * re-mints its token, so a continuously connected client must never be
- * pruned between refreshes. It also needs to be short enough that a closed
- * tab stops receiving fan-out promptly. If either value changes, check the
- * other still leaves enough headroom.
+ * This is a bound on fan-out width, not a liveness proof. Most clients only
+ * register once, at connect — there is no periodic re-mint on the managed
+ * WebSocket connection path (`src/lib/battlemapSync.ts`), which is what most
+ * battle-map canvases use; only the polling-fallback listener
+ * (`src/lib/battlemapPokeListener.ts`, `PROACTIVE_REFRESH_MS` = 4 minutes)
+ * re-mints periodically, and it isn't used by the canvas clients this
+ * registry primarily exists to help. So the window has to comfortably exceed
+ * a realistic session length rather than a refresh interval — 12 hours — so a
+ * client that registered once near the start of a long session is still
+ * fan-out-eligible near the end of it. A poke to a room that has since gone
+ * quiet is a harmless no-op at the relay (`relay/src/poke.ts` returns
+ * `sent: 0`), and `MAX_LIVE_MAP_ROOMS` bounds the blast radius, so erring long
+ * here is cheap.
  */
-export const LIVE_MAP_ROOM_WINDOW_MS = 10 * 60 * 1000;
+export const LIVE_MAP_ROOM_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 /** Hard ceiling on fan-out, so one write cannot spray unbounded pokes. */
 export const MAX_LIVE_MAP_ROOMS = 25;
+
+/**
+ * TTL for the live-room registry key itself. Independent from the campaign's
+ * general `SLIDING_TTL_SECONDS` (60 days, in `src/lib/redis.ts`) — that value
+ * is sized for durable campaign data, not this registry, whose entries are
+ * all pruned as stale well before it. Kept comfortably above
+ * `LIVE_MAP_ROOM_WINDOW_MS` purely so the key doesn't vanish out from under a
+ * still-live room; the pruning in `listLiveMapRooms` is what actually keeps
+ * the registry's contents honest.
+ */
+export const LIVE_MAP_ROOM_TTL_SECONDS = 24 * 60 * 60;
 
 /**
  * Structural subset of the redis client needed to read the live-room
@@ -32,15 +51,26 @@ export interface LiveMapRoomsReader {
 }
 
 /**
+ * Structural subset of the pipeline object needed to record a live room in
+ * one round trip. Narrow, so a small fake pipeline works in tests without
+ * pulling in the real `@upstash/redis` `Pipeline` type.
+ */
+export interface LiveMapRoomsPipeline {
+  zadd(key: string, scoreMember: { score: number; member: string }): unknown;
+  expire(key: string, seconds: number): unknown;
+  exec(): Promise<unknown[]>;
+}
+
+/**
  * Structural subset of the redis client needed to record a live room at
- * token-mint time.
+ * token-mint time. `zadd` + `expire` are issued through a pipeline so the
+ * connect critical path pays one Redis round trip instead of two, and so a
+ * throwing `expire` cannot leave a brand-new key without a TTL (they either
+ * both land or, on any error, neither is trusted to have landed and the whole
+ * write is treated as failed).
  */
 export interface LiveMapRoomsWriter {
-  zadd(
-    key: string,
-    scoreMember: { score: number; member: string }
-  ): Promise<number | null>;
-  expire(key: string, seconds: number): Promise<number>;
+  pipeline(): LiveMapRoomsPipeline;
 }
 
 /**
@@ -57,8 +87,10 @@ export async function recordLiveMapRoom(
   const now = deps.now ?? Date.now();
   const key = campaignLiveMapRoomsKey(code);
   try {
-    await redis.zadd(key, { score: now, member: battleMapId });
-    await redis.expire(key, SLIDING_TTL_SECONDS);
+    const pipeline = redis.pipeline();
+    pipeline.zadd(key, { score: now, member: battleMapId });
+    pipeline.expire(key, LIVE_MAP_ROOM_TTL_SECONDS);
+    await pipeline.exec();
   } catch (err) {
     console.warn('[liveMapRooms] recordLiveMapRoom failed:', err);
   }

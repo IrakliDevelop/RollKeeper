@@ -1,5 +1,5 @@
 import { signBattleMapToken } from '@/lib/battlemapToken';
-import { listLiveMapRooms } from '@/lib/liveMapRooms';
+import { listLiveMapRooms, MAX_LIVE_MAP_ROOMS } from '@/lib/liveMapRooms';
 import { campaignSharedKey } from '@/lib/redis';
 
 import type { LiveMapRoomsReader } from '@/lib/liveMapRooms';
@@ -77,6 +77,30 @@ async function pokeRoom(
 }
 
 /**
+ * Reads the campaign's `activeBattleMapId`, or `null` if there is none or the
+ * read/parse fails. Shared by `sendBattleMapPoke` (the only room it targets)
+ * and `sendBattleMapPokeToLiveRooms` (one room among the union it targets).
+ * Never throws.
+ */
+async function readActiveBattleMapId(
+  code: string,
+  redis: RedisReader
+): Promise<string | null> {
+  try {
+    const raw = await redis.get<string | SharedBattleMapState>(
+      campaignSharedKey(code, 'battlemap')
+    );
+    if (!raw) return null;
+    const battleMap: SharedBattleMapState =
+      typeof raw === 'string' ? JSON.parse(raw) : raw;
+    return battleMap?.activeBattleMapId ?? null;
+  } catch (err) {
+    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
+    return null;
+  }
+}
+
+/**
  * Best-effort WS poke after a write: tells clients in the active battle-map
  * room to refetch /shared immediately for the given feature. Never throws —
  * the 5s poll is the source-of-truth fallback; this only shaves latency.
@@ -90,25 +114,9 @@ export async function sendBattleMapPoke(
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
   if (!relayUrl || !secret) return;
-  try {
-    const raw = await redis.get<string | SharedBattleMapState>(
-      campaignSharedKey(code, 'battlemap')
-    );
-    if (!raw) return;
-    const battleMap: SharedBattleMapState =
-      typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (!battleMap?.activeBattleMapId) return;
-
-    await pokeRoom(
-      code,
-      battleMap.activeBattleMapId,
-      feature,
-      deps,
-      'active-map'
-    );
-  } catch (err) {
-    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
-  }
+  const activeBattleMapId = await readActiveBattleMapId(code, redis);
+  if (!activeBattleMapId) return;
+  await pokeRoom(code, activeBattleMapId, feature, deps, 'active-map');
 }
 
 /**
@@ -127,12 +135,22 @@ export async function sendBattleMapPokeToRoom(
 
 /**
  * Poke every battle-map room the campaign currently has connected clients
- * in (per the live-room registry), rather than only the single
- * `activeBattleMapId` room. Falls back to `sendBattleMapPoke`'s
- * active-map-only behaviour when the registry is empty — a campaign whose
- * clients predate the registry, or a Redis blip, is no worse off than
- * today. Runs the fan-out concurrently with `Promise.allSettled` so one
- * slow or failing room cannot starve or fail the others. Never throws.
+ * in — the union of the live-room registry and `activeBattleMapId` — rather
+ * than only the single `activeBattleMapId` room, and rather than either/or
+ * between the two. A registry that happens not to contain
+ * `activeBattleMapId` (e.g. its entry aged out of `LIVE_MAP_ROOM_WINDOW_MS`
+ * while the room stayed live, or the DM has a second map open elsewhere)
+ * must never cause a poke that pre-registry code would have sent to go
+ * unsent — this union makes that true by construction, not by case
+ * analysis on whether the registry happens to be empty.
+ *
+ * The result is capped at `MAX_LIVE_MAP_ROOMS`, with `activeBattleMapId`
+ * (when present) always kept — it's the one entry a poke must never drop —
+ * and the oldest registry entries trimmed first if the union would
+ * otherwise exceed the cap.
+ *
+ * Runs the fan-out concurrently with `Promise.allSettled` so one slow or
+ * failing room cannot starve or fail the others. Never throws.
  *
  * Bails out before touching Redis when the relay isn't configured — the
  * registry read can't lead to a send in that case, so there's nothing to
@@ -148,11 +166,30 @@ export async function sendBattleMapPokeToLiveRooms(
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
   if (!relayUrl || !secret) return;
 
-  const rooms = await listLiveMapRooms(redis, code, { now: deps.now });
-  if (rooms.length === 0) {
-    await sendBattleMapPoke(code, redis, feature, deps);
-    return;
+  const [liveRooms, activeBattleMapId] = await Promise.all([
+    listLiveMapRooms(redis, code, { now: deps.now }),
+    readActiveBattleMapId(code, redis),
+  ]);
+
+  // activeBattleMapId goes in first and always keeps its slot; liveRooms
+  // (already most-recent-first, and already capped to MAX_LIVE_MAP_ROOMS by
+  // listLiveMapRooms) fills the remainder, oldest entries dropped first if
+  // the union doesn't fit.
+  const rooms: string[] = [];
+  const seen = new Set<string>();
+  if (activeBattleMapId) {
+    rooms.push(activeBattleMapId);
+    seen.add(activeBattleMapId);
   }
+  for (const battleMapId of liveRooms) {
+    if (rooms.length >= MAX_LIVE_MAP_ROOMS) break;
+    if (seen.has(battleMapId)) continue;
+    seen.add(battleMapId);
+    rooms.push(battleMapId);
+  }
+
+  if (rooms.length === 0) return;
+
   await Promise.allSettled(
     rooms.map(battleMapId => pokeRoom(code, battleMapId, feature, deps, 'room'))
   );
