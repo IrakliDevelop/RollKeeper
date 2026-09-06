@@ -15,7 +15,7 @@ import {
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
 import { useBattleMapStore } from '@/store/battleMapStore';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { FogAppearance } from '@/types/battlemap';
 import { DmVttToolbar } from './DmVttToolbar';
 import {
   useDmBattleMapCanvas,
@@ -93,7 +93,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     campaignCode,
     battleMapId,
     dmId: props.dmId,
-    appearance: fogAppearance,
+    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
     onError: () => {
       addToast({
         type: 'error',
@@ -109,7 +109,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   }, [viewport, fogAppearance]);
 
   const handleFogAppearanceChange = useCallback(
-    (appearance: FogAppearanceV1) => {
+    (appearance: FogAppearance) => {
       viewport?.setFogStyle(resolveFogRendererOptions(appearance));
       updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
     },

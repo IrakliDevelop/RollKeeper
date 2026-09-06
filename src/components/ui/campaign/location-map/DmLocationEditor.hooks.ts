@@ -296,7 +296,7 @@ export interface DmLocationEditorState {
   /** Shared fog authoring state/actions for both DM battle-map surfaces. */
   fogControls: import('./fog').DmFogControls;
   handleFogAppearanceChange: (
-    appearance: import('@/types/battlemap').FogAppearanceV1
+    appearance: import('@/types/battlemap').FogAppearance
   ) => void;
 
   /** Resolved portal destination state for the active marker panel. */
@@ -1870,7 +1870,7 @@ export function useDmLocationEditor(
     portalState,
     fogControls,
     handleFogAppearanceChange: useCallback(
-      (appearance: import('@/types/battlemap').FogAppearanceV1) => {
+      (appearance: import('@/types/battlemap').FogAppearance) => {
         getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,

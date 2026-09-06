@@ -114,7 +114,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     campaignCode: props.campaignCode,
     battleMapId: props.location.id,
     dmId: props.dmId,
-    appearance: fogAppearance,
+    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
     onError: () => {
       addToast({
         type: 'error',

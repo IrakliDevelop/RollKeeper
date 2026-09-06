@@ -30,7 +30,12 @@ describe('campaign_settings family boundary', () => {
       stableIdentity: 'campaign.code',
       excludedIdentityFields: ['code', 'name', 'createdAt'],
       excludedEnvelopeFields: ['dmId'],
-      privateFields: ['bannerUrl', 'playerColors', 'dmDashboardUi'],
+      privateFields: [
+        'bannerUrl',
+        'playerColors',
+        'dmDashboardUi',
+        'fogPresets',
+      ],
       playerVisibleFields: [
         'stackableInspiration',
         'customCounterLabel',
@@ -158,6 +163,7 @@ describe('campaign_settings family boundary', () => {
       bannerUrl: 'private-ref',
       playerColors: { p1: '#fff' },
       dmDashboardUi: { playersSectionOpen: false },
+      fogPresets: [{ v: 1, id: 'fp_1', name: 'Secret Mist' }],
     });
 
     expect(projection).toEqual({
@@ -167,6 +173,33 @@ describe('campaign_settings family boundary', () => {
     });
     expect(JSON.stringify(projection)).not.toContain('private-ref');
     expect(JSON.stringify(projection)).not.toContain('dmDashboardUi');
+    expect(JSON.stringify(projection)).not.toContain('fogPresets');
+    expect(JSON.stringify(projection)).not.toContain('Secret Mist');
+  });
+
+  it('classifies fogPresets so a campaign with presets has no manifest blocker', async () => {
+    const manifest = await buildCampaignSettingsManifest({
+      campaignCode: 'PRESETS',
+      rawEnvelope: envelope([
+        {
+          code: 'PRESETS',
+          name: 'Preset campaign',
+          createdAt: '2026-09-05T00:00:00.000Z',
+          fogPresets: [
+            {
+              v: 1,
+              id: 'fp_1',
+              name: 'Mist',
+              material: { v: 1, kind: 'solid', color: '#102030' },
+              createdAt: '2026-09-05T00:00:00.000Z',
+              updatedAt: '2026-09-05T00:00:00.000Z',
+            },
+          ],
+        },
+      ]),
+    });
+    expect(manifest.blockers).toEqual([]);
+    expect(manifest.records[0].payload.fogPresets).toHaveLength(1);
   });
 
   it('extracts and fingerprints only canary fields, preserving explicit nulls', async () => {

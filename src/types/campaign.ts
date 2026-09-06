@@ -1,4 +1,5 @@
 import { CharacterState } from './character';
+import type { FogPresetV1 } from './fogMaterial';
 
 export interface CampaignData {
   dmId: string;
@@ -29,6 +30,8 @@ export interface CampaignInfo {
   bannerUrl?: string; // S3 URL for campaign banner image
   /** House rule: allow players to stack more than one Heroic Inspiration. Default false. */
   stackableInspiration?: boolean;
+  /** Campaign fog preset library. DM-private; never projected to players. Absent when empty. */
+  fogPresets?: FogPresetV1[];
   /** DM campaign page: collapsible dashboard sections (persisted in localStorage). */
   dmDashboardUi?: {
     playersSectionOpen?: boolean;

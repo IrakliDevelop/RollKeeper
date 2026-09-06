@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  CLOUDY_PRESET,
   parseFogAppearance,
   resolveFogRendererOptions,
+  resolvePlayerFogStyle,
 } from '../fogAppearance';
 
 describe('parseFogAppearance', () => {
@@ -102,5 +104,46 @@ describe('resolveFogRendererOptions', () => {
     const a = resolveFogRendererOptions('solid');
     const b = resolveFogRendererOptions('solid');
     expect(a).toBe(b);
+  });
+});
+
+const customSolid = {
+  v: 2,
+  kind: 'custom',
+  material: { v: 1, kind: 'solid', color: '#ff0000' },
+} as const;
+
+describe('custom appearances', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('resolves to solid while the library gate is off', () => {
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', '');
+    expect(parseFogAppearance(customSolid)).toBe('solid');
+    expect(resolveFogRendererOptions(customSolid)).toEqual({});
+  });
+
+  it('resolves custom materials while the gate is on', () => {
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
+    expect(parseFogAppearance(customSolid)).toEqual(customSolid);
+    expect(resolveFogRendererOptions(customSolid).playerStyle).toEqual({
+      kind: 'solid',
+      color: '#ff0000',
+    });
+  });
+});
+
+describe('resolvePlayerFogStyle', () => {
+  it('matches the renderer defaults for legacy values', () => {
+    expect(resolvePlayerFogStyle('solid')).toEqual({
+      kind: 'solid',
+      color: '#0b1020',
+    });
+    expect(resolvePlayerFogStyle(undefined)).toEqual({
+      kind: 'solid',
+      color: '#0b1020',
+    });
+    expect(resolvePlayerFogStyle('cloudy')).toEqual(CLOUDY_PRESET.playerStyle);
   });
 });

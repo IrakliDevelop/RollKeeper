@@ -1,5 +1,5 @@
 import type {
-  FogAppearanceV1,
+  FogAppearance,
   MarkerDetail,
   PublicMarkerDetail,
   SavedCameraView,
@@ -25,7 +25,7 @@ export interface LocationMap {
   gridEnabled: boolean;
   gridSettings?: GridSettings;
   cameraViews?: SavedCameraView[];
-  fogAppearance?: FogAppearanceV1;
+  fogAppearance?: FogAppearance;
   /** Marker detail records keyed by their `ref` (see `MarkerDetail.id`).
    * DM product state — the public projection is added separately in B8. */
   markers?: MarkerDetail[];

@@ -30,7 +30,7 @@ import DmLocationToolOptions, {
   type MovementControls,
 } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { FogAppearance } from '@/types/battlemap';
 import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { markerAudienceToggleTitle } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
@@ -89,8 +89,8 @@ export interface DmVttToolbarProps {
   /** Shared-presence "who is viewing" + cursor-sharing switches. */
   presenceControl?: ReactNode;
   fogControls?: DmFogControls;
-  fogAppearance?: FogAppearanceV1;
-  onFogAppearanceChange?: (appearance: FogAppearanceV1) => void;
+  fogAppearance?: FogAppearance;
+  onFogAppearanceChange?: (appearance: FogAppearance) => void;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
