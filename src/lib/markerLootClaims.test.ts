@@ -164,9 +164,17 @@ describe('claimMarkerLoot arguments and result mapping', () => {
       ok: true,
       claim: expect.objectContaining({ grantedQuantity: 3 }),
     });
+    expect(evaluate.mock.calls[0][1]).toEqual(['L', 'T', 'R']);
     const argv = evaluate.mock.calls[0][2];
-    expect(argv).toContain('transfer-loot-req-1');
-    expect(argv).toContain(3);
+    expect(argv).toEqual([
+      'ref-1',
+      'loot-1',
+      'req-1',
+      'transfer-loot-req-1',
+      '2026-09-06T00:00:00.000Z',
+      300,
+      3,
+    ]);
   });
 
   it('maps a locked reply to the locked error', async () => {
