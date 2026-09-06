@@ -3,11 +3,13 @@ import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import {
+  downgradeFogAppearanceForGate,
+  isFogPresetLibraryEnabled,
   isProceduralFogAppearanceEnabled,
   parseBattleMapFogAppearanceProjection,
-  type BattleMapFogAppearanceProjectionV1,
+  type BattleMapFogAppearanceProjection,
 } from '@/lib/fogOfWar';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { ProjectedFogAppearance } from '@/types/battlemap';
 
 const TOKEN_TTL_MS = 5 * 60 * 1000;
 
@@ -77,16 +79,19 @@ export async function POST(
       secret
     );
 
-    let fogAppearance: FogAppearanceV1 = 'solid';
+    let fogAppearance: ProjectedFogAppearance = 'solid';
     let fogAppearanceUpdatedAt: string | null = null;
     if (isProceduralFogAppearanceEnabled()) {
       try {
-        const raw = await redis.get<BattleMapFogAppearanceProjectionV1>(
+        const raw = await redis.get<BattleMapFogAppearanceProjection>(
           campaignFogAppearanceKey(code, battleMapId)
         );
         const projection = parseBattleMapFogAppearanceProjection(raw);
-        if (projection && projection.v === 1) {
-          fogAppearance = projection.appearance;
+        if (projection) {
+          fogAppearance = downgradeFogAppearanceForGate(
+            projection.appearance,
+            isFogPresetLibraryEnabled()
+          );
           fogAppearanceUpdatedAt = projection.updatedAt;
         }
       } catch {

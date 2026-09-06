@@ -310,4 +310,24 @@ describe('fog appearance token metadata', () => {
     const response = await mint();
     expect((await response.json()).fogAppearance).toBe('solid');
   });
+
+  it('returns the projected custom appearance when the library gate is on and solid when off', async () => {
+    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+    const material = { v: 1, kind: 'solid', color: '#ff0000' };
+    seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
+      v: 2,
+      appearance: { v: 2, kind: 'custom', material },
+      updatedAt: '2026-09-05T10:00:00.000Z',
+    });
+    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED = 'true';
+    let response = await mint();
+    expect((await response.json()).fogAppearance).toEqual({
+      v: 2,
+      kind: 'custom',
+      material,
+    });
+    delete process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED;
+    response = await mint();
+    expect((await response.json()).fogAppearance).toBe('solid');
+  });
 });

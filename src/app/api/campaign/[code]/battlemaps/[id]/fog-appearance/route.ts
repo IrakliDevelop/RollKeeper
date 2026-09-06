@@ -8,12 +8,15 @@ import {
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import { sendBattleMapPokeToRoom } from '@/lib/relayPoke';
 import {
+  downgradeFogAppearanceForGate,
   isFogAppearanceV1,
+  isFogPresetLibraryEnabled,
   isProceduralFogAppearanceEnabled,
   parseBattleMapFogAppearanceProjection,
-  type BattleMapFogAppearanceProjectionV1,
+  parseProjectedFogAppearance,
+  type BattleMapFogAppearanceProjection,
 } from '@/lib/fogOfWar';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { ProjectedFogAppearance } from '@/types/battlemap';
 
 const MAX_BATTLE_MAP_ID_LENGTH = 200;
 
@@ -55,14 +58,17 @@ export async function GET(
       );
     }
 
-    let fogAppearance: FogAppearanceV1 = 'solid';
+    let fogAppearance: ProjectedFogAppearance = 'solid';
     let updatedAt: string | null = null;
-    const raw = await redis.get<BattleMapFogAppearanceProjectionV1>(
+    const raw = await redis.get<BattleMapFogAppearanceProjection>(
       campaignFogAppearanceKey(code, id)
     );
     const projection = parseBattleMapFogAppearanceProjection(raw);
-    if (projection && projection.v === 1) {
-      fogAppearance = projection.appearance;
+    if (projection) {
+      fogAppearance = downgradeFogAppearanceForGate(
+        projection.appearance,
+        isFogPresetLibraryEnabled()
+      );
       updatedAt = projection.updatedAt;
     }
 
@@ -97,13 +103,26 @@ export async function PUT(
       return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
     }
 
-    if (!isFogAppearanceV1(body.appearance)) {
+    let appearance: ProjectedFogAppearance;
+    if (isFogAppearanceV1(body.appearance)) {
+      appearance = body.appearance;
+    } else if (
+      isFogPresetLibraryEnabled() &&
+      typeof body.appearance === 'object' &&
+      body.appearance !== null &&
+      parseProjectedFogAppearance(body.appearance) !== 'solid'
+    ) {
+      appearance = parseProjectedFogAppearance(body.appearance);
+    } else {
       return NextResponse.json(
-        { error: 'appearance must be solid or cloudy' },
+        {
+          error: isFogPresetLibraryEnabled()
+            ? 'appearance must be solid, cloudy, or a valid custom material'
+            : 'appearance must be solid or cloudy',
+        },
         { status: 400 }
       );
     }
-    const appearance = body.appearance;
 
     const redis = getRedis();
     const session = await authorizeBattleMapSession(
@@ -123,11 +142,11 @@ export async function PUT(
       );
     }
 
-    const projection: BattleMapFogAppearanceProjectionV1 = {
-      v: 1,
-      appearance,
-      updatedAt: new Date().toISOString(),
-    };
+    const updatedAt = new Date().toISOString();
+    const projection: BattleMapFogAppearanceProjection =
+      typeof appearance === 'string'
+        ? { v: 1, appearance, updatedAt }
+        : { v: 2, appearance, updatedAt };
     await redis.set(campaignFogAppearanceKey(code, id), projection, {
       ex: SLIDING_TTL_SECONDS,
     });

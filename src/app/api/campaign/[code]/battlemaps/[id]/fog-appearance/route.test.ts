@@ -230,3 +230,82 @@ describe('PUT fog appearance projection', () => {
     );
   });
 });
+
+const material = {
+  v: 1,
+  kind: 'procedural',
+  baseColor: '#102030',
+  noiseColor: '#a0b0c0',
+  noiseOpacity: 0.4,
+  scale: 300,
+  detail: 3,
+  seed: 1234,
+} as const;
+const customBody = {
+  dmId: 'dm-1',
+  appearance: { v: 2, kind: 'custom', sourcePresetId: 'fp_1', material },
+};
+
+describe('custom appearance projection', () => {
+  it('rejects custom bodies while the library gate is off', async () => {
+    const response = await PUT(putRequest(customBody), params);
+    expect(response.status).toBe(400);
+    expect(getRedisStore().has(projectionKey)).toBe(false);
+  });
+
+  it('writes a V2 record without the source id and serves it to viewers', async () => {
+    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED = 'true';
+    const put = await PUT(putRequest(customBody), params);
+    expect(put.status).toBe(200);
+    const stored = getRedisStore().get(projectionKey) ?? '';
+    expect(stored).toContain('"v":2');
+    expect(stored).not.toContain('fp_1');
+
+    const get = await GET(getRequest('role=player&playerId=player-1'), params);
+    const body = await get.json();
+    expect(body.fogAppearance).toEqual({ v: 2, kind: 'custom', material });
+    expect(typeof body.updatedAt).toBe('string');
+    expect(sendBattleMapPokeToRoom).toHaveBeenCalledWith(
+      CODE,
+      MAP_ID,
+      'fog-appearance'
+    );
+    delete process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED;
+  });
+
+  it('serves a stored V2 record as solid while the library gate is off, without rewriting it', async () => {
+    const updatedAt = '2026-09-05T10:00:00.000Z';
+    seedRedis(projectionKey, {
+      v: 2,
+      appearance: { v: 2, kind: 'custom', material },
+      updatedAt,
+    });
+    const get = await GET(getRequest('role=player&playerId=player-1'), params);
+    expect(await get.json()).toEqual({ fogAppearance: 'solid', updatedAt });
+    expect(getRedisStore().get(projectionKey)).toContain('"v":2');
+  });
+
+  it('rejects malformed custom materials even with the gate on', async () => {
+    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED = 'true';
+    const response = await PUT(
+      putRequest({
+        dmId: 'dm-1',
+        appearance: {
+          v: 2,
+          kind: 'custom',
+          material: { ...material, scale: 5000 },
+        },
+      }),
+      params
+    );
+    expect(response.status).toBe(400);
+    delete process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED;
+  });
+
+  it('still writes legacy strings as V1 records', async () => {
+    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED = 'true';
+    await PUT(putRequest({ dmId: 'dm-1', appearance: 'cloudy' }), params);
+    expect(getRedisStore().get(projectionKey)).toContain('"v":1');
+    delete process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED;
+  });
+});
