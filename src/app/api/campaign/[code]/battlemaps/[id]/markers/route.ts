@@ -137,6 +137,17 @@ export async function POST(
         { status: 400 }
       );
 
+    const quantity = body.quantity === undefined ? 1 : body.quantity;
+    if (
+      !Number.isInteger(quantity) ||
+      (quantity as number) < 1 ||
+      (quantity as number) > 999
+    )
+      return NextResponse.json(
+        { error: 'Invalid claim quantity' },
+        { status: 400 }
+      );
+
     const playerId = body.playerId as string;
     const guest = await authorizeHybridGuestRoute(
       request,
@@ -180,13 +191,18 @@ export async function POST(
         entryId: body.entryId as string,
         requestId,
         transferIdPrefix: `transfer-loot-${requestId}`,
-        quantity: 1,
+        quantity: quantity as number,
         now: new Date().toISOString(),
       },
       SLIDING_TTL_SECONDS
     );
     if (!result.ok) {
-      const status = result.error === 'depleted' ? 409 : 404;
+      const status =
+        result.error === 'depleted'
+          ? 409
+          : result.error === 'locked'
+            ? 403
+            : 404;
       return NextResponse.json({ error: result.error }, { status });
     }
 
