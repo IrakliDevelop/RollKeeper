@@ -51,7 +51,6 @@ describe('DmLocationToolbar', () => {
   it('offers the shared fog action only when enabled and respects mutation gating', () => {
     const requestActivate = vi.fn();
     const fogControls = {
-      available: true,
       initialized: true,
       disabled: true,
       disabledReason: 'Finish arranging map images before editing fog.',

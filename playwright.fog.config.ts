@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'fog-of-war.spec.ts',
+  testMatch: ['fog-of-war.spec.ts', 'fog-preset-library.spec.ts'],
   outputDir: 'test-results/fog',
   timeout: 60_000,
   retries: 0,
