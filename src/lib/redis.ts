@@ -125,6 +125,10 @@ export function campaignFogAppearanceKey(
   return `campaign:${code}:fog-appearance:${battleMapId}`;
 }
 
+export function campaignLiveMapRoomsKey(code: string): string {
+  return `campaign:${code}:live-maps`;
+}
+
 export function characterShareKey(characterId: string): string {
   return `character:share:${characterId}`;
 }
