@@ -1,11 +1,15 @@
 'use client';
 
-import { useId } from 'react';
+import { useEffect, useRef } from 'react';
+import { renderFogStylePreview } from '@fieldnotes/core';
 import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { FogPresetControls } from '../useFogPresetControls';
-import { FOG_MATERIAL_BOUNDS } from '@/lib/fogMaterial';
+import {
+  FOG_MATERIAL_BOUNDS,
+  resolveCustomPlayerFogStyle,
+} from '@/lib/fogMaterial';
 import type {
   CustomFogMaterialV1,
   CustomProceduralFogMaterialV1,
@@ -41,40 +45,46 @@ export function FogMaterialPreview({
 }: {
   material: CustomFogMaterialV1;
 }) {
-  const filterId = useId().replace(/:/g, '');
-  const procedural = material.kind === 'procedural' ? material : null;
-  const frequency = procedural ? 0.008 + (1024 - procedural.scale) / 64000 : 0;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const draw = () => {
+      const size = Math.max(
+        1,
+        Math.round(canvas.getBoundingClientRect().width || 176)
+      );
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(size * dpr);
+      canvas.height = Math.round(size * dpr);
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.scale(dpr, dpr);
+      renderFogStylePreview(
+        ctx,
+        resolveCustomPlayerFogStyle(material),
+        size,
+        size
+      );
+    };
+
+    draw();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(draw);
+    observer?.observe(canvas);
+    return () => observer?.disconnect();
+  }, [material]);
+
   return (
     <figure className="flex flex-col gap-2">
-      <div
+      <canvas
+        ref={canvasRef}
         aria-label="Fog material preview"
         role="img"
         className="border-divider aspect-square w-full overflow-hidden rounded-xl border shadow-inner"
-        style={{
-          backgroundColor:
-            material.kind === 'solid' ? material.color : material.baseColor,
-        }}
-      >
-        {procedural && (
-          <svg className="h-full w-full" aria-hidden="true">
-            <filter id={filterId} x="-20%" y="-20%" width="140%" height="140%">
-              <feTurbulence
-                type="fractalNoise"
-                baseFrequency={frequency}
-                numOctaves={procedural.detail}
-                seed={procedural.seed}
-              />
-              <feColorMatrix type="saturate" values="0" />
-              <feComponentTransfer>
-                <feFuncA type="linear" slope={procedural.noiseOpacity} />
-              </feComponentTransfer>
-              <feFlood floodColor={procedural.noiseColor} result="tint" />
-              <feComposite in="tint" in2="SourceGraphic" operator="in" />
-            </filter>
-            <rect width="100%" height="100%" filter={`url(#${filterId})`} />
-          </svg>
-        )}
-      </div>
+      />
       <figcaption className="text-muted text-center text-xs">
         Material preview
       </figcaption>
