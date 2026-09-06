@@ -52,4 +52,72 @@ describe('buildMarkerLootLedger', () => {
       buildMarkerLootLedger([marker], [{ id: 'gone', title: '', body: '' }])
     ).toEqual([]);
   });
+
+  it('marks entries from a locked container as locked', () => {
+    const ledger = buildMarkerLootLedger(
+      [
+        {
+          id: 'ref-1',
+          title: 'Chest',
+          body: '',
+          dmNotes: '',
+          lootAccess: 'locked',
+          loot: [
+            {
+              id: 'loot-1',
+              itemKind: 'inventory',
+              item: {
+                id: 'item-1',
+                name: 'Rope',
+                category: 'tool',
+                quantity: 2,
+                location: 'Backpack',
+                tags: [],
+                createdAt: '2026-08-12T00:00:00Z',
+                updatedAt: '2026-08-12T00:00:00Z',
+              },
+              quantity: 2,
+              claimedQuantity: 0,
+            },
+          ],
+        },
+      ],
+      [{ id: 'ref-1', title: 'Chest', body: '', lootLocked: true }]
+    );
+    expect(ledger).toHaveLength(1);
+    expect(ledger[0].locked).toBe(true);
+  });
+
+  it('marks entries from an open container as unlocked', () => {
+    const ledger = buildMarkerLootLedger(
+      [
+        {
+          id: 'ref-1',
+          title: 'Chest',
+          body: '',
+          dmNotes: '',
+          loot: [
+            {
+              id: 'loot-1',
+              itemKind: 'inventory',
+              item: {
+                id: 'item-1',
+                name: 'Rope',
+                category: 'tool',
+                quantity: 2,
+                location: 'Backpack',
+                tags: [],
+                createdAt: '2026-08-12T00:00:00Z',
+                updatedAt: '2026-08-12T00:00:00Z',
+              },
+              quantity: 2,
+              claimedQuantity: 0,
+            },
+          ],
+        },
+      ],
+      [{ id: 'ref-1', title: 'Chest', body: '' }]
+    );
+    expect(ledger[0].locked).toBe(false);
+  });
 });

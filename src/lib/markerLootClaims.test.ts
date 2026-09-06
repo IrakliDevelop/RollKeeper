@@ -39,6 +39,24 @@ describe('marker loot validation', () => {
   ])('rejects invalid or duplicate entries', ({ value }) => {
     expect(validateMarkerLootSeed(value)).toBeNull();
   });
+
+  it('rejects a ledger entry with a non-boolean locked flag', () => {
+    expect(
+      validateMarkerLootSeed([{ ...entry, locked: 'yes' as unknown as boolean }])
+    ).toBeNull();
+  });
+
+  it('rejects a ledger entry missing the locked flag', () => {
+    const { locked: _locked, ...withoutLocked } = entry;
+    void _locked;
+    expect(validateMarkerLootSeed([withoutLocked])).toBeNull();
+  });
+
+  it('accepts a locked ledger entry', () => {
+    expect(validateMarkerLootSeed([{ ...entry, locked: true }])).toEqual([
+      { ...entry, locked: true },
+    ]);
+  });
 });
 
 describe('marker loot atomic scripts', () => {

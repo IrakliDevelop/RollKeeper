@@ -96,7 +96,8 @@ function isMarkerLootLedgerEntry(
     entry.quantity! <= 999 &&
     Number.isInteger(entry.claimedQuantity) &&
     entry.claimedQuantity! >= 0 &&
-    entry.claimedQuantity! <= entry.quantity!
+    entry.claimedQuantity! <= entry.quantity! &&
+    typeof entry.locked === 'boolean'
   );
 }
 

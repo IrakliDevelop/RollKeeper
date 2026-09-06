@@ -15,8 +15,8 @@ export function buildMarkerLootLedger(
       ? []
       : (marker.loot ?? []).map(entry => ({
           markerId: marker.id,
-          locked: false,
           ...structuredClone(entry),
+          locked: marker.lootAccess === 'locked',
         }))
   );
 }
