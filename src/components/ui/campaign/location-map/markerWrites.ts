@@ -360,6 +360,7 @@ export function editMarkerDetail(
     discovery?: MarkerDetail['discovery'];
     trap?: MarkerDetail['trap'];
     loot?: MarkerDetail['loot'];
+    lootAccess?: MarkerDetail['lootAccess'];
     /**
      * Nullable, unlike every other field here: `undefined` (omitted) leaves
      * whatever `portal` value already exists on the record UNTOUCHED — the
@@ -398,6 +399,9 @@ export function editMarkerDetail(
     }
     if (patch.trap !== undefined) updated.trap = sanitizeTrap(patch.trap);
     if (patch.loot !== undefined) updated.loot = sanitizeLoot(patch.loot);
+    if (patch.lootAccess === 'locked' || patch.lootAccess === 'open') {
+      updated.lootAccess = patch.lootAccess;
+    }
     if (patch.portal === null) {
       delete updated.portal;
     } else if (patch.portal !== undefined) {

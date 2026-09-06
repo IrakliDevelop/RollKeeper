@@ -9,6 +9,7 @@ import type { Redis } from '@upstash/redis';
 
 const entry = {
   markerId: 'marker-1',
+  locked: false,
   id: 'entry-1',
   itemKind: 'inventory' as const,
   item: {
@@ -37,6 +38,28 @@ describe('marker loot validation', () => {
     { value: [{ ...entry, item: { ...entry.item, name: '' } }] },
   ])('rejects invalid or duplicate entries', ({ value }) => {
     expect(validateMarkerLootSeed(value)).toBeNull();
+  });
+
+  it('rejects a ledger entry with a non-boolean locked flag', () => {
+    expect(
+      validateMarkerLootSeed([
+        { ...entry, locked: 'yes' as unknown as boolean },
+      ])
+    ).toBeNull();
+  });
+
+  it('defaults a missing locked flag to false', () => {
+    const { locked: _locked, ...withoutLocked } = entry;
+    void _locked;
+    expect(validateMarkerLootSeed([withoutLocked])).toEqual([
+      { ...withoutLocked, locked: false },
+    ]);
+  });
+
+  it('accepts a locked ledger entry', () => {
+    expect(validateMarkerLootSeed([{ ...entry, locked: true }])).toEqual([
+      { ...entry, locked: true },
+    ]);
   });
 });
 
@@ -67,8 +90,9 @@ describe('marker loot atomic scripts', () => {
       requestId: 'request-1',
       markerId: 'marker-1',
       entryId: 'entry-1',
+      grantedQuantity: 1,
       remainingQuantity: 1,
-      transferId: 'transfer-1',
+      transferId: 'transfer-1-0',
     };
     const evalMock = vi.fn().mockResolvedValue(JSON.stringify(claim));
     const result = await claimMarkerLoot(
@@ -78,7 +102,8 @@ describe('marker loot atomic scripts', () => {
         markerId: 'marker-1',
         entryId: 'entry-1',
         requestId: 'request-1',
-        transferId: 'transfer-1',
+        transferIdPrefix: 'transfer-1',
+        quantity: 1,
         now: '2026-08-12T00:00:00Z',
       },
       60
@@ -97,11 +122,71 @@ describe('marker loot atomic scripts', () => {
           markerId: 'marker-1',
           entryId: 'entry-1',
           requestId: 'request-2',
-          transferId: 'transfer-2',
+          transferIdPrefix: 'transfer-2',
+          quantity: 1,
           now: '2026-08-12T00:00:00Z',
         },
         60
       )
     ).resolves.toEqual({ ok: false, error: 'depleted' });
+  });
+});
+
+describe('claimMarkerLoot arguments and result mapping', () => {
+  const keys = { ledger: 'L', transfers: 'T', receipt: 'R' };
+  const input = {
+    markerId: 'ref-1',
+    entryId: 'loot-1',
+    requestId: 'req-1',
+    transferIdPrefix: 'transfer-loot-req-1',
+    quantity: 3,
+    now: '2026-09-06T00:00:00.000Z',
+  };
+
+  it('forwards the requested quantity and the transfer id prefix', async () => {
+    const evaluate = vi.fn().mockResolvedValue(
+      JSON.stringify({
+        requestId: 'req-1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        grantedQuantity: 3,
+        remainingQuantity: 0,
+        transferId: 'transfer-loot-req-1-0',
+      })
+    );
+    const result = await claimMarkerLoot(
+      { eval: evaluate } as unknown as Redis,
+      keys,
+      input,
+      300
+    );
+    expect(result).toEqual({
+      ok: true,
+      claim: expect.objectContaining({ grantedQuantity: 3 }),
+    });
+    expect(evaluate.mock.calls[0][1]).toEqual(['L', 'T', 'R']);
+    const argv = evaluate.mock.calls[0][2];
+    expect(argv).toEqual([
+      'ref-1',
+      'loot-1',
+      'req-1',
+      'transfer-loot-req-1',
+      '2026-09-06T00:00:00.000Z',
+      300,
+      3,
+    ]);
+  });
+
+  it('maps a locked reply to the locked error', async () => {
+    const evaluate = vi
+      .fn()
+      .mockResolvedValue(JSON.stringify({ error: 'locked' }));
+    const result = await claimMarkerLoot(
+      { eval: evaluate } as unknown as Redis,
+      keys,
+      input,
+      300
+    );
+    expect(result).toEqual({ ok: false, error: 'locked' });
   });
 });

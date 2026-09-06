@@ -230,6 +230,7 @@ describe('applyCanonicalRemaining', () => {
     const ledger: MarkerLootLedgerEntry[] = [
       {
         markerId: 'marker-1',
+        locked: false,
         id: 'entry-1',
         itemKind: 'inventory',
         item: {
@@ -270,5 +271,83 @@ describe('applyCanonicalRemaining', () => {
     ]) as unknown as PublicMarkerDetail[];
 
     expect(() => applyCanonicalRemaining(markers, [])).not.toThrow();
+  });
+});
+
+describe('lootLocked handling', () => {
+  it('preserves lootLocked and drops loot a client sends alongside it', () => {
+    const result = sanitizePublicMarkers([
+      {
+        id: 'ref-1',
+        title: 'Chest',
+        body: '',
+        lootLocked: true,
+        loot: [
+          {
+            id: 'loot-1',
+            name: 'Leaked Sword',
+            itemKind: 'magic',
+            quantity: 1,
+            remainingQuantity: 1,
+          },
+        ],
+      },
+    ]);
+    expect(result).not.toBeNull();
+    expect(result![0].lootLocked).toBe(true);
+    expect(result![0].loot).toBeUndefined();
+  });
+
+  it('rejects a non-boolean lootLocked', () => {
+    expect(
+      sanitizePublicMarkers([
+        { id: 'ref-1', title: 'Chest', body: '', lootLocked: 'yes' },
+      ])
+    ).toBeNull();
+  });
+
+  it('applyCanonicalRemaining keeps lootLocked and adds no loot', () => {
+    const result = applyCanonicalRemaining(
+      [{ id: 'ref-1', title: 'Chest', body: '', lootLocked: true }],
+      [
+        {
+          markerId: 'ref-1',
+          id: 'loot-1',
+          itemKind: 'inventory',
+          item: { id: 'item-1', name: 'Rope' },
+          quantity: 2,
+          claimedQuantity: 0,
+          locked: true,
+        } as MarkerLootLedgerEntry,
+      ]
+    );
+    expect(result[0].lootLocked).toBe(true);
+    expect(result[0].loot).toBeUndefined();
+  });
+
+  it('applyCanonicalRemaining drops loot when a marker carries both lootLocked and a non-empty loot array', () => {
+    const result = applyCanonicalRemaining(
+      [
+        {
+          id: 'ref-1',
+          title: 'Chest',
+          body: '',
+          lootLocked: true,
+          loot: [
+            {
+              id: 'loot-1',
+              name: 'Leaked Sword',
+              itemKind: 'magic',
+              quantity: 1,
+              remainingQuantity: 1,
+            },
+          ],
+        },
+      ],
+      []
+    );
+    expect(result[0].lootLocked).toBe(true);
+    expect(result[0].loot).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('Leaked Sword');
   });
 });

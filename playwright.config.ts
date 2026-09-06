@@ -2,7 +2,14 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['**/auth/**', '**/auth-wizard/**', '**/fog-of-war.spec.ts'],
+  // Specs with their own config because they need services this project's
+  // webServer does not start (the relay, Redis) run only under that config.
+  testIgnore: [
+    '**/auth/**',
+    '**/auth-wizard/**',
+    '**/fog-of-war.spec.ts',
+    '**/marker-loot-locked-claim.spec.ts',
+  ],
   outputDir: 'test-results',
   timeout: 60_000,
   retries: 0,

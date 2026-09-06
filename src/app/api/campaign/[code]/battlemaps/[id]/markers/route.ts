@@ -23,7 +23,7 @@ import {
   sanitizePublicMarkers,
 } from '@/lib/sanitizePublicMarkers';
 import type { PublicMarkerDetail } from '@/types/battlemap';
-import { sendBattleMapPoke } from '@/lib/relayPoke';
+import { sendBattleMapPokeToRoom } from '@/lib/relayPoke';
 import {
   guestDeniedResponse,
   rejectHybridGuestPrivilegeEscalation,
@@ -102,6 +102,7 @@ export async function PUT(
       ex: SLIDING_TTL_SECONDS,
     });
     await refreshCampaignTTL(redis, code);
+    await sendBattleMapPokeToRoom(code, id, 'markers');
     return NextResponse.json({ success: true, markers: publicMarkers });
   } catch (error) {
     console.error('Failed to publish battle-map markers:', error);
@@ -134,6 +135,17 @@ export async function POST(
     )
       return NextResponse.json(
         { error: 'Invalid claim request' },
+        { status: 400 }
+      );
+
+    const quantity = body.quantity === undefined ? 1 : body.quantity;
+    if (
+      !Number.isInteger(quantity) ||
+      (quantity as number) < 1 ||
+      (quantity as number) > 999
+    )
+      return NextResponse.json(
+        { error: 'Invalid claim quantity' },
         { status: 400 }
       );
 
@@ -179,13 +191,19 @@ export async function POST(
         markerId: body.markerId as string,
         entryId: body.entryId as string,
         requestId,
-        transferId: `transfer-loot-${requestId}`,
+        transferIdPrefix: `transfer-loot-${requestId}`,
+        quantity: quantity as number,
         now: new Date().toISOString(),
       },
       SLIDING_TTL_SECONDS
     );
     if (!result.ok) {
-      const status = result.error === 'depleted' ? 409 : 404;
+      const status =
+        result.error === 'depleted'
+          ? 409
+          : result.error === 'locked'
+            ? 403
+            : 404;
       return NextResponse.json({ error: result.error }, { status });
     }
 
@@ -198,7 +216,7 @@ export async function POST(
       parseStoredMarkerLootLedger(ledgerRaw)
     );
     await refreshCampaignTTL(redis, code);
-    await sendBattleMapPoke(code, redis, 'markers');
+    await sendBattleMapPokeToRoom(code, id, 'markers');
     return NextResponse.json({
       success: true,
       claim: result.claim,

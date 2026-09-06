@@ -569,3 +569,71 @@ describe('buildPublicMarkerDetails — fail-closed canvas inputs', () => {
     ).toEqual([]);
   });
 });
+
+describe('buildPublicMarkerDetails locked loot', () => {
+  const lootEntry = {
+    id: 'loot-1',
+    itemKind: 'inventory' as const,
+    item: {
+      id: 'item-1',
+      name: 'Potion of Healing',
+      category: 'consumable',
+      quantity: 1,
+      tags: [],
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+    quantity: 3,
+    claimedQuantity: 0,
+  };
+
+  it('omits loot entirely and flags lootLocked when locked', () => {
+    const el = pin({ ref: 'ref-1' });
+
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([el]),
+      markers: [
+        detail('ref-1', {
+          lootAccess: 'locked',
+          loot: [lootEntry],
+        }),
+      ],
+      dmOnlyElements: {},
+    });
+
+    expect(result[0].lootLocked).toBe(true);
+    expect(result[0].loot).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain('Potion of Healing');
+  });
+
+  it('publishes loot and no lootLocked flag when open', () => {
+    const el = pin({ ref: 'ref-1' });
+
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([el]),
+      markers: [
+        detail('ref-1', {
+          lootAccess: 'open',
+          loot: [lootEntry],
+        }),
+      ],
+      dmOnlyElements: {},
+    });
+
+    expect(result[0].lootLocked).toBeUndefined();
+    expect(result[0].loot).toHaveLength(1);
+  });
+
+  it('treats absent lootAccess as open', () => {
+    const el = pin({ ref: 'ref-1' });
+
+    const result = buildPublicMarkerDetails({
+      canvasState: canvas([el]),
+      markers: [detail('ref-1', { loot: [lootEntry] })],
+      dmOnlyElements: {},
+    });
+
+    expect(result[0].loot).toHaveLength(1);
+    expect(result[0].lootLocked).toBeUndefined();
+  });
+});

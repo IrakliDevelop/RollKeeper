@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Gift, Minus, Plus, Trash2 } from 'lucide-react';
+import { Gift, Lock, Minus, Plus, Trash2 } from 'lucide-react';
 import {
   AllItemsAutocomplete,
   type CompendiumItem,
@@ -87,12 +87,16 @@ export function LootEditor({
   value,
   onChange,
   onDelivered,
+  access,
+  onAccessChange,
 }: {
   campaignCode: string;
   dmId?: string;
   value: MarkerLootEntry[];
   onChange: (next: MarkerLootEntry[]) => void;
   onDelivered: (next: MarkerLootEntry[]) => void;
+  access: 'locked' | 'open';
+  onAccessChange: (next: 'locked' | 'open') => void;
 }) {
   const mundane = useItemsData();
   const magic = useMagicItemsData();
@@ -192,6 +196,41 @@ export function LootEditor({
       >
         Loot contents
       </h4>
+      <div className="flex flex-col gap-1.5">
+        <span className="text-heading text-xs font-semibold">
+          Player access
+        </span>
+        <div
+          role="group"
+          aria-label="Player access"
+          className="border-divider bg-surface flex gap-1 rounded-md border p-1"
+        >
+          <Button
+            variant={access === 'locked' ? 'warning' : 'ghost'}
+            size="sm"
+            className="flex-1"
+            aria-pressed={access === 'locked'}
+            leftIcon={<Lock size={14} />}
+            onClick={() => onAccessChange('locked')}
+          >
+            Locked
+          </Button>
+          <Button
+            variant={access === 'open' ? 'success' : 'ghost'}
+            size="sm"
+            className="flex-1"
+            aria-pressed={access === 'open'}
+            onClick={() => onAccessChange('open')}
+          >
+            Open
+          </Button>
+        </div>
+        <p className="text-body text-xs">
+          {access === 'locked'
+            ? 'Players see a locked chest and nothing inside. Claims are refused on the server too.'
+            : "Players can see the contents and claim up to what's left."}
+        </p>
+      </div>
       {deliveryMessage && (
         <p role="status" className="text-muted text-sm">
           {deliveryMessage}

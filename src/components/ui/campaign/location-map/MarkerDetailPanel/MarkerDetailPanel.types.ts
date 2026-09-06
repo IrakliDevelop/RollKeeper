@@ -69,6 +69,7 @@ export interface MarkerDetailPanelProps {
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
     loot?: MarkerLootEntry[];
+    lootAccess?: MarkerDetail['lootAccess'];
     portal?: MarkerPortalTargetV1 | null;
   }) => void;
   /** DM mode only. Background persistence that must not close the dialog. */
@@ -80,6 +81,8 @@ export interface MarkerDetailPanelProps {
   /** DM mode only. Applies to every sibling pin sharing this marker ref. */
   onAudienceChange?: (dmOnly: boolean) => void;
   audienceNotice?: string | null;
-  /** Player mode only. Claims one unit from an authoritative server ledger. */
-  onClaimLoot?: (entryId: string) => Promise<void>;
+  /** Player mode only. Claims up to `quantity` units from the server ledger.
+   *  Resolves to the number of units actually granted — the server may grant
+   *  fewer than requested if another player claimed some first. */
+  onClaimLoot?: (entryId: string, quantity: number) => Promise<number>;
 }

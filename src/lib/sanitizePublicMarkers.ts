@@ -61,7 +61,9 @@ export function sanitizePublicMarkers(
       typeof marker.body !== 'string' ||
       marker.body.length > 100_000 ||
       (marker.status !== undefined &&
-        !STATUSES.has(marker.status as MarkerStatus))
+        !STATUSES.has(marker.status as MarkerStatus)) ||
+      (marker.lootLocked !== undefined &&
+        typeof marker.lootLocked !== 'boolean')
     )
       return null;
     result.push({
@@ -71,38 +73,40 @@ export function sanitizePublicMarkers(
       ...(marker.status === undefined
         ? {}
         : { status: marker.status as MarkerStatus }),
-      ...(Array.isArray(marker.loot)
-        ? {
-            loot: marker.loot.flatMap(item => {
-              if (!item || typeof item !== 'object') return [];
-              const entry = item as Record<string, unknown>;
-              if (
-                typeof entry.id !== 'string' ||
-                typeof entry.name !== 'string' ||
-                (entry.itemKind !== 'inventory' &&
-                  entry.itemKind !== 'magic') ||
-                !Number.isInteger(entry.quantity) ||
-                !Number.isInteger(entry.remainingQuantity)
-              )
-                return [];
-              return [
-                {
-                  id: entry.id,
-                  name: entry.name,
-                  itemKind: entry.itemKind,
-                  quantity: entry.quantity as number,
-                  remainingQuantity: entry.remainingQuantity as number,
-                  ...(typeof entry.description === 'string'
-                    ? { description: entry.description }
-                    : {}),
-                  ...(typeof entry.rarity === 'string'
-                    ? { rarity: entry.rarity }
-                    : {}),
-                },
-              ];
-            }),
-          }
-        : {}),
+      ...(marker.lootLocked === true
+        ? { lootLocked: true }
+        : Array.isArray(marker.loot)
+          ? {
+              loot: marker.loot.flatMap(item => {
+                if (!item || typeof item !== 'object') return [];
+                const entry = item as Record<string, unknown>;
+                if (
+                  typeof entry.id !== 'string' ||
+                  typeof entry.name !== 'string' ||
+                  (entry.itemKind !== 'inventory' &&
+                    entry.itemKind !== 'magic') ||
+                  !Number.isInteger(entry.quantity) ||
+                  !Number.isInteger(entry.remainingQuantity)
+                )
+                  return [];
+                return [
+                  {
+                    id: entry.id,
+                    name: entry.name,
+                    itemKind: entry.itemKind,
+                    quantity: entry.quantity as number,
+                    remainingQuantity: entry.remainingQuantity as number,
+                    ...(typeof entry.description === 'string'
+                      ? { description: entry.description }
+                      : {}),
+                    ...(typeof entry.rarity === 'string'
+                      ? { rarity: entry.rarity }
+                      : {}),
+                  },
+                ];
+              }),
+            }
+          : {}),
     });
   }
   return result;
@@ -129,13 +133,15 @@ export function applyCanonicalRemaining(
     title: marker.title,
     body: marker.body,
     ...(marker.status === undefined ? {} : { status: marker.status }),
-    ...(marker.loot === undefined
-      ? {}
-      : {
-          loot: marker.loot.map(entry => ({
-            ...entry,
-            remainingQuantity: remaining.get(`${marker.id}:${entry.id}`) ?? 0,
-          })),
-        }),
+    ...(marker.lootLocked === true
+      ? { lootLocked: true }
+      : marker.loot === undefined
+        ? {}
+        : {
+            loot: marker.loot.map(entry => ({
+              ...entry,
+              remainingQuantity: remaining.get(`${marker.id}:${entry.id}`) ?? 0,
+            })),
+          }),
   }));
 }

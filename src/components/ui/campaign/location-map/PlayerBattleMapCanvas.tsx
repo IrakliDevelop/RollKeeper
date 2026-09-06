@@ -92,6 +92,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 
 import type { MovementResolution } from './movementTool';
 
@@ -470,7 +471,7 @@ export function PlayerBattleMapCanvas({
   }, []);
 
   const handleClaimLoot = useCallback(
-    async (entryId: string) => {
+    async (entryId: string, quantity: number): Promise<number> => {
       if (markerPanelState.kind !== 'ready')
         throw new Error('This loot container is no longer available.');
       const response = await fetch(
@@ -485,6 +486,7 @@ export function PlayerBattleMapCanvas({
             playerId: characterId,
             markerId: markerPanelState.detail.id,
             entryId,
+            quantity,
             requestId: crypto.randomUUID(),
           }),
         }
@@ -492,15 +494,19 @@ export function PlayerBattleMapCanvas({
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         markers?: PublicMarkerDetail[];
+        claim?: { grantedQuantity?: number };
       };
       if (!response.ok) {
         throw new Error(
           data.error === 'depleted'
             ? 'Someone else claimed the last one.'
-            : 'Could not claim that item.'
+            : data.error === 'locked'
+              ? 'This container is locked.'
+              : 'Could not claim that item.'
         );
       }
       setPublishedMarkers(data.markers ?? []);
+      return data.claim?.grantedQuantity ?? quantity;
     },
     [battleMapId, campaignCode, characterId, markerPanelState]
   );
@@ -518,6 +524,9 @@ export function PlayerBattleMapCanvas({
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
     viewportRef.current = vp;
+    // Mirrors the DM canvases (`DmBattleMapCanvas.hooks.ts`,
+    // `DmLocationEditor.hooks.ts`) — dev/test-only, no-ops in production.
+    exposeStoreForE2E('viewport', vp);
 
     configureFogView(vp.fog, 'player', false);
 

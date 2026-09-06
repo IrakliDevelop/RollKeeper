@@ -7,7 +7,7 @@ import type {
 
 const MAX_LEDGER_ENTRIES = 500;
 
-const SEED_SCRIPT = `
+export const SEED_SCRIPT = `
 local oldRaw = redis.call('GET', KEYS[1])
 local oldById = {}
 if oldRaw then
@@ -31,7 +31,15 @@ redis.call('SET', KEYS[1], encoded, 'EX', ARGV[2])
 return encoded
 `;
 
-const CLAIM_SCRIPT = `
+export const CLAIM_SCRIPT = `
+-- Ceiling on magic-item fan-out for a single claim: each granted magic-item
+-- unit becomes its own transfer-queue entry (the queue itself has no cap),
+-- so an unclamped claim of up to 999 units would enqueue up to 999
+-- individual transfers in one write. Applied to \`granted\` below, before
+-- claimedQuantity is incremented and before the result is built, so the
+-- ledger, the response, and the enqueued transfer count always agree.
+local MAX_MAGIC_CLAIM_UNITS = 25
+
 local previous = redis.call('GET', KEYS[3])
 if previous then return previous end
 
@@ -46,26 +54,47 @@ for _, entry in ipairs(ledger) do
   end
 end
 if not selected then return cjson.encode({ error = 'entry-not-found' }) end
-if selected.claimedQuantity >= selected.quantity then
-  return cjson.encode({ error = 'depleted' })
+if selected.locked then return cjson.encode({ error = 'locked' }) end
+
+local available = selected.quantity - selected.claimedQuantity
+if available <= 0 then return cjson.encode({ error = 'depleted' }) end
+local requested = tonumber(ARGV[7]) or 1
+if requested < 1 then requested = 1 end
+local granted = requested
+if granted > available then granted = available end
+if selected.itemKind == 'magic' and granted > MAX_MAGIC_CLAIM_UNITS then
+  granted = MAX_MAGIC_CLAIM_UNITS
 end
 
-selected.claimedQuantity = selected.claimedQuantity + 1
-local item = cjson.decode(cjson.encode(selected.item))
-if selected.itemKind == 'inventory' then item.quantity = 1 end
+selected.claimedQuantity = selected.claimedQuantity + granted
 local result = {
   requestId = ARGV[3], markerId = ARGV[1], entryId = ARGV[2],
+  grantedQuantity = granted,
   remainingQuantity = selected.quantity - selected.claimedQuantity,
-  transferId = ARGV[4]
+  transferId = ARGV[4] .. '-0'
 }
-local transfer = {
-  id = ARGV[4], item = item, itemKind = selected.itemKind,
-  fromPlayerName = 'DM', fromCharacterName = 'Map loot',
-  fromType = 'dm', sentAt = ARGV[5]
-}
+
 local queueRaw = redis.call('GET', KEYS[2])
 local queue = queueRaw and cjson.decode(queueRaw) or {}
-table.insert(queue, transfer)
+if selected.itemKind == 'inventory' then
+  local item = cjson.decode(cjson.encode(selected.item))
+  item.quantity = granted
+  table.insert(queue, {
+    id = ARGV[4] .. '-0', item = item, itemKind = 'inventory',
+    fromPlayerName = 'DM', fromCharacterName = 'Map loot',
+    fromType = 'dm', sentAt = ARGV[5]
+  })
+else
+  for index = 0, granted - 1 do
+    local item = cjson.decode(cjson.encode(selected.item))
+    table.insert(queue, {
+      id = ARGV[4] .. '-' .. index, item = item, itemKind = 'magic',
+      fromPlayerName = 'DM', fromCharacterName = 'Map loot',
+      fromType = 'dm', sentAt = ARGV[5]
+    })
+  end
+end
+
 redis.call('SET', KEYS[1], cjson.encode(ledger), 'EX', ARGV[6])
 redis.call('SET', KEYS[2], cjson.encode(queue), 'EX', ARGV[6])
 local resultRaw = cjson.encode(result)
@@ -96,7 +125,8 @@ function isMarkerLootLedgerEntry(
     entry.quantity! <= 999 &&
     Number.isInteger(entry.claimedQuantity) &&
     entry.claimedQuantity! >= 0 &&
-    entry.claimedQuantity! <= entry.quantity!
+    entry.claimedQuantity! <= entry.quantity! &&
+    (entry.locked === undefined || typeof entry.locked === 'boolean')
   );
 }
 
@@ -106,7 +136,11 @@ export function validateMarkerLootSeed(
   if (!Array.isArray(value) || value.length > MAX_LEDGER_ENTRIES) return null;
   if (!value.every(isMarkerLootLedgerEntry)) return null;
   const keys = new Set(value.map(entry => `${entry.markerId}:${entry.id}`));
-  return keys.size === value.length ? value : null;
+  if (keys.size !== value.length) return null;
+  return value.map(entry => ({
+    ...entry,
+    locked: entry.locked ?? false,
+  }));
 }
 
 /**
@@ -151,7 +185,7 @@ export type ClaimMarkerLootResult =
   | { ok: true; claim: MarkerLootClaimResult }
   | {
       ok: false;
-      error: 'container-not-found' | 'entry-not-found' | 'depleted';
+      error: 'container-not-found' | 'entry-not-found' | 'depleted' | 'locked';
     };
 
 export async function claimMarkerLoot(
@@ -161,7 +195,10 @@ export async function claimMarkerLoot(
     markerId: string;
     entryId: string;
     requestId: string;
-    transferId: string;
+    /** Transfer ids are derived as `${transferIdPrefix}-${index}`, so the
+     *  client never supplies an id it could collide with or forge. */
+    transferIdPrefix: string;
+    quantity: number;
     now: string;
   },
   ttlSeconds: number
@@ -173,14 +210,21 @@ export async function claimMarkerLoot(
       input.markerId,
       input.entryId,
       input.requestId,
-      input.transferId,
+      input.transferIdPrefix,
       input.now,
       ttlSeconds,
+      input.quantity,
     ]
   );
   const parsed = JSON.parse(String(raw)) as
     | MarkerLootClaimResult
-    | { error: 'container-not-found' | 'entry-not-found' | 'depleted' };
+    | {
+        error:
+          | 'container-not-found'
+          | 'entry-not-found'
+          | 'depleted'
+          | 'locked';
+      };
   if ('error' in parsed) return { ok: false, error: parsed.error };
   return { ok: true, claim: parsed };
 }

@@ -75,6 +75,7 @@ export interface MarkerWrites {
       discovery?: MarkerDetail['discovery'];
       trap?: MarkerDetail['trap'];
       loot?: MarkerDetail['loot'];
+      lootAccess?: MarkerDetail['lootAccess'];
       portal?: MarkerPortalTargetV1 | null;
     }
   ): boolean;
@@ -330,6 +331,7 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
         discovery?: MarkerDetail['discovery'];
         trap?: MarkerDetail['trap'];
         loot?: MarkerDetail['loot'];
+        lootAccess?: MarkerDetail['lootAccess'];
         portal?: MarkerPortalTargetV1 | null;
       }
     ): boolean => editMarkerDetailWrite(depsFor(null), ref, patch),

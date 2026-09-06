@@ -1,19 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
-const { redis, rawRedis, verifyDmAuthority, seedMarkerLoot, claimMarkerLoot } =
-  vi.hoisted(() => ({
-    redis: {
-      get: vi.fn(),
-      set: vi.fn(),
-      sismember: vi.fn(),
-      expire: vi.fn(),
-    },
-    rawRedis: { get: vi.fn(), eval: vi.fn() },
-    verifyDmAuthority: vi.fn(),
-    seedMarkerLoot: vi.fn(),
-    claimMarkerLoot: vi.fn(),
-  }));
+const {
+  redis,
+  rawRedis,
+  verifyDmAuthority,
+  seedMarkerLoot,
+  claimMarkerLoot,
+  sendBattleMapPoke,
+  sendBattleMapPokeToRoom,
+} = vi.hoisted(() => ({
+  redis: {
+    get: vi.fn(),
+    set: vi.fn(),
+    sismember: vi.fn(),
+    expire: vi.fn(),
+  },
+  rawRedis: { get: vi.fn(), eval: vi.fn() },
+  verifyDmAuthority: vi.fn(),
+  seedMarkerLoot: vi.fn(),
+  claimMarkerLoot: vi.fn(),
+  sendBattleMapPoke: vi.fn(),
+  sendBattleMapPokeToRoom: vi.fn(),
+}));
 
 vi.mock('@/lib/redis', () => ({
   getRedis: () => redis,
@@ -39,6 +48,10 @@ vi.mock('@/lib/markerLootClaims', async importOriginal => {
     await importOriginal<typeof import('@/lib/markerLootClaims')>();
   return { ...actual, seedMarkerLoot, claimMarkerLoot };
 });
+vi.mock('@/lib/relayPoke', () => ({
+  sendBattleMapPoke,
+  sendBattleMapPokeToRoom,
+}));
 
 import { GET, POST, PUT } from './route';
 
@@ -114,6 +127,12 @@ describe('battle-map marker publication', () => {
     const stored = redis.set.mock.calls[0][1];
     expect(JSON.stringify(stored)).not.toContain('dmNotes');
     expect(stored[0].loot[0].remainingQuantity).toBe(0);
+    expect(sendBattleMapPokeToRoom).toHaveBeenCalledWith(
+      'ABC',
+      'map-1',
+      'markers'
+    );
+    expect(sendBattleMapPoke).not.toHaveBeenCalled();
   });
 
   it('derives fresh remaining quantities from the canonical ledger', async () => {
@@ -139,7 +158,7 @@ describe('battle-map marker publication', () => {
 });
 
 describe('player marker loot claims', () => {
-  const request = () =>
+  const request = (overrides: Record<string, unknown> = {}) =>
     new NextRequest('http://localhost/api', {
       method: 'POST',
       body: JSON.stringify({
@@ -147,6 +166,7 @@ describe('player marker loot claims', () => {
         markerId: 'marker-1',
         entryId: 'entry-1',
         requestId: 'request-1',
+        ...overrides,
       }),
     });
 
@@ -184,6 +204,120 @@ describe('player marker loot claims', () => {
     expect(response.status).toBe(200);
     expect(claimMarkerLoot.mock.calls[0][1].receipt).toBe(
       'claim:ABC:map-1:player-1:request-1'
+    );
+    expect(sendBattleMapPokeToRoom).toHaveBeenCalledWith(
+      'ABC',
+      'map-1',
+      'markers'
+    );
+    expect(sendBattleMapPoke).not.toHaveBeenCalled();
+  });
+
+  it('defaults a missing quantity to 1', async () => {
+    redis.sismember.mockResolvedValue(1);
+    claimMarkerLoot.mockResolvedValue({
+      ok: true,
+      claim: {
+        requestId: 'r1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        remainingQuantity: 0,
+        grantedQuantity: 1,
+        transferId: 'transfer-loot-r1',
+      },
+    });
+    redis.get.mockResolvedValue([publicMarker]);
+    rawRedis.get.mockResolvedValue(
+      JSON.stringify([{ ...ledgerEntry, claimedQuantity: 1 }])
+    );
+
+    await POST(
+      request({
+        playerId: 'p1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        requestId: 'r1',
+      }),
+      params
+    );
+
+    expect(claimMarkerLoot).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ quantity: 1 }),
+      expect.anything()
+    );
+  });
+
+  it('rejects a non-integer or out-of-range quantity', async () => {
+    for (const quantity of [0, -1, 1.5, 1000, 'two']) {
+      const response = await POST(
+        request({
+          playerId: 'p1',
+          markerId: 'ref-1',
+          entryId: 'loot-1',
+          requestId: 'r1',
+          quantity,
+        }),
+        params
+      );
+      expect(response.status).toBe(400);
+    }
+    expect(claimMarkerLoot).not.toHaveBeenCalled();
+  });
+
+  it('answers 403 for a locked container', async () => {
+    redis.sismember.mockResolvedValue(1);
+    claimMarkerLoot.mockResolvedValue({ ok: false, error: 'locked' });
+
+    const response = await POST(
+      request({
+        playerId: 'p1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        requestId: 'r1',
+      }),
+      params
+    );
+
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({ error: 'locked' });
+  });
+
+  it('passes a derived transfer id prefix, never a client-supplied one', async () => {
+    redis.sismember.mockResolvedValue(1);
+    claimMarkerLoot.mockResolvedValue({
+      ok: true,
+      claim: {
+        requestId: 'r1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        remainingQuantity: 0,
+        grantedQuantity: 1,
+        transferId: 'transfer-loot-r1',
+      },
+    });
+    redis.get.mockResolvedValue([publicMarker]);
+    rawRedis.get.mockResolvedValue(
+      JSON.stringify([{ ...ledgerEntry, claimedQuantity: 1 }])
+    );
+
+    await POST(
+      request({
+        playerId: 'p1',
+        markerId: 'ref-1',
+        entryId: 'loot-1',
+        requestId: 'r1',
+        transferIdPrefix: 'attacker-controlled',
+      }),
+      params
+    );
+
+    expect(claimMarkerLoot).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({ transferIdPrefix: 'transfer-loot-r1' }),
+      expect.anything()
     );
   });
 });

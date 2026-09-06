@@ -51,6 +51,14 @@ export interface MarkerDetail {
   trap?: MarkerTrapMechanics;
   /** Copied loot definitions. Library edits never rewrite prepared markers. */
   loot?: MarkerLootEntry[];
+  /**
+   * Whether players may open this container. Absent means `'open'` — every
+   * container published before this field existed stays claimable. Locked is a
+   * deliberate DM opt-in, enforced server-side in the claim script, and it
+   * removes `loot` from the public projection entirely rather than greying it
+   * out. Independent of `status`, which is cosmetic.
+   */
+  lootAccess?: 'locked' | 'open';
   /** Private map-to-map navigation link. Never included in
    *  PublicMarkerDetail. */
   portal?: MarkerPortalTargetV1;
@@ -78,12 +86,18 @@ export interface PublicMarkerLootEntry {
 /** Authenticated DM-to-server seed for an authoritative loot container. */
 export interface MarkerLootLedgerEntry extends MarkerLootEntry {
   markerId: string;
+  /** Mirrors the owning marker's `lootAccess`, flattened per entry so the
+   *  claim script can reject without a second lookup. */
+  locked: boolean;
 }
 
 export interface MarkerLootClaimResult {
   requestId: string;
   markerId: string;
   entryId: string;
+  /** Units actually granted — may be fewer than requested when another player
+   *  took some first. The player is told when it differs. */
+  grantedQuantity: number;
   remainingQuantity: number;
   transferId: string;
 }
@@ -140,6 +154,12 @@ export interface PublicMarkerDetail {
   body: string;
   status?: MarkerStatus;
   loot?: PublicMarkerLootEntry[];
+  /**
+   * True when the DM has locked the container. Explicit rather than inferred
+   * from a missing `loot`, because a locked container and an empty one must
+   * not render identically to the player.
+   */
+  lootLocked?: boolean;
   /**
    * Structural refusal, not documentation. Without it a `MarkerDetail` is
    * assignable to `PublicMarkerDetail` (extra properties survive anything but

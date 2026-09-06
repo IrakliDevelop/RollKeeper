@@ -1803,3 +1803,39 @@ describe('guardLocalMarkerAdd — adoption is BOTH directions', () => {
     expect(harness.state.dmOnlyElements[a.id]).toBeUndefined();
   });
 });
+
+describe('editMarkerDetail lootAccess', () => {
+  it('persists an explicit lootAccess value', () => {
+    const harness = makeHarness();
+    harness.seedMarker(detail({ id: 'ref-1', title: 'Chest' }));
+
+    const applied = editMarkerDetail(harness.deps, 'ref-1', {
+      lootAccess: 'locked',
+    });
+
+    expect(applied).toBe(true);
+    expect(harness.state.markers[0]?.lootAccess).toBe('locked');
+  });
+
+  it('leaves an existing lootAccess untouched when the patch omits it', () => {
+    const harness = makeHarness();
+    harness.seedMarker(
+      detail({ id: 'ref-1', title: 'Chest', lootAccess: 'locked' })
+    );
+
+    editMarkerDetail(harness.deps, 'ref-1', { title: 'Renamed' });
+
+    expect(harness.state.markers[0]?.lootAccess).toBe('locked');
+  });
+
+  it('ignores a value outside the union', () => {
+    const harness = makeHarness();
+    harness.seedMarker(detail({ id: 'ref-1', title: 'Chest' }));
+
+    editMarkerDetail(harness.deps, 'ref-1', {
+      lootAccess: 'sideways' as MarkerDetail['lootAccess'],
+    });
+
+    expect(harness.state.markers[0]?.lootAccess).toBeUndefined();
+  });
+});

@@ -418,6 +418,90 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
       dmNotes: 'Poison needle.',
     });
   });
+
+  it('publishes a locked loot projection and ledger from battle-map setup mode', async () => {
+    const fetchMock = vi.fn<
+      (url: string, init?: RequestInit) => Promise<{ ok: true }>
+    >(async () => ({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      result.current.markerControls.onKindChange('loot');
+    });
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    vi.mocked(vp.exportJSON).mockImplementation(() =>
+      JSON.stringify({ elements: store.getAll() })
+    );
+
+    act(() => {
+      useBattleMapStore
+        .getState()
+        .updateBattleMap(CODE, MAP_ID, { dmOnlyElements: {} });
+      emitActivate(pin);
+    });
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Locked chest',
+        body: '',
+        dmNotes: '',
+        lootAccess: 'locked',
+        loot: [
+          {
+            id: 'loot-1',
+            itemKind: 'inventory',
+            item: {
+              id: 'item-1',
+              name: 'Silver arrow',
+              category: 'treasure',
+              quantity: 3,
+              location: 'Backpack',
+              tags: [],
+              createdAt: '2026-09-07T00:00:00.000Z',
+              updatedAt: '2026-09-07T00:00:00.000Z',
+            },
+            quantity: 3,
+            claimedQuantity: 0,
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    });
+
+    const publishCall = fetchMock.mock.calls.findLast(
+      ([url]) => url === `/api/campaign/${CODE}/battlemaps/${MAP_ID}/markers`
+    );
+    expect(publishCall).toBeDefined();
+    if (!publishCall) throw new Error('marker publication was not requested');
+    const init = publishCall[1];
+    if (!init) throw new Error('marker publication omitted request options');
+    expect(init.method).toBe('PUT');
+    const body = JSON.parse(String(init.body));
+    expect(body.markers).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Locked chest',
+        body: '',
+        lootLocked: true,
+      },
+    ]);
+    expect(body.markers[0]).not.toHaveProperty('loot');
+    expect(body.loot).toEqual([
+      expect.objectContaining({
+        markerId: body.markers[0].id,
+        id: 'loot-1',
+        locked: true,
+        quantity: 3,
+      }),
+    ]);
+  });
 });
 
 describe('useDmLocationEditor — marker kind and colour reach the tool', () => {
@@ -2085,6 +2169,39 @@ describe('useDmLocationEditor — location publication-dirty seam', () => {
         body: '',
         dmNotes: '',
         status: 'active',
+      });
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('public field edit (lootAccess only) marks dirty', async () => {
+    const { vp, store, result, emitActivate } = await setupLocationSynced();
+
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    act(() => {
+      emitActivate(pin);
+    });
+
+    const fetchMock = vi.fn(async () => ({ ok: true, json: async () => ({}) }));
+    vi.stubGlobal('fetch', fetchMock);
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+    expect(result.current.hasUnsyncedChanges).toBe(false);
+
+    // Toggle ONLY lootAccess — no title/body/status/loot change. This is
+    // exactly what the DM's "Player access" control does: it drives
+    // `lootLocked`/the omission of `loot` from the public projection, so it
+    // must mark dirty on its own.
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: '',
+        body: '',
+        dmNotes: '',
+        lootAccess: 'locked',
       });
     });
     expect(result.current.hasUnsyncedChanges).toBe(true);
