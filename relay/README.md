@@ -43,16 +43,16 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 
 ## Fog rollout and rollback
 
-Keep the feature dark until every compatibility gate is in place. The release order is:
+Deploy the relay before the app so no client can outrun the protocol. The release order is:
 
 1. Fieldnotes #153 (`c07f928`) and core 0.66.0, sync 0.12.0, sync-server 0.14.0, and sync-redis 0.5.0 must be published. Completed 2026-09-04.
-2. Merge and Railway-deploy the relay fog compatibility PR while both web flags remain off. Record the deployed commit and verify `/healthz`.
-3. Deploy the fog-capable web app, still with `NEXT_PUBLIC_FOG_OF_WAR_ENABLED=false` and `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false`.
+2. Merge and Railway-deploy the relay fog compatibility PR. Record the deployed commit and verify `/healthz`.
+3. Deploy the fog-capable web app with `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false`.
 4. Set `BATTLEMAP_FOG_PROTOCOL_REQUIRED=true` and verify stale token requests receive HTTP 426 while current DM, player, and display clients reconnect.
-5. Wait at least five minutes (the token lifetime), or rotate `BATTLEMAP_RELAY_SECRET` on both services and verify reconnect, so no pre-gate tokens remain.
-6. Set `NEXT_PUBLIC_FOG_OF_WAR_ENABLED=true`, redeploy the web app, and run the DM/player/display/location smoke matrix.
+5. Wait at least five minutes (the token lifetime), or rotate `BATTLEMAP_RELAY_SECRET` on both services and verify reconnect, so no pre-upgrade tokens remain.
+6. Run the DM/player/display/location smoke matrix against the deployed app.
 
-To roll back, turn the public UI flag off first. Keep the fog-capable relay and the 0.66 client deployed so existing Redis fog records and CanvasState v3 remain readable. Do not downgrade a client that may persist CanvasState v3 to core 0.65. If the capability gate itself causes an incident, turn it off only after the UI is dark; retain the upgraded relay/backend throughout.
+To roll back, keep the fog-capable relay and the 0.66 client deployed so existing Redis fog records and CanvasState v3 remain readable. Do not downgrade a client that may persist CanvasState v3 to core 0.65. If the protocol compatibility switch itself causes an incident, set `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false` and retain the upgraded relay/backend throughout.
 
 Useful release evidence:
 

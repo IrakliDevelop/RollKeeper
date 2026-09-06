@@ -26,7 +26,6 @@ describe('useDmFogControls', () => {
     const { result } = renderHook(() =>
       useDmFogControls({
         viewport,
-        available: true,
         getBounds: () => ({ x: 10, y: 20, w: 600, h: 400 }),
       })
     );
@@ -56,7 +55,6 @@ describe('useDmFogControls', () => {
     const { result, unmount } = renderHook(() =>
       useDmFogControls({
         viewport,
-        available: true,
         getBounds: () => ({ x: 0, y: 0, w: 100, h: 100 }),
       })
     );
@@ -78,7 +76,6 @@ describe('useDmFogControls', () => {
     renderHook(() =>
       useDmFogControls({
         viewport,
-        available: true,
         getBounds: () => ({ x: 0, y: 0, w: 100, h: 100 }),
       })
     );
@@ -97,7 +94,6 @@ describe('useDmFogControls', () => {
     const { result } = renderHook(() =>
       useDmFogControls({
         viewport,
-        available: true,
         getBounds: () => ({ x: 0, y: 0, w: 100, h: 100 }),
       })
     );
@@ -128,7 +124,6 @@ describe('useDmFogControls', () => {
     const { result } = renderHook(() =>
       useDmFogControls({
         viewport,
-        available: true,
         getBounds: () => ({ x: 0, y: 0, w: 100, h: 100 }),
         disabled: true,
         disabledReason: 'Finish arranging map images before editing fog.',

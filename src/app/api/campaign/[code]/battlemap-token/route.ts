@@ -3,9 +3,6 @@ import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import {
-  downgradeFogAppearanceForGate,
-  isFogPresetLibraryEnabled,
-  isProceduralFogAppearanceEnabled,
   parseBattleMapFogAppearanceProjection,
   type BattleMapFogAppearanceProjection,
 } from '@/lib/fogOfWar';
@@ -81,22 +78,17 @@ export async function POST(
 
     let fogAppearance: ProjectedFogAppearance = 'solid';
     let fogAppearanceUpdatedAt: string | null = null;
-    if (isProceduralFogAppearanceEnabled()) {
-      try {
-        const raw = await redis.get<BattleMapFogAppearanceProjection>(
-          campaignFogAppearanceKey(code, battleMapId)
-        );
-        const projection = parseBattleMapFogAppearanceProjection(raw);
-        if (projection) {
-          fogAppearance = downgradeFogAppearanceForGate(
-            projection.appearance,
-            isFogPresetLibraryEnabled()
-          );
-          fogAppearanceUpdatedAt = projection.updatedAt;
-        }
-      } catch {
-        // Default to solid on read failure.
+    try {
+      const raw = await redis.get<BattleMapFogAppearanceProjection>(
+        campaignFogAppearanceKey(code, battleMapId)
+      );
+      const projection = parseBattleMapFogAppearanceProjection(raw);
+      if (projection) {
+        fogAppearance = projection.appearance;
+        fogAppearanceUpdatedAt = projection.updatedAt;
       }
+    } catch {
+      // Default to solid on read failure.
     }
 
     return NextResponse.json({

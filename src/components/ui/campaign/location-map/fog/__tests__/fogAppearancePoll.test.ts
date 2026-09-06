@@ -47,8 +47,6 @@ describe('fetchAndApplyFogAppearance', () => {
   });
 
   it('applies a projected custom material and falls back to solid for a malformed one', () => {
-    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
-    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
     const setFogStyle = vi.fn();
     const viewport = { setFogStyle } as unknown as Viewport;
     const material = { v: 1, kind: 'solid', color: '#ff0000' };
@@ -70,7 +68,21 @@ describe('fetchAndApplyFogAppearance', () => {
       '2026-09-05T10:00:01.000Z'
     );
     expect(setFogStyle).toHaveBeenLastCalledWith({});
-    vi.unstubAllEnvs();
+  });
+
+  it('strips a source preset id before applying viewer metadata', () => {
+    const vp = fakeViewport();
+    const material = { v: 1, kind: 'solid', color: '#ff0000' };
+
+    applyFogAppearanceMetadata(
+      vp,
+      { v: 2, kind: 'custom', material, sourcePresetId: 'fp_1' },
+      '2026-09-05T10:00:00.000Z'
+    );
+
+    const applied = getAppliedFogAppearance(vp);
+    expect(applied).toEqual({ v: 2, kind: 'custom', material });
+    expect(JSON.stringify(applied)).not.toContain('fp_1');
   });
 
   it('applies appearance from response', async () => {

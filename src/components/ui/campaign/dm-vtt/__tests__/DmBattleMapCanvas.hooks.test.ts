@@ -156,6 +156,7 @@ function makeVp(): Viewport {
       getTool: vi.fn((name: string) =>
         name === 'path' ? fakeMovementTool : undefined
       ),
+      register: vi.fn(),
     },
     onSelectionChange: vi.fn(() => vi.fn()),
     getSelectedIds: vi.fn(() => []),

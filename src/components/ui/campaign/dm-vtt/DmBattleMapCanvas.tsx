@@ -14,7 +14,6 @@ import {
   useAppliedFogAppearance,
   useFogPresetControls,
 } from '@/components/ui/campaign/location-map/fog';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { FogAppearance } from '@/types/battlemap';
@@ -83,12 +82,10 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
   const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
-    useAppliedFogAppearance(battleMap?.fogAppearance, proceduralFogEnabled);
+    useAppliedFogAppearance(battleMap?.fogAppearance);
   useFogAppearanceProjection({
     enabled:
-      proceduralFogEnabled &&
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
       battleMap !== undefined,
     campaignCode,
@@ -119,7 +116,6 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     [viewport, updateBattleMap, campaignCode, battleMapId]
   );
   const fogPresetControls = useFogPresetControls({
-    enabled: proceduralFogEnabled,
     campaignCode,
     viewport,
     applied: fogAppearance,
@@ -173,10 +169,6 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={fogAppearance}
-            onFogAppearanceChange={
-              proceduralFogEnabled ? handleFogAppearanceChange : undefined
-            }
             fogPresetControls={fogPresetControls}
             exportControl={
               <BattleMapExportControl

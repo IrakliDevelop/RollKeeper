@@ -146,7 +146,7 @@ export default function DmLocationToolbar({
             <Icon size={15} />
           </Button>
         ))}
-        {fogControls?.available && (
+        {fogControls && (
           <>
             <Button
               variant={activeTool === 'fog' ? 'primary' : 'ghost'}

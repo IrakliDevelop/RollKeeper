@@ -19,7 +19,6 @@ import {
   useFogPresetControls,
 } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
@@ -107,12 +106,10 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     fogControls,
     handleFogAppearanceChange,
   } = useDmLocationEditor(props);
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
-    useAppliedFogAppearance(props.location.fogAppearance, proceduralFogEnabled);
+    useAppliedFogAppearance(props.location.fogAppearance);
   useFogAppearanceProjection({
     enabled:
-      proceduralFogEnabled &&
       mode === 'battlemap' &&
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL),
     campaignCode: props.campaignCode,
@@ -136,7 +133,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
   }, [viewport, fogFingerprint]);
 
   const fogPresetControls = useFogPresetControls({
-    enabled: proceduralFogEnabled,
     campaignCode: props.campaignCode,
     viewport,
     applied: fogAppearance,
@@ -284,10 +280,6 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={fogAppearance}
-            onFogAppearanceChange={
-              proceduralFogEnabled ? handleFogAppearanceChange : undefined
-            }
             fogPresetControls={fogPresetControls}
           />
         )}

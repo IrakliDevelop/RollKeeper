@@ -1,48 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   CLOUDY_PRESET,
-  parseFogAppearance,
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
 } from '../fogAppearance';
-
-describe('parseFogAppearance', () => {
-  it('returns solid for undefined', () => {
-    expect(parseFogAppearance(undefined)).toBe('solid');
-  });
-
-  it('returns solid for null', () => {
-    expect(parseFogAppearance(null)).toBe('solid');
-  });
-
-  it('returns solid for empty string', () => {
-    expect(parseFogAppearance('')).toBe('solid');
-  });
-
-  it('returns solid for unknown string value', () => {
-    expect(parseFogAppearance('misty')).toBe('solid');
-  });
-
-  it('returns solid for numeric input', () => {
-    expect(parseFogAppearance(42)).toBe('solid');
-  });
-
-  it('returns solid for boolean input', () => {
-    expect(parseFogAppearance(true)).toBe('solid');
-  });
-
-  it('returns solid for object input', () => {
-    expect(parseFogAppearance({ kind: 'cloudy' })).toBe('solid');
-  });
-
-  it('accepts solid', () => {
-    expect(parseFogAppearance('solid')).toBe('solid');
-  });
-
-  it('accepts cloudy', () => {
-    expect(parseFogAppearance('cloudy')).toBe('cloudy');
-  });
-});
 
 describe('resolveFogRendererOptions', () => {
   it('returns empty options for solid', () => {
@@ -114,23 +75,24 @@ const customSolid = {
 } as const;
 
 describe('custom appearances', () => {
-  afterEach(() => vi.unstubAllEnvs());
-
-  it('resolves to solid while the library gate is off', () => {
-    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
-    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', '');
-    expect(parseFogAppearance(customSolid)).toBe('solid');
-    expect(resolveFogRendererOptions(customSolid)).toEqual({});
-  });
-
-  it('resolves custom materials while the gate is on', () => {
-    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
-    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
-    expect(parseFogAppearance(customSolid)).toEqual(customSolid);
+  it('resolves custom materials', () => {
     expect(resolveFogRendererOptions(customSolid).playerStyle).toEqual({
       kind: 'solid',
       color: '#ff0000',
     });
+    expect(resolvePlayerFogStyle(customSolid)).toEqual({
+      kind: 'solid',
+      color: '#ff0000',
+    });
+  });
+
+  it('fails closed to solid for a malformed custom material', () => {
+    expect(
+      resolveFogRendererOptions({
+        ...customSolid,
+        material: { v: 1, kind: 'solid', color: 'red' },
+      })
+    ).toEqual({});
   });
 });
 

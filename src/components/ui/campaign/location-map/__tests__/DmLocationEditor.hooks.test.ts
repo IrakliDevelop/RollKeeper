@@ -11,6 +11,7 @@ import type { CanvasElement, Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
 import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
+import { CLOUDY_PRESET } from '../fog/fogAppearance';
 import { useLocationStore } from '@/store/locationStore';
 import type { LocationMap } from '@/types/location';
 
@@ -431,7 +432,6 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
   });
 
   it('keeps the previous publication and reports an error when a fog snapshot upload fails', async () => {
-    vi.stubEnv('NEXT_PUBLIC_FOG_OF_WAR_ENABLED', 'true');
     useLocationStore.getState().addLocation('TEST01', baseLocation);
     const { vp, result } = await setup('location');
     vp.fog.initialize({
@@ -467,11 +467,7 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
     expect(result.current.hasUnsyncedChanges).toBe(true);
   });
 
-  it('publishes the solid fog style when the procedural fog gate is off, even though the location stores cloudy', async () => {
-    // NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED is intentionally left unstubbed
-    // (unset) so the gate defaults to off, exercising the regression this
-    // covers: publication must not leak an ungated 'cloudy' appearance.
-    vi.stubEnv('NEXT_PUBLIC_FOG_OF_WAR_ENABLED', 'true');
+  it('publishes the cloudy player style for a cloudy location', async () => {
     const cloudyLocation: LocationMap = {
       ...baseLocation,
       fogAppearance: 'cloudy',
@@ -499,7 +495,7 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
       expect.objectContaining({
         fog: expect.objectContaining({
           mode: 'player',
-          style: { kind: 'solid', color: '#0b1020' },
+          style: CLOUDY_PRESET.playerStyle,
         }),
       })
     );

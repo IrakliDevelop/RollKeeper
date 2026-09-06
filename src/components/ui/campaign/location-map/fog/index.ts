@@ -6,7 +6,6 @@ export { reconcileMapFogBounds } from './reconcileMapFogBounds';
 export { configureFogView } from './configureFogView';
 export { attachFogPersistence } from './attachFogPersistence';
 export {
-  parseFogAppearance,
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
 } from './fogAppearance';

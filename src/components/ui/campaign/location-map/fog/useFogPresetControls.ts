@@ -19,7 +19,6 @@ import {
   parseFogPresetLibrary,
   sortFogPresetsForDisplay,
 } from '@/lib/fogPreset';
-import { isFogPresetLibraryEnabled } from '@/lib/fogOfWar';
 import type { FogAppearance } from '@/types/battlemap';
 import type {
   CustomFogMaterialV1,
@@ -44,7 +43,6 @@ export interface FogPresetEditorState {
 }
 
 export interface FogPresetControls {
-  enabled: boolean;
   /** Custom presets sorted for display. */
   library: FogPresetV1[];
   applied: FogAppearance;
@@ -79,7 +77,6 @@ export interface FogPresetControls {
 }
 
 export interface UseFogPresetControlsInput {
-  enabled: boolean;
   campaignCode: string;
   viewport: Viewport | null;
   applied: FogAppearance;
@@ -100,7 +97,6 @@ export function useFogPresetControls(
   input: UseFogPresetControlsInput
 ): FogPresetControls {
   const { campaignCode, viewport, applied, onApply } = input;
-  const enabled = input.enabled && isFogPresetLibraryEnabled();
   const rawLibrary = useDmStore(s => s.getCampaign(campaignCode)?.fogPresets);
   const upsertFogPreset = useDmStore(s => s.upsertFogPreset);
   const removeFogPreset = useDmStore(s => s.removeFogPreset);
@@ -177,7 +173,6 @@ export function useFogPresetControls(
 
   const select = useCallback(
     (value: string) => {
-      if (!enabled) return;
       if (value === 'solid' || value === 'cloudy') {
         onApply(value);
         return;
@@ -191,17 +186,16 @@ export function useFogPresetControls(
         material: structuredClone(preset.material),
       });
     },
-    [enabled, onApply, storageLibrary]
+    [onApply, storageLibrary]
   );
 
   const openEditor = useCallback(() => {
-    if (!enabled) return;
     setEditor({
       draft: structuredClone(materialFromApplied(applied)),
       sourcePresetId: sourcePreset?.id ?? null,
       error: null,
     });
-  }, [enabled, applied, sourcePreset]);
+  }, [applied, sourcePreset]);
 
   const setDraft = useCallback(
     (next: CustomFogMaterialV1) => {
@@ -404,9 +398,8 @@ export function useFogPresetControls(
   }, [pendingDeleteId, removeFogPreset, campaignCode]);
 
   const openManager = useCallback(() => {
-    if (!enabled) return;
     setManagerOpen(true);
-  }, [enabled]);
+  }, []);
 
   const closeManager = useCallback(() => {
     setManagerOpen(false);
@@ -419,7 +412,6 @@ export function useFogPresetControls(
   }, []);
 
   return {
-    enabled,
     library,
     applied,
     selectedValue,

@@ -21,7 +21,6 @@ function setup(applied: FogAppearance = 'solid') {
   const hook = renderHook(
     ({ current }) =>
       useFogPresetControls({
-        enabled: true,
         campaignCode: CODE,
         viewport,
         applied: current,
@@ -39,8 +38,6 @@ function flushFrames() {
 }
 
 beforeEach(() => {
-  vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
-  vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
   vi.stubGlobal('requestAnimationFrame', (cb: FrameRequestCallback) => {
     rafCallbacks.push(cb);
     return rafCallbacks.length;
@@ -56,7 +53,6 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -254,29 +250,6 @@ describe('editor drafts and preview', () => {
 
     flushFrames();
     expect(setFogStyle).not.toHaveBeenCalled();
-  });
-});
-
-describe('gating', () => {
-  it('is inert when disabled: select, openEditor, and openManager are no-ops', () => {
-    const setFogStyle = vi.fn();
-    const viewport = { setFogStyle } as unknown as Viewport;
-    const onApply = vi.fn();
-    const { result } = renderHook(() =>
-      useFogPresetControls({
-        enabled: false,
-        campaignCode: CODE,
-        viewport,
-        applied: 'solid',
-        onApply,
-      })
-    );
-    act(() => result.current.select('cloudy'));
-    act(() => result.current.openEditor());
-    act(() => result.current.openManager());
-    expect(onApply).not.toHaveBeenCalled();
-    expect(result.current.editor).toBeNull();
-    expect(result.current.managerOpen).toBe(false);
   });
 });
 

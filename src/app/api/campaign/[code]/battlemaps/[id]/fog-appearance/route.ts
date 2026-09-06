@@ -8,10 +8,7 @@ import {
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import { sendBattleMapPokeToRoom } from '@/lib/relayPoke';
 import {
-  downgradeFogAppearanceForGate,
   isFogAppearanceV1,
-  isFogPresetLibraryEnabled,
-  isProceduralFogAppearanceEnabled,
   parseBattleMapFogAppearanceProjection,
   parseProjectedFogAppearance,
   type BattleMapFogAppearanceProjection,
@@ -30,9 +27,6 @@ export async function GET(
 ) {
   try {
     const { code, id } = await params;
-    if (!isProceduralFogAppearanceEnabled()) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
     if (!isValidBattleMapId(id)) {
       return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
     }
@@ -65,10 +59,7 @@ export async function GET(
     );
     const projection = parseBattleMapFogAppearanceProjection(raw);
     if (projection) {
-      fogAppearance = downgradeFogAppearanceForGate(
-        projection.appearance,
-        isFogPresetLibraryEnabled()
-      );
+      fogAppearance = projection.appearance;
       updatedAt = projection.updatedAt;
     }
 
@@ -88,9 +79,6 @@ export async function PUT(
 ) {
   try {
     const { code, id } = await params;
-    if (!isProceduralFogAppearanceEnabled()) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    }
     if (!isValidBattleMapId(id)) {
       return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
     }
@@ -103,26 +91,14 @@ export async function PUT(
       return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
     }
 
-    let appearance: ProjectedFogAppearance;
-    if (isFogAppearanceV1(body.appearance)) {
-      appearance = body.appearance;
-    } else if (
-      isFogPresetLibraryEnabled() &&
-      typeof body.appearance === 'object' &&
-      body.appearance !== null &&
-      parseProjectedFogAppearance(body.appearance) !== 'solid'
-    ) {
-      appearance = parseProjectedFogAppearance(body.appearance);
-    } else {
+    const parsed = parseProjectedFogAppearance(body.appearance);
+    if (parsed === 'solid' && !isFogAppearanceV1(body.appearance)) {
       return NextResponse.json(
-        {
-          error: isFogPresetLibraryEnabled()
-            ? 'appearance must be solid, cloudy, or a valid custom material'
-            : 'appearance must be solid or cloudy',
-        },
+        { error: 'Invalid fog appearance' },
         { status: 400 }
       );
     }
+    const appearance: ProjectedFogAppearance = parsed;
 
     const redis = getRedis();
     const session = await authorizeBattleMapSession(

@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { resetRedis, seedRedis, seedRedisSet } from '@/test/mocks/redis';
 
@@ -32,10 +32,6 @@ function request(body: Record<string, unknown>, secure = false) {
 }
 
 const params = { params: Promise.resolve({ code: CODE }) };
-
-afterEach(() => {
-  delete process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED;
-});
 
 describe('membership-aware relay authority minting', () => {
   beforeEach(() => {
@@ -279,18 +275,7 @@ describe('fog appearance token metadata', () => {
     );
   }
 
-  it('keeps token metadata solid while the procedural rollout is disabled', async () => {
-    seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
-      v: 1,
-      appearance: 'cloudy',
-      updatedAt: '2026-09-05T00:00:00.000Z',
-    });
-    const response = await mint();
-    expect((await response.json()).fogAppearance).toBe('solid');
-  });
-
-  it('returns a valid projection when the rollout is enabled', async () => {
-    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+  it('returns a valid V1 projection', async () => {
     seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
       v: 1,
       appearance: 'cloudy',
@@ -300,8 +285,7 @@ describe('fog appearance token metadata', () => {
     expect((await response.json()).fogAppearance).toBe('cloudy');
   });
 
-  it('falls back to solid for a future projection version', async () => {
-    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+  it('falls back to solid for a malformed projection record', async () => {
     seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
       v: 2,
       appearance: 'cloudy',
@@ -311,23 +295,16 @@ describe('fog appearance token metadata', () => {
     expect((await response.json()).fogAppearance).toBe('solid');
   });
 
-  it('returns the projected custom appearance when the library gate is on and solid when off', async () => {
-    process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED = 'true';
+  it('returns the projected custom appearance without a source preset id', async () => {
     const material = { v: 1, kind: 'solid', color: '#ff0000' };
     seedRedis(`campaign:${CODE}:fog-appearance:map-a`, {
       v: 2,
-      appearance: { v: 2, kind: 'custom', material },
+      appearance: { v: 2, kind: 'custom', material, sourcePresetId: 'fp_1' },
       updatedAt: '2026-09-05T10:00:00.000Z',
     });
-    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED = 'true';
-    let response = await mint();
-    expect((await response.json()).fogAppearance).toEqual({
-      v: 2,
-      kind: 'custom',
-      material,
-    });
-    delete process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED;
-    response = await mint();
-    expect((await response.json()).fogAppearance).toBe('solid');
+    const response = await mint();
+    const body = await response.json();
+    expect(body.fogAppearance).toEqual({ v: 2, kind: 'custom', material });
+    expect(JSON.stringify(body.fogAppearance)).not.toContain('fp_1');
   });
 });

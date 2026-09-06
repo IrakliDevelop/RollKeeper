@@ -138,7 +138,6 @@ describe('DmLocationToolOptions pencil options', () => {
 
 describe('DmLocationToolOptions fog appearance', () => {
   const fogControls: DmFogControls = {
-    available: true,
     initialized: true,
     disabled: false,
     operation: 'reveal',
@@ -165,30 +164,10 @@ describe('DmLocationToolOptions fog appearance', () => {
 
   afterEach(() => cleanup());
 
-  it('presents malformed persisted values as the solid fallback', () => {
-    render(
-      <DmLocationToolOptions
-        mode="battlemap"
-        fogControls={fogControls}
-        fogAppearance={'misty' as never}
-        onFogAppearanceChange={vi.fn()}
-      />
-    );
-
-    expect(
-      screen.getByRole('button', { name: 'Solid (classic)' })
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Cloudy' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
-  });
-
   function makeFogPresetControls(
     overrides: Partial<FogPresetControls> = {}
   ): FogPresetControls {
     return {
-      enabled: true,
       library: [],
       applied: 'solid',
       selectedValue: 'solid',
@@ -219,38 +198,31 @@ describe('DmLocationToolOptions fog appearance', () => {
     };
   }
 
-  it('renders the preset panel and hides the legacy Solid/Cloudy buttons when fogPresetControls is enabled', () => {
+  it('renders the preset panel whenever fogPresetControls is provided', () => {
     render(
       <DmLocationToolOptions
         mode="battlemap"
         fogControls={fogControls}
-        fogPresetControls={makeFogPresetControls({ enabled: true })}
+        fogPresetControls={makeFogPresetControls()}
       />
     );
 
     expect(
       screen.getByRole('combobox', { name: 'Fog appearance' })
     ).toBeInTheDocument();
-    expect(
-      screen.queryByRole('button', { name: 'Cloudy' })
-    ).not.toBeInTheDocument();
   });
 
-  it('renders the legacy Solid/Cloudy buttons and no combobox when fogPresetControls is disabled', () => {
+  it('renders the fog bar with no appearance control when fogPresetControls is omitted', () => {
     render(
-      <DmLocationToolOptions
-        mode="battlemap"
-        fogControls={fogControls}
-        fogAppearance="solid"
-        onFogAppearanceChange={vi.fn()}
-        fogPresetControls={makeFogPresetControls({ enabled: false })}
-      />
+      <DmLocationToolOptions mode="battlemap" fogControls={fogControls} />
     );
 
     expect(
       screen.queryByRole('combobox', { name: 'Fog appearance' })
     ).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Cloudy' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cover all' })
+    ).toBeInTheDocument();
   });
 });
 

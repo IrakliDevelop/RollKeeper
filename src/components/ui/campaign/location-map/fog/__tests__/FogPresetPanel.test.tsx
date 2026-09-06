@@ -33,7 +33,6 @@ function controls(
   overrides: Partial<FogPresetControls> = {}
 ): FogPresetControls {
   return {
-    enabled: true,
     library: [preset],
     applied: 'solid',
     selectedValue: 'solid',

@@ -6,7 +6,6 @@ import { FogPresetSelector } from './FogPresetSelector';
 import type { FogPresetControls } from '../useFogPresetControls';
 
 export function FogPresetPanel({ controls }: { controls: FogPresetControls }) {
-  if (!controls.enabled) return null;
   return (
     <>
       <FogPresetSelector controls={controls} />

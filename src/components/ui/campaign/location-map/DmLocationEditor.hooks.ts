@@ -71,10 +71,6 @@ import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
 import {
-  isFogOfWarEnabled,
-  isProceduralFogAppearanceEnabled,
-} from '@/lib/fogOfWar';
-import {
   attachFogPersistence,
   configureFogView,
   reconcileMapFogBounds,
@@ -652,7 +648,6 @@ export function useDmLocationEditor(
   }, [getVp, location.mapImageSize]);
   const fogControls = useDmFogControls({
     viewport,
-    available: isFogOfWarEnabled(),
     getBounds: getFogBounds,
     disabled: imageUploading || arrangeMapsActive,
     disabledReason: imageUploading
@@ -882,10 +877,8 @@ export function useDmLocationEditor(
       syncSelection();
 
       // AutoSave — persist to store
-      if (isFogOfWarEnabled()) {
-        vp.toolManager.register(new FogTool(vp.fog));
-        configureFogView(vp.fog, 'dm', false);
-      }
+      vp.toolManager.register(new FogTool(vp.fog));
+      configureFogView(vp.fog, 'dm', false);
 
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `location-canvas-${location.id}`,
@@ -1580,11 +1573,7 @@ export function useDmLocationEditor(
                 fog: {
                   state: fogState,
                   mode: 'player' as const,
-                  style: resolvePlayerFogStyle(
-                    isProceduralFogAppearanceEnabled()
-                      ? location.fogAppearance
-                      : 'solid'
-                  ),
+                  style: resolvePlayerFogStyle(location.fogAppearance),
                 },
               }
             : {}),

@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import {
+  act,
+  render,
+  cleanup,
+  fireEvent,
+  screen,
+} from '@testing-library/react';
 import type { ReactElement } from 'react';
 import type { Viewport, CameraView, FocusAudience } from '@fieldnotes/core';
 
@@ -156,22 +162,10 @@ describe('DmBattleMapCanvas wiring', () => {
 
   afterEach(() => {
     cleanup();
-    vi.unstubAllEnvs();
     Object.assign(mockHookState, defaultMarkerHookFields());
   });
 
-  it('keeps the appearance selector hidden behind its independent rollout flag', () => {
-    mockHookState.battleMap = baseBattleMap;
-
-    renderCanvas();
-
-    const toolbarProps = vi.mocked(DmVttToolbar).mock.calls.at(-1)?.[0];
-    expect(toolbarProps?.fogAppearance).toBe('solid');
-    expect(toolbarProps?.onFogAppearanceChange).toBeUndefined();
-  });
-
-  it('applies an enabled appearance immediately before persisting it', () => {
-    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+  it('applies the stored appearance immediately before persisting a change', () => {
     const battleMap = { ...baseBattleMap, fogAppearance: 'cloudy' as const };
     useBattleMapStore.setState({
       battleMaps: { [CAMPAIGN_CODE]: { [BATTLE_MAP_ID]: battleMap } },
@@ -187,7 +181,8 @@ describe('DmBattleMapCanvas wiring', () => {
       })
     );
     const toolbarProps = vi.mocked(DmVttToolbar).mock.calls.at(-1)?.[0];
-    toolbarProps?.onFogAppearanceChange?.('solid');
+    expect(toolbarProps?.fogPresetControls?.applied).toBe('cloudy');
+    act(() => toolbarProps?.fogPresetControls?.select('solid'));
 
     expect(mockHookState.viewport.setFogStyle).toHaveBeenLastCalledWith({});
     expect(
