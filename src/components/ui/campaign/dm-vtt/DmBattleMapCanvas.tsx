@@ -12,6 +12,7 @@ import {
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
   useAppliedFogAppearance,
+  useFogPresetControls,
 } from '@/components/ui/campaign/location-map/fog';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
@@ -117,6 +118,13 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     },
     [viewport, updateBattleMap, campaignCode, battleMapId]
   );
+  const fogPresetControls = useFogPresetControls({
+    enabled: proceduralFogEnabled,
+    campaignCode,
+    viewport,
+    applied: fogAppearance,
+    onApply: handleFogAppearanceChange,
+  });
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
   // anyone else's camera.
@@ -169,6 +177,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             onFogAppearanceChange={
               proceduralFogEnabled ? handleFogAppearanceChange : undefined
             }
+            fogPresetControls={fogPresetControls}
             exportControl={
               <BattleMapExportControl
                 getViewport={() => viewport}

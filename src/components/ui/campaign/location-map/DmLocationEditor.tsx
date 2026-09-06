@@ -16,6 +16,7 @@ import {
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
   useAppliedFogAppearance,
+  useFogPresetControls,
 } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
@@ -133,6 +134,14 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     // fogFingerprint stands in for fogAppearance: same material, same effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport, fogFingerprint]);
+
+  const fogPresetControls = useFogPresetControls({
+    enabled: proceduralFogEnabled,
+    campaignCode: props.campaignCode,
+    viewport,
+    applied: fogAppearance,
+    onApply: handleFogAppearanceChange,
+  });
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -279,6 +288,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             onFogAppearanceChange={
               proceduralFogEnabled ? handleFogAppearanceChange : undefined
             }
+            fogPresetControls={fogPresetControls}
           />
         )}
 

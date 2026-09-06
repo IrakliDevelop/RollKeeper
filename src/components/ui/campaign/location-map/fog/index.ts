@@ -31,3 +31,4 @@ export type {
   FogPresetControls,
   FogPresetEditorState,
 } from './useFogPresetControls';
+export { FogPresetPanel } from './FogPresetPanel';

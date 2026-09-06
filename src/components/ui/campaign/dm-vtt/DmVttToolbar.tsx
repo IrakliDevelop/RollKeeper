@@ -29,7 +29,10 @@ import DmLocationToolOptions, {
   type MeasureSharingControl,
   type MovementControls,
 } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
-import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
+import type {
+  DmFogControls,
+  FogPresetControls,
+} from '@/components/ui/campaign/location-map/fog';
 import type { FogAppearance } from '@/types/battlemap';
 import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
 import { markerAudienceToggleTitle } from '@/components/ui/campaign/location-map/markerAudienceCopy';
@@ -91,6 +94,7 @@ export interface DmVttToolbarProps {
   fogControls?: DmFogControls;
   fogAppearance?: FogAppearance;
   onFogAppearanceChange?: (appearance: FogAppearance) => void;
+  fogPresetControls?: FogPresetControls;
 }
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
@@ -136,6 +140,7 @@ export function DmVttToolbar({
   fogControls,
   fogAppearance,
   onFogAppearanceChange,
+  fogPresetControls,
 }: DmVttToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const TokenInfoIcon = TOKEN_INFO_ICON[tokenInfoToggle.mode ?? 'compact'];
@@ -321,6 +326,7 @@ export function DmVttToolbar({
           fogControls={fogControls}
           fogAppearance={fogAppearance}
           onFogAppearanceChange={onFogAppearanceChange}
+          fogPresetControls={fogPresetControls}
         />
       </div>
     </div>

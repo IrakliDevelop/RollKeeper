@@ -29,7 +29,12 @@ import { MARKER_KIND_ICONS } from './markerIcons';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { MARKER_COLOR_CSS } from './markerPainter';
 import type { EditorMode } from './DmLocationEditor.types';
-import { parseFogAppearance, type DmFogControls } from './fog';
+import {
+  FogPresetPanel,
+  parseFogAppearance,
+  type DmFogControls,
+  type FogPresetControls,
+} from './fog';
 import type { FogAppearance } from '@/types/battlemap';
 import {
   FOG_COVER_ALL_DESCRIPTION,
@@ -118,6 +123,9 @@ interface DmLocationToolOptionsProps {
   fogControls?: DmFogControls;
   fogAppearance?: FogAppearance;
   onFogAppearanceChange?: (appearance: FogAppearance) => void;
+  /** Fog preset selector/editor/manager. Renders in place of the legacy
+   * Solid/Cloudy buttons when present and enabled. */
+  fogPresetControls?: FogPresetControls;
 }
 
 export default function DmLocationToolOptions({
@@ -129,6 +137,7 @@ export default function DmLocationToolOptions({
   fogControls,
   fogAppearance,
   onFogAppearanceChange,
+  fogPresetControls,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   const resolvedFogAppearance = parseFogAppearance(fogAppearance);
@@ -434,27 +443,33 @@ export default function DmLocationToolOptions({
                 label="Preview as player"
                 wrapperClassName="min-h-[44px] items-center"
               />
-              {onFogAppearanceChange && (
-                <>
-                  <span className="text-muted text-xs font-semibold">
-                    Appearance
-                  </span>
-                  <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
-                    {(['solid', 'cloudy'] as const).map(value => (
-                      <Button
-                        key={value}
-                        variant={
-                          resolvedFogAppearance === value ? 'primary' : 'ghost'
-                        }
-                        onClick={() => onFogAppearanceChange(value)}
-                        aria-pressed={resolvedFogAppearance === value}
-                        className="min-h-[44px] px-3 text-xs capitalize"
-                      >
-                        {value === 'solid' ? 'Solid (classic)' : 'Cloudy'}
-                      </Button>
-                    ))}
-                  </div>
-                </>
+              {fogPresetControls?.enabled ? (
+                <FogPresetPanel controls={fogPresetControls} />
+              ) : (
+                onFogAppearanceChange && (
+                  <>
+                    <span className="text-muted text-xs font-semibold">
+                      Appearance
+                    </span>
+                    <div className="border-divider bg-surface flex items-center gap-0.5 rounded-md border p-0.5">
+                      {(['solid', 'cloudy'] as const).map(value => (
+                        <Button
+                          key={value}
+                          variant={
+                            resolvedFogAppearance === value
+                              ? 'primary'
+                              : 'ghost'
+                          }
+                          onClick={() => onFogAppearanceChange(value)}
+                          aria-pressed={resolvedFogAppearance === value}
+                          className="min-h-[44px] px-3 text-xs capitalize"
+                        >
+                          {value === 'solid' ? 'Solid (classic)' : 'Cloudy'}
+                        </Button>
+                      ))}
+                    </div>
+                  </>
+                )
               )}
               <Button
                 variant="ghost"
