@@ -658,3 +658,214 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     await playerContext.close();
   }
 });
+
+/**
+ * Regression coverage for the manual-acceptance-gate defect: a player's
+ * marker panel, left OPEN while the DM flips a shared container from Open to
+ * Locked, must flip to the locked card on its own — no close/reopen. The
+ * happy-path test above never exercises this because its player always
+ * closes the dialog (`Escape`) before the DM's next change and only reads
+ * the fresh state on the NEXT `clickMarker`, which re-derives
+ * `markerPanelState` from a fresh `handleMarkerActivate`-triggered
+ * `refreshMarkers()` call — not from the WS poke this test targets.
+ *
+ * Root cause (see `stale-panel-fix-report.md`): the markers PUT/POST routes
+ * called `sendBattleMapPoke`, which resolves the poke's target room from the
+ * campaign's "active battle map" (`campaignSharedKey(code, 'battlemap')`,
+ * written only by the DM's explicit "share battle map" action /
+ * `useDmBattleMapSync.pushActive`), not from this route's own `id` param.
+ * This test's player joins the map by direct URL (the same thing a real
+ * session does when a DM never toggles that separate "activate" flag), so
+ * `activeBattleMapId` is never set and the poke silently no-ops — the
+ * player's live WebSocket connection is to the right room
+ * (`${code}:${battleMapId}`), it simply never receives a nudge to refetch.
+ */
+test('DM locks a shared container while the player has it open — the open panel updates itself', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+
+  const dmContext = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const playerContext = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+  });
+  const dmPage = await dmContext.newPage();
+  const playerPage = await playerContext.newPage();
+
+  try {
+    // Routes are already compiled by the earlier test in this file when run
+    // together; prewarm anyway so `--grep`-ing this test alone is reliable
+    // too (see the comment on the same loop in the test above).
+    for (const path of [
+      '/player',
+      '/dm',
+      '/player/characters/new',
+      '/dm/campaign/warm/battlemaps/warm',
+    ]) {
+      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+    }
+    for (const path of [
+      '/player',
+      '/player/characters/new',
+      '/player/campaign/warm/battlemap/warm',
+    ]) {
+      await playerPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+    }
+
+    // ---- DM: create the real campaign + a blank battle map ----
+    await seedDm(dmPage);
+    const code = await createCampaign(dmPage, CAMPAIGN_NAME);
+    console.log('[live-update test] campaign created', code);
+    await seedBattleMap(dmPage, code);
+
+    await dmPage.goto(`/dm/campaign/${code}/battlemaps/${MAP_ID}`, {
+      waitUntil: 'networkidle',
+    });
+    await expect(dmPage.getByRole('button', { name: 'Marker' })).toBeVisible({
+      timeout: 15_000,
+    });
+    await dmPage.waitForFunction(
+      () => !!window.__rkStores?.viewport,
+      undefined,
+      { timeout: 15_000 }
+    );
+    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+
+    // ---- Player: real character, real campaign join, open the map by
+    // direct URL — the same thing a real session does when the DM never
+    // toggles the separate "share battle map" activation flag. ----
+    const characterUrl = await createCharacter(playerPage, 'Loot Hero Two');
+    const characterId = characterIdFromUrl(characterUrl);
+    await joinCampaign(playerPage, code, characterId);
+
+    await playerPage.goto(
+      `/player/campaign/${code}/battlemap/${MAP_ID}?character=${characterId}`,
+      { waitUntil: 'networkidle' }
+    );
+    await waitForStoresReady(playerPage);
+    await waitForCharacterLoaded(playerPage, characterId);
+    await playerPage.waitForFunction(
+      () => !!window.__rkStores?.viewport,
+      undefined,
+      { timeout: 15_000 }
+    );
+    await expect(playerPage.getByText('Live', { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    console.log('[live-update test] player relay live');
+
+    // ---- DM: place a loot marker, add one open unit, share it ----
+    await dmPage.getByRole('button', { name: 'Marker' }).click();
+    await dmPage.getByRole('button', { name: 'Marker kind: loot' }).click();
+    const canvas = dmPage.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('DM canvas has no bounding box');
+    await dmPage.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+
+    const dmElementId = await waitForLootMarkerElementId(dmPage);
+
+    await clickMarker(dmPage, dmElementId, { double: true });
+    const dmDialog = markerDialog(dmPage);
+    await expect(dmDialog).toBeVisible({ timeout: 10_000 });
+
+    const manualTreasureInput = dmDialog.getByPlaceholder(
+      '250 gp, ruby, sealed letter…'
+    );
+    await expect(manualTreasureInput).toBeVisible({ timeout: 15_000 });
+    await manualTreasureInput.fill(ITEM_NAME);
+    await dmDialog.getByRole('button', { name: 'Add' }).click();
+    await expect(dmDialog.getByText('1 of 1 available')).toBeVisible();
+    // Adding an item (or changing its quantity) only updates `LootEditor`'s
+    // own local state (`EditForm`'s `LootEditor onChange={setLoot}`, plain
+    // `setLoot`, no `onPersist` call) — only `onDelivered` and
+    // `onAccessChange` call `onPersist`, which is what actually flows the
+    // edit into `markerWrites`/the debounced publish effect. Explicitly
+    // confirming "Open" (already the default, but idempotently re-clicking
+    // still fires `onAccessChange`) is what makes the newly added item
+    // actually persist and publish — without this click the item never
+    // leaves the dialog's own component state.
+    await dmDialog.getByRole('button', { name: 'Open' }).click();
+    await expect(
+      dmDialog.getByText(
+        "Players can see the contents and claim up to what's left."
+      )
+    ).toBeVisible();
+    await dmPage.keyboard.press('Escape');
+    await expect(dmDialog).toBeHidden({ timeout: 5_000 });
+
+    await clickMarker(dmPage, dmElementId);
+    const shareToggle = dmPage.getByTestId('dm-vtt-dm-only-toggle');
+    await expect(shareToggle).toBeVisible({ timeout: 5_000 });
+    await shareToggle.click();
+    console.log('[live-update test] dm shared marker');
+
+    // ---- Player: opens the marker while it is OPEN, and leaves it open ----
+    const playerElementId = await waitForLootMarkerElementId(playerPage);
+    await waitForMarkerProjection(
+      playerPage,
+      code,
+      MAP_ID,
+      markers => (markers[0]?.loot as unknown[] | undefined)?.length === 1
+    );
+    await clickMarker(playerPage, playerElementId);
+    const playerDialog = markerDialog(playerPage);
+    await expect(playerDialog).toBeVisible({ timeout: 10_000 });
+    await expect(playerDialog.getByText(ITEM_NAME)).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(playerDialog.getByText('1 available')).toBeVisible();
+    await expect(
+      playerDialog.getByRole('button', { name: 'Claim 1' })
+    ).toBeEnabled();
+    console.log('[live-update test] player panel open, container open');
+
+    // ---- DM: locks the SAME container. Player's panel is left open and
+    // never touched from here — no click, no Escape, no reopen. ----
+    await clickMarker(dmPage, dmElementId, { double: true });
+    await expect(dmDialog).toBeVisible({ timeout: 10_000 });
+    await dmDialog.getByRole('button', { name: 'Locked' }).click();
+    await expect(
+      dmDialog.getByText(
+        'Players see a locked chest and nothing inside. Claims are refused on the server too.'
+      )
+    ).toBeVisible();
+    await dmPage.keyboard.press('Escape');
+    await expect(dmDialog).toBeHidden({ timeout: 5_000 });
+    console.log('[live-update test] dm locked the container');
+
+    // Confirm the SERVER projection is already locked — independent of
+    // whatever the player's open panel is showing. This is the part that was
+    // never in question (spec §"enforcement is intact").
+    await waitForMarkerProjection(
+      playerPage,
+      code,
+      MAP_ID,
+      markers => markers[0]?.lootLocked === true
+    );
+    console.log('[live-update test] server projection confirms locked');
+
+    // The defect under test: WITHOUT any interaction on `playerPage`, the
+    // already-open panel must flip to the locked card on its own. Playwright
+    // assertions retry on their own timeout, so this genuinely waits for the
+    // live update rather than polling manually — and it is well past any
+    // debounce (the DM's publish debounce is 200ms).
+    await expect(playerDialog.getByText('Locked')).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      playerDialog.getByText("You'd need to get it open first.")
+    ).toBeVisible();
+    await expect(playerDialog).not.toContainText(ITEM_NAME);
+    await expect(
+      playerDialog.getByRole('button', { name: /^Claim/ })
+    ).toHaveCount(0);
+    console.log('[live-update test] player panel updated itself while open');
+  } finally {
+    await dmContext.close();
+    await playerContext.close();
+  }
+});
