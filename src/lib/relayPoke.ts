@@ -24,56 +24,12 @@ export type BattleMapPokeFeature =
   | 'fog-appearance';
 
 /**
- * Best-effort WS poke after a write: tells clients in the active battle-map
- * room to refetch /shared immediately for the given feature. Never throws —
- * the 5s poll is the source-of-truth fallback; this only shaves latency.
+ * Shared body behind every battle-map poke: env-var guard, token signing,
+ * fetch with timeout, and a catch-all so a poke never throws. Never
+ * exported — callers go through one of the wrappers below, each of which
+ * decides which room(s) to target.
  */
-export async function sendBattleMapPoke(
-  code: string,
-  redis: RedisReader,
-  feature: BattleMapPokeFeature,
-  deps: { fetchFn?: typeof fetch; now?: number } = {}
-): Promise<void> {
-  const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-  const secret = process.env.BATTLEMAP_RELAY_SECRET;
-  if (!relayUrl || !secret) return;
-  try {
-    const raw = await redis.get<string | SharedBattleMapState>(
-      campaignSharedKey(code, 'battlemap')
-    );
-    if (!raw) return;
-    const battleMap: SharedBattleMapState =
-      typeof raw === 'string' ? JSON.parse(raw) : raw;
-    if (!battleMap?.activeBattleMapId) return;
-
-    const room = `${code}:${battleMap.activeBattleMapId}`;
-    const token = signBattleMapToken(
-      {
-        userId: '@server',
-        role: 'dm',
-        room,
-        exp: (deps.now ?? Date.now()) + POKE_TOKEN_TTL_MS,
-      },
-      secret
-    );
-    const fetchFn = deps.fetchFn ?? fetch;
-    await fetchFn(`${relayHttpUrl(relayUrl)}/poke`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ room, feature, token }),
-      signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
-    });
-  } catch (err) {
-    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
-  }
-}
-
-/**
- * Poke a specific battle-map room directly, without looking up the active map.
- * Used for per-map metadata (fog appearance) that must reach a TV display
- * opened on an inactive map.
- */
-export async function sendBattleMapPokeToRoom(
+async function pokeRoom(
   code: string,
   battleMapId: string,
   feature: BattleMapPokeFeature,
@@ -101,8 +57,51 @@ export async function sendBattleMapPokeToRoom(
       signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
     });
   } catch (err) {
-    console.warn('[relayPoke] room poke failed (poll remains fallback):', err);
+    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
   }
+}
+
+/**
+ * Best-effort WS poke after a write: tells clients in the active battle-map
+ * room to refetch /shared immediately for the given feature. Never throws —
+ * the 5s poll is the source-of-truth fallback; this only shaves latency.
+ */
+export async function sendBattleMapPoke(
+  code: string,
+  redis: RedisReader,
+  feature: BattleMapPokeFeature,
+  deps: { fetchFn?: typeof fetch; now?: number } = {}
+): Promise<void> {
+  const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const secret = process.env.BATTLEMAP_RELAY_SECRET;
+  if (!relayUrl || !secret) return;
+  try {
+    const raw = await redis.get<string | SharedBattleMapState>(
+      campaignSharedKey(code, 'battlemap')
+    );
+    if (!raw) return;
+    const battleMap: SharedBattleMapState =
+      typeof raw === 'string' ? JSON.parse(raw) : raw;
+    if (!battleMap?.activeBattleMapId) return;
+
+    await pokeRoom(code, battleMap.activeBattleMapId, feature, deps);
+  } catch (err) {
+    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
+  }
+}
+
+/**
+ * Poke a specific battle-map room directly, without looking up the active map.
+ * Used for per-map metadata (fog appearance) that must reach a TV display
+ * opened on an inactive map.
+ */
+export async function sendBattleMapPokeToRoom(
+  code: string,
+  battleMapId: string,
+  feature: BattleMapPokeFeature,
+  deps: { fetchFn?: typeof fetch; now?: number } = {}
+): Promise<void> {
+  await pokeRoom(code, battleMapId, feature, deps);
 }
 
 /** Back-compat wrapper — the shared route's call sites keep this name. */
