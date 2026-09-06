@@ -3,6 +3,7 @@ import {
   sendInitiativePoke,
   sendBattleMapPoke,
   sendBattleMapPokeToRoom,
+  sendBattleMapPokeToLiveRooms,
   relayHttpUrl,
 } from '@/lib/relayPoke';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
@@ -19,6 +20,33 @@ function redisWith(battlemapValue: unknown): MockRedis {
     get: vi.fn(async (key: string) =>
       key.includes('battlemap') ? battlemapValue : null
     ) as <T = unknown>(key: string) => Promise<T | null>,
+  };
+}
+
+interface MockLiveRoomsRedis extends MockRedis {
+  zremrangebyscore(key: string, min: number, max: number): Promise<number>;
+  zrange(
+    key: string,
+    min: number,
+    max: number,
+    opts?: { rev?: boolean }
+  ): Promise<unknown[]>;
+}
+
+/**
+ * A combined fake satisfying both `RedisReader` (for the activeBattleMapId
+ * fallback) and `LiveMapRoomsReader` (for the live-room registry read).
+ * `liveRooms` is what `zrange` returns; `battlemapValue` is what `get`
+ * returns for the shared battlemap key, used only on fallback.
+ */
+function liveRoomsRedisWith(
+  liveRooms: string[],
+  battlemapValue: unknown = null
+): MockLiveRoomsRedis {
+  return {
+    ...redisWith(battlemapValue),
+    zremrangebyscore: vi.fn(async () => 0),
+    zrange: vi.fn(async () => liveRooms),
   };
 }
 
@@ -202,5 +230,108 @@ describe('sendBattleMapPokeToRoom', () => {
     expect(payload).not.toBeNull();
     expect(payload!.room).toBe(`${CODE}:map-X`);
     expect(payload!.role).toBe('dm');
+  });
+});
+
+describe('sendBattleMapPokeToLiveRooms', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.example.com');
+    vi.stubEnv('BATTLEMAP_RELAY_SECRET', SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('pokes every live room, each with its own room in body and token', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    const redis = liveRoomsRedisWith(['map-1', 'map-2', 'map-3']);
+
+    await sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', {
+      fetchFn,
+      now: 1_000_000,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    const expectedRooms = ['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3'];
+    const actualRooms = fetchFn.mock.calls.map(call => {
+      const [, init] = call as unknown as [string, RequestInit];
+      return JSON.parse(init.body as string).room;
+    });
+    expect(actualRooms.sort()).toEqual(expectedRooms.sort());
+
+    for (const call of fetchFn.mock.calls) {
+      const [url, init] = call as unknown as [string, RequestInit];
+      expect(url).toBe('https://relay.example.com/poke');
+      const body = JSON.parse(init.body as string);
+      expect(body.feature).toBe('markers');
+      const payload = verifyBattleMapToken(body.token, SECRET, 1_000_000);
+      expect(payload).toMatchObject({ role: 'dm', room: body.room });
+    }
+  });
+
+  it('falls back to the active-map room when the registry is empty', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    const redis = liveRoomsRedisWith(
+      [],
+      JSON.stringify({ activeBattleMapId: 'map-42' })
+    );
+
+    await sendBattleMapPokeToLiveRooms(CODE, redis, 'players', {
+      fetchFn,
+      now: 1_000_000,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.room).toBe('CAMP1:map-42');
+    expect(body.feature).toBe('players');
+  });
+
+  it('sends nothing when the registry is empty and there is no active map', async () => {
+    const fetchFn = vi.fn();
+    const redis = liveRoomsRedisWith([], null);
+
+    await expect(
+      sendBattleMapPokeToLiveRooms(CODE, redis, 'players', { fetchFn })
+    ).resolves.toBeUndefined();
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('one room failing does not prevent the others from being poked, and does not throw', async () => {
+    const perRoomFetch = vi.fn(async (...args: Parameters<typeof fetch>) => {
+      const init = args[1];
+      const body = JSON.parse(init?.body as string);
+      if (body.room === 'CAMP1:map-2') {
+        throw new Error('relay down for map-2');
+      }
+      return new Response(null, { status: 200 });
+    });
+    const redis = liveRoomsRedisWith(['map-1', 'map-2', 'map-3']);
+
+    await expect(
+      sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', {
+        fetchFn: perRoomFetch,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(perRoomFetch).toHaveBeenCalledTimes(3);
+    const rooms = perRoomFetch.mock.calls.map(
+      call => JSON.parse((call[1] as RequestInit).body as string).room
+    );
+    expect(rooms.sort()).toEqual(['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3']);
+  });
+
+  it('does nothing when relay env vars are missing', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    vi.stubEnv('BATTLEMAP_RELAY_SECRET', '');
+    const fetchFn = vi.fn();
+    const redis = liveRoomsRedisWith(['map-1', 'map-2']);
+
+    await expect(
+      sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', { fetchFn })
+    ).resolves.toBeUndefined();
+    expect(fetchFn).not.toHaveBeenCalled();
   });
 });

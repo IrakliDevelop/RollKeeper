@@ -1,6 +1,8 @@
 import { signBattleMapToken } from '@/lib/battlemapToken';
+import { listLiveMapRooms } from '@/lib/liveMapRooms';
 import { campaignSharedKey } from '@/lib/redis';
 
+import type { LiveMapRoomsReader } from '@/lib/liveMapRooms';
 import type { SharedBattleMapState } from '@/types/sharedState';
 
 const POKE_TOKEN_TTL_MS = 30_000;
@@ -102,6 +104,31 @@ export async function sendBattleMapPokeToRoom(
   deps: { fetchFn?: typeof fetch; now?: number } = {}
 ): Promise<void> {
   await pokeRoom(code, battleMapId, feature, deps);
+}
+
+/**
+ * Poke every battle-map room the campaign currently has connected clients
+ * in (per the live-room registry), rather than only the single
+ * `activeBattleMapId` room. Falls back to `sendBattleMapPoke`'s
+ * active-map-only behaviour when the registry is empty — a campaign whose
+ * clients predate the registry, or a Redis blip, is no worse off than
+ * today. Runs the fan-out concurrently with `Promise.allSettled` so one
+ * slow or failing room cannot starve or fail the others. Never throws.
+ */
+export async function sendBattleMapPokeToLiveRooms(
+  code: string,
+  redis: RedisReader & LiveMapRoomsReader,
+  feature: BattleMapPokeFeature,
+  deps: { fetchFn?: typeof fetch; now?: number } = {}
+): Promise<void> {
+  const rooms = await listLiveMapRooms(redis, code, { now: deps.now });
+  if (rooms.length === 0) {
+    await sendBattleMapPoke(code, redis, feature, deps);
+    return;
+  }
+  await Promise.allSettled(
+    rooms.map(battleMapId => pokeRoom(code, battleMapId, feature, deps))
+  );
 }
 
 /** Back-compat wrapper — the shared route's call sites keep this name. */
