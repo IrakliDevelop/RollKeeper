@@ -23,6 +23,22 @@ function resolveRelaySecret(): string {
 
 const RELAY_SECRET = process.env.BATTLEMAP_RELAY_SECRET ?? resolveRelaySecret();
 
+/**
+ * The app's dev server command, overridable per-environment.
+ *
+ * Defaults to the repo's own `npm run dev` — the same command
+ * `playwright.fog.config.ts` and every other spec's webServer runs. In some
+ * environments a symlinked (or otherwise non-standard) `node_modules` can
+ * trip Turbopack's project-root/filesystem-boundary check and prevent `next
+ * dev` from starting at all (`TurbopackInternalError: Symlink
+ * [project]/node_modules is invalid, it points out of the filesystem
+ * root`). Where that happens, set `ROLLKEEPER_E2E_DEV_COMMAND` to a command
+ * that avoids Turbopack (e.g. `npx next dev --webpack`) without editing
+ * this committed file. This has not been observed against a normal
+ * checkout — see task-9-report.md for exactly what was and wasn't verified.
+ */
+const DEV_COMMAND = process.env.ROLLKEEPER_E2E_DEV_COMMAND ?? 'npm run dev';
+
 // Dedicated config for the VTT loot-completion e2e coverage, mirroring the
 // existing `playwright.fog.config.ts` pattern (its own test file, its own
 // webServer wiring) rather than the shared default `playwright.config.ts`.
@@ -31,19 +47,6 @@ const RELAY_SECRET = process.env.BATTLEMAP_RELAY_SECRET ?? resolveRelaySecret();
 // player's canvas over the live battle-map relay (`relay/`), never over a
 // REST snapshot (see `src/lib/battlemapSync.ts`). So, unlike every other
 // e2e spec in this repo, it needs a second local service besides Redis.
-//
-// The app's dev server is started with `--webpack` instead of the default
-// `next dev --turbopack` (see `package.json`'s `dev` script): in this git
-// worktree, `node_modules` is a symlink out to the main checkout
-// (`CONSTRAINTS.md` — intentional, never reinstalled here), and Turbopack's
-// project-root/filesystem-boundary check treats that symlink as "outside
-// the filesystem root" and refuses to boot at all
-// (`TurbopackInternalError: Symlink [project]/node_modules is invalid, it
-// points out of the filesystem root`). That is pre-existing and
-// environment-wide — reproduced identically against an untouched existing
-// spec (`cross-tab-encounter.spec.ts`) under the default config — not
-// something this slice introduced. `--webpack` sidesteps it; see
-// task-9-report.md for the reproduction.
 export default defineConfig({
   testDir: './e2e',
   testMatch: ['marker-loot-locked-claim.spec.ts'],
@@ -74,7 +77,7 @@ export default defineConfig({
       timeout: 60_000,
     },
     {
-      command: `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false UPSTASH_REDIS_REST_URL=http://localhost:8079 UPSTASH_REDIS_REST_TOKEN=local_dev_token BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 npx next dev --webpack`,
+      command: `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false UPSTASH_REDIS_REST_URL=http://localhost:8079 UPSTASH_REDIS_REST_TOKEN=local_dev_token BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
       url: 'http://localhost:3000/player',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
