@@ -14,6 +14,7 @@ import {
 import {
   createManagedBattleMapConnection,
   isValidClientId,
+  mintBattleMapToken,
   type BattleMapConnectionStatus,
   type BattleMapTransport,
 } from '@/lib/battlemapSync';
@@ -210,6 +211,46 @@ describe('createManagedBattleMapConnection', () => {
       fogAppearanceUpdatedAt: '2026-09-05T00:00:00.000Z',
     });
     conn.stop();
+  });
+
+  it('keeps a projected custom appearance when the library gate is on and fails closed when off', async () => {
+    const material = { v: 1, kind: 'solid', color: '#ff0000' };
+    const fetchMock = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        token: 't',
+        fogAppearance: {
+          v: 2,
+          kind: 'custom',
+          material,
+          sourcePresetId: 'fp_1',
+        },
+        fogAppearanceUpdatedAt: '2026-09-05T10:00:00.000Z',
+      }),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubEnv('NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED', 'true');
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
+    const on = await mintBattleMapToken('CODE', {
+      role: 'player',
+      battleMapId: 'm',
+      playerId: 'p',
+    });
+    expect(on?.fogAppearance).toEqual({
+      v: 2,
+      kind: 'custom',
+      material,
+      sourcePresetId: 'fp_1',
+    });
+    vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', '');
+    const off = await mintBattleMapToken('CODE', {
+      role: 'player',
+      battleMapId: 'm',
+      playerId: 'p',
+    });
+    expect(off?.fogAppearance).toBe('solid');
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   it('does not expose token metadata after the connection is stopped', async () => {
