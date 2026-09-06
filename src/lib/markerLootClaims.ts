@@ -115,7 +115,7 @@ function isMarkerLootLedgerEntry(
     Number.isInteger(entry.claimedQuantity) &&
     entry.claimedQuantity! >= 0 &&
     entry.claimedQuantity! <= entry.quantity! &&
-    typeof entry.locked === 'boolean'
+    (entry.locked === undefined || typeof entry.locked === 'boolean')
   );
 }
 
@@ -125,7 +125,11 @@ export function validateMarkerLootSeed(
   if (!Array.isArray(value) || value.length > MAX_LEDGER_ENTRIES) return null;
   if (!value.every(isMarkerLootLedgerEntry)) return null;
   const keys = new Set(value.map(entry => `${entry.markerId}:${entry.id}`));
-  return keys.size === value.length ? value : null;
+  if (keys.size !== value.length) return null;
+  return value.map(entry => ({
+    ...entry,
+    locked: entry.locked ?? false,
+  }));
 }
 
 /**

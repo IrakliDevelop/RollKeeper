@@ -48,10 +48,12 @@ describe('marker loot validation', () => {
     ).toBeNull();
   });
 
-  it('rejects a ledger entry missing the locked flag', () => {
+  it('defaults a missing locked flag to false', () => {
     const { locked: _locked, ...withoutLocked } = entry;
     void _locked;
-    expect(validateMarkerLootSeed([withoutLocked])).toBeNull();
+    expect(validateMarkerLootSeed([withoutLocked])).toEqual([
+      { ...withoutLocked, locked: false },
+    ]);
   });
 
   it('accepts a locked ledger entry', () => {
