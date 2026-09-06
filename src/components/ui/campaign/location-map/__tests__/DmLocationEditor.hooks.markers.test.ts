@@ -418,6 +418,90 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
       dmNotes: 'Poison needle.',
     });
   });
+
+  it('publishes a locked loot projection and ledger from battle-map setup mode', async () => {
+    const fetchMock = vi.fn<
+      (url: string, init?: RequestInit) => Promise<{ ok: true }>
+    >(async () => ({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const { vp, store, result, emitActivate } = await setup('battlemap');
+
+    act(() => {
+      result.current.markerControls.onKindChange('loot');
+    });
+    act(() => {
+      tapMarkerTool(result.current.tools, vp);
+    });
+    const pin = markerElements(store)[0] as HtmlElement;
+    vi.mocked(vp.exportJSON).mockImplementation(() =>
+      JSON.stringify({ elements: store.getAll() })
+    );
+
+    act(() => {
+      useBattleMapStore
+        .getState()
+        .updateBattleMap(CODE, MAP_ID, { dmOnlyElements: {} });
+      emitActivate(pin);
+    });
+    act(() => {
+      result.current.handleSaveMarkerDetail({
+        title: 'Locked chest',
+        body: '',
+        dmNotes: '',
+        lootAccess: 'locked',
+        loot: [
+          {
+            id: 'loot-1',
+            itemKind: 'inventory',
+            item: {
+              id: 'item-1',
+              name: 'Silver arrow',
+              category: 'treasure',
+              quantity: 3,
+              location: 'Backpack',
+              tags: [],
+              createdAt: '2026-09-07T00:00:00.000Z',
+              updatedAt: '2026-09-07T00:00:00.000Z',
+            },
+            quantity: 3,
+            claimedQuantity: 0,
+          },
+        ],
+      });
+    });
+
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 250));
+    });
+
+    const publishCall = fetchMock.mock.calls.findLast(
+      ([url]) => url === `/api/campaign/${CODE}/battlemaps/${MAP_ID}/markers`
+    );
+    expect(publishCall).toBeDefined();
+    if (!publishCall) throw new Error('marker publication was not requested');
+    const init = publishCall[1];
+    if (!init) throw new Error('marker publication omitted request options');
+    expect(init.method).toBe('PUT');
+    const body = JSON.parse(String(init.body));
+    expect(body.markers).toEqual([
+      {
+        id: expect.any(String),
+        title: 'Locked chest',
+        body: '',
+        lootLocked: true,
+      },
+    ]);
+    expect(body.markers[0]).not.toHaveProperty('loot');
+    expect(body.loot).toEqual([
+      expect.objectContaining({
+        markerId: body.markers[0].id,
+        id: 'loot-1',
+        locked: true,
+        quantity: 3,
+      }),
+    ]);
+  });
 });
 
 describe('useDmLocationEditor — marker kind and colour reach the tool', () => {

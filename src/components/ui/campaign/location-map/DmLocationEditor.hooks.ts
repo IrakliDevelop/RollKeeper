@@ -86,6 +86,7 @@ import type { MovableTokenIdentity } from './tokenIdentity';
 import { DmMarkerTool, type PlaceMarkerRequest } from './DmMarkerTool';
 import { applyMarkerAudienceToggle } from './markerAudienceToggle';
 import { MARKER_MIXED_AUDIENCE_MESSAGE } from './markerAudienceCopy';
+import { buildMarkerLootLedger } from './markerLootPublication';
 import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
@@ -377,13 +378,22 @@ export function useDmLocationEditor(
   const locationStoreGetLoc = useLocationStore(s => s.getLocation);
   const locationStoreToggle = useLocationStore(s => s.toggleDmOnly);
   const locationStoreUpdate = useLocationStore(s => s.updateLocation);
-  const markerDmOnlyElements = useLocationStore(
+  const locationMarkerDmOnlyElements = useLocationStore(
     state => state.locations[campaignCode]?.[location.id]?.dmOnlyElements
   );
 
   const battleMapStoreGetBm = useBattleMapStore(s => s.getBattleMap);
   const battleMapStoreToggle = useBattleMapStore(s => s.toggleDmOnly);
   const battleMapStoreUpdate = useBattleMapStore(s => s.updateBattleMap);
+  const battleMapForMarkerPublication = useBattleMapStore(state =>
+    mode === 'battlemap'
+      ? state.battleMaps[campaignCode]?.[location.id]
+      : undefined
+  );
+  const markerDmOnlyElements =
+    mode === 'battlemap'
+      ? battleMapForMarkerPublication?.dmOnlyElements
+      : locationMarkerDmOnlyElements;
 
   // Pick the right store based on mode
   const storeGetLocation =
@@ -531,6 +541,45 @@ export function useDmLocationEditor(
     mapId: location.id,
     getViewport: getMarkerViewport,
   });
+
+  // Setup and Play are separate battle-map surfaces. Play publishes marker
+  // details in DmBattleMapCanvas; Setup must do the same or a Locked/Open
+  // change remains local until the DM switches modes. That leaves the public
+  // projection and authoritative claim ledger stale in the meantime.
+  useEffect(() => {
+    if (mode !== 'battlemap' || !viewport || !battleMapForMarkerPublication)
+      return;
+
+    const timeout = window.setTimeout(() => {
+      const markers = buildPublicMarkerDetails({
+        canvasState:
+          viewport.exportJSON() || battleMapForMarkerPublication.canvasState,
+        markers: markerWrites.markers,
+        dmOnlyElements: battleMapForMarkerPublication.dmOnlyElements,
+      });
+      const loot = buildMarkerLootLedger(markerWrites.markers, markers);
+      void fetch(
+        `/api/campaign/${campaignCode}/battlemaps/${location.id}/markers`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dmId, markers, loot }),
+        }
+      ).catch(error => {
+        console.warn('Failed to publish marker details:', error);
+      });
+    }, 200);
+
+    return () => window.clearTimeout(timeout);
+  }, [
+    battleMapForMarkerPublication,
+    campaignCode,
+    dmId,
+    location.id,
+    markerWrites.markers,
+    mode,
+    viewport,
+  ]);
   // Same staleness problem as the picker refs: the tool instance outlives
   // every `markerWrites` identity, so the placement handler is reached
   // through a ref rather than captured.
