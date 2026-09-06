@@ -232,6 +232,8 @@ export const mockRedis = {
 
   expire: vi.fn(async () => 1),
 
+  zadd: vi.fn(async () => 1),
+
   pipeline: vi.fn(() => makePipeline()),
 };
 
@@ -263,6 +265,7 @@ vi.mock('@/lib/redis', () => ({
   campaignDisplayKeyKey: (code: string) => `campaign:${code}:displaykey`,
   campaignFogAppearanceKey: (code: string, battleMapId: string) =>
     `campaign:${code}:fog-appearance:${battleMapId}`,
+  campaignLiveMapRoomsKey: (code: string) => `campaign:${code}:live-maps`,
   characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
   SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,
