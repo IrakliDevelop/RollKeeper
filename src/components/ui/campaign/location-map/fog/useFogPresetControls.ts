@@ -172,6 +172,7 @@ export function useFogPresetControls(
 
   const select = useCallback(
     (value: string) => {
+      if (!enabled) return;
       if (value === 'solid' || value === 'cloudy') {
         onApply(value);
         return;
@@ -185,16 +186,17 @@ export function useFogPresetControls(
         material: structuredClone(preset.material),
       });
     },
-    [onApply, storageLibrary]
+    [enabled, onApply, storageLibrary]
   );
 
   const openEditor = useCallback(() => {
+    if (!enabled) return;
     setEditor({
       draft: structuredClone(materialFromApplied(applied)),
       sourcePresetId: sourcePreset?.id ?? null,
       error: null,
     });
-  }, [applied, sourcePreset]);
+  }, [enabled, applied, sourcePreset]);
 
   const setDraft = useCallback(
     (next: CustomFogMaterialV1) => {
@@ -266,17 +268,19 @@ export function useFogPresetControls(
     if (!editor) return;
     cancelPreview();
     const material = structuredClone(editor.draft);
+    const source = editor.sourcePresetId
+      ? storageLibrary.find(p => p.id === editor.sourcePresetId)
+      : undefined;
     const keepSource =
-      editor.sourcePresetId !== null &&
-      sourcePreset !== null &&
-      fogMaterialsEqual(sourcePreset.material, material);
-    onApply(
-      keepSource
-        ? { v: 2, kind: 'custom', sourcePresetId: sourcePreset.id, material }
-        : { v: 2, kind: 'custom', material }
-    );
+      source !== undefined && fogMaterialsEqual(source.material, editor.draft);
+    onApply({
+      v: 2,
+      kind: 'custom',
+      ...(keepSource ? { sourcePresetId: source.id } : {}),
+      material,
+    });
     setEditor(null);
-  }, [editor, cancelPreview, onApply, sourcePreset]);
+  }, [editor, cancelPreview, onApply, storageLibrary]);
 
   const validateName = useCallback(
     (
@@ -391,6 +395,20 @@ export function useFogPresetControls(
     setPendingDeleteId(null);
   }, [pendingDeleteId, removeFogPreset, campaignCode]);
 
+  const openManager = useCallback(() => {
+    if (!enabled) return;
+    setManagerOpen(true);
+  }, [enabled]);
+
+  const closeManager = useCallback(() => {
+    setManagerOpen(false);
+    setPendingDeleteId(null);
+  }, []);
+
+  const cancelDelete = useCallback(() => {
+    setPendingDeleteId(null);
+  }, []);
+
   return {
     enabled,
     library,
@@ -409,16 +427,13 @@ export function useFogPresetControls(
     saveDraftAsPreset,
     updateSourcePreset,
     managerOpen,
-    openManager: () => setManagerOpen(true),
-    closeManager: () => {
-      setManagerOpen(false);
-      setPendingDeleteId(null);
-    },
+    openManager,
+    closeManager,
     renamePreset,
     duplicatePreset,
     pendingDeleteId,
     requestDelete: setPendingDeleteId,
     confirmDelete,
-    cancelDelete: () => setPendingDeleteId(null),
+    cancelDelete,
   };
 }

@@ -4,7 +4,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Viewport } from '@fieldnotes/core';
 import { useDmStore } from '@/store/dmStore';
 import type { FogAppearance } from '@/types/battlemap';
-import { useFogPresetControls } from '../useFogPresetControls';
+import {
+  FOG_PRESET_ERRORS,
+  useFogPresetControls,
+} from '../useFogPresetControls';
 
 const CODE = 'PRESETS';
 const solidRed = { v: 1, kind: 'solid', color: '#ff0000' } as const;
@@ -214,10 +217,71 @@ describe('editor drafts and preview', () => {
     act(() => result.current.applyDraft());
     expect(onApply).toHaveBeenLastCalledWith(applied);
   });
+
+  it('keeps the attribution set by saveDraftAsPreset when applying afterward', () => {
+    const { result, onApply } = setup('solid');
+    act(() => result.current.openEditor());
+    act(() => result.current.updateDraft({ color: '#123456' }));
+    act(() => {
+      result.current.saveDraftAsPreset('Mine');
+    });
+    act(() => result.current.applyDraft());
+    const savedId = useDmStore
+      .getState()
+      .getCampaign(CODE)!
+      .fogPresets!.find(p => p.name === 'Mine')!.id;
+    expect(onApply).toHaveBeenLastCalledWith({
+      v: 2,
+      kind: 'custom',
+      sourcePresetId: savedId,
+      material: { v: 1, kind: 'solid', color: '#123456' },
+    });
+  });
+
+  it('does nothing to the frame loop or applied state when the pending frame is cancelled on unmount', () => {
+    const { result, unmount, setFogStyle } = setup('cloudy');
+    act(() => result.current.openEditor());
+    setFogStyle.mockClear();
+    act(() => result.current.updateDraft({ noiseOpacity: 0.4 }));
+    expect(rafCallbacks.length).toBe(1);
+
+    const cancelAnimationFrame = vi.fn();
+    vi.stubGlobal('cancelAnimationFrame', cancelAnimationFrame);
+
+    unmount();
+
+    expect(cancelAnimationFrame).toHaveBeenCalledWith(1);
+
+    flushFrames();
+    expect(setFogStyle).not.toHaveBeenCalled();
+  });
+});
+
+describe('gating', () => {
+  it('is inert when disabled: select, openEditor, and openManager are no-ops', () => {
+    const setFogStyle = vi.fn();
+    const viewport = { setFogStyle } as unknown as Viewport;
+    const onApply = vi.fn();
+    const { result } = renderHook(() =>
+      useFogPresetControls({
+        enabled: false,
+        campaignCode: CODE,
+        viewport,
+        applied: 'solid',
+        onApply,
+      })
+    );
+    act(() => result.current.select('cloudy'));
+    act(() => result.current.openEditor());
+    act(() => result.current.openManager());
+    expect(onApply).not.toHaveBeenCalled();
+    expect(result.current.editor).toBeNull();
+    expect(result.current.managerOpen).toBe(false);
+  });
 });
 
 describe('library CRUD', () => {
-  it('saves a new preset, rejects duplicates and reserved names, and enforces the cap', () => {
+  it('saves a new preset, rejects duplicates and reserved names', () => {
     const { result } = setup('solid');
     act(() => result.current.openEditor());
     let error: string | null = null;
@@ -243,6 +307,31 @@ describe('library CRUD', () => {
       error = result.current.saveDraftAsPreset('');
     });
     expect(error).toBe('Enter a name between 1 and 60 characters.');
+  });
+
+  it('rejects saving a new preset once the library is at the 50-preset cap', () => {
+    act(() => {
+      for (let i = 1; i <= 50; i += 1) {
+        useDmStore.getState().upsertFogPreset(CODE, {
+          v: 1,
+          id: `fp_${i}`,
+          name: `P${i}`,
+          material: solidRed,
+          createdAt: '2026-09-05T00:00:00.000Z',
+          updatedAt: '2026-09-05T00:00:00.000Z',
+        });
+      }
+    });
+    const { result } = setup('solid');
+    act(() => result.current.openEditor());
+    let error: string | null = null;
+    act(() => {
+      error = result.current.saveDraftAsPreset('P51');
+    });
+    expect(error).toBe(FOG_PRESET_ERRORS.full);
+    expect(useDmStore.getState().getCampaign(CODE)!.fogPresets!.length).toBe(
+      50
+    );
   });
 
   it('updates the source preset from the draft without touching the applied map', () => {
