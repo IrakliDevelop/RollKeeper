@@ -69,6 +69,7 @@ export interface MarkerDetailPanelProps {
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
     loot?: MarkerLootEntry[];
+    lootAccess?: MarkerDetail['lootAccess'];
     portal?: MarkerPortalTargetV1 | null;
   }) => void;
   /** DM mode only. Background persistence that must not close the dialog. */

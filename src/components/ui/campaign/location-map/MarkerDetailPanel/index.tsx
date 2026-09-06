@@ -36,6 +36,7 @@ import { buildMarkerPortalTarget } from '../markerPortal';
 import { LootEditor } from './LootEditor';
 import { MarkerRichText } from './MarkerRichText';
 import type {
+  MarkerDetail,
   MarkerDiscovery,
   MarkerDiscoverySkill,
   MarkerDisarmMethod,
@@ -95,6 +96,7 @@ interface EditFormProps {
   initialDiscovery?: MarkerDiscovery;
   initialTrap?: MarkerTrapMechanics;
   initialLoot?: MarkerLootEntry[];
+  initialLootAccess?: MarkerDetail['lootAccess'];
   portalState?: ResolvedPortalState;
   campaignCode?: string;
   dmId?: string;
@@ -106,6 +108,7 @@ interface EditFormProps {
     discovery?: MarkerDiscovery;
     trap?: MarkerTrapMechanics;
     loot?: MarkerLootEntry[];
+    lootAccess?: MarkerDetail['lootAccess'];
     portal?: MarkerPortalTargetV1 | null;
   }) => void;
   onPersist?: EditFormProps['onSave'];
@@ -127,6 +130,7 @@ function EditForm({
   initialDiscovery,
   initialTrap,
   initialLoot,
+  initialLootAccess,
   portalState,
   campaignCode,
   dmId,
@@ -156,6 +160,9 @@ function EditForm({
   const [effect, setEffect] = useState(initialTrap?.effect ?? '');
   const [damage, setDamage] = useState(initialTrap?.damage ?? '');
   const [loot, setLoot] = useState<MarkerLootEntry[]>(initialLoot ?? []);
+  const [lootAccess, setLootAccess] = useState<'locked' | 'open'>(
+    initialLootAccess ?? 'open'
+  );
 
   const [portalTouched, setPortalTouched] = useState(false);
   const [portalDraftKind, setPortalDraftKind] = useState<
@@ -179,7 +186,10 @@ function EditForm({
     return { portal: buildMarkerPortalTarget(portalDraftKind, portalDraftId) };
   }
 
-  const buildPatch = (lootValue: MarkerLootEntry[] = loot) => ({
+  const buildPatch = (
+    lootValue: MarkerLootEntry[] = loot,
+    accessValue: 'locked' | 'open' = lootAccess
+  ) => ({
     title,
     body,
     dmNotes,
@@ -203,7 +213,7 @@ function EditForm({
           },
         }
       : {}),
-    ...(kind === 'loot' ? { loot: lootValue } : {}),
+    ...(kind === 'loot' ? { loot: lootValue, lootAccess: accessValue } : {}),
     ...buildPortalPatch(),
   });
 
@@ -310,6 +320,11 @@ function EditForm({
           onDelivered={next => {
             setLoot(next);
             onPersist?.(buildPatch(next));
+          }}
+          access={lootAccess}
+          onAccessChange={next => {
+            setLootAccess(next);
+            onPersist?.(buildPatch(loot, next));
           }}
         />
       )}
@@ -648,6 +663,9 @@ function renderPanelBody(
               'item' in state.detail.loot[0]
                 ? (state.detail.loot as MarkerLootEntry[])
                 : undefined
+            }
+            initialLootAccess={
+              'lootAccess' in state.detail ? state.detail.lootAccess : undefined
             }
             portalState={portalState}
             campaignCode={campaignCode}

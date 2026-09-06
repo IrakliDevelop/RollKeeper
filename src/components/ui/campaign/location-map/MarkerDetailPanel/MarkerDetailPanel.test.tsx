@@ -1298,4 +1298,98 @@ describe('MarkerDetailPanel portal destination', () => {
       unmount();
     }
   });
+
+  describe('loot access control', () => {
+    function stubPlayersFetch() {
+      vi.stubGlobal(
+        'fetch',
+        vi
+          .fn()
+          .mockResolvedValue({ ok: true, json: async () => ({ players: [] }) })
+      );
+    }
+
+    it('saves lootAccess when the DM locks a container', async () => {
+      stubPlayersFetch();
+      const user = userEvent.setup();
+      const onSave = vi.fn();
+
+      render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          campaignCode="ABC123"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+            detail: detail({ loot: [] }),
+          }}
+          onClose={() => {}}
+          onSave={onSave}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Locked' }));
+      await user.click(screen.getByRole('button', { name: 'Save' }));
+
+      expect(onSave).toHaveBeenCalledWith(
+        expect.objectContaining({ lootAccess: 'locked' })
+      );
+    });
+
+    it('defaults a container with no stored lootAccess to open', () => {
+      stubPlayersFetch();
+
+      render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          campaignCode="ABC123"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+            detail: detail({ loot: [] }),
+          }}
+          onClose={() => {}}
+          onSave={() => {}}
+        />
+      );
+
+      expect(screen.getByRole('button', { name: 'Open' })).toHaveAttribute(
+        'aria-pressed',
+        'true'
+      );
+      expect(
+        screen.getByText(
+          /players can see the contents and claim up to what's left/i
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('explains what locking does', async () => {
+      stubPlayersFetch();
+      const user = userEvent.setup();
+
+      render(
+        <MarkerDetailPanel
+          open
+          mode="dm"
+          campaignCode="ABC123"
+          state={{
+            kind: 'ready',
+            data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+            detail: detail({ loot: [] }),
+          }}
+          onClose={() => {}}
+          onSave={() => {}}
+        />
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Locked' }));
+
+      expect(
+        screen.getByText(/claims are refused on the server too/i)
+      ).toBeInTheDocument();
+    });
+  });
 });
