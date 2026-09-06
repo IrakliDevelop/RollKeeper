@@ -10,6 +10,7 @@ export {
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
 } from './fogAppearance';
+export { useAppliedFogAppearance } from './useAppliedFogAppearance';
 export {
   FOG_SECURITY_EXPLANATION,
   FOG_ENABLE_TITLE,

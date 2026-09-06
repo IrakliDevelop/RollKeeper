@@ -9,8 +9,8 @@ import { PresenceControl } from '@/components/ui/campaign/location-map/PresenceC
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import {
-  parseFogAppearance,
   resolveFogRendererOptions,
+  useAppliedFogAppearance,
 } from '@/components/ui/campaign/location-map/fog';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
@@ -82,9 +82,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   const { toasts, addToast, dismissToast } = useToast();
   const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
   const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
-  const fogAppearance = proceduralFogEnabled
-    ? parseFogAppearance(battleMap?.fogAppearance)
-    : 'solid';
+  const { appearance: fogAppearance, fingerprint: fogFingerprint } =
+    useAppliedFogAppearance(battleMap?.fogAppearance, proceduralFogEnabled);
   useFogAppearanceProjection({
     enabled:
       proceduralFogEnabled &&
@@ -93,7 +92,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     campaignCode,
     battleMapId,
     dmId: props.dmId,
-    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
+    appearance: fogAppearance,
     onError: () => {
       addToast({
         type: 'error',
@@ -106,7 +105,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
-  }, [viewport, fogAppearance]);
+    // fogFingerprint stands in for fogAppearance: same material, same effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, fogFingerprint]);
 
   const handleFogAppearanceChange = useCallback(
     (appearance: FogAppearance) => {

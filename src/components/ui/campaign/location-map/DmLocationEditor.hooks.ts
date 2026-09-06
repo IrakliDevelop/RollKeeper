@@ -28,6 +28,7 @@ import {
 } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
+import type { FogAppearance } from '@/types/battlemap';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import {
   createManagedBattleMapConnection,
@@ -1870,7 +1871,7 @@ export function useDmLocationEditor(
     portalState,
     fogControls,
     handleFogAppearanceChange: useCallback(
-      (appearance: import('@/types/battlemap').FogAppearance) => {
+      (appearance: FogAppearance) => {
         getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,

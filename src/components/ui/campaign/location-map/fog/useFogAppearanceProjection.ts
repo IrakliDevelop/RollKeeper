@@ -1,14 +1,18 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import type { FogAppearanceV1 } from '@/types/battlemap';
+import type { FogAppearance } from '@/types/battlemap';
+import {
+  fogAppearanceFingerprint,
+  toProjectedFogAppearance,
+} from '@/lib/fogOfWar';
 
 interface FogAppearanceProjectionInput {
   enabled: boolean;
   campaignCode: string;
   battleMapId: string;
   dmId: string;
-  appearance: FogAppearanceV1;
+  appearance: FogAppearance;
   onError?: (error: Error) => void;
 }
 
@@ -25,7 +29,7 @@ export async function writeFogAppearanceProjection(
       },
       body: JSON.stringify({
         dmId: input.dmId,
-        appearance: input.appearance,
+        appearance: toProjectedFogAppearance(input.appearance),
       }),
     }
   );
@@ -57,10 +61,14 @@ export function useFogAppearanceProjection(
     };
   }, []);
 
+  const appearanceRef = useRef(appearance);
+  appearanceRef.current = appearance;
+  const fingerprint = fogAppearanceFingerprint(appearance);
+
   useEffect(() => {
     if (!enabled) return;
 
-    const key = `${campaignCode}\u0000${battleMapId}\u0000${dmId}\u0000${appearance}`;
+    const key = [campaignCode, battleMapId, dmId, fingerprint].join(' ');
     if (lastQueuedRef.current === key) return;
     lastQueuedRef.current = key;
 
@@ -70,7 +78,7 @@ export function useFogAppearanceProjection(
           campaignCode,
           battleMapId,
           dmId,
-          appearance,
+          appearance: appearanceRef.current,
         })
       )
       .catch(error => {
@@ -81,5 +89,5 @@ export function useFogAppearanceProjection(
             : new Error('Fog appearance projection failed')
         );
       });
-  }, [appearance, battleMapId, campaignCode, dmId, enabled]);
+  }, [fingerprint, battleMapId, campaignCode, dmId, enabled]);
 }

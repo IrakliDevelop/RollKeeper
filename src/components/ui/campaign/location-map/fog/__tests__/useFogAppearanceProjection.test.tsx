@@ -162,4 +162,49 @@ describe('useFogAppearanceProjection', () => {
 
     expect(onError).not.toHaveBeenCalled();
   });
+
+  it('publishes each distinct custom material and dedupes by fingerprint, not identity', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    vi.stubGlobal('fetch', fetchMock);
+    const red = {
+      v: 2,
+      kind: 'custom',
+      sourcePresetId: 'fp_r',
+      material: { v: 1, kind: 'solid', color: '#ff0000' },
+    } as const;
+    const blue = {
+      v: 2,
+      kind: 'custom',
+      sourcePresetId: 'fp_b',
+      material: { v: 1, kind: 'solid', color: '#0000ff' },
+    } as const;
+
+    const { rerender } = renderHook(
+      ({ appearance }) =>
+        useFogAppearanceProjection({ ...baseInput, appearance }),
+      { initialProps: { appearance: red as typeof red | typeof blue } }
+    );
+    await act(async () => {});
+    rerender({ appearance: { ...red, material: { ...red.material } } });
+    await act(async () => {});
+    rerender({ appearance: blue });
+    await act(async () => {});
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const bodies = fetchMock.mock.calls.map(call => {
+      const [, init] = call as unknown as [string, RequestInit];
+      return JSON.parse(init.body as string);
+    });
+    expect(bodies[0].appearance).toEqual({
+      v: 2,
+      kind: 'custom',
+      material: red.material,
+    });
+    expect(bodies[1].appearance).toEqual({
+      v: 2,
+      kind: 'custom',
+      material: blue.material,
+    });
+    expect(JSON.stringify(bodies)).not.toContain('fp_');
+  });
 });

@@ -12,7 +12,7 @@ import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
-import { parseFogAppearance, resolveFogRendererOptions } from './fog';
+import { resolveFogRendererOptions, useAppliedFogAppearance } from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
@@ -103,9 +103,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handleFogAppearanceChange,
   } = useDmLocationEditor(props);
   const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
-  const fogAppearance = proceduralFogEnabled
-    ? parseFogAppearance(props.location.fogAppearance)
-    : 'solid';
+  const { appearance: fogAppearance, fingerprint: fogFingerprint } =
+    useAppliedFogAppearance(props.location.fogAppearance, proceduralFogEnabled);
   useFogAppearanceProjection({
     enabled:
       proceduralFogEnabled &&
@@ -114,7 +113,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     campaignCode: props.campaignCode,
     battleMapId: props.location.id,
     dmId: props.dmId,
-    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
+    appearance: fogAppearance,
     onError: () => {
       addToast({
         type: 'error',
@@ -127,7 +126,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
-  }, [viewport, fogAppearance]);
+    // fogFingerprint stands in for fogAppearance: same material, same effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, fogFingerprint]);
 
   return (
     <ViewportContext.Provider value={viewport}>
