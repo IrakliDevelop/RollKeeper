@@ -565,6 +565,10 @@ function ReadOnlyView({
       )}
       {!lootLocked && loot && loot.length > 0 && (
         <div className="flex flex-col gap-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-heading text-sm font-semibold">Loot</span>
+            <Badge variant="success">Open</Badge>
+          </div>
           {loot.map(entry => {
             const max = Math.max(1, entry.remainingQuantity);
             const requested = Math.min(max, quantities[entry.id] ?? max);

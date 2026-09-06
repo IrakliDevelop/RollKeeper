@@ -927,6 +927,39 @@ describe('MarkerDetailPanel player loot: locked container and quantity stepper',
     expect(screen.getByRole('button', { name: 'Claim 8' })).toBeEnabled();
   });
 
+  // Visual design spec, artboard 1c ("Player, open"): a `Loot` section
+  // heading with an emerald `Open` badge on the right, shown only while the
+  // container is open — never while locked.
+  it('shows a "Loot" heading with an emerald Open badge only when open', () => {
+    const { rerender } = render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Loot')).toBeInTheDocument();
+    expect(screen.getByText('Open')).toBeInTheDocument();
+
+    rerender(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({
+          title: 'Chest',
+          body: 'Iron-banded.',
+          lootLocked: true,
+        })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.queryByText('Loot')).toBeNull();
+    expect(screen.queryByText('Open')).toBeNull();
+  });
+
   it('claims the quantity the player stepped down to', async () => {
     const user = userEvent.setup();
     const onClaimLoot = vi.fn().mockResolvedValue(6);
