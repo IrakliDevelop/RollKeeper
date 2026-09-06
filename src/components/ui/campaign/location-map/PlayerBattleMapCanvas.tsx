@@ -92,6 +92,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
+import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 
 import type { MovementResolution } from './movementTool';
 
@@ -523,6 +524,9 @@ export function PlayerBattleMapCanvas({
   const handleReady = (vp: Viewport) => {
     setViewport(vp);
     viewportRef.current = vp;
+    // Mirrors the DM canvases (`DmBattleMapCanvas.hooks.ts`,
+    // `DmLocationEditor.hooks.ts`) — dev/test-only, no-ops in production.
+    exposeStoreForE2E('viewport', vp);
 
     configureFogView(vp.fog, 'player', false);
 
