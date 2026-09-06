@@ -153,6 +153,24 @@ describe('editor drafts and preview', () => {
     );
   });
 
+  it('preserves back-to-back edits to different draft fields before React renders', () => {
+    const { result } = setup('cloudy');
+    act(() => result.current.openEditor());
+
+    act(() => {
+      result.current.updateDraft({ noiseOpacity: 0.72 });
+      result.current.updateDraft({ scale: 760 });
+      result.current.saveDraftAsPreset('Rapid edits');
+    });
+
+    expect(result.current.editor?.draft).toEqual(
+      expect.objectContaining({ noiseOpacity: 0.72, scale: 760 })
+    );
+    expect(
+      useDmStore.getState().getCampaign(CODE)!.fogPresets![0].material
+    ).toEqual(expect.objectContaining({ noiseOpacity: 0.72, scale: 760 }));
+  });
+
   it('switches texture mode, randomizes the seed, and resets', () => {
     const { result } = setup('solid');
     act(() => result.current.openEditor());

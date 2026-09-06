@@ -112,6 +112,10 @@ export function useFogPresetControls(
   const [editor, setEditor] = useState<FogPresetEditorState | null>(null);
   const editorRef = useRef(editor);
   editorRef.current = editor;
+  const commitEditor = useCallback((next: FogPresetEditorState | null) => {
+    editorRef.current = next;
+    setEditor(next);
+  }, []);
   const [managerOpen, setManagerOpen] = useState(false);
   const [managerError, setManagerError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -190,21 +194,21 @@ export function useFogPresetControls(
   );
 
   const openEditor = useCallback(() => {
-    setEditor({
+    commitEditor({
       draft: structuredClone(materialFromApplied(applied)),
       sourcePresetId: sourcePreset?.id ?? null,
       error: null,
     });
-  }, [applied, sourcePreset]);
+  }, [applied, sourcePreset, commitEditor]);
 
   const setDraft = useCallback(
     (next: CustomFogMaterialV1) => {
-      setEditor(current =>
-        current ? { ...current, draft: next, error: null } : current
-      );
+      const current = editorRef.current;
+      if (!current) return;
+      commitEditor({ ...current, draft: next, error: null });
       schedulePreview(next);
     },
-    [schedulePreview]
+    [schedulePreview, commitEditor]
   );
 
   const updateDraft = useCallback<FogPresetControls['updateDraft']>(
@@ -212,10 +216,10 @@ export function useFogPresetControls(
       const current = editorRef.current;
       if (!current) return;
       const next = { ...current.draft, ...patch } as CustomFogMaterialV1;
-      setEditor({ ...current, draft: next, error: null });
+      commitEditor({ ...current, draft: next, error: null });
       schedulePreview(next);
     },
-    [schedulePreview]
+    [schedulePreview, commitEditor]
   );
 
   const setDraftKind = useCallback(
@@ -236,46 +240,47 @@ export function useFogPresetControls(
                   ? current.draft.color
                   : DEFAULT_CUSTOM_PROCEDURAL_MATERIAL.baseColor,
             };
-      setEditor({ ...current, draft: next, error: null });
+      commitEditor({ ...current, draft: next, error: null });
       schedulePreview(next);
     },
-    [schedulePreview]
+    [schedulePreview, commitEditor]
   );
 
   const randomizeSeed = useCallback(() => {
     const current = editorRef.current;
     if (!current || current.draft.kind !== 'procedural') return;
     const next = { ...current.draft, seed: randomSeed() };
-    setEditor({ ...current, draft: next, error: null });
+    commitEditor({ ...current, draft: next, error: null });
     schedulePreview(next);
-  }, [schedulePreview]);
+  }, [schedulePreview, commitEditor]);
 
   const resetDraft = useCallback(() => {
     setDraft(structuredClone(materialFromApplied(applied)));
   }, [applied, setDraft]);
 
   const cancelEditor = useCallback(() => {
-    setEditor(null);
+    commitEditor(null);
     restoreApplied();
-  }, [restoreApplied]);
+  }, [restoreApplied, commitEditor]);
 
   const applyDraft = useCallback(() => {
-    if (!editor) return;
+    const current = editorRef.current;
+    if (!current) return;
     cancelPreview();
-    const material = structuredClone(editor.draft);
-    const source = editor.sourcePresetId
-      ? storageLibrary.find(p => p.id === editor.sourcePresetId)
+    const material = structuredClone(current.draft);
+    const source = current.sourcePresetId
+      ? storageLibrary.find(p => p.id === current.sourcePresetId)
       : undefined;
     const keepSource =
-      source !== undefined && fogMaterialsEqual(source.material, editor.draft);
+      source !== undefined && fogMaterialsEqual(source.material, current.draft);
     onApply({
       v: 2,
       kind: 'custom',
       ...(keepSource ? { sourcePresetId: source.id } : {}),
       material,
     });
-    setEditor(null);
-  }, [editor, cancelPreview, onApply, storageLibrary]);
+    commitEditor(null);
+  }, [cancelPreview, onApply, storageLibrary, commitEditor]);
 
   const validateName = useCallback(
     (
@@ -301,18 +306,15 @@ export function useFogPresetControls(
 
   const saveDraftAsPreset = useCallback(
     (name: string): string | null => {
-      if (!editor) return FOG_PRESET_ERRORS.missing;
+      const current = editorRef.current;
+      if (!current) return FOG_PRESET_ERRORS.missing;
       if (!canAddFogPreset(storageLibrary)) {
-        setEditor(current =>
-          current ? { ...current, error: FOG_PRESET_ERRORS.full } : current
-        );
+        commitEditor({ ...current, error: FOG_PRESET_ERRORS.full });
         return FOG_PRESET_ERRORS.full;
       }
       const checked = validateName(name);
       if (!checked.ok) {
-        setEditor(current =>
-          current ? { ...current, error: checked.error } : current
-        );
+        commitEditor({ ...current, error: checked.error });
         return checked.error;
       }
       const now = new Date().toISOString();
@@ -321,29 +323,28 @@ export function useFogPresetControls(
         v: 1,
         id,
         name: checked.name,
-        material: structuredClone(editor.draft),
+        material: structuredClone(current.draft),
         createdAt: now,
         updatedAt: now,
       });
-      setEditor(current =>
-        current ? { ...current, sourcePresetId: id, error: null } : current
-      );
+      commitEditor({ ...current, sourcePresetId: id, error: null });
       return null;
     },
-    [editor, storageLibrary, validateName, upsertFogPreset, campaignCode]
+    [storageLibrary, validateName, upsertFogPreset, campaignCode, commitEditor]
   );
 
   const updateSourcePreset = useCallback((): string | null => {
-    if (!editor || !editor.sourcePresetId) return FOG_PRESET_ERRORS.missing;
-    const preset = storageLibrary.find(p => p.id === editor.sourcePresetId);
+    const current = editorRef.current;
+    if (!current || !current.sourcePresetId) return FOG_PRESET_ERRORS.missing;
+    const preset = storageLibrary.find(p => p.id === current.sourcePresetId);
     if (!preset) return FOG_PRESET_ERRORS.missing;
     upsertFogPreset(campaignCode, {
       ...preset,
-      material: structuredClone(editor.draft),
+      material: structuredClone(current.draft),
       updatedAt: new Date().toISOString(),
     });
     return null;
-  }, [editor, storageLibrary, upsertFogPreset, campaignCode]);
+  }, [storageLibrary, upsertFogPreset, campaignCode]);
 
   const renamePreset = useCallback(
     (id: string, name: string): string | null => {
