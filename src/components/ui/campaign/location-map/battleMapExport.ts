@@ -1,4 +1,8 @@
-import type { ExportImageOptions, FogStateV1 } from '@fieldnotes/core';
+import type {
+  ExportImageOptions,
+  FogStateV1,
+  FogStyle,
+} from '@fieldnotes/core';
 
 import { createStandaloneMarkerRegistry } from './markerPainter';
 import { MARKER_HTML_TYPES } from './markerData';
@@ -13,6 +17,8 @@ export interface BattleMapExportRequest {
   /** DM surfaces only; player surface omits it (store already relay-filtered). */
   dmOnlyElements?: Record<string, boolean>;
   fogState?: FogStateV1 | null;
+  /** Applied player style. Set whenever fogState is set so a live editor draft never leaks. */
+  fogStyle?: FogStyle;
 }
 
 export interface BattleMapExportResult {
@@ -83,7 +89,7 @@ export async function exportBattleMap(
     // is normally `editor`; allowing the renderer to inherit it leaks the
     // DM preview into an export. A null state means fog is disabled.
     options.fog = req.fogState
-      ? { state: req.fogState, mode: 'player' }
+      ? { state: req.fogState, mode: 'player', style: req.fogStyle }
       : false;
   } else if (req.audience === 'full') {
     options.fog = false;

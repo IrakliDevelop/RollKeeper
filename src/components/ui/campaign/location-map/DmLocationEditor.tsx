@@ -12,7 +12,11 @@ import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
-import { resolveFogRendererOptions, useAppliedFogAppearance } from './fog';
+import {
+  resolveFogRendererOptions,
+  resolvePlayerFogStyle,
+  useAppliedFogAppearance,
+} from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
@@ -189,6 +193,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 mapImageSize={props.location.mapImageSize}
                 getDmOnlyElements={getDmOnlyElements}
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={message =>
                   addToast({ type: 'error', title: 'Export failed', message })
                 }

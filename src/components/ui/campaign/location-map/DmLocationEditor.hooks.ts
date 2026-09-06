@@ -77,6 +77,7 @@ import {
   reconcileMapFogBounds,
   resolveFogRendererOptions,
   resolveMapImageBounds,
+  resolvePlayerFogStyle,
   useDmFogControls,
 } from './fog';
 import { useDmStore } from '@/store/dmStore';
@@ -1572,7 +1573,13 @@ export function useDmLocationEditor(
           quality: 0.85,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
           ...(fogEnabled
-            ? { fog: { state: fogState, mode: 'player' as const } }
+            ? {
+                fog: {
+                  state: fogState,
+                  mode: 'player' as const,
+                  style: resolvePlayerFogStyle(location.fogAppearance),
+                },
+              }
             : {}),
         });
       } catch (error) {

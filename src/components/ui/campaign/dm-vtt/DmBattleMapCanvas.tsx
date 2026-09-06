@@ -10,6 +10,7 @@ import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetai
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import {
   resolveFogRendererOptions,
+  resolvePlayerFogStyle,
   useAppliedFogAppearance,
 } from '@/components/ui/campaign/location-map/fog';
 import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
@@ -180,6 +181,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                   {}
                 }
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={onExportError}
               />
             }

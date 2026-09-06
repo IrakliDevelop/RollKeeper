@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import type { FogStateV1 } from '@fieldnotes/core';
+import type { FogStateV1, FogStyle } from '@fieldnotes/core';
 import {
   downloadBlob,
   exportBattleMap,
@@ -18,6 +18,8 @@ export interface BattleMapExportControlProps {
   getDmOnlyElements?: () => Record<string, boolean>;
   /** Read live so exports include the latest local or relayed fog state. */
   getFogState?: () => FogStateV1 | null;
+  /** Read live so exports use the applied style, never a live editor draft. */
+  getFogStyle?: () => FogStyle;
   onError: (message: string) => void;
   /** Test seam; defaults to exportBattleMap. */
   exporter?: typeof exportBattleMap;
@@ -29,6 +31,7 @@ export function BattleMapExportControl({
   mapImageSize,
   getDmOnlyElements,
   getFogState,
+  getFogStyle,
   onError,
   exporter = exportBattleMap,
 }: BattleMapExportControlProps) {
@@ -76,6 +79,7 @@ export function BattleMapExportControl({
         mapImageSize,
         dmOnlyElements: getDmOnlyElements?.(),
         fogState: getFogState?.() ?? null,
+        fogStyle: getFogStyle?.(),
       });
       downloadBlob(blob, filename);
       setOpen(false);
