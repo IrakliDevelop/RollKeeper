@@ -102,6 +102,7 @@ export async function PUT(
       ex: SLIDING_TTL_SECONDS,
     });
     await refreshCampaignTTL(redis, code);
+    await sendBattleMapPoke(code, redis, 'markers');
     return NextResponse.json({ success: true, markers: publicMarkers });
   } catch (error) {
     console.error('Failed to publish battle-map markers:', error);
