@@ -256,11 +256,16 @@ export const mockRedis = {
     return Object.fromEntries(h.entries());
   }),
 
-  expire: vi.fn(async (_key: string, _seconds: number) => 1),
-
-  zadd: vi.fn(
-    async (_key: string, _scoreMember: { score: number; member: string }) => 1
+  expire: vi.fn<(key: string, seconds: number) => Promise<number>>(
+    async () => 1
   ),
+
+  zadd: vi.fn<
+    (
+      key: string,
+      scoreMember: { score: number; member: string }
+    ) => Promise<number>
+  >(async () => 1),
 
   pipeline: vi.fn(() => makePipeline()),
 };
