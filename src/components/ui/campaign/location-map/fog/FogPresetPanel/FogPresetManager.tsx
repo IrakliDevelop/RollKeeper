@@ -53,6 +53,11 @@ export function FogPresetManager({
               onStopRename={() => setRenamingId(null)}
             />
           ))}
+          {controls.managerError && (
+            <p role="alert" className="text-accent-red-text text-sm">
+              {controls.managerError}
+            </p>
+          )}
           {pending && (
             <FogPresetDeleteConfirm name={pending.name} controls={controls} />
           )}

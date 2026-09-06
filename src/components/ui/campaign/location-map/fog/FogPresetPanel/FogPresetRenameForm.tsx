@@ -38,7 +38,10 @@ export function FogPresetRenameForm({
         onClick={() => {
           const nextError = controls.renamePreset(preset.id, name);
           if (nextError) setError(nextError);
-          else onDone();
+          else {
+            controls.setManagerError(null);
+            onDone();
+          }
         }}
       >
         Save name

@@ -58,18 +58,20 @@ export default function BattleMapEditorPage() {
 
   if (mode === 'play') {
     return (
-      <ErrorBoundary fallback={<VttErrorFallback />}>
+      <>
         {campaign && (
           <CampaignSettingsSyncControls campaign={campaign} headless />
         )}
-        <DmVttScreen
-          campaignCode={code}
-          battleMapId={id}
-          dmId={dmId}
-          mode={mode}
-          onModeChange={handleModeChange}
-        />
-      </ErrorBoundary>
+        <ErrorBoundary fallback={<VttErrorFallback />}>
+          <DmVttScreen
+            campaignCode={code}
+            battleMapId={id}
+            dmId={dmId}
+            mode={mode}
+            onModeChange={handleModeChange}
+          />
+        </ErrorBoundary>
+      </>
     );
   }
 

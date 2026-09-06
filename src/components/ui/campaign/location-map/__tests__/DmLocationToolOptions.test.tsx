@@ -11,7 +11,10 @@ import {
   MARKER_KINDS,
 } from '@/components/ui/campaign/location-map/markerData';
 import { MARKER_COLOR_CSS } from '@/components/ui/campaign/location-map/markerPainter';
-import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
+import type {
+  DmFogControls,
+  FogPresetControls,
+} from '@/components/ui/campaign/location-map/fog';
 
 let mockActiveTool = 'pencil';
 let mockToolOptions: Record<string, Record<string, unknown> | undefined> = {};
@@ -179,6 +182,75 @@ describe('DmLocationToolOptions fog appearance', () => {
       'aria-pressed',
       'false'
     );
+  });
+
+  function makeFogPresetControls(
+    overrides: Partial<FogPresetControls> = {}
+  ): FogPresetControls {
+    return {
+      enabled: true,
+      library: [],
+      applied: 'solid',
+      selectedValue: 'solid',
+      appliedLabel: null,
+      select: vi.fn(),
+      editor: null,
+      openEditor: vi.fn(),
+      updateDraft: vi.fn(),
+      setDraftKind: vi.fn(),
+      randomizeSeed: vi.fn(),
+      resetDraft: vi.fn(),
+      cancelEditor: vi.fn(),
+      applyDraft: vi.fn(),
+      saveDraftAsPreset: vi.fn(() => null),
+      updateSourcePreset: vi.fn(() => null),
+      managerOpen: false,
+      openManager: vi.fn(),
+      closeManager: vi.fn(),
+      renamePreset: vi.fn(() => null),
+      duplicatePreset: vi.fn(() => null),
+      managerError: null,
+      setManagerError: vi.fn(),
+      pendingDeleteId: null,
+      requestDelete: vi.fn(),
+      confirmDelete: vi.fn(),
+      cancelDelete: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('renders the preset panel and hides the legacy Solid/Cloudy buttons when fogPresetControls is enabled', () => {
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={fogControls}
+        fogPresetControls={makeFogPresetControls({ enabled: true })}
+      />
+    );
+
+    expect(
+      screen.getByRole('combobox', { name: 'Fog appearance' })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Cloudy' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('renders the legacy Solid/Cloudy buttons and no combobox when fogPresetControls is disabled', () => {
+    render(
+      <DmLocationToolOptions
+        mode="battlemap"
+        fogControls={fogControls}
+        fogAppearance="solid"
+        onFogAppearanceChange={vi.fn()}
+        fogPresetControls={makeFogPresetControls({ enabled: false })}
+      />
+    );
+
+    expect(
+      screen.queryByRole('combobox', { name: 'Fog appearance' })
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cloudy' })).toBeInTheDocument();
   });
 });
 

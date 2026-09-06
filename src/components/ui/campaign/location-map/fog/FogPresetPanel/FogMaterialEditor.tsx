@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Switch } from '@/components/ui/forms/switch';
@@ -23,6 +23,9 @@ export function FogMaterialEditor({
 }) {
   const { editor } = controls;
   const [name, setName] = useState('');
+  useEffect(() => {
+    if (!editor) setName('');
+  }, [editor]);
   if (!editor) return null;
   const { draft, sourcePresetId, error } = editor;
 

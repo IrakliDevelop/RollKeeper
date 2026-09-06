@@ -70,6 +70,8 @@ export interface FogPresetControls {
   closeManager(): void;
   renamePreset(id: string, name: string): string | null;
   duplicatePreset(id: string): string | null;
+  managerError: string | null;
+  setManagerError(error: string | null): void;
   pendingDeleteId: string | null;
   requestDelete(id: string): void;
   confirmDelete(): void;
@@ -112,7 +114,10 @@ export function useFogPresetControls(
   );
 
   const [editor, setEditor] = useState<FogPresetEditorState | null>(null);
+  const editorRef = useRef(editor);
+  editorRef.current = editor;
   const [managerOpen, setManagerOpen] = useState(false);
+  const [managerError, setManagerError] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
 
   const frameRef = useRef<number | null>(null);
@@ -210,49 +215,45 @@ export function useFogPresetControls(
 
   const updateDraft = useCallback<FogPresetControls['updateDraft']>(
     patch => {
-      setEditor(current => {
-        if (!current) return current;
-        const next = { ...current.draft, ...patch } as CustomFogMaterialV1;
-        schedulePreview(next);
-        return { ...current, draft: next, error: null };
-      });
+      const current = editorRef.current;
+      if (!current) return;
+      const next = { ...current.draft, ...patch } as CustomFogMaterialV1;
+      setEditor({ ...current, draft: next, error: null });
+      schedulePreview(next);
     },
     [schedulePreview]
   );
 
   const setDraftKind = useCallback(
     (kind: 'solid' | 'procedural') => {
-      setEditor(current => {
-        if (!current || current.draft.kind === kind) return current;
-        const next: CustomFogMaterialV1 =
-          kind === 'solid'
-            ? {
-                v: 1,
-                kind: 'solid',
-                color: (current.draft as CustomProceduralFogMaterialV1)
-                  .baseColor,
-              }
-            : {
-                ...DEFAULT_CUSTOM_PROCEDURAL_MATERIAL,
-                baseColor:
-                  current.draft.kind === 'solid'
-                    ? current.draft.color
-                    : DEFAULT_CUSTOM_PROCEDURAL_MATERIAL.baseColor,
-              };
-        schedulePreview(next);
-        return { ...current, draft: next, error: null };
-      });
+      const current = editorRef.current;
+      if (!current || current.draft.kind === kind) return;
+      const next: CustomFogMaterialV1 =
+        kind === 'solid'
+          ? {
+              v: 1,
+              kind: 'solid',
+              color: (current.draft as CustomProceduralFogMaterialV1).baseColor,
+            }
+          : {
+              ...DEFAULT_CUSTOM_PROCEDURAL_MATERIAL,
+              baseColor:
+                current.draft.kind === 'solid'
+                  ? current.draft.color
+                  : DEFAULT_CUSTOM_PROCEDURAL_MATERIAL.baseColor,
+            };
+      setEditor({ ...current, draft: next, error: null });
+      schedulePreview(next);
     },
     [schedulePreview]
   );
 
   const randomizeSeed = useCallback(() => {
-    setEditor(current => {
-      if (!current || current.draft.kind !== 'procedural') return current;
-      const next = { ...current.draft, seed: randomSeed() };
-      schedulePreview(next);
-      return { ...current, draft: next, error: null };
-    });
+    const current = editorRef.current;
+    if (!current || current.draft.kind !== 'procedural') return;
+    const next = { ...current.draft, seed: randomSeed() };
+    setEditor({ ...current, draft: next, error: null });
+    schedulePreview(next);
   }, [schedulePreview]);
 
   const resetDraft = useCallback(() => {
@@ -307,7 +308,12 @@ export function useFogPresetControls(
   const saveDraftAsPreset = useCallback(
     (name: string): string | null => {
       if (!editor) return FOG_PRESET_ERRORS.missing;
-      if (!canAddFogPreset(storageLibrary)) return FOG_PRESET_ERRORS.full;
+      if (!canAddFogPreset(storageLibrary)) {
+        setEditor(current =>
+          current ? { ...current, error: FOG_PRESET_ERRORS.full } : current
+        );
+        return FOG_PRESET_ERRORS.full;
+      }
       const checked = validateName(name);
       if (!checked.ok) {
         setEditor(current =>
@@ -368,10 +374,11 @@ export function useFogPresetControls(
       if (!canAddFogPreset(storageLibrary)) return FOG_PRESET_ERRORS.full;
       let candidate = `${preset.name} copy`;
       let n = 2;
-      while (
-        findFogPresetNameConflict(storageLibrary, candidate) !== null ||
-        normalizeFogPresetName(candidate) === null
-      ) {
+      for (;;) {
+        if (normalizeFogPresetName(candidate) === null)
+          return FOG_PRESET_ERRORS.name;
+        if (findFogPresetNameConflict(storageLibrary, candidate) === null)
+          break;
         candidate = `${preset.name} copy ${n}`;
         n += 1;
         if (n > 50) return FOG_PRESET_ERRORS.duplicate;
@@ -393,6 +400,7 @@ export function useFogPresetControls(
   const confirmDelete = useCallback(() => {
     if (pendingDeleteId) removeFogPreset(campaignCode, pendingDeleteId);
     setPendingDeleteId(null);
+    setManagerError(null);
   }, [pendingDeleteId, removeFogPreset, campaignCode]);
 
   const openManager = useCallback(() => {
@@ -403,6 +411,7 @@ export function useFogPresetControls(
   const closeManager = useCallback(() => {
     setManagerOpen(false);
     setPendingDeleteId(null);
+    setManagerError(null);
   }, []);
 
   const cancelDelete = useCallback(() => {
@@ -431,6 +440,8 @@ export function useFogPresetControls(
     closeManager,
     renamePreset,
     duplicatePreset,
+    managerError,
+    setManagerError,
     pendingDeleteId,
     requestDelete: setPendingDeleteId,
     confirmDelete,

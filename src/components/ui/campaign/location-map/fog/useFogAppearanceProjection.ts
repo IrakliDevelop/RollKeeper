@@ -68,7 +68,7 @@ export function useFogAppearanceProjection(
   useEffect(() => {
     if (!enabled) return;
 
-    const key = [campaignCode, battleMapId, dmId, fingerprint].join(' ');
+    const key = [campaignCode, battleMapId, dmId, fingerprint].join('\0');
     if (lastQueuedRef.current === key) return;
     lastQueuedRef.current = key;
 

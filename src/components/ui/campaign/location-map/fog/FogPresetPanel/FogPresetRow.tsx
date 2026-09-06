@@ -41,7 +41,9 @@ export function FogPresetRow({
             variant="ghost"
             className="min-h-[44px] px-3 text-xs"
             aria-label={`Duplicate ${preset.name}`}
-            onClick={() => controls.duplicatePreset(preset.id)}
+            onClick={() =>
+              controls.setManagerError(controls.duplicatePreset(preset.id))
+            }
           >
             Duplicate
           </Button>

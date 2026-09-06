@@ -8,7 +8,10 @@ import {
 } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FogPresetPanel } from '../FogPresetPanel';
-import type { FogPresetControls } from '../useFogPresetControls';
+import {
+  FOG_PRESET_ERRORS,
+  type FogPresetControls,
+} from '../useFogPresetControls';
 
 // This suite's vitest project runs without `test.globals`, so
 // @testing-library/react cannot auto-detect a global `afterEach` to register
@@ -51,6 +54,8 @@ function controls(
     closeManager: vi.fn(),
     renamePreset: vi.fn(() => null),
     duplicatePreset: vi.fn(() => null),
+    managerError: null,
+    setManagerError: vi.fn(),
     pendingDeleteId: null,
     requestDelete: vi.fn(),
     confirmDelete: vi.fn(),
@@ -170,17 +175,21 @@ describe('FogMaterialEditor', () => {
     expect(field).toHaveValue('#102030');
   });
 
-  it('Cancel restores without apply', () => {
+  it('Cancel restores without apply, and clears the preset name field on reopen', () => {
     const applyDraft = vi.fn();
     const saveDraftAsPreset = vi.fn(() => null);
     const updateSourcePreset = vi.fn(() => null);
     const cancelEditor = vi.fn();
-    function Harness() {
-      const [editor, setEditor] = useState<FogPresetControls['editor']>({
+    function freshEditor(): NonNullable<FogPresetControls['editor']> {
+      return {
         draft: { ...preset.material, color: '#102030' },
         sourcePresetId: null,
         error: null,
-      });
+      };
+    }
+    function Harness() {
+      const [editor, setEditor] =
+        useState<FogPresetControls['editor']>(freshEditor());
       const c = controls({
         editor,
         updateDraft: patch =>
@@ -195,6 +204,7 @@ describe('FogMaterialEditor', () => {
           cancelEditor();
           setEditor(null);
         }),
+        openEditor: vi.fn(() => setEditor(freshEditor())),
         applyDraft,
         saveDraftAsPreset,
         updateSourcePreset,
@@ -203,6 +213,10 @@ describe('FogMaterialEditor', () => {
     }
     render(<Harness />);
     const dialog = screen.getByRole('dialog', { name: 'Fog material' });
+    fireEvent.change(
+      within(dialog).getByRole('textbox', { name: 'Preset name' }),
+      { target: { value: 'Crimson' } }
+    );
     fireEvent.change(
       within(dialog).getByRole('textbox', { name: 'Fog color' }),
       { target: { value: '#ff0000' } }
@@ -213,6 +227,12 @@ describe('FogMaterialEditor', () => {
     expect(applyDraft).not.toHaveBeenCalled();
     expect(saveDraftAsPreset).not.toHaveBeenCalled();
     expect(updateSourcePreset).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Customize fog' }));
+    const reopened = screen.getByRole('dialog', { name: 'Fog material' });
+    expect(
+      within(reopened).getByRole('textbox', { name: 'Preset name' })
+    ).toHaveValue('');
   });
 
   it('saves with a name, surfaces errors, and offers Update for a sourced draft', () => {
@@ -269,5 +289,34 @@ describe('FogPresetManager', () => {
       within(confirm).getByRole('button', { name: 'Delete preset' })
     );
     expect(c.confirmDelete).toHaveBeenCalled();
+  });
+
+  it('surfaces a duplicate error as an alert under the list', () => {
+    const longName = 'X'.repeat(60);
+    const longPreset = {
+      v: 1 as const,
+      id: 'fp_long',
+      name: longName,
+      material: preset.material,
+      createdAt: '2026-09-05T00:00:00.000Z',
+      updatedAt: '2026-09-05T00:00:00.000Z',
+    };
+    function Harness() {
+      const [managerError, setManagerError] = useState<string | null>(null);
+      const c = controls({
+        managerOpen: true,
+        library: [longPreset],
+        duplicatePreset: vi.fn(() => FOG_PRESET_ERRORS.name),
+        managerError,
+        setManagerError,
+      });
+      return <FogPresetPanel controls={c} />;
+    }
+    render(<Harness />);
+    const dialog = screen.getByRole('dialog', { name: 'Fog presets' });
+    fireEvent.click(
+      within(dialog).getByRole('button', { name: `Duplicate ${longName}` })
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(FOG_PRESET_ERRORS.name);
   });
 });

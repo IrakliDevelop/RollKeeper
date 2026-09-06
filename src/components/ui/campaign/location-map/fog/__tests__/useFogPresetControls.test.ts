@@ -332,6 +332,7 @@ describe('library CRUD', () => {
     expect(useDmStore.getState().getCampaign(CODE)!.fogPresets!.length).toBe(
       50
     );
+    expect(result.current.editor?.error).toBe(FOG_PRESET_ERRORS.full);
   });
 
   it('updates the source preset from the draft without touching the applied map', () => {
@@ -391,5 +392,31 @@ describe('library CRUD', () => {
     act(() => result.current.confirmDelete());
     expect(names()).toEqual(['Crimson copy']);
     expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('fails fast with a name error when duplicating a preset whose name is already at the length limit', () => {
+    const longName = 'L'.repeat(60);
+    act(() => {
+      useDmStore.getState().upsertFogPreset(CODE, {
+        v: 1,
+        id: 'fp_long',
+        name: longName,
+        material: solidRed,
+        createdAt: '2026-09-05T00:00:00.000Z',
+        updatedAt: '2026-09-05T00:00:00.000Z',
+      });
+    });
+    const { result } = setup('solid');
+    let error: string | null = null;
+    act(() => {
+      error = result.current.duplicatePreset('fp_long');
+    });
+    expect(error).toBe(FOG_PRESET_ERRORS.name);
+    expect(
+      useDmStore
+        .getState()
+        .getCampaign(CODE)!
+        .fogPresets!.map(p => p.name)
+    ).toEqual([longName]);
   });
 });
