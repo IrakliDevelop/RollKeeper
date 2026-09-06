@@ -2,7 +2,16 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { Eye, EyeOff, Map, MapPin, ExternalLink } from 'lucide-react';
+import {
+  Eye,
+  EyeOff,
+  Map,
+  MapPin,
+  ExternalLink,
+  Lock,
+  Minus,
+  Plus,
+} from 'lucide-react';
 
 import {
   Dialog,
@@ -18,6 +27,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Textarea } from '@/components/ui/forms/textarea';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { CompactRichTextEditor } from '@/components/ui/forms/CompactRichTextEditor';
+import { Badge } from '@/components/ui/layout/badge';
 import { cn } from '@/utils/cn';
 
 import {
@@ -486,25 +496,30 @@ function ReadOnlyView({
   body,
   status,
   loot,
+  lootLocked,
   onClaimLoot,
 }: {
   title: string;
   body: string;
   status?: MarkerStatus;
   loot?: PublicMarkerLootEntry[];
-  onClaimLoot?: (entryId: string) => Promise<void>;
+  lootLocked?: boolean;
+  onClaimLoot?: (entryId: string, quantity: number) => Promise<number>;
 }) {
   const [claimingEntryId, setClaimingEntryId] = useState<string | null>(null);
   const [claimMessage, setClaimMessage] = useState<string | null>(null);
+  const [quantities, setQuantities] = useState<Record<string, number>>({});
 
-  const handleClaim = async (entryId: string) => {
+  const handleClaim = async (entryId: string, quantity: number) => {
     if (!onClaimLoot || claimingEntryId) return;
     setClaimingEntryId(entryId);
     setClaimMessage(null);
     try {
-      await onClaimLoot(entryId);
+      const granted = await onClaimLoot(entryId, quantity);
       setClaimMessage(
-        'Claimed. The item will appear on your character shortly.'
+        granted < quantity
+          ? `Claimed ${granted} of ${quantity} — the rest were already taken. The item will appear on your character shortly.`
+          : 'Claimed. The item will appear on your character shortly.'
       );
     } catch (error) {
       setClaimMessage(
@@ -535,34 +550,108 @@ function ReadOnlyView({
       >
         <MarkerRichText content={body} />
       </div>
-      {loot && loot.length > 0 && (
-        <ul className="border-divider divide-divider divide-y rounded-md border">
-          {loot.map(entry => (
-            <li
-              key={entry.id}
-              className="flex items-center justify-between gap-3 p-3 text-sm"
-            >
-              <span className="text-heading font-medium">{entry.name}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-muted">
-                  {entry.remainingQuantity} available
+      {lootLocked && (
+        <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3.5">
+          <span className="bg-surface-secondary text-muted flex h-10 w-10 shrink-0 items-center justify-center rounded-lg">
+            <Lock size={20} />
+          </span>
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="text-heading text-base font-bold">Locked</span>
+            <span className="text-body text-sm">
+              You&apos;d need to get it open first.
+            </span>
+          </span>
+        </div>
+      )}
+      {!lootLocked && loot && loot.length > 0 && (
+        <div className="flex flex-col gap-2.5">
+          {loot.map(entry => {
+            const max = Math.max(1, entry.remainingQuantity);
+            const requested = Math.min(max, quantities[entry.id] ?? max);
+            const soldOut = entry.remainingQuantity <= 0;
+            return (
+              <div
+                key={entry.id}
+                className="border-divider bg-surface-raised flex flex-col gap-2.5 rounded-lg border p-3"
+              >
+                <span className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-2">
+                    <span className="text-heading text-base font-bold">
+                      {entry.name}
+                    </span>
+                    {entry.rarity && (
+                      <Badge variant="neutral">{entry.rarity}</Badge>
+                    )}
+                  </span>
+                  <span className="text-body text-sm">
+                    {entry.remainingQuantity} available
+                  </span>
                 </span>
                 {onClaimLoot && (
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    disabled={
-                      entry.remainingQuantity <= 0 || claimingEntryId !== null
-                    }
-                    onClick={() => void handleClaim(entry.id)}
-                  >
-                    {claimingEntryId === entry.id ? 'Claiming…' : 'Claim'}
-                  </Button>
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex items-center gap-1.5">
+                      <Button
+                        variant="outline"
+                        aria-label={`Take fewer ${entry.name}`}
+                        className={cn(
+                          MARKER_PANEL_TOUCH_TARGET_CLASS,
+                          'h-11 w-11 p-0'
+                        )}
+                        disabled={soldOut || requested <= 1}
+                        onClick={() =>
+                          setQuantities(prev => ({
+                            ...prev,
+                            [entry.id]: Math.max(1, requested - 1),
+                          }))
+                        }
+                      >
+                        <Minus size={19} />
+                      </Button>
+                      <span className="text-heading min-w-8.5 text-center text-lg font-bold tabular-nums">
+                        {soldOut ? 0 : requested}
+                      </span>
+                      <Button
+                        variant="outline"
+                        aria-label={`Take more ${entry.name}`}
+                        className={cn(
+                          MARKER_PANEL_TOUCH_TARGET_CLASS,
+                          'h-11 w-11 p-0'
+                        )}
+                        disabled={soldOut || requested >= max}
+                        onClick={() =>
+                          setQuantities(prev => ({
+                            ...prev,
+                            [entry.id]: Math.min(max, requested + 1),
+                          }))
+                        }
+                      >
+                        <Plus size={19} />
+                      </Button>
+                    </span>
+                    <Button
+                      variant="primary"
+                      className={cn(
+                        MARKER_PANEL_TOUCH_TARGET_CLASS,
+                        'h-11 flex-1'
+                      )}
+                      disabled={soldOut || claimingEntryId !== null}
+                      onClick={() => void handleClaim(entry.id, requested)}
+                    >
+                      {claimingEntryId === entry.id
+                        ? 'Claiming…'
+                        : soldOut
+                          ? 'Taken'
+                          : `Claim ${requested}`}
+                    </Button>
+                  </div>
                 )}
               </div>
-            </li>
-          ))}
-        </ul>
+            );
+          })}
+          <p className="text-muted text-sm">
+            Claimed items arrive on your character sheet a moment later.
+          </p>
+        </div>
       )}
       {claimMessage && (
         <p role="status" className="text-body text-sm">
@@ -686,6 +775,9 @@ function renderPanelBody(
           state.detail.loot?.[0] && 'remainingQuantity' in state.detail.loot[0]
             ? (state.detail.loot as PublicMarkerLootEntry[])
             : undefined
+        }
+        lootLocked={
+          'lootLocked' in state.detail ? state.detail.lootLocked : undefined
         }
         onClaimLoot={onClaimLoot}
       />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, within, cleanup, act } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Viewport, createHtmlElement } from '@fieldnotes/core';
 
 import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
@@ -58,6 +59,15 @@ function stubCanvas(): void {
     if (tag === 'canvas') {
       const canvas = el as HTMLCanvasElement;
       vi.spyOn(canvas, 'getContext').mockReturnValue({
+        // Back-reference to the owning element: `@fieldnotes/core`'s
+        // internal render loop reads `ctx.canvas.width`/`height` on every
+        // frame. Every other test in this file only ever wraps its actions
+        // in synchronous `act()` calls, so a real rAF tick never lands
+        // before `vp.destroy()` runs; the async loot-claim test below
+        // awaits real interactions (`userEvent`, `findByRole`) that do let
+        // a queued frame fire while the viewport is still alive, which is
+        // what first exposed this gap.
+        canvas,
         save: vi.fn(),
         restore: vi.fn(),
         scale: vi.fn(),
@@ -468,6 +478,114 @@ describe('PlayerBattleMapCanvas: an open marker panel does not outlive its eleme
       vp.store.remove(active.id);
     });
     expect(screen.queryByRole('dialog')).toBeNull();
+
+    unmount();
+    vp.destroy();
+  });
+});
+
+/**
+ * Task 8 / controller ruling R2: the claim route returns
+ * `claim.grantedQuantity`, which can be less than what the player asked for
+ * when another player claimed some of the stack first. `handleClaimLoot`
+ * must read that field and resolve with it (not silently swallow it), so the
+ * panel's status line can tell the player how many they actually got.
+ */
+describe('PlayerBattleMapCanvas: claiming loot surfaces a partial grant', () => {
+  beforeEach(() => {
+    mockActiveTool = 'hand';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('reports how many units were actually granted when fewer than requested were left', async () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activateSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const lootDetail: PublicMarkerDetail = {
+      id: 'ref-1',
+      title: 'Chest',
+      body: '',
+      loot: [
+        {
+          id: 'loot-1',
+          name: 'Arrows',
+          itemKind: 'inventory',
+          quantity: 8,
+          remainingQuantity: 8,
+        },
+      ],
+    };
+    // Discriminate on method: the background `refreshMarkers` GET (fired on
+    // mount and again after activation) must keep returning the pre-claim
+    // ledger, or the panel would render "Claim 4" from the start and the
+    // partial-grant path this test exists to cover would never be reached.
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (_input, init) => {
+      if (init?.method === 'POST') {
+        return {
+          ok: true,
+          json: async () => ({
+            success: true,
+            claim: { grantedQuantity: 4 },
+            markers: [
+              {
+                ...lootDetail,
+                loot: [{ ...lootDetail.loot?.[0], remainingQuantity: 4 }],
+              },
+            ],
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ markers: [lootDetail] }),
+      } as Response;
+    });
+
+    const { unmount } = renderPlayer({ markers: [lootDetail] });
+    fireReady(vp);
+
+    const markerEl = createHtmlElement({
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      htmlType: MARKER_HTML_TYPE,
+      data: { ...buildMarkerData({ kind: 'loot', ref: 'ref-1' }) },
+    });
+    act(() => {
+      vp.store.add(markerEl);
+    });
+
+    const listener = activateSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() => {
+      listener({
+        element: markerEl,
+        world: { x: 0, y: 0 },
+        pointerType: 'touch',
+        gesture: 'single',
+      });
+    });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Claim 8' }));
+
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent(/claimed 4 of 8/i);
+    expect(vi.mocked(globalThis.fetch)).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        body: expect.stringContaining('"quantity":8'),
+      })
+    );
 
     unmount();
     vp.destroy();

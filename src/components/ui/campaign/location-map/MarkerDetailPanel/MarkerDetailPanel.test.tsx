@@ -29,7 +29,7 @@ import {
   type MarkerKind,
 } from '../markerData';
 
-import type { MarkerDetail } from '@/types/battlemap';
+import type { MarkerDetail, PublicMarkerDetail } from '@/types/battlemap';
 
 vi.mock('next/link', () => ({
   default: ({
@@ -342,7 +342,7 @@ describe('MarkerDetailPanel', () => {
 
   it('lets a player claim available loot and disables depleted entries', async () => {
     const user = userEvent.setup();
-    const onClaimLoot = vi.fn().mockResolvedValue(undefined);
+    const onClaimLoot = vi.fn().mockResolvedValue(1);
     render(
       <MarkerDetailPanel
         open
@@ -377,11 +377,12 @@ describe('MarkerDetailPanel', () => {
       />
     );
 
-    const buttons = screen.getAllByRole('button', { name: 'Claim' });
-    expect(buttons[0]).toBeEnabled();
-    expect(buttons[1]).toBeDisabled();
-    await user.click(buttons[0]);
-    expect(onClaimLoot).toHaveBeenCalledWith('potion');
+    const claimPotion = screen.getByRole('button', { name: 'Claim 1' });
+    const claimSword = screen.getByRole('button', { name: 'Taken' });
+    expect(claimPotion).toBeEnabled();
+    expect(claimSword).toBeDisabled();
+    await user.click(claimPotion);
+    expect(onClaimLoot).toHaveBeenCalledWith('potion', 1);
     expect(screen.getByRole('status')).toHaveTextContent('Claimed');
   });
 
@@ -863,6 +864,147 @@ describe('MarkerDetailPanel', () => {
     expect(
       RAW_TAILWIND_COLOR_RE.test(dialogHtmlForColorScan(playerDialog))
     ).toBe(false);
+  });
+});
+
+describe('MarkerDetailPanel player loot: locked container and quantity stepper', () => {
+  /** Builds a "ready" player state around a `PublicMarkerDetail` — the
+   * player surface never sees a `MarkerDetail`, so `lootLocked` (present
+   * only on the public projection) has to be set on a literal like this
+   * rather than through the DM-shaped `detail()` helper above. */
+  function lootReadyState(
+    overrides: Partial<PublicMarkerDetail> = {}
+  ): MarkerPanelState {
+    return {
+      kind: 'ready',
+      data: buildMarkerData({ kind: 'loot', ref: 'ref-1' }),
+      detail: { id: 'ref-1', title: 'Chest', body: '', ...overrides },
+    };
+  }
+
+  const arrowsLoot = (remainingQuantity: number) => [
+    {
+      id: 'loot-1',
+      name: 'Arrows',
+      itemKind: 'inventory' as const,
+      quantity: 8,
+      remainingQuantity,
+    },
+  ];
+
+  it('shows a locked notice and no item list when the container is locked', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({
+          title: 'Chest',
+          body: 'Iron-banded.',
+          lootLocked: true,
+        })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Locked')).toBeInTheDocument();
+    expect(
+      screen.getByText(/you'd need to get it open first/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /claim/i })).toBeNull();
+  });
+
+  it('defaults the stepper to every remaining unit and shows it in the button', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(screen.getByText('8 available')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Claim 8' })).toBeEnabled();
+  });
+
+  it('claims the quantity the player stepped down to', async () => {
+    const user = userEvent.setup();
+    const onClaimLoot = vi.fn().mockResolvedValue(6);
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={onClaimLoot}
+      />
+    );
+    const decrease = screen.getByRole('button', { name: /take fewer arrows/i });
+    await user.click(decrease);
+    await user.click(decrease);
+    expect(screen.getByRole('button', { name: 'Claim 6' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Claim 6' }));
+    expect(onClaimLoot).toHaveBeenCalledWith('loot-1', 6);
+  });
+
+  it('clamps the stepper to the remaining count', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(2) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: /take more arrows/i })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Claim 2' })).toBeInTheDocument();
+  });
+
+  it('keeps the stepper visible but inert for a single remaining unit', () => {
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(1) })}
+        onClose={() => {}}
+        onClaimLoot={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: /take fewer arrows/i })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: /take more arrows/i })
+    ).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Claim 1' })).toBeEnabled();
+  });
+
+  // Controller ruling R2: the route returns `claim.grantedQuantity`, which
+  // can be less than what the player asked for (another player claimed some
+  // first). `onClaimLoot` resolves with that granted count, and the panel's
+  // existing `claimMessage` status line must say so instead of a flat
+  // "Claimed." — never silently accept fewer than requested without saying so.
+  it('reports a partial grant instead of a flat "Claimed." when fewer units were available than requested', async () => {
+    const user = userEvent.setup();
+    const onClaimLoot = vi.fn().mockResolvedValue(4);
+    render(
+      <MarkerDetailPanel
+        open
+        mode="player"
+        state={lootReadyState({ loot: arrowsLoot(8) })}
+        onClose={() => {}}
+        onClaimLoot={onClaimLoot}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Claim 8' }));
+
+    expect(onClaimLoot).toHaveBeenCalledWith('loot-1', 8);
+    const status = await screen.findByRole('status');
+    expect(status).toHaveTextContent(/claimed 4 of 8/i);
   });
 });
 
