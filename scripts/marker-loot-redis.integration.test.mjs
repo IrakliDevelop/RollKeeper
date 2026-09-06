@@ -162,4 +162,27 @@ test('real Redis enforces locked, clamped and idempotent loot claims', async t =
   ]);
   const reseeded = JSON.parse(redis('GET', LEDGER).join('\n'));
   assert.equal(reseeded[0].claimedQuantity, 2);
+
+  // A single magic-item claim is clamped to MAX_MAGIC_CLAIM_UNITS (25) even
+  // when far more is both requested and available — the clamp reduces
+  // `granted` before claimedQuantity is incremented and before the result is
+  // built, so the ledger, the response, and the transfer count all agree.
+  redis('DEL', TRANSFERS);
+  seed([
+    entry({
+      id: 'loot-3',
+      itemKind: 'magic',
+      item: { id: 'magic-2', name: 'Bag of Holding', rarity: 'uncommon' },
+      quantity: 999,
+    }),
+  ]);
+  const bigClaim = claim({ requestId: 'r6', quantity: 100, entryId: 'loot-3' });
+  assert.equal(bigClaim.grantedQuantity, 25);
+  assert.equal(bigClaim.remainingQuantity, 999 - 25);
+  const bigQueue = JSON.parse(redis('GET', TRANSFERS).join('\n'));
+  assert.equal(bigQueue.length, 25);
+  assert.equal(new Set(bigQueue.map(t => t.id)).size, 25);
+  const clampedLedger = JSON.parse(redis('GET', LEDGER).join('\n'));
+  const clampedEntry = clampedLedger.find(e => e.id === 'loot-3');
+  assert.equal(clampedEntry.claimedQuantity, 25);
 });

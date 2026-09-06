@@ -32,6 +32,14 @@ return encoded
 `;
 
 export const CLAIM_SCRIPT = `
+-- Ceiling on magic-item fan-out for a single claim: each granted magic-item
+-- unit becomes its own transfer-queue entry (the queue itself has no cap),
+-- so an unclamped claim of up to 999 units would enqueue up to 999
+-- individual transfers in one write. Applied to \`granted\` below, before
+-- claimedQuantity is incremented and before the result is built, so the
+-- ledger, the response, and the enqueued transfer count always agree.
+local MAX_MAGIC_CLAIM_UNITS = 25
+
 local previous = redis.call('GET', KEYS[3])
 if previous then return previous end
 
@@ -54,6 +62,9 @@ local requested = tonumber(ARGV[7]) or 1
 if requested < 1 then requested = 1 end
 local granted = requested
 if granted > available then granted = available end
+if selected.itemKind == 'magic' and granted > MAX_MAGIC_CLAIM_UNITS then
+  granted = MAX_MAGIC_CLAIM_UNITS
+end
 
 selected.claimedQuantity = selected.claimedQuantity + granted
 local result = {
