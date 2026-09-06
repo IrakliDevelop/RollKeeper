@@ -57,6 +57,9 @@ jobs:
       - name: Calendar Redis
         run: npm run test:calendar:redis
 
+      - name: Loot Redis
+        run: npm run test:loot:redis
+
       - name: Campaign settings Redis
         run: npm run test:campaign-settings:redis
 
@@ -205,5 +208,4 @@ jobs:
       - name: Stop local Supabase stack
         if: always()
         run: npx supabase stop --no-backup
-
 # TODO(nightly-roadmap): staging OTP through Resend — deliberately skipped until a staging Supabase project and RESEND secrets exist.
