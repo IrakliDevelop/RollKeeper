@@ -286,6 +286,86 @@ async function waitForMarkerProjection(
     .toBe(true);
 }
 
+/** Reads the DM's own product state (`rollkeeper-battlemap-data`, the same
+ *  key `seedBattleMap` writes) to find the real `MarkerDetail.id` (the
+ *  ledger's `markerId`, distinct from the canvas element id) and the loot
+ *  entry's `id` for the locked container — data the player's client cannot
+ *  see while locked, but which the app's own claim route requires to
+ *  distinguish "locked" from "entry-not-found". */
+async function readDmLootIds(
+  dmPage: Page,
+  code: string,
+  mapId: string
+): Promise<{ markerId: string; entryId: string }> {
+  return dmPage.evaluate(
+    ({ code, mapId }) => {
+      const raw = window.localStorage.getItem('rollkeeper-battlemap-data');
+      if (!raw) throw new Error('No battle map data in localStorage');
+      const parsed = JSON.parse(raw) as {
+        state: {
+          battleMaps: Record<
+            string,
+            Record<
+              string,
+              {
+                markers?: Array<{
+                  id: string;
+                  loot?: Array<{ id: string }>;
+                }>;
+              }
+            >
+          >;
+        };
+      };
+      const map = parsed.state.battleMaps[code]?.[mapId];
+      const marker = map?.markers?.find(m => (m.loot?.length ?? 0) > 0);
+      const entry = marker?.loot?.[0];
+      if (!marker || !entry)
+        throw new Error('No loot marker/entry found in DM battle map data');
+      return { markerId: marker.id, entryId: entry.id };
+    },
+    { code, mapId }
+  );
+}
+
+/** POSTs a claim from the player's own page context — real fetch, real CSRF
+ *  header, same body shape `handleClaimLoot` (`PlayerBattleMapCanvas.tsx`)
+ *  sends — and returns the raw status/body so the test can assert the
+ *  server itself refuses a locked claim, independent of what the UI shows. */
+async function claimLootFromPlayer(
+  playerPage: Page,
+  code: string,
+  mapId: string,
+  playerId: string,
+  markerId: string,
+  entryId: string
+): Promise<{ status: number; body: unknown }> {
+  return playerPage.evaluate(
+    async ({ code, mapId, playerId, markerId, entryId }) => {
+      const res = await fetch(
+        `/api/campaign/${code}/battlemaps/${mapId}/markers`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
+          body: JSON.stringify({
+            playerId,
+            markerId,
+            entryId,
+            quantity: 1,
+            requestId: crypto.randomUUID(),
+          }),
+        }
+      );
+      const body = await res.json().catch(() => null);
+      return { status: res.status, body };
+    },
+    { code, mapId, playerId, markerId, entryId }
+  );
+}
+
 async function waitForLootMarkerElementId(page: Page): Promise<string> {
   const handle = await page.waitForFunction(
     () => {
@@ -485,6 +565,23 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
 
     // The container leaks no item identity anywhere in the DOM while locked.
     await expect(playerPage.locator('body')).not.toContainText(ITEM_NAME);
+
+    // The server refuses the claim too, not just the UI — the slice's
+    // headline claim ("enforced server-side"). Uses the real marker/entry
+    // ids from the DM's own product state (see `readDmLootIds`), since the
+    // player's client never receives them while locked.
+    const { markerId, entryId } = await readDmLootIds(dmPage, code, MAP_ID);
+    const claimResult = await claimLootFromPlayer(
+      playerPage,
+      code,
+      MAP_ID,
+      characterId,
+      markerId,
+      entryId
+    );
+    expect(claimResult.status).toBe(403);
+    expect(claimResult.body).toEqual({ error: 'locked' });
+    console.log('[test] server refused locked claim with 403');
 
     await playerPage.keyboard.press('Escape');
     await expect(playerDialog).toBeHidden({ timeout: 5_000 });
