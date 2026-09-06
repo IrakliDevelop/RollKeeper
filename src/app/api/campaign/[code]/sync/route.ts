@@ -8,7 +8,7 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import { CampaignPlayerData } from '@/types/campaign';
-import { sendBattleMapPoke } from '@/lib/relayPoke';
+import { sendBattleMapPokeToLiveRooms } from '@/lib/relayPoke';
 import { compareAndSetCampaignPlayer } from '@/lib/campaignPlayerCas';
 import {
   guestDeniedResponse,
@@ -137,7 +137,7 @@ export async function POST(
 
     // Latency shave: nudge battle-map clients (other players' VTTs, the DM
     // VTT) to refetch player data now. Best-effort; polling is the fallback.
-    await sendBattleMapPoke(code, redis, 'players');
+    await sendBattleMapPokeToLiveRooms(code, redis, 'players');
 
     return NextResponse.json({
       success: true,

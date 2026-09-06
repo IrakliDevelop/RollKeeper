@@ -11,19 +11,14 @@ import { verifyBattleMapToken } from '@/lib/battlemapToken';
 const CODE = 'CAMP1';
 const SECRET = 'test-secret';
 
+/**
+ * Satisfies both `RedisReader` (for the activeBattleMapId fallback) and
+ * `LiveMapRoomsReader` (for the live-room registry read) — every wrapper in
+ * relayPoke.ts now needs both, since `sendBattleMapPoke` and
+ * `sendInitiativePoke` delegate through `sendBattleMapPokeToLiveRooms`.
+ */
 interface MockRedis {
   get<T = unknown>(key: string): Promise<T | null>;
-}
-
-function redisWith(battlemapValue: unknown): MockRedis {
-  return {
-    get: vi.fn(async (key: string) =>
-      key.includes('battlemap') ? battlemapValue : null
-    ) as <T = unknown>(key: string) => Promise<T | null>,
-  };
-}
-
-interface MockLiveRoomsRedis extends MockRedis {
   zremrangebyscore(key: string, min: number, max: number): Promise<number>;
   zrange(
     key: string,
@@ -32,6 +27,22 @@ interface MockLiveRoomsRedis extends MockRedis {
     opts?: { rev?: boolean }
   ): Promise<unknown[]>;
 }
+
+/** `liveRooms` defaults to empty so callers exercise the active-map fallback. */
+function redisWith(
+  battlemapValue: unknown,
+  liveRooms: string[] = []
+): MockRedis {
+  return {
+    get: vi.fn(async (key: string) =>
+      key.includes('battlemap') ? battlemapValue : null
+    ) as <T = unknown>(key: string) => Promise<T | null>,
+    zremrangebyscore: vi.fn(async () => 0),
+    zrange: vi.fn(async () => liveRooms),
+  };
+}
+
+type MockLiveRoomsRedis = MockRedis;
 
 /**
  * A combined fake satisfying both `RedisReader` (for the activeBattleMapId
@@ -43,11 +54,7 @@ function liveRoomsRedisWith(
   liveRooms: string[],
   battlemapValue: unknown = null
 ): MockLiveRoomsRedis {
-  return {
-    ...redisWith(battlemapValue),
-    zremrangebyscore: vi.fn(async () => 0),
-    zrange: vi.fn(async () => liveRooms),
-  };
+  return redisWith(battlemapValue, liveRooms);
 }
 
 describe('relayHttpUrl', () => {
@@ -333,5 +340,18 @@ describe('sendBattleMapPokeToLiveRooms', () => {
       sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', { fetchFn })
     ).resolves.toBeUndefined();
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('never reads the live-room registry when the relay is not configured', async () => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    vi.stubEnv('BATTLEMAP_RELAY_SECRET', '');
+    const fetchFn = vi.fn();
+    const redis = liveRoomsRedisWith(['map-1', 'map-2']);
+
+    await sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', { fetchFn });
+
+    expect(redis.zrange).not.toHaveBeenCalled();
+    expect(redis.zremrangebyscore).not.toHaveBeenCalled();
+    expect(redis.get).not.toHaveBeenCalled();
   });
 });

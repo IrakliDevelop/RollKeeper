@@ -30,12 +30,18 @@ export type BattleMapPokeFeature =
  * fetch with timeout, and a catch-all so a poke never throws. Never
  * exported — callers go through one of the wrappers below, each of which
  * decides which room(s) to target.
+ *
+ * `pokeKind` only shapes the warning log on failure, so a caller who omits
+ * it still gets correct behaviour — it defaults to `'room'`, which is what
+ * every directed-room caller (`sendBattleMapPokeToRoom`, the live-room
+ * fan-out) wants; only the active-map path opts into the distinct label.
  */
 async function pokeRoom(
   code: string,
   battleMapId: string,
   feature: BattleMapPokeFeature,
-  deps: { fetchFn?: typeof fetch; now?: number } = {}
+  deps: { fetchFn?: typeof fetch; now?: number } = {},
+  pokeKind: 'room' | 'active-map' = 'room'
 ): Promise<void> {
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
@@ -59,7 +65,11 @@ async function pokeRoom(
       signal: AbortSignal.timeout(POKE_TIMEOUT_MS),
     });
   } catch (err) {
-    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
+    const label = pokeKind === 'room' ? 'room ' : '';
+    console.warn(
+      `[relayPoke] ${label}poke failed (poll remains fallback):`,
+      err
+    );
   }
 }
 
@@ -86,7 +96,13 @@ export async function sendBattleMapPoke(
       typeof raw === 'string' ? JSON.parse(raw) : raw;
     if (!battleMap?.activeBattleMapId) return;
 
-    await pokeRoom(code, battleMap.activeBattleMapId, feature, deps);
+    await pokeRoom(
+      code,
+      battleMap.activeBattleMapId,
+      feature,
+      deps,
+      'active-map'
+    );
   } catch (err) {
     console.warn('[relayPoke] poke failed (poll remains fallback):', err);
   }
@@ -114,6 +130,10 @@ export async function sendBattleMapPokeToRoom(
  * clients predate the registry, or a Redis blip, is no worse off than
  * today. Runs the fan-out concurrently with `Promise.allSettled` so one
  * slow or failing room cannot starve or fail the others. Never throws.
+ *
+ * Bails out before touching Redis when the relay isn't configured — the
+ * registry read can't lead to a send in that case, so there's nothing to
+ * gain from it (mirrors the same guard inside `pokeRoom`/`sendBattleMapPoke`).
  */
 export async function sendBattleMapPokeToLiveRooms(
   code: string,
@@ -121,6 +141,10 @@ export async function sendBattleMapPokeToLiveRooms(
   feature: BattleMapPokeFeature,
   deps: { fetchFn?: typeof fetch; now?: number } = {}
 ): Promise<void> {
+  const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  const secret = process.env.BATTLEMAP_RELAY_SECRET;
+  if (!relayUrl || !secret) return;
+
   const rooms = await listLiveMapRooms(redis, code, { now: deps.now });
   if (rooms.length === 0) {
     await sendBattleMapPoke(code, redis, feature, deps);
@@ -131,11 +155,15 @@ export async function sendBattleMapPokeToLiveRooms(
   );
 }
 
-/** Back-compat wrapper — the shared route's call sites keep this name. */
+/**
+ * Back-compat wrapper — the shared route's call site keeps this name and
+ * signature. Fans out to every live room rather than only the active map,
+ * same as `sendBattleMapPokeToLiveRooms` generally.
+ */
 export async function sendInitiativePoke(
   code: string,
-  redis: RedisReader,
+  redis: RedisReader & LiveMapRoomsReader,
   deps: { fetchFn?: typeof fetch; now?: number } = {}
 ): Promise<void> {
-  return sendBattleMapPoke(code, redis, 'initiative', deps);
+  return sendBattleMapPokeToLiveRooms(code, redis, 'initiative', deps);
 }
