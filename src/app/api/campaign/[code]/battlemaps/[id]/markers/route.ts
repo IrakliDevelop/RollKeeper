@@ -179,7 +179,8 @@ export async function POST(
         markerId: body.markerId as string,
         entryId: body.entryId as string,
         requestId,
-        transferId: `transfer-loot-${requestId}`,
+        transferIdPrefix: `transfer-loot-${requestId}`,
+        quantity: 1,
         now: new Date().toISOString(),
       },
       SLIDING_TTL_SECONDS
