@@ -1,10 +1,12 @@
 import type { Viewport } from '@fieldnotes/core';
+import type { FogAppearance } from '@/types/battlemap';
 import { parseFogAppearance, resolveFogRendererOptions } from './fogAppearance';
 import { normalizeFogAppearanceProjectionTimestamp } from '@/lib/fogOfWar';
 
 const POLL_INTERVAL_MS = 60_000;
 const requestVersions = new WeakMap<Viewport, number>();
 const appliedProjectionVersions = new WeakMap<Viewport, string>();
+const appliedAppearances = new WeakMap<Viewport, FogAppearance>();
 
 interface FogAppearancePollOptions {
   viewport: Viewport;
@@ -25,7 +27,13 @@ export function applyFogAppearanceMetadata(
   if (currentVersion && (!version || version < currentVersion)) return;
   if (version) appliedProjectionVersions.set(viewport, version);
   const appearance = parseFogAppearance(raw);
+  appliedAppearances.set(viewport, appearance);
   viewport.setFogStyle(resolveFogRendererOptions(appearance));
+}
+
+/** The last appearance applied to this viewport; Solid until metadata arrives. */
+export function getAppliedFogAppearance(viewport: Viewport): FogAppearance {
+  return appliedAppearances.get(viewport) ?? 'solid';
 }
 
 export function fetchAndApplyFogAppearance(

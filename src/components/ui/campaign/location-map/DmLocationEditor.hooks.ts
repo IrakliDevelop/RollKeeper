@@ -70,7 +70,10 @@ import {
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
-import { isFogOfWarEnabled } from '@/lib/fogOfWar';
+import {
+  isFogOfWarEnabled,
+  isProceduralFogAppearanceEnabled,
+} from '@/lib/fogOfWar';
 import {
   attachFogPersistence,
   configureFogView,
@@ -1577,7 +1580,11 @@ export function useDmLocationEditor(
                 fog: {
                   state: fogState,
                   mode: 'player' as const,
-                  style: resolvePlayerFogStyle(location.fogAppearance),
+                  style: resolvePlayerFogStyle(
+                    isProceduralFogAppearanceEnabled()
+                      ? location.fogAppearance
+                      : 'solid'
+                  ),
                 },
               }
             : {}),

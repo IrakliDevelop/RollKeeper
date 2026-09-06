@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   applyFogAppearanceMetadata,
   fetchAndApplyFogAppearance,
+  getAppliedFogAppearance,
   startFogAppearancePoll,
 } from '../fogAppearancePoll';
 import type { Viewport } from '@fieldnotes/core';
@@ -135,6 +136,19 @@ describe('fetchAndApplyFogAppearance', () => {
     fetchAndApplyFogAppearance(vp, '/test');
     await vi.advanceTimersByTimeAsync(0);
     expect(vp.setFogStyle).not.toHaveBeenCalled();
+  });
+});
+
+describe('getAppliedFogAppearance', () => {
+  it('returns solid for a fresh viewport before any metadata is applied', () => {
+    const vp = fakeViewport();
+    expect(getAppliedFogAppearance(vp)).toBe('solid');
+  });
+
+  it('returns the last appearance applied to that viewport', () => {
+    const vp = fakeViewport();
+    applyFogAppearanceMetadata(vp, 'cloudy', '2026-09-05T00:00:00.000Z');
+    expect(getAppliedFogAppearance(vp)).toBe('cloudy');
   });
 });
 

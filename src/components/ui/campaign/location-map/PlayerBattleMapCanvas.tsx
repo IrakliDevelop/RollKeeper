@@ -48,10 +48,11 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
-import { configureFogView } from './fog';
+import { configureFogView, resolvePlayerFogStyle } from './fog';
 import {
   applyFogAppearanceMetadata,
   fetchAndApplyFogAppearance,
+  getAppliedFogAppearance,
   startFogAppearancePoll,
 } from './fog/fogAppearancePoll';
 import DmLocationToolOptions from './DmLocationToolOptions';
@@ -752,6 +753,9 @@ export function PlayerBattleMapCanvas({
                 getViewport={() => viewport}
                 name="battle-map"
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() =>
+                  resolvePlayerFogStyle(getAppliedFogAppearance(viewport))
+                }
                 onError={onExportError}
               />
             }

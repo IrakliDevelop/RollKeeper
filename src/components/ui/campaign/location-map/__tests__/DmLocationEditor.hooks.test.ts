@@ -466,4 +466,42 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
     expect(result.current.syncError).toMatch(/masked snapshot upload failed/i);
     expect(result.current.hasUnsyncedChanges).toBe(true);
   });
+
+  it('publishes the solid fog style when the procedural fog gate is off, even though the location stores cloudy', async () => {
+    // NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED is intentionally left unstubbed
+    // (unset) so the gate defaults to off, exercising the regression this
+    // covers: publication must not leak an ungated 'cloudy' appearance.
+    vi.stubEnv('NEXT_PUBLIC_FOG_OF_WAR_ENABLED', 'true');
+    const cloudyLocation: LocationMap = {
+      ...baseLocation,
+      fogAppearance: 'cloudy',
+    };
+    useLocationStore.getState().addLocation('TEST01', cloudyLocation);
+    const { vp, result } = await setup('location', cloudyLocation);
+    vp.fog.initialize({
+      bounds: { x: 0, y: 0, w: 100, h: 100 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    const exportImageMock = vi
+      .spyOn(vp, 'exportImage')
+      .mockResolvedValue(new Blob(['masked'], { type: 'image/jpeg' }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }))
+    );
+
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+
+    expect(exportImageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fog: expect.objectContaining({
+          mode: 'player',
+          style: { kind: 'solid', color: '#0b1020' },
+        }),
+      })
+    );
+  });
 });
