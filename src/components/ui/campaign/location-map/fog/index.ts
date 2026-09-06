@@ -6,10 +6,10 @@ export { reconcileMapFogBounds } from './reconcileMapFogBounds';
 export { configureFogView } from './configureFogView';
 export { attachFogPersistence } from './attachFogPersistence';
 export {
-  parseFogAppearance,
   resolveFogRendererOptions,
   resolvePlayerFogStyle,
 } from './fogAppearance';
+export { useAppliedFogAppearance } from './useAppliedFogAppearance';
 export {
   FOG_SECURITY_EXPLANATION,
   FOG_ENABLE_TITLE,
@@ -22,3 +22,12 @@ export {
   FOG_DISABLE_TITLE,
   FOG_DISABLE_DESCRIPTION,
 } from './fogProductCopy';
+export {
+  useFogPresetControls,
+  FOG_PRESET_ERRORS,
+} from './useFogPresetControls';
+export type {
+  FogPresetControls,
+  FogPresetEditorState,
+} from './useFogPresetControls';
+export { FogPresetPanel } from './FogPresetPanel';

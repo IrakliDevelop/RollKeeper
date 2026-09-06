@@ -9,10 +9,11 @@ import { PresenceControl } from '@/components/ui/campaign/location-map/PresenceC
 import MarkerDetailPanel from '@/components/ui/campaign/location-map/MarkerDetailPanel';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
 import {
-  parseFogAppearance,
   resolveFogRendererOptions,
+  resolvePlayerFogStyle,
+  useAppliedFogAppearance,
+  useFogPresetControls,
 } from '@/components/ui/campaign/location-map/fog';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from '@/components/ui/campaign/location-map/fog/useFogAppearanceProjection';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { FogAppearance } from '@/types/battlemap';
@@ -81,19 +82,16 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
   const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
-  const fogAppearance = proceduralFogEnabled
-    ? parseFogAppearance(battleMap?.fogAppearance)
-    : 'solid';
+  const { appearance: fogAppearance, fingerprint: fogFingerprint } =
+    useAppliedFogAppearance(battleMap?.fogAppearance);
   useFogAppearanceProjection({
     enabled:
-      proceduralFogEnabled &&
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
       battleMap !== undefined,
     campaignCode,
     battleMapId,
     dmId: props.dmId,
-    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
+    appearance: fogAppearance,
     onError: () => {
       addToast({
         type: 'error',
@@ -106,7 +104,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
-  }, [viewport, fogAppearance]);
+    // fogFingerprint stands in for fogAppearance: same material, same effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, fogFingerprint]);
 
   const handleFogAppearanceChange = useCallback(
     (appearance: FogAppearance) => {
@@ -115,6 +115,12 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     },
     [viewport, updateBattleMap, campaignCode, battleMapId]
   );
+  const fogPresetControls = useFogPresetControls({
+    campaignCode,
+    viewport,
+    applied: fogAppearance,
+    onApply: handleFogAppearanceChange,
+  });
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
   // anyone else's camera.
@@ -163,10 +169,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={fogAppearance}
-            onFogAppearanceChange={
-              proceduralFogEnabled ? handleFogAppearanceChange : undefined
-            }
+            fogPresetControls={fogPresetControls}
             exportControl={
               <BattleMapExportControl
                 getViewport={() => viewport}
@@ -179,6 +182,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                   {}
                 }
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={onExportError}
               />
             }

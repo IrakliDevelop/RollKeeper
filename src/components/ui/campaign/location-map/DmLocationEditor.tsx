@@ -12,9 +12,13 @@ import { BattleMapViewsControl } from './BattleMapViewsControl';
 import { PresenceControl } from './PresenceControl';
 import { useDmLocationEditor } from './DmLocationEditor.hooks';
 import type { DmLocationEditorProps } from './DmLocationEditor.types';
-import { parseFogAppearance, resolveFogRendererOptions } from './fog';
+import {
+  resolveFogRendererOptions,
+  resolvePlayerFogStyle,
+  useAppliedFogAppearance,
+  useFogPresetControls,
+} from './fog';
 import { useBattleMapStore } from '@/store/battleMapStore';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
@@ -102,19 +106,16 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     fogControls,
     handleFogAppearanceChange,
   } = useDmLocationEditor(props);
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
-  const fogAppearance = proceduralFogEnabled
-    ? parseFogAppearance(props.location.fogAppearance)
-    : 'solid';
+  const { appearance: fogAppearance, fingerprint: fogFingerprint } =
+    useAppliedFogAppearance(props.location.fogAppearance);
   useFogAppearanceProjection({
     enabled:
-      proceduralFogEnabled &&
       mode === 'battlemap' &&
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL),
     campaignCode: props.campaignCode,
     battleMapId: props.location.id,
     dmId: props.dmId,
-    appearance: typeof fogAppearance === 'string' ? fogAppearance : 'solid',
+    appearance: fogAppearance,
     onError: () => {
       addToast({
         type: 'error',
@@ -127,7 +128,16 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
 
   useEffect(() => {
     viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
-  }, [viewport, fogAppearance]);
+    // fogFingerprint stands in for fogAppearance: same material, same effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [viewport, fogFingerprint]);
+
+  const fogPresetControls = useFogPresetControls({
+    campaignCode: props.campaignCode,
+    viewport,
+    applied: fogAppearance,
+    onApply: handleFogAppearanceChange,
+  });
 
   return (
     <ViewportContext.Provider value={viewport}>
@@ -188,6 +198,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 mapImageSize={props.location.mapImageSize}
                 getDmOnlyElements={getDmOnlyElements}
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={message =>
                   addToast({ type: 'error', title: 'Export failed', message })
                 }
@@ -269,10 +280,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
               },
             }}
             fogControls={fogControls}
-            fogAppearance={fogAppearance}
-            onFogAppearanceChange={
-              proceduralFogEnabled ? handleFogAppearanceChange : undefined
-            }
+            fogPresetControls={fogPresetControls}
           />
         )}
 

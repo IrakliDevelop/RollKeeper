@@ -11,7 +11,10 @@ import {
   MARKER_KINDS,
 } from '@/components/ui/campaign/location-map/markerData';
 import { MARKER_COLOR_CSS } from '@/components/ui/campaign/location-map/markerPainter';
-import type { DmFogControls } from '@/components/ui/campaign/location-map/fog';
+import type {
+  DmFogControls,
+  FogPresetControls,
+} from '@/components/ui/campaign/location-map/fog';
 
 let mockActiveTool = 'pencil';
 let mockToolOptions: Record<string, Record<string, unknown> | undefined> = {};
@@ -135,7 +138,6 @@ describe('DmLocationToolOptions pencil options', () => {
 
 describe('DmLocationToolOptions fog appearance', () => {
   const fogControls: DmFogControls = {
-    available: true,
     initialized: true,
     disabled: false,
     operation: 'reveal',
@@ -162,23 +164,65 @@ describe('DmLocationToolOptions fog appearance', () => {
 
   afterEach(() => cleanup());
 
-  it('presents malformed persisted values as the solid fallback', () => {
+  function makeFogPresetControls(
+    overrides: Partial<FogPresetControls> = {}
+  ): FogPresetControls {
+    return {
+      library: [],
+      applied: 'solid',
+      selectedValue: 'solid',
+      appliedLabel: null,
+      select: vi.fn(),
+      editor: null,
+      openEditor: vi.fn(),
+      updateDraft: vi.fn(),
+      setDraftKind: vi.fn(),
+      randomizeSeed: vi.fn(),
+      resetDraft: vi.fn(),
+      cancelEditor: vi.fn(),
+      applyDraft: vi.fn(),
+      saveDraftAsPreset: vi.fn(() => null),
+      updateSourcePreset: vi.fn(() => null),
+      managerOpen: false,
+      openManager: vi.fn(),
+      closeManager: vi.fn(),
+      renamePreset: vi.fn(() => null),
+      duplicatePreset: vi.fn(() => null),
+      managerError: null,
+      setManagerError: vi.fn(),
+      pendingDeleteId: null,
+      requestDelete: vi.fn(),
+      confirmDelete: vi.fn(),
+      cancelDelete: vi.fn(),
+      ...overrides,
+    };
+  }
+
+  it('renders the preset panel whenever fogPresetControls is provided', () => {
     render(
       <DmLocationToolOptions
         mode="battlemap"
         fogControls={fogControls}
-        fogAppearance={'misty' as never}
-        onFogAppearanceChange={vi.fn()}
+        fogPresetControls={makeFogPresetControls()}
       />
     );
 
     expect(
-      screen.getByRole('button', { name: 'Solid (classic)' })
-    ).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByRole('button', { name: 'Cloudy' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
+      screen.getByRole('combobox', { name: 'Fog appearance' })
+    ).toBeInTheDocument();
+  });
+
+  it('renders the fog bar with no appearance control when fogPresetControls is omitted', () => {
+    render(
+      <DmLocationToolOptions mode="battlemap" fogControls={fogControls} />
     );
+
+    expect(
+      screen.queryByRole('combobox', { name: 'Fog appearance' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Cover all' })
+    ).toBeInTheDocument();
   });
 });
 

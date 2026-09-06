@@ -7,7 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { BattleMapExportControl } from '../BattleMapExportControl';
-import type { FogStateV1 } from '@fieldnotes/core';
+import type { FogStateV1, FogStyle } from '@fieldnotes/core';
 
 const vp = { exportImage: vi.fn(), getVisibleRect: vi.fn() };
 
@@ -66,6 +66,31 @@ describe('BattleMapExportControl', () => {
     expect(exporter).toHaveBeenCalledWith(
       vp,
       expect.objectContaining({ audience: 'player', fogState })
+    );
+  });
+
+  it('reads both live fog state and live fog style from their own getters', async () => {
+    const fogState = {
+      version: 1,
+      definition: {
+        bounds: { x: 0, y: 0, w: 100, h: 80 },
+        base: 'covered',
+        cellSize: 16,
+        generation: 'g1',
+      },
+      tiles: [],
+    } as unknown as FogStateV1;
+    const fogStyle: FogStyle = { kind: 'solid', color: '#123456' };
+    const exporter = renderControl({
+      getFogState: () => fogState,
+      getFogStyle: () => fogStyle,
+    });
+    fireEvent.click(screen.getByRole('button', { name: /^export$/i }));
+
+    await waitFor(() => expect(exporter).toHaveBeenCalledOnce());
+    expect(exporter).toHaveBeenCalledWith(
+      vp,
+      expect.objectContaining({ fogState, fogStyle })
     );
   });
 

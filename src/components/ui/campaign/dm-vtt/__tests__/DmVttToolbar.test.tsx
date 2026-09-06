@@ -27,7 +27,6 @@ describe('DmVttToolbar', () => {
   it('threads the shared fog controller into the button and options bar', () => {
     const requestActivate = vi.fn();
     const fogControls = {
-      available: true,
       initialized: false,
       disabled: false,
       operation: 'reveal' as const,

@@ -108,7 +108,6 @@ import type {
 } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
 import { resolveDmPortalDestination } from '@/components/ui/campaign/location-map/markerPortal';
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
-import { isFogOfWarEnabled } from '@/lib/fogOfWar';
 import {
   attachFogPersistence,
   configureFogView,
@@ -671,7 +670,6 @@ export function useDmBattleMapCanvas({
   }, [battleMap?.mapImageSize]);
   const fogControls = useDmFogControls({
     viewport,
-    available: isFogOfWarEnabled(),
     getBounds: getFogBounds,
   });
   const fogControlsRef = useRef(fogControls);
@@ -754,12 +752,10 @@ export function useDmBattleMapCanvas({
           });
       }
 
-      if (isFogOfWarEnabled()) {
-        vp.toolManager.register(new FogTool(vp.fog));
-        // DM preview is deliberately session-only and always resets when a
-        // canvas mounts; persisted state never decides the authoring view.
-        configureFogView(vp.fog, 'dm', false);
-      }
+      vp.toolManager.register(new FogTool(vp.fog));
+      // DM preview is deliberately session-only and always resets when a
+      // canvas mounts; persisted state never decides the authoring view.
+      configureFogView(vp.fog, 'dm', false);
 
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `battlemap-canvas-${battleMapId}`,

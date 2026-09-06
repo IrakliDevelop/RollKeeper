@@ -92,17 +92,54 @@ describe('exportBattleMap', () => {
       },
       tiles: [],
     } as never;
+    const fogStyle = { kind: 'solid', color: '#ff0000' } as never;
     await exportBattleMap(vp, {
       audience: 'player',
       bounds: 'map',
       format: 'png',
       name: 'Cave',
       fogState,
+      fogStyle,
     });
     expect(vp.exportImage.mock.calls[0][0].fog).toEqual({
       state: fogState,
       mode: 'player',
+      style: fogStyle,
     });
+  });
+
+  it('passes the explicit player style so an open draft cannot leak into the file', async () => {
+    const vp = fakeVp();
+    const fogState = { definition: { cellSize: 32 } } as never;
+    const fogStyle = { kind: 'solid', color: '#ff0000' } as const;
+    await exportBattleMap(vp, {
+      audience: 'player',
+      bounds: 'view',
+      format: 'png',
+      name: 'Map',
+      fogState,
+      fogStyle,
+    });
+    expect(vp.exportImage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fog: { state: fogState, mode: 'player', style: fogStyle },
+      })
+    );
+  });
+
+  it('keeps fog off for full exports even when fogStyle is supplied', async () => {
+    const vp = fakeVp();
+    await exportBattleMap(vp, {
+      audience: 'full',
+      bounds: 'view',
+      format: 'png',
+      name: 'Map',
+      fogState: { definition: { cellSize: 32 } } as never,
+      fogStyle: { kind: 'solid', color: '#ff0000' } as never,
+    });
+    expect(vp.exportImage).toHaveBeenCalledWith(
+      expect.objectContaining({ fog: false })
+    );
   });
 
   it('plumbs jpeg quality and builds the filename', async () => {

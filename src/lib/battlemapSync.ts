@@ -13,7 +13,7 @@ import type {
 } from '@fieldnotes/core';
 import type { BattleMapRole } from '@/lib/battlemapToken';
 import {
-  normalizeFogAppearance,
+  parseProjectedFogAppearance,
   normalizeFogAppearanceProjectionTimestamp,
 } from '@/lib/fogOfWar';
 
@@ -38,7 +38,7 @@ export interface BattleMapTokenRequest {
 
 export interface BattleMapTokenResult {
   token: string;
-  fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+  fogAppearance?: import('@/types/battlemap').ProjectedFogAppearance;
   fogAppearanceUpdatedAt?: string | null;
 }
 
@@ -58,13 +58,13 @@ export async function mintBattleMapToken(
     if (!res.ok) return null;
     const data = (await res.json()) as {
       token?: string;
-      fogAppearance?: string;
+      fogAppearance?: unknown;
       fogAppearanceUpdatedAt?: unknown;
     };
     if (!data.token) return null;
     return {
       token: data.token,
-      fogAppearance: normalizeFogAppearance(data.fogAppearance),
+      fogAppearance: parseProjectedFogAppearance(data.fogAppearance),
       fogAppearanceUpdatedAt: normalizeFogAppearanceProjectionTimestamp(
         data.fogAppearanceUpdatedAt
       ),
@@ -142,7 +142,7 @@ export interface ManagedConnectionOptions {
   onPoke?: (feature: string) => void;
   /** Called with session metadata from each token mint (initial + refreshes). */
   onTokenMetadata?: (meta: {
-    fogAppearance?: import('@/types/battlemap').FogAppearanceV1;
+    fogAppearance?: import('@/types/battlemap').ProjectedFogAppearance;
     fogAppearanceUpdatedAt?: string | null;
   }) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */

@@ -15,7 +15,6 @@ export type FogConfirmationAction =
 export type FogShape = 'brush' | 'rectangle' | 'polygon';
 
 export interface DmFogControls {
-  available: boolean;
   initialized: boolean;
   disabled: boolean;
   disabledReason?: string;
@@ -48,12 +47,11 @@ function fogDiagnostic(error: unknown): string {
 
 export function useDmFogControls(options: {
   viewport: Viewport | null;
-  available: boolean;
   getBounds: () => Bounds;
   disabled?: boolean;
   disabledReason?: string;
 }): DmFogControls {
-  const { viewport, available, getBounds } = options;
+  const { viewport, getBounds } = options;
   const disabled = options.disabled ?? false;
   const [initialized, setInitialized] = useState(false);
   const [operation, setOperationState] = useState<FogOperation>('reveal');
@@ -65,7 +63,7 @@ export function useDmFogControls(options: {
     useState<FogConfirmationAction | null>(null);
 
   useEffect(() => {
-    if (!viewport || !available) {
+    if (!viewport) {
       setInitialized(false);
       return;
     }
@@ -76,7 +74,7 @@ export function useDmFogControls(options: {
       setInitialized(viewport.fog.getState() !== null);
     });
     return unsubscribe;
-  }, [viewport, available]);
+  }, [viewport]);
 
   useEffect(() => {
     if (disabled && viewport?.toolManager.activeTool?.name === 'fog') {
@@ -109,7 +107,7 @@ export function useDmFogControls(options: {
   );
 
   const requestActivate = useCallback(() => {
-    if (!viewport || !available) return;
+    if (!viewport) return;
     if (disabled) {
       setDiagnostic(
         options.disabledReason ??
@@ -124,7 +122,7 @@ export function useDmFogControls(options: {
     configureFogView(viewport.fog, 'dm', preview);
     viewport.setTool('fog');
     setDiagnostic(null);
-  }, [available, disabled, options.disabledReason, preview, viewport]);
+  }, [disabled, options.disabledReason, preview, viewport]);
 
   const confirmAction = useCallback(() => {
     if (!viewport || !pendingAction) return;
@@ -153,7 +151,6 @@ export function useDmFogControls(options: {
   }, [getBounds, pendingAction, viewport, withDiagnostic]);
 
   return {
-    available,
     initialized,
     disabled,
     disabledReason: options.disabledReason,

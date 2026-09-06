@@ -2,6 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest';
 import {
   applyFogAppearanceMetadata,
   fetchAndApplyFogAppearance,
+  getAppliedFogAppearance,
   startFogAppearancePoll,
 } from '../fogAppearancePoll';
 import type { Viewport } from '@fieldnotes/core';
@@ -43,6 +44,45 @@ describe('fetchAndApplyFogAppearance', () => {
         playerStyle: expect.objectContaining({ kind: 'procedural' }),
       })
     );
+  });
+
+  it('applies a projected custom material and falls back to solid for a malformed one', () => {
+    const setFogStyle = vi.fn();
+    const viewport = { setFogStyle } as unknown as Viewport;
+    const material = { v: 1, kind: 'solid', color: '#ff0000' };
+
+    applyFogAppearanceMetadata(
+      viewport,
+      { v: 2, kind: 'custom', material },
+      '2026-09-05T10:00:00.000Z'
+    );
+    expect(setFogStyle).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        playerStyle: { kind: 'solid', color: '#ff0000' },
+      })
+    );
+
+    applyFogAppearanceMetadata(
+      viewport,
+      { v: 2, kind: 'custom', material: { v: 1, kind: 'solid', color: 'red' } },
+      '2026-09-05T10:00:01.000Z'
+    );
+    expect(setFogStyle).toHaveBeenLastCalledWith({});
+  });
+
+  it('strips a source preset id before applying viewer metadata', () => {
+    const vp = fakeViewport();
+    const material = { v: 1, kind: 'solid', color: '#ff0000' };
+
+    applyFogAppearanceMetadata(
+      vp,
+      { v: 2, kind: 'custom', material, sourcePresetId: 'fp_1' },
+      '2026-09-05T10:00:00.000Z'
+    );
+
+    const applied = getAppliedFogAppearance(vp);
+    expect(applied).toEqual({ v: 2, kind: 'custom', material });
+    expect(JSON.stringify(applied)).not.toContain('fp_1');
   });
 
   it('applies appearance from response', async () => {
@@ -108,6 +148,19 @@ describe('fetchAndApplyFogAppearance', () => {
     fetchAndApplyFogAppearance(vp, '/test');
     await vi.advanceTimersByTimeAsync(0);
     expect(vp.setFogStyle).not.toHaveBeenCalled();
+  });
+});
+
+describe('getAppliedFogAppearance', () => {
+  it('returns solid for a fresh viewport before any metadata is applied', () => {
+    const vp = fakeViewport();
+    expect(getAppliedFogAppearance(vp)).toBe('solid');
+  });
+
+  it('returns the last appearance applied to that viewport', () => {
+    const vp = fakeViewport();
+    applyFogAppearanceMetadata(vp, 'cloudy', '2026-09-05T00:00:00.000Z');
+    expect(getAppliedFogAppearance(vp)).toBe('cloudy');
   });
 });
 

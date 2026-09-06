@@ -27,7 +27,6 @@ import {
   startFogAppearancePoll,
 } from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -50,7 +49,6 @@ function DisplayCanvas() {
   const toolsRef = useRef([new HandTool()]);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -90,15 +88,13 @@ function DisplayCanvas() {
           onApplied: () => vp.requestRender(),
         }),
       },
-      onTokenMetadata: proceduralFogEnabled
-        ? meta => {
-            applyFogAppearanceMetadata(
-              vp,
-              meta.fogAppearance,
-              meta.fogAppearanceUpdatedAt
-            );
-          }
-        : undefined,
+      onTokenMetadata: meta => {
+        applyFogAppearanceMetadata(
+          vp,
+          meta.fogAppearance,
+          meta.fogAppearanceUpdatedAt
+        );
+      },
       onStatus: s => {
         setStatus(s);
         if (s === 'live') {
@@ -107,7 +103,7 @@ function DisplayCanvas() {
         }
       },
       onPoke: feature => {
-        if (proceduralFogEnabled && feature === 'fog-appearance') {
+        if (feature === 'fog-appearance') {
           fetchAndApplyFogAppearance(
             vp,
             `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
@@ -152,14 +148,12 @@ function DisplayCanvas() {
           awareness.dispose();
         });
 
-        if (proceduralFogEnabled) {
-          scope.push(
-            startFogAppearancePoll({
-              viewport: vp,
-              url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
-            })
-          );
-        }
+        scope.push(
+          startFogAppearancePoll({
+            viewport: vp,
+            url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
+          })
+        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and

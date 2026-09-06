@@ -48,10 +48,11 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
-import { configureFogView } from './fog';
+import { configureFogView, resolvePlayerFogStyle } from './fog';
 import {
   applyFogAppearanceMetadata,
   fetchAndApplyFogAppearance,
+  getAppliedFogAppearance,
   startFogAppearancePoll,
 } from './fog/fogAppearancePoll';
 import DmLocationToolOptions from './DmLocationToolOptions';
@@ -91,7 +92,6 @@ import { useCharacterStore } from '@/store/characterStore';
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
-import { isProceduralFogAppearanceEnabled } from '@/lib/fogOfWar';
 
 import type { MovementResolution } from './movementTool';
 
@@ -292,7 +292,6 @@ export function PlayerBattleMapCanvas({
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
-  const proceduralFogEnabled = isProceduralFogAppearanceEnabled();
   const [hasSelection, setHasSelection] = useState(false);
   const [activeMarkerElementId, setActiveMarkerElementId] = useState<
     string | null
@@ -607,18 +606,16 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current?.announce();
         }
       },
-      onTokenMetadata: proceduralFogEnabled
-        ? meta => {
-            applyFogAppearanceMetadata(
-              vp,
-              meta.fogAppearance,
-              meta.fogAppearanceUpdatedAt
-            );
-          }
-        : undefined,
+      onTokenMetadata: meta => {
+        applyFogAppearanceMetadata(
+          vp,
+          meta.fogAppearance,
+          meta.fogAppearanceUpdatedAt
+        );
+      },
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkers();
-        if (proceduralFogEnabled && feature === 'fog-appearance') {
+        if (feature === 'fog-appearance') {
           fetchAndApplyFogAppearance(
             vp,
             `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
@@ -691,14 +688,12 @@ export function PlayerBattleMapCanvas({
           awareness.dispose();
         });
 
-        if (proceduralFogEnabled) {
-          scope.push(
-            startFogAppearancePoll({
-              viewport: vp,
-              url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
-            })
-          );
-        }
+        scope.push(
+          startFogAppearancePoll({
+            viewport: vp,
+            url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
+          })
+        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and
@@ -752,6 +747,9 @@ export function PlayerBattleMapCanvas({
                 getViewport={() => viewport}
                 name="battle-map"
                 getFogState={() => viewport.fog.getState()}
+                getFogStyle={() =>
+                  resolvePlayerFogStyle(getAppliedFogAppearance(viewport))
+                }
                 onError={onExportError}
               />
             }

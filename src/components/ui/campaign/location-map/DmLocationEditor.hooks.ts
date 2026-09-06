@@ -28,6 +28,7 @@ import {
 } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
+import type { FogAppearance } from '@/types/battlemap';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import {
   createManagedBattleMapConnection,
@@ -69,13 +70,13 @@ import {
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
-import { isFogOfWarEnabled } from '@/lib/fogOfWar';
 import {
   attachFogPersistence,
   configureFogView,
   reconcileMapFogBounds,
   resolveFogRendererOptions,
   resolveMapImageBounds,
+  resolvePlayerFogStyle,
   useDmFogControls,
 } from './fog';
 import { useDmStore } from '@/store/dmStore';
@@ -647,7 +648,6 @@ export function useDmLocationEditor(
   }, [getVp, location.mapImageSize]);
   const fogControls = useDmFogControls({
     viewport,
-    available: isFogOfWarEnabled(),
     getBounds: getFogBounds,
     disabled: imageUploading || arrangeMapsActive,
     disabledReason: imageUploading
@@ -877,10 +877,8 @@ export function useDmLocationEditor(
       syncSelection();
 
       // AutoSave — persist to store
-      if (isFogOfWarEnabled()) {
-        vp.toolManager.register(new FogTool(vp.fog));
-        configureFogView(vp.fog, 'dm', false);
-      }
+      vp.toolManager.register(new FogTool(vp.fog));
+      configureFogView(vp.fog, 'dm', false);
 
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `location-canvas-${location.id}`,
@@ -1571,7 +1569,13 @@ export function useDmLocationEditor(
           quality: 0.85,
           filter: (el: { id: string }) => !currentDmOnly[el.id],
           ...(fogEnabled
-            ? { fog: { state: fogState, mode: 'player' as const } }
+            ? {
+                fog: {
+                  state: fogState,
+                  mode: 'player' as const,
+                  style: resolvePlayerFogStyle(location.fogAppearance),
+                },
+              }
             : {}),
         });
       } catch (error) {
@@ -1870,7 +1874,7 @@ export function useDmLocationEditor(
     portalState,
     fogControls,
     handleFogAppearanceChange: useCallback(
-      (appearance: import('@/types/battlemap').FogAppearance) => {
+      (appearance: FogAppearance) => {
         getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,

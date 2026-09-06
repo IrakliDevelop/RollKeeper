@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './e2e',
-  testMatch: 'fog-of-war.spec.ts',
+  testMatch: ['fog-of-war.spec.ts', 'fog-preset-library.spec.ts'],
   outputDir: 'test-results/fog',
   timeout: 60_000,
   retries: 0,
@@ -19,7 +19,7 @@ export default defineConfig({
   },
   webServer: {
     command:
-      'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_FOG_OF_WAR_ENABLED=true NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED=true NEXT_PUBLIC_BATTLEMAP_RELAY_URL= npm run dev',
+      'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_BATTLEMAP_RELAY_URL= npm run dev',
     url: 'http://localhost:3000/player',
     reuseExistingServer: false,
     timeout: 120_000,

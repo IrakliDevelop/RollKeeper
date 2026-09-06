@@ -8,31 +8,6 @@ import { fogMaterialFingerprint, parseCustomFogMaterial } from './fogMaterial';
 
 const VALID_FOG_APPEARANCES = new Set<FogAppearanceV1>(['solid', 'cloudy']);
 
-export function isFogOfWarEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_FOG_OF_WAR_ENABLED === 'true';
-}
-
-/**
- * Rollout gate for the DM-facing procedural appearance selector. Keep this
- * separate from fog-of-war itself so incomplete viewer propagation can never
- * expose a control that only changes the DM's canvas.
- */
-export function isProceduralFogAppearanceEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_PROCEDURAL_FOG_ENABLED === 'true';
-}
-
-/**
- * Rollout gate for the campaign fog preset library. Additive on top of the
- * procedural gate: nothing in the library can be visible while the
- * Solid/Cloudy control itself is hidden.
- */
-export function isFogPresetLibraryEnabled(): boolean {
-  return (
-    isProceduralFogAppearanceEnabled() &&
-    process.env.NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED === 'true'
-  );
-}
-
 export function isFogAppearanceV1(value: unknown): value is FogAppearanceV1 {
   return (
     typeof value === 'string' &&
@@ -121,22 +96,6 @@ export function toProjectedFogAppearance(
 ): ProjectedFogAppearance {
   if (typeof appearance === 'string') return appearance;
   return { v: 2, kind: 'custom', material: appearance.material };
-}
-
-/** While the library gate is off a stored custom snapshot renders as Solid without being rewritten. */
-export function downgradeFogAppearanceForGate<
-  T extends FogAppearance | ProjectedFogAppearance,
->(appearance: T, libraryEnabled: boolean): T | 'solid' {
-  return typeof appearance === 'string' || libraryEnabled
-    ? appearance
-    : 'solid';
-}
-
-export function parseFogAppearanceForClient(value: unknown): FogAppearance {
-  return downgradeFogAppearanceForGate(
-    parseAppliedFogAppearance(value),
-    isFogPresetLibraryEnabled()
-  );
 }
 
 /** Stable string for effect deps, dedup keys, and "Modified" labels. */

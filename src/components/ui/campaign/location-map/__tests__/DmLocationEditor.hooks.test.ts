@@ -11,6 +11,7 @@ import type { CanvasElement, Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
 import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
+import { CLOUDY_PRESET } from '../fog/fogAppearance';
 import { useLocationStore } from '@/store/locationStore';
 import type { LocationMap } from '@/types/location';
 
@@ -431,7 +432,6 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
   });
 
   it('keeps the previous publication and reports an error when a fog snapshot upload fails', async () => {
-    vi.stubEnv('NEXT_PUBLIC_FOG_OF_WAR_ENABLED', 'true');
     useLocationStore.getState().addLocation('TEST01', baseLocation);
     const { vp, result } = await setup('location');
     vp.fog.initialize({
@@ -465,5 +465,39 @@ describe('useDmLocationEditor — handleSyncToPlayers marker projection', () => 
     ).toBe(false);
     expect(result.current.syncError).toMatch(/masked snapshot upload failed/i);
     expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('publishes the cloudy player style for a cloudy location', async () => {
+    const cloudyLocation: LocationMap = {
+      ...baseLocation,
+      fogAppearance: 'cloudy',
+    };
+    useLocationStore.getState().addLocation('TEST01', cloudyLocation);
+    const { vp, result } = await setup('location', cloudyLocation);
+    vp.fog.initialize({
+      bounds: { x: 0, y: 0, w: 100, h: 100 },
+      base: 'covered',
+      cellSize: 8,
+    });
+    const exportImageMock = vi
+      .spyOn(vp, 'exportImage')
+      .mockResolvedValue(new Blob(['masked'], { type: 'image/jpeg' }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }))
+    );
+
+    await act(async () => {
+      await result.current.handleSyncToPlayers();
+    });
+
+    expect(exportImageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        fog: expect.objectContaining({
+          mode: 'player',
+          style: CLOUDY_PRESET.playerStyle,
+        }),
+      })
+    );
   });
 });
