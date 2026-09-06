@@ -3,10 +3,11 @@
 This wiki is written for AI coding agents (any provider) picking up work in this
 repository. It explains what the project is, how it's structured, and where the
 non-obvious complexity lives. It supplements — and deliberately does not repeat —
-`/CLAUDE.md` (Claude-specific conventions, design system rules, PR style) and
-`/AGENTS.md` (Codex-specific conventions). Read those too; this wiki fills the gaps
-they don't cover, mainly the sync/storage architecture, which is the largest part
-of the codebase without a single source of truth.
+`/AGENTS.md` (the tool-agnostic source of truth: commands, conventions, design
+system rules, PR style, read natively by most agents) and `/CLAUDE.md` (a thin
+`@AGENTS.md` import plus a small Claude-Code-only addendum). Read those too; this
+wiki fills the gaps they don't cover, mainly the sync/storage architecture, which
+is the largest part of the codebase without a single source of truth.
 
 **Read this first if you're new here.** Files are kept short and single-topic —
 skim the table below and open only what you need.

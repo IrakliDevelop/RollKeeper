@@ -5,17 +5,21 @@ this repo.
 
 ## Read these first, don't duplicate them
 
-- `/CLAUDE.md` — Claude Code conventions: PR writing, character-sheet layout
-  rules, frontend guidelines (dark mode, design system, naming), the
-  Next.js-version warning, and the manual-browser-gate rule for Claude
-  specifically.
-- `/AGENTS.md` — the equivalent for Codex, including its own manual-browser
-  gate for Codex desktop's in-app Browser. **Do not follow Codex's browser
-  setup steps if you're Claude, or vice versa** — only the shared
-  checklist/seed script they both point to is common.
+- `/AGENTS.md` — the tool-agnostic source of truth: commands, architecture,
+  conventions, PR writing, character-sheet layout rules, frontend guidelines
+  (dark mode, design system, naming), the Next.js-version warning, and the
+  generic manual-browser-gate rule. Read natively by most non-Claude agents
+  (Codex, Cursor, Copilot, Windsurf, Gemini CLI, Devin, ...).
+- `/CLAUDE.md` — a one-line `@AGENTS.md` import plus a short Claude-specific
+  addendum (currently just the Claude-only rules for the manual browser gate,
+  e.g. the Chrome-extension requirement). If you're Claude Code, read this
+  file — it pulls in `AGENTS.md` for you.
 - `.claude/skills/rollkeeper-manual-browser/SKILL.md` and
-  `.agents/skills/rollkeeper-manual-browser/SKILL.md` — same skill, one copy
-  per provider directory (see [12](12-conventions-and-workflow.md)).
+  `.agents/skills/rollkeeper-manual-browser/SKILL.md` — the concrete
+  per-provider implementations of the browser gate (Claude Chrome extension
+  vs. Codex desktop Browser). **Do not follow the other provider's browser
+  setup steps** — only the shared checklist/seed script they both point to is
+  common (see [12](12-conventions-and-workflow.md)).
 
 This wiki (`docs/wiki/`) exists to cover what those files don't: the
 sync/storage architecture (files 03–06), the fog-of-war/VTT subsystem (07),

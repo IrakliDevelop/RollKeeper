@@ -35,17 +35,37 @@ Don't auto-commit or auto-push without an explicit request in the current
 conversation — this applies to every agent working in this repo, not just a
 specific provider's default behavior.
 
+## AGENTS.md is the source of truth; CLAUDE.md imports it
+
+`AGENTS.md` is the tool-agnostic instruction file — the
+[open standard](https://agents.md) read natively by most AI coding agents
+(Codex, Cursor, GitHub Copilot, Windsurf, Gemini CLI, Devin, and others).
+`CLAUDE.md` is a one-line `@AGENTS.md` import followed by a small
+Claude-Code-only section (currently just the Claude-specific rules for the
+manual browser gate). Don't duplicate tool-agnostic content back into
+`CLAUDE.md` — add it to `AGENTS.md` once, and Claude Code picks it up through
+the import. This mirrors the pattern this Next.js version's own scaffolding
+generator (`node_modules/next/dist/server/lib/generate-agent-files.js`)
+already assumes for fresh projects.
+
+If you add instructions for a different agent/tool (a new `.cursor/rules/`
+file, `.github/copilot-instructions.md`, etc.), apply the same rule: keep only
+what that tool's format can uniquely express (e.g. glob-scoped rules), and
+point everything else back at `AGENTS.md` rather than re-stating it.
+
 ## Per-provider skill duplication
 
-Agent-facing instructions are duplicated per provider directory:
-`.claude/skills/<name>/SKILL.md` and `.agents/skills/<name>/SKILL.md` hold the
-same skill for different agent providers (Claude Code vs. Codex). If you're
-adding or editing agent-facing instructions for a workflow that both
-providers use, update both locations — don't assume one covers the other. See
-`CLAUDE.md` (Claude-specific rules) and `AGENTS.md` (Codex-specific rules) for
-the current split; they reference the same shared checklist/seed script for
-the manual-browser gate but each has provider-specific setup steps that must
-not be swapped.
+Agent-facing *skills* (as opposed to the root instruction files above) are
+still duplicated per provider directory: `.claude/skills/<name>/SKILL.md` and
+`.agents/skills/<name>/SKILL.md` hold the same skill for different agent
+providers (Claude Code vs. Codex). No portable cross-tool skill format has
+been adopted yet (as of this writing, "Agent Plugins 1.0" is too new/unproven
+to migrate to), so this duplication is intentional, not an oversight. If
+you're adding or editing agent-facing instructions for a workflow both
+providers use, update both locations — don't assume one covers the other. The
+manual-browser-gate pair reference the same shared checklist/seed script but
+each has provider-specific browser-automation setup steps that must not be
+swapped.
 
 ## Docker / local services
 
