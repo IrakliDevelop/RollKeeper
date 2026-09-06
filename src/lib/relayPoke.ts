@@ -31,17 +31,20 @@ export type BattleMapPokeFeature =
  * exported — callers go through one of the wrappers below, each of which
  * decides which room(s) to target.
  *
- * `pokeKind` only shapes the warning log on failure, so a caller who omits
- * it still gets correct behaviour — it defaults to `'room'`, which is what
- * every directed-room caller (`sendBattleMapPokeToRoom`, the live-room
- * fan-out) wants; only the active-map path opts into the distinct label.
+ * `pokeKind` only shapes the warning log on failure — it never affects
+ * whether or where a poke is sent. It has no default and every call site
+ * must pass it explicitly: a defaulted label would let a future call site
+ * silently inherit the wrong one (worse, a *plausible-looking* wrong one —
+ * e.g. an active-map failure silently logged as "room poke failed", a
+ * false-specific label that misleads on-call triage) with no compiler or
+ * test signal. Requiring it turns that failure mode into a compile error.
  */
 async function pokeRoom(
   code: string,
   battleMapId: string,
   feature: BattleMapPokeFeature,
-  deps: { fetchFn?: typeof fetch; now?: number } = {},
-  pokeKind: 'room' | 'active-map' = 'room'
+  deps: { fetchFn?: typeof fetch; now?: number },
+  pokeKind: 'room' | 'active-map'
 ): Promise<void> {
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
@@ -119,7 +122,7 @@ export async function sendBattleMapPokeToRoom(
   feature: BattleMapPokeFeature,
   deps: { fetchFn?: typeof fetch; now?: number } = {}
 ): Promise<void> {
-  await pokeRoom(code, battleMapId, feature, deps);
+  await pokeRoom(code, battleMapId, feature, deps, 'room');
 }
 
 /**
@@ -151,7 +154,7 @@ export async function sendBattleMapPokeToLiveRooms(
     return;
   }
   await Promise.allSettled(
-    rooms.map(battleMapId => pokeRoom(code, battleMapId, feature, deps))
+    rooms.map(battleMapId => pokeRoom(code, battleMapId, feature, deps, 'room'))
   );
 }
 

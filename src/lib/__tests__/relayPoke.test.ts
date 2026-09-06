@@ -180,6 +180,25 @@ describe('sendInitiativePoke', () => {
     const body = JSON.parse(init.body as string);
     expect(body.feature).toBe('initiative');
   });
+
+  it('fans out to multiple live rooms', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    const redis = liveRoomsRedisWith(['map-1', 'map-2']);
+
+    await sendInitiativePoke(CODE, redis, { fetchFn, now: 1_000_000 });
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+    const rooms = fetchFn.mock.calls.map(call => {
+      const [, init] = call as unknown as [string, RequestInit];
+      return JSON.parse(init.body as string).room;
+    });
+    expect(rooms.sort()).toEqual(['CAMP1:map-1', 'CAMP1:map-2']);
+    for (const call of fetchFn.mock.calls) {
+      const [, init] = call as unknown as [string, RequestInit];
+      const body = JSON.parse(init.body as string);
+      expect(body.feature).toBe('initiative');
+    }
+  });
 });
 
 describe('sendBattleMapPokeToRoom', () => {
@@ -353,5 +372,62 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     expect(redis.zrange).not.toHaveBeenCalled();
     expect(redis.zremrangebyscore).not.toHaveBeenCalled();
     expect(redis.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('poke failure log distinction (room vs active-map)', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.example.com');
+    vi.stubEnv('BATTLEMAP_RELAY_SECRET', SECRET);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it('logs an active-map poke failure without the word "room"', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn(async () => {
+      throw new Error('relay down');
+    });
+    const redis = redisWith(JSON.stringify({ activeBattleMapId: 'map-42' }));
+
+    await sendBattleMapPoke(CODE, redis, 'players', { fetchFn });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message] = warnSpy.mock.calls[0] as [string, unknown];
+    expect(message).not.toMatch(/room/i);
+    warnSpy.mockRestore();
+  });
+
+  it('logs a directed-room poke failure containing "room" (sendBattleMapPokeToRoom)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn(async () => {
+      throw new Error('relay down');
+    });
+
+    await sendBattleMapPokeToRoom(CODE, 'map-7', 'fog-appearance', {
+      fetchFn,
+    });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message] = warnSpy.mock.calls[0] as [string, unknown];
+    expect(message).toMatch(/room/i);
+    warnSpy.mockRestore();
+  });
+
+  it('logs a directed-room poke failure containing "room" (live-room fan-out)', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fetchFn = vi.fn(async () => {
+      throw new Error('relay down');
+    });
+    const redis = liveRoomsRedisWith(['map-1']);
+
+    await sendBattleMapPokeToLiveRooms(CODE, redis, 'markers', { fetchFn });
+
+    expect(warnSpy).toHaveBeenCalledTimes(1);
+    const [message] = warnSpy.mock.calls[0] as [string, unknown];
+    expect(message).toMatch(/room/i);
+    warnSpy.mockRestore();
   });
 });
