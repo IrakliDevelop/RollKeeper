@@ -63,11 +63,12 @@ export interface LiveMapRoomsPipeline {
 
 /**
  * Structural subset of the redis client needed to record a live room at
- * token-mint time. `zadd` + `expire` are issued through a pipeline so the
- * connect critical path pays one Redis round trip instead of two, and so a
- * throwing `expire` cannot leave a brand-new key without a TTL (they either
- * both land or, on any error, neither is trusted to have landed and the whole
- * write is treated as failed).
+ * token-mint time. `zadd` + `expire` are issued through a pipeline (not a
+ * transaction) so the connect critical path pays one Redis round trip
+ * instead of two. This is best-effort, not atomic: a server-side `expire`
+ * error after a successful `zadd` can still leave the key without a TTL,
+ * and any rejection here is treated as "the write is not trusted to have
+ * landed" by the caller, not as a guarantee that neither command applied.
  */
 export interface LiveMapRoomsWriter {
   pipeline(): LiveMapRoomsPipeline;

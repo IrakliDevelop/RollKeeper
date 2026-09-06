@@ -95,7 +95,10 @@ async function readActiveBattleMapId(
       typeof raw === 'string' ? JSON.parse(raw) : raw;
     return battleMap?.activeBattleMapId ?? null;
   } catch (err) {
-    console.warn('[relayPoke] poke failed (poll remains fallback):', err);
+    console.warn(
+      '[relayPoke] active-map lookup failed (poll remains fallback):',
+      err
+    );
     return null;
   }
 }
