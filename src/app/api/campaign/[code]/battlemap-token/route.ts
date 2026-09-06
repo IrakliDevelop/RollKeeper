@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
+import { recordLiveMapRoom } from '@/lib/liveMapRooms';
 import {
   parseBattleMapFogAppearanceProjection,
   type BattleMapFogAppearanceProjection,
@@ -65,6 +66,14 @@ export async function POST(
         { status: session.status }
       );
     }
+
+    // Best-effort: record that this campaign/battle-map pair has a live
+    // client, so a later poke can fan out to every live room instead of
+    // only the campaign's activeBattleMapId. Runs only after authorization
+    // succeeds — an unauthorized caller must never write into the registry.
+    // recordLiveMapRoom swallows its own errors, so awaiting it here cannot
+    // fail the mint; it's awaited only for deterministic ordering in tests.
+    await recordLiveMapRoom(redis, code, battleMapId);
 
     const token = signBattleMapToken(
       {

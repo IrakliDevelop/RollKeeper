@@ -8,10 +8,10 @@ import {
 import { NextRequest } from 'next/server';
 
 vi.mock('@/lib/relayPoke', () => ({
-  sendBattleMapPoke: vi.fn(async () => {}),
+  sendBattleMapPokeToLiveRooms: vi.fn(async () => {}),
 }));
 
-import { sendBattleMapPoke } from '@/lib/relayPoke';
+import { sendBattleMapPokeToLiveRooms } from '@/lib/relayPoke';
 import { POST } from '../sync/route';
 
 async function push(characterData: unknown) {
@@ -31,29 +31,33 @@ async function push(characterData: unknown) {
 describe('POST /api/campaign/[code]/sync — players poke', () => {
   beforeEach(() => {
     resetRedis();
-    vi.mocked(sendBattleMapPoke).mockClear();
+    vi.mocked(sendBattleMapPokeToLiveRooms).mockClear();
   });
 
   it('pokes feature "players" after an accepted write', async () => {
     const res = await push({ ...createMockCharacterState(), revision: 1 });
     expect(res.status).toBe(200);
-    expect(sendBattleMapPoke).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(sendBattleMapPoke).mock.calls[0][0]).toBe('ABC123');
-    expect(vi.mocked(sendBattleMapPoke).mock.calls[0][2]).toBe('players');
+    expect(sendBattleMapPokeToLiveRooms).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendBattleMapPokeToLiveRooms).mock.calls[0][0]).toBe(
+      'ABC123'
+    );
+    expect(vi.mocked(sendBattleMapPokeToLiveRooms).mock.calls[0][2]).toBe(
+      'players'
+    );
   });
 
   it('does not poke on a stale 409 push', async () => {
     await push({ ...createMockCharacterState(), revision: 5 });
-    vi.mocked(sendBattleMapPoke).mockClear();
+    vi.mocked(sendBattleMapPokeToLiveRooms).mockClear();
     const res = await push({ ...createMockCharacterState(), revision: 1 });
     expect(res.status).toBe(409);
-    expect(sendBattleMapPoke).not.toHaveBeenCalled();
+    expect(sendBattleMapPokeToLiveRooms).not.toHaveBeenCalled();
   });
 
   it('does not poke on 410 (removed player)', async () => {
     seedRedis('campaign:ABC123:removed:player-1', '1');
     const res = await push(createMockCharacterState());
     expect(res.status).toBe(410);
-    expect(sendBattleMapPoke).not.toHaveBeenCalled();
+    expect(sendBattleMapPokeToLiveRooms).not.toHaveBeenCalled();
   });
 });

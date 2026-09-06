@@ -39,10 +39,18 @@ export function getRedisLists() {
 interface MockPipeline {
   get(key: string): MockPipeline;
   set(key: string, value: string): MockPipeline;
+  zadd(
+    key: string,
+    scoreMember: { score: number; member: string }
+  ): MockPipeline;
+  expire(key: string, seconds: number): MockPipeline;
   exec(): Promise<unknown[]>;
 }
 
 const makePipeline = (): MockPipeline => {
+  // Each queued command is (re-)run against the live spies below so tests
+  // that assert on e.g. `mockRedis.zadd` see calls made through a pipeline
+  // too, and `mockRejectedValueOnce` on a spy surfaces as a rejection here.
   const commands: Array<() => unknown> = [];
   const pipeline: MockPipeline = {
     get: (key: string) => {
@@ -59,7 +67,25 @@ const makePipeline = (): MockPipeline => {
       });
       return pipeline;
     },
-    exec: async () => commands.map(fn => fn()),
+    zadd: (key: string, scoreMember: { score: number; member: string }) => {
+      commands.push(() => mockRedis.zadd(key, scoreMember));
+      return pipeline;
+    },
+    expire: (key: string, seconds: number) => {
+      commands.push(() => mockRedis.expire(key, seconds));
+      return pipeline;
+    },
+    exec: async () => {
+      // Sequential and awaited (not `commands.map(fn => fn())`), matching
+      // real pipeline semantics: commands run in order, and a rejecting
+      // command fails the whole `exec()` rather than becoming an unawaited,
+      // unhandled rejection.
+      const results: unknown[] = [];
+      for (const run of commands) {
+        results.push(await run());
+      }
+      return results;
+    },
   };
   return pipeline;
 };
@@ -230,7 +256,16 @@ export const mockRedis = {
     return Object.fromEntries(h.entries());
   }),
 
-  expire: vi.fn(async () => 1),
+  expire: vi.fn<(key: string, seconds: number) => Promise<number>>(
+    async () => 1
+  ),
+
+  zadd: vi.fn<
+    (
+      key: string,
+      scoreMember: { score: number; member: string }
+    ) => Promise<number>
+  >(async () => 1),
 
   pipeline: vi.fn(() => makePipeline()),
 };
@@ -263,6 +298,7 @@ vi.mock('@/lib/redis', () => ({
   campaignDisplayKeyKey: (code: string) => `campaign:${code}:displaykey`,
   campaignFogAppearanceKey: (code: string, battleMapId: string) =>
     `campaign:${code}:fog-appearance:${battleMapId}`,
+  campaignLiveMapRoomsKey: (code: string) => `campaign:${code}:live-maps`,
   characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
   SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,

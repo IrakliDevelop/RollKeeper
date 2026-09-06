@@ -1,7 +1,12 @@
 import { NextRequest } from 'next/server';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resetRedis, seedRedis, seedRedisSet } from '@/test/mocks/redis';
+import {
+  mockRedis,
+  resetRedis,
+  seedRedis,
+  seedRedisSet,
+} from '@/test/mocks/redis';
 
 const { authorizeCampaignMembershipRoute } = vi.hoisted(() => ({
   authorizeCampaignMembershipRoute: vi.fn(),
@@ -145,6 +150,55 @@ describe('membership-aware relay authority minting', () => {
     );
     expect(response.status).toBe(200);
     expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
+  });
+});
+
+describe('live map room registration', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
+  });
+
+  it('records the requested battleMapId for the campaign on a successful mint', async () => {
+    const response = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(mockRedis.zadd).toHaveBeenCalledWith(
+      `campaign:${CODE}:live-maps`,
+      expect.objectContaining({ member: 'map-a' })
+    );
+  });
+
+  it('records nothing when authorization is rejected', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'not-a-member',
+      }),
+      params
+    );
+    expect(response.status).toBe(403);
+    expect(mockRedis.zadd).not.toHaveBeenCalled();
+  });
+
+  it('still returns 200 with a valid token when the registry write throws', async () => {
+    mockRedis.zadd.mockRejectedValueOnce(new Error('redis unavailable'));
+    const response = await POST(
+      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      params
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(typeof body.token).toBe('string');
+    expect(body.token.length).toBeGreaterThan(0);
   });
 });
 
