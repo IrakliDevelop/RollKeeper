@@ -117,6 +117,12 @@ interface ProjectionIncident {
 
 interface Props {
   campaign: CampaignInfo;
+  /**
+   * Run hydration and autosave without rendering the migration card. Mounted
+   * on DM surfaces (battle-map and location editors) that edit campaign
+   * settings fields such as `fogPresets` but do not show sync controls.
+   */
+  headless?: boolean;
 }
 
 function currentRawEnvelope() {
@@ -145,7 +151,7 @@ function authorityGeneration(
   return `${accountId}:${campaignId}:${next.authority}:${next.epoch}`;
 }
 
-export function CampaignSettingsSyncControls({ campaign }: Props) {
+export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
   const [context, setContext] = useState<BrowserDmWorkspaceContext | null>(
     null
   );
@@ -1309,7 +1315,7 @@ export function CampaignSettingsSyncControls({ campaign }: Props) {
     await loadProjectionStatus();
   };
 
-  if (!areStandaloneMigrationControlsVisible()) return null;
+  if (headless || !areStandaloneMigrationControlsVisible()) return null;
 
   return (
     <Card padding="lg">

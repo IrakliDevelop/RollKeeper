@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, Map } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
@@ -22,6 +23,9 @@ export default function BattleMapEditorPage() {
   const hasHydrated = useHydration();
   const { getBattleMap, updateBattleMap } = useBattleMapStore();
   const { dmId } = useDmStore();
+  const campaign = useDmStore(state =>
+    state.campaigns.find(item => item.code === code)
+  );
 
   const { mode, handleModeChange } = useBattleMapMode(id, hasHydrated, () =>
     getBattleMap(code, id)
@@ -55,6 +59,9 @@ export default function BattleMapEditorPage() {
   if (mode === 'play') {
     return (
       <ErrorBoundary fallback={<VttErrorFallback />}>
+        {campaign && (
+          <CampaignSettingsSyncControls campaign={campaign} headless />
+        )}
         <DmVttScreen
           campaignCode={code}
           battleMapId={id}
@@ -80,6 +87,9 @@ export default function BattleMapEditorPage() {
 
   return (
     <div className="bg-surface flex h-screen flex-col overflow-hidden">
+      {campaign && (
+        <CampaignSettingsSyncControls campaign={campaign} headless />
+      )}
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">

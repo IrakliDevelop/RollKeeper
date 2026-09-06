@@ -1159,4 +1159,54 @@ describe('CampaignSettingsSyncControls default-off contract', () => {
       { timeout: 5000 }
     );
   });
+
+  it('headless mount hydrates and autosaves without rendering controls', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE', 'true');
+    const remembered = mockOwnerWorkspaceWithMemory();
+    remembered.push(ownerWorkspace);
+    mockOwnerSession();
+    seedOneCampaign();
+    await seedLocalIndexedDbAuthority();
+
+    function HeadlessHarness() {
+      const campaign = useDmStore(state =>
+        state.campaigns.find(item => item.code === CAMPAIGN_CODE)
+      );
+      if (!campaign) return null;
+      return <CampaignSettingsSyncControls campaign={campaign} headless />;
+    }
+    const { container } = render(<HeadlessHarness />);
+
+    // Nothing renders; hydration is witnessed by the workspace context open,
+    // and the commit below proves autosave was armed by that hydration.
+    const openContext = vi.mocked(browserDmWorkspace.createBrowserDmWorkspace);
+    await waitFor(() => expect(openContext).toHaveBeenCalledTimes(1));
+    expect(container).toBeEmptyDOMElement();
+
+    const commit = vi.spyOn(
+      IndexedDbCampaignSettingsRepository.prototype,
+      'commit'
+    );
+    await act(async () => {
+      useDmStore.getState().upsertFogPreset(CAMPAIGN_CODE, {
+        v: 1,
+        id: 'fp_headless',
+        name: 'Headless',
+        material: { v: 1, kind: 'solid', color: '#102030' },
+        createdAt: NOW,
+        updatedAt: NOW,
+      });
+    });
+    await waitFor(() => expect(commit).toHaveBeenCalled(), { timeout: 5000 });
+    await waitFor(
+      async () => {
+        const saved = await readCampaignSettingsDocument();
+        const presets = (saved?.payload as CampaignSettingsPayload | undefined)
+          ?.fogPresets as Array<{ id: string }> | undefined;
+        expect(presets?.map(p => p.id)).toEqual(['fp_headless']);
+        expect(saved?.localRevision).toBe(2);
+      },
+      { timeout: 5000 }
+    );
+  });
 });

@@ -6,6 +6,7 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft, MapPinned } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignSettingsSyncControls';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { useLocationStore } from '@/store/locationStore';
 import { useHydration } from '@/hooks/useHydration';
@@ -18,6 +19,9 @@ export default function LocationEditorPage() {
   const hasHydrated = useHydration();
   const { getLocation, updateLocation } = useLocationStore();
   const { dmId } = useDmStore();
+  const campaign = useDmStore(state =>
+    state.campaigns.find(item => item.code === code)
+  );
 
   if (!hasHydrated) {
     return (
@@ -56,6 +60,9 @@ export default function LocationEditorPage() {
 
   return (
     <div className="bg-surface flex h-screen flex-col overflow-hidden">
+      {campaign && (
+        <CampaignSettingsSyncControls campaign={campaign} headless />
+      )}
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
