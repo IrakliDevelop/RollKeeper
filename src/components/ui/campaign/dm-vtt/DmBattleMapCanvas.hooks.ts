@@ -203,6 +203,7 @@ export interface DmBattleMapCanvasState {
     discovery?: import('@/types/battlemap').MarkerDiscovery;
     trap?: import('@/types/battlemap').MarkerTrapMechanics;
     loot?: import('@/types/battlemap').MarkerLootEntry[];
+    lootAccess?: import('@/types/battlemap').MarkerDetail['lootAccess'];
     portal?: MarkerPortalTargetV1 | null;
   }) => void;
   handleDeleteMarker: () => void;
@@ -636,6 +637,7 @@ export function useDmBattleMapCanvas({
       discovery?: import('@/types/battlemap').MarkerDiscovery;
       trap?: import('@/types/battlemap').MarkerTrapMechanics;
       loot?: import('@/types/battlemap').MarkerLootEntry[];
+      lootAccess?: import('@/types/battlemap').MarkerDetail['lootAccess'];
       portal?: MarkerPortalTargetV1 | null;
     }) => {
       if (activeMarkerRef === null) return;
