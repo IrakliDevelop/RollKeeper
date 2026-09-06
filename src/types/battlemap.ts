@@ -95,6 +95,9 @@ export interface MarkerLootClaimResult {
   requestId: string;
   markerId: string;
   entryId: string;
+  /** Units actually granted — may be fewer than requested when another player
+   *  took some first. The player is told when it differs. */
+  grantedQuantity: number;
   remainingQuantity: number;
   transferId: string;
 }
