@@ -92,6 +92,9 @@ describe('battle-map fog appearance projection', () => {
 });
 
 describe('applied and projected fog appearance', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
   const material = { v: 1, kind: 'solid', color: '#102030' } as const;
   const applied = {
     v: 2,
@@ -129,7 +132,7 @@ describe('applied and projected fog appearance', () => {
   });
 
   it('allows an applied snapshot without a source id', () => {
-    const { sourcePresetId: _omit, ...orphan } = applied;
+    const orphan = { v: 2, kind: 'custom', material } as const;
     expect(parseAppliedFogAppearance(orphan)).toEqual(orphan);
   });
 
@@ -164,7 +167,6 @@ describe('applied and projected fog appearance', () => {
     expect(parseFogAppearanceForClient(applied)).toBe('solid');
     vi.stubEnv('NEXT_PUBLIC_FOG_PRESET_LIBRARY_ENABLED', 'true');
     expect(parseFogAppearanceForClient(applied)).toEqual(applied);
-    vi.unstubAllEnvs();
   });
 
   it('fingerprints by material, not identity or source id', () => {

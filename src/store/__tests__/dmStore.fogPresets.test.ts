@@ -29,6 +29,30 @@ function presets(): FogPresetV1[] | undefined {
 }
 
 describe('fog preset store actions', () => {
+  it('ignores presets that would not survive hydrate', () => {
+    const { upsertFogPreset } = useDmStore.getState();
+    upsertFogPreset(CODE, { ...preset('solid', 'Reserved id') });
+    upsertFogPreset(CODE, {
+      ...preset('fp_x', 'Bad color'),
+      material: { v: 1, kind: 'solid', color: '#ABC' },
+    });
+    upsertFogPreset(CODE, {
+      ...preset('fp_y', 'Bad time'),
+      createdAt: '2026-09-05',
+    });
+    expect(presets()).toBeUndefined();
+    upsertFogPreset(CODE, {
+      ...preset('fp_z', 'Upper'),
+      material: { v: 1, kind: 'solid', color: '#ABCDEF' },
+    });
+    expect(presets()).toEqual([
+      {
+        ...preset('fp_z', 'Upper'),
+        material: { v: 1, kind: 'solid', color: '#abcdef' },
+      },
+    ]);
+  });
+
   it('appends new presets in creation order and replaces by id', () => {
     const { upsertFogPreset } = useDmStore.getState();
     upsertFogPreset(CODE, preset('fp_b', 'B'));
