@@ -9,6 +9,7 @@ import type { Redis } from '@upstash/redis';
 
 const entry = {
   markerId: 'marker-1',
+  locked: false,
   id: 'entry-1',
   itemKind: 'inventory' as const,
   item: {

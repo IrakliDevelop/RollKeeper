@@ -230,6 +230,7 @@ describe('applyCanonicalRemaining', () => {
     const ledger: MarkerLootLedgerEntry[] = [
       {
         markerId: 'marker-1',
+        locked: false,
         id: 'entry-1',
         itemKind: 'inventory',
         item: {
