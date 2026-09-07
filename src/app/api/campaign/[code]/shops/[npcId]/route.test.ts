@@ -12,12 +12,14 @@ const {
   verifyDmAuthority,
   rejectHybridGuestPrivilegeEscalation,
   seedShopLedger,
+  authorizeHybridGuestRoute,
 } = vi.hoisted(() => ({
   redis: { get: vi.fn(), set: vi.fn(), del: vi.fn() },
   rawRedis: { get: vi.fn(), eval: vi.fn() },
   verifyDmAuthority: vi.fn(),
   rejectHybridGuestPrivilegeEscalation: vi.fn(),
   seedShopLedger: vi.fn(),
+  authorizeHybridGuestRoute: vi.fn(),
 }));
 
 vi.mock('@/lib/redis', () => ({
@@ -29,8 +31,16 @@ vi.mock('@/lib/redis', () => ({
   SLIDING_TTL_SECONDS: 3600,
 }));
 vi.mock('@/lib/dmAuth', () => ({ verifyDmAuthority }));
-vi.mock('@/lib/guestRouteResponses', () => ({
-  rejectHybridGuestPrivilegeEscalation,
+// `guestDeniedResponse` is kept REAL (via importOriginal) — it builds a
+// plain NextResponse from whatever resolution object the test hands
+// `authorizeHybridGuestRoute`'s mock, so there's no need to mock it too.
+vi.mock('@/lib/guestRouteResponses', async importOriginal => {
+  const actual =
+    await importOriginal<typeof import('@/lib/guestRouteResponses')>();
+  return { ...actual, rejectHybridGuestPrivilegeEscalation };
+});
+vi.mock('@/lib/supabase/guestSessionServer', () => ({
+  authorizeHybridGuestRoute,
 }));
 vi.mock('@/lib/shopPurchases', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/shopPurchases')>();
@@ -42,7 +52,7 @@ import {
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
 } from '@/lib/shopPurchases';
 
-import { PUT } from './route';
+import { GET, PUT } from './route';
 
 const params = { params: Promise.resolve({ code: 'ABC', npcId: 'npc-1' }) };
 
@@ -77,6 +87,28 @@ function request(body: Record<string, unknown>) {
   });
 }
 
+function getRequest() {
+  return new NextRequest('http://localhost/api', { method: 'GET' });
+}
+
+function makePublicShop(overrides: Record<string, unknown> = {}) {
+  return {
+    npcId: 'npc-1',
+    merchantName: 'Old Tam',
+    entityIds: ['entity-1'],
+    items: [
+      {
+        id: 'item-1',
+        name: 'Rope, 50ft',
+        itemKind: 'inventory',
+        priceCopper: 100,
+        remainingQuantity: 10,
+      },
+    ],
+    ...overrides,
+  };
+}
+
 const storedLedgerEntry = {
   id: 'item-1',
   name: 'Rope, 50ft',
@@ -103,6 +135,7 @@ beforeEach(() => {
   redis.set.mockResolvedValue('OK');
   redis.del.mockResolvedValue(1);
   seedShopLedger.mockResolvedValue([storedLedgerEntry]);
+  authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
 });
 
 describe('shop publish route — auth', () => {
@@ -331,5 +364,110 @@ describe('shop publish route — request validation', () => {
       params
     );
     expect(response.status).toBe(400);
+  });
+});
+
+describe('shop read route — auth', () => {
+  it('rejects a denied caller before touching redis', async () => {
+    authorizeHybridGuestRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 403,
+      clearCookie: false,
+    });
+    const response = await GET(getRequest(), params);
+    expect(response.status).toBe(403);
+    expect(redis.get).not.toHaveBeenCalled();
+    expect(rawRedis.get).not.toHaveBeenCalled();
+  });
+});
+
+describe('shop read route — no-shop results', () => {
+  it('returns shop: null when the projection is missing', async () => {
+    redis.get.mockResolvedValue(null);
+    rawRedis.get.mockResolvedValue(JSON.stringify([storedLedgerEntry]));
+    const response = await GET(getRequest(), params);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ shop: null });
+  });
+
+  it('returns shop: null when the ledger is missing (shop closed/expired)', async () => {
+    redis.get.mockResolvedValue(JSON.stringify(makePublicShop()));
+    rawRedis.get.mockResolvedValue(null);
+    const response = await GET(getRequest(), params);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ shop: null });
+    // The ledger gate is checked before the projection is even parsed —
+    // never "serve the stale projection alone".
+  });
+});
+
+describe('shop read route — live stock overlay', () => {
+  it('overlays the ledger live remainingQuantity onto the published projection', async () => {
+    redis.get.mockResolvedValue(JSON.stringify(makePublicShop()));
+    rawRedis.get.mockResolvedValue(
+      JSON.stringify([{ ...storedLedgerEntry, remainingQuantity: 7 }])
+    );
+    const response = await GET(getRequest(), params);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.shop.items).toEqual([
+      expect.objectContaining({ id: 'item-1', remainingQuantity: 7 }),
+    ]);
+  });
+
+  it('drops a projection row that has no matching ledger entry, rather than showing stale stock', async () => {
+    redis.get.mockResolvedValue(
+      JSON.stringify(
+        makePublicShop({
+          items: [
+            {
+              id: 'item-1',
+              name: 'Rope, 50ft',
+              itemKind: 'inventory',
+              priceCopper: 100,
+              remainingQuantity: 10,
+            },
+            {
+              id: 'item-2',
+              name: 'Torch',
+              itemKind: 'inventory',
+              priceCopper: 5,
+              remainingQuantity: 20,
+            },
+          ],
+        })
+      )
+    );
+    // Only item-1 is in the ledger — item-2 was never seeded (or has since
+    // dropped out of it) and must not be served with its stale count.
+    rawRedis.get.mockResolvedValue(JSON.stringify([storedLedgerEntry]));
+    const response = await GET(getRequest(), params);
+    const body = await response.json();
+    expect(body.shop.items).toHaveLength(1);
+    expect(body.shop.items[0].id).toBe('item-1');
+  });
+
+  it("never leaks a ledger entry's full item definition to the player response", async () => {
+    const secretMechanicalText =
+      'DM-only mechanical text that must never reach a player';
+    redis.get.mockResolvedValue(JSON.stringify(makePublicShop()));
+    rawRedis.get.mockResolvedValue(
+      JSON.stringify([
+        {
+          ...storedLedgerEntry,
+          remainingQuantity: 7,
+          item: {
+            ...storedLedgerEntry.item,
+            description: secretMechanicalText,
+          },
+        },
+      ])
+    );
+    const response = await GET(getRequest(), params);
+    const body = await response.json();
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain(secretMechanicalText);
+    expect(serialized).not.toContain('"item"');
+    expect(body.shop.items[0]).not.toHaveProperty('item');
   });
 });

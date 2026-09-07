@@ -20,7 +20,12 @@
 
 import type { InventoryItem, MagicItem } from '@/types/character';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
-import type { PublicShop, PublicShopItem, ShopLedgerSeed } from '@/types/shop';
+import type {
+  PublicShop,
+  PublicShopItem,
+  ShopLedgerEntry,
+  ShopLedgerSeed,
+} from '@/types/shop';
 import { resolvePriceCopper } from '@/utils/itemPricing';
 
 const MAX_SHOP_ITEMS = 500;
@@ -175,6 +180,61 @@ export function applyCanonicalShopRemaining(
         ? item
         : { ...item, remainingQuantity: canonical };
     }),
+  };
+}
+
+/**
+ * Overlays a shop ledger's live (post-sales) `remainingQuantity` onto a
+ * PUBLISHED `PublicShop` for a player-facing `GET` (VTT merchants Slice 3,
+ * Task 5a / controller ruling R10). This is NOT `applyCanonicalShopRemaining`
+ * under another name — that function runs at PUBLISH time against a
+ * projection and a ledger seed built from the SAME request, where a mismatch
+ * can't happen, so it leaves an unmatched row untouched as a defensive
+ * no-op. This one runs at READ time against two keys that age independently
+ * — `PURCHASE_SCRIPT` decrements the ledger on every sale and never touches
+ * the projection — so a mismatch here is exactly the stale-stock hazard the
+ * read exists to close, and is handled by dropping, not trusting:
+ *
+ *   - A projection row with no matching ledger entry is REMOVED — never
+ *     shown with a stale (pre-sale) count.
+ *   - A ledger row with no matching projection row is simply never visited:
+ *     this only ever iterates the projection's rows, since the projection
+ *     alone defines what is public. The ledger is consulted for counts
+ *     only, never as a source of rows — a `ShopLedgerEntry` carries the
+ *     full `item` that `PublicShopItem.item: never` exists to keep off the
+ *     wire, so nothing here may spread or return a ledger entry.
+ *
+ * Every field but `remainingQuantity` is explicit-field-picked from the
+ * PROJECTION's row.
+ */
+export function overlayLiveShopStock(
+  shop: PublicShop,
+  ledger: readonly ShopLedgerEntry[]
+): PublicShop {
+  const remainingById = new Map(
+    ledger.map(entry => [entry.id, entry.remainingQuantity])
+  );
+  const items: PublicShopItem[] = [];
+  for (const item of shop.items) {
+    const remainingQuantity = remainingById.get(item.id);
+    if (remainingQuantity === undefined) continue;
+    items.push({
+      id: item.id,
+      name: item.name,
+      itemKind: item.itemKind,
+      priceCopper: item.priceCopper,
+      remainingQuantity,
+      ...(item.description !== undefined
+        ? { description: item.description }
+        : {}),
+      ...(item.rarity !== undefined ? { rarity: item.rarity } : {}),
+    });
+  }
+  return {
+    npcId: shop.npcId,
+    merchantName: shop.merchantName,
+    entityIds: [...shop.entityIds],
+    items,
   };
 }
 
