@@ -40,6 +40,17 @@ const isAbortError = (error: unknown): boolean =>
  * tab reports leader and the pre-existing double-drain behaviour returns.
  * Every browser this app targets ships Web Locks; the fallback exists so a
  * missing API degrades to today's behaviour instead of no reconciliation.
+ *
+ * Leadership deliberately does NOT follow tab visibility (a backgrounded
+ * leader keeps the lock even while the DM works in a foregrounded follower
+ * tab, at the cost of that follower's view lagging behind the leader's
+ * throttled `setInterval` — see `ShopSalesSyncProvider`'s doc comment for
+ * that trade-off in detail). Releasing on every hide would multiply
+ * leadership handoffs, and a handoff is the one moment this lock's whole
+ * design has to avoid: the ledger that decides "already applied" has to
+ * have landed in the new leader's tab (via `crossTabNpcSync`) before it
+ * starts draining, and there is no guarantee of that around a hide/show
+ * cycle.
  */
 export class ShopSalesDrainLock {
   private heldFor: string | null = null;
@@ -52,7 +63,16 @@ export class ShopSalesDrainLock {
     return this.heldFor === campaignCode;
   }
 
-  /** Pass `''` to release without acquiring anything (unmount). */
+  /**
+   * Pass `''` to release without acquiring anything (unmount).
+   *
+   * Single-consumer-per-instance assumption: this early return keeps only
+   * the LAST caller's `callbacks` around (assigned below), so a second
+   * concurrent caller targeting the same `campaignCode` would silently have
+   * its own `onPromoted` dropped. Harmless today — `shopSalesDrainLock` has
+   * exactly one mount site (`src/app/dm/campaign/[code]/layout.tsx`) — but
+   * would need a refcount/callback-list if that ever changes.
+   */
   switchTo(campaignCode: string, callbacks: DrainLockCallbacks): void {
     if (this.targetCode === campaignCode) return;
     this.targetCode = campaignCode;

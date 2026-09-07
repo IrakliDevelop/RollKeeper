@@ -44,10 +44,22 @@ const EMPTY_NPCS: CampaignNPC[] = [];
  * (VTT merchants follow-ups, Task 2). A DM with the dashboard open in one tab
  * and a battlemap in another would otherwise run two independent drains
  * against the same Redis log; see `shopSalesDrainLock.ts`'s doc comment for
- * why that double-applies sales. The leader tab also drains immediately on
- * `visibilitychange`/`focus`: a backgrounded tab's `setInterval` is throttled
- * to roughly once a minute, and the leader may well be the one in the
- * background.
+ * why that double-applies sales.
+ *
+ * The `visibilitychange`/`focus` listener below covers exactly one case:
+ * the LEADER tab itself becoming visible/focused again after being
+ * backgrounded — it forces an immediate `drainNow()` instead of waiting out
+ * that tab's throttled `setInterval` (backgrounded tabs are throttled to
+ * roughly once a minute). It does NOT cover leadership staying in a
+ * backgrounded tab while the DM actively works in a different, foregrounded
+ * follower tab — e.g. dashboard-tab-opened-first, then battlemap-tab-opened.
+ * The leader keeps the lock deliberately (see `shopSalesDrainLock.ts` for
+ * why leadership does not follow visibility), so in that arrangement the
+ * DM's visible purse can lag up to roughly a minute behind the leader's
+ * throttled poll. This is display latency in the DM's own view ONLY — the
+ * credit is never lost or double-applied, and once the leader tab's poll
+ * (or its own visibility/focus event) fires, `crossTabNpcSync` propagates
+ * the update into every other tab, including the one the DM is looking at.
  */
 export function ShopSalesSyncProvider({
   campaignCode,
