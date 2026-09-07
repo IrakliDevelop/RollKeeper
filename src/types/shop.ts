@@ -46,6 +46,18 @@ export interface PublicShopItem {
  */
 export interface ShopLedgerEntry extends Omit<PublicShopItem, 'item'> {
   item: InventoryItem | MagicItem;
+  /**
+   * Cumulative units sold from this row across its lifetime — ledger-only,
+   * never on `PublicShopItem` (players have no business seeing sales
+   * counts). `SHOP_SEED_SCRIPT` uses it to compute `remainingQuantity` on
+   * every reseed as `max(0, freshlyAuthoredStock - soldQuantity)`, so a DM
+   * republishing the shop (which resends the *authored* stock as
+   * `remainingQuantity`, unaware of sales) can genuinely restock an item —
+   * unlike a bare non-increasing `remainingQuantity`, which can only ever
+   * shrink. `PURCHASE_SCRIPT` increments it by the same amount it decrements
+   * `remainingQuantity`.
+   */
+  soldQuantity: number;
 }
 
 /** One completed sale, drained by the DM sync hook for reconciliation. */

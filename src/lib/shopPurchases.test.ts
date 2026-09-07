@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  parseStoredShopLedger,
   purchaseFromShop,
   seedShopLedger,
   validateShopLedgerSeed,
@@ -13,6 +14,7 @@ const entry = {
   itemKind: 'inventory' as const,
   priceCopper: 100,
   remainingQuantity: 3,
+  soldQuantity: 0,
   item: {
     id: 'item-1',
     name: 'Rope, 50ft',
@@ -33,8 +35,12 @@ describe('shop ledger validation', () => {
   it.each([
     { value: [{ ...entry, priceCopper: -1 }] },
     { value: [{ ...entry, priceCopper: 1.5 }] },
+    { value: [{ ...entry, priceCopper: 100_000_001 }] },
     { value: [{ ...entry, remainingQuantity: -1 }] },
     { value: [{ ...entry, remainingQuantity: 1000 }] },
+    { value: [{ ...entry, soldQuantity: -1 }] },
+    { value: [{ ...entry, soldQuantity: 1.5 }] },
+    { value: [{ ...entry, soldQuantity: 1_000_001 }] },
     { value: [entry, entry] },
     { value: [{ ...entry, item: { ...entry.item, name: '' } }] },
     { value: [{ ...entry, itemKind: 'weapon' }] },
@@ -57,6 +63,43 @@ describe('shop ledger validation', () => {
       },
     };
     expect(validateShopLedgerSeed([magicEntry])).toEqual([magicEntry]);
+  });
+
+  it('accepts the maximum allowed priceCopper and soldQuantity', () => {
+    const boundaryEntry = {
+      ...entry,
+      priceCopper: 100_000_000,
+      soldQuantity: 1_000_000,
+    };
+    expect(validateShopLedgerSeed([boundaryEntry])).toEqual([boundaryEntry]);
+  });
+
+  it('defaults a missing soldQuantity to 0 (legacy ledger tolerance)', () => {
+    const { soldQuantity: _soldQuantity, ...withoutSoldQuantity } = entry;
+    void _soldQuantity;
+    expect(validateShopLedgerSeed([withoutSoldQuantity])).toEqual([
+      { ...withoutSoldQuantity, soldQuantity: 0 },
+    ]);
+  });
+});
+
+describe('parseStoredShopLedger', () => {
+  it('returns an empty ledger for a null/absent value', () => {
+    expect(parseStoredShopLedger(null)).toEqual([]);
+  });
+
+  it('normalizes the Redis Lua empty-table encoding to an empty ledger', () => {
+    expect(parseStoredShopLedger('{}')).toEqual([]);
+  });
+
+  it('parses a well-formed stored ledger', () => {
+    expect(parseStoredShopLedger(JSON.stringify([entry]))).toEqual([entry]);
+  });
+
+  it('throws on a malformed stored ledger rather than silently dropping it', () => {
+    expect(() =>
+      parseStoredShopLedger(JSON.stringify([{ ...entry, priceCopper: -1 }]))
+    ).toThrow('Invalid shop ledger');
   });
 });
 
@@ -100,6 +143,14 @@ describe('purchaseFromShop', () => {
     now: '2026-09-07T00:00:00.000Z',
   };
 
+  // NOTE: with redis.eval mocked, this wrapper cannot distinguish a reply
+  // that came from a fresh purchase from one replayed by the receipt-first
+  // check in PURCHASE_SCRIPT — both arrive as the identical JSON shape. This
+  // test only proves the wrapper stamps npcId onto whatever ShopPurchaseReceipt
+  // shape it receives. The actual replay guarantee (a second call with the
+  // same requestId short-circuits before mutating the ledger/queue/sales and
+  // returns byte-identical output) is Task 4's real-Redis harness's claim to
+  // make, not this file's.
   it('returns a successful receipt and stamps the caller-supplied npcId', async () => {
     const receiptFromScript = {
       requestId: 'request-1',
@@ -125,7 +176,7 @@ describe('purchaseFromShop', () => {
     });
   });
 
-  it('forwards KEYS in ledger/transfers/sales/receipt order', async () => {
+  it('forwards KEYS in ledger/transfers/sales/receipt order and ARGV in the documented order', async () => {
     const evalMock = vi.fn().mockResolvedValue(
       JSON.stringify({
         requestId: 'request-1',
@@ -160,7 +211,7 @@ describe('purchaseFromShop', () => {
     ]);
   });
 
-  it('never forwards a price/cost as an ARGV — only quantity and identifiers', async () => {
+  it('never forwards a price/cost as an ARGV, even when the caller-supplied input carries one', async () => {
     const evalMock = vi.fn().mockResolvedValue(
       JSON.stringify({
         requestId: 'request-1',
@@ -172,7 +223,10 @@ describe('purchaseFromShop', () => {
         transferIds: ['transfer-shop-request-1-0'],
       })
     );
-    const forgedInput = { ...input, costCopper: 1 } as typeof input & {
+    // A distinctive, otherwise-impossible-to-coincidentally-match value: if
+    // the wrapper ever forwarded a "costCopper"-shaped field from the input
+    // object, this exact number would show up in the ARGV array below.
+    const forgedInput = { ...input, costCopper: 424_242 } as typeof input & {
       costCopper: number;
     };
     await purchaseFromShop(
@@ -181,7 +235,17 @@ describe('purchaseFromShop', () => {
       forgedInput,
       60
     );
-    expect(evalMock.mock.calls[0][2]).not.toContain(1);
+    // The ARGV array is exactly the seven documented fields — nothing more,
+    // nothing forged — regardless of extra properties on the input object.
+    expect(evalMock.mock.calls[0][2]).toEqual([
+      'entry-1',
+      'request-1',
+      'player-1',
+      2,
+      '2026-09-07T00:00:00.000Z',
+      60,
+      'Old Tam',
+    ]);
   });
 
   it.each([
@@ -197,34 +261,5 @@ describe('purchaseFromShop', () => {
       60
     );
     expect(result).toEqual({ ok: false, error });
-  });
-
-  it('replays a receipt verbatim without re-deriving npcId from the reply', async () => {
-    // The Lua script's receipt-replay path returns exactly what was stored
-    // on the ORIGINAL call, which never included npcId (it isn't known to
-    // the script). The wrapper must still stamp the caller's npcId on a
-    // replay, the same as on a fresh purchase.
-    const receiptFromScript = {
-      requestId: 'request-1',
-      entryId: 'entry-1',
-      playerId: 'player-1',
-      grantedQuantity: 2,
-      costCopper: 200,
-      remainingQuantity: 1,
-      transferIds: ['transfer-shop-request-1-0'],
-    };
-    const evalMock = vi
-      .fn()
-      .mockResolvedValue(JSON.stringify(receiptFromScript));
-    const result = await purchaseFromShop(
-      { eval: evalMock } as unknown as Redis,
-      keys,
-      input,
-      60
-    );
-    expect(result).toEqual({
-      ok: true,
-      receipt: { npcId: 'npc-1', ...receiptFromScript },
-    });
   });
 });

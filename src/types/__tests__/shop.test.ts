@@ -80,6 +80,7 @@ describe('ShopLedgerEntry shape', () => {
       itemKind: 'inventory',
       priceCopper: 100,
       remainingQuantity: 3,
+      soldQuantity: 0,
       item: sampleItem,
     };
     expect(entry.item).toBe(sampleItem);

@@ -130,6 +130,10 @@ export function buildShopLedger(npc: CampaignNPC): ShopLedgerEntry[] {
     entries.push({
       ...toPublicShopItem(row, priceCopper),
       item: toLedgerItem(row),
+      // A fresh build from the NPC's authored inventory has no notion of
+      // sales — `SHOP_SEED_SCRIPT` (shopPurchases.ts) is what merges this
+      // against the persisted ledger's `soldQuantity` on reseed.
+      soldQuantity: 0,
     });
   }
   return entries;

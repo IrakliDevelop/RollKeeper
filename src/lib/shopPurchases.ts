@@ -5,21 +5,41 @@ import type { ShopLedgerEntry } from '@/types/shop';
 const MAX_LEDGER_ENTRIES = 500;
 
 /**
+ * Upper bound on a ledger row's `priceCopper`. `cjson` (Redis's Lua JSON
+ * codec) encodes numbers with `%.14g`, so an integer at/beyond roughly 1e15
+ * prints in scientific notation (`1e+15`) — still valid JSON, but silently
+ * lossy the moment it round-trips through a receipt or sale row that then
+ * gets replayed or re-parsed. `100_000_000` (one million gold pieces) keeps
+ * `price * MAX_MAGIC_PURCHASE_UNITS` (2.5e9) far inside both `Number`'s safe
+ * integer range and `cjson`'s 14 significant digits, with a wide margin.
+ */
+const MAX_PRICE_COPPER = 100_000_000;
+
+/** Cumulative sold-units counter, mirrored on every ledger row; see the cap
+ *  rationale on `ShopLedgerEntry.soldQuantity`. Generous but bounded so a
+ *  pathological row can't grow the ledger's numeric fields without limit. */
+const MAX_SOLD_QUANTITY = 1_000_000;
+
+/**
  * Seeds/reseeds a shop's authoritative ledger (VTT merchants Slice 3, Task 3).
- * Modelled directly on `markerLootClaims.ts`'s `SEED_SCRIPT`: the DM's
- * freshly-authored rows (`ARGV[1]`) always win on every field EXCEPT
- * `remainingQuantity`, which must never increase past what is already
- * persisted — a lower persisted value means units were already sold, and a
- * reseed (price edit, new item added, etc.) must not resurrect them. Unlike
- * marker loot, a shop row has no separate quantity/claimed pair — a single
- * `remainingQuantity` counter serves both roles — so the two-step
- * (inherit-then-clamp) dance collapses into one min() comparison:
+ * Modelled directly on `markerLootClaims.ts`'s `SEED_SCRIPT`, but using the
+ * two-field model marker loot uses (`quantity`/`claimedQuantity`) rather than
+ * a bare non-increasing counter: incoming rows (`ARGV[1]`) carry the DM's
+ * freshly-authored *total* stock in `remainingQuantity` (Task 2's
+ * `buildShopLedger` always emits `soldQuantity: 0`, since a fresh build from
+ * the NPC's inventory has no notion of sales). This script:
  *
- *   if the OLD remaining is lower than the incoming one, keep the OLD
- *   (lower) value — this is what "preserves already-sold quantities" means.
- *   Otherwise the incoming (lower or equal) value is already the more
- *   depleted one — e.g. the DM reducing stock — so it is kept as-is; this is
- *   what "clamps a reduced stock" means.
+ *   1. inherits the OLD row's `soldQuantity` (0 if the row is new), and
+ *   2. recomputes `remainingQuantity = max(0, freshlyAuthoredStock - soldQuantity)`.
+ *
+ * This is deliberately NOT a `min(old, incoming)` comparison — an earlier
+ * version of this script used that, which satisfies "never resurrect sold
+ * units" but ALSO makes `remainingQuantity` permanently non-increasing,
+ * so a DM adding stock to an existing row (Task 5 republishes the whole
+ * shop on every edit) would watch it silently disappear forever. The
+ * two-field model distinguishes "republished unchanged" from "restocked":
+ * new stock 10 with 2 sold -> 8 remaining; new stock 1 with 2 sold -> 0
+ * remaining (still clamped, still never resurrected).
  *
  * Rows are matched by `id` alone (a shop ledger is already scoped to one
  * NPC via the Redis key, unlike marker loot's ledger which spans every
@@ -37,12 +57,13 @@ end
 local incoming = cjson.decode(ARGV[1])
 for _, entry in ipairs(incoming) do
   local old = oldById[entry.id]
-  if old and old.remainingQuantity < entry.remainingQuantity then
-    entry.remainingQuantity = old.remainingQuantity
-  end
-  if entry.remainingQuantity < 0 then
-    entry.remainingQuantity = 0
-  end
+  local sold = 0
+  if old and old.soldQuantity then sold = old.soldQuantity end
+  local seeded = entry.remainingQuantity
+  local remaining = seeded - sold
+  if remaining < 0 then remaining = 0 end
+  entry.soldQuantity = sold
+  entry.remainingQuantity = remaining
 end
 local encoded = #incoming == 0 and '[]' or cjson.encode(incoming)
 redis.call('SET', KEYS[1], encoded, 'EX', ARGV[2])
@@ -59,9 +80,18 @@ return encoded
  *   4. remaining stock < the raw requested quantity      -> 'insufficient-stock'
  *   5. price = entry.priceCopper * the GRANTED quantity  -- server's price;
  *      the client never supplies one, and none is read from ARGV
- *   6. decrement remaining by the granted quantity
+ *   6. decrement remaining by the granted quantity (and increment
+ *      `soldQuantity` by the same amount — see `SHOP_SEED_SCRIPT`'s doc
+ *      comment for why the two counters are tracked separately)
  *   7. enqueue transfers onto the player's transfer queue
- *   8. append a sale row for DM-side reconciliation
+ *   8. append a sale row for DM-side reconciliation, trimming the log to the
+ *      most recent `MAX_SALES_LOG_ENTRIES` (500, matching `MAX_LEDGER_ENTRIES`)
+ *      — this is the same fan-out-protection concern as the transfer/magic
+ *      caps below, applied to a key this script append-rewrites on every
+ *      purchase. A shop that racks up more than 500 un-reconciled sales
+ *      while the DM is disconnected loses its oldest entries; Task 12's
+ *      drain-on-reconnect should poll often enough that this is generous
+ *      headroom, not a real ceiling — noted here for whoever owns that trade-off
  *   9. write the receipt (so a retry short-circuits at step 1)
  *
  * `MAX_MAGIC_PURCHASE_UNITS` mirrors `markerLootClaims.ts`'s
@@ -91,6 +121,9 @@ export const PURCHASE_SCRIPT = `
 -- fan-out concern; shop purchases have their own cap because the queue
 -- being protected (a player's transfer queue) is a different key.
 local MAX_MAGIC_PURCHASE_UNITS = 25
+-- Bounds the sales log this script append-rewrites on every purchase (see
+-- MAX_SALES_LOG_ENTRIES in shopPurchases.ts for the size rationale).
+local MAX_SALES_LOG_ENTRIES = 500
 
 local receiptKey = KEYS[4]
 local previous = redis.call('GET', receiptKey)
@@ -108,8 +141,16 @@ for _, entry in ipairs(ledger) do
 end
 if not selected then return cjson.encode({ error = 'entry-not-found' }) end
 
+-- ARGV[4] is client-controlled. A fractional or non-integer quantity here
+-- would otherwise multiply through into a fractional price, a fractional
+-- remainingQuantity/soldQuantity persisted to the ledger, and — because
+-- validateShopLedgerSeed/isShopLedgerEntry require an integer —
+-- permanently break every future read of this ledger (parseStoredShopLedger
+-- throws), with the bad receipt then replaying forever. Floor immediately
+-- after the minimum-1 clamp so both bounds are enforced on the same value.
 local requested = tonumber(ARGV[4]) or 1
 if requested < 1 then requested = 1 end
+requested = math.floor(requested)
 if selected.remainingQuantity < requested then
   return cjson.encode({ error = 'insufficient-stock' })
 end
@@ -121,6 +162,9 @@ end
 
 local price = selected.priceCopper * granted
 selected.remainingQuantity = selected.remainingQuantity - granted
+local soldSoFar = selected.soldQuantity
+if not soldSoFar then soldSoFar = 0 end
+selected.soldQuantity = soldSoFar + granted
 
 local transferIdPrefix = 'transfer-shop-' .. ARGV[2]
 local transferIds = {}
@@ -161,7 +205,11 @@ table.insert(sales, {
   id = 'sale-' .. ARGV[2], entryId = ARGV[1], quantity = granted,
   copper = price, playerId = ARGV[3], at = ARGV[5]
 })
-redis.call('SET', KEYS[3], cjson.encode(sales), 'EX', ARGV[6])
+while #sales > MAX_SALES_LOG_ENTRIES do
+  table.remove(sales, 1)
+end
+local salesEncoded = #sales == 0 and '[]' or cjson.encode(sales)
+redis.call('SET', KEYS[3], salesEncoded, 'EX', ARGV[6])
 
 local result = {
   requestId = ARGV[2], entryId = ARGV[1], playerId = ARGV[3],
@@ -187,9 +235,14 @@ function isShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
     (entry.itemKind !== 'inventory' && entry.itemKind !== 'magic') ||
     !Number.isInteger(entry.priceCopper) ||
     entry.priceCopper! < 0 ||
+    entry.priceCopper! > MAX_PRICE_COPPER ||
     !Number.isInteger(entry.remainingQuantity) ||
     entry.remainingQuantity! < 0 ||
     entry.remainingQuantity! > 999 ||
+    (entry.soldQuantity !== undefined &&
+      (!Number.isInteger(entry.soldQuantity) ||
+        entry.soldQuantity < 0 ||
+        entry.soldQuantity > MAX_SOLD_QUANTITY)) ||
     (entry.description !== undefined &&
       typeof entry.description !== 'string') ||
     (entry.rarity !== undefined && typeof entry.rarity !== 'string')
@@ -204,9 +257,10 @@ function isShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
 /**
  * Validates a DM-authored shop seed before it is written through
  * `SHOP_SEED_SCRIPT`. Mirrors `validateMarkerLootSeed`'s bounds discipline
- * (length caps, per-entry validity, duplicate-id rejection); unlike that
- * function there is no `locked` flag to default, so a valid entry is
- * returned as-is.
+ * (length caps, per-entry validity, duplicate-id rejection). `soldQuantity`
+ * defaults to `0` when absent — the same tolerance
+ * `validateMarkerLootSeed` gives a missing `locked` flag — so a ledger
+ * written before this field existed keeps validating.
  */
 export function validateShopLedgerSeed(
   value: unknown
@@ -215,7 +269,10 @@ export function validateShopLedgerSeed(
   if (!value.every(isShopLedgerEntry)) return null;
   const ids = new Set(value.map(entry => entry.id));
   if (ids.size !== value.length) return null;
-  return value.map(entry => ({ ...entry }));
+  return value.map(entry => ({
+    ...entry,
+    soldQuantity: entry.soldQuantity ?? 0,
+  }));
 }
 
 /**
