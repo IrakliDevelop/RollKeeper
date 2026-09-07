@@ -133,15 +133,18 @@ describe('canAfford', () => {
 });
 
 describe('spendCopper', () => {
-  it('3 gp / 40 sp / 1 pp → 12 gp equivalent', () => {
-    // 1700 cp total; spending 500 cp (5 gp) leaves 1200 cp = 12 gp equivalent,
-    // re-denominated as 1 pp + 2 gp rather than the original 3 gp/40 sp/1 pp.
+  it('pays from silver on hand, breaking only the last coin needed for the remainder', () => {
+    // 1700 cp total; spending 305 cp is covered by 30 of the 40 silver
+    // outright (300 cp), then 1 more silver must be broken into copper for
+    // the last 5 cp. Gold and platinum are never touched.
     const result = spendCopper(
       purse({ gold: 3, silver: 40, platinum: 1 }),
-      500
+      305
     );
-    expect(result).toEqual(purse({ platinum: 1, gold: 2 }));
-    expect(purseToCopper(result as Currency)).toBe(1200);
+    expect(result).toEqual(
+      purse({ platinum: 1, gold: 3, silver: 9, copper: 5 })
+    );
+    expect(purseToCopper(result as Currency)).toBe(1395);
   });
 
   it('exact change: spending the entire purse leaves all zeros', () => {
@@ -149,7 +152,14 @@ describe('spendCopper', () => {
     expect(result).toEqual(purse());
   });
 
-  it('breaking a platinum: no smaller coins on hand forces a full re-denomination', () => {
+  it('pays from copper on hand without breaking anything', () => {
+    // {silver: 7, copper: 8} = 78 cp; spending 5 cp is covered entirely by
+    // the copper on hand, so the 7 silver come back untouched.
+    const result = spendCopper(purse({ silver: 7, copper: 8 }), 5);
+    expect(result).toEqual(purse({ silver: 7, copper: 3 }));
+  });
+
+  it('breaking a platinum: no smaller coins on hand forces a cascading break', () => {
     const result = spendCopper(purse({ platinum: 1 }), 5);
     expect(result).toEqual(
       purse({ gold: 9, electrum: 1, silver: 4, copper: 5 })
@@ -162,8 +172,10 @@ describe('spendCopper', () => {
     expect(result).toBeNull();
   });
 
-  it('spending 0 returns the purse unchanged in value and composition', () => {
-    const start = purse({ gold: 2, electrum: 1, copper: 3 });
+  it('spending 0 returns a non-canonical purse completely untouched', () => {
+    // {electrum: 2} is worth the same as {gold: 1}, but a 0 cp spend must
+    // not "tidy up" the purse into that canonical form.
+    const start = purse({ electrum: 2 });
     const result = spendCopper(start, 0);
     expect(result).toEqual(start);
   });

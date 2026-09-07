@@ -63,41 +63,82 @@ export function canAfford(purse: Currency, copper: number): boolean {
   return purseToCopper(purse) >= copper;
 }
 
+// Denominations ascending by value — the order `spendCopper` pays from.
+const ASCENDING_DENOMINATIONS: (keyof Currency)[] = [
+  'copper',
+  'silver',
+  'electrum',
+  'gold',
+  'platinum',
+];
+
+/**
+ * Pays as much of `owed` as possible using only whole coins already in
+ * `coins`, smallest denomination first. Mutates `coins` in place and
+ * returns whatever portion of `owed` remains unpaid (0 once fully paid
+ * without needing to break any coin).
+ */
+function payFromCoinsOnHand(coins: Currency, owed: number): number {
+  let remainingOwed = owed;
+  for (const denom of ASCENDING_DENOMINATIONS) {
+    if (remainingOwed <= 0) break;
+    const value = CURRENCY_VALUES[denom];
+    const use = Math.min(coins[denom], Math.floor(remainingOwed / value));
+    coins[denom] -= use;
+    remainingOwed -= use * value;
+  }
+  return remainingOwed;
+}
+
+/**
+ * Breaks the smallest denomination coin on hand larger than copper into
+ * coins of the denomination immediately below it. Returns false when there
+ * is nothing left to break.
+ */
+function breakSmallestAvailableCoin(coins: Currency): boolean {
+  for (let i = 1; i < ASCENDING_DENOMINATIONS.length; i++) {
+    const denom = ASCENDING_DENOMINATIONS[i];
+    if (coins[denom] > 0) {
+      const lowerDenom = ASCENDING_DENOMINATIONS[i - 1];
+      const coinsFromBreak =
+        CURRENCY_VALUES[denom] / CURRENCY_VALUES[lowerDenom];
+      coins[denom] -= 1;
+      coins[lowerDenom] += coinsFromBreak;
+      return true;
+    }
+  }
+  return false;
+}
+
 /**
  * Spends `copper` (integer) from a purse, returning the resulting purse or
  * `null` when the purse cannot cover the cost. Never a partial spend, never
  * negative coin counts.
  *
- * The purse never tracks which physical coins are consumed — only its total
- * value does. So spending is: fold the purse to a single integer-copper
- * total, subtract the cost, then re-denominate the remainder greedily from
- * the largest coin down (platinum, then gold, electrum, silver, copper),
- * taking as many of a denomination as fit before moving to the next. That
- * re-denomination is what "breaks" a large coin: if the remainder is smaller
- * than the coins on hand, the greedy pass simply expresses it using more of
- * the smaller denominations instead — e.g. a purse holding a single platinum
- * piece, after a 5 cp spend, comes back as 9 gold + 1 electrum + 4 silver +
- * 5 copper (995 cp), not a broken-open platinum plus loose change.
+ * Pays greedily from the smallest denomination up, using only the coins
+ * actually on hand, and breaks a larger coin only when the smaller ones
+ * can't cover what's still owed — one coin at a time, immediately down to
+ * the next denomination, then retrying the payment before breaking again if
+ * needed. Coins the spend never needed to touch come back untouched: e.g.
+ * `{silver: 7, copper: 8}` spending 5 cp pays from the copper on hand and
+ * returns `{silver: 7, copper: 3}`, not a re-denominated purse. A purse
+ * holding only `{platinum: 1}` spending 5 cp has nothing smaller to pay
+ * with, so it cascades platinum -> gold -> electrum -> silver -> copper one
+ * break at a time until there's enough small change, landing on
+ * `{gold: 9, electrum: 1, silver: 4, copper: 5}` (995 cp).
  */
 export function spendCopper(purse: Currency, copper: number): Currency | null {
   const total = purseToCopper(purse);
   if (copper < 0 || copper > total) return null;
+  if (copper === 0) return { ...purse };
 
-  let remaining = total - copper;
+  const coins: Currency = { ...purse };
+  let owed = payFromCoinsOnHand(coins, copper);
 
-  const platinum = Math.floor(remaining / CURRENCY_VALUES.platinum);
-  remaining -= platinum * CURRENCY_VALUES.platinum;
+  while (owed > 0) {
+    if (!breakSmallestAvailableCoin(coins)) return null;
+    owed = payFromCoinsOnHand(coins, owed);
+  }
 
-  const gold = Math.floor(remaining / CURRENCY_VALUES.gold);
-  remaining -= gold * CURRENCY_VALUES.gold;
-
-  const electrum = Math.floor(remaining / CURRENCY_VALUES.electrum);
-  remaining -= electrum * CURRENCY_VALUES.electrum;
-
-  const silver = Math.floor(remaining / CURRENCY_VALUES.silver);
-  remaining -= silver * CURRENCY_VALUES.silver;
-
-  const copperCoins = remaining;
-
-  return { platinum, gold, electrum, silver, copper: copperCoins };
+  return coins;
 }
