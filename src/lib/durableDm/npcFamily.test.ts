@@ -228,6 +228,7 @@ describe('Slice 11D NPC family', () => {
         'tags',
         'hitDice',
         'deathSaves',
+        'shop',
         'initiativeModifier',
         'proficiencyBonus',
         'inventory',
@@ -427,6 +428,20 @@ describe('Slice 11D NPC family', () => {
     expect(emptyName.records).toEqual([]);
     expect(kinds(stringMaxHp)).toEqual(['invalid-npc']);
     expect(stringMaxHp.records).toEqual([]);
+  });
+
+  it('accepts an NPC carrying a shop field without treating it as unclassified', async () => {
+    // Regression guard: `shop` must be in NPC_DOCUMENT_FIELDS. If it is
+    // dropped from the allowlist, the whole NPC — not just `shop` — is
+    // rejected as `unclassified-field` and stops syncing entirely.
+    const manifest = await build([
+      npc({ shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' } }),
+    ]);
+
+    expect(manifest.blockers).toEqual([]);
+    expect(manifest.records[0].payload).toMatchObject({
+      shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+    });
   });
 
   it('quarantines invalid and duplicated child identities', async () => {
@@ -674,6 +689,23 @@ describe('Slice 11D NPC family', () => {
     ['actions that are not an array', { actions: 'Dagger' }],
     ['hitDice that are not an object', { hitDice: 'd8' }],
     ['deathSaves that are not an object', { deathSaves: [] }],
+    ['a shop that is not an object', { shop: 'open' }],
+    [
+      'a shop with a non-boolean open',
+      { shop: { open: 'yes', updatedAt: '2026-01-01T00:00:00.000Z' } },
+    ],
+    [
+      'a shop with a non-string updatedAt',
+      { shop: { open: true, updatedAt: 123 } },
+    ],
+    [
+      'a shop updatedAt over 100 characters',
+      { shop: { open: true, updatedAt: 'x'.repeat(101) } },
+    ],
+    [
+      'a shop missing open',
+      { shop: { updatedAt: '2026-01-01T00:00:00.000Z' } },
+    ],
     ['currency that is not an object', { currency: 25 }],
     ['abilityScores that are not an object', { abilityScores: 'str 11' }],
     ['abilityUsage that is not an object', { abilityUsage: 1 }],
@@ -751,6 +783,11 @@ describe('Slice 11D NPC family', () => {
     [
       'null optional numbers',
       { currentHp: null, tempHp: null, xp: null, tempAc: null },
+    ],
+    ['a null shop', { shop: null }],
+    [
+      'a valid shop',
+      { shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
     ],
     [
       'null child collections',

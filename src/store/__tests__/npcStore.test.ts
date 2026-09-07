@@ -1237,6 +1237,78 @@ describe('npcStore — useNpcAbility / restoreNpcAbility', () => {
   });
 });
 
+describe('npcStore — merchant shop fields', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useNPCStore.setState({ npcsByCampaign: {} });
+  });
+
+  it('an NPC persisted without shop/forSale round-trips unchanged', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Plain Villager',
+      armorClass: '10',
+      maxHp: 4,
+      speed: '30 ft.',
+      inventory: [{ id: 'item-1', name: 'Rock', quantity: 1 }],
+    });
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.shop).toBeUndefined();
+    expect(npc?.inventory?.[0].forSale).toBeUndefined();
+    expect(npc?.inventory?.[0].priceCopper).toBeUndefined();
+
+    const persisted = JSON.parse(localStorage.getItem('rollkeeper-npc-data')!);
+    expect(persisted.version).toBe(4);
+    const persistedNpc = persisted.state.npcsByCampaign[CAMPAIGN][0];
+    expect(persistedNpc.shop).toBeUndefined();
+    expect(persistedNpc.inventory[0].forSale).toBeUndefined();
+    expect(persistedNpc.inventory[0].priceCopper).toBeUndefined();
+  });
+
+  it('setting shop and per-item forSale/priceCopper persists', () => {
+    const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+      name: 'Merchant Mira',
+      armorClass: '10',
+      maxHp: 6,
+      speed: '30 ft.',
+      inventory: [
+        { id: 'item-1', name: 'Longsword', quantity: 1, value: 1500 },
+      ],
+    });
+
+    useNPCStore.getState().updateNPC(CAMPAIGN, id, {
+      shop: { open: true, updatedAt: '2026-09-07T00:00:00.000Z' },
+      inventory: [
+        {
+          id: 'item-1',
+          name: 'Longsword',
+          quantity: 1,
+          value: 1500,
+          forSale: true,
+          priceCopper: 2000,
+        },
+      ],
+    });
+
+    const npc = useNPCStore.getState().getNPC(CAMPAIGN, id);
+    expect(npc?.shop).toEqual({
+      open: true,
+      updatedAt: '2026-09-07T00:00:00.000Z',
+    });
+    expect(npc?.inventory?.[0].forSale).toBe(true);
+    expect(npc?.inventory?.[0].priceCopper).toBe(2000);
+
+    const persisted = JSON.parse(localStorage.getItem('rollkeeper-npc-data')!);
+    const persistedNpc = persisted.state.npcsByCampaign[CAMPAIGN][0];
+    expect(persistedNpc.shop).toEqual({
+      open: true,
+      updatedAt: '2026-09-07T00:00:00.000Z',
+    });
+    expect(persistedNpc.inventory[0].forSale).toBe(true);
+    expect(persistedNpc.inventory[0].priceCopper).toBe(2000);
+  });
+});
+
 describe('npcStore — rests reset ability usage', () => {
   beforeEach(() => {
     useNPCStore.setState({ npcsByCampaign: {} });

@@ -20,6 +20,7 @@ import {
   Swords,
   Thermometer,
   Tag,
+  Store,
 } from 'lucide-react';
 import {
   Dialog,
@@ -60,11 +61,12 @@ import {
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellTab } from './NPCSpellTab';
+import { NPCShopTab } from './NPCShopTab';
 import { useNPCStore } from '@/store/npcStore';
 import { NPCCurrencyStrip } from './NPCCurrencyStrip';
 import type { Currency } from '@/types/character';
 
-type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
+type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
 
 const EMPTY_CURRENCY: Currency = {
   platinum: 0,
@@ -705,6 +707,11 @@ export function NPCDetailDialog({
         icon: <BookOpen className="h-3.5 w-3.5" />,
         label: 'Lore',
       },
+      {
+        key: 'shop',
+        icon: <Store className="h-3.5 w-3.5" />,
+        label: 'Shop',
+      },
     ];
 
   return (
@@ -1018,6 +1025,8 @@ export function NPCDetailDialog({
                 </div>
               </div>
             ))}
+
+          {activeTab === 'shop' && <NPCShopTab npc={npc} readOnly={readOnly} />}
         </DialogBody>
 
         <DialogFooter className="!flex-col !items-start gap-2">

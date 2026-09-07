@@ -307,6 +307,12 @@ export interface NPCInventoryItem {
   rarity?: string; // common, uncommon, rare, very rare, legendary, artifact
   /** Full reusable definition when this row came from the DM magic item library. */
   magicItem?: import('./character').MagicItem;
+
+  // Merchant shop fields (DM-authored; unrelated to player-facing inventory)
+  /** Whether this item is listed for sale in the NPC's shop. */
+  forSale?: boolean;
+  /** Per-item price override, in copper. Absent falls through to resolvePriceCopper(). */
+  priceCopper?: number;
 }
 
 export interface CampaignNPC {
@@ -375,7 +381,10 @@ export interface CampaignNPC {
   collapsedSpellSections?: string[]; // e.g. ['stats', 'slotTracker', 'spells']
 
   // UI state: last viewed detail tab
-  lastDetailTab?: 'stats' | 'spells' | 'inventory' | 'lore';
+  lastDetailTab?: 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
+
+  // Merchant shop state. Absent means this NPC is not a merchant.
+  shop?: { open: boolean; updatedAt: string };
 
   // Passive abilities
   passivePerception?: number;
