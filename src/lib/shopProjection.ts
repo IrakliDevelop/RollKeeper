@@ -121,10 +121,7 @@ function toLedgerItem(row: NPCInventoryItem): InventoryItem | MagicItem {
  * carries the full item so a sale can enqueue an `ItemTransfer`. Never sent
  * to players directly.
  */
-export function buildShopLedger(
-  npc: CampaignNPC,
-  entityIds: string[]
-): ShopLedgerEntry[] {
+export function buildShopLedger(npc: CampaignNPC): ShopLedgerEntry[] {
   const entries: ShopLedgerEntry[] = [];
   for (const row of npc.inventory ?? []) {
     if (row.forSale !== true) continue;
@@ -135,9 +132,6 @@ export function buildShopLedger(
       item: toLedgerItem(row),
     });
   }
-  // entityIds is accepted for interface symmetry with buildPublicShop; the
-  // ledger itself is per-NPC/per-item and does not carry entityIds.
-  void entityIds;
   return entries;
 }
 

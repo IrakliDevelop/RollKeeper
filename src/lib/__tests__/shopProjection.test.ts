@@ -174,7 +174,7 @@ describe('buildShopLedger', () => {
         makeItem({ id: 'c', forSale: true, value: 40 }),
       ],
     });
-    const ledger = buildShopLedger(npc, []);
+    const ledger = buildShopLedger(npc);
     expect(ledger.map(entry => entry.id)).toEqual(['c']);
   });
 
@@ -185,7 +185,7 @@ describe('buildShopLedger', () => {
         makeItem({ id: 'ring', forSale: true, magicItem, priceCopper: 5000 }),
       ],
     });
-    const [entry] = buildShopLedger(npc, []);
+    const [entry] = buildShopLedger(npc);
     expect(entry.item).toEqual(magicItem);
     expect(entry.item).not.toBe(magicItem); // cloned, not aliased
   });
@@ -203,7 +203,7 @@ describe('buildShopLedger', () => {
         }),
       ],
     });
-    const [entry] = buildShopLedger(npc, []);
+    const [entry] = buildShopLedger(npc);
     expect(entry.itemKind).toBe('inventory');
     expect(entry.item).toMatchObject({
       id: 'sword',
