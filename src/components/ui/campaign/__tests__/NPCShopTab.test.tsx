@@ -57,6 +57,44 @@ describe('NPCShopTab', () => {
     ).toBeDisabled();
   });
 
+  it('leaves the price placeholders blank for an unpriceable row instead of showing 0', () => {
+    render(<Harness initial={makeNpc({ inventory: [makeItem()] })} />);
+
+    const gp = screen.getByRole('textbox', { name: 'Test Item price (gp)' });
+    const sp = screen.getByRole('textbox', { name: 'Test Item price (sp)' });
+    const cp = screen.getByRole('textbox', { name: 'Test Item price (cp)' });
+
+    // 0 copper is a legitimate DM-authored price — an unpriceable row must
+    // not suggest "free" via a 0 placeholder.
+    expect(gp).not.toHaveAttribute('placeholder');
+    expect(sp).not.toHaveAttribute('placeholder');
+    expect(cp).not.toHaveAttribute('placeholder');
+  });
+
+  it('gives a known-but-unpriceable rarity (artifact) its own provenance line, not "no rarity"', () => {
+    render(
+      <Harness
+        initial={makeNpc({
+          inventory: [makeItem({ rarity: 'artifact' })],
+        })}
+      />
+    );
+
+    expect(
+      screen.getByText(
+        'magic item · artifact, no guideline price — set a price to sell it'
+      )
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/no value, no rarity/)).not.toBeInTheDocument();
+  });
+
+  it('renders the spec\'s "Merchant\'s purse" label above the currency strip', () => {
+    render(<Harness initial={makeNpc()} />);
+
+    expect(screen.getByText("Merchant's purse")).toBeInTheDocument();
+    expect(screen.queryByText('Currency')).not.toBeInTheDocument();
+  });
+
   it('shows the derived default as placeholder text, not as the field value', () => {
     // 5432 copper = 54 gp, 3 sp, 2 cp
     render(

@@ -63,6 +63,11 @@ function knownRarity(item: NPCInventoryItem): MagicItemRarity | null {
  * suffix generalizes to the other two since an override can apply to any
  * row). Ordering mirrors `resolvePriceCopper`'s real precedence: value beats
  * a rarity default.
+ *
+ * A row with a *recognised* rarity that has no guideline price (currently
+ * only `artifact` — RAW priceless, see `itemPricing.ts`) gets its own
+ * message naming the rarity rather than being folded into the "no value, no
+ * rarity" copy, which would misstate a row that does have a rarity.
  */
 export function getProvenanceLine(item: NPCInventoryItem): string {
   const overridden = item.priceCopper !== undefined;
@@ -75,11 +80,14 @@ export function getProvenanceLine(item: NPCInventoryItem): string {
   }
 
   const rarity = knownRarity(item);
-  const rarityDefault = rarity
-    ? MAGIC_ITEM_RARITY_DEFAULT_COPPER[rarity]
-    : null;
-  if (rarityDefault !== null && rarityDefault !== undefined) {
-    return `magic item · rarity default ${formatCurrencyFromCopper(rarityDefault)}${suffix}`;
+  if (rarity) {
+    const rarityDefault = MAGIC_ITEM_RARITY_DEFAULT_COPPER[rarity];
+    if (rarityDefault !== null && rarityDefault !== undefined) {
+      return `magic item · rarity default ${formatCurrencyFromCopper(rarityDefault)}${suffix}`;
+    }
+    return overridden
+      ? `magic item · ${rarity}, no guideline price · overridden`
+      : `magic item · ${rarity}, no guideline price — set a price to sell it`;
   }
 
   return overridden

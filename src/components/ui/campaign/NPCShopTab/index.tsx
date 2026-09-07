@@ -63,6 +63,7 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
           currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
           readonly={readOnly}
           onChange={readOnly ? undefined : setCurrency}
+          label="Merchant's purse"
         />
       </div>
 

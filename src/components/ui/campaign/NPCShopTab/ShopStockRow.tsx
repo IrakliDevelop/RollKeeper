@@ -34,7 +34,11 @@ export function ShopStockRow({
 }: ShopStockRowProps) {
   const priceRequired = resolvePriceCopper(item) === null;
   const rarity = item.magicItem?.rarity ?? item.rarity;
-  const placeholder = priceCopperToDenominations(defaultPriceCopper(item) ?? 0);
+  const defaultPrice = defaultPriceCopper(item);
+  // `null` means no derivable price — leave the placeholder blank rather
+  // than showing 0, since 0 copper is itself a legitimate DM-authored price.
+  const placeholder =
+    defaultPrice !== null ? priceCopperToDenominations(defaultPrice) : null;
   const overrideParts =
     item.priceCopper !== undefined
       ? priceCopperToDenominations(item.priceCopper)
@@ -100,7 +104,7 @@ export function ShopStockRow({
               aria-label={`${item.name} price (${denom})`}
               value={overrideParts?.[denom]}
               onChange={v => handlePriceChange(denom, v)}
-              placeholder={String(placeholder[denom])}
+              placeholder={placeholder ? String(placeholder[denom]) : undefined}
               min={0}
               allowEmpty
               disabled={readOnly}

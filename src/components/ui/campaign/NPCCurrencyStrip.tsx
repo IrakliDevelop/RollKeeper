@@ -32,6 +32,8 @@ interface NPCCurrencyStripProps {
   currency: Currency;
   readonly?: boolean;
   onChange?: (type: keyof Currency, amount: number) => void;
+  /** Heading above the coin grid. Defaults to 'Currency'. */
+  label?: string;
 }
 
 /** A modal-sized currency editor: one compact row with direct balances. */
@@ -39,12 +41,13 @@ export function NPCCurrencyStrip({
   currency,
   readonly = false,
   onChange,
+  label = 'Currency',
 }: NPCCurrencyStripProps) {
   return (
     <section aria-label="NPC currency" className="space-y-1.5">
       <div className="text-muted flex items-center gap-1.5 text-xs font-semibold">
         <Coins className="h-3.5 w-3.5" />
-        Currency
+        {label}
       </div>
       <div className="border-divider bg-surface-secondary grid grid-cols-5 gap-px overflow-hidden rounded-lg border">
         {COINS.map(coin => (

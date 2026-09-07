@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
-import { fireEvent, render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { NPCCurrencyStrip } from '../NPCCurrencyStrip';
 
 const currency = {
@@ -10,6 +10,10 @@ const currency = {
   silver: 40,
   copper: 5,
 };
+
+afterEach(() => {
+  cleanup();
+});
 
 describe('NPCCurrencyStrip', () => {
   it('renders all five coin balances in one compact section', () => {
@@ -31,5 +35,20 @@ describe('NPCCurrencyStrip', () => {
     });
 
     expect(onChange).toHaveBeenCalledWith('gold', 0);
+  });
+
+  it('defaults its heading to "Currency" when no label is given', () => {
+    render(<NPCCurrencyStrip currency={currency} readonly />);
+
+    expect(screen.getByText('Currency')).toBeInTheDocument();
+  });
+
+  it('renders a custom label in place of "Currency" when given one', () => {
+    render(
+      <NPCCurrencyStrip currency={currency} readonly label="Merchant's purse" />
+    );
+
+    expect(screen.getByText("Merchant's purse")).toBeInTheDocument();
+    expect(screen.queryByText('Currency')).not.toBeInTheDocument();
   });
 });
