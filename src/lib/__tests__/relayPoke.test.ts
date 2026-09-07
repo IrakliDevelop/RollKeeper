@@ -296,6 +296,33 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     }
   });
 
+  it('pokes every live room for the "shop" feature, each with a matching room in body and token', async () => {
+    const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
+    const redis = liveRoomsRedisWith(['map-1', 'map-2', 'map-3']);
+
+    await sendBattleMapPokeToLiveRooms(CODE, redis, 'shop', {
+      fetchFn,
+      now: 1_000_000,
+    });
+
+    expect(fetchFn).toHaveBeenCalledTimes(3);
+    const expectedRooms = ['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3'];
+    const actualRooms = fetchFn.mock.calls.map(call => {
+      const [, init] = call as unknown as [string, RequestInit];
+      return JSON.parse(init.body as string).room;
+    });
+    expect(actualRooms.sort()).toEqual(expectedRooms.sort());
+
+    for (const call of fetchFn.mock.calls) {
+      const [url, init] = call as unknown as [string, RequestInit];
+      expect(url).toBe('https://relay.example.com/poke');
+      const body = JSON.parse(init.body as string);
+      expect(body.feature).toBe('shop');
+      const payload = verifyBattleMapToken(body.token, SECRET, 1_000_000);
+      expect(payload).toMatchObject({ role: 'dm', room: body.room });
+    }
+  });
+
   it('falls back to the active-map room when the registry is empty', async () => {
     const fetchFn = vi.fn(async () => new Response(null, { status: 200 }));
     const redis = liveRoomsRedisWith(
