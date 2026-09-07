@@ -20,6 +20,7 @@ import {
   Swords,
   Thermometer,
   Tag,
+  Store,
 } from 'lucide-react';
 import {
   Dialog,
@@ -60,11 +61,12 @@ import {
   formDataToNpcInventoryPatch,
 } from '@/utils/npcInventoryItemForm';
 import { NPCSpellTab } from './NPCSpellTab';
+import { NPCShopTab } from './NPCShopTab';
 import { useNPCStore } from '@/store/npcStore';
 import { NPCCurrencyStrip } from './NPCCurrencyStrip';
 import type { Currency } from '@/types/character';
 
-type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore';
+type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
 
 const EMPTY_CURRENCY: Currency = {
   platinum: 0,
@@ -613,11 +615,7 @@ export function NPCDetailDialog({
     if (open) {
       if (initialTab) {
         setActiveTab(initialTab);
-      } else if (npc?.lastDetailTab && npc.lastDetailTab !== 'shop') {
-        // TEMPORARY: delete the `!== 'shop'` exclusion below once DetailTab
-        // includes 'shop' (Task 4). Widening the type alone will NOT surface
-        // a compile error here, and leaving this clause in silently discards
-        // a DM's saved Shop tab.
+      } else if (npc?.lastDetailTab) {
         setActiveTab(npc.lastDetailTab);
       } else {
         setActiveTab('stats');
@@ -708,6 +706,11 @@ export function NPCDetailDialog({
         key: 'lore',
         icon: <BookOpen className="h-3.5 w-3.5" />,
         label: 'Lore',
+      },
+      {
+        key: 'shop',
+        icon: <Store className="h-3.5 w-3.5" />,
+        label: 'Shop',
       },
     ];
 
@@ -1022,6 +1025,8 @@ export function NPCDetailDialog({
                 </div>
               </div>
             ))}
+
+          {activeTab === 'shop' && <NPCShopTab npc={npc} readOnly={readOnly} />}
         </DialogBody>
 
         <DialogFooter className="!flex-col !items-start gap-2">
