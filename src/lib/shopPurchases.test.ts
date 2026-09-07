@@ -5,9 +5,13 @@ import {
   purchaseFromShop,
   seedShopLedger,
   validateShopLedgerSeed,
+  validateStoredShopLedger,
 } from './shopPurchases';
 import type { Redis } from '@upstash/redis';
 
+/** The STORED ledger shape (`ShopLedgerEntry`) — what Redis holds and what
+ *  `parseStoredShopLedger`/`validateStoredShopLedger` accept. Never valid
+ *  input to `seedShopLedger` (ruling R6) — see `seedEntry` below for that. */
 const entry = {
   id: 'entry-1',
   name: 'Rope, 50ft',
@@ -27,9 +31,22 @@ const entry = {
   },
 };
 
-describe('shop ledger validation', () => {
+/** The SEED shape (`ShopLedgerSeed`) — `buildShopLedger`'s output and the
+ *  only shape `seedShopLedger`/`validateShopLedgerSeed` accept. Has
+ *  `seededQuantity` where the stored shape has `remainingQuantity`, and
+ *  carries no `soldQuantity` at all. */
+const seedEntry = {
+  id: 'entry-1',
+  name: 'Rope, 50ft',
+  itemKind: 'inventory' as const,
+  priceCopper: 100,
+  seededQuantity: 3,
+  item: entry.item,
+};
+
+describe('validateStoredShopLedger (the shape read back from Redis)', () => {
   it('accepts bounded unique entries', () => {
-    expect(validateShopLedgerSeed([entry])).toEqual([entry]);
+    expect(validateStoredShopLedger([entry])).toEqual([entry]);
   });
 
   it.each([
@@ -47,7 +64,7 @@ describe('shop ledger validation', () => {
     { value: [{ ...entry, id: '' }] },
     { value: 'not-an-array' },
   ])('rejects invalid or duplicate entries', ({ value }) => {
-    expect(validateShopLedgerSeed(value)).toBeNull();
+    expect(validateStoredShopLedger(value)).toBeNull();
   });
 
   it('accepts a magic-item entry with description and rarity', () => {
@@ -62,7 +79,7 @@ describe('shop ledger validation', () => {
         name: 'Ring of Protection',
       },
     };
-    expect(validateShopLedgerSeed([magicEntry])).toEqual([magicEntry]);
+    expect(validateStoredShopLedger([magicEntry])).toEqual([magicEntry]);
   });
 
   it('accepts the maximum allowed priceCopper and soldQuantity', () => {
@@ -71,15 +88,74 @@ describe('shop ledger validation', () => {
       priceCopper: 100_000_000,
       soldQuantity: 1_000_000,
     };
-    expect(validateShopLedgerSeed([boundaryEntry])).toEqual([boundaryEntry]);
+    expect(validateStoredShopLedger([boundaryEntry])).toEqual([boundaryEntry]);
   });
 
   it('defaults a missing soldQuantity to 0 (legacy ledger tolerance)', () => {
     const { soldQuantity: _soldQuantity, ...withoutSoldQuantity } = entry;
     void _soldQuantity;
-    expect(validateShopLedgerSeed([withoutSoldQuantity])).toEqual([
+    expect(validateStoredShopLedger([withoutSoldQuantity])).toEqual([
       { ...withoutSoldQuantity, soldQuantity: 0 },
     ]);
+  });
+});
+
+describe('validateShopLedgerSeed (the DM-authored input to seedShopLedger)', () => {
+  it('accepts bounded unique seed entries', () => {
+    expect(validateShopLedgerSeed([seedEntry])).toEqual([seedEntry]);
+  });
+
+  it.each([
+    { value: [{ ...seedEntry, priceCopper: -1 }] },
+    { value: [{ ...seedEntry, priceCopper: 1.5 }] },
+    { value: [{ ...seedEntry, priceCopper: 100_000_001 }] },
+    { value: [{ ...seedEntry, seededQuantity: -1 }] },
+    { value: [{ ...seedEntry, seededQuantity: 1000 }] },
+    { value: [seedEntry, seedEntry] },
+    { value: [{ ...seedEntry, item: { ...seedEntry.item, name: '' } }] },
+    { value: [{ ...seedEntry, itemKind: 'weapon' }] },
+    { value: [{ ...seedEntry, id: '' }] },
+    { value: 'not-an-array' },
+  ])('rejects invalid or duplicate seed entries', ({ value }) => {
+    expect(validateShopLedgerSeed(value)).toBeNull();
+  });
+
+  it('accepts a magic-item seed entry with description and rarity', () => {
+    const magicSeed = {
+      ...seedEntry,
+      id: 'entry-2',
+      itemKind: 'magic' as const,
+      description: 'A ring of protection',
+      rarity: 'rare',
+      item: {
+        ...seedEntry.item,
+        name: 'Ring of Protection',
+      },
+    };
+    expect(validateShopLedgerSeed([magicSeed])).toEqual([magicSeed]);
+  });
+
+  it('accepts the maximum allowed priceCopper and seededQuantity', () => {
+    const boundarySeed = {
+      ...seedEntry,
+      priceCopper: 100_000_000,
+      seededQuantity: 999,
+    };
+    expect(validateShopLedgerSeed([boundarySeed])).toEqual([boundarySeed]);
+  });
+
+  // The type-level guarantee (ruling R6) made concrete at runtime: the
+  // STORED shape (remainingQuantity/soldQuantity) must never validate as a
+  // seed, even though `validateShopLedgerSeed` accepts `unknown` and cannot
+  // rely on the compiler to keep the two shapes apart at this boundary.
+  it('rejects the stored ledger shape outright — the round-trip hazard the type split exists to prevent', () => {
+    expect(validateShopLedgerSeed([entry])).toBeNull();
+  });
+
+  it('rejects a seed entry that smuggles a soldQuantity field', () => {
+    expect(
+      validateShopLedgerSeed([{ ...seedEntry, soldQuantity: 0 }])
+    ).toBeNull();
   });
 });
 
@@ -109,13 +185,16 @@ describe('shop ledger atomic seed', () => {
     const result = await seedShopLedger(
       { eval: evalMock } as unknown as Redis,
       'ledger',
-      [entry],
+      [seedEntry],
       60
     );
     expect(result).toEqual([entry]);
     expect(evalMock).toHaveBeenCalledOnce();
     expect(evalMock.mock.calls[0][1]).toEqual(['ledger']);
-    expect(evalMock.mock.calls[0][2]).toEqual([JSON.stringify([entry]), 60]);
+    expect(evalMock.mock.calls[0][2]).toEqual([
+      JSON.stringify([seedEntry]),
+      60,
+    ]);
   });
 
   it('normalizes the Redis Lua empty-table encoding to an empty ledger', async () => {
@@ -123,6 +202,42 @@ describe('shop ledger atomic seed', () => {
     await expect(
       seedShopLedger({ eval: evalMock } as unknown as Redis, 'ledger', [], 60)
     ).resolves.toEqual([]);
+  });
+
+  // Binding requirement (Task 5 review of Task 3, Critical): validate the
+  // seed BEFORE the write, not just the script's return value. An
+  // out-of-bounds entry must never reach `EVAL` — proven here by asserting
+  // the mock (standing in for the Redis write) is never called.
+  it('rejects an out-of-bounds seed entry before calling EVAL — nothing is written', async () => {
+    const evalMock = vi.fn();
+    const overPriced = { ...seedEntry, priceCopper: 100_000_001 };
+    await expect(
+      seedShopLedger(
+        { eval: evalMock } as unknown as Redis,
+        'ledger',
+        [overPriced],
+        60
+      )
+    ).rejects.toThrow('Invalid shop ledger seed');
+    expect(evalMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects the stored ledger shape as seed input before calling EVAL (ruling R6 at runtime)', async () => {
+    const evalMock = vi.fn();
+    await expect(
+      seedShopLedger(
+        { eval: evalMock } as unknown as Redis,
+        'ledger',
+        // @ts-expect-error ShopLedgerEntry is not assignable to
+        // ShopLedgerSeed — this is the type-level guarantee ruling R6
+        // exists to provide. Cast through `unknown` is not used here on
+        // purpose: the compile error itself is part of what this test
+        // documents, alongside the runtime rejection below.
+        [entry],
+        60
+      )
+    ).rejects.toThrow('Invalid shop ledger seed');
+    expect(evalMock).not.toHaveBeenCalled();
   });
 });
 

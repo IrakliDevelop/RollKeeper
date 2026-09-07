@@ -1,6 +1,6 @@
 import type { Redis } from '@upstash/redis';
 
-import type { ShopLedgerEntry } from '@/types/shop';
+import type { ShopLedgerEntry, ShopLedgerSeed } from '@/types/shop';
 
 const MAX_LEDGER_ENTRIES = 500;
 
@@ -25,9 +25,12 @@ const MAX_SOLD_QUANTITY = 1_000_000;
  * Modelled directly on `markerLootClaims.ts`'s `SEED_SCRIPT`, but using the
  * two-field model marker loot uses (`quantity`/`claimedQuantity`) rather than
  * a bare non-increasing counter: incoming rows (`ARGV[1]`) carry the DM's
- * freshly-authored *total* stock in `remainingQuantity` (Task 2's
- * `buildShopLedger` always emits `soldQuantity: 0`, since a fresh build from
- * the NPC's inventory has no notion of sales). This script:
+ * freshly-authored *total* stock in `seededQuantity` (Task 2's
+ * `buildShopLedger` produces this `ShopLedgerSeed` shape — never
+ * `ShopLedgerEntry` — since a fresh build from the NPC's inventory has no
+ * notion of sales; see the type doc on `ShopLedgerSeed` in `types/shop.ts`
+ * for why the field is deliberately NOT named `remainingQuantity`). This
+ * script:
  *
  *   1. inherits the OLD row's `soldQuantity` (0 if the row is new), and
  *   2. recomputes `remainingQuantity = max(0, freshlyAuthoredStock - soldQuantity)`.
@@ -59,11 +62,12 @@ for _, entry in ipairs(incoming) do
   local old = oldById[entry.id]
   local sold = 0
   if old and old.soldQuantity then sold = old.soldQuantity end
-  local seeded = entry.remainingQuantity
+  local seeded = entry.seededQuantity
   local remaining = seeded - sold
   if remaining < 0 then remaining = 0 end
   entry.soldQuantity = sold
   entry.remainingQuantity = remaining
+  entry.seededQuantity = nil
 end
 local encoded = #incoming == 0 and '[]' or cjson.encode(incoming)
 redis.call('SET', KEYS[1], encoded, 'EX', ARGV[2])
@@ -222,9 +226,15 @@ redis.call('SET', receiptKey, resultRaw, 'EX', ARGV[6])
 return resultRaw
 `;
 
-function isShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
-  if (!value || typeof value !== 'object') return false;
-  const entry = value as Partial<ShopLedgerEntry> & { item?: unknown };
+/** Shared bounds check for the `id`/`name`/`itemKind`/`priceCopper`/
+ *  `description`/`rarity`/`item` fields common to both the stored ledger
+ *  shape (`ShopLedgerEntry`) and the seed shape (`ShopLedgerSeed`). The
+ *  stock field (`remainingQuantity`+`soldQuantity` vs. `seededQuantity`) is
+ *  deliberately NOT checked here — each shape validates that part itself,
+ *  which is the whole point of the two shapes being distinct (ruling R6). */
+function hasValidShopEntryCommonFields(
+  entry: Record<string, unknown> & { item?: unknown }
+): boolean {
   if (
     typeof entry.id !== 'string' ||
     entry.id.length === 0 ||
@@ -234,15 +244,8 @@ function isShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
     entry.name.length > 300 ||
     (entry.itemKind !== 'inventory' && entry.itemKind !== 'magic') ||
     !Number.isInteger(entry.priceCopper) ||
-    entry.priceCopper! < 0 ||
-    entry.priceCopper! > MAX_PRICE_COPPER ||
-    !Number.isInteger(entry.remainingQuantity) ||
-    entry.remainingQuantity! < 0 ||
-    entry.remainingQuantity! > 999 ||
-    (entry.soldQuantity !== undefined &&
-      (!Number.isInteger(entry.soldQuantity) ||
-        entry.soldQuantity < 0 ||
-        entry.soldQuantity > MAX_SOLD_QUANTITY)) ||
+    (entry.priceCopper as number) < 0 ||
+    (entry.priceCopper as number) > MAX_PRICE_COPPER ||
     (entry.description !== undefined &&
       typeof entry.description !== 'string') ||
     (entry.rarity !== undefined && typeof entry.rarity !== 'string')
@@ -250,29 +253,97 @@ function isShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
     return false;
   }
   if (!entry.item || typeof entry.item !== 'object') return false;
-  const { name } = entry.item;
+  const { name } = entry.item as { name?: unknown };
   return typeof name === 'string' && name.length > 0 && name.length <= 300;
 }
 
+function isStoredShopLedgerEntry(value: unknown): value is ShopLedgerEntry {
+  if (!value || typeof value !== 'object') return false;
+  const entry = value as Partial<ShopLedgerEntry> &
+    Record<string, unknown> & { item?: unknown };
+  if (
+    !hasValidShopEntryCommonFields(entry) ||
+    !Number.isInteger(entry.remainingQuantity) ||
+    (entry.remainingQuantity as number) < 0 ||
+    (entry.remainingQuantity as number) > 999 ||
+    (entry.soldQuantity !== undefined &&
+      (!Number.isInteger(entry.soldQuantity) ||
+        (entry.soldQuantity as number) < 0 ||
+        (entry.soldQuantity as number) > MAX_SOLD_QUANTITY))
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
- * Validates a DM-authored shop seed before it is written through
- * `SHOP_SEED_SCRIPT`. Mirrors `validateMarkerLootSeed`'s bounds discipline
- * (length caps, per-entry validity, duplicate-id rejection). `soldQuantity`
- * defaults to `0` when absent — the same tolerance
- * `validateMarkerLootSeed` gives a missing `locked` flag — so a ledger
- * written before this field existed keeps validating.
+ * Validates the STORED ledger shape (`ShopLedgerEntry[]`) — a value read
+ * back from Redis, either via `parseStoredShopLedger` or as the return of
+ * `SHOP_SEED_SCRIPT`/`PURCHASE_SCRIPT`. Mirrors `validateMarkerLootSeed`'s
+ * bounds discipline (length caps, per-entry validity, duplicate-id
+ * rejection). `soldQuantity` defaults to `0` when absent — the same
+ * tolerance `validateMarkerLootSeed` gives a missing `locked` flag — so a
+ * ledger written before this field existed keeps validating.
+ *
+ * NOT the seed-input validator — see `validateShopLedgerSeed` for that.
+ * This function must never be used to validate input on the way INTO
+ * `seedShopLedger`; its return shape (`remainingQuantity`/`soldQuantity`)
+ * is exactly the shape `ShopLedgerSeed` was introduced to keep out of that
+ * path (ruling R6).
  */
-export function validateShopLedgerSeed(
+export function validateStoredShopLedger(
   value: unknown
 ): ShopLedgerEntry[] | null {
   if (!Array.isArray(value) || value.length > MAX_LEDGER_ENTRIES) return null;
-  if (!value.every(isShopLedgerEntry)) return null;
+  if (!value.every(isStoredShopLedgerEntry)) return null;
   const ids = new Set(value.map(entry => entry.id));
   if (ids.size !== value.length) return null;
   return value.map(entry => ({
     ...entry,
     soldQuantity: entry.soldQuantity ?? 0,
   }));
+}
+
+function isShopLedgerSeedEntry(value: unknown): value is ShopLedgerSeed {
+  if (!value || typeof value !== 'object') return false;
+  const entry = value as Partial<ShopLedgerSeed> &
+    Record<string, unknown> & { item?: unknown };
+  if (
+    !hasValidShopEntryCommonFields(entry) ||
+    !Number.isInteger(entry.seededQuantity) ||
+    (entry.seededQuantity as number) < 0 ||
+    (entry.seededQuantity as number) > 999 ||
+    // The seed shape never carries a stock-reconciliation field — an input
+    // asserting one is exactly the round-trip hazard this type exists to
+    // catch (ruling R6), so reject it outright rather than ignoring it.
+    'remainingQuantity' in entry ||
+    'soldQuantity' in entry
+  ) {
+    return false;
+  }
+  return true;
+}
+
+/**
+ * Validates a DM-authored shop ledger SEED (`ShopLedgerSeed[]`) — the ONLY
+ * value `seedShopLedger` accepts as input, and always BEFORE the write
+ * (Task 5 review of Task 3, Critical): an out-of-bounds entry (e.g. a
+ * `priceCopper` above `MAX_PRICE_COPPER`) must never reach `SHOP_SEED_SCRIPT`
+ * in the first place, or it would be persisted to Redis and only rejected on
+ * the way back — a bricked, unreadable ledger. Mirrors
+ * `validateStoredShopLedger`'s bounds discipline for every field the two
+ * shapes share, but checks `seededQuantity` (not `remainingQuantity`) and
+ * rejects an entry carrying either stored-only field
+ * (`remainingQuantity`/`soldQuantity`) outright — see `isShopLedgerSeedEntry`.
+ */
+export function validateShopLedgerSeed(
+  value: unknown
+): ShopLedgerSeed[] | null {
+  if (!Array.isArray(value) || value.length > MAX_LEDGER_ENTRIES) return null;
+  if (!value.every(isShopLedgerSeedEntry)) return null;
+  const ids = new Set(value.map(entry => entry.id));
+  if (ids.size !== value.length) return null;
+  return value.map(entry => ({ ...entry }));
 }
 
 /**
@@ -294,21 +365,30 @@ export function parseStoredShopLedger(raw: string | null): ShopLedgerEntry[] {
   ) {
     return [];
   }
-  const ledger = validateShopLedgerSeed(parsed);
+  const ledger = validateStoredShopLedger(parsed);
   if (!ledger) throw new Error('Invalid shop ledger');
   return ledger;
 }
 
+/**
+ * Seeds/reseeds a shop's ledger atomically. Validates `entries` as a
+ * well-formed `ShopLedgerSeed[]` BEFORE calling `EVAL` — an out-of-bounds
+ * entry is rejected here, before anything is written to Redis, rather than
+ * being persisted first and only caught on the way back out (the bricked-
+ * shop failure mode Task 3's review flagged as Critical).
+ */
 export async function seedShopLedger(
   redis: Redis,
   key: string,
-  entries: ShopLedgerEntry[],
+  entries: ShopLedgerSeed[],
   ttlSeconds: number
 ): Promise<ShopLedgerEntry[]> {
+  const validated = validateShopLedgerSeed(entries);
+  if (!validated) throw new Error('Invalid shop ledger seed');
   const raw = await redis.eval(
     SHOP_SEED_SCRIPT,
     [key],
-    [JSON.stringify(entries), ttlSeconds]
+    [JSON.stringify(validated), ttlSeconds]
   );
   return parseStoredShopLedger(String(raw));
 }

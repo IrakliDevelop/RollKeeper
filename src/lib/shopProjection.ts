@@ -20,7 +20,7 @@
 
 import type { InventoryItem, MagicItem } from '@/types/character';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
-import type { PublicShop, PublicShopItem, ShopLedgerEntry } from '@/types/shop';
+import type { PublicShop, PublicShopItem, ShopLedgerSeed } from '@/types/shop';
 import { resolvePriceCopper } from '@/utils/itemPricing';
 
 const MAX_SHOP_ITEMS = 500;
@@ -116,27 +116,66 @@ function toLedgerItem(row: NPCInventoryItem): InventoryItem | MagicItem {
 }
 
 /**
- * Builds the server-authoritative shop ledger — same inclusion rule as
+ * Builds the server-authoritative shop ledger SEED — same inclusion rule as
  * `buildPublicShop` (`forSale === true` AND priceable), but every entry also
  * carries the full item so a sale can enqueue an `ItemTransfer`. Never sent
  * to players directly.
+ *
+ * Returns `ShopLedgerSeed[]`, NOT `ShopLedgerEntry[]` (ruling R6): a fresh
+ * build from the NPC's authored inventory has no notion of sales, so there
+ * is no `soldQuantity` to report, and the stock field is named
+ * `seededQuantity` rather than `remainingQuantity` so this can never be
+ * confused with — or type-check as — the stored ledger shape
+ * `parseStoredShopLedger` returns. `SHOP_SEED_SCRIPT` (shopPurchases.ts) is
+ * what merges this against the persisted ledger's `soldQuantity` on reseed.
  */
-export function buildShopLedger(npc: CampaignNPC): ShopLedgerEntry[] {
-  const entries: ShopLedgerEntry[] = [];
+export function buildShopLedger(npc: CampaignNPC): ShopLedgerSeed[] {
+  const entries: ShopLedgerSeed[] = [];
   for (const row of npc.inventory ?? []) {
     if (row.forSale !== true) continue;
     const priceCopper = resolvePriceCopper(row);
     if (priceCopper === null) continue;
+    const { remainingQuantity, ...publicFields } = toPublicShopItem(
+      row,
+      priceCopper
+    );
     entries.push({
-      ...toPublicShopItem(row, priceCopper),
+      ...publicFields,
       item: toLedgerItem(row),
-      // A fresh build from the NPC's authored inventory has no notion of
-      // sales — `SHOP_SEED_SCRIPT` (shopPurchases.ts) is what merges this
-      // against the persisted ledger's `soldQuantity` on reseed.
-      soldQuantity: 0,
+      seededQuantity: remainingQuantity,
     });
   }
   return entries;
+}
+
+/**
+ * Overlays a shop ledger's canonical (post-sales) `remainingQuantity` onto a
+ * freshly-built `PublicShop` — the shop analogue of `applyCanonicalRemaining`
+ * in `sanitizePublicMarkers.ts`. `buildPublicShop` projects each row's
+ * `remainingQuantity` straight from `NPCInventoryItem.quantity` (the DM's
+ * freshly-authored total stock, with no notion of sales); after
+ * `seedShopLedger` reconciles that total against already-sold units, the
+ * ledger's `remainingQuantity` is the true live count and must replace it —
+ * otherwise a republish would show players the pre-sale stock count again.
+ * A ledger row with no matching public item (filtered out, or vice versa)
+ * is left untouched; this never adds or removes items, only corrects counts.
+ */
+export function applyCanonicalShopRemaining(
+  shop: PublicShop,
+  ledger: readonly { id: string; remainingQuantity: number }[]
+): PublicShop {
+  const remainingById = new Map(
+    ledger.map(entry => [entry.id, entry.remainingQuantity])
+  );
+  return {
+    ...shop,
+    items: shop.items.map(item => {
+      const canonical = remainingById.get(item.id);
+      return canonical === undefined
+        ? item
+        : { ...item, remainingQuantity: canonical };
+    }),
+  };
 }
 
 function isPublicShopItem(value: unknown): value is PublicShopItem {

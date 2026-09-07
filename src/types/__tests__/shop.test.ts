@@ -6,6 +6,7 @@ import type {
   PublicShop,
   PublicShopItem,
   ShopLedgerEntry,
+  ShopLedgerSeed,
   ShopSale,
 } from '../shop';
 
@@ -84,6 +85,45 @@ describe('ShopLedgerEntry shape', () => {
       item: sampleItem,
     };
     expect(entry.item).toBe(sampleItem);
+  });
+});
+
+describe('ShopLedgerSeed vs ShopLedgerEntry (ruling R6 — type-level)', () => {
+  it('a stored ShopLedgerEntry does not type-check as a ShopLedgerSeed; the seed shape type-checks cleanly (positive control)', () => {
+    const stored: ShopLedgerEntry = {
+      id: 'entry-1',
+      name: sampleItem.name,
+      itemKind: 'inventory',
+      priceCopper: 100,
+      remainingQuantity: 3,
+      soldQuantity: 1,
+      item: sampleItem,
+    };
+
+    // @ts-expect-error ShopLedgerSeed has no `remainingQuantity`/
+    // `soldQuantity` and REQUIRES `seededQuantity` — a stored ledger row
+    // (this is exactly `parseStoredShopLedger`'s return element shape) must
+    // never type-check as seed input to `seedShopLedger`. This is the
+    // compile-time half of ruling R6: feeding a stored ledger back into
+    // seedShopLedger(redis, key, await parseStoredShopLedger(raw)) silently
+    // eroded stock before this type existed. If a future edit widens
+    // `ShopLedgerSeed` back to accept this shape, this directive stops
+    // being an error and `npm run type-check` fails with "Unused
+    // '@ts-expect-error' directive".
+    const smuggled: ShopLedgerSeed = stored;
+    expect(smuggled).toBeDefined();
+
+    // Positive control: the actual seed shape — seededQuantity, no
+    // soldQuantity — type-checks cleanly.
+    const clean: ShopLedgerSeed = {
+      id: 'entry-1',
+      name: sampleItem.name,
+      itemKind: 'inventory',
+      priceCopper: 100,
+      seededQuantity: 3,
+      item: sampleItem,
+    };
+    expect(clean).toBeDefined();
   });
 });
 

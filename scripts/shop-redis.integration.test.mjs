@@ -88,14 +88,18 @@ after(() => {
   server?.kill('SIGTERM');
 });
 
+// Builds a SEED-shaped entry (`ShopLedgerSeed`) — the only shape
+// SHOP_SEED_SCRIPT accepts as input (ARGV[1]). `seededQuantity` is the
+// DM-authored TOTAL stock, never a live remaining count, and there is no
+// `soldQuantity` field here at all — see the type doc on `ShopLedgerSeed`
+// in src/types/shop.ts for why the two shapes are deliberately distinct.
 function shopEntry(overrides = {}) {
   return {
     id: 'entry-1',
     name: 'Rope, 50ft',
     itemKind: 'inventory',
     priceCopper: 100,
-    remainingQuantity: 3,
-    soldQuantity: 0,
+    seededQuantity: 3,
     item: {
       id: 'item-1',
       name: 'Rope, 50ft',
@@ -187,7 +191,7 @@ async function getRaw(key) {
 // ---------------------------------------------------------------------------
 test('concurrent purchases for the last unit: exactly one succeeds', async () => {
   await seedLedger('npc-race', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 1, priceCopper: 50 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 1, priceCopper: 50 }),
   ]);
 
   const [a, b] = await Promise.all([
@@ -228,7 +232,7 @@ test('concurrent purchases for the last unit: exactly one succeeds', async () =>
 // ---------------------------------------------------------------------------
 test('replaying a requestId returns the original receipt and mutates nothing again', async () => {
   await seedLedger('npc-replay', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 5, priceCopper: 100 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 5, priceCopper: 100 }),
   ]);
 
   const first = await purchase({
@@ -279,7 +283,7 @@ test('replaying a requestId returns the original receipt and mutates nothing aga
 // ---------------------------------------------------------------------------
 test('stock exhaustion returns insufficient-stock without going negative', async () => {
   await seedLedger('npc-exhaust', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 2, priceCopper: 10 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 2, priceCopper: 10 }),
   ]);
 
   const buyAll = await purchase({
@@ -338,7 +342,7 @@ test('a magic-item purchase of N stamps costCopper on transfer 0 only', async ()
       id: 'wand-1',
       itemKind: 'magic',
       priceCopper: 40,
-      remainingQuantity: 10,
+      seededQuantity: 10,
       item: {
         id: 'item-wand',
         name: 'Wand of Magic Missiles',
@@ -377,7 +381,7 @@ test('a magic-item purchase of N stamps costCopper on transfer 0 only', async ()
 // ---------------------------------------------------------------------------
 test('a forged price argument is ignored; cost always derives from the ledger', async () => {
   await seedLedger('npc-forged', [
-    shopEntry({ id: 'entry-1', priceCopper: 75, remainingQuantity: 5 }),
+    shopEntry({ id: 'entry-1', priceCopper: 75, seededQuantity: 5 }),
   ]);
 
   // The documented ARGV list has exactly 7 entries; the script never reads
@@ -404,7 +408,7 @@ test('a forged price argument is ignored; cost always derives from the ledger', 
 // ---------------------------------------------------------------------------
 test('a fractional quantity floors and leaves the ledger integer-clean', async () => {
   await seedLedger('npc-fraction', [
-    shopEntry({ id: 'entry-1', priceCopper: 10, remainingQuantity: 5 }),
+    shopEntry({ id: 'entry-1', priceCopper: 10, seededQuantity: 5 }),
   ]);
 
   const receipt = await purchase({
@@ -440,7 +444,7 @@ test('MAX_PRICE_COPPER times a large granted quantity never renders in scientifi
       id: 'artifact-1',
       itemKind: 'magic',
       priceCopper: MAX_PRICE_COPPER,
-      remainingQuantity: 999,
+      seededQuantity: 999,
       item: { id: 'item-artifact', name: 'Artifact', rarity: 'legendary' },
     }),
   ]);
@@ -520,7 +524,7 @@ test('restock model: reseeding recomputes remaining from fresh stock minus cumul
   );
 
   const seeded = await seedLedger('npc-restock', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 10 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 10 }),
   ]);
   const initial = JSON.parse(seeded.join('\n'));
   assert.equal(
@@ -540,7 +544,7 @@ test('restock model: reseeding recomputes remaining from fresh stock minus cumul
   assert.equal(sale.remainingQuantity, 8);
 
   const reseedTo10 = await seedLedger('npc-restock', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 10 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 10 }),
   ]);
   const after10 = JSON.parse(reseedTo10.join('\n'));
   assert.equal(
@@ -551,7 +555,7 @@ test('restock model: reseeding recomputes remaining from fresh stock minus cumul
   assert.equal(after10[0].soldQuantity, 2);
 
   const reseedTo1 = await seedLedger('npc-restock', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 1 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 1 }),
   ]);
   const after1 = JSON.parse(reseedTo1.join('\n'));
   assert.equal(
@@ -567,17 +571,22 @@ test('restock model: reseeding recomputes remaining from fresh stock minus cumul
 });
 
 // ---------------------------------------------------------------------------
-// 9. The seed round-trip hazard (binding, from the re-review): feeding the
-//    stored/parsed ledger back into the seed script as "incoming" silently
-//    destroys stock, because the seed script reads incoming.remainingQuantity
-//    as freshly-authored stock, not as a snapshot of current remaining stock.
-//    No production caller does this yet; this test pins the current,
-//    dangerous behaviour so it cannot regress silently once Task 5 lands a
-//    caller that must NOT do this.
+// 9. The seed round-trip hazard, FIXED (ruling R6, Task 5 review of Task 3):
+//    the script used to read incoming.remainingQuantity as freshly-authored
+//    stock, which meant feeding the stored/parsed ledger straight back into
+//    the seed script silently eroded stock (8 -> 6 -> 4). SHOP_SEED_SCRIPT
+//    now reads incoming.seededQuantity instead — a field the stored shape
+//    never carries — so that exact round-trip is no longer silent data
+//    corruption; it is a hard script failure that leaves the ledger
+//    untouched. (The TypeScript half of this guarantee — that
+//    `ShopLedgerEntry` no longer type-checks as `seedShopLedger`'s input at
+//    all — is asserted separately in shopPurchases.test.ts and
+//    types/__tests__/shop.test.ts; this script has no type system to
+//    exercise, so it pins the runtime consequence instead.)
 // ---------------------------------------------------------------------------
-test('CHARACTERIZATION: feeding the stored ledger back into seed silently erodes stock (8 -> 6 -> 4)', async () => {
+test('the former round-trip hazard is now a hard script failure, not a silent erosion', async () => {
   await seedLedger('npc-hazard', [
-    shopEntry({ id: 'entry-1', remainingQuantity: 10 }),
+    shopEntry({ id: 'entry-1', seededQuantity: 10 }),
   ]);
   const afterSale = await purchase({
     npcId: 'npc-hazard',
@@ -588,25 +597,34 @@ test('CHARACTERIZATION: feeding the stored ledger back into seed silently erodes
   });
   assert.equal(afterSale.remainingQuantity, 8);
 
-  // Round 1: read back the authoritative stored ledger and feed it straight
-  // into the seed script, exactly as a naive "republish" implementation
-  // might. remainingQuantity (8) is misread as fresh stock and soldQuantity
-  // (2) is subtracted from it again: 8 - 2 = 6.
-  const stored1 = await getJson(ledgerKey('npc-hazard'));
-  const round1 = await seedLedger('npc-hazard', stored1);
-  const afterRound1 = JSON.parse(round1.join('\n'));
+  // Read back the authoritative stored ledger (remainingQuantity/
+  // soldQuantity, no seededQuantity) and feed it straight into the seed
+  // script, exactly as a naive "republish" implementation might have done
+  // before this fix. `entry.seededQuantity` is now nil in Lua, so
+  // `seeded - sold` throws instead of silently computing 8 - 2 = 6.
+  const stored = await getJson(ledgerKey('npc-hazard'));
   assert.equal(
-    afterRound1[0].remainingQuantity,
-    6,
-    'round-tripping the stored ledger back into seed erodes stock (hazard, not a fix target here)'
+    'seededQuantity' in stored[0],
+    false,
+    'sanity check: the stored shape must not carry seededQuantity'
+  );
+  const rejected = await seedLedger('npc-hazard', stored);
+  const rejectedText = rejected.join('\n');
+  assert.match(
+    rejectedText,
+    /nil value/i,
+    'feeding the stored ledger back into seed must fail loudly (Lua arithmetic-on-nil), not silently erode stock'
   );
 
-  // Round 2: doing it again erodes it further, confirming this is a
-  // repeatable erosion, not a one-off quirk of the first round.
-  const stored2 = await getJson(ledgerKey('npc-hazard'));
-  const round2 = await seedLedger('npc-hazard', stored2);
-  const afterRound2 = JSON.parse(round2.join('\n'));
-  assert.equal(afterRound2[0].remainingQuantity, 4);
+  // Confirm the rejected attempt mutated nothing: stock is exactly what it
+  // was before the bad reseed was attempted.
+  const ledgerAfter = await getJson(ledgerKey('npc-hazard'));
+  assert.equal(
+    ledgerAfter[0].remainingQuantity,
+    8,
+    'a rejected reseed must leave the ledger untouched'
+  );
+  assert.equal(ledgerAfter[0].soldQuantity, 2);
 });
 
 // ---------------------------------------------------------------------------
@@ -618,7 +636,7 @@ test('CHARACTERIZATION: an empty tags array round-trips through cjson as {} (an 
   await seedLedger('npc-tags', [
     shopEntry({
       id: 'entry-1',
-      remainingQuantity: 5,
+      seededQuantity: 5,
       item: { ...shopEntry().item, tags: [] },
     }),
   ]);

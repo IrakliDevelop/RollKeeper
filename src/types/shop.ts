@@ -60,6 +60,30 @@ export interface ShopLedgerEntry extends Omit<PublicShopItem, 'item'> {
   soldQuantity: number;
 }
 
+/**
+ * The DM-authored SEED for one shop row — `buildShopLedger`'s output and the
+ * only shape `seedShopLedger`/`SHOP_SEED_SCRIPT` ever accept as input.
+ * Deliberately NOT the same shape as `ShopLedgerEntry` (controller ruling
+ * R6, Task 5 review of Task 3): `seededQuantity` names the freshly-authored
+ * TOTAL stock a republish wants live, never the live remaining count, and
+ * there is no `soldQuantity` here at all — a fresh seed has no notion of
+ * sales, `SHOP_SEED_SCRIPT` derives that from the OLD stored row keyed by
+ * `id`. Renaming the stock field (rather than merely documenting the
+ * hazard) makes it a compile error to feed `parseStoredShopLedger`'s return
+ * value — `ShopLedgerEntry[]`, which carries `remainingQuantity` and
+ * `soldQuantity` — back into `seedShopLedger`: exactly the
+ * reseed-erodes-stock hazard (8 -> 6 -> 4) the Task 3 review flagged.
+ * `parseStoredShopLedger` keeps returning `ShopLedgerEntry[]`; the two types
+ * must never be interchangeable.
+ */
+export interface ShopLedgerSeed
+  extends Omit<PublicShopItem, 'item' | 'remainingQuantity'> {
+  item: InventoryItem | MagicItem;
+  /** Authored total stock for this row, before any already-sold units are
+   *  subtracted. Never a live/remaining count — see the type doc above. */
+  seededQuantity: number;
+}
+
 /** One completed sale, drained by the DM sync hook for reconciliation. */
 export interface ShopSale {
   id: string;
