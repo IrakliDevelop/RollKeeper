@@ -149,6 +149,7 @@ interface PlayerBattleMapCanvasProps {
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
+const EMPTY_APPLIED_TRANSFER_IDS: string[] = [];
 
 const PLAYER_TOOLS: {
   name: string;
@@ -489,8 +490,15 @@ export function PlayerBattleMapCanvas({
   // Purchases committed this VTT visit but not yet debited from
   // `ownCharacterCurrency` — see `useCommittedShopSpend`'s doc comment for
   // why (queue vs. sessionStorage receipt union) and how it survives both
-  // a dialog close/reopen and a full VTT reload.
-  const appliedTransferIds = useCharacterStore(s => s.appliedTransferIds);
+  // a dialog close/reopen and a full VTT reload. Guarded by the same
+  // `character.id === characterId` identity check as `ownCharacterCurrency`
+  // above, so a stale `characterStore` (e.g. mid roster-switch) can never
+  // sweep receipts against a different character's ledger.
+  const appliedTransferIdsRaw = useCharacterStore(s => s.appliedTransferIds);
+  const appliedTransferIds =
+    character && character.id === characterId
+      ? appliedTransferIdsRaw
+      : EMPTY_APPLIED_TRANSFER_IDS;
   const { committedCopper, recordCommit } = useCommittedShopSpend({
     characterId,
     pendingTransfers,

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 /**
  * Tracks copper a player has committed to shop purchases this VTT visit but
@@ -99,16 +99,27 @@ function writeReceipts(key: string, receipts: Receipts): void {
   }
 }
 
-/** Applies the four sweep rules to `receipts` against the current queue
- *  snapshot. Returns the same object reference (via unchanged per-id
- *  entries) when nothing moved, so callers can cheaply detect "no-op". */
+/** Applies the sweep rules to `receipts` against the current queue snapshot.
+ *  Returns the same object reference (via unchanged per-id entries) when
+ *  nothing moved, so callers can cheaply detect "no-op".
+ *
+ *  `pendingTransfers === undefined` means "queue unknown" (no
+ *  `useSharedCampaignState` poll has resolved yet), NOT "queue empty" — on
+ *  a fresh mount that distinction matters because a persisted `seen: true`
+ *  receipt from a previous session would otherwise read as "was seen in the
+ *  queue, now gone → merged and acked" and be deleted before the debit has
+ *  actually landed. While the queue is unknown, only the
+ *  "already applied → drop" rule may still fire (it depends on
+ *  `appliedTransferIds`, an independent, always-known source); the
+ *  seen-and-now-absent and staleness rules are skipped entirely. */
 function sweepReceipts(
   receipts: Receipts,
-  pendingTransfers: { id: string; costCopper?: number }[],
+  pendingTransfers: { id: string; costCopper?: number }[] | undefined,
   appliedTransferIds: string[],
   nowMs: number
 ): { receipts: Receipts; changed: boolean } {
-  const pendingIds = new Set(pendingTransfers.map(t => t.id));
+  const queueKnown = pendingTransfers !== undefined;
+  const pendingIds = new Set((pendingTransfers ?? []).map(t => t.id));
   const appliedIds = new Set(appliedTransferIds);
   let changed = false;
   const next: Receipts = {};
@@ -116,6 +127,10 @@ function sweepReceipts(
   for (const [id, receipt] of Object.entries(receipts)) {
     if (appliedIds.has(id)) {
       changed = true; // debit landed — drop
+      continue;
+    }
+    if (!queueKnown) {
+      next[id] = receipt; // queue unknown — leave seen/staleness alone
       continue;
     }
     if (receipt.seen && !pendingIds.has(id)) {
@@ -185,30 +200,52 @@ export function useCommittedShopSpend(options: {
   // a different character without an intervening unmount, and a different
   // `characterId` means a different storage key — reload from THAT key
   // rather than carrying this tab's in-memory receipts across the switch.
+  //
+  // React does NOT abort a render when a setter is called mid-render — the
+  // render body runs to completion with its local bindings unchanged, and
+  // only the *committed output* (including queued state updates) is
+  // discarded/reconciled. So `receipts` state still holds the OLD
+  // character's data for the rest of this render even after `setReceipts`
+  // is queued here; every subsequent read in this render must go through
+  // `current` (the freshly loaded value), never the stale `receipts`
+  // variable, or a roster switch can sweep and persist A's receipts under
+  // B's storage key.
   const keyRef = useRef(key);
-  if (keyRef.current !== key) {
-    keyRef.current = key;
-    setReceipts(readReceipts(key));
-  }
+  const switchedCharacter = keyRef.current !== key;
+  if (switchedCharacter) keyRef.current = key;
+  const current = switchedCharacter ? readReceipts(key) : receipts;
+  if (switchedCharacter) setReceipts(current);
 
   // Sweep on every render (adjusting state during render, same pattern as
   // the identity guard above — React discards this render and re-runs with
-  // the swept receipts applied). Persist only when something actually
-  // moved, never unconditionally.
+  // the swept receipts applied). `pendingTransfers` (not `pending`) is
+  // passed through so `sweepReceipts` can distinguish "queue empty" from
+  // "queue unknown" (see its doc comment).
   const nowMs = now();
   const { receipts: swept, changed } = sweepReceipts(
-    receipts,
-    pending,
+    current,
+    pendingTransfers,
     appliedTransferIds,
     nowMs
   );
   if (changed) {
     setReceipts(swept);
-    writeReceipts(key, swept);
   }
 
+  // Persistence is I/O and belongs in an effect, not the render body or a
+  // `setState` updater (both run during render/commit, before React has
+  // decided this render's output is the one that sticks) — see the guard
+  // above for why a render-body write is concretely dangerous. This effect
+  // is the single writer for every path that changes `receipts`: the sweep
+  // above, `recordCommit` below, and the roster-switch reload (a no-op
+  // rewrite of what was just read).
+  const effectiveReceipts = changed ? swept : current;
+  useEffect(() => {
+    writeReceipts(key, effectiveReceipts);
+  }, [key, effectiveReceipts]);
+
   const committedCopper = sumCommitted(
-    changed ? swept : receipts,
+    effectiveReceipts,
     pending,
     appliedTransferIds
   );
@@ -232,11 +269,10 @@ export function useCommittedShopSpend(options: {
             seen: false,
           };
         });
-        writeReceipts(key, next);
         return next;
       });
     },
-    [key, now]
+    [now]
   );
 
   return { committedCopper, recordCommit };
