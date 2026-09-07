@@ -14,13 +14,24 @@ export interface IntentWatermark {
 }
 
 /** Cap on `appliedTransferIds` (dedup ledger for auto-merged item
- * transfers). The server-side transfer queue is drained and deleted on a
- * successful acknowledge, so this only needs to outlive the in-flight
- * window between "applied locally" and "acknowledge confirmed" — not the
- * campaign. 50 is generous headroom above any plausible burst of pending
- * transfers (items are sent one at a time) while keeping the persisted
- * envelope tiny (id strings only). */
-export const APPLIED_TRANSFER_IDS_MAX = 50;
+ * transfers). A shop purchase stamps `costCopper` on transfer index 0 of
+ * its batch only (see `src/lib/shopPurchases.ts`'s "first-transfer-carries-
+ * the-whole-cost rule"); with FIFO eviction, the oldest entry evicted could
+ * be exactly that cost-carrying id, re-charging the purchase on a later
+ * reload. A single purchase batch is bounded at `MAX_MAGIC_PURCHASE_UNITS`
+ * (25, in `shopPurchases.ts`'s Lua script) transfers, so this cap must clear
+ * that with real margin — not per-purchase, since the server's transfer
+ * enqueue path (`shared/route.ts`'s `item_transfer` handler) has no cap of
+ * its own and multiple sends/purchases can accumulate while acks fail.
+ * `useItemTransferAutoMerge` also removes an id from this ledger the moment
+ * its specific acknowledge succeeds (not just when the whole legacy
+ * whole-queue ack succeeds), so steady-state usage stays near zero and this
+ * cap is a backstop against *sustained* ack failure, not routine operation.
+ * 500 mirrors this codebase's own established convention for the identical
+ * "unbounded queue fan-out" concern class — see `MAX_SALES_LOG_ENTRIES` /
+ * `MAX_LEDGER_ENTRIES` in `shopPurchases.ts` — rather than a fresh guess,
+ * and gives 20x headroom over one purchase's maximum batch size. */
+export const APPLIED_TRANSFER_IDS_MAX = 500;
 
 export interface CharacterEnvelope {
   character: CharacterState;

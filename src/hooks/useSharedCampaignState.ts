@@ -19,7 +19,18 @@ interface UseSharedCampaignStateResult {
   lastFetched: Date | null;
   acknowledgeMessage: (messageId: string) => Promise<void>;
   acknowledgeDmEffects: () => Promise<void>;
-  acknowledgeTransfers: () => Promise<void>;
+  /**
+   * Acknowledges one transfer by id, or — with no argument — the entire
+   * queue. Prefer passing the id of exactly what was applied: a
+   * no-argument call DELETEs the whole Redis key, destroying any transfer
+   * enqueued between the client's last poll and this call before it's ever
+   * applied (harmless for a gift, a silently lost purchase for one that
+   * carries `costCopper`). Resolves `true` iff the request completed
+   * without throwing (network failure) — unlike the other acknowledge
+   * helpers, callers use this to decide whether it's safe to forget local
+   * dedup state for that id (see `useItemTransferAutoMerge`).
+   */
+  acknowledgeTransfers: (transferId?: string) => Promise<boolean>;
   /**
    * Acknowledge one XP award by receipt. THROWS on failure (unlike the other
    * acknowledge helpers) — the award processor must stop, not continue.
@@ -241,25 +252,39 @@ export function useSharedCampaignState(
     }
   }, [campaignCode, playerId]);
 
-  const acknowledgeTransfers = useCallback(async () => {
-    if (!campaignCode || !playerId) return;
-    try {
-      await fetch(`/api/campaign/${campaignCode}/shared`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-rollkeeper-csrf': '1',
-        },
-        body: JSON.stringify({ playerId, type: 'transfers' }),
-      });
-      setSharedState(prev => {
-        if (!prev) return prev;
-        return { ...prev, transfers: [] };
-      });
-    } catch (err) {
-      console.error('Failed to acknowledge transfers:', err);
-    }
-  }, [campaignCode, playerId]);
+  const acknowledgeTransfers = useCallback(
+    async (transferId?: string): Promise<boolean> => {
+      if (!campaignCode || !playerId) return false;
+      try {
+        await fetch(`/api/campaign/${campaignCode}/shared`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
+          body: JSON.stringify({
+            playerId,
+            type: 'transfers',
+            ...(transferId ? { transferId } : {}),
+          }),
+        });
+        setSharedState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            transfers: transferId
+              ? prev.transfers.filter(t => t.id !== transferId)
+              : [],
+          };
+        });
+        return true;
+      } catch (err) {
+        console.error('Failed to acknowledge transfers:', err);
+        return false;
+      }
+    },
+    [campaignCode, playerId]
+  );
 
   const acknowledgeXpAward = useCallback(
     async (receipt: string) => {

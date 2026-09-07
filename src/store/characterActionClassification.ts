@@ -216,7 +216,19 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   clearDeathAnimation: 'LOCAL_UI',
   clearLevelUpAnimation: 'LOCAL_UI',
   noteIntentApplied: 'LOCAL_UI',
-  recordAppliedTransfer: 'LOCAL_UI',
+  // Exception to the "mutates `character`" framing above: recordAppliedTransfer
+  // mutates the sibling `appliedTransferIds` field, never `character`. It is
+  // classified CANONICAL anyway because `createPerCharacterStorage`'s
+  // persistence gate is per-TAB (leader-only), not per-field — a follower
+  // tab's LOCAL_UI write would update memory but never reach localStorage.
+  // The item-transfer auto-merge effect runs in whichever tab has the sheet
+  // page open, which is not necessarily the writer-lock leader (e.g.
+  // PlayerVttScreen holds the lock but never applies transfers), so this
+  // must ride the leader-executed/forwarded pipeline like a real canonical
+  // mutation to actually persist.
+  recordAppliedTransfer: 'CANONICAL',
+  // Same exception and rationale as recordAppliedTransfer immediately above.
+  clearAppliedTransfer: 'CANONICAL',
   triggerDeathAnimation: 'LOCAL_UI',
   triggerLevelUpAnimation: 'LOCAL_UI',
   // — queries —

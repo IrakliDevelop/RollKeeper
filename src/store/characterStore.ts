@@ -441,8 +441,18 @@ interface CharacterStore {
    * the next mount. Capped at `APPLIED_TRANSFER_IDS_MAX`, FIFO eviction. */
   appliedTransferIds: string[];
   /** Records a transfer id as applied. Idempotent — recording an id already
-   * present is a no-op (order-preserving, does not re-bump it to "newest"). */
+   * present is a no-op (order-preserving, does not re-bump it to "newest").
+   * Classified CANONICAL (see characterActionClassification.ts) so a
+   * follower tab's call is forwarded to and persisted by the leader,
+   * rather than silently dropped by the leader-only persistence gate. */
   recordAppliedTransfer: (transferId: string) => void;
+  /** Removes a transfer id from the ledger once its specific
+   * `acknowledgeTransfers(id)` call has actually succeeded — it will never
+   * reappear in the live transfer queue, so there's nothing left to dedupe
+   * against and no reason to keep spending ledger capacity on it. Same
+   * CANONICAL classification and rationale as `recordAppliedTransfer`. A
+   * no-op if the id is already absent. */
+  clearAppliedTransfer: (transferId: string) => void;
   showDeathAnimation: boolean;
   showLevelUpAnimation: boolean;
   levelUpAnimationLevel: number;
@@ -5472,6 +5482,17 @@ export const useCharacterStore = create<CharacterStore>()(
                   ]),
                 }
           ),
+
+        clearAppliedTransfer: transferId =>
+          set(state =>
+            state.appliedTransferIds.includes(transferId)
+              ? {
+                  appliedTransferIds: state.appliedTransferIds.filter(
+                    id => id !== transferId
+                  ),
+                }
+              : {}
+          ),
       }))
     ),
     {
@@ -5521,7 +5542,12 @@ export const characterIntentBus = new CharacterIntentBus({
   applyIntent: applyForwardedIntent,
 });
 
-function onPromotedToLeader(characterId: string): void {
+// Exported for direct unit testing: `characterWriterLock.switchTo`'s
+// `onPromoted` callback is only ever invoked when the Web Locks API is
+// available, which jsdom does not implement — so a test can't reach this
+// function through the real module-load wiring below. Not intended to be
+// called from outside characterStore.ts/tests otherwise.
+export function onPromotedToLeader(characterId: string): void {
   // Hydration barrier (spec): adopt the canonical envelope BEFORE serving
   // intents or announcing — lock acquisition must not race ahead of the
   // previous leader's queued storage event.

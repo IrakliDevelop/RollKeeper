@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 
 import { useItemTransferAutoMerge } from '../useItemTransferAutoMerge';
 import type { ItemTransfer } from '@/types/sharedState';
@@ -47,20 +47,33 @@ function makeStore(initialIds: string[] = []) {
       appliedTransferIds = [...appliedTransferIds, id];
     }
   });
+  const clearAppliedTransfer = vi.fn((id: string) => {
+    appliedTransferIds = appliedTransferIds.filter(x => x !== id);
+  });
   return {
     get appliedTransferIds() {
       return appliedTransferIds;
     },
     recordAppliedTransfer,
+    clearAppliedTransfer,
   };
 }
 
+/** Flushes the microtask queue so the effect's fire-and-forget
+ * `acknowledgeTransfers(id).then(...)` chains settle before assertions. */
+async function flush() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe('useItemTransferAutoMerge', () => {
-  it('applies a new transfer and acknowledges it', () => {
+  it('applies a new transfer, acknowledges it by id, and clears the ledger entry on success', async () => {
     const store = makeStore();
     const addInventoryItem = vi.fn();
     const addMagicItem = vi.fn();
-    const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
     const transfer = makeTransfer();
 
     const updateCurrency = vi.fn();
@@ -70,6 +83,7 @@ describe('useItemTransferAutoMerge', () => {
         transfers: [transfer],
         appliedTransferIds: store.appliedTransferIds,
         recordAppliedTransfer: store.recordAppliedTransfer,
+        clearAppliedTransfer: store.clearAppliedTransfer,
         addInventoryItem,
         addMagicItem,
         acknowledgeTransfers,
@@ -81,16 +95,50 @@ describe('useItemTransferAutoMerge', () => {
     expect(addInventoryItem).toHaveBeenCalledTimes(1);
     expect(addMagicItem).not.toHaveBeenCalled();
     expect(store.recordAppliedTransfer).toHaveBeenCalledWith('transfer-1');
+    // Per-id, not a blanket whole-queue acknowledge.
     expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
+    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
     // No cost on this transfer — the purse must not be touched at all.
     expect(updateCurrency).not.toHaveBeenCalled();
+
+    await flush();
+    expect(store.clearAppliedTransfer).toHaveBeenCalledWith('transfer-1');
   });
 
-  it('skips a transfer whose id is already in appliedTransferIds', () => {
+  it('does NOT clear the ledger entry when the acknowledge fails', async () => {
+    const store = makeStore();
+    const addInventoryItem = vi.fn();
+    const addMagicItem = vi.fn();
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(false);
+    const transfer = makeTransfer();
+    const updateCurrency = vi.fn();
+
+    renderHook(() =>
+      useItemTransferAutoMerge({
+        transfers: [transfer],
+        appliedTransferIds: store.appliedTransferIds,
+        recordAppliedTransfer: store.recordAppliedTransfer,
+        clearAppliedTransfer: store.clearAppliedTransfer,
+        addInventoryItem,
+        addMagicItem,
+        acknowledgeTransfers,
+        currency: DEFAULT_CURRENCY,
+        updateCurrency,
+      })
+    );
+
+    await flush();
+    expect(store.clearAppliedTransfer).not.toHaveBeenCalled();
+    // The item stays applied regardless — only the ledger bookkeeping is
+    // conditional on ack success.
+    expect(store.appliedTransferIds).toContain('transfer-1');
+  });
+
+  it('skips a transfer whose id is already in appliedTransferIds, but still retries acknowledging it', async () => {
     const store = makeStore(['transfer-1']);
     const addInventoryItem = vi.fn();
     const addMagicItem = vi.fn();
-    const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
     const transfer = makeTransfer();
 
     const updateCurrency = vi.fn();
@@ -100,6 +148,7 @@ describe('useItemTransferAutoMerge', () => {
         transfers: [transfer],
         appliedTransferIds: store.appliedTransferIds,
         recordAppliedTransfer: store.recordAppliedTransfer,
+        clearAppliedTransfer: store.clearAppliedTransfer,
         addInventoryItem,
         addMagicItem,
         acknowledgeTransfers,
@@ -111,9 +160,46 @@ describe('useItemTransferAutoMerge', () => {
     expect(addInventoryItem).not.toHaveBeenCalled();
     expect(addMagicItem).not.toHaveBeenCalled();
     expect(store.recordAppliedTransfer).not.toHaveBeenCalled();
-    // Nothing was added, so there's nothing new to acknowledge.
-    expect(acknowledgeTransfers).not.toHaveBeenCalled();
     expect(updateCurrency).not.toHaveBeenCalled();
+    // Still present in the live queue (its own prior ack presumably
+    // failed) — worth another acknowledge attempt even though nothing was
+    // (re-)applied.
+    expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
+    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
+
+    await flush();
+    expect(store.clearAppliedTransfer).toHaveBeenCalledWith('transfer-1');
+  });
+
+  it('acknowledges each transfer in a batch individually, not with a blanket call', async () => {
+    const store = makeStore();
+    const addInventoryItem = vi.fn();
+    const addMagicItem = vi.fn();
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+    const updateCurrency = vi.fn();
+    const transfers = [
+      makeTransfer({ id: 'transfer-1' }),
+      makeTransfer({ id: 'transfer-2' }),
+    ];
+
+    renderHook(() =>
+      useItemTransferAutoMerge({
+        transfers,
+        appliedTransferIds: store.appliedTransferIds,
+        recordAppliedTransfer: store.recordAppliedTransfer,
+        clearAppliedTransfer: store.clearAppliedTransfer,
+        addInventoryItem,
+        addMagicItem,
+        acknowledgeTransfers,
+        currency: DEFAULT_CURRENCY,
+        updateCurrency,
+      })
+    );
+
+    expect(acknowledgeTransfers).toHaveBeenCalledTimes(2);
+    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
+    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-2');
+    expect(acknowledgeTransfers).not.toHaveBeenCalledWith(undefined);
   });
 
   it(
@@ -130,9 +216,7 @@ describe('useItemTransferAutoMerge', () => {
       const store = makeStore();
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi
-        .fn()
-        .mockRejectedValue(new Error('network error'));
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(false);
       const transfer = makeTransfer();
 
       const updateCurrency = vi.fn();
@@ -143,6 +227,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -152,9 +237,8 @@ describe('useItemTransferAutoMerge', () => {
       );
       expect(addInventoryItem).toHaveBeenCalledTimes(1);
       expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
-      // Let the rejected acknowledge promise settle without an unhandled
-      // rejection failing the test.
-      await acknowledgeTransfers.mock.results[0]?.value.catch(() => {});
+      await flush();
+      expect(store.clearAppliedTransfer).not.toHaveBeenCalled();
 
       first.unmount();
 
@@ -165,6 +249,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -178,12 +263,89 @@ describe('useItemTransferAutoMerge', () => {
     }
   );
 
+  it('REGRESSION (StrictMode): a double-invoked mount effect applies the transfer exactly once', async () => {
+    // React StrictMode runs a mount effect twice in a row (run, cleanup,
+    // run again) with no re-render — and therefore no fresh
+    // `appliedTransferIds` prop — between the two invocations. A guard that
+    // only reads the (stale) prop would rebuild an empty `seen` set both
+    // times and double-apply. `renderHook(..., { reactStrictMode: true })`
+    // is this repo's established idiom for pinning this (see
+    // useMarkerRegistration.test.tsx / markers.integration.test.tsx) — a
+    // `<StrictMode>` wrapper does NOT double-invoke effects on this stack.
+    const store = makeStore();
+    const addInventoryItem = vi.fn();
+    const addMagicItem = vi.fn();
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+    const updateCurrency = vi.fn();
+    const transfer = makeTransfer({ costCopper: 50 });
+    const currency: Currency = {
+      copper: 0,
+      silver: 0,
+      electrum: 0,
+      gold: 1,
+      platinum: 0,
+    };
+
+    renderHook(
+      () =>
+        useItemTransferAutoMerge({
+          transfers: [transfer],
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency,
+          updateCurrency,
+        }),
+      { reactStrictMode: true }
+    );
+
+    expect(addInventoryItem).toHaveBeenCalledTimes(1);
+    expect(updateCurrency).toHaveBeenCalledTimes(1);
+    expect(store.recordAppliedTransfer).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not record a transfer as applied when addInventoryItem throws (recoverable on the next pass)', () => {
+    const store = makeStore();
+    const addInventoryItem = vi.fn(() => {
+      throw new Error('boom');
+    });
+    const addMagicItem = vi.fn();
+    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+    const updateCurrency = vi.fn();
+    const transfer = makeTransfer();
+
+    expect(() =>
+      renderHook(() =>
+        useItemTransferAutoMerge({
+          transfers: [transfer],
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency: DEFAULT_CURRENCY,
+          updateCurrency,
+        })
+      )
+    ).toThrow('boom');
+
+    // The throw happened before recordAppliedTransfer was reached — the
+    // ledger must NOT claim this transfer was applied, or it would be lost
+    // forever instead of retried on the next poll/reload.
+    expect(store.recordAppliedTransfer).not.toHaveBeenCalled();
+    expect(store.appliedTransferIds).not.toContain('transfer-1');
+  });
+
   describe('coin debit', () => {
     it('a costCopper: 0 transfer debits nothing and does not reshape the purse', () => {
       const store = makeStore();
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
       const updateCurrency = vi.fn();
       const transfer = makeTransfer({ costCopper: 0 });
       const currency: Currency = {
@@ -199,6 +361,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -215,7 +378,7 @@ describe('useItemTransferAutoMerge', () => {
       const store = makeStore();
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
       const updateCurrency = vi.fn();
       const transfer = makeTransfer();
       expect(transfer.costCopper).toBeUndefined();
@@ -225,6 +388,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -240,7 +404,7 @@ describe('useItemTransferAutoMerge', () => {
       const store = makeStore();
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
       const updateCurrency = vi.fn();
       // 235 cp on hand; a 50 cp purchase pays from copper/silver on hand
       // without breaking anything.
@@ -258,6 +422,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -287,7 +452,7 @@ describe('useItemTransferAutoMerge', () => {
       const store = makeStore();
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
       const updateCurrency = vi.fn();
       const currency: Currency = {
         copper: 0,
@@ -337,6 +502,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers,
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -363,7 +529,7 @@ describe('useItemTransferAutoMerge', () => {
       const store = makeStore(['transfer-1']);
       const addInventoryItem = vi.fn();
       const addMagicItem = vi.fn();
-      const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
       const updateCurrency = vi.fn();
       const currency: Currency = {
         copper: 0,
@@ -379,6 +545,7 @@ describe('useItemTransferAutoMerge', () => {
           transfers: [transfer],
           appliedTransferIds: store.appliedTransferIds,
           recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
           addInventoryItem,
           addMagicItem,
           acknowledgeTransfers,
@@ -400,7 +567,7 @@ describe('useItemTransferAutoMerge', () => {
         const store = makeStore();
         const addInventoryItem = vi.fn();
         const addMagicItem = vi.fn();
-        const acknowledgeTransfers = vi.fn().mockResolvedValue(undefined);
+        const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
         const updateCurrency = vi.fn();
         // Only 40 cp on hand; the server-committed cost is 300 cp — this
         // can only happen if the purse was drained from another tab
@@ -420,6 +587,7 @@ describe('useItemTransferAutoMerge', () => {
             transfers: [transfer],
             appliedTransferIds: store.appliedTransferIds,
             recordAppliedTransfer: store.recordAppliedTransfer,
+            clearAppliedTransfer: store.clearAppliedTransfer,
             addInventoryItem,
             addMagicItem,
             acknowledgeTransfers,

@@ -239,6 +239,7 @@ export default function CharacterSheet() {
     deleteInventoryItem,
     appliedTransferIds,
     recordAppliedTransfer,
+    clearAppliedTransfer,
     updateCurrency,
   } = useCharacterStore();
 
@@ -380,6 +381,7 @@ export default function CharacterSheet() {
     transfers: sharedState?.transfers,
     appliedTransferIds,
     recordAppliedTransfer,
+    clearAppliedTransfer,
     addInventoryItem,
     addMagicItem,
     acknowledgeTransfers,

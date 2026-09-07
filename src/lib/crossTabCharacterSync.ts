@@ -10,6 +10,7 @@ interface CharacterStoreLike {
   };
   setState: (partial: {
     intentWatermarks: Record<string, IntentWatermark>;
+    appliedTransferIds: string[];
   }) => void;
 }
 
@@ -38,6 +39,7 @@ export function initCrossTabCharacterSync(
 
     let incomingCharacter: CharacterState | undefined;
     let incomingWatermarks: Record<string, IntentWatermark> = {};
+    let incomingAppliedTransferIds: string[] = [];
     try {
       const parsed: unknown = JSON.parse(event.newValue);
       const state = (
@@ -45,11 +47,13 @@ export function initCrossTabCharacterSync(
           state?: {
             character?: CharacterState;
             intentWatermarks?: Record<string, IntentWatermark>;
+            appliedTransferIds?: string[];
           };
         } | null
       )?.state;
       incomingCharacter = state?.character;
       incomingWatermarks = state?.intentWatermarks ?? {};
+      incomingAppliedTransferIds = state?.appliedTransferIds ?? [];
     } catch {
       return;
     }
@@ -60,7 +64,18 @@ export function initCrossTabCharacterSync(
     if (!isStrictlyFresher(incomingCharacter, character)) return;
 
     loadCharacterState(incomingCharacter);
-    store.setState({ intentWatermarks: incomingWatermarks });
+    // `recordAppliedTransfer` alone never bumps the character's revision (it
+    // doesn't touch `character`), so a write it triggers on its own would
+    // fail the `isStrictlyFresher` gate above and never reach here — but in
+    // practice it's always immediately followed, in the same tick, by the
+    // CANONICAL item-add action for the same transfer, which does bump the
+    // revision. That second write's envelope already reflects the ledger
+    // update, so this branch (reached via the item-add's fresher character)
+    // is where a follower's local ledger actually converges.
+    store.setState({
+      intentWatermarks: incomingWatermarks,
+      appliedTransferIds: incomingAppliedTransferIds,
+    });
   };
 
   window.addEventListener('storage', onStorage);

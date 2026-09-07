@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { ItemTransfer } from '@/types/sharedState';
 import type { Currency, InventoryItem, MagicItem } from '@/types/character';
@@ -17,16 +17,23 @@ interface UseItemTransferAutoMergeOptions {
   appliedTransferIds: string[];
   /** Persists a transfer id as applied. Idempotent. */
   recordAppliedTransfer: (transferId: string) => void;
+  /** Forgets a transfer id once its specific acknowledge has actually
+   * succeeded — it can never reappear in the live queue, so there's no
+   * reason left to keep it in the dedup ledger. */
+  clearAppliedTransfer: (transferId: string) => void;
   addInventoryItem: (
     item: Omit<InventoryItem, 'id' | 'createdAt' | 'updatedAt'>
   ) => void;
   addMagicItem: (
     item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>
   ) => void;
-  /** Fire-and-forget: clears the server-side queue. May fail (network) or
-   * never run (tab closed) — the dedup ledger, not this call, is what
-   * prevents re-application on the next mount. */
-  acknowledgeTransfers: () => Promise<void>;
+  /** Acknowledges one transfer by id, clearing it from the server-side
+   * queue. Resolves `true` iff the request actually completed — used to
+   * decide whether `clearAppliedTransfer` is safe to call. May resolve
+   * `false` (network failure) or never settle in time (tab closed) — the
+   * dedup ledger, not this call, is what prevents re-application on the
+   * next mount. */
+  acknowledgeTransfers: (transferId: string) => Promise<boolean>;
   /** Purse snapshot from the render that scheduled this effect. A purchase
    * debit is applied against this snapshot (and any earlier debit already
    * applied within the same pass — see the running-purse note below), never
@@ -48,23 +55,37 @@ export function useItemTransferAutoMerge({
   transfers,
   appliedTransferIds,
   recordAppliedTransfer,
+  clearAppliedTransfer,
   addInventoryItem,
   addMagicItem,
   acknowledgeTransfers,
   currency,
   updateCurrency,
 }: UseItemTransferAutoMergeOptions): void {
+  // React StrictMode double-invokes a mount effect (run, cleanup, run again)
+  // synchronously, with NO re-render — and therefore no fresh
+  // `appliedTransferIds` prop — between the two runs. Without this, the
+  // second run would rebuild `seen` from the same stale prop, miss the id
+  // `recordAppliedTransfer` just wrote (a store update, but not yet
+  // reflected in this closure's prop), and re-apply the transfer. This ref
+  // is a same-mount latch only: it survives the double-invoke (refs aren't
+  // reset by it) but resets on a genuine remount, where `appliedTransferIds`
+  // itself (now correctly persisted) is what prevents re-application.
+  const appliedThisMountRef = useRef<Set<string>>(new Set());
+
   useEffect(() => {
     const pending = transfers ?? [];
     if (pending.length === 0) return;
 
-    // Snapshot plus a within-run guard: `appliedTransferIds` is the value
-    // from the render that scheduled this effect, so a duplicate id inside
-    // the same `pending` batch (should not happen, but the queue is
-    // server-controlled) would otherwise slip past a `.includes` check
-    // against a snapshot that never changes mid-loop.
+    // Snapshot plus the StrictMode/within-run guard described above.
     const seen = new Set(appliedTransferIds);
-    let added = false;
+    for (const id of appliedThisMountRef.current) seen.add(id);
+
+    // Every transfer still in `pending` gets an acknowledge attempt this
+    // pass — including one already recorded as applied (its OWN prior
+    // acknowledge may have failed and left it stuck in the live queue). Only
+    // a transfer newly applied this pass needs the item/currency work first.
+    const toAcknowledge: string[] = [];
 
     // Running purse across the whole batch: `currency` is a single snapshot
     // from the render that scheduled this effect, and `updateCurrency` won't
@@ -79,9 +100,13 @@ export function useItemTransferAutoMerge({
     let purseChanged = false;
 
     for (const transfer of pending) {
-      if (seen.has(transfer.id)) continue;
+      if (seen.has(transfer.id)) {
+        // Already applied (this mount or a prior one) — nothing left to add
+        // or charge, but still worth an acknowledge retry.
+        toAcknowledge.push(transfer.id);
+        continue;
+      }
       seen.add(transfer.id);
-      recordAppliedTransfer(transfer.id);
 
       if (transfer.itemKind === 'magic') {
         const {
@@ -94,7 +119,6 @@ export function useItemTransferAutoMerge({
         void _createdAt;
         void _updatedAt;
         addMagicItem({ ...item, isAttuned: false, isEquipped: false });
-        added = true;
       } else {
         const inventoryItem = transfer.item as InventoryItem;
         addInventoryItem({
@@ -109,8 +133,15 @@ export function useItemTransferAutoMerge({
           location: inventoryItem.location || 'Backpack',
           tags: inventoryItem.tags || [],
         });
-        added = true;
       }
+
+      // Only record AFTER the item is actually applied above: a throw from
+      // addInventoryItem/addMagicItem would otherwise leave this id marked
+      // "applied" in the persisted ledger with no item to show for it,
+      // permanently losing it instead of recovering on the next reload.
+      appliedThisMountRef.current.add(transfer.id);
+      recordAppliedTransfer(transfer.id);
+      toAcknowledge.push(transfer.id);
 
       // `costCopper` is absent or 0 for gifts/loot and for every transfer
       // in a multi-unit purchase after the first — treat that as an
@@ -160,13 +191,22 @@ export function useItemTransferAutoMerge({
       updateCurrency(purse);
     }
 
-    if (added) {
-      acknowledgeTransfers();
+    // Per-id, not a blanket whole-queue DELETE: acknowledging exactly what
+    // was (re-)confirmed here never destroys a transfer enqueued between
+    // the last poll and now that hasn't been applied yet. Fire-and-forget —
+    // forgetting the ledger entry is a bonus if this lands, not a
+    // requirement for correctness (the ledger only needs to outlive the
+    // in-flight window, and the cap bounds it regardless).
+    for (const id of toAcknowledge) {
+      void acknowledgeTransfers(id).then(ok => {
+        if (ok) clearAppliedTransfer(id);
+      });
     }
   }, [
     transfers,
     appliedTransferIds,
     recordAppliedTransfer,
+    clearAppliedTransfer,
     addInventoryItem,
     addMagicItem,
     acknowledgeTransfers,

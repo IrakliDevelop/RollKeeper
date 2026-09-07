@@ -25,13 +25,19 @@ function makeProps(overrides: Partial<Props> = {}): Props {
 describe('useCharacterRosterSync', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    useCharacterStore.setState({ intentWatermarks: {} });
+    useCharacterStore.setState({
+      intentWatermarks: {},
+      appliedTransferIds: [],
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
     window.localStorage.clear();
-    useCharacterStore.setState({ intentWatermarks: {} });
+    useCharacterStore.setState({
+      intentWatermarks: {},
+      appliedTransferIds: [],
+    });
   });
 
   it('loads the roster character into the store exactly once per characterId', () => {
@@ -287,6 +293,78 @@ describe('useCharacterRosterSync', () => {
       'tab-x': { seq: 9, lastSeen: 500 },
       'tab-y': { seq: 1, lastSeen: 2 },
     });
+  });
+
+  it('adopts the envelope applied-transfer ledger even when the roster entry wins arbitration', () => {
+    // This is the restore path that actually carries Task 8's fix: without
+    // it, a persisted ledger written by a prior mount/tab is never read
+    // back into the live store, and a transfer whose acknowledge failed
+    // before this mount re-applies exactly like the ref-based bug it
+    // replaced.
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: {},
+          appliedTransferIds: ['transfer-1', 'transfer-2'],
+        },
+        version: 0,
+      })
+    );
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+      'transfer-1',
+      'transfer-2',
+    ]);
+  });
+
+  it('merges envelope applied-transfer ids against current in-memory state instead of clobbering', () => {
+    const envelopeCharacter = makeCharacter({ id: 'char-1', revision: 3 });
+    const rosterData = makeCharacter({ id: 'char-1', revision: 7 });
+    window.localStorage.setItem(
+      characterEnvelopeKey('char-1'),
+      JSON.stringify({
+        state: {
+          character: envelopeCharacter,
+          intentWatermarks: {},
+          appliedTransferIds: ['transfer-1'],
+        },
+        version: 0,
+      })
+    );
+    // In-memory already knows about a transfer applied THIS tab hasn't
+    // written to the envelope yet.
+    useCharacterStore.setState({ appliedTransferIds: ['transfer-2'] });
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    renderHook(p => useCharacterRosterSync(p), { initialProps: props });
+
+    expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+      'transfer-1',
+      'transfer-2',
+    ]);
+  });
+
+  it('a roster load with no envelope present leaves the applied-transfer ledger empty, not throwing', () => {
+    const rosterData = makeCharacter({ id: 'char-1' });
+    const props = makeProps({
+      playerCharacter: { characterData: rosterData },
+    });
+
+    expect(() =>
+      renderHook(p => useCharacterRosterSync(p), { initialProps: props })
+    ).not.toThrow();
+    expect(useCharacterStore.getState().appliedTransferIds).toEqual([]);
   });
 
   it('still writes fresher store state back to the roster when a stale load is skipped', () => {

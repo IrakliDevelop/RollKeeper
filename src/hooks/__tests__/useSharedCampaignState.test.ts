@@ -553,6 +553,72 @@ describe('useSharedCampaignState', () => {
     expect(result.current.sharedState!.transfers).toHaveLength(0);
   });
 
+  it('acknowledgeTransfers(id) sends the transferId and removes only that transfer locally', async () => {
+    const state = makeSharedState({
+      transfers: [makeTransfer('t-1'), makeTransfer('t-2')],
+    });
+
+    mockFetchSequence([
+      { status: 200, body: state },
+      { status: 200, body: {} },
+    ]);
+
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.sharedState!.transfers).toHaveLength(2);
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.acknowledgeTransfers('t-1');
+    });
+
+    expect(resolved).toBe(true);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls.find(([, opts]) => opts?.method === 'DELETE');
+    expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
+      playerId: 'player-1',
+      type: 'transfers',
+      transferId: 't-1',
+    });
+
+    // t-2 was never acknowledged and must survive — a no-id ack would have
+    // destroyed it even though it was never applied.
+    expect(result.current.sharedState!.transfers.map(t => t.id)).toEqual([
+      't-2',
+    ]);
+  });
+
+  it('acknowledgeTransfers resolves false (without throwing) when the request fails', async () => {
+    const state = makeSharedState({ transfers: [makeTransfer('t-1')] });
+
+    mockFetchSequence([{ status: 200, body: state }]);
+
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    global.fetch = vi.fn(() =>
+      Promise.reject(new Error('network down'))
+    ) as unknown as typeof global.fetch;
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.acknowledgeTransfers('t-1');
+    });
+
+    expect(resolved).toBe(false);
+    // Nothing was actually acknowledged — local state is untouched.
+    expect(result.current.sharedState!.transfers).toHaveLength(1);
+  });
+
   // -----------------------------------------------------------------------
   // Polling interval
   // -----------------------------------------------------------------------

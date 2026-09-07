@@ -1,11 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 
-import { useCharacterStore } from '@/store/characterStore';
+import {
+  useCharacterStore,
+  onPromotedToLeader,
+  characterIntentBus,
+} from '@/store/characterStore';
 import {
   readCharacterEnvelope,
   characterEnvelopeKey,
   APPLIED_TRANSFER_IDS_MAX,
 } from '@/lib/characterCanonicalStorage';
+import { characterWriterLock } from '@/lib/characterWriterLock';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 describe('characterStore — appliedTransferIds / recordAppliedTransfer', () => {
@@ -89,5 +94,172 @@ describe('characterStore — appliedTransferIds / recordAppliedTransfer', () => 
     expect(
       useCharacterStore.getState().appliedTransferIds.includes('anything')
     ).toBe(false);
+  });
+
+  describe('onPromotedToLeader adoption', () => {
+    // `characterWriterLock.switchTo`'s `onPromoted` callback is only ever
+    // invoked when the Web Locks API is available, which jsdom does not
+    // implement — so this exercises the exported function directly instead
+    // of going through the real module-load wiring, which this suite alone
+    // cannot reach. This is the other half of the restore path (alongside
+    // useCharacterRosterSync's load-time adoption): without it, a tab that
+    // becomes leader after startup never adopts a ledger written by
+    // whichever tab held the lock before it.
+    it('adopts the envelope applied-transfer ledger on promotion', () => {
+      const character = makeCharacter({ id: 'leader-char', revision: 5 });
+      useCharacterStore.getState().loadCharacterState(character);
+      window.localStorage.setItem(
+        characterEnvelopeKey('leader-char'),
+        JSON.stringify({
+          state: {
+            character,
+            intentWatermarks: {},
+            appliedTransferIds: ['transfer-1', 'transfer-2'],
+          },
+          version: 0,
+        })
+      );
+
+      onPromotedToLeader('leader-char');
+
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+        'transfer-2',
+      ]);
+    });
+
+    it('merges the envelope ledger against current in-memory state instead of clobbering', () => {
+      const character = makeCharacter({ id: 'leader-char', revision: 5 });
+      useCharacterStore.getState().loadCharacterState(character);
+      useCharacterStore.setState({ appliedTransferIds: ['transfer-2'] });
+      window.localStorage.setItem(
+        characterEnvelopeKey('leader-char'),
+        JSON.stringify({
+          state: {
+            character,
+            intentWatermarks: {},
+            appliedTransferIds: ['transfer-1'],
+          },
+          version: 0,
+        })
+      );
+
+      onPromotedToLeader('leader-char');
+
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+        'transfer-2',
+      ]);
+    });
+
+    it('is a no-op for the ledger when no envelope exists for the character', () => {
+      const character = makeCharacter({ id: 'no-envelope-char' });
+      useCharacterStore.getState().loadCharacterState(character);
+      useCharacterStore.setState({ appliedTransferIds: ['transfer-1'] });
+
+      expect(() => onPromotedToLeader('no-envelope-char')).not.toThrow();
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+      ]);
+    });
+  });
+
+  describe('clearAppliedTransfer', () => {
+    it('removes a recorded id', () => {
+      useCharacterStore.getState().recordAppliedTransfer('transfer-1');
+      useCharacterStore.getState().recordAppliedTransfer('transfer-2');
+      useCharacterStore.getState().clearAppliedTransfer('transfer-1');
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-2',
+      ]);
+    });
+
+    it('is a no-op for an id not present', () => {
+      useCharacterStore.getState().recordAppliedTransfer('transfer-1');
+      expect(() =>
+        useCharacterStore.getState().clearAppliedTransfer('nonexistent')
+      ).not.toThrow();
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+      ]);
+    });
+
+    it('persists the removal to the canonical envelope', () => {
+      const character = makeCharacter({ id: 'clear-char' });
+      useCharacterStore.getState().loadCharacterState(character);
+      useCharacterStore.getState().recordAppliedTransfer('transfer-1');
+      useCharacterStore.getState().clearAppliedTransfer('transfer-1');
+
+      const envelope = readCharacterEnvelope('clear-char');
+      expect(envelope?.appliedTransferIds).not.toContain('transfer-1');
+    });
+  });
+
+  describe('CANONICAL classification (Important #2): a follower tab forwards instead of dropping the write', () => {
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('a follower tab does not mutate its own ledger locally — it forwards the call as an intent', () => {
+      const character = makeCharacter({ id: 'follower-char' });
+      useCharacterStore.getState().loadCharacterState(character);
+      vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(false);
+      const sendSpy = vi.spyOn(characterIntentBus, 'send');
+
+      useCharacterStore.getState().recordAppliedTransfer('transfer-1');
+
+      // Not executed locally in a follower tab — a LOCAL_UI classification
+      // would have mutated this immediately, updating memory only, never
+      // reaching localStorage (createPerCharacterStorage's leader-only
+      // persistence gate), reproducing the original bug in whichever tab
+      // isn't the writer-lock leader (e.g. the sheet tab, when
+      // PlayerVttScreen holds the lock but never applies transfers).
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([]);
+      expect(sendSpy).toHaveBeenCalledWith(
+        'follower-char',
+        'recordAppliedTransfer',
+        ['transfer-1']
+      );
+    });
+
+    it('the leader tab still executes and persists locally, unchanged from before reclassification', () => {
+      const character = makeCharacter({ id: 'leader-tab-char' });
+      useCharacterStore.getState().loadCharacterState(character);
+      vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(true);
+
+      useCharacterStore.getState().recordAppliedTransfer('transfer-1');
+
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+      ]);
+      const envelope = readCharacterEnvelope('leader-tab-char');
+      expect(envelope?.appliedTransferIds).toEqual(['transfer-1']);
+    });
+  });
+
+  describe('cap financial-bug margin (escalated finding)', () => {
+    it('a full-size shop purchase batch (25 transfers) never evicts its own cost-carrying entry, even against a near-full ledger', () => {
+      // Fill the ledger to just under the cap with unrelated, older ids —
+      // simulating a backlog of applied-but-unacknowledged transfers from
+      // earlier activity.
+      const backlogSize = APPLIED_TRANSFER_IDS_MAX - 10;
+      for (let i = 0; i < backlogSize; i++) {
+        useCharacterStore.getState().recordAppliedTransfer(`backlog-${i}`);
+      }
+
+      // A single shop purchase batch: up to MAX_MAGIC_PURCHASE_UNITS (25)
+      // transfers, cost stamped on index 0 only.
+      const purchaseIds = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
+      for (const id of purchaseIds) {
+        useCharacterStore.getState().recordAppliedTransfer(id);
+      }
+
+      const ids = useCharacterStore.getState().appliedTransferIds;
+      // The cost-carrying entry (index 0 of the purchase) must still be
+      // present — this is the entry that would trigger a re-charge if
+      // evicted and later re-applied on reload.
+      expect(ids).toContain('wand-0');
+      expect(ids).toContain(`wand-24`);
+    });
   });
 });
