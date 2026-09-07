@@ -52,10 +52,10 @@ export interface ShopLedgerEntry extends Omit<PublicShopItem, 'item'> {
    * counts). `SHOP_SEED_SCRIPT` uses it to compute `remainingQuantity` on
    * every reseed as `max(0, freshlyAuthoredStock - soldQuantity)`, so a DM
    * republishing the shop (which resends the *authored* stock as
-   * `remainingQuantity`, unaware of sales) can genuinely restock an item —
-   * unlike a bare non-increasing `remainingQuantity`, which can only ever
-   * shrink. `PURCHASE_SCRIPT` increments it by the same amount it decrements
-   * `remainingQuantity`.
+   * `ShopLedgerSeed.seededQuantity`, unaware of sales) can genuinely restock
+   * an item — unlike a bare non-increasing `remainingQuantity`, which can
+   * only ever shrink. `PURCHASE_SCRIPT` increments it by the same amount it
+   * decrements `remainingQuantity`.
    */
   soldQuantity: number;
 }

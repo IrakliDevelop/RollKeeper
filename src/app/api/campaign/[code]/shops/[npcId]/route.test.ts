@@ -1,13 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest, NextResponse } from 'next/server';
 
+// `redis` and `rawRedis` are deliberately DISTINCT objects (mirroring
+// `markers/route.test.ts`) so call-site client identity is assertable: the
+// route must pass `rawRedis` (the raw, non-auto-deserializing client) to
+// `seedShopLedger`, and `redis` (the default client) to `verifyDmAuthority`/
+// `set`/`del`. A shared mock object would let a swap regress silently.
 const {
   redis,
+  rawRedis,
   verifyDmAuthority,
   rejectHybridGuestPrivilegeEscalation,
   seedShopLedger,
 } = vi.hoisted(() => ({
   redis: { get: vi.fn(), set: vi.fn(), del: vi.fn() },
+  rawRedis: { get: vi.fn(), eval: vi.fn() },
   verifyDmAuthority: vi.fn(),
   rejectHybridGuestPrivilegeEscalation: vi.fn(),
   seedShopLedger: vi.fn(),
@@ -15,6 +22,7 @@ const {
 
 vi.mock('@/lib/redis', () => ({
   getRedis: () => redis,
+  getRawRedis: () => rawRedis,
   campaignShopKey: (code: string, npcId: string) => `shop:${code}:${npcId}`,
   campaignShopLedgerKey: (code: string, npcId: string) =>
     `shop-ledger:${code}:${npcId}`,
@@ -28,6 +36,11 @@ vi.mock('@/lib/shopPurchases', async importOriginal => {
   const actual = await importOriginal<typeof import('@/lib/shopPurchases')>();
   return { ...actual, seedShopLedger };
 });
+
+import {
+  INVALID_SHOP_LEDGER_SEED_ERROR,
+  SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
+} from '@/lib/shopPurchases';
 
 import { PUT } from './route';
 
@@ -130,7 +143,11 @@ describe('shop publish route — publishing an open shop', () => {
     expect(response.status).toBe(200);
 
     expect(seedShopLedger).toHaveBeenCalledOnce();
-    const [, ledgerKeyArg, seedArg, ttlArg] = seedShopLedger.mock.calls[0];
+    const [redisArg, ledgerKeyArg, seedArg, ttlArg] =
+      seedShopLedger.mock.calls[0];
+    // The Critical fix: seedShopLedger must receive the RAW client, never
+    // the auto-deserializing default — see the note on `getRawRedis` above.
+    expect(redisArg).toBe(rawRedis);
     expect(ledgerKeyArg).toBe('shop-ledger:ABC:npc-1');
     expect(seedArg).toEqual([
       expect.objectContaining({ id: 'item-1', seededQuantity: 5 }),
@@ -205,14 +222,55 @@ describe('shop publish route — publishing an open shop', () => {
   });
 
   it('rejects an out-of-bounds ledger seed before anything is written to Redis', async () => {
-    seedShopLedger.mockRejectedValue(new Error('Invalid shop ledger seed'));
+    seedShopLedger.mockRejectedValue(new Error(INVALID_SHOP_LEDGER_SEED_ERROR));
     const response = await PUT(
       request({ dmId: 'dm-1', npc: makeNpc(), entityIds: ['entity-1'] }),
       params
     );
     expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: INVALID_SHOP_LEDGER_SEED_ERROR,
+    });
     expect(redis.set).not.toHaveBeenCalled();
     expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('rejects a too-large ledger seed with its own distinguishable message, before anything is written', async () => {
+    seedShopLedger.mockRejectedValue(
+      new Error(SHOP_LEDGER_SEED_TOO_LARGE_ERROR)
+    );
+    const response = await PUT(
+      request({ dmId: 'dm-1', npc: makeNpc(), entityIds: ['entity-1'] }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({
+      error: SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
+    });
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  // Important fix: only the two known validation messages map to 400.
+  // Anything else (a Redis outage, the exact serialization bug this review
+  // caught — mismatched client producing a SyntaxError, etc.) must fall
+  // through to the outer 500 handler rather than being reported as "your
+  // shop data is invalid".
+  it('maps an unrecognized seedShopLedger failure to 500, not 400', async () => {
+    seedShopLedger.mockRejectedValue(
+      new SyntaxError('Unexpected token o in JSON at position 1')
+    );
+    const consoleErrorSpy = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    const response = await PUT(
+      request({ dmId: 'dm-1', npc: makeNpc(), entityIds: ['entity-1'] }),
+      params
+    );
+    expect(response.status).toBe(500);
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(consoleErrorSpy).toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
   });
 });
 

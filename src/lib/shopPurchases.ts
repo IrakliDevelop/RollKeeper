@@ -370,12 +370,34 @@ export function parseStoredShopLedger(raw: string | null): ShopLedgerEntry[] {
   return ledger;
 }
 
+/** Thrown by `seedShopLedger` when `entries` is well-formed but exceeds
+ *  `MAX_LEDGER_ENTRIES` — kept distinguishable from `INVALID_SHOP_LEDGER_SEED_ERROR`
+ *  so a route can report "too many rows" separately from "a row is malformed"
+ *  instead of collapsing both into one opaque 400. */
+export const SHOP_LEDGER_SEED_TOO_LARGE_ERROR = `Shop ledger seed exceeds the maximum of ${MAX_LEDGER_ENTRIES} entries`;
+
+/** Thrown by `seedShopLedger` when `entries` fails `validateShopLedgerSeed`
+ *  for any reason other than exceeding the length cap (see
+ *  `SHOP_LEDGER_SEED_TOO_LARGE_ERROR`). */
+export const INVALID_SHOP_LEDGER_SEED_ERROR = 'Invalid shop ledger seed';
+
 /**
  * Seeds/reseeds a shop's ledger atomically. Validates `entries` as a
  * well-formed `ShopLedgerSeed[]` BEFORE calling `EVAL` — an out-of-bounds
  * entry is rejected here, before anything is written to Redis, rather than
  * being persisted first and only caught on the way back out (the bricked-
  * shop failure mode Task 3's review flagged as Critical).
+ *
+ * `redis` MUST be the raw, non-auto-deserializing client (`getRawRedis()`),
+ * exactly as `seedMarkerLoot`/`claimMarkerLoot` require in
+ * `markerLootClaims.ts`: `parseStoredShopLedger(String(raw))` needs the
+ * `EVAL` reply as the literal JSON string `SHOP_SEED_SCRIPT` returned. The
+ * default client (`getRedis()`) has `automaticDeserialization` on, so it
+ * JSON-parses the bulk string into an array FIRST — `String([{...}])`
+ * becomes the literal text `"[object Object]"`, which then fails to parse
+ * as JSON on any non-empty ledger (an empty ledger stringifies to `''`,
+ * which happens to parse back to `[]`, so this mistake is invisible on a
+ * zero-item shop and breaks every other one).
  */
 export async function seedShopLedger(
   redis: Redis,
@@ -383,8 +405,11 @@ export async function seedShopLedger(
   entries: ShopLedgerSeed[],
   ttlSeconds: number
 ): Promise<ShopLedgerEntry[]> {
+  if (entries.length > MAX_LEDGER_ENTRIES) {
+    throw new Error(SHOP_LEDGER_SEED_TOO_LARGE_ERROR);
+  }
   const validated = validateShopLedgerSeed(entries);
-  if (!validated) throw new Error('Invalid shop ledger seed');
+  if (!validated) throw new Error(INVALID_SHOP_LEDGER_SEED_ERROR);
   const raw = await redis.eval(
     SHOP_SEED_SCRIPT,
     [key],

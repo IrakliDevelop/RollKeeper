@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  INVALID_SHOP_LEDGER_SEED_ERROR,
   parseStoredShopLedger,
   purchaseFromShop,
   seedShopLedger,
+  SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
   validateShopLedgerSeed,
   validateStoredShopLedger,
 } from './shopPurchases';
@@ -218,7 +220,7 @@ describe('shop ledger atomic seed', () => {
         [overPriced],
         60
       )
-    ).rejects.toThrow('Invalid shop ledger seed');
+    ).rejects.toThrow(INVALID_SHOP_LEDGER_SEED_ERROR);
     expect(evalMock).not.toHaveBeenCalled();
   });
 
@@ -236,7 +238,27 @@ describe('shop ledger atomic seed', () => {
         [entry],
         60
       )
-    ).rejects.toThrow('Invalid shop ledger seed');
+    ).rejects.toThrow(INVALID_SHOP_LEDGER_SEED_ERROR);
+    expect(evalMock).not.toHaveBeenCalled();
+  });
+
+  // A too-large seed gets a message distinguishable from "a row is
+  // malformed" (INVALID_SHOP_LEDGER_SEED_ERROR) — a DM with >500 for-sale
+  // rows should see something diagnosable, not an opaque "invalid" 400.
+  it('rejects a seed exceeding MAX_LEDGER_ENTRIES with a distinguishable message, before calling EVAL', async () => {
+    const evalMock = vi.fn();
+    const tooMany = Array.from({ length: 501 }, (_, i) => ({
+      ...seedEntry,
+      id: `entry-${i}`,
+    }));
+    await expect(
+      seedShopLedger(
+        { eval: evalMock } as unknown as Redis,
+        'ledger',
+        tooMany,
+        60
+      )
+    ).rejects.toThrow(SHOP_LEDGER_SEED_TOO_LARGE_ERROR);
     expect(evalMock).not.toHaveBeenCalled();
   });
 });

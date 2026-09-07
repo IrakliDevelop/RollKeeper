@@ -5,6 +5,7 @@ import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses'
 import {
   campaignShopKey,
   campaignShopLedgerKey,
+  getRawRedis,
   getRedis,
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
@@ -13,7 +14,11 @@ import {
   buildPublicShop,
   buildShopLedger,
 } from '@/lib/shopProjection';
-import { seedShopLedger } from '@/lib/shopPurchases';
+import {
+  INVALID_SHOP_LEDGER_SEED_ERROR,
+  seedShopLedger,
+  SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
+} from '@/lib/shopPurchases';
 import type { CampaignNPC } from '@/types/encounter';
 
 /** Generous but bounded — a shop realistically maps to a handful of tokens.
@@ -105,13 +110,10 @@ export async function PUT(
       return NextResponse.json({ success: true, shop: null });
     }
 
-    const publicShop = buildPublicShop(typedNpc, entityIds);
-    // Unreachable given the open check above, but keeps this branch honest
-    // about buildPublicShop's actual contract rather than asserting past it.
-    if (!publicShop) {
-      await Promise.all([redis.del(shopKey), redis.del(ledgerKey)]);
-      return NextResponse.json({ success: true, shop: null });
-    }
+    // buildPublicShop returns null only when `shop?.open !== true`, which
+    // the branch above already handled — `typedNpc.shop.open === true` here
+    // is therefore guaranteed non-null.
+    const publicShop = buildPublicShop(typedNpc, entityIds)!;
 
     const seed = buildShopLedger(typedNpc);
 
@@ -119,17 +121,31 @@ export async function PUT(
     try {
       // Validates the seed BEFORE writing anything (Task 3 review, Critical):
       // an out-of-bounds row is rejected here, before either key is touched.
+      // `getRawRedis()` — NOT `redis` (`getRedis()`) — is required here:
+      // `seedShopLedger` needs the literal JSON string EVAL returns
+      // (`parseStoredShopLedger(String(raw))`), and the auto-deserializing
+      // default client would JSON-parse it into an object array first,
+      // making `String(...)` produce `"[object Object]"` instead. See
+      // `seedShopLedger`'s doc comment in shopPurchases.ts.
       ledger = await seedShopLedger(
-        redis,
+        getRawRedis(),
         ledgerKey,
         seed,
         SLIDING_TTL_SECONDS
       );
-    } catch {
-      return NextResponse.json(
-        { error: 'Invalid shop ledger' },
-        { status: 400 }
-      );
+    } catch (error) {
+      // Only a validation failure from seedShopLedger itself is a 400 — a
+      // Redis outage, a serialization bug, or anything else unexpected must
+      // fall through to the outer catch's 500, not be reported as "your
+      // shop data is invalid".
+      if (
+        error instanceof Error &&
+        (error.message === INVALID_SHOP_LEDGER_SEED_ERROR ||
+          error.message === SHOP_LEDGER_SEED_TOO_LARGE_ERROR)
+      ) {
+        return NextResponse.json({ error: error.message }, { status: 400 });
+      }
+      throw error;
     }
 
     const merged = applyCanonicalShopRemaining(publicShop, ledger);
