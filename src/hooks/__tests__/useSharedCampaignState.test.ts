@@ -641,6 +641,52 @@ describe('useSharedCampaignState', () => {
     ]);
   });
 
+  it('acknowledgeTransfers([]) sends transferIds: [] as a no-op, never eliding it into a whole-queue clear (Slice 3 final review, Important finding)', async () => {
+    const state = makeSharedState({
+      transfers: [makeTransfer('t-1'), makeTransfer('t-2')],
+    });
+
+    mockFetchSequence([
+      { status: 200, body: state },
+      { status: 200, body: {} },
+    ]);
+
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.acknowledgeTransfers([]);
+    });
+
+    expect(resolved).toBe(true);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls.find(([, opts]) => opts?.method === 'DELETE');
+    // The explicit empty array MUST still reach the server as
+    // `transferIds: []` — an earlier version elided it whenever
+    // `ids.length === 0`, which made this call indistinguishable
+    // server-side from the deliberate "no id field at all" full-clear call
+    // tested above.
+    expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
+      playerId: 'player-1',
+      type: 'transfers',
+      transferIds: [],
+    });
+
+    // Neither transfer was actually acknowledged — both must survive
+    // locally too.
+    expect(result.current.sharedState!.transfers.map(t => t.id)).toEqual([
+      't-1',
+      't-2',
+    ]);
+  });
+
   it('acknowledgeTransfers resolves false (without throwing) when the request fails outright (network error)', async () => {
     const state = makeSharedState({ transfers: [makeTransfer('t-1')] });
 

@@ -234,16 +234,16 @@ export function useItemTransferAutoMerge({
 
     // ONE batched acknowledge for every id confirmed this pass — not a
     // blanket whole-queue DELETE (which would destroy a transfer enqueued
-    // between the last poll and now that hasn't been applied yet), and
-    // NOT N separate per-id requests either: the route does a non-atomic
-    // read-filter-write, so concurrent per-id DELETEs race each other and
-    // the last writer silently undoes every other request's removal — a
-    // 25-unit purchase would issue 25 concurrent acks, ~24 of which are
-    // lost, and this hook would still (wrongly) forget those ids from the
-    // ledger because each one individually reported success. Fire-and-
-    // forget — forgetting ledger entries is a bonus if this lands, not a
-    // requirement for correctness (the ledger only needs to outlive the
-    // in-flight window, and the cap bounds it regardless).
+    // between the last poll and now that hasn't been applied yet), and NOT
+    // N separate per-id requests either: even though the route's ack is now
+    // an atomic Lua EVAL (`ACK_ITEM_TRANSFER_SCRIPT`, Slice 3 final review)
+    // rather than the plain read-filter-write it used to be — so N
+    // concurrent per-id DELETEs would no longer race each other — a single
+    // batched request is still strictly better: one round trip instead of
+    // N, and no reason to reintroduce N. Fire-and-forget — forgetting
+    // ledger entries is a bonus if this lands, not a requirement for
+    // correctness (the ledger only needs to outlive the in-flight window,
+    // and the cap bounds it regardless).
     if (toAcknowledge.length > 0) {
       void acknowledgeTransfers(toAcknowledge).then(ok => {
         if (ok) {

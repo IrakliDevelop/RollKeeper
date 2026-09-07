@@ -279,7 +279,15 @@ export function useSharedCampaignState(
           body: JSON.stringify({
             playerId,
             type: 'transfers',
-            ...(ids && ids.length > 0 ? { transferIds: ids } : {}),
+            // `ids` is only `undefined` when the caller passed no argument
+            // at all (the deliberate "clear the whole queue" call). An
+            // explicit empty array must still be SENT as `transferIds: []`
+            // — eliding it here (as an earlier version did whenever
+            // `ids.length === 0`) made an intentional empty-batch no-op
+            // indistinguishable, server-side, from "no id field at all",
+            // which the route treats as a full-queue DELETE (Slice 3 final
+            // review, Important finding).
+            ...(ids !== undefined ? { transferIds: ids } : {}),
           }),
         });
         // `fetch` only rejects on network failure — a 403 (guest binding),
