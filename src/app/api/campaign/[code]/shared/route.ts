@@ -589,11 +589,22 @@ export async function DELETE(
       // undo every other request's removal (see `ackXpAward` in
       // xpAwardQueue.ts, which needs `LREM`'s atomicity for the identical
       // reason on a different queue).
-      const ids: string[] = Array.isArray(transferIds)
+      const transferIdsProvided = Array.isArray(transferIds);
+      const ids: string[] = transferIdsProvided
         ? transferIds.filter((id): id is string => typeof id === 'string')
         : typeof transferId === 'string'
           ? [transferId]
           : [];
+
+      // A `transferIds` array that's PRESENT but resolves to zero valid ids
+      // (empty array, or every entry the wrong type) must be a no-op, never
+      // "acknowledge nothing" silently becoming "delete the whole queue".
+      // Only the true "no id field at all" shape below — the deliberate
+      // clear-everything call `acknowledgeTransfers()` makes with no
+      // arguments — reaches the full-key delete.
+      if (transferIdsProvided && ids.length === 0) {
+        return NextResponse.json({ success: true });
+      }
 
       if (ids.length === 0) {
         await redis.del(campaignTransfersKey(code, playerId));

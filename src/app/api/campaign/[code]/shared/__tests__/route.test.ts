@@ -865,6 +865,64 @@ describe('DELETE /api/campaign/[code]/shared', () => {
   });
 
   it(
+    'does not clear the whole queue when transferIds is present but empty ' +
+      '(type=transfers, transferIds: [])',
+    async () => {
+      seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+        makeTransfer('xfr-1'),
+        makeTransfer('xfr-2'),
+      ]);
+
+      const req = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: { playerId: 'player-1', type: 'transfers', transferIds: [] },
+      });
+      const res = await DELETE(
+        req as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(res.status).toBe(200);
+      const raw = getRedisStore().get(
+        campaignTransfersKey('TEST', 'player-1')
+      )!;
+      const remaining: ItemTransfer[] = JSON.parse(raw);
+      expect(remaining.map(t => t.id)).toEqual(['xfr-1', 'xfr-2']);
+    }
+  );
+
+  it(
+    'does not clear the whole queue when transferIds is present but every ' +
+      'entry is the wrong type (type=transfers)',
+    async () => {
+      seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+        makeTransfer('xfr-1'),
+        makeTransfer('xfr-2'),
+      ]);
+
+      const req = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: {
+          playerId: 'player-1',
+          type: 'transfers',
+          transferIds: [123, null, {}],
+        },
+      });
+      const res = await DELETE(
+        req as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(res.status).toBe(200);
+      const raw = getRedisStore().get(
+        campaignTransfersKey('TEST', 'player-1')
+      )!;
+      const remaining: ItemTransfer[] = JSON.parse(raw);
+      expect(remaining.map(t => t.id)).toEqual(['xfr-1', 'xfr-2']);
+    }
+  );
+
+  it(
     'CRITICAL FIX: a single batch ack of a 25-entry purchase never loses ' +
       'an entry the way N concurrent single-id acks against this non-atomic ' +
       'read-filter-write route would',
