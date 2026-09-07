@@ -117,3 +117,32 @@ export interface ShopSale {
   playerId: string;
   at: string; // ISO timestamp
 }
+
+/**
+ * One completed sale as displayed in the DM Shop tab's sales log (VTT
+ * merchants Slice 3, Task 13b — artboard 1a's "2 sales · 165 gp" state).
+ * Recorded by `useDmShopSalesSync`'s `applySaleToNpc` at apply time, into
+ * `npcStore`'s `shopSalesLogByNpc` — a sibling of, and always written
+ * alongside, `appliedShopSaleIds` (that field is a bare id ledger for
+ * dedup only and carries nothing display-worthy).
+ *
+ * `itemName` is captured at sale time rather than re-derived from the
+ * current inventory row on every render: a later rename or deletion of
+ * that row must never rewrite what a past sale is shown as. `reconciled`
+ * is `false` when the sale's inventory row (or the NPC record itself)
+ * could no longer be found at drain time — the coin credit still lands,
+ * but the stock decrement could not be applied. The spec requires this to
+ * surface in the log rather than vanish into a console warning; see
+ * `applySaleToNpc`'s doc comment in `useDmShopSalesSync.ts`.
+ */
+export interface ShopSaleLogEntry {
+  /** `ShopSale.id` — lets a future entry point back at the source sale. */
+  id: string;
+  entryId: string;
+  itemName: string;
+  quantity: number;
+  copper: number;
+  playerId: string;
+  at: string; // ISO timestamp
+  reconciled: boolean;
+}

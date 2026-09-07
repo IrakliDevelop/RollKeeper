@@ -71,7 +71,11 @@ function mockSalesResponse(sales: unknown[]) {
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
-  useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+  useNPCStore.setState({
+    npcsByCampaign: {},
+    appliedShopSaleIds: {},
+    shopSalesLogByNpc: {},
+  });
   fetchMock = vi.fn();
   global.fetch = fetchMock as unknown as typeof fetch;
 });
@@ -251,6 +255,12 @@ describe('useDmShopSalesSync', () => {
     expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
       'sale-req-1',
     ]);
+    // Surfaced in the DM-visible sales log (Task 13b) rather than only ever
+    // reaching a console warning — reconciled: false is the signal the Shop
+    // tab renders as an "unreconciled" badge.
+    expect(useNPCStore.getState().shopSalesLogByNpc['npc-1']).toEqual([
+      expect.objectContaining({ id: 'sale-req-1', reconciled: false }),
+    ]);
   });
 
   it('a sale referencing a deleted NPC does not crash and is still recorded so it is not retried forever', async () => {
@@ -278,6 +288,44 @@ describe('useDmShopSalesSync', () => {
     );
     expect(useNPCStore.getState().appliedShopSaleIds['npc-ghost']).toEqual([
       'sale-req-1',
+    ]);
+    expect(useNPCStore.getState().shopSalesLogByNpc['npc-ghost']).toEqual([
+      expect.objectContaining({ id: 'sale-req-1', reconciled: false }),
+    ]);
+  });
+
+  it("records a reconciled sales-log entry (Task 13b) carrying the sold item's name", async () => {
+    seedMerchant('npc-1', {
+      inventory: [{ id: 'item-1', name: 'Rope, 50ft', quantity: 10 }],
+    });
+    fetchMock.mockResolvedValue(
+      mockSalesResponse([
+        makeSale({ quantity: 3, copper: 300, playerId: 'char-42' }),
+      ])
+    );
+
+    const { result } = renderHook(() =>
+      useDmShopSalesSync({
+        campaignCode: CAMPAIGN,
+        dmId: DM_ID,
+        npcIds: ['npc-1'],
+      })
+    );
+    await act(async () => {
+      await result.current.drainNow();
+    });
+
+    expect(useNPCStore.getState().shopSalesLogByNpc['npc-1']).toEqual([
+      {
+        id: 'sale-req-1',
+        entryId: 'item-1',
+        itemName: 'Rope, 50ft',
+        quantity: 3,
+        copper: 300,
+        playerId: 'char-42',
+        at: '2026-09-07T00:00:00.000Z',
+        reconciled: true,
+      },
     ]);
   });
 

@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { isValidShopSale } from '@/lib/shopPurchases';
 import { useNPCStore } from '@/store/npcStore';
 import type { Currency } from '@/types/character';
-import type { ShopSale } from '@/types/shop';
+import type { ShopSale, ShopSaleLogEntry } from '@/types/shop';
 import { creditCopper } from '@/utils/currency';
 
 const DEFAULT_POLL_INTERVAL_MS = 10000;
@@ -37,20 +37,51 @@ export interface UseDmShopSalesSyncResult {
   drainNow: () => Promise<void>;
 }
 
+/** Builds the `ShopSaleLogEntry` for one drained sale — shared by every
+ *  branch of `applySaleToNpc` so the DM Shop tab's sales log (Task 13b)
+ *  always gets an entry, reconciled or not, whenever a sale is applied. */
+function toSaleLogEntry(
+  sale: ShopSale,
+  itemName: string,
+  reconciled: boolean
+): ShopSaleLogEntry {
+  return {
+    id: sale.id,
+    entryId: sale.entryId,
+    itemName,
+    quantity: sale.quantity,
+    copper: sale.copper,
+    playerId: sale.playerId,
+    at: sale.at,
+    reconciled,
+  };
+}
+
+/** Shown as the sales-log row's item name when the row a sale refers to can
+ *  no longer be identified (its `NPCInventoryItem` — or the whole NPC — was
+ *  deleted before this drain ran). See `applySaleToNpc`'s doc comment. */
+const UNRECONCILED_ITEM_NAME = 'Unknown item';
+
 /**
  * Applies one already-validated sale to an NPC: credits `npc.currency` by
  * `sale.copper` and decrements the matching `NPCInventoryItem.quantity` by
- * `sale.quantity`.
+ * `sale.quantity`. Always also appends a `ShopSaleLogEntry` via
+ * `recordShopSale` (VTT merchants Slice 3, Task 13b) so the DM's Shop tab
+ * has something to render — never only the bare id ledger.
  *
  * Spec edge case (a sale is a fact, not something to drop): if the DM
  * deleted the inventory row this sale refers to — or the NPC itself — while
  * the shop was open, the coin credit is still attempted. The currency
  * credit is computed and applied FIRST and unconditionally (whenever the
  * NPC itself still exists); only the inventory decrement is skipped when its
- * row can't be found, with a warning logged instead of the sale being
- * silently dropped. If the NPC record itself is gone there is no purse left
+ * row can't be found, with a warning logged AND a `reconciled: false` log
+ * entry recorded — the spec requires this surface in the sales log rather
+ * than drop the sale silently, not just console-warn where only a developer
+ * would ever see it. If the NPC record itself is gone there is no purse left
  * to credit into — `updateNPC` is a no-op for a missing id — but the sale is
- * still logged rather than vanishing without a trace, and the caller still
+ * still logged (against `npcId`, even though no `CampaignNPC` document
+ * exists to render it against — harmless, and correct if the id is ever
+ * reused) rather than vanishing without a trace, and the caller still
  * records it as applied so a permanently-deleted NPC doesn't cause the same
  * sale to be retried, and warned about, forever.
  */
@@ -59,12 +90,13 @@ function applySaleToNpc(
   npcId: string,
   sale: ShopSale
 ): void {
-  const { getNPC, updateNPC } = useNPCStore.getState();
+  const { getNPC, updateNPC, recordShopSale } = useNPCStore.getState();
   const npc = getNPC(campaignCode, npcId);
   if (!npc) {
     console.warn(
       `[useDmShopSalesSync] sale ${sale.id} would credit ${sale.copper} copper to NPC ${npcId}, but that NPC no longer exists. The coin credit could not be applied anywhere; this sale's stock is unreconciled.`
     );
+    recordShopSale(npcId, toSaleLogEntry(sale, UNRECONCILED_ITEM_NAME, false));
     return;
   }
 
@@ -79,9 +111,11 @@ function applySaleToNpc(
       `[useDmShopSalesSync] sale ${sale.id} for NPC ${npcId} references inventory row ${sale.entryId}, which no longer exists. Crediting ${sale.copper} copper regardless; this sale's stock is unreconciled.`
     );
     updateNPC(campaignCode, npcId, { currency: nextCurrency });
+    recordShopSale(npcId, toSaleLogEntry(sale, UNRECONCILED_ITEM_NAME, false));
     return;
   }
 
+  const soldItem = inventory[itemIndex];
   const nextInventory = inventory.map((item, index) =>
     index === itemIndex
       ? { ...item, quantity: Math.max(0, item.quantity - sale.quantity) }
@@ -91,6 +125,7 @@ function applySaleToNpc(
     currency: nextCurrency,
     inventory: nextInventory,
   });
+  recordShopSale(npcId, toSaleLogEntry(sale, soldItem.name, true));
 }
 
 /**

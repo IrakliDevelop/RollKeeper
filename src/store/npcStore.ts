@@ -5,6 +5,7 @@ import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstra
 import { createSafeStorage } from '@/lib/safeStorage';
 import { CampaignNPC } from '@/types/encounter';
 import { Spell } from '@/types/character';
+import type { ShopSaleLogEntry } from '@/types/shop';
 import {
   getNPCSpellSlots,
   resetNPCSpellcasting,
@@ -52,6 +53,28 @@ function capAppliedSaleIds(ids: string[]): string[] {
   return ids.length > APPLIED_SHOP_SALE_IDS_MAX
     ? ids.slice(ids.length - APPLIED_SHOP_SALE_IDS_MAX)
     : ids;
+}
+
+/**
+ * Display-only recent-activity window for the DM Shop tab's sales log
+ * (VTT merchants Slice 3, Task 13b), keyed by npcId — a SIBLING of
+ * `appliedShopSaleIds`, never a replacement for it: that field is the bare
+ * dedup ledger `useDmShopSalesSync` checks before re-applying a sale, this
+ * one is what the tab renders, and the two are written together (never one
+ * without the other) from `applySaleToNpc`. A much smaller cap than
+ * `APPLIED_SHOP_SALE_IDS_MAX` is fine here — this is a DM convenience view
+ * of recent business, not a financial ledger (the server-side
+ * `ShopLedgerEntry.soldQuantity` already is one, and stays authoritative
+ * regardless of what ages out of this array). Oldest entries are trimmed
+ * from the FRONT so the array stays in chronological (oldest-first) order,
+ * matching the artboard's sales log ordering.
+ */
+const SHOP_SALES_LOG_MAX = 50;
+
+function capShopSalesLog(entries: ShopSaleLogEntry[]): ShopSaleLogEntry[] {
+  return entries.length > SHOP_SALES_LOG_MAX
+    ? entries.slice(entries.length - SHOP_SALES_LOG_MAX)
+    : entries;
 }
 
 /** A cross-device stable identity, so cloud documents keep one legacy ID. */
@@ -109,6 +132,8 @@ interface NPCStoreState {
   npcsByCampaign: Record<string, CampaignNPC[]>;
   /** See the doc comment above `APPLIED_SHOP_SALE_IDS_MAX`. */
   appliedShopSaleIds: Record<string, string[]>;
+  /** See the doc comment above `SHOP_SALES_LOG_MAX`. */
+  shopSalesLogByNpc: Record<string, ShopSaleLogEntry[]>;
 
   createNPC: (
     campaignCode: string,
@@ -197,6 +222,16 @@ interface NPCStoreState {
    * `appliedTransferIds` is on `characterStore`.
    */
   recordAppliedShopSale: (npcId: string, saleId: string) => void;
+  /**
+   * Appends one sale to `shopSalesLogByNpc[npcId]`'s DISPLAY log (FIFO,
+   * capped at `SHOP_SALES_LOG_MAX`) — always called alongside
+   * `recordAppliedShopSale`, never in place of it, from
+   * `useDmShopSalesSync`'s `applySaleToNpc`. Unlike `recordAppliedShopSale`
+   * this is not idempotency bookkeeping and never checks for an existing
+   * `entry.id` — `applySaleToNpc` already guards re-application via
+   * `appliedShopSaleIds`, so this is only ever called once per sale.
+   */
+  recordShopSale: (npcId: string, entry: ShopSaleLogEntry) => void;
 }
 
 export function migrateNpcPersistedState(
@@ -262,6 +297,7 @@ export const useNPCStore = create<NPCStoreState>()(
     (set, get) => ({
       npcsByCampaign: {},
       appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
 
       createNPC: (campaignCode, npcData) => {
         const id = generateId();
@@ -799,6 +835,18 @@ export const useNPCStore = create<NPCStoreState>()(
             appliedShopSaleIds: {
               ...state.appliedShopSaleIds,
               [npcId]: capAppliedSaleIds([...existing, saleId]),
+            },
+          };
+        });
+      },
+
+      recordShopSale: (npcId, entry) => {
+        set(state => {
+          const existing = state.shopSalesLogByNpc[npcId] ?? [];
+          return {
+            shopSalesLogByNpc: {
+              ...state.shopSalesLogByNpc,
+              [npcId]: capShopSalesLog([...existing, entry]),
             },
           };
         });

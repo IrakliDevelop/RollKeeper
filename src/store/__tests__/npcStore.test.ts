@@ -39,11 +39,12 @@ describe('npcStore (campaign-scoped)', () => {
         localStorage.getItem('rollkeeper-npc-data')!
       );
       expect(persisted.version).toBe(4);
-      // Task 12 added `appliedShopSaleIds` as a sibling top-level field
-      // (see the doc comment above `APPLIED_SHOP_SALE_IDS_MAX` in
-      // npcStore.ts for why it's off `CampaignNPC`/`npcsByCampaign`).
+      // Task 12 added `appliedShopSaleIds`, and Task 13b added
+      // `shopSalesLogByNpc`, as sibling top-level fields (see the doc
+      // comments above `APPLIED_SHOP_SALE_IDS_MAX`/`SHOP_SALES_LOG_MAX` in
+      // npcStore.ts for why they're off `CampaignNPC`/`npcsByCampaign`).
       expect(Object.keys(persisted.state).sort()).toEqual(
-        ['appliedShopSaleIds', 'npcsByCampaign'].sort()
+        ['appliedShopSaleIds', 'npcsByCampaign', 'shopSalesLogByNpc'].sort()
       );
       expect(persisted.state.npcsByCampaign[CAMPAIGN]).toHaveLength(1);
       expect(persisted.state.npcsByCampaign[CAMPAIGN][0]).toMatchObject({

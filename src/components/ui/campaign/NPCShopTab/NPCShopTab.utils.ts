@@ -5,6 +5,7 @@
 import { useEncounterStore } from '@/store/encounterStore';
 import type { NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
+import type { ShopSaleLogEntry } from '@/types/shop';
 import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
@@ -121,4 +122,99 @@ export function getProvenanceLine(item: NPCInventoryItem): string {
   return overridden
     ? 'no value, no rarity · overridden'
     : 'no value, no rarity — set a price to sell it';
+}
+
+/**
+ * The closed-state "Open for business" subtitle (artboard 1a, and Task
+ * 13b item 4 — controller reach correction). The old copy ("Players can't
+ * see this stock yet. Turn it on to publish.") undersold what publishing
+ * actually does now that `GET /api/campaign/[code]/shops` lists every open
+ * shop's npcId/name/token ids to any campaign member: the toggle went from
+ * "visible to whoever finds the token" to "listed campaign-wide," including
+ * to players who have never reached this NPC's map. This says so plainly,
+ * without implying anything unsafe — it is still ordinary shared campaign
+ * state, just wider-reaching than a single token.
+ */
+export const SHOP_CLOSED_SUBTITLE =
+  "Players can't see this stock yet. Opening it lists the shop for the whole campaign, not just whoever finds the token.";
+
+/** The open-state "Open for business" subtitle (artboard 1a: "2 items
+ *  still in stock. Players who tap Brenn's token can buy now."). */
+export function shopOpenSubtitle(
+  npcName: string,
+  itemsInStock: number
+): string {
+  const noun = itemsInStock === 1 ? 'item' : 'items';
+  return `${itemsInStock} ${noun} still in stock. Players who tap ${npcName}'s token can buy now.`;
+}
+
+/** The Stock section's helper line — REPLACED, not supplemented, when the
+ *  shop is open (artboard 1a: "Price falls back..." closed vs. "Stock
+ *  reflects sales already reconciled..." open). */
+export function shopStockHelperText(
+  shopOpen: boolean,
+  npcName: string
+): string {
+  return shopOpen
+    ? `Stock reflects sales already reconciled to ${npcName}'s inventory.`
+    : "Price falls back to the item's value, then its rarity. Placeholder is what players would pay.";
+}
+
+/**
+ * Count of rows a player could actually buy right now: flagged for sale,
+ * priceable, and with at least one unit left. Drives the open-state
+ * subtitle's "N items still in stock" (artboard 1a says "2" for a shop
+ * whose Chain Shirt just sold out — a for-sale, priceable row at 0 stock
+ * does NOT count).
+ */
+export function countItemsInStock(inventory: NPCInventoryItem[]): number {
+  return inventory.filter(
+    item =>
+      item.forSale === true &&
+      resolvePriceCopper(item) !== null &&
+      item.quantity > 0
+  ).length;
+}
+
+/** Sum of `ShopSaleLogEntry.copper` across every entry — the sales log
+ *  header's "N sales · X gp" total (artboard 1a). */
+export function totalSalesCopper(entries: readonly ShopSaleLogEntry[]): number {
+  return entries.reduce((sum, entry) => sum + entry.copper, 0);
+}
+
+function isSameLocalDay(iso: string, reference: Date): boolean {
+  return new Date(iso).toDateString() === reference.toDateString();
+}
+
+/** Sum of `ShopSaleLogEntry.copper` for sales made on `now`'s local
+ *  calendar day — the purse label's "+165 gp today" delta (artboard 1a).
+ *  `now` is a parameter (default `new Date()`) purely so tests can pin it;
+ *  callers should never pass anything else. */
+export function todaysSalesCopper(
+  entries: readonly ShopSaleLogEntry[],
+  now: Date = new Date()
+): number {
+  return entries
+    .filter(entry => isSameLocalDay(entry.at, now))
+    .reduce((sum, entry) => sum + entry.copper, 0);
+}
+
+/**
+ * Units sold per inventory row id, derived from the (capped, recent-window)
+ * sales log — there is no separate `soldQuantity` counter client-side, so
+ * this is what drives each stock row's "N sold" / "N sold — none left"
+ * badge (artboard 1a). An approximation, not a ledger: a row's true
+ * lifetime sold count can exceed this once older sales age out of
+ * `SHOP_SALES_LOG_MAX` (`npcStore.ts`) — acceptable for a UI badge, since
+ * the server-side `ShopLedgerEntry.soldQuantity` remains the authoritative
+ * count and this never feeds back into stock math.
+ */
+export function soldQuantityByItemId(
+  entries: readonly ShopSaleLogEntry[]
+): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const entry of entries) {
+    map.set(entry.entryId, (map.get(entry.entryId) ?? 0) + entry.quantity);
+  }
+  return map;
 }

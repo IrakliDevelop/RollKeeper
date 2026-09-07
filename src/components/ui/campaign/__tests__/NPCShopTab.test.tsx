@@ -11,12 +11,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
 import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
+import type { ShopSaleLogEntry } from '@/types/shop';
 
 const updateNPC = vi.fn();
 const getEncountersByCampaign = vi.fn(() => [] as unknown[]);
+let shopSalesLogByNpc: Record<string, ShopSaleLogEntry[]> = {};
 
 vi.mock('@/store/npcStore', () => ({
-  useNPCStore: { getState: () => ({ updateNPC }) },
+  useNPCStore: Object.assign(
+    (
+      selector: (state: {
+        shopSalesLogByNpc: typeof shopSalesLogByNpc;
+      }) => unknown
+    ) => selector({ shopSalesLogByNpc }),
+    { getState: () => ({ updateNPC }) }
+  ),
 }));
 
 vi.mock('@/store/dmStore', () => ({
@@ -28,15 +37,44 @@ vi.mock('@/store/encounterStore', () => ({
   useEncounterStore: { getState: () => ({ getEncountersByCampaign }) },
 }));
 
+const PLAYER_NAMES: Record<string, string> = { 'player-1': 'Mirelle Vane' };
+
+vi.mock('@/components/ui/campaign/location-map/usePlayerDirectory', () => ({
+  usePlayerDirectory: () => ({
+    directory: {
+      ids: new Set(Object.keys(PLAYER_NAMES)),
+      nameOf: (id: string) => PLAYER_NAMES[id],
+    },
+    ensureKnown: vi.fn(),
+  }),
+}));
+
 beforeEach(() => {
   resetFetch();
   getEncountersByCampaign.mockReturnValue([]);
+  shopSalesLogByNpc = {};
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
 });
+
+function makeSaleLogEntry(
+  overrides: Partial<ShopSaleLogEntry> = {}
+): ShopSaleLogEntry {
+  return {
+    id: 'sale-1',
+    entryId: 'item-1',
+    itemName: 'Potion of Healing',
+    quantity: 1,
+    copper: 6500,
+    playerId: 'player-1',
+    at: '2026-09-07T20:42:00.000Z',
+    reconciled: true,
+    ...overrides,
+  };
+}
 
 function makeNpc(overrides: Partial<CampaignNPC> = {}): CampaignNPC {
   return {
@@ -255,7 +293,7 @@ describe('NPCShopTab', () => {
     expect(screen.queryByText('price required')).not.toBeInTheDocument();
   });
 
-  it('renders the sales log empty state (Slice 2 has no sales data source)', () => {
+  it('renders the sales log empty state unchanged when no sales are recorded', () => {
     render(<Harness initial={makeNpc({ inventory: [] })} />);
 
     expect(
@@ -270,7 +308,7 @@ describe('NPCShopTab', () => {
 
     expect(
       screen.getByText(
-        "Players can't see this stock yet. Turn it on to publish."
+        "Players can't see this stock yet. Opening it lists the shop for the whole campaign, not just whoever finds the token."
       )
     ).toBeInTheDocument();
 
@@ -462,6 +500,246 @@ describe('NPCShopTab', () => {
       const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
       const body = JSON.parse((options as RequestInit).body as string);
       expect(body.npc.shop.description).toBe('Ironmonger of the Low Market');
+    });
+  });
+
+  describe('open-state chrome (artboard 1a, Task 13b)', () => {
+    it('the toggle card is neutral when closed and emerald-tinted when open', () => {
+      render(<Harness initial={makeNpc()} />);
+
+      const closedCard = screen
+        .getByRole('switch', { name: 'Open for business' })
+        .closest('div');
+      expect(closedCard).toHaveClass('border-divider');
+      expect(closedCard).toHaveClass('bg-surface-secondary');
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      const openCard = screen
+        .getByRole('switch', { name: 'Open for business' })
+        .closest('div');
+      expect(openCard).toHaveClass('border-accent-emerald-border');
+      expect(openCard).toHaveClass('bg-accent-emerald-bg');
+    });
+
+    it('switches the subtitle to the open-state copy, counting only for-sale/priceable/in-stock rows', () => {
+      render(
+        <Harness
+          initial={makeNpc({
+            name: 'Halvard Brenn',
+            inventory: [
+              makeItem({ id: 'i1', value: 100, forSale: true, quantity: 5 }),
+              makeItem({ id: 'i2', value: 100, forSale: true, quantity: 0 }),
+              makeItem({ id: 'i3', value: 100, forSale: false, quantity: 3 }),
+            ],
+          })}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      expect(
+        screen.getByText(
+          "1 item still in stock. Players who tap Halvard Brenn's token can buy now."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('replaces (not supplements) the Stock helper line when open', () => {
+      render(<Harness initial={makeNpc({ name: 'Halvard Brenn' })} />);
+
+      expect(
+        screen.getByText(
+          "Price falls back to the item's value, then its rarity. Placeholder is what players would pay."
+        )
+      ).toBeInTheDocument();
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      expect(
+        screen.queryByText(
+          "Price falls back to the item's value, then its rarity. Placeholder is what players would pay."
+        )
+      ).not.toBeInTheDocument();
+      expect(
+        screen.getByText(
+          "Stock reflects sales already reconciled to Halvard Brenn's inventory."
+        )
+      ).toBeInTheDocument();
+    });
+
+    it('states the campaign-wide reach of publishing in the closed-state subtitle', () => {
+      render(<Harness initial={makeNpc()} />);
+
+      expect(
+        screen.getByText(
+          "Players can't see this stock yet. Opening it lists the shop for the whole campaign, not just whoever finds the token."
+        )
+      ).toBeInTheDocument();
+    });
+  });
+
+  describe('sales log (Task 13b)', () => {
+    it('renders populated sales rows and the running summary', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [
+          makeSaleLogEntry({
+            id: 's1',
+            itemName: 'Potion of Healing',
+            quantity: 1,
+            copper: 6500,
+            at: '2026-09-07T20:42:00.000Z',
+          }),
+          makeSaleLogEntry({
+            id: 's2',
+            itemName: 'Chain Shirt',
+            quantity: 2,
+            copper: 10000,
+            entryId: 'item-2',
+            at: '2026-09-07T20:47:00.000Z',
+          }),
+        ],
+      };
+
+      render(<Harness initial={makeNpc()} />);
+
+      expect(screen.getByText('2 sales · 165 gp')).toBeInTheDocument();
+      expect(screen.getByText('Potion of Healing ×1')).toBeInTheDocument();
+      expect(screen.getByText('Chain Shirt ×2')).toBeInTheDocument();
+      expect(screen.getByText('65 gp')).toBeInTheDocument();
+      expect(screen.getByText('100 gp')).toBeInTheDocument();
+      expect(screen.getAllByText(/Mirelle Vane/).length).toBe(2);
+    });
+
+    it('shows an unreconciled sale distinctly rather than dropping it', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [
+          makeSaleLogEntry({ itemName: 'Unknown item', reconciled: false }),
+        ],
+      };
+
+      render(<Harness initial={makeNpc()} />);
+
+      expect(screen.getByText('unreconciled')).toBeInTheDocument();
+    });
+
+    it('shows a "N sold" badge on the matching stock row', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [makeSaleLogEntry({ entryId: 'item-1', quantity: 2 })],
+      };
+
+      render(
+        <Harness
+          initial={makeNpc({
+            inventory: [makeItem({ id: 'item-1', value: 100, quantity: 3 })],
+          })}
+        />
+      );
+
+      expect(screen.getByText('2 sold')).toBeInTheDocument();
+    });
+
+    it('appends "— none left" once the sold-out row has zero remaining stock', () => {
+      shopSalesLogByNpc = {
+        'npc-1': [makeSaleLogEntry({ entryId: 'item-1', quantity: 2 })],
+      };
+
+      render(
+        <Harness
+          initial={makeNpc({
+            inventory: [makeItem({ id: 'item-1', value: 100, quantity: 0 })],
+          })}
+        />
+      );
+
+      expect(screen.getByText('2 sold — none left')).toBeInTheDocument();
+    });
+  });
+
+  describe('republishing while open (Task 13b, controller ruling R22)', () => {
+    it('a price edit while open triggers exactly one debounced republish', async () => {
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      const gp = screen.getByRole('textbox', {
+        name: 'Test Item price (gp)',
+      });
+      fireEvent.change(gp, { target: { value: '1' } });
+      fireEvent.change(gp, { target: { value: '12' } });
+      fireEvent.change(gp, { target: { value: '123' } });
+
+      expect(fetchFn).not.toHaveBeenCalled();
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.inventory[0].priceCopper).toBe(12300);
+
+      vi.useRealTimers();
+    });
+
+    it('does not republish an edit made while the shop is closed', async () => {
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(
+        <Harness initial={makeNpc({ inventory: [makeItem({ value: 100 })] })} />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(fetchFn).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it('surfaces a failed republish to the DM', async () => {
+      vi.useFakeTimers();
+      mockFetchResponse(500, { error: 'Failed to publish shop' });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+
+      await vi.advanceTimersByTimeAsync(600);
+      // The debounced republish's fetch has now fired; switch back to real
+      // timers so `waitFor`'s own polling (which uses `setTimeout`) can run
+      // while the fetch/json promise chain resolves.
+      vi.useRealTimers();
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Failed to publish shop'
+        )
+      );
     });
   });
 });

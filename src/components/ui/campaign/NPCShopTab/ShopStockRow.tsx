@@ -32,6 +32,7 @@ const RARITY_BADGE_VARIANT: Record<
 export function ShopStockRow({
   item,
   shopOpen,
+  soldCount,
   readOnly = false,
   onPatch,
 }: ShopStockRowProps) {
@@ -73,6 +74,11 @@ export function ShopStockRow({
           {priceRequired && (
             <Badge variant="warning" size="sm">
               price required
+            </Badge>
+          )}
+          {soldCount > 0 && (
+            <Badge variant="info" size="sm">
+              {soldCount} sold{item.quantity === 0 ? ' — none left' : ''}
             </Badge>
           )}
         </div>
