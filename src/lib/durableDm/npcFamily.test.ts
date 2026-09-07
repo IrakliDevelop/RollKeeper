@@ -728,6 +728,26 @@ describe('Slice 11D NPC family', () => {
       'a shop missing open',
       { shop: { updatedAt: '2026-01-01T00:00:00.000Z' } },
     ],
+    [
+      'a shop with a non-string description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 42,
+        },
+      },
+    ],
+    [
+      'a shop description over 300 characters',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 'x'.repeat(301),
+        },
+      },
+    ],
     ['currency that is not an object', { currency: 25 }],
     ['abilityScores that are not an object', { abilityScores: 'str 11' }],
     ['abilityUsage that is not an object', { abilityUsage: 1 }],
@@ -810,6 +830,26 @@ describe('Slice 11D NPC family', () => {
     [
       'a valid shop',
       { shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
+    ],
+    [
+      'a valid shop with a player-facing description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 'Ironmonger of the Low Market',
+        },
+      },
+    ],
+    [
+      'a valid shop with a null description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: null,
+        },
+      },
     ],
     [
       'null child collections',

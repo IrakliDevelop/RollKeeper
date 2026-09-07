@@ -1,15 +1,37 @@
 // @vitest-environment jsdom
 import { useState } from 'react';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  waitFor,
+} from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
+import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 
 const updateNPC = vi.fn();
+const getEncountersByCampaign = vi.fn(() => [] as unknown[]);
 
 vi.mock('@/store/npcStore', () => ({
   useNPCStore: { getState: () => ({ updateNPC }) },
 }));
+
+vi.mock('@/store/dmStore', () => ({
+  useDmStore: (selector: (state: { dmId: string }) => unknown) =>
+    selector({ dmId: 'dm-1' }),
+}));
+
+vi.mock('@/store/encounterStore', () => ({
+  useEncounterStore: { getState: () => ({ getEncountersByCampaign }) },
+}));
+
+beforeEach(() => {
+  resetFetch();
+  getEncountersByCampaign.mockReturnValue([]);
+});
 
 afterEach(() => {
   cleanup();
@@ -261,5 +283,185 @@ describe('NPCShopTab', () => {
         shop: expect.objectContaining({ open: true }),
       })
     );
+  });
+
+  describe('publishing the shop', () => {
+    it('toggling on publishes with entityIds resolved from matching encounter entities', async () => {
+      getEncountersByCampaign.mockReturnValue([
+        {
+          id: 'enc-1',
+          entities: [
+            { id: 'entity-1', npcSourceId: 'npc-1' },
+            { id: 'entity-2', npcSourceId: 'npc-1' },
+            { id: 'entity-3', npcSourceId: 'someone-else' },
+          ],
+        },
+      ]);
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+
+      render(<Harness initial={makeNpc()} />);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      const [url, options] = (fetchFn as ReturnType<typeof vi.fn>).mock
+        .calls[0];
+      expect(url).toBe('/api/campaign/ABCD/shops/npc-1');
+      expect((options as RequestInit).method).toBe('PUT');
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.dmId).toBe('dm-1');
+      expect([...body.entityIds].sort()).toEqual(['entity-1', 'entity-2']);
+      expect(body.npc.shop).toEqual(expect.objectContaining({ open: true }));
+    });
+
+    it('toggling off tears down via the same publish route with shop.open: false', async () => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: null });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          })}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.shop.open).toBe(false);
+    });
+
+    it('surfaces a failed publish (non-2xx) to the DM instead of swallowing it', async () => {
+      mockFetchResponse(500, { error: 'Failed to publish shop' });
+      render(<Harness initial={makeNpc()} />);
+
+      const toggle = screen.getByRole('switch', { name: 'Open for business' });
+      fireEvent.click(toggle);
+      // Local state flips immediately even though the publish will fail.
+      expect(toggle).toBeChecked();
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent(
+          'Failed to publish shop'
+        )
+      );
+    });
+
+    it('surfaces a rejected fetch (network failure) to the DM too', async () => {
+      global.fetch = vi
+        .fn()
+        .mockRejectedValue(
+          new Error('Network down')
+        ) as unknown as typeof global.fetch;
+      render(<Harness initial={makeNpc()} />);
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      await waitFor(() =>
+        expect(screen.getByRole('alert')).toHaveTextContent('Network down')
+      );
+    });
+
+    it('preserves shop.description across an off/on toggle cycle (regression: setOpen must merge, never replace)', () => {
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: {
+              open: true,
+              updatedAt: '2026-01-01T00:00:00.000Z',
+              description: 'Ironmonger of the Low Market',
+            },
+          })}
+        />
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      expect(updateNPC).toHaveBeenLastCalledWith(
+        'ABCD',
+        'npc-1',
+        expect.objectContaining({
+          shop: expect.objectContaining({
+            open: false,
+            description: 'Ironmonger of the Low Market',
+          }),
+        })
+      );
+
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      expect(updateNPC).toHaveBeenLastCalledWith(
+        'ABCD',
+        'npc-1',
+        expect.objectContaining({
+          shop: expect.objectContaining({
+            open: true,
+            description: 'Ironmonger of the Low Market',
+          }),
+        })
+      );
+    });
+  });
+
+  describe('shop description authoring', () => {
+    it('labels the field as player-visible and matches the artboard placeholder', () => {
+      render(<Harness initial={makeNpc()} />);
+
+      const field = screen.getByLabelText('Shown to players as');
+      expect(field).toHaveAttribute(
+        'placeholder',
+        'Ironmonger of the Low Market'
+      );
+    });
+
+    it('writes shop.description via updateNPC, preserving open/updatedAt', () => {
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+          })}
+        />
+      );
+
+      fireEvent.change(screen.getByLabelText('Shown to players as'), {
+        target: { value: 'Ironmonger of the Low Market' },
+      });
+
+      expect(updateNPC).toHaveBeenCalledWith(
+        'ABCD',
+        'npc-1',
+        expect.objectContaining({
+          shop: expect.objectContaining({
+            open: true,
+            description: 'Ironmonger of the Low Market',
+          }),
+        })
+      );
+    });
+
+    it('round-trips the authored description into the publish payload sent to the shop route', async () => {
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+
+      fireEvent.change(screen.getByLabelText('Shown to players as'), {
+        target: { value: 'Ironmonger of the Low Market' },
+      });
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.shop.description).toBe('Ironmonger of the Low Market');
+    });
   });
 });

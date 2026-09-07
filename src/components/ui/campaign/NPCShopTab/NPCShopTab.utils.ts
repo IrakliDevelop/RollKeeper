@@ -2,12 +2,55 @@
 // JSX. See Task 5 of the Slice 2 merchant plan
 // (.superpowers/sdd/2026-09-07-vtt-merchants-slice2/task-5-brief.md).
 
+import { useEncounterStore } from '@/store/encounterStore';
 import type { NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
 import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
 } from '@/utils/itemPricing';
+
+/** DM-authored player-facing shop subtitle (e.g. "Ironmonger of the Low
+ *  Market"). Mirrors the 300-char cap `sanitizePublicShop` (shopProjection.ts)
+ *  enforces on the wire-format `merchantDescription`, and the identical cap
+ *  added to `isNullableShop` in `durableDm/npcFamily.ts` — all three must
+ *  move together. */
+export const MAX_SHOP_DESCRIPTION_LENGTH = 300;
+
+/** Generous but bounded — a shop realistically maps to a handful of tokens.
+ *  Matches `MAX_ENTITY_IDS` in `shops/[npcId]/route.ts` and
+ *  `shopProjection.ts`'s `sanitizePublicShop`; capped here too so an NPC
+ *  placed unusually often never trips the route's own bound and turns a
+ *  publish into a surprise 400. */
+const MAX_SHOP_ENTITY_IDS = 50;
+
+/**
+ * DM-side resolution of which encounter entities a published shop should
+ * carry (VTT merchants Slice 3, Task 13a): every `EncounterEntity` across
+ * every encounter in this campaign whose `npcSourceId` (`encounter.ts`)
+ * points at this NPC. This is what lets a player's later token tap find the
+ * shop — see `PUT /api/campaign/[code]/shops/[npcId]`'s doc comment, which
+ * depends on the DM client sending exactly this resolution.
+ *
+ * Scans every encounter in the campaign, not just the active one — an NPC's
+ * token can sit in more than one encounter, or in an inactive one, and any
+ * of those is still a legitimate way for a player to reach the shop.
+ */
+export function resolveShopEntityIds(
+  campaignCode: string,
+  npcId: string
+): string[] {
+  const encounters = useEncounterStore
+    .getState()
+    .getEncountersByCampaign(campaignCode);
+  const entityIds: string[] = [];
+  for (const encounter of encounters) {
+    for (const entity of encounter.entities) {
+      if (entity.npcSourceId === npcId) entityIds.push(entity.id);
+    }
+  }
+  return entityIds.slice(0, MAX_SHOP_ENTITY_IDS);
+}
 import { formatCurrencyFromCopper } from '@/utils/currency';
 
 /**

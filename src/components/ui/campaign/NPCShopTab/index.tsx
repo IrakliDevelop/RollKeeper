@@ -1,13 +1,13 @@
 'use client';
 
 import { Card } from '@/components/ui/layout/card';
-import { Switch } from '@/components/ui/forms/switch';
-import { NPCCurrencyStrip } from '../NPCCurrencyStrip';
 import { useNPCStore } from '@/store/npcStore';
 import { cn } from '@/utils/cn';
 import type { Currency } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
 import { ShopStockRow } from './ShopStockRow';
+import { ShopOpenSection } from './ShopOpenSection';
+import { useShopPublish } from './NPCShopTab.hooks';
 import { SHOP_STOCK_GRID_COLS } from './NPCShopTab.utils';
 import type { NPCShopTabProps } from './NPCShopTab.types';
 
@@ -20,13 +20,17 @@ const EMPTY_CURRENCY: Currency = {
 };
 
 /**
- * DM-only merchant authoring surface (Slice 2 — publishes nothing
- * player-reachable). See the Task 5 brief and spec artboard 1a for the exact
- * copy and layout this implements.
+ * DM-only merchant authoring surface. See the Task 5 brief and spec artboard
+ * 1a for the exact copy and layout this implements (artboard 1a's open-state
+ * chrome — the bordered card, the subtitle/stock-helper copy that changes
+ * when open — is Task 13b, not here). Publishing/teardown against
+ * `PUT /shops/[npcId]` and `entityIds` resolution live in `useShopPublish`
+ * (Task 13a); this component owns local NPC-store writes and layout only.
  */
 export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
   const inventory = npc.inventory ?? [];
   const shopOpen = npc.shop?.open ?? false;
+  const { setOpen, publishError } = useShopPublish(npc);
 
   const patchItem = (itemId: string, patch: Partial<NPCInventoryItem>) => {
     const updated = inventory.map(item =>
@@ -37,9 +41,17 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
       .updateNPC(npc.campaignCode, npc.id, { inventory: updated });
   };
 
-  const setOpen = (open: boolean) => {
+  // Local authoring only — publishing a description change while the shop
+  // is already open still requires the DM to toggle it (same as any other
+  // Shop tab edit); see the Task 13a report for why that's in scope here.
+  const setDescription = (description: string) => {
     useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
-      shop: { open, updatedAt: new Date().toISOString() },
+      shop: {
+        open: false,
+        ...npc.shop,
+        description,
+        updatedAt: new Date().toISOString(),
+      },
     });
   };
 
@@ -52,22 +64,17 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <Switch
-          checked={shopOpen}
-          disabled={readOnly}
-          onCheckedChange={setOpen}
-          aria-label="Open for business"
-          label="Open for business"
-          description="Players can't see this stock yet. Turn it on to publish."
-        />
-        <NPCCurrencyStrip
-          currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
-          readonly={readOnly}
-          onChange={readOnly ? undefined : setCurrency}
-          label="Merchant's purse"
-        />
-      </div>
+      <ShopOpenSection
+        npcName={npc.name}
+        shopOpen={shopOpen}
+        description={npc.shop?.description ?? ''}
+        readOnly={readOnly}
+        publishError={publishError}
+        currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
+        onSetOpen={setOpen}
+        onSetDescription={setDescription}
+        onSetCurrency={setCurrency}
+      />
 
       <section className="space-y-2">
         <div>

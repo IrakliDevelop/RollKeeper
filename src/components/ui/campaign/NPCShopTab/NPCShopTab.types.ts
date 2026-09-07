@@ -1,9 +1,25 @@
+import type { Currency } from '@/types/character';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 
 export interface NPCShopTabProps {
   npc: CampaignNPC;
   /** Viewer cannot edit — every control renders disabled. */
   readOnly?: boolean;
+}
+
+export interface ShopOpenSectionProps {
+  npcName: string;
+  shopOpen: boolean;
+  /** `npc.shop?.description ?? ''` — the player-facing subtitle. */
+  description: string;
+  readOnly: boolean;
+  /** Set when the last publish/teardown attempt failed (see
+   *  `useShopPublish`). */
+  publishError: string | null;
+  currency: Currency;
+  onSetOpen: (open: boolean) => void;
+  onSetDescription: (description: string) => void;
+  onSetCurrency: (type: keyof Currency, amount: number) => void;
 }
 
 /** Relocated to `@/utils/itemPricing` in Task 10 (VTT merchants Slice 3) so

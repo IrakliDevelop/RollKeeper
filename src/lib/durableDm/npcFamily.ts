@@ -175,6 +175,9 @@ const STAT_BLOCK_SECTIONS = [
 const MAX_ID_LENGTH = 255;
 const MAX_NAME_LENGTH = 1_000;
 const MAX_LABEL_LENGTH = 100;
+/** Matches the 300-char cap `sanitizePublicShop` (shopProjection.ts) enforces
+ *  on the wire-format `merchantDescription` this field becomes. */
+const MAX_SHOP_DESCRIPTION_LENGTH = 300;
 
 function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -257,13 +260,17 @@ function isNullableArmorValue(value: unknown) {
   );
 }
 
-/** Merchant shop state: absent means "not a merchant". */
+/** Merchant shop state: absent means "not a merchant". `description` is the
+ *  player-facing flavour text (`buildPublicShop` ships it as
+ *  `merchantDescription`) — every other free-text field this validator
+ *  checks is bounded, so this one must be too. */
 function isNullableShop(value: unknown) {
   return (
     isAbsent(value) ||
     (record(value) &&
       typeof value.open === 'boolean' &&
-      isBoundedString(value.updatedAt, MAX_LABEL_LENGTH))
+      isBoundedString(value.updatedAt, MAX_LABEL_LENGTH) &&
+      isNullableBoundedString(value.description, MAX_SHOP_DESCRIPTION_LENGTH))
   );
 }
 
@@ -385,7 +392,7 @@ export function validateNpcPayload(value: unknown): NpcPayloadValidation {
   if (!isNullableShop(value.shop))
     return reject(
       'invalid-npc',
-      `NPC shop must be an object with a boolean open and an updatedAt string of at most ${MAX_LABEL_LENGTH} characters`
+      `NPC shop must be an object with a boolean open, an updatedAt string of at most ${MAX_LABEL_LENGTH} characters, and, if present, a description string of at most ${MAX_SHOP_DESCRIPTION_LENGTH} characters`
     );
   if (
     !isNullableNumber(value.currentHp) ||
