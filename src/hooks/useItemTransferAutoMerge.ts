@@ -134,7 +134,22 @@ export function useItemTransferAutoMerge({
         void _id;
         void _createdAt;
         void _updatedAt;
-        addMagicItem({ ...item, isAttuned: false, isEquipped: false });
+        addMagicItem({
+          ...item,
+          // Both the shop purchase path (`PURCHASE_SCRIPT`'s
+          // `cjson.decode(cjson.encode(selected.item))` clone) and the
+          // item_transfer path (`shared/route.ts`'s enqueue, now atomic —
+          // Slice 3 final review — but still a plain JSON round-trip
+          // through Redis) can hand back `properties: {}` instead of `[]`:
+          // Redis Lua's `cjson` encodes an empty table as an object, not an
+          // array, unless the encoder explicitly writes the array literal.
+          // `|| []` alone would NOT catch this — `{}` is truthy — so this
+          // normalizes at the one place both paths converge, rather than
+          // trusting either producer.
+          properties: Array.isArray(item.properties) ? item.properties : [],
+          isAttuned: false,
+          isEquipped: false,
+        });
       } else {
         const inventoryItem = transfer.item as InventoryItem;
         addInventoryItem({
@@ -147,7 +162,10 @@ export function useItemTransferAutoMerge({
           rarity: inventoryItem.rarity,
           type: inventoryItem.type,
           location: inventoryItem.location || 'Backpack',
-          tags: inventoryItem.tags || [],
+          // Same `cjson` empty-array-becomes-`{}` hazard as `properties`
+          // above — `inventoryItem.tags || []` alone would not catch it,
+          // since a stray `{}` is truthy.
+          tags: Array.isArray(inventoryItem.tags) ? inventoryItem.tags : [],
         });
       }
 

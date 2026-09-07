@@ -479,6 +479,45 @@ export function PlayerBattleMapCanvas({
   const ownCharacterCurrency: Currency | null =
     character && character.id === characterId ? character.currency : null;
 
+  // Purchases committed this VTT visit but not yet debited from
+  // `ownCharacterCurrency` (final review follow-up, "player can commit more
+  // purchases than they can pay for" — the fix that landed inside
+  // `PlayerShopDialog` alone reset on every dialog close, which is exactly
+  // when the bug is easiest to hit: buy a 40gp item, close the dialog,
+  // re-tap the SAME token, and the shop reopens with a fresh
+  // `useSessionSpend` seeing the untouched purse again). Lives HERE, one
+  // level above `{openShop && ... && <PlayerShopDialog .../>}`, because
+  // THIS component — not the dialog — stays mounted across an open/close
+  // cycle; `PlayerShopDialog` now reads it as a prop instead of tracking
+  // its own local total.
+  //
+  // Resets to 0 exactly when it should and never otherwise: the debit hook
+  // (`useItemTransferAutoMerge`) only runs on the character-sheet route, so
+  // `ownCharacterCurrency` never itself changes while this canvas stays
+  // mounted — there is no live event to key a reset off. The canvas
+  // UNMOUNTING (navigating to the sheet, applying the debit, then
+  // returning here later) is what actually invalidates this total, and an
+  // unmount already resets `useState` for free. The `characterId` effect
+  // below is pure defense against a roster-switch re-render reusing this
+  // same component instance for a DIFFERENT character without an
+  // intervening unmount — mirroring the identity guard `ownMovementRef`
+  // above already uses for the same reason.
+  const [committedCopper, setCommittedCopper] = useState(0);
+  const committedCopperCharacterIdRef = useRef(characterId);
+  if (committedCopperCharacterIdRef.current !== characterId) {
+    committedCopperCharacterIdRef.current = characterId;
+    // Safe to call during render (React discards this render and re-runs
+    // with the update applied) — the same "adjust state on a prop change"
+    // pattern React's own docs recommend over an effect for this case,
+    // since an effect would let one stale-character render slip through
+    // first.
+    setCommittedCopper(0);
+  }
+  const handleShopPurchaseCommitted = useCallback((costCopper: number) => {
+    if (!Number.isInteger(costCopper) || costCopper <= 0) return;
+    setCommittedCopper(prev => prev + costCopper);
+  }, []);
+
   const activeMarkerElement =
     activeMarkerElementId !== null
       ? (viewport?.store.getById(activeMarkerElementId) ?? null)
@@ -845,6 +884,8 @@ export function PlayerBattleMapCanvas({
             playerId={characterId}
             initialShop={openShop.shop}
             purse={ownCharacterCurrency}
+            committedCopper={committedCopper}
+            onPurchaseCommitted={handleShopPurchaseCommitted}
           />
         )}
         {viewport && children}

@@ -779,4 +779,93 @@ describe('useItemTransferAutoMerge', () => {
       expect(onInsufficientFunds).not.toHaveBeenCalled();
     });
   });
+
+  describe('cjson empty-array normalization (final review follow-up)', () => {
+    // Redis Lua's `cjson` encodes an empty table as an empty OBJECT, not an
+    // array, unless the encoding script writes the array literal explicitly
+    // — both PURCHASE_SCRIPT's item clone and the item_transfer enqueue
+    // round-trip through it, so `InventoryItem.tags: []` / `MagicItem.
+    // properties: []` can arrive here as `{}`. `|| []` would NOT catch this
+    // (an empty object is truthy), so these pin the `Array.isArray` guard
+    // added at this merge site.
+    it('normalizes an inventory transfer whose tags arrived as {} (not []) into an empty array', () => {
+      const store = makeStore();
+      const addInventoryItem = vi.fn();
+      const addMagicItem = vi.fn();
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+      const updateCurrency = vi.fn();
+      const transfer = makeTransfer({
+        item: {
+          id: 'item-1',
+          name: 'Potion of Healing',
+          category: 'consumable',
+          quantity: 1,
+          // Simulates the cjson round-trip corruption directly, since this
+          // hook only ever sees already-deserialized JSON by the time it
+          // runs (the corruption happens server-side, not in this hook).
+          tags: {} as unknown as string[],
+          createdAt: '2026-01-01T00:00:00.000Z',
+          updatedAt: '2026-01-01T00:00:00.000Z',
+        },
+      });
+
+      renderHook(() =>
+        useItemTransferAutoMerge({
+          transfers: [transfer],
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency: DEFAULT_CURRENCY,
+          updateCurrency,
+        })
+      );
+
+      expect(addInventoryItem).toHaveBeenCalledWith(
+        expect.objectContaining({ tags: [] })
+      );
+    });
+
+    it('normalizes a magic-item transfer whose properties arrived as {} (not []) into an empty array', () => {
+      const store = makeStore();
+      const addInventoryItem = vi.fn();
+      const addMagicItem = vi.fn();
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+      const updateCurrency = vi.fn();
+      const magicItem: MagicItem = {
+        id: 'wand-1',
+        name: 'Wand of Magic Missiles',
+        category: 'wand',
+        rarity: 'uncommon',
+        description: 'Fires magic missiles.',
+        properties: {} as unknown as string[],
+        requiresAttunement: false,
+        isAttuned: false,
+        isEquipped: false,
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      };
+      const transfer = makeTransfer({ itemKind: 'magic', item: magicItem });
+
+      renderHook(() =>
+        useItemTransferAutoMerge({
+          transfers: [transfer],
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency: DEFAULT_CURRENCY,
+          updateCurrency,
+        })
+      );
+
+      expect(addMagicItem).toHaveBeenCalledWith(
+        expect.objectContaining({ properties: [] })
+      );
+    });
+  });
 });

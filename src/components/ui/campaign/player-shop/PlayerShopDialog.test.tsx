@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -57,7 +58,18 @@ function mockFetchSequence(
   return fetchMock;
 }
 
-function renderDialog(shop: PublicShop, purse: Currency = PURSE) {
+/** `committedCopper`/`onPurchaseCommitted` are now owned by the CALLER
+ *  (`PlayerBattleMapCanvas` in production — see `PlayerShopDialog.types.ts`),
+ *  not this dialog, so every direct render of it in these tests must supply
+ *  them explicitly. Defaults (`0` / a no-op) reproduce the dialog's own
+ *  prior self-contained behavior for every test that isn't specifically
+ *  exercising cross-close persistence. */
+function renderDialog(
+  shop: PublicShop,
+  purse: Currency = PURSE,
+  committedCopper = 0,
+  onPurchaseCommitted: (costCopper: number) => void = () => {}
+) {
   mockFetchSequence([{ body: { shop } }]);
   render(
     <PlayerShopDialog
@@ -67,6 +79,8 @@ function renderDialog(shop: PublicShop, purse: Currency = PURSE) {
       npcId="npc-1"
       playerId="player-1"
       purse={purse}
+      committedCopper={committedCopper}
+      onPurchaseCommitted={onPurchaseCommitted}
     />
   );
 }
@@ -166,6 +180,8 @@ describe('merchant header reads both name and description from the SAME shop rec
         npcId="npc-1"
         playerId="player-1"
         purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
       />
     );
     await screen.findByText('Halvard Brenn');
@@ -189,6 +205,8 @@ describe('initialShop seeds the dialog and skips the redundant fetch (controller
         playerId="player-1"
         initialShop={makeShop([makeItem()])}
         purse={PURSE}
+        committedCopper={0}
+        onPurchaseCommitted={() => {}}
       />
     );
 
@@ -229,43 +247,67 @@ describe('shortfall + preview computation', () => {
   });
 });
 
-describe('session-committed spend corrects affordability across multiple purchases (composition fix)', () => {
-  it('marks a second item unaffordable once an earlier purchase this session has committed enough of the purse, even though purse itself is untouched', async () => {
-    // 50 gp purse. Sword (40 gp) and Shield (30 gp) are each individually
-    // affordable against the raw 50 gp purse — the dialog and the
-    // character-sheet debit hook are never co-mounted, so nothing debits
-    // `purse` until the sheet is reopened. Buying the Sword first must still
-    // make the Shield show as unaffordable, because only 10 gp is actually
-    // left to spend this session.
-    const purse: Currency = {
-      platinum: 0,
-      gold: 50,
-      electrum: 0,
-      silver: 0,
-      copper: 0,
-    };
-    const shop = makeShop([
-      makeItem({
-        id: 'sword',
-        name: 'Sword',
-        priceCopper: 4000,
-        remainingQuantity: 1,
-      }),
-      makeItem({
-        id: 'shield',
-        name: 'Shield',
-        priceCopper: 3000,
-        remainingQuantity: 1,
-      }),
-    ]);
-    renderDialog(shop, purse);
-    await screen.findByText('Sword');
+describe('committed spend (owned by the caller) corrects affordability across multiple purchases and a dialog close/reopen', () => {
+  const SWORD_SHIELD_SHOP = makeShop([
+    makeItem({
+      id: 'sword',
+      name: 'Sword',
+      priceCopper: 4000,
+      remainingQuantity: 1,
+    }),
+    makeItem({
+      id: 'shield',
+      name: 'Shield',
+      priceCopper: 3000,
+      remainingQuantity: 1,
+    }),
+  ]);
+  const FIFTY_GOLD_PURSE: Currency = {
+    platinum: 0,
+    gold: 50,
+    electrum: 0,
+    silver: 0,
+    copper: 0,
+  };
 
-    // Both start out affordable against the raw 50 gp purse.
-    expect(screen.getByRole('button', { name: 'Buy · 40 gp' })).not.toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).not.toBeDisabled();
+  /**
+   * Mimics `PlayerBattleMapCanvas`'s ownership of `committedCopper` — a
+   * final-review follow-up finding: the fix originally lived INSIDE
+   * `PlayerShopDialog` as a hook that reset on every close, which meant a
+   * player could buy, close, re-tap the same token, and see the shop
+   * reopen with a fresh (wrongly permissive) total. This harness holds
+   * `committedCopper` itself and conditionally MOUNTS/UNMOUNTS
+   * `PlayerShopDialog` (not merely toggling its `open` prop) — exactly the
+   * `{openShop && ... && <PlayerShopDialog .../>}` shape in production —
+   * so a test can prove the total survives that unmount.
+   */
+  function ShopHarness({
+    mounted,
+    purse = FIFTY_GOLD_PURSE,
+  }: {
+    mounted: boolean;
+    purse?: Currency;
+  }) {
+    const [committedCopper, setCommittedCopper] = useState(0);
+    if (!mounted) return null;
+    return (
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        purse={purse}
+        committedCopper={committedCopper}
+        onPurchaseCommitted={costCopper =>
+          setCommittedCopper(prev => prev + costCopper)
+        }
+      />
+    );
+  }
 
-    const fetchMock = vi.fn().mockResolvedValueOnce({
+  function mockBoughtSword() {
+    return vi.fn().mockResolvedValueOnce({
       ok: true,
       status: 200,
       json: () =>
@@ -277,7 +319,28 @@ describe('session-committed spend corrects affordability across multiple purchas
           remainingQuantity: 0,
         }),
     });
-    vi.stubGlobal('fetch', fetchMock);
+  }
+
+  it('marks a second item unaffordable once an earlier purchase this session has committed enough of the purse, even though purse itself is untouched', async () => {
+    // 50 gp purse. Sword (40 gp) and Shield (30 gp) are each individually
+    // affordable against the raw 50 gp purse — the dialog and the
+    // character-sheet debit hook are never co-mounted, so nothing debits
+    // `purse` until the sheet is reopened. Buying the Sword first must still
+    // make the Shield show as unaffordable, because only 10 gp is actually
+    // left to spend this session.
+    mockFetchSequence([{ body: { shop: SWORD_SHIELD_SHOP } }]);
+    render(<ShopHarness mounted />);
+    await screen.findByText('Sword');
+
+    // Both start out affordable against the raw 50 gp purse.
+    expect(
+      screen.getByRole('button', { name: 'Buy · 40 gp' })
+    ).not.toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Buy · 30 gp' })
+    ).not.toBeDisabled();
+
+    vi.stubGlobal('fetch', mockBoughtSword());
 
     const user = userEvent.setup();
     await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
@@ -292,7 +355,44 @@ describe('session-committed spend corrects affordability across multiple purchas
     // Only 10 gp of the 50 gp purse remains uncommitted; the 30 gp Shield
     // must now read as unaffordable, with a shortfall pill computed against
     // the SAME effective (post-commitment) total, not the stale 50 gp.
-    const shortfall = 3000 - purseToCopper(spendCopper(purse, 4000)!);
+    const shortfall =
+      3000 - purseToCopper(spendCopper(FIFTY_GOLD_PURSE, 4000)!);
+    expect(screen.getByText(formatShortfall(shortfall))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
+  });
+
+  it('a purchase committed before the dialog was closed still gates affordability after it reopens (final review follow-up)', async () => {
+    mockFetchSequence([{ body: { shop: SWORD_SHIELD_SHOP } }]);
+    const { rerender } = render(<ShopHarness mounted />);
+    await screen.findByText('Sword');
+
+    vi.stubGlobal('fetch', mockBoughtSword());
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Bought. The item will appear on your character shortly.'
+        )
+      ).toBeInTheDocument()
+    );
+
+    // Close: unmount the dialog entirely, exactly like
+    // `{openShop && ...}` flipping to `null` in PlayerBattleMapCanvas —
+    // NOT just hiding it via Dialog's own `open` prop, which would leave
+    // PlayerShopDialog's own state (and the bug fix under test) untouched.
+    rerender(<ShopHarness mounted={false} />);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Re-open (re-tap the same token): a fresh fetch of the same shop, and
+    // a brand-new PlayerShopDialog instance — but `ShopHarness` itself never
+    // unmounted, so its `committedCopper` state survived.
+    mockFetchSequence([{ body: { shop: SWORD_SHIELD_SHOP } }]);
+    rerender(<ShopHarness mounted />);
+    await screen.findByText('Sword');
+
+    const shortfall =
+      3000 - purseToCopper(spendCopper(FIFTY_GOLD_PURSE, 4000)!);
     expect(screen.getByText(formatShortfall(shortfall))).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
   });

@@ -30,6 +30,43 @@ export function formatPurseLine(currency: Currency): string {
   return parts.length > 0 ? parts.join(' · ') : '0 cp';
 }
 
+const ZERO_PURSE: Currency = {
+  copper: 0,
+  silver: 0,
+  electrum: 0,
+  gold: 0,
+  platinum: 0,
+};
+
+/**
+ * Derives the purse this dialog should actually check affordability
+ * against: `purse` minus `committedCopper` (VTT merchants Slice 3 final
+ * review, Important finding, revised by a later follow-up finding).
+ *
+ * `committedCopper` — copper already spent this VTT visit that `purse`
+ * does not yet reflect — is owned and persisted by `PlayerBattleMapCanvas`,
+ * NOT this dialog: an earlier version of this fix tracked it in a hook
+ * local to this dialog (`useSessionSpend`) that reset to 0 whenever the
+ * dialog closed, which reintroduced the exact overspend bug it fixed the
+ * instant a player closed the dialog and re-tapped the same token. This
+ * function is now a pure derivation with no state of its own — the caller
+ * is responsible for keeping `committedCopper` alive across a close/reopen
+ * (and for resetting it only when the underlying debit actually lands,
+ * which happens off-screen on the character-sheet route).
+ *
+ * `null` from `spendCopper` (committed spend exceeds the known purse —
+ * shouldn't happen in practice, since committedCopper is built from the
+ * same purchases this purse total would need to cover, but defensive
+ * regardless) falls back to an EMPTY purse, never a stale full one — this
+ * errs toward under-, never over-, stating what's spendable.
+ */
+export function deriveEffectivePurse(
+  purse: Currency,
+  committedCopper: number
+): Currency {
+  return spendCopper(purse, committedCopper) ?? ZERO_PURSE;
+}
+
 /**
  * The shortfall pill's exact copy (artboard 1b): `You're 30 gp 2 sp 8 cp
  * short`. `shortfallCopper` must be computed by the caller as

@@ -7,6 +7,7 @@ import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
 import { useCharacterStore } from '@/store/characterStore';
 
 import type { CanvasElement } from '@fieldnotes/core';
+import type { Currency } from '@/types/character';
 import type { PublicShop, PublicShopIndexEntry } from '@/types/shop';
 
 // Task 11 (VTT merchants Slice 3): tapping a merchant token opens
@@ -108,10 +109,14 @@ function fireReady(vp: Viewport): void {
   act(() => onReady(vp));
 }
 
-function seedOwnCharacter(): void {
+function seedOwnCharacter(currencyOverrides: Partial<Currency> = {}): void {
   const base = useCharacterStore.getState().character;
   useCharacterStore.setState({
-    character: { ...base, id: 'char-1' },
+    character: {
+      ...base,
+      id: 'char-1',
+      currency: { ...base.currency, ...currencyOverrides },
+    },
   });
 }
 
@@ -277,6 +282,160 @@ describe('PlayerBattleMapCanvas: merchant token tap opens the shop dialog', () =
       )
     ).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
+
+    unmount();
+    vp.destroy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Final review follow-up: a purchase's committed cost must survive the
+// dialog closing and the SAME token being re-tapped — `committedCopper`
+// lives on `PlayerBattleMapCanvas` (which stays mounted across that cycle),
+// not inside `PlayerShopDialog` (which does not). Reproduces the exact
+// two-click repro from the finding: buy an item, close, re-tap the same
+// token, and a second item that was individually affordable against the
+// untouched purse must now read as unaffordable.
+// ---------------------------------------------------------------------------
+const SWORD_SHIELD_SHOP: PublicShop = {
+  npcId: 'npc-1',
+  merchantName: 'Brenn',
+  entityIds: ['entity-1'],
+  items: [
+    {
+      id: 'sword',
+      name: 'Sword',
+      itemKind: 'inventory',
+      priceCopper: 4000,
+      remainingQuantity: 1,
+    },
+    {
+      id: 'shield',
+      name: 'Shield',
+      itemKind: 'inventory',
+      priceCopper: 3000,
+      remainingQuantity: 1,
+    },
+  ],
+};
+
+describe('PlayerBattleMapCanvas: committed spend survives a dialog close/reopen (final review follow-up)', () => {
+  beforeEach(() => {
+    mockActiveTool = 'hand';
+    seedOwnCharacter({ gold: 50 }); // 50 gp, nothing else
+    vi.spyOn(globalThis, 'fetch').mockImplementation(
+      (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === '/api/campaign/CODE/shops') {
+          return Promise.resolve({
+            json: () => Promise.resolve({ shops: [INDEX_ENTRY] }),
+          } as Response);
+        }
+        if (
+          url.startsWith('/api/campaign/CODE/shops/npc-1/purchases') &&
+          init?.method === 'POST'
+        ) {
+          return Promise.resolve({
+            ok: true,
+            status: 200,
+            json: () =>
+              Promise.resolve({
+                success: true,
+                entryId: 'sword',
+                grantedQuantity: 1,
+                costCopper: 4000,
+                remainingQuantity: 0,
+              }),
+          } as Response);
+        }
+        if (url.startsWith('/api/campaign/CODE/shops/')) {
+          return Promise.resolve({
+            json: () => Promise.resolve({ shop: SWORD_SHIELD_SHOP }),
+          } as Response);
+        }
+        return Promise.resolve({
+          ok: true,
+          json: () => Promise.resolve({ markers: [] }),
+        } as Response);
+      }
+    );
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it('buy, close, re-tap the same token: the second item is correctly shown as unaffordable', async () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activateSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const { unmount } = renderPlayer();
+    fireReady(vp);
+
+    const listener = activateSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    const tap = () =>
+      act(() => {
+        listener({
+          element: combatantTokenElement('entity-1'),
+          world: { x: 0, y: 0 },
+          pointerType: 'mouse',
+          gesture: 'single',
+        });
+      });
+
+    tap();
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await screen.findByText('Sword');
+
+    // Both items are individually affordable against the untouched 50 gp
+    // purse before any purchase.
+    expect(
+      screen.getByRole('button', { name: 'Buy · 40 gp' })
+    ).not.toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Buy · 30 gp' })
+    ).not.toBeDisabled();
+
+    const user = (await import('@testing-library/user-event')).default.setup({
+      delay: null,
+    });
+    await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Bought. The item will appear on your character shortly.'
+        )
+      ).toBeInTheDocument()
+    );
+
+    // Close: the dialog's own Close button — Radix's onOpenChange(false) ->
+    // PlayerBattleMapCanvas's closeShop() -> `openShop` -> null ->
+    // PlayerShopDialog UNMOUNTS entirely (not merely hidden).
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
+
+    // Re-tap the SAME token — a fresh PlayerShopDialog instance.
+    tap();
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await screen.findByText('Sword');
+
+    // The purse itself is still untouched (the debit hook never ran here),
+    // but the Shield must now read as unaffordable — the 40 gp already
+    // spent on the Sword survived the close/reopen via
+    // PlayerBattleMapCanvas's own `committedCopper` state, not a counter
+    // reset with the dialog.
+    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
+    expect(screen.getByText("You're 20 gp short")).toBeInTheDocument();
 
     unmount();
     vp.destroy();

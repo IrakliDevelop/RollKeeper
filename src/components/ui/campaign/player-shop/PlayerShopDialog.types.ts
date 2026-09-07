@@ -36,6 +36,23 @@ export interface PlayerShopDialogProps {
    *  (`useItemTransferAutoMerge`); this dialog only ever *previews* the
    *  result using the same `currency.ts` helpers that merge will use. */
   purse: Currency;
+  /**
+   * Copper already committed to a purchase — this VTT visit, possibly
+   * across an earlier close/reopen of THIS dialog — that `purse` does not
+   * yet reflect (final review follow-up to the original overspend fix).
+   * Owned by the caller (`PlayerBattleMapCanvas`), not this component: a
+   * counter that lived inside this dialog reset every time it closed,
+   * which is exactly when a player is most likely to retap the same token
+   * and see the stale, pre-purchase purse again. This dialog only ever
+   * DERIVES `purse - committedCopper` for its own affordability checks —
+   * see `deriveEffectivePurse` in `PlayerShopDialog.utils.ts` — never
+   * tracks or resets this total itself.
+   */
+  committedCopper: number;
+  /** Called with a purchase's `costCopper` immediately after it succeeds,
+   *  so the caller can fold it into `committedCopper` for every following
+   *  render — including ones after this dialog has closed and reopened. */
+  onPurchaseCommitted: (costCopper: number) => void;
 }
 
 export type ShopCardState = 'affordable' | 'unaffordable' | 'sold-out';

@@ -7,12 +7,11 @@ import type { PublicShopItem } from '@/types/shop';
 import { PlayerShopHeader } from './PlayerShopHeader';
 import { PlayerShopFooter } from './PlayerShopFooter';
 import { ShopItemList } from './ShopItemList';
+import { useShopData, usePurchase } from './PlayerShopDialog.hooks';
 import {
-  useShopData,
-  usePurchase,
-  useSessionSpend,
-} from './PlayerShopDialog.hooks';
-import { resolveShopPreview } from './PlayerShopDialog.utils';
+  deriveEffectivePurse,
+  resolveShopPreview,
+} from './PlayerShopDialog.utils';
 import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
 
 /**
@@ -30,11 +29,15 @@ import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
  *
  * Because that debit lands later — this dialog and the debit hook are never
  * co-mounted (Slice 3 final review, Important finding) — every card's
- * affordability check runs against `useSessionSpend`'s `effectivePurse`
- * (the `purse` prop minus this session's already-committed-but-undebited
- * purchases), never the raw `purse` prop directly. Without that, a second
- * or third purchase in the same session would still be checked against the
- * pre-purchase balance and wrongly appear affordable.
+ * affordability check runs against `deriveEffectivePurse(purse,
+ * committedCopper)` (the `purse` prop minus purchases already committed but
+ * not yet debited), never the raw `purse` prop directly. `committedCopper`
+ * is owned by the CALLER (`PlayerBattleMapCanvas`), not this component — a
+ * final-review follow-up found that tracking it locally here reset it on
+ * every dialog close, reopening the exact overspend window a player could
+ * hit in two clicks (buy, close, re-tap the same token). This dialog only
+ * reports a purchase's cost back via `onPurchaseCommitted`; it never resets
+ * or otherwise owns the running total.
  */
 export function PlayerShopDialog({
   open,
@@ -45,6 +48,8 @@ export function PlayerShopDialog({
   merchantAvatarUrl,
   initialShop,
   purse,
+  committedCopper,
+  onPurchaseCommitted,
 }: PlayerShopDialogProps) {
   const { shop, loading, error, setShop } = useShopData(
     campaignCode,
@@ -57,15 +62,7 @@ export function PlayerShopDialog({
     npcId,
     playerId
   );
-  // Corrects the affordability check for a dialog session where more than
-  // one purchase is made — see `useSessionSpend`'s doc comment (Slice 3
-  // final review, Important finding). `purse` itself is never mutated; this
-  // only folds already-committed-but-undebited purchases into what the
-  // dialog treats as spendable.
-  const { effectivePurse, commit: commitSpend } = useSessionSpend(
-    purse,
-    open
-  );
+  const effectivePurse = deriveEffectivePurse(purse, committedCopper);
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [results, setResults] = useState<
     Record<string, { message: string; tone: 'success' | 'error' }>
@@ -104,7 +101,7 @@ export function PlayerShopDialog({
       },
     }));
     if (outcome.ok) {
-      commitSpend(outcome.costCopper ?? 0);
+      onPurchaseCommitted(outcome.costCopper ?? 0);
       setShop(prevShop =>
         prevShop
           ? {
