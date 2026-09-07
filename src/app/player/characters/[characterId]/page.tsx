@@ -239,6 +239,7 @@ export default function CharacterSheet() {
     deleteInventoryItem,
     appliedTransferIds,
     recordAppliedTransfer,
+    updateCurrency,
   } = useCharacterStore();
 
   // Derive campaign days from local calendar (may be overridden by shared state below)
@@ -382,6 +383,8 @@ export default function CharacterSheet() {
     addInventoryItem,
     addMagicItem,
     acknowledgeTransfers,
+    currency: character.currency,
+    updateCurrency,
   });
 
   // Latch DM effects into local state for the notification toast before
