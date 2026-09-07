@@ -104,6 +104,7 @@ export function PlayerVttScreen({
       onExportError={message =>
         addToast({ type: 'error', title: 'Export failed', message })
       }
+      pendingTransfers={sharedState?.transfers}
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController
