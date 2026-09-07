@@ -65,6 +65,11 @@ export default defineConfig({
   },
   webServer: [
     {
+      // Prerequisite (Slice 3 final review, Minor finding): this needs
+      // `relay/node_modules` to already exist (`npm install` inside
+      // `relay/`, once) — when it's missing, this webServer entry never
+      // reaches `/healthz` and Playwright times out opaquely after 60s with
+      // no indication the relay's own dependencies were the problem.
       command: `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} REDIS_URL=redis://localhost:6379 npm run dev`,
       cwd: './relay',
       url: 'http://localhost:8787/healthz',

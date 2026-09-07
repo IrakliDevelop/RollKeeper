@@ -643,7 +643,12 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     const quantityValue = itemCard
       .getByText('Quantity:', { exact: true })
       .locator('xpath=following-sibling::*[1]');
-    await expect(quantityValue).toContainText('1');
+    // Exact match (Slice 3 final review, Minor finding): `toContainText`
+    // does a substring match and would also pass on "11", contradicting the
+    // exact-integer discipline the currency assertion right below already
+    // follows. `toHaveText` checks the element's whole (whitespace-
+    // normalized) text content instead.
+    await expect(quantityValue).toHaveText('1');
 
     // Exact-integer currency assertion (never a formatted "70 gp" string
     // that could pass on a wrong denomination split): the purse's total

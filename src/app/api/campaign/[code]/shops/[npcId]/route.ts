@@ -142,10 +142,15 @@ export async function GET(
  * the token itself carrying an npcId). Otherwise this builds the public
  * projection and a fresh ledger seed from the trusted `npc` object (never a
  * client-supplied projection — the explicit-field-pick security boundary
- * lives in `buildPublicShop`/`buildShopLedger`, not here), seeds the ledger
- * through `SHOP_SEED_SCRIPT` (which validates the seed BEFORE writing — see
- * `seedShopLedger`), adds `npcId` to the shops index, and only then writes
- * the public projection, overlaid with the ledger's canonical post-sales
+ * lives in `buildPublicShop`/`buildShopLedger`, not here), re-validates the
+ * projection through `sanitizePublicShop` BEFORE writing anything (Slice 3
+ * final review, Minor finding — an over-long `merchantName`/`description`
+ * would otherwise publish successfully and then read back as `{ shop: null
+ * }` forever, since every player-facing read re-validates through that same
+ * function), seeds the ledger through `SHOP_SEED_SCRIPT` (which validates
+ * the seed BEFORE writing — see `seedShopLedger`), adds `npcId` to the
+ * shops index, and only then writes the public projection, overlaid with
+ * the ledger's canonical post-sales
  * `remainingQuantity` so a republish never shows players stale pre-sale
  * stock counts.
  *
@@ -231,6 +236,26 @@ export async function PUT(
     // the branch above already handled — `typedNpc.shop.open === true` here
     // is therefore guaranteed non-null.
     const publicShop = buildPublicShop(typedNpc, entityIds)!;
+
+    // Validate BEFORE writing anything (Slice 3 final review, Minor
+    // finding): `buildPublicShop` picks `npc.name`/`npc.shop.description`
+    // verbatim, and `CampaignNPC` allows a 1000-char name while
+    // `sanitizePublicShop` caps `merchantName` at 300 — an over-long value
+    // used to publish with `success: true` and then read back as
+    // `{ shop: null }` forever, since the player-facing GET route
+    // (`../[npcId]/route.ts`'s own `GET`, and `shops/route.ts`'s index)
+    // both re-validate through this same function. Rejecting here, before
+    // the ledger is even seeded, keeps a bad publish attempt from writing
+    // anything at all.
+    if (!sanitizePublicShop(publicShop)) {
+      return NextResponse.json(
+        {
+          error:
+            'Shop data exceeds published limits (name, description, or item count/fields)',
+        },
+        { status: 400 }
+      );
+    }
 
     const seed = buildShopLedger(typedNpc);
 

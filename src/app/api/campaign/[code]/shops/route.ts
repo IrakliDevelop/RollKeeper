@@ -66,8 +66,18 @@ export async function GET(
 
     npcIds.forEach((npcId, i) => {
       const raw = results[i];
-      const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      const shop = parsed ? sanitizePublicShop(parsed) : null;
+      // Wrapped locally (Slice 3 final review, Minor finding): one corrupt
+      // projection must drop only ITS OWN entry from the index, never crash
+      // the whole listing — the sibling purchase route
+      // (`shops/[npcId]/purchases/route.ts`) already wraps the identical
+      // parse for the identical reason.
+      let shop: ReturnType<typeof sanitizePublicShop> = null;
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        shop = parsed ? sanitizePublicShop(parsed) : null;
+      } catch {
+        shop = null;
+      }
       if (!shop) {
         staleNpcIds.push(npcId);
         return;
