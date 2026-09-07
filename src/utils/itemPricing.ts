@@ -1,6 +1,11 @@
-// Price resolution for NPC/merchant inventory rows (DM-authored only; this
-// module publishes nothing player-reachable — see Slice 2 of the merchant
-// feature plan).
+// Price resolution for NPC/merchant inventory rows (DM-authored) plus the
+// gp/sp/cp <-> copper denomination helpers shared by the DM Shop tab and the
+// player shop dialog. `resolvePriceCopper`/`MAGIC_ITEM_RARITY_DEFAULT_COPPER`
+// are DM-side-only concerns (see Slice 2 of the merchant feature plan); the
+// `PriceDenominations` type and its two conversion functions below were
+// relocated here in Slice 3 Task 10 specifically because the player-facing
+// shop dialog needs them too and the old home
+// (`NPCShopTab/NPCShopTab.utils.ts`) is a DM-only module.
 
 import type { NPCInventoryItem } from '@/types/encounter';
 import type { MagicItemRarity } from '@/types/character';
@@ -68,4 +73,41 @@ export function resolvePriceCopper(item: NPCInventoryItem): number | null {
 
   const rarity = asKnownRarity(item.magicItem?.rarity ?? item.rarity);
   return rarity ? MAGIC_ITEM_RARITY_DEFAULT_COPPER[rarity] : null;
+}
+
+/** A price split into the three entry/display denominations the DM Shop tab
+ *  edits directly and the player shop dialog reads back. Relocated here
+ *  (Task 10, VTT merchants Slice 3) from the DM-only
+ *  `NPCShopTab/NPCShopTab.utils.ts` — the player shop dialog needs both
+ *  conversion functions below, and this module (unlike the DM Shop tab) is
+ *  reachable from player-facing code. */
+export interface PriceDenominations {
+  gp: number;
+  sp: number;
+  cp: number;
+}
+
+/** Splits an integer copper price into gp/sp/cp for display or entry fields. */
+export function priceCopperToDenominations(copper: number): PriceDenominations {
+  const gp = Math.floor(copper / CURRENCY_VALUES.gold);
+  const afterGold = copper % CURRENCY_VALUES.gold;
+  const sp = Math.floor(afterGold / CURRENCY_VALUES.silver);
+  const cp = afterGold % CURRENCY_VALUES.silver;
+  return { gp, sp, cp };
+}
+
+/**
+ * Controller decision (Slice 2 Task 5 brief, R2): the gp/sp/cp entry fields
+ * combine into the single integer `priceCopper` written to the item. A
+ * missing denomination counts as zero, so editing one field alone still
+ * produces a valid price.
+ */
+export function denominationsToPriceCopper(
+  entry: Partial<PriceDenominations>
+): number {
+  return (
+    (entry.gp ?? 0) * CURRENCY_VALUES.gold +
+    (entry.sp ?? 0) * CURRENCY_VALUES.silver +
+    (entry.cp ?? 0) * CURRENCY_VALUES.copper
+  );
 }

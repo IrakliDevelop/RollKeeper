@@ -19,7 +19,27 @@ interface UseSharedCampaignStateResult {
   lastFetched: Date | null;
   acknowledgeMessage: (messageId: string) => Promise<void>;
   acknowledgeDmEffects: () => Promise<void>;
-  acknowledgeTransfers: () => Promise<void>;
+  /**
+   * Acknowledges one or more transfers by id in a SINGLE request, or — with
+   * no argument — the entire queue. Always pass exactly the ids that were
+   * applied, as a batch when there's more than one: this route does a
+   * non-atomic read-filter-write, so N separate concurrent calls (one per
+   * id) race each other and the last writer silently undoes every other
+   * call's removal — the batch form does one read-filter-write for the
+   * whole set instead. A no-argument call DELETEs the whole Redis key,
+   * destroying any transfer enqueued between the client's last poll and
+   * this call before it's ever applied (harmless for a gift, a silently
+   * lost purchase for one that carries `costCopper`).
+   *
+   * Resolves `true` iff the server actually confirmed the acknowledge (a
+   * non-2xx response resolves `false`, same as a network failure) — unlike
+   * the other acknowledge helpers, the caller uses this to decide whether
+   * it's safe to forget local dedup state for these ids (see
+   * `useItemTransferAutoMerge`); a false positive here would let the ledger
+   * forget a transfer the server still holds, re-applying (and, for a
+   * purchase, re-charging) it on the next reload.
+   */
+  acknowledgeTransfers: (transferIds?: string | string[]) => Promise<boolean>;
   /**
    * Acknowledge one XP award by receipt. THROWS on failure (unlike the other
    * acknowledge helpers) — the award processor must stop, not continue.
@@ -241,25 +261,57 @@ export function useSharedCampaignState(
     }
   }, [campaignCode, playerId]);
 
-  const acknowledgeTransfers = useCallback(async () => {
-    if (!campaignCode || !playerId) return;
-    try {
-      await fetch(`/api/campaign/${campaignCode}/shared`, {
-        method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-rollkeeper-csrf': '1',
-        },
-        body: JSON.stringify({ playerId, type: 'transfers' }),
-      });
-      setSharedState(prev => {
-        if (!prev) return prev;
-        return { ...prev, transfers: [] };
-      });
-    } catch (err) {
-      console.error('Failed to acknowledge transfers:', err);
-    }
-  }, [campaignCode, playerId]);
+  const acknowledgeTransfers = useCallback(
+    async (transferIds?: string | string[]): Promise<boolean> => {
+      if (!campaignCode || !playerId) return false;
+      const ids = Array.isArray(transferIds)
+        ? transferIds
+        : transferIds
+          ? [transferIds]
+          : undefined;
+      try {
+        const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-rollkeeper-csrf': '1',
+          },
+          body: JSON.stringify({
+            playerId,
+            type: 'transfers',
+            // `ids` is only `undefined` when the caller passed no argument
+            // at all (the deliberate "clear the whole queue" call). An
+            // explicit empty array must still be SENT as `transferIds: []`
+            // — eliding it here (as an earlier version did whenever
+            // `ids.length === 0`) made an intentional empty-batch no-op
+            // indistinguishable, server-side, from "no id field at all",
+            // which the route treats as a full-queue DELETE (Slice 3 final
+            // review, Important finding).
+            ...(ids !== undefined ? { transferIds: ids } : {}),
+          }),
+        });
+        // `fetch` only rejects on network failure — a 403 (guest binding),
+        // 400, or 500 resolves normally and would otherwise report success
+        // on an acknowledge the server never actually performed, letting
+        // the caller forget dedup state for a transfer Redis still holds.
+        if (!res.ok) return false;
+        setSharedState(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            transfers: ids
+              ? prev.transfers.filter(t => !ids.includes(t.id))
+              : [],
+          };
+        });
+        return true;
+      } catch (err) {
+        console.error('Failed to acknowledge transfers:', err);
+        return false;
+      }
+    },
+    [campaignCode, playerId]
+  );
 
   const acknowledgeXpAward = useCallback(
     async (receipt: string) => {

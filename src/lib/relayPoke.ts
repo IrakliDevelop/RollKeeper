@@ -23,7 +23,8 @@ export type BattleMapPokeFeature =
   | 'initiative'
   | 'players'
   | 'markers'
-  | 'fog-appearance';
+  | 'fog-appearance'
+  | 'shop';
 
 /**
  * Shared body behind every battle-map poke: env-var guard, token signing,

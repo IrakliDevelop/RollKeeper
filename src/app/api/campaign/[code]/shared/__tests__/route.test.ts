@@ -816,4 +816,213 @@ describe('DELETE /api/campaign/[code]/shared', () => {
       false
     );
   });
+
+  it('removes every id in one batch request (type=transfers, transferIds)', async () => {
+    seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+      makeTransfer('xfr-1'),
+      makeTransfer('xfr-2'),
+      makeTransfer('xfr-3'),
+    ]);
+
+    const req = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'DELETE',
+      body: {
+        playerId: 'player-1',
+        type: 'transfers',
+        transferIds: ['xfr-1', 'xfr-3'],
+      },
+    });
+    const res = await DELETE(
+      req as NextRequest,
+      createRouteParams({ code: 'TEST' })
+    );
+
+    expect(res.status).toBe(200);
+    const raw = getRedisStore().get(campaignTransfersKey('TEST', 'player-1'))!;
+    const remaining: ItemTransfer[] = JSON.parse(raw);
+    expect(remaining.map(t => t.id)).toEqual(['xfr-2']);
+  });
+
+  it('deletes the transfers key when a batch removes every remaining transfer', async () => {
+    seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+      makeTransfer('xfr-1'),
+      makeTransfer('xfr-2'),
+    ]);
+
+    const req = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'DELETE',
+      body: {
+        playerId: 'player-1',
+        type: 'transfers',
+        transferIds: ['xfr-1', 'xfr-2'],
+      },
+    });
+    await DELETE(req as NextRequest, createRouteParams({ code: 'TEST' }));
+
+    expect(getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))).toBe(
+      false
+    );
+  });
+
+  it(
+    'does not clear the whole queue when transferIds is present but empty ' +
+      '(type=transfers, transferIds: [])',
+    async () => {
+      seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+        makeTransfer('xfr-1'),
+        makeTransfer('xfr-2'),
+      ]);
+
+      const req = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: { playerId: 'player-1', type: 'transfers', transferIds: [] },
+      });
+      const res = await DELETE(
+        req as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(res.status).toBe(200);
+      const raw = getRedisStore().get(
+        campaignTransfersKey('TEST', 'player-1')
+      )!;
+      const remaining: ItemTransfer[] = JSON.parse(raw);
+      expect(remaining.map(t => t.id)).toEqual(['xfr-1', 'xfr-2']);
+    }
+  );
+
+  it(
+    'does not clear the whole queue when transferIds is present but every ' +
+      'entry is the wrong type (type=transfers)',
+    async () => {
+      seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+        makeTransfer('xfr-1'),
+        makeTransfer('xfr-2'),
+      ]);
+
+      const req = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: {
+          playerId: 'player-1',
+          type: 'transfers',
+          transferIds: [123, null, {}],
+        },
+      });
+      const res = await DELETE(
+        req as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(res.status).toBe(200);
+      const raw = getRedisStore().get(
+        campaignTransfersKey('TEST', 'player-1')
+      )!;
+      const remaining: ItemTransfer[] = JSON.parse(raw);
+      expect(remaining.map(t => t.id)).toEqual(['xfr-1', 'xfr-2']);
+    }
+  );
+
+  it(
+    'a batch ack of a 25-entry purchase never loses an entry, in one request',
+    async () => {
+      // Reproduces the exact shape of a full-size shop purchase batch: 25
+      // transfers, one shared queue.
+      const ids = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
+      seedRedis(
+        campaignTransfersKey('TEST', 'player-1'),
+        ids.map(id => makeTransfer(id))
+      );
+
+      const batchReq = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: { playerId: 'player-1', type: 'transfers', transferIds: ids },
+      });
+      await DELETE(
+        batchReq as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(
+        getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))
+      ).toBe(false);
+    }
+  );
+
+  it(
+    'Slice 3 final review, Important finding: N concurrent single-id acks ' +
+      'no longer race each other either, now that each ack is its own ' +
+      'atomic Lua EVAL (ACK_ITEM_TRANSFER_SCRIPT) rather than a plain ' +
+      'GET -> filter -> SET/DEL against the route handler',
+    async () => {
+      // This used to be a NEGATIVE control: N concurrent single-id acks
+      // raced the route's old get -> filter -> set and lost all but the
+      // last writer's removal, because each request read the list BEFORE
+      // any of the others had written back (exactly why the batch form
+      // above existed as the only safe way to remove more than one id at
+      // once). Moving the ack itself into an atomic EVAL closes that
+      // window regardless of how many separate requests call it
+      // concurrently — this now asserts the queue ends up EXACTLY empty,
+      // the opposite of what this same setup used to prove.
+      const ids = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
+      seedRedis(
+        campaignTransfersKey('TEST', 'player-1'),
+        ids.map(id => makeTransfer(id))
+      );
+
+      const concurrentRequests = ids.map(id =>
+        DELETE(
+          createNextRequest('/api/campaign/TEST/shared', {
+            method: 'DELETE',
+            body: { playerId: 'player-1', type: 'transfers', transferId: id },
+          }) as NextRequest,
+          createRouteParams({ code: 'TEST' })
+        )
+      );
+      await Promise.all(concurrentRequests);
+
+      expect(
+        getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))
+      ).toBe(false);
+    }
+  );
+
+  it(
+    'Slice 3 final review, Important finding: an enqueue racing a concurrent ' +
+      'ack never resurrects the acknowledged transfer',
+    async () => {
+      // The exact race the finding describes: `T` is already applied and
+      // about to be acknowledged, while a DM gift/loot grant
+      // (`item_transfer`) enqueues concurrently. Before the fix, an
+      // enqueue's stale GET (read before the ack's SET/DEL landed) could
+      // overwrite the ack's write and resurrect `T` alongside the gift.
+      seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+        makeTransfer('transfer-shop-already-applied'),
+      ]);
+
+      const ackReq = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: {
+          playerId: 'player-1',
+          type: 'transfers',
+          transferIds: ['transfer-shop-already-applied'],
+        },
+      });
+      const enqueueReq = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'POST',
+        body: {
+          feature: 'item_transfer',
+          data: { transfer: makeTransfer('transfer-gift-1'), playerId: 'player-1' },
+        },
+      });
+
+      await Promise.all([
+        DELETE(ackReq as NextRequest, createRouteParams({ code: 'TEST' })),
+        POST(enqueueReq as NextRequest, createRouteParams({ code: 'TEST' })),
+      ]);
+
+      const raw = getRedisStore().get(campaignTransfersKey('TEST', 'player-1'));
+      const remaining: ItemTransfer[] = raw ? JSON.parse(raw) : [];
+      expect(remaining.map(t => t.id)).toEqual(['transfer-gift-1']);
+    }
+  );
 });

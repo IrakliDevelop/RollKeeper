@@ -749,8 +749,13 @@ export function NPCDetailDialog({
               </button>
             )}
             <div className="min-w-0 flex-1">
-              <DialogTitle className="text-heading text-xl font-bold">
+              <DialogTitle className="text-heading flex items-center gap-2 text-xl font-bold">
                 {npc.name}
+                {npc.shop?.open && (
+                  <Badge variant="primary" size="sm">
+                    Open
+                  </Badge>
+                )}
               </DialogTitle>
               {npc.description && (
                 <p className="text-muted mt-0.5 text-sm">{npc.description}</p>

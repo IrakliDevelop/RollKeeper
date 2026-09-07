@@ -3,6 +3,16 @@
  * marker canvas painter and to marker pointer activation, and tearing both
  * down again on unmount / dependency change.
  *
+ * Despite the name, this hook's ACTIVATION half is no longer marker-only
+ * (Task 11, VTT merchants Slice 3): `isExtraActivatable`/`onActivateExtra`
+ * let a second element kind (currently: merchant combatant tokens, see
+ * `useMerchantShopActivation`) share the single `setActivation` slot a
+ * viewport allows — see those parameters' own doc comments for why a
+ * second, independent registration would silently replace this one instead
+ * of composing with it. The PAINTER half (`expectCanvasHtmlTypes`/
+ * `registerHtmlPainter`) remains marker-only; a future second painted
+ * element kind would need its own registration for that half.
+ *
  * Connection-independent: no relay import, no store import, no React state.
  * Registration and activation must work with no relay URL configured
  * (CONSTRAINTS-B, spec §7.2). Wiring this hook into `DmBattleMapCanvas` /
@@ -58,6 +68,28 @@ export interface UseMarkerRegistrationArgs {
   isActivationSuppressed?: () => boolean;
   /** Product-state details keyed by the marker ref; never written to canvas. */
   markerDetails?: readonly (MarkerDetail | PublicMarkerDetail)[];
+  /**
+   * A SECOND activatable-element predicate, ORed with `isMarkerElement` on
+   * this same registration (VTT merchants Slice 3, Task 11 — merchant
+   * tokens). `Viewport.setActivation` REPLACES the current activation
+   * wholesale rather than composing with an earlier one (see its doc
+   * comment), so a second, independent `useMarkerRegistration`-shaped hook
+   * calling `setActivation` again on the same viewport would silently
+   * cannibalize this one instead of adding a second recognized element kind
+   * — this parameter exists so a caller shares the one slot instead. Read at
+   * gesture time via a ref, same as `isActivationSuppressed`.
+   *
+   * Supplying `isExtraActivatable` WITHOUT `onActivateExtra` is valid but
+   * silently inert: the element still becomes activatable (so it, correctly,
+   * no longer falls through to whatever a lower layer would otherwise do
+   * with the gesture), but the resulting `ElementActivationEvent` is simply
+   * dropped — no callback fires, nothing throws. Always pass both together.
+   */
+  isExtraActivatable?: (el: Readonly<CanvasElement>) => boolean;
+  /** Fired instead of `onActivateMarker` when the activated element matched
+   *  `isExtraActivatable` rather than `isMarkerElement`. Has no effect
+   *  without `isExtraActivatable` also supplied (see its doc comment). */
+  onActivateExtra?: (event: ElementActivationEvent) => void;
 }
 
 /**
@@ -135,6 +167,12 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
   const isActivationSuppressedRef = useRef(args.isActivationSuppressed);
   isActivationSuppressedRef.current = args.isActivationSuppressed;
 
+  const isExtraActivatableRef = useRef(args.isExtraActivatable);
+  isExtraActivatableRef.current = args.isExtraActivatable;
+
+  const onActivateExtraRef = useRef(args.onActivateExtra);
+  onActivateExtraRef.current = args.onActivateExtra;
+
   const markerStatusesRef = useRef(new Map<string, MarkerDetail['status']>());
   markerStatusesRef.current = new Map(
     (args.markerDetails ?? []).map(detail => [detail.id, detail.status])
@@ -152,10 +190,16 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
      * veto THROUGH THE REF at gesture time — a value captured when the effect
      * ran would pin the tool that happened to be active at mount, and the
      * effect deliberately does not re-run on callback identity changes.
+     *
+     * ORs in `isExtraActivatable` (Task 11) so a second recognized element
+     * kind shares this one `setActivation` slot instead of competing for it
+     * — see that parameter's doc comment on why a second call would be
+     * silently destructive rather than additive.
      */
-    const isActivatableMarker = (el: Readonly<CanvasElement>): boolean => {
+    const isActivatableElement = (el: Readonly<CanvasElement>): boolean => {
       if (isActivationSuppressedRef.current?.() === true) return false;
-      return isMarkerElement(el);
+      if (isMarkerElement(el)) return true;
+      return isExtraActivatableRef.current?.(el) === true;
     };
 
     const releaseDeclaration =
@@ -172,16 +216,23 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
         ? null
         : viewport.setActivation({
             gesture,
-            isActivatable: isActivatableMarker,
+            isActivatable: isActivatableElement,
             isCameraBusy: () => isCameraBusyRef.current?.() ?? false,
           });
     // Second gate, for the same reason `isActivatable` is the first: the
     // activation emitter is viewport-owned and persistent, so an event raised
     // by some OTHER `setActivation` owner (or by a stale generation) must not
-    // open a panel behind a canvas-writing tool either.
+    // open a panel behind a canvas-writing tool either. Dispatches by WHICH
+    // half of `isActivatableElement` matched, so a marker and an extra
+    // element (Task 11: a merchant token) never both fire for the same
+    // activation.
     const offActivate = viewport.onElementActivate(event => {
-      if (!isActivatableMarker(event.element)) return;
-      onActivateMarkerRef.current?.(event);
+      if (!isActivatableElement(event.element)) return;
+      if (isMarkerElement(event.element)) {
+        onActivateMarkerRef.current?.(event);
+      } else {
+        onActivateExtraRef.current?.(event);
+      }
     });
 
     return () => {

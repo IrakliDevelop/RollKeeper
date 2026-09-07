@@ -1,14 +1,20 @@
 'use client';
 
-import { Card } from '@/components/ui/layout/card';
-import { Switch } from '@/components/ui/forms/switch';
-import { NPCCurrencyStrip } from '../NPCCurrencyStrip';
 import { useNPCStore } from '@/store/npcStore';
 import { cn } from '@/utils/cn';
 import type { Currency } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
 import { ShopStockRow } from './ShopStockRow';
-import { SHOP_STOCK_GRID_COLS } from './NPCShopTab.utils';
+import { ShopOpenSection } from './ShopOpenSection';
+import { ShopSalesLog } from './ShopSalesLog';
+import { useShopPublish, useShopSalesLog } from './NPCShopTab.hooks';
+import {
+  SHOP_STOCK_GRID_COLS,
+  countItemsInStock,
+  shopStockHelperText,
+  soldQuantityByItemId,
+  todaysSalesCopper,
+} from './NPCShopTab.utils';
 import type { NPCShopTabProps } from './NPCShopTab.types';
 
 const EMPTY_CURRENCY: Currency = {
@@ -20,13 +26,21 @@ const EMPTY_CURRENCY: Currency = {
 };
 
 /**
- * DM-only merchant authoring surface (Slice 2 — publishes nothing
- * player-reachable). See the Task 5 brief and spec artboard 1a for the exact
- * copy and layout this implements.
+ * DM-only merchant authoring surface. See the Task 5 brief and spec artboard
+ * 1a for the exact copy and layout this implements — including the
+ * open-state chrome (bordered/tinted toggle card, subtitle and Stock helper
+ * copy that switch when open, the "Open" header badge, and the populated
+ * sales log) added in Task 13b. Publishing/teardown against
+ * `PUT /shops/[npcId]`, `entityIds` resolution, and the debounced
+ * republish-while-open all live in `useShopPublish` (Task 13a/13b); this
+ * component owns local NPC-store writes and layout only.
  */
 export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
   const inventory = npc.inventory ?? [];
   const shopOpen = npc.shop?.open ?? false;
+  const { setOpen, publishError, republish } = useShopPublish(npc);
+  const salesLog = useShopSalesLog(npc.id);
+  const soldByItemId = soldQuantityByItemId(salesLog);
 
   const patchItem = (itemId: string, patch: Partial<NPCInventoryItem>) => {
     const updated = inventory.map(item =>
@@ -35,12 +49,24 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
     useNPCStore
       .getState()
       .updateNPC(npc.campaignCode, npc.id, { inventory: updated });
+    // Price/forSale/quantity are all shop-relevant — republish while the
+    // shop is already open (Task 13b, controller ruling R22) rather than
+    // requiring an off/on toggle to reach players. `republish()` no-ops if
+    // the shop isn't open, so this guard is an optimization, not a
+    // correctness requirement.
+    if (shopOpen) republish();
   };
 
-  const setOpen = (open: boolean) => {
+  const setDescription = (description: string) => {
     useNPCStore.getState().updateNPC(npc.campaignCode, npc.id, {
-      shop: { open, updatedAt: new Date().toISOString() },
+      shop: {
+        open: false,
+        ...npc.shop,
+        description,
+        updatedAt: new Date().toISOString(),
+      },
     });
+    if (shopOpen) republish();
   };
 
   const setCurrency = (type: keyof Currency, amount: number) => {
@@ -52,29 +78,25 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <Switch
-          checked={shopOpen}
-          disabled={readOnly}
-          onCheckedChange={setOpen}
-          aria-label="Open for business"
-          label="Open for business"
-          description="Players can't see this stock yet. Turn it on to publish."
-        />
-        <NPCCurrencyStrip
-          currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
-          readonly={readOnly}
-          onChange={readOnly ? undefined : setCurrency}
-          label="Merchant's purse"
-        />
-      </div>
+      <ShopOpenSection
+        npcName={npc.name}
+        shopOpen={shopOpen}
+        description={npc.shop?.description ?? ''}
+        readOnly={readOnly}
+        publishError={publishError}
+        currency={{ ...EMPTY_CURRENCY, ...npc.currency }}
+        itemsInStock={countItemsInStock(inventory)}
+        todayCopper={todaysSalesCopper(salesLog)}
+        onSetOpen={setOpen}
+        onSetDescription={setDescription}
+        onSetCurrency={setCurrency}
+      />
 
       <section className="space-y-2">
         <div>
           <h3 className="text-heading text-sm font-semibold">Stock</h3>
           <p className="text-muted text-xs">
-            Price falls back to the item&apos;s value, then its rarity.
-            Placeholder is what players would pay.
+            {shopStockHelperText(shopOpen, npc.name)}
           </p>
         </div>
 
@@ -101,6 +123,7 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
                 item={item}
                 shopOpen={shopOpen}
                 readOnly={readOnly}
+                soldCount={soldByItemId.get(item.id) ?? 0}
                 onPatch={patch => patchItem(item.id, patch)}
               />
             ))}
@@ -108,13 +131,7 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
         )}
       </section>
 
-      <section className="space-y-2">
-        <h3 className="text-heading text-sm font-semibold">Sales log</h3>
-        <Card padding="md" className="text-muted text-sm">
-          No sales yet. Sales appear here once the shop is open, even if your
-          tab was closed at the time.
-        </Card>
-      </section>
+      <ShopSalesLog campaignCode={npc.campaignCode} entries={salesLog} />
     </div>
   );
 }

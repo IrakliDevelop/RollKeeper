@@ -343,6 +343,28 @@ describe('Slice 11D NPC family', () => {
     expect(manifest.totalBytes).toBe(0);
   });
 
+  it('ignores an extra sibling top-level state field rather than rejecting the envelope (Task 12: appliedShopSaleIds)', async () => {
+    // npcStore.ts added `appliedShopSaleIds` as a SIBLING field on the
+    // persisted store state, deliberately never inside any CampaignNPC
+    // record — this proves why that placement is safe: buildNpcManifest
+    // only ever looks at `state.npcsByCampaign`, so an unrelated sibling key
+    // in `state` is inert here, unlike a field added to an actual NPC
+    // record (which the per-record allowlist below WOULD reject).
+    const manifest = await buildNpcManifest({
+      campaignCode: 'ABC123',
+      rawEnvelope: JSON.stringify({
+        state: {
+          npcsByCampaign: { ABC123: [npc()] },
+          appliedShopSaleIds: { 'npc-1': ['sale-1'] },
+        },
+        version: 4,
+      }),
+    });
+
+    expect(manifest.blockers).toEqual([]);
+    expect(manifest.recordCount).toBe(1);
+  });
+
   it('blocks an envelope that has never been persisted', async () => {
     const manifest = await buildNpcManifest({
       campaignCode: 'ABC123',
@@ -706,6 +728,26 @@ describe('Slice 11D NPC family', () => {
       'a shop missing open',
       { shop: { updatedAt: '2026-01-01T00:00:00.000Z' } },
     ],
+    [
+      'a shop with a non-string description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 42,
+        },
+      },
+    ],
+    [
+      'a shop description over 300 characters',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 'x'.repeat(301),
+        },
+      },
+    ],
     ['currency that is not an object', { currency: 25 }],
     ['abilityScores that are not an object', { abilityScores: 'str 11' }],
     ['abilityUsage that is not an object', { abilityUsage: 1 }],
@@ -788,6 +830,26 @@ describe('Slice 11D NPC family', () => {
     [
       'a valid shop',
       { shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' } },
+    ],
+    [
+      'a valid shop with a player-facing description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: 'Ironmonger of the Low Market',
+        },
+      },
+    ],
+    [
+      'a valid shop with a null description',
+      {
+        shop: {
+          open: true,
+          updatedAt: '2026-01-01T00:00:00.000Z',
+          description: null,
+        },
+      },
     ],
     [
       'null child collections',

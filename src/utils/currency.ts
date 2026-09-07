@@ -98,13 +98,15 @@ function payFromCoinsOnHand(coins: Currency, owed: number): number {
  * an *existing* electrum coin (spending it down further) still yields
  * silver as normal, since that doesn't create any new electrum.
  */
-const BREAK_TARGET: Record<Exclude<keyof Currency, 'copper'>, keyof Currency> =
-  {
-    silver: 'copper',
-    electrum: 'silver',
-    gold: 'silver',
-    platinum: 'gold',
-  };
+const BREAK_TARGET: Record<
+  Exclude<keyof Currency, 'copper'>,
+  keyof Currency
+> = {
+  silver: 'copper',
+  electrum: 'silver',
+  gold: 'silver',
+  platinum: 'gold',
+};
 
 /**
  * Breaks the smallest denomination coin on hand larger than copper into
@@ -160,4 +162,53 @@ export function spendCopper(purse: Currency, copper: number): Currency | null {
   }
 
   return coins;
+}
+
+// Denominations used to mint a fresh credit, largest value first. Skips
+// electrum, mirroring ruling R11 (`BREAK_TARGET` above): minting new coins
+// for an incoming credit must never manufacture electrum either — a purse
+// only ever gains electrum by already holding it, never by conjuring it from
+// a lump sum of copper.
+const DESCENDING_MINT_DENOMINATIONS: (keyof Currency)[] = [
+  'platinum',
+  'gold',
+  'silver',
+  'copper',
+];
+
+/**
+ * Credits `copper` (integer) onto a purse — the natural counterpart to
+ * `spendCopper`, and this module's second consumer (a shop sale crediting an
+ * NPC's till in `useDmShopSalesSync`).
+ *
+ * Mints whole coins largest-denomination-first (platinum -> gold -> silver
+ * -> copper, skipping electrum per ruling R11) and adds them on top of
+ * whatever the purse already holds. Where `spendCopper` pays smallest-first
+ * so it never disturbs large coins already on hand, `creditCopper` mints
+ * largest-first so a sizeable sale doesn't dump the whole price into a pile
+ * of copper pieces; existing coins (including any electrum already in the
+ * purse) are never touched, only added to.
+ *
+ * Non-integer or negative `copper` is a no-op — returns a shallow copy of
+ * `purse`, never throws, never partially credits. Callers
+ * (`useDmShopSalesSync`) validate `ShopSale.copper` before calling this; the
+ * guard here just keeps the helper safe to call defensively on its own.
+ */
+export function creditCopper(purse: Currency, copper: number): Currency {
+  if (!Number.isInteger(copper) || copper <= 0) return { ...purse };
+
+  const next: Currency = { ...purse };
+  let remaining = copper;
+  for (const denom of DESCENDING_MINT_DENOMINATIONS) {
+    if (denom === 'copper') {
+      next.copper += remaining;
+      remaining = 0;
+      break;
+    }
+    const value = CURRENCY_VALUES[denom];
+    const count = Math.floor(remaining / value);
+    next[denom] += count;
+    remaining -= count * value;
+  }
+  return next;
 }

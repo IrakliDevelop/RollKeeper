@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Coins } from 'lucide-react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { Currency } from '@/types/character';
@@ -34,6 +35,9 @@ interface NPCCurrencyStripProps {
   onChange?: (type: keyof Currency, amount: number) => void;
   /** Heading above the coin grid. Defaults to 'Currency'. */
   label?: string;
+  /** Optional content rendered right-aligned beside `label` (e.g. the
+   *  Shop tab's "+165 gp today" sales delta, artboard 1a open state). */
+  labelExtra?: ReactNode;
 }
 
 /** A modal-sized currency editor: one compact row with direct balances. */
@@ -42,12 +46,16 @@ export function NPCCurrencyStrip({
   readonly = false,
   onChange,
   label = 'Currency',
+  labelExtra,
 }: NPCCurrencyStripProps) {
   return (
     <section aria-label="NPC currency" className="space-y-1.5">
-      <div className="text-muted flex items-center gap-1.5 text-xs font-semibold">
-        <Coins className="h-3.5 w-3.5" />
-        {label}
+      <div className="text-muted flex items-center justify-between gap-1.5 text-xs font-semibold">
+        <span className="flex items-center gap-1.5">
+          <Coins className="h-3.5 w-3.5" />
+          {label}
+        </span>
+        {labelExtra}
       </div>
       <div className="border-divider bg-surface-secondary grid grid-cols-5 gap-px overflow-hidden rounded-lg border">
         {COINS.map(coin => (

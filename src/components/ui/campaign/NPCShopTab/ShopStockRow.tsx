@@ -3,13 +3,15 @@
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
-import { resolvePriceCopper } from '@/utils/itemPricing';
+import {
+  resolvePriceCopper,
+  priceCopperToDenominations,
+} from '@/utils/itemPricing';
 import { cn } from '@/utils/cn';
 import { usePriceDraft } from './ShopStockRow.hooks';
 import {
   defaultPriceCopper,
   getProvenanceLine,
-  priceCopperToDenominations,
   SHOP_STOCK_GRID_COLS,
 } from './NPCShopTab.utils';
 import type { ShopStockRowProps } from './NPCShopTab.types';
@@ -30,6 +32,7 @@ const RARITY_BADGE_VARIANT: Record<
 export function ShopStockRow({
   item,
   shopOpen,
+  soldCount,
   readOnly = false,
   onPatch,
 }: ShopStockRowProps) {
@@ -71,6 +74,11 @@ export function ShopStockRow({
           {priceRequired && (
             <Badge variant="warning" size="sm">
               price required
+            </Badge>
+          )}
+          {soldCount > 0 && (
+            <Badge variant="info" size="sm">
+              {soldCount} sold{item.quantity === 0 ? ' — none left' : ''}
             </Badge>
           )}
         </div>

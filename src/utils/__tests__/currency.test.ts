@@ -6,6 +6,7 @@ import {
   purseToCopper,
   canAfford,
   spendCopper,
+  creditCopper,
 } from '@/utils/currency';
 import type { Currency } from '@/types/character';
 
@@ -207,5 +208,65 @@ describe('spendCopper', () => {
     const empty = purse();
     expect(spendCopper(empty, 0)).toEqual(empty);
     expect(spendCopper(empty, 1)).toBeNull();
+  });
+});
+
+describe('creditCopper', () => {
+  it('mints coins largest-denomination-first into an empty purse', () => {
+    // 1234 cp -> 1 pp (1000), 2 gp (200), 3 sp (30), 4 cp.
+    const result = creditCopper(purse(), 1234);
+    expect(result).toEqual(
+      purse({ platinum: 1, gold: 2, silver: 3, copper: 4 })
+    );
+    expect(purseToCopper(result)).toBe(1234);
+  });
+
+  it('adds newly minted coins on top of existing coins without disturbing them', () => {
+    const result = creditCopper(purse({ gold: 1 }), 5);
+    expect(result).toEqual(purse({ gold: 1, copper: 5 }));
+  });
+
+  it('never manufactures electrum, but leaves existing electrum untouched', () => {
+    // Ruling R11 applies to minting too: 30 cp decomposes into 3 sp, never
+    // 0 sp + fresh electrum, and the 2 electrum already on hand survive.
+    const result = creditCopper(purse({ electrum: 2 }), 30);
+    expect(result).toEqual(purse({ electrum: 2, silver: 3 }));
+    expect(purseToCopper(result)).toBe(130);
+  });
+
+  it('decomposes a large credit across every denomination', () => {
+    const result = creditCopper(purse(), 12345);
+    expect(result).toEqual(
+      purse({ platinum: 12, gold: 3, silver: 4, copper: 5 })
+    );
+    expect(purseToCopper(result)).toBe(12345);
+  });
+
+  it('crediting 0 returns the purse unchanged', () => {
+    const start = purse({ electrum: 2, copper: 3 });
+    expect(creditCopper(start, 0)).toEqual(start);
+  });
+
+  it('crediting a negative amount is a no-op, not a debit', () => {
+    const start = purse({ gold: 1 });
+    expect(creditCopper(start, -50)).toEqual(start);
+  });
+
+  it('crediting a non-integer amount is a no-op', () => {
+    const start = purse({ gold: 1 });
+    expect(creditCopper(start, 12.5)).toEqual(start);
+  });
+
+  it('round-trips with purseToCopper: crediting N always raises the total by exactly N', () => {
+    const start = purse({
+      platinum: 2,
+      gold: 7,
+      electrum: 1,
+      silver: 3,
+      copper: 9,
+    });
+    const before = purseToCopper(start);
+    const result = creditCopper(start, 777);
+    expect(purseToCopper(result)).toBe(before + 777);
   });
 });

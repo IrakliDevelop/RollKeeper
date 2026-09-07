@@ -384,7 +384,20 @@ export interface CampaignNPC {
   lastDetailTab?: 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
 
   // Merchant shop state. Absent means this NPC is not a merchant.
-  shop?: { open: boolean; updatedAt: string };
+  shop?: {
+    open: boolean;
+    updatedAt: string;
+    /**
+     * Player-facing one-line flavour text shown under the merchant's name
+     * (artboard 1b, e.g. "Ironmonger of the Low Market") — DELIBERATELY
+     * separate from `CampaignNPC.description` (the DM's private free-text
+     * note, authored with no indication it becomes player-visible; see
+     * `shopProjection.ts`'s doc comment, controller ruling R17). Authoring
+     * UI for this field is Task 13's job; `buildPublicShop` already
+     * publishes it when present.
+     */
+    description?: string;
+  };
 
   // Passive abilities
   passivePerception?: number;

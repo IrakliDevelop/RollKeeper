@@ -13,9 +13,34 @@ export interface IntentWatermark {
   lastSeen: number;
 }
 
+/** Cap on `appliedTransferIds` (dedup ledger for auto-merged item
+ * transfers). A shop purchase stamps `costCopper` on transfer index 0 of
+ * its batch only (see `src/lib/shopPurchases.ts`'s "first-transfer-carries-
+ * the-whole-cost rule"); with FIFO eviction, the oldest entry evicted could
+ * be exactly that cost-carrying id, re-charging the purchase on a later
+ * reload. A single purchase batch is bounded at `MAX_MAGIC_PURCHASE_UNITS`
+ * (25, in `shopPurchases.ts`'s Lua script) transfers, so this cap must clear
+ * that with real margin — not per-purchase, since the server's transfer
+ * enqueue path (`shared/route.ts`'s `item_transfer` handler) has no cap of
+ * its own and multiple sends/purchases can accumulate while acks fail.
+ * `useItemTransferAutoMerge` also removes an id from this ledger the moment
+ * its specific acknowledge succeeds (not just when the whole legacy
+ * whole-queue ack succeeds), so steady-state usage stays near zero and this
+ * cap is a backstop against *sustained* ack failure, not routine operation.
+ * 500 mirrors this codebase's own established convention for the identical
+ * "unbounded queue fan-out" concern class — see `MAX_SALES_LOG_ENTRIES` /
+ * `MAX_LEDGER_ENTRIES` in `shopPurchases.ts` — rather than a fresh guess,
+ * and gives 20x headroom over one purchase's maximum batch size. */
+export const APPLIED_TRANSFER_IDS_MAX = 500;
+
 export interface CharacterEnvelope {
   character: CharacterState;
   intentWatermarks: Record<string, IntentWatermark>;
+  /** Ids of item transfers already applied to inventory, oldest first —
+   * persisted so a failed/never-sent `acknowledgeTransfers()` DELETE can't
+   * cause the transfer to re-apply on the next mount (the in-memory ref it
+   * replaces was reset on every remount). Capped, FIFO eviction. */
+  appliedTransferIds: string[];
 }
 
 export const characterEnvelopeKey = (characterId: string): string =>
@@ -34,6 +59,7 @@ interface PersistedShape {
   state?: {
     character?: CharacterState;
     intentWatermarks?: Record<string, IntentWatermark>;
+    appliedTransferIds?: string[];
   };
   version?: number;
 }
@@ -47,6 +73,9 @@ function parseEnvelope(raw: string | null): CharacterEnvelope | null {
     return {
       character,
       intentWatermarks: parsed?.state?.intentWatermarks ?? {},
+      // `?? []` guards a character persisted before this field existed —
+      // it must load as an empty ledger, not throw on a missing key.
+      appliedTransferIds: parsed?.state?.appliedTransferIds ?? [],
     };
   } catch {
     return null;
@@ -93,6 +122,31 @@ export function mergeWatermarks(
       : envMark;
   }
   return merged;
+}
+
+/** Caps an applied-transfer-id ledger to `APPLIED_TRANSFER_IDS_MAX`,
+ * evicting the oldest (front of the array) first. Pure — shared by the
+ * store action and the merge below. */
+export function capAppliedTransferIds(ids: string[]): string[] {
+  return ids.length > APPLIED_TRANSFER_IDS_MAX
+    ? ids.slice(ids.length - APPLIED_TRANSFER_IDS_MAX)
+    : ids;
+}
+
+/** Merges the envelope's applied-transfer-id ledger with the in-memory one
+ * on load, envelope-first (it reflects everything acknowledged/applied
+ * before this mount): union, preserving relative order, deduplicated, then
+ * capped. Mirrors `mergeWatermarks`'s envelope-dominant, never-regress
+ * shape for the flat-list case. */
+export function mergeAppliedTransferIds(
+  envelopeIds: string[],
+  currentIds: string[]
+): string[] {
+  const merged = [...envelopeIds];
+  for (const id of currentIds) {
+    if (!merged.includes(id)) merged.push(id);
+  }
+  return capAppliedTransferIds(merged);
 }
 
 /** Load-time arbitration between the canonical envelope and the roster

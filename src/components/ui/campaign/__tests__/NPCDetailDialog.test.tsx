@@ -111,4 +111,36 @@ describe('NPCDetailDialog — Shop tab wiring', () => {
     expect(screen.queryByRole('button', { name: /Add Item/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Add Spell/ })).toBeNull();
   });
+
+  describe('header "Open" badge (artboard 1a, Task 13b)', () => {
+    it('does not show an Open badge when the NPC has no shop', () => {
+      const npc = makeNpc();
+      seedNpc(npc);
+      render(<NPCDetailDialog npc={npc} open={true} onOpenChange={() => {}} />);
+
+      expect(screen.queryByText('Open')).toBeNull();
+    });
+
+    it('does not show an Open badge when the shop is closed', () => {
+      const npc = makeNpc({
+        shop: { open: false, updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      seedNpc(npc);
+      render(<NPCDetailDialog npc={npc} open={true} onOpenChange={() => {}} />);
+
+      expect(screen.queryByText('Open')).toBeNull();
+    });
+
+    it('shows an emerald Open badge beside the merchant name when the shop is open', () => {
+      const npc = makeNpc({
+        shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+      });
+      seedNpc(npc);
+      render(<NPCDetailDialog npc={npc} open={true} onOpenChange={() => {}} />);
+
+      const badge = screen.getByText('Open');
+      expect(badge).toBeInTheDocument();
+      expect(badge).toHaveClass('bg-accent-emerald-bg');
+    });
+  });
 });

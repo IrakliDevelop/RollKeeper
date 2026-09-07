@@ -4,8 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import {
   denominationsToPriceCopper,
   priceCopperToDenominations,
-} from './NPCShopTab.utils';
-import type { PriceDenominations } from './NPCShopTab.types';
+  type PriceDenominations,
+} from '@/utils/itemPricing';
 
 interface UsePriceDraftResult {
   /** Current gp/sp/cp field values; a denomination is `undefined` when its

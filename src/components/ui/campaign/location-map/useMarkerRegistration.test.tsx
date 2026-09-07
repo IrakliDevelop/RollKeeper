@@ -488,6 +488,175 @@ describe('useMarkerRegistration', () => {
     expect(onActivateMarker).toHaveBeenCalledWith(markerEvent);
   });
 
+  // Task 11 (VTT merchants Slice 3): `isExtraActivatable`/`onActivateExtra`
+  // let a SECOND element kind (a merchant token) share this hook's single
+  // `setActivation` slot, because `Viewport.setActivation` REPLACES rather
+  // than composes — a second independent registration would silently
+  // cannibalize this one instead of adding a recognized element kind.
+  describe('isExtraActivatable / onActivateExtra (Task 11 shared-slot extension)', () => {
+    function shopTokenElement(entityId = 'entity-1'): CanvasElement {
+      return {
+        ...createShape({
+          position: { x: 0, y: 0 },
+          size: { w: 40, h: 40 },
+          shape: 'ellipse',
+        }),
+        entityId,
+        tokenKind: 'combatant',
+        shopNpcId: 'npc-1',
+      } as CanvasElement;
+    }
+
+    it('setActivation is called exactly once even when isExtraActivatable/onActivateExtra are supplied (no second, competing slot)', () => {
+      const d = createViewportDouble();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          isExtraActivatable: () => true,
+          onActivateExtra: vi.fn(),
+        })
+      );
+      expect(d.calls.filter(c => c === 'setActivation')).toHaveLength(1);
+    });
+
+    it('isActivatable is true for an element the marker predicate rejects but isExtraActivatable accepts', () => {
+      const d = createViewportDouble();
+      const isExtraActivatable = vi.fn(
+        (el: CanvasElement) =>
+          (el as { shopNpcId?: string }).shopNpcId !== undefined
+      );
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          isExtraActivatable,
+        })
+      );
+      const isActivatable = d.activationOptionsCalls[0]?.isActivatable;
+      if (!isActivatable) throw new Error('expected isActivatable to be set');
+
+      expect(isActivatable(shopTokenElement())).toBe(true);
+      expect(
+        isActivatable(
+          createShape({
+            position: { x: 0, y: 0 },
+            size: { w: 10, h: 10 },
+            shape: 'ellipse',
+          })
+        )
+      ).toBe(false);
+    });
+
+    it('dispatches a matching extra element to onActivateExtra, never to onActivateMarker', () => {
+      const d = createViewportDouble();
+      const onActivateMarker = vi.fn();
+      const onActivateExtra = vi.fn();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          onActivateMarker,
+          isExtraActivatable: el =>
+            (el as { shopNpcId?: string }).shopNpcId !== undefined,
+          onActivateExtra,
+        })
+      );
+
+      const event = activationEvent(shopTokenElement());
+      emitToAll(d.activateListeners, event);
+
+      expect(onActivateExtra).toHaveBeenCalledTimes(1);
+      expect(onActivateExtra).toHaveBeenCalledWith(event);
+      expect(onActivateMarker).not.toHaveBeenCalled();
+    });
+
+    it('a marker element still dispatches to onActivateMarker (not onActivateExtra) when both predicates are registered together — the regression this extension must not break', () => {
+      const d = createViewportDouble();
+      const onActivateMarker = vi.fn();
+      const onActivateExtra = vi.fn();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          onActivateMarker,
+          isExtraActivatable: el =>
+            (el as { shopNpcId?: string }).shopNpcId !== undefined,
+          onActivateExtra,
+        })
+      );
+
+      const event = activationEvent(markerHtmlElement());
+      emitToAll(d.activateListeners, event);
+
+      expect(onActivateMarker).toHaveBeenCalledTimes(1);
+      expect(onActivateMarker).toHaveBeenCalledWith(event);
+      expect(onActivateExtra).not.toHaveBeenCalled();
+    });
+
+    it('an element matching neither predicate dispatches to neither callback', () => {
+      const d = createViewportDouble();
+      const onActivateMarker = vi.fn();
+      const onActivateExtra = vi.fn();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          onActivateMarker,
+          isExtraActivatable: el =>
+            (el as { shopNpcId?: string }).shopNpcId !== undefined,
+          onActivateExtra,
+        })
+      );
+
+      emitToAll(
+        d.activateListeners,
+        activationEvent(createNote({ position: { x: 0, y: 0 } }))
+      );
+
+      expect(onActivateMarker).not.toHaveBeenCalled();
+      expect(onActivateExtra).not.toHaveBeenCalled();
+    });
+
+    it('isActivationSuppressed still vetoes an extra-predicate match (shared suppression gate)', () => {
+      const d = createViewportDouble();
+      const onActivateExtra = vi.fn();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          isActivationSuppressed: () => true,
+          isExtraActivatable: () => true,
+          onActivateExtra,
+        })
+      );
+      const isActivatable = d.activationOptionsCalls[0]?.isActivatable;
+      if (!isActivatable) throw new Error('expected isActivatable to be set');
+      expect(isActivatable(shopTokenElement())).toBe(false);
+
+      emitToAll(d.activateListeners, activationEvent(shopTokenElement()));
+      expect(onActivateExtra).not.toHaveBeenCalled();
+    });
+
+    it('omitting isExtraActivatable/onActivateExtra behaves exactly as before (backward compatible default)', () => {
+      const d = createViewportDouble();
+      const onActivateMarker = vi.fn();
+      renderHook(() =>
+        useMarkerRegistration({
+          viewport: d.viewport,
+          gesture: 'single',
+          onActivateMarker,
+        })
+      );
+      const isActivatable = d.activationOptionsCalls[0]?.isActivatable;
+      if (!isActivatable) throw new Error('expected isActivatable to be set');
+      expect(isActivatable(shopTokenElement())).toBe(false);
+
+      emitToAll(d.activateListeners, activationEvent(shopTokenElement()));
+      expect(onActivateMarker).not.toHaveBeenCalled();
+    });
+  });
+
   it('isActivatable accepts unsupported and invalid marker data, and rejects a note element and a non-marker html element', () => {
     const d = createViewportDouble();
 

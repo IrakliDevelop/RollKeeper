@@ -7,7 +7,7 @@ const CAMPAIGN = 'test-campaign';
 describe('npcStore (campaign-scoped)', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
   });
 
   describe('createNPC', () => {
@@ -39,7 +39,13 @@ describe('npcStore (campaign-scoped)', () => {
         localStorage.getItem('rollkeeper-npc-data')!
       );
       expect(persisted.version).toBe(4);
-      expect(Object.keys(persisted.state)).toEqual(['npcsByCampaign']);
+      // Task 12 added `appliedShopSaleIds`, and Task 13b added
+      // `shopSalesLogByNpc`, as sibling top-level fields (see the doc
+      // comments above `APPLIED_SHOP_SALE_IDS_MAX`/`SHOP_SALES_LOG_MAX` in
+      // npcStore.ts for why they're off `CampaignNPC`/`npcsByCampaign`).
+      expect(Object.keys(persisted.state).sort()).toEqual(
+        ['appliedShopSaleIds', 'npcsByCampaign', 'shopSalesLogByNpc'].sort()
+      );
       expect(persisted.state.npcsByCampaign[CAMPAIGN]).toHaveLength(1);
       expect(persisted.state.npcsByCampaign[CAMPAIGN][0]).toMatchObject({
         id,
@@ -968,7 +974,7 @@ function createAbilityNpc(): string {
 describe('npc inventory costs', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
   });
 
   it('atomically consumes inventory for an unlimited action', () => {
@@ -1240,7 +1246,7 @@ describe('npcStore — useNpcAbility / restoreNpcAbility', () => {
 describe('npcStore — merchant shop fields', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
   });
 
   it('an NPC persisted without shop/forSale round-trips unchanged', () => {
@@ -1306,6 +1312,82 @@ describe('npcStore — merchant shop fields', () => {
     });
     expect(persistedNpc.inventory[0].forSale).toBe(true);
     expect(persistedNpc.inventory[0].priceCopper).toBe(2000);
+  });
+});
+
+describe('npcStore — recordAppliedShopSale (Task 12 idempotency ledger)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+  });
+
+  it('starts empty for an unknown npc', () => {
+    expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toBeUndefined();
+  });
+
+  it('records a sale id under the npc', () => {
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+      'sale-1',
+    ]);
+  });
+
+  it('recording the same id twice is a no-op — no duplicate, no reorder', () => {
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-2');
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+      'sale-1',
+      'sale-2',
+    ]);
+  });
+
+  it('keeps separate ledgers per npc', () => {
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    useNPCStore.getState().recordAppliedShopSale('npc-2', 'sale-1');
+    expect(useNPCStore.getState().appliedShopSaleIds).toEqual({
+      'npc-1': ['sale-1'],
+      'npc-2': ['sale-1'],
+    });
+  });
+
+  it('caps at APPLIED_SHOP_SALE_IDS_MAX (500), evicting oldest first', () => {
+    for (let i = 0; i < 501; i++) {
+      useNPCStore.getState().recordAppliedShopSale('npc-1', `sale-${i}`);
+    }
+    const ids = useNPCStore.getState().appliedShopSaleIds['npc-1'];
+    expect(ids).toHaveLength(500);
+    expect(ids).not.toContain('sale-0');
+    expect(ids[0]).toBe('sale-1');
+    expect(ids[ids.length - 1]).toBe('sale-500');
+  });
+
+  it('persists the ledger and survives a store rehydrate', () => {
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    const persisted = JSON.parse(localStorage.getItem('rollkeeper-npc-data')!);
+    expect(persisted.state.appliedShopSaleIds).toEqual({
+      'npc-1': ['sale-1'],
+    });
+  });
+
+  it('an NPC store persisted before this field existed loads with an empty ledger', () => {
+    localStorage.setItem(
+      'rollkeeper-npc-data',
+      JSON.stringify({
+        state: { npcsByCampaign: {} },
+        version: 4,
+      })
+    );
+    // Force a fresh read through zustand's persist rehydrate path rather
+    // than relying on in-memory state left over from a prior test.
+    useNPCStore.persist.rehydrate();
+    expect(useNPCStore.getState().appliedShopSaleIds).toEqual({});
+    // And the store still behaves normally from here (migration-wipe hazard
+    // guard: no crash reading/recording against the missing key).
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-1');
+    expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+      'sale-1',
+    ]);
   });
 });
 

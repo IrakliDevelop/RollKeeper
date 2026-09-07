@@ -225,6 +225,39 @@ export const mockRedis = {
       list.push(value);
       return 'ok';
     }
+    // ENQUEUE_ITEM_TRANSFER_SCRIPT (itemTransferQueue.ts) — atomic
+    // GET -> push -> SET against `store` directly (no `await` between the
+    // read and the write) so concurrently-issued `eval` calls in a
+    // `Promise.all` can never interleave the way the route's old plain
+    // `redis.get`/`redis.set` pair could.
+    if (script.includes('local queue = raw and cjson.decode(raw) or {}')) {
+      const [key] = keys;
+      const [transferJson] = args;
+      const raw = store.get(key);
+      const queue = raw ? JSON.parse(raw) : [];
+      queue.push(JSON.parse(transferJson));
+      const encoded = JSON.stringify(queue);
+      store.set(key, encoded);
+      return encoded;
+    }
+    // ACK_ITEM_TRANSFER_SCRIPT (itemTransferQueue.ts) — atomic
+    // GET -> filter -> SET/DEL, same atomicity guarantee as above.
+    if (script.includes('local transfers = cjson.decode(raw)')) {
+      const [key] = keys;
+      const [idsJson] = args;
+      const raw = store.get(key);
+      if (!raw) return '[]';
+      const transfers = JSON.parse(raw) as { id: string }[];
+      const ackedIds = new Set<string>(JSON.parse(idsJson));
+      const remaining = transfers.filter(t => !ackedIds.has(t.id));
+      if (remaining.length === 0) {
+        store.delete(key);
+        return '[]';
+      }
+      const encoded = JSON.stringify(remaining);
+      store.set(key, encoded);
+      return encoded;
+    }
     throw new Error('mockRedis.eval: unrecognized script');
   }),
 

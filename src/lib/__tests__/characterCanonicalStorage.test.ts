@@ -7,6 +7,9 @@ import {
   pickFresherCharacter,
   createPerCharacterStorage,
   mergeWatermarks,
+  mergeAppliedTransferIds,
+  capAppliedTransferIds,
+  APPLIED_TRANSFER_IDS_MAX,
 } from '@/lib/characterCanonicalStorage';
 import { characterWriterLock } from '@/lib/characterWriterLock';
 import { STORAGE_QUOTA_EVENT } from '@/lib/safeStorage';
@@ -16,8 +19,19 @@ import type { CharacterState } from '@/types/character';
 const char = (id: string, revision: number, extra: object = {}) =>
   ({ id, revision, name: `c-${id}`, ...extra }) as unknown as CharacterState;
 
-const persistJson = (character: object, intentWatermarks: object = {}) =>
-  JSON.stringify({ state: { character, intentWatermarks }, version: 0 });
+const persistJson = (
+  character: object,
+  intentWatermarks: object = {},
+  appliedTransferIds?: string[]
+) =>
+  JSON.stringify({
+    state: {
+      character,
+      intentWatermarks,
+      ...(appliedTransferIds ? { appliedTransferIds } : {}),
+    },
+    version: 0,
+  });
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -51,11 +65,39 @@ describe('readCharacterEnvelope', () => {
   });
 });
 
+describe('readCharacterEnvelope — appliedTransferIds', () => {
+  it('reads a persisted applied-transfer ledger', () => {
+    window.localStorage.setItem(
+      characterEnvelopeKey('a'),
+      persistJson(char('a', 3), {}, ['transfer-1', 'transfer-2'])
+    );
+    expect(readCharacterEnvelope('a')?.appliedTransferIds).toEqual([
+      'transfer-1',
+      'transfer-2',
+    ]);
+  });
+
+  it('defaults to an empty ledger for a character persisted before this field existed', () => {
+    // No `appliedTransferIds` key at all in the persisted blob — the
+    // migration-wipe hazard this repo has hit before: any loop over this
+    // must be guarded with `?? []`, and a pre-existing character must load
+    // cleanly rather than throwing.
+    window.localStorage.setItem(
+      characterEnvelopeKey('a'),
+      persistJson(char('a', 3))
+    );
+    const env = readCharacterEnvelope('a');
+    expect(env).not.toBeNull();
+    expect(env?.appliedTransferIds).toEqual([]);
+  });
+});
+
 describe('pickFresherCharacter', () => {
   it('arbitrates by freshness, envelope wins ties', () => {
     const env = {
       character: char('a', 3),
       intentWatermarks: {},
+      appliedTransferIds: [],
     };
     expect(pickFresherCharacter(env, char('a', 4))?.revision).toBe(4);
     expect(pickFresherCharacter(env, char('a', 3))?.revision).toBe(3); // tie → envelope
@@ -187,5 +229,54 @@ describe('mergeWatermarks', () => {
     expect(mergeWatermarks({ F: { seq: 5, lastSeen: 1 } }, {})).toEqual({
       F: { seq: 5, lastSeen: 1 },
     });
+  });
+});
+
+describe('capAppliedTransferIds', () => {
+  it('leaves a short list untouched', () => {
+    expect(capAppliedTransferIds(['a', 'b'])).toEqual(['a', 'b']);
+  });
+
+  it('evicts the oldest entries (front of the array) first once over the cap', () => {
+    const ids = Array.from(
+      { length: APPLIED_TRANSFER_IDS_MAX + 3 },
+      (_, i) => `t-${i}`
+    );
+    const capped = capAppliedTransferIds(ids);
+    expect(capped.length).toBe(APPLIED_TRANSFER_IDS_MAX);
+    // The 3 oldest ('t-0', 't-1', 't-2') are gone; the newest survive.
+    expect(capped).not.toContain('t-0');
+    expect(capped).not.toContain('t-2');
+    expect(capped[0]).toBe('t-3');
+    expect(capped[capped.length - 1]).toBe(`t-${APPLIED_TRANSFER_IDS_MAX + 2}`);
+  });
+});
+
+describe('mergeAppliedTransferIds', () => {
+  it('unions envelope and current ledgers, envelope entries first', () => {
+    expect(mergeAppliedTransferIds(['a', 'b'], ['c'])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('deduplicates ids present in both ledgers without reordering', () => {
+    expect(mergeAppliedTransferIds(['a', 'b'], ['b', 'c'])).toEqual([
+      'a',
+      'b',
+      'c',
+    ]);
+  });
+
+  it('never drops an id the envelope already recorded (never regresses)', () => {
+    expect(mergeAppliedTransferIds(['a'], [])).toEqual(['a']);
+  });
+
+  it('caps the merged result', () => {
+    const envelopeIds = Array.from(
+      { length: APPLIED_TRANSFER_IDS_MAX },
+      (_, i) => `env-${i}`
+    );
+    const merged = mergeAppliedTransferIds(envelopeIds, ['extra-1', 'extra-2']);
+    expect(merged.length).toBe(APPLIED_TRANSFER_IDS_MAX);
+    expect(merged).toContain('extra-2');
+    expect(merged).not.toContain('env-0');
   });
 });

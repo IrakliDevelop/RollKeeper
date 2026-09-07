@@ -125,6 +125,45 @@ export function campaignFogAppearanceKey(
   return `campaign:${code}:fog-appearance:${battleMapId}`;
 }
 
+// Merchant shop keys (VTT merchants Slice 3). Per-NPC, not campaign-wide, so
+// each is written with its own `{ ex: SLIDING_TTL_SECONDS }` at write time —
+// matching campaignTransfersKey/campaignXpKey/campaignMarkerLootKey — rather
+// than being added to refreshCampaignTTL, which is reserved for the four
+// campaign-wide structures.
+export function campaignShopKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop:${npcId}`;
+}
+
+export function campaignShopLedgerKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop-ledger:${npcId}`;
+}
+
+// Campaign-wide (not per-NPC) SET of npcIds with a currently-open shop —
+// the player-readable index (controller ruling R16, Task 11) that lets a
+// token tap resolve `entityId -> npcId` without the token itself carrying
+// that mapping. Maintained by the publish `PUT` (sadd + refreshed TTL on
+// open, srem on close) and read by `GET /api/campaign/[code]/shops`. Its own
+// sliding TTL, refreshed alongside — like every other shop key, deliberately
+// NOT part of `refreshCampaignTTL`. A LOOKUP only: a listed npcId whose own
+// `campaignShopKey` has since expired or gone invalid is dropped (and
+// lazily self-healed out of this set) by the list route, never trusted on
+// its own.
+export function campaignShopsIndexKey(code: string): string {
+  return `campaign:${code}:shops-index`;
+}
+
+export function campaignShopSalesKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop-sales:${npcId}`;
+}
+
+export function campaignShopReceiptKey(
+  code: string,
+  npcId: string,
+  requestId: string
+): string {
+  return `campaign:${code}:shop-receipt:${npcId}:${requestId}`;
+}
+
 export function campaignLiveMapRoomsKey(code: string): string {
   return `campaign:${code}:live-maps`;
 }

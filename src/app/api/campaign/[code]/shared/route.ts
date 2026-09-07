@@ -19,6 +19,10 @@ import {
   ackXpAward,
   validateDmXpAward,
 } from '@/lib/xpAwardQueue';
+import {
+  enqueueItemTransfer,
+  acknowledgeItemTransfers,
+} from '@/lib/itemTransferQueue';
 import type {
   DmMessage,
   DmEffect,
@@ -462,16 +466,17 @@ export async function POST(
         );
       }
 
-      const key = campaignTransfersKey(code, targetPlayerId);
-      const existing = await redis.get<string>(key);
-      let queue: ItemTransfer[] = [];
-      if (existing) {
-        queue = typeof existing === 'string' ? JSON.parse(existing) : existing;
-      }
-      queue.push(transfer);
-      await redis.set(key, JSON.stringify(queue), {
-        ex: SLIDING_TTL_SECONDS,
-      });
+      // Atomic append (Slice 3 final review, Important finding) — a plain
+      // GET -> push -> SET here raced the batch ack below (and
+      // PURCHASE_SCRIPT's own atomic append to this same key) and could
+      // resurrect an already-acknowledged transfer. See
+      // `enqueueItemTransfer`'s doc comment in `itemTransferQueue.ts`.
+      await enqueueItemTransfer(
+        getRawRedis(),
+        campaignTransfersKey(code, targetPlayerId),
+        transfer,
+        SLIDING_TTL_SECONDS
+      );
 
       await refreshCampaignTTL(redis, code);
       return NextResponse.json({ success: true });
@@ -580,25 +585,44 @@ export async function DELETE(
     }
 
     if (type === 'transfers') {
-      const { transferId } = body;
-      if (!transferId) {
+      const { transferId, transferIds } = body;
+      // Batch form: one request acknowledging every id at once, rather than
+      // N separate requests — still worth preferring even now that the ack
+      // itself is atomic (`acknowledgeItemTransfers`/`ACK_ITEM_TRANSFER_SCRIPT`
+      // below, Slice 3 final review), since one EVAL beats N round trips.
+      const transferIdsProvided = Array.isArray(transferIds);
+      const ids: string[] = transferIdsProvided
+        ? transferIds.filter((id): id is string => typeof id === 'string')
+        : typeof transferId === 'string'
+          ? [transferId]
+          : [];
+
+      // A `transferIds` array that's PRESENT but resolves to zero valid ids
+      // (empty array, or every entry the wrong type) must be a no-op, never
+      // "acknowledge nothing" silently becoming "delete the whole queue".
+      // Only the true "no id field at all" shape below — the deliberate
+      // clear-everything call `acknowledgeTransfers()` makes with no
+      // arguments — reaches the full-key delete.
+      if (transferIdsProvided && ids.length === 0) {
+        return NextResponse.json({ success: true });
+      }
+
+      if (ids.length === 0) {
         await redis.del(campaignTransfersKey(code, playerId));
         return NextResponse.json({ success: true });
       }
-      const key = campaignTransfersKey(code, playerId);
-      const raw = await redis.get<string>(key);
-      if (raw) {
-        const transfers: ItemTransfer[] =
-          typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const filtered = transfers.filter(t => t.id !== transferId);
-        if (filtered.length === 0) {
-          await redis.del(key);
-        } else {
-          await redis.set(key, JSON.stringify(filtered), {
-            ex: SLIDING_TTL_SECONDS,
-          });
-        }
-      }
+
+      // Atomic ack (Slice 3 final review, Important finding) — a plain
+      // GET -> filter -> SET/DEL here raced the enqueue above and could let
+      // a concurrent enqueue's stale snapshot resurrect a transfer this
+      // call just removed. See `acknowledgeItemTransfers`'s doc comment in
+      // `itemTransferQueue.ts`.
+      await acknowledgeItemTransfers(
+        getRawRedis(),
+        campaignTransfersKey(code, playerId),
+        ids,
+        SLIDING_TTL_SECONDS
+      );
       return NextResponse.json({ success: true });
     }
 
