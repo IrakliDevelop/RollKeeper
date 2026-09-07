@@ -94,16 +94,82 @@ function applySaleToNpc(
 }
 
 /**
- * Drains one NPC's `campaign:{code}:shop-sales:{npcId}` log: fetches it,
- * then applies every sale not already recorded in this NPC's
- * `appliedShopSaleIds` ledger (idempotent on `ShopSale.id` — see
- * `npcStore.ts`'s doc comment on that field for why it's persisted the same
- * way as `characterStore`'s `appliedTransferIds`).
+ * Acknowledges every sale in `saleIds` for one NPC in a SINGLE batch
+ * request (Task 12a) — never one `DELETE` per sale. The server route does a
+ * non-atomic read-filter-write, exactly like `shared/route.ts`'s batch
+ * transfer ack; N concurrent single-id calls would each write "log minus MY
+ * id" against the same starting snapshot and the last writer would silently
+ * resurrect every other call's id, so every id applied on this drain (or
+ * still pending acknowledgement from a previous one — see the caller) is
+ * sent together.
  *
- * A malformed row is skipped (logged, not applied, not recorded as applied)
- * rather than aborting the rest of the batch — the same row-level resilience
- * `parseStoredShopSales` already gives the server-side parse, applied again
- * here as defense in depth against whatever the fetch actually hands back.
+ * Deliberately swallows both a rejected fetch AND a non-ok HTTP status
+ * (`fetch` only throws on network failure — a 403/500 otherwise looks like
+ * success) rather than propagating either to `drainNow`'s caller: a failed
+ * ack is harmless by construction, because it runs strictly AFTER the sale
+ * was already applied and recorded in `appliedShopSaleIds` — the ledger
+ * already guarantees the next drain won't double-apply these sales, so all
+ * a failed ack costs is a redundant re-fetch-and-re-filter of rows the
+ * server still holds. Surfacing it as a `drainNow` error would incorrectly
+ * suggest a sale failed to apply, when every sale here already succeeded.
+ */
+async function acknowledgeAppliedSales(
+  campaignCode: string,
+  dmId: string,
+  npcId: string,
+  saleIds: string[]
+): Promise<void> {
+  try {
+    const res = await fetch(
+      `/api/campaign/${encodeURIComponent(campaignCode)}/shops/${encodeURIComponent(npcId)}/sales`,
+      {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dmId, saleIds }),
+      }
+    );
+    if (!res.ok) {
+      console.warn(
+        `[useDmShopSalesSync] failed to acknowledge ${saleIds.length} sale(s) for NPC ${npcId} (status ${res.status}); they remain in the server log and will be retried next drain`
+      );
+    }
+  } catch (err) {
+    console.warn(
+      `[useDmShopSalesSync] failed to acknowledge sales for NPC ${npcId}; will retry next drain`,
+      err
+    );
+  }
+}
+
+/**
+ * Drains one NPC's `campaign:{code}:shop-sales:{npcId}` log: fetches it,
+ * applies every sale not already recorded in this NPC's `appliedShopSaleIds`
+ * ledger (idempotent on `ShopSale.id` — see `npcStore.ts`'s doc comment on
+ * that field for why it's persisted the same way as `characterStore`'s
+ * `appliedTransferIds`), and then — Task 12a — acknowledges every sale seen
+ * this drain that has been applied, so the server-side log stays short in
+ * normal operation instead of relying on `PURCHASE_SCRIPT`'s 500-entry FIFO
+ * cap never being reached.
+ *
+ * Order is apply -> record in the ledger -> acknowledge, deliberately never
+ * the other way around: acknowledging BEFORE recording would let a crash
+ * between the two lose a sale entirely (the server has already forgotten
+ * it, but the ledger never learned it happened, so `npc.currency`/
+ * `NPCInventoryItem.quantity` never get credited/decremented and nothing
+ * ever retries it). With acknowledge last, the same crash just leaves the
+ * sale un-acknowledged — the next drain re-fetches it, sees it's already in
+ * `appliedShopSaleIds`, skips re-applying it, and re-attempts the ack. A
+ * sale already in `appliedShopSaleIds` when this drain starts (an
+ * apply from a previous drain whose ack failed or never ran) is therefore
+ * skipped for re-application but still added to `idsToAck` — otherwise a
+ * merchant whose DM ack keeps failing would never shrink its log, exactly
+ * the unbounded-growth failure mode this task exists to close.
+ *
+ * A malformed row is skipped (logged, not applied, not recorded as applied,
+ * and not acknowledged) rather than aborting the rest of the batch — the
+ * same row-level resilience `parseStoredShopSales` already gives the
+ * server-side parse, applied again here as defense in depth against
+ * whatever the fetch actually hands back.
  */
 async function drainNpcSales(
   campaignCode: string,
@@ -127,6 +193,7 @@ async function drainNpcSales(
   const appliedIds = new Set(
     useNPCStore.getState().appliedShopSaleIds[npcId] ?? []
   );
+  const idsToAck: string[] = [];
 
   for (const candidate of sales) {
     if (!isValidShopSale(candidate)) {
@@ -136,10 +203,21 @@ async function drainNpcSales(
       );
       continue;
     }
-    if (appliedIds.has(candidate.id)) continue;
+    if (appliedIds.has(candidate.id)) {
+      // Already applied (this drain or an earlier one) but still present in
+      // the server log — a previous ack for it must have failed or never
+      // ran. Re-attempt the ack; never re-apply.
+      idsToAck.push(candidate.id);
+      continue;
+    }
     applySaleToNpc(campaignCode, npcId, candidate);
     useNPCStore.getState().recordAppliedShopSale(npcId, candidate.id);
     appliedIds.add(candidate.id);
+    idsToAck.push(candidate.id);
+  }
+
+  if (idsToAck.length > 0) {
+    await acknowledgeAppliedSales(campaignCode, dmId, npcId, idsToAck);
   }
 }
 

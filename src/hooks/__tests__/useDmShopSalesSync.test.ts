@@ -367,4 +367,186 @@ describe('useDmShopSalesSync', () => {
 
     await waitFor(() => expect(result.current.error).toBeTruthy());
   });
+
+  describe('acknowledging applied sales (Task 12a)', () => {
+    function mockAckResponse(ok = true) {
+      return { ok, status: ok ? 200 : 500, json: async () => ({}) } as Response;
+    }
+
+    it('acknowledges every applied sale in ONE batch call, not one per sale', async () => {
+      seedMerchant('npc-1');
+      const sales = [
+        makeSale({ id: 'sale-1', copper: 100, quantity: 1 }),
+        makeSale({ id: 'sale-2', copper: 150, quantity: 1 }),
+        makeSale({ id: 'sale-3', copper: 200, quantity: 2 }),
+      ];
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'DELETE') return mockAckResponse(true);
+        return mockSalesResponse(sales);
+      });
+
+      const { result } = renderHook(() =>
+        useDmShopSalesSync({
+          campaignCode: CAMPAIGN,
+          dmId: DM_ID,
+          npcIds: ['npc-1'],
+        })
+      );
+      await act(async () => {
+        await result.current.drainNow();
+      });
+
+      const deleteCalls = fetchMock.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'DELETE'
+      );
+      expect(deleteCalls).toHaveLength(1);
+      const [url, init] = deleteCalls[0];
+      expect(url).toBe(`/api/campaign/${CAMPAIGN}/shops/npc-1/sales`);
+      const body = JSON.parse((init as RequestInit).body as string);
+      expect(body).toEqual({
+        dmId: DM_ID,
+        saleIds: ['sale-1', 'sale-2', 'sale-3'],
+      });
+    });
+
+    it('a failed ack (rejected fetch) does not disturb the applied-sales ledger, so the next drain does not double-apply', async () => {
+      seedMerchant('npc-1');
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'DELETE') {
+          throw new Error('network down');
+        }
+        return mockSalesResponse([makeSale({ copper: 200, quantity: 2 })]);
+      });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { result } = renderHook(() =>
+        useDmShopSalesSync({
+          campaignCode: CAMPAIGN,
+          dmId: DM_ID,
+          npcIds: ['npc-1'],
+        })
+      );
+
+      await act(async () => {
+        await result.current.drainNow();
+      });
+      expect(result.current.error).toBeNull();
+      expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+        'sale-req-1',
+      ]);
+      let npc = useNPCStore.getState().getNPC(CAMPAIGN, 'npc-1');
+      expect(npc?.currency).toEqual(creditCopper(ZERO_PURSE, 200));
+
+      // The server still holds the sale (the ack never landed) and would
+      // legitimately return it again on the next poll.
+      await act(async () => {
+        await result.current.drainNow();
+      });
+      npc = useNPCStore.getState().getNPC(CAMPAIGN, 'npc-1');
+      // Not re-applied: same coin total, ledger unchanged (no duplicate id).
+      expect(npc?.currency).toEqual(creditCopper(ZERO_PURSE, 200));
+      expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+        'sale-req-1',
+      ]);
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('a failed ack (non-ok HTTP status) does not disturb the applied-sales ledger, so the next drain does not double-apply', async () => {
+      seedMerchant('npc-1');
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'DELETE') return mockAckResponse(false);
+        return mockSalesResponse([makeSale({ copper: 300, quantity: 1 })]);
+      });
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      const { result } = renderHook(() =>
+        useDmShopSalesSync({
+          campaignCode: CAMPAIGN,
+          dmId: DM_ID,
+          npcIds: ['npc-1'],
+        })
+      );
+
+      await act(async () => {
+        await result.current.drainNow();
+      });
+      await act(async () => {
+        await result.current.drainNow();
+      });
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, 'npc-1');
+      expect(npc?.currency).toEqual(creditCopper(ZERO_PURSE, 300));
+      expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+        'sale-req-1',
+      ]);
+      expect(warnSpy).toHaveBeenCalled();
+    });
+
+    it('the property that matters: sales piling up while the DM is away are all applied and acknowledged, and the server log never grows without bound across repeated drains', async () => {
+      seedMerchant('npc-1');
+      // A stand-in for the server's `campaign:{code}:shop-sales:{npcId}` log
+      // — GET reads it, DELETE removes acknowledged ids, exactly like the
+      // real route.
+      let serverLog: ShopSale[] = [
+        makeSale({ id: 'sale-1', copper: 100, quantity: 1 }),
+        makeSale({ id: 'sale-2', copper: 150, quantity: 1 }),
+      ];
+      fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+        if (init?.method === 'DELETE') {
+          const { saleIds } = JSON.parse(init.body as string) as {
+            saleIds: string[];
+          };
+          const idSet = new Set(saleIds);
+          serverLog = serverLog.filter(s => !idSet.has(s.id));
+          return mockAckResponse(true);
+        }
+        return mockSalesResponse(serverLog);
+      });
+
+      const { result } = renderHook(() =>
+        useDmShopSalesSync({
+          campaignCode: CAMPAIGN,
+          dmId: DM_ID,
+          npcIds: ['npc-1'],
+        })
+      );
+
+      await act(async () => {
+        await result.current.drainNow();
+      });
+      // Both pre-existing sales applied and acknowledged: the log drains to
+      // empty, not capped-but-nonzero.
+      expect(serverLog).toHaveLength(0);
+
+      // More sales accumulate while the DM is still away (a purchase
+      // append never depends on this hook running).
+      serverLog.push(
+        makeSale({ id: 'sale-3', copper: 200, quantity: 2 }),
+        makeSale({ id: 'sale-4', copper: 50, quantity: 1 }),
+        makeSale({ id: 'sale-5', copper: 75, quantity: 1 })
+      );
+
+      await act(async () => {
+        await result.current.drainNow();
+      });
+      expect(serverLog).toHaveLength(0);
+
+      const npc = useNPCStore.getState().getNPC(CAMPAIGN, 'npc-1');
+      // `creditCopper` mints per-transaction (largest-first), so the
+      // expected purse is built the same way — one credit per sale, in
+      // applied order — not from a single lump-sum credit.
+      const expectedCurrency = [100, 150, 200, 50, 75].reduce(
+        (purse, amount) => creditCopper(purse, amount),
+        ZERO_PURSE
+      );
+      expect(npc?.currency).toEqual(expectedCurrency);
+      expect(useNPCStore.getState().appliedShopSaleIds['npc-1']).toEqual([
+        'sale-1',
+        'sale-2',
+        'sale-3',
+        'sale-4',
+        'sale-5',
+      ]);
+    });
+  });
 });
