@@ -750,6 +750,72 @@ describe('NPCShopTab', () => {
       vi.useRealTimers();
     });
 
+    it('a price edit after a sale republishes with the already-decremented quantity unchanged (Slice 3 final review, Critical finding)', async () => {
+      // The item started at 10, and a sale of 2 has already been drained by
+      // `useDmShopSalesSync` — this NPC's inventory quantity (8) is already
+      // net of that sale by the time this tab ever sees it. A price edit
+      // must republish exactly that 8, never a stale pre-sale 10 the old
+      // (double-subtracting) SHOP_SEED_SCRIPT would have needed to correct
+      // for. This proves the DM-side half of the fix: the client was never
+      // the one adding the bug back in, but pins that a price-only edit
+      // never mutates `quantity` on its way out either.
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100, quantity: 8 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.inventory[0].quantity).toBe(8);
+      expect(body.npc.inventory[0].priceCopper).toBe(500);
+
+      vi.useRealTimers();
+    });
+
+    it('flushes a pending debounced republish on unmount instead of silently dropping it (Slice 3 final review, Minor finding)', async () => {
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      const { unmount } = render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+
+      // Unmount well within the 600ms debounce window — closing the NPC
+      // dialog right after typing must not lose this edit.
+      expect(fetchFn).not.toHaveBeenCalled();
+      unmount();
+
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.npc.inventory[0].priceCopper).toBe(500);
+
+      vi.useRealTimers();
+    });
+
     it('surfaces a failed republish to the DM', async () => {
       vi.useFakeTimers();
       mockFetchResponse(500, { error: 'Failed to publish shop' });

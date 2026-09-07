@@ -300,6 +300,49 @@ describe('shop publish route — publishing an open shop', () => {
     expect(redis.del).not.toHaveBeenCalled();
   });
 
+  // Slice 3 final review, Minor finding: `CampaignNPC.name` allows up to
+  // 1000 chars but `sanitizePublicShop` caps `merchantName` at 300 — before
+  // this fix, an over-long name published with `success: true` and then
+  // read back as `{ shop: null }` forever (every player-facing read
+  // re-validates through the same `sanitizePublicShop`). Rejecting here
+  // means nothing is ever written for a publish that could never be read
+  // back.
+  it('rejects an over-long merchantName before seeding the ledger or writing anything', async () => {
+    const response = await PUT(
+      request({
+        dmId: 'dm-1',
+        npc: makeNpc({ name: 'x'.repeat(301) }),
+        entityIds: ['entity-1'],
+      }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(seedShopLedger).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.sadd).not.toHaveBeenCalled();
+  });
+
+  it('rejects an over-long shop description before seeding the ledger or writing anything', async () => {
+    const response = await PUT(
+      request({
+        dmId: 'dm-1',
+        npc: makeNpc({
+          shop: {
+            open: true,
+            updatedAt: '2026-01-01T00:00:00.000Z',
+            description: 'x'.repeat(301),
+          },
+        }),
+        entityIds: ['entity-1'],
+      }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(seedShopLedger).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.sadd).not.toHaveBeenCalled();
+  });
+
   // Important fix: only the two known validation messages map to 400.
   // Anything else (a Redis outage, the exact serialization bug this review
   // caught — mismatched client producing a SyntaxError, etc.) must fall

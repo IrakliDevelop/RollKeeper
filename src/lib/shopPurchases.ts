@@ -23,58 +23,67 @@ export const MAX_SALES_LOG_ENTRIES = 500;
  */
 const MAX_PRICE_COPPER = 100_000_000;
 
-/** Cumulative sold-units counter, mirrored on every ledger row; see the cap
- *  rationale on `ShopLedgerEntry.soldQuantity`. Generous but bounded so a
- *  pathological row can't grow the ledger's numeric fields without limit. */
+/** Since-last-publish sold-units counter, mirrored on every ledger row; see
+ *  the doc comment on `ShopLedgerEntry.soldQuantity`. Generous but bounded
+ *  so a pathological row can't grow the ledger's numeric fields without
+ *  limit. */
 const MAX_SOLD_QUANTITY = 1_000_000;
 
 /**
- * Seeds/reseeds a shop's authoritative ledger (VTT merchants Slice 3, Task 3).
- * Modelled directly on `markerLootClaims.ts`'s `SEED_SCRIPT`, but using the
- * two-field model marker loot uses (`quantity`/`claimedQuantity`) rather than
- * a bare non-increasing counter: incoming rows (`ARGV[1]`) carry the DM's
- * freshly-authored *total* stock in `seededQuantity` (Task 2's
- * `buildShopLedger` produces this `ShopLedgerSeed` shape — never
- * `ShopLedgerEntry` — since a fresh build from the NPC's inventory has no
- * notion of sales; see the type doc on `ShopLedgerSeed` in `types/shop.ts`
- * for why the field is deliberately NOT named `remainingQuantity`). This
- * script:
+ * Seeds/reseeds a shop's authoritative ledger (VTT merchants Slice 3, Task 3;
+ * corrected by the Slice 3 final review, Critical finding — controller
+ * ruling R5 superseded).
  *
- *   1. inherits the OLD row's `soldQuantity` (0 if the row is new), and
- *   2. recomputes `remainingQuantity = max(0, freshlyAuthoredStock - soldQuantity)`.
+ * R5's original two-field model (`seededQuantity`/`soldQuantity`,
+ * `remainingQuantity = max(0, seededQuantity - soldQuantity)` on every
+ * reseed) assumed the DM-authored quantity on `NPCInventoryItem` was the
+ * total EVER stocked, never touched by a sale. That is not how this shop
+ * actually works: `useDmShopSalesSync`'s drain decrements
+ * `NPCInventoryItem.quantity` by the sold amount on every applied sale, and
+ * `buildShopLedger` (`shopProjection.ts`) feeds that already-decremented
+ * `quantity` straight into `seededQuantity`. So a republish while open
+ * (ruling R22) was subtracting `soldQuantity` a SECOND time on top of a
+ * count that had already had it subtracted once, permanently eroding stock
+ * toward zero on every edit made after a sale (stock 10, sell 1 -> ledger 9
+ * / DM inventory 9; republish -> 9 - 1 = 8; sell 1 more -> DM inventory 7,
+ * ledger 7; republish -> 7 - 2 = 5; ...). This is also why the UI copy
+ * ("Stock reflects sales already reconciled to ...", `NPCShopTab.utils.ts`)
+ * and the "N sold" badges key off `NPCInventoryItem.quantity` directly —
+ * the client has been authoritative for remaining stock all along.
  *
- * This is deliberately NOT a `min(old, incoming)` comparison — an earlier
- * version of this script used that, which satisfies "never resurrect sold
- * units" but ALSO makes `remainingQuantity` permanently non-increasing,
- * so a DM adding stock to an existing row (Task 5 republishes the whole
- * shop on every edit) would watch it silently disappear forever. The
- * two-field model distinguishes "republished unchanged" from "restocked":
- * new stock 10 with 2 sold -> 8 remaining; new stock 1 with 2 sold -> 0
- * remaining (still clamped, still never resurrected).
+ * `seededQuantity` (`ARGV[1]`) is therefore now read as the LIVE remaining
+ * count, not a lifetime total: `remainingQuantity = seededQuantity`,
+ * verbatim, and `soldQuantity` resets to 0 on every reseed (it is now purely
+ * a since-last-publish counter for this ledger's own lifetime, incremented
+ * by `PURCHASE_SCRIPT` — nothing reads it across a republish boundary
+ * anymore). The `entry.seededQuantity + 0` arithmetic (rather than a bare
+ * assignment) is deliberate: it preserves the hard-failure guarantee that
+ * feeding the STORED ledger shape (`remainingQuantity`/`soldQuantity`, no
+ * `seededQuantity`) back into this script errors loudly (Lua arithmetic on
+ * a nil field) instead of silently writing a corrupt row — see the
+ * "round-trip hazard" integration test.
+ *
+ * Trade-off, stated explicitly rather than silently accepted: a DM who
+ * republishes in the narrow window between a purchase committing and the
+ * DM's own drain applying it will briefly OVER-state stock by the
+ * undrained amount (the purchase already decremented the ledger's
+ * `remainingQuantity`, but `NPCInventoryItem.quantity` — and therefore the
+ * next `seededQuantity` — hasn't caught up yet). That self-heals on the
+ * very next drain-plus-republish cycle. This is a transient over-statement,
+ * never a permanent one — the acceptable trade against today's permanent,
+ * cumulative under-statement.
  *
  * Rows are matched by `id` alone (a shop ledger is already scoped to one
  * NPC via the Redis key, unlike marker loot's ledger which spans every
- * marker on a map and needs the `markerId:id` composite).
+ * marker on a map and needs the `markerId:id` composite) — there is no
+ * longer any need to read the OLD ledger row at all, since nothing from it
+ * carries forward across a reseed.
  */
 export const SHOP_SEED_SCRIPT = `
-local oldRaw = redis.call('GET', KEYS[1])
-local oldById = {}
-if oldRaw then
-  local old = cjson.decode(oldRaw)
-  for _, entry in ipairs(old) do
-    oldById[entry.id] = entry
-  end
-end
 local incoming = cjson.decode(ARGV[1])
 for _, entry in ipairs(incoming) do
-  local old = oldById[entry.id]
-  local sold = 0
-  if old and old.soldQuantity then sold = old.soldQuantity end
-  local seeded = entry.seededQuantity
-  local remaining = seeded - sold
-  if remaining < 0 then remaining = 0 end
-  entry.soldQuantity = sold
-  entry.remainingQuantity = remaining
+  entry.remainingQuantity = entry.seededQuantity + 0
+  entry.soldQuantity = 0
   entry.seededQuantity = nil
 end
 local encoded = #incoming == 0 and '[]' or cjson.encode(incoming)
@@ -93,8 +102,9 @@ return encoded
  *   5. price = entry.priceCopper * the GRANTED quantity  -- server's price;
  *      the client never supplies one, and none is read from ARGV
  *   6. decrement remaining by the granted quantity (and increment
- *      `soldQuantity` by the same amount — see `SHOP_SEED_SCRIPT`'s doc
- *      comment for why the two counters are tracked separately)
+ *      `soldQuantity` by the same amount — a since-last-publish counter
+ *      only, reset to 0 on every reseed; see `SHOP_SEED_SCRIPT`'s doc
+ *      comment for why it no longer carries forward across a republish)
  *   7. enqueue transfers onto the player's transfer queue
  *   8. append a sale row for DM-side reconciliation, trimming the log to the
  *      most recent `MAX_SALES_LOG_ENTRIES` (500, matching `MAX_LEDGER_ENTRIES`)

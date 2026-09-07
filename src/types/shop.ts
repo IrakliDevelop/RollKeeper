@@ -70,15 +70,20 @@ export interface PublicShopItem {
 export interface ShopLedgerEntry extends Omit<PublicShopItem, 'item'> {
   item: InventoryItem | MagicItem;
   /**
-   * Cumulative units sold from this row across its lifetime — ledger-only,
-   * never on `PublicShopItem` (players have no business seeing sales
-   * counts). `SHOP_SEED_SCRIPT` uses it to compute `remainingQuantity` on
-   * every reseed as `max(0, freshlyAuthoredStock - soldQuantity)`, so a DM
-   * republishing the shop (which resends the *authored* stock as
-   * `ShopLedgerSeed.seededQuantity`, unaware of sales) can genuinely restock
-   * an item — unlike a bare non-increasing `remainingQuantity`, which can
-   * only ever shrink. `PURCHASE_SCRIPT` increments it by the same amount it
-   * decrements `remainingQuantity`.
+   * Units sold from this row SINCE THE LAST PUBLISH — ledger-only, never on
+   * `PublicShopItem` (players have no business seeing sales counts).
+   * `PURCHASE_SCRIPT` increments it by the same amount it decrements
+   * `remainingQuantity`; `SHOP_SEED_SCRIPT` resets it to 0 on every reseed.
+   *
+   * NOT a lifetime counter (Slice 3 final review, Critical finding —
+   * controller ruling R5 superseded): an earlier version of this field
+   * carried forward across a reseed so `SHOP_SEED_SCRIPT` could recompute
+   * `remainingQuantity = max(0, freshlyAuthoredStock - soldQuantity)`. That
+   * double-subtracted every sale, because `NPCInventoryItem.quantity` — the
+   * source `ShopLedgerSeed.seededQuantity` is built from — is ALSO
+   * decremented per sale by `useDmShopSalesSync`'s drain. See
+   * `SHOP_SEED_SCRIPT`'s doc comment (`shopPurchases.ts`) for the full
+   * arithmetic and the fix.
    */
   soldQuantity: number;
 }
@@ -87,23 +92,27 @@ export interface ShopLedgerEntry extends Omit<PublicShopItem, 'item'> {
  * The DM-authored SEED for one shop row — `buildShopLedger`'s output and the
  * only shape `seedShopLedger`/`SHOP_SEED_SCRIPT` ever accept as input.
  * Deliberately NOT the same shape as `ShopLedgerEntry` (controller ruling
- * R6, Task 5 review of Task 3): `seededQuantity` names the freshly-authored
- * TOTAL stock a republish wants live, never the live remaining count, and
- * there is no `soldQuantity` here at all — a fresh seed has no notion of
- * sales, `SHOP_SEED_SCRIPT` derives that from the OLD stored row keyed by
- * `id`. Renaming the stock field (rather than merely documenting the
- * hazard) makes it a compile error to feed `parseStoredShopLedger`'s return
- * value — `ShopLedgerEntry[]`, which carries `remainingQuantity` and
- * `soldQuantity` — back into `seedShopLedger`: exactly the
- * reseed-erodes-stock hazard (8 -> 6 -> 4) the Task 3 review flagged.
- * `parseStoredShopLedger` keeps returning `ShopLedgerEntry[]`; the two types
- * must never be interchangeable.
+ * R6, Task 5 review of Task 3) — `item`/other fields are shared, but the
+ * stock field is named `seededQuantity`, not `remainingQuantity`, so it is a
+ * compile error to feed `parseStoredShopLedger`'s return value
+ * (`ShopLedgerEntry[]`) straight back into `seedShopLedger`.
+ *
+ * `seededQuantity` IS the live remaining count the DM's client wants
+ * published (Slice 3 final review, Critical finding — superseding R5's
+ * "freshly-authored total stock, unaware of sales" description of this
+ * field): `buildShopLedger` builds it from `NPCInventoryItem.quantity`,
+ * which `useDmShopSalesSync`'s drain already decrements per sale, so by the
+ * time a republish happens the client-authored count has already had sold
+ * units subtracted once. `SHOP_SEED_SCRIPT` writes it straight through to
+ * `remainingQuantity` with no further subtraction — see that script's doc
+ * comment (`shopPurchases.ts`) for why an earlier version subtracted a
+ * second time and eroded stock on every post-sale edit.
  */
 export interface ShopLedgerSeed
   extends Omit<PublicShopItem, 'item' | 'remainingQuantity'> {
   item: InventoryItem | MagicItem;
-  /** Authored total stock for this row, before any already-sold units are
-   *  subtracted. Never a live/remaining count — see the type doc above. */
+  /** Live remaining stock for this row, already net of any sales (see the
+   *  type doc above) — never a lifetime total. */
   seededQuantity: number;
 }
 

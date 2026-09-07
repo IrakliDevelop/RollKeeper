@@ -33,12 +33,14 @@ export interface UseShopPublishResult {
    * unconditionally (e.g. after every inventory patch): it re-checks
    * `shop.open` at the moment the debounce fires and is a no-op if the shop
    * is closed by then (including "closed during the debounce window").
-   * Re-seeding while open is safe by design — `SHOP_SEED_SCRIPT`
-   * (`shopPurchases.ts`) always inherits the ledger's existing
-   * `soldQuantity` and clamps `remainingQuantity` to
-   * `max(0, freshlyAuthoredStock - soldQuantity)`, so a republish can only
-   * ever correct stock/price/description, never resurrect or double-count a
-   * sale.
+   * Re-seeding while open is safe by design — `buildShopLedger` reads
+   * `NPCInventoryItem.quantity`, which `useDmShopSalesSync`'s drain already
+   * decremented for any sale applied so far, and `SHOP_SEED_SCRIPT`
+   * (`shopPurchases.ts`) writes that count straight through as the new
+   * `remainingQuantity`, so a republish can only ever correct
+   * stock/price/description, never resurrect or double-count a sale (Slice
+   * 3 final review, Critical finding — see `SHOP_SEED_SCRIPT`'s doc comment
+   * for the double-subtraction bug this replaced).
    */
   republish: () => void;
   /** Set when the last publish/teardown/republish request failed. The local
@@ -116,6 +118,19 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
     }
   }, []);
 
+  // Shared by the debounce timer firing normally AND by the unmount flush
+  // below — both are "send the latest state now", just triggered
+  // differently. Reads `npcRef.current`, never a closed-over `npc`, for the
+  // same reason `republish` schedules against the ref in the first place.
+  const runPendingRepublish = useCallback(() => {
+    const current = npcRef.current;
+    // The shop may have been closed (or never opened) by the time this
+    // fires — never send an unsolicited publish.
+    if (current.shop?.open !== true) return;
+    setPublishError(null);
+    sendPublish(current, true);
+  }, [sendPublish]);
+
   const setOpen = useCallback(
     (open: boolean) => {
       const nextShop = {
@@ -140,16 +155,32 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
     cancelPendingRepublish();
     debounceRef.current = setTimeout(() => {
       debounceRef.current = null;
-      const current = npcRef.current;
-      // The shop may have been closed (or never opened) by the time this
-      // fires — never send an unsolicited publish.
-      if (current.shop?.open !== true) return;
-      setPublishError(null);
-      sendPublish(current, true);
+      runPendingRepublish();
     }, REPUBLISH_DEBOUNCE_MS);
-  }, [sendPublish, cancelPendingRepublish]);
+  }, [cancelPendingRepublish, runPendingRepublish]);
 
-  useEffect(() => cancelPendingRepublish, [cancelPendingRepublish]);
+  // Read via a ref, like `npcRef` above, so the unmount effect below can
+  // keep a STABLE dependency array ([cancelPendingRepublish] never changes
+  // identity) and its cleanup therefore only ever runs on true unmount —
+  // never on an incidental `dmId` change re-running the effect mid-session.
+  const runPendingRepublishRef = useRef(runPendingRepublish);
+  runPendingRepublishRef.current = runPendingRepublish;
+
+  useEffect(() => {
+    // Flush, never merely cancel (Slice 3 final review, Minor finding): a
+    // DM closing this NPC's dialog within `REPUBLISH_DEBOUNCE_MS` of their
+    // last edit used to have that edit silently dropped — the timeout was
+    // cancelled on unmount with nothing ever sent. Firing the pending send
+    // immediately on unmount means the DM's last edit always reaches the
+    // server, whether or not anything is still mounted to show the result
+    // (a failure here has nowhere left to surface `publishError`, but that
+    // is strictly better than never sending the request at all).
+    return () => {
+      const hadPending = debounceRef.current !== null;
+      cancelPendingRepublish();
+      if (hadPending) runPendingRepublishRef.current();
+    };
+  }, [cancelPendingRepublish]);
 
   return { setOpen, republish, publishError };
 }

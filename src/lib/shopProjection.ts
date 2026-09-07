@@ -139,13 +139,17 @@ function toLedgerItem(row: NPCInventoryItem): InventoryItem | MagicItem {
  * carries the full item so a sale can enqueue an `ItemTransfer`. Never sent
  * to players directly.
  *
- * Returns `ShopLedgerSeed[]`, NOT `ShopLedgerEntry[]` (ruling R6): a fresh
- * build from the NPC's authored inventory has no notion of sales, so there
- * is no `soldQuantity` to report, and the stock field is named
+ * Returns `ShopLedgerSeed[]`, NOT `ShopLedgerEntry[]` (ruling R6): there is
+ * no `soldQuantity` to report here, and the stock field is named
  * `seededQuantity` rather than `remainingQuantity` so this can never be
  * confused with — or type-check as — the stored ledger shape
- * `parseStoredShopLedger` returns. `SHOP_SEED_SCRIPT` (shopPurchases.ts) is
- * what merges this against the persisted ledger's `soldQuantity` on reseed.
+ * `parseStoredShopLedger` returns. `seededQuantity` is read straight off
+ * `row.quantity` — which `useDmShopSalesSync`'s drain already decrements per
+ * sale — so it IS the live remaining count by the time a republish sends
+ * it; `SHOP_SEED_SCRIPT` (shopPurchases.ts) writes it straight through to
+ * `remainingQuantity` with no further subtraction (Slice 3 final review,
+ * Critical finding — see that script's doc comment for why an earlier
+ * version subtracted `soldQuantity` a second time here).
  */
 export function buildShopLedger(npc: CampaignNPC): ShopLedgerSeed[] {
   const entries: ShopLedgerSeed[] = [];

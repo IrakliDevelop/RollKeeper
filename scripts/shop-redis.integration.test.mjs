@@ -42,6 +42,8 @@ async function waitForRedis() {
 let seedScript;
 let purchaseScript;
 let ackScript;
+let enqueueTransferScript;
+let ackTransferScript;
 let server;
 
 before(async () => {
@@ -84,6 +86,30 @@ before(async () => {
     'PURCHASE_SCRIPT must be exported for this harness'
   );
   assert.ok(ackScript, 'SALES_ACK_SCRIPT must be exported for this harness');
+
+  // Slice 3 final review, Important finding: the item-transfer queue's own
+  // atomic enqueue/ack scripts (`itemTransferQueue.ts`) share this exact
+  // Redis instance and `campaignTransfersKey` shape with PURCHASE_SCRIPT's
+  // own transfer append above, so the race between them is exercised here
+  // rather than standing up a second Docker harness for it.
+  const transferQueueSource = fs.readFileSync(
+    new URL('../src/lib/itemTransferQueue.ts', import.meta.url),
+    'utf8'
+  );
+  enqueueTransferScript = transferQueueSource.match(
+    /export const ENQUEUE_ITEM_TRANSFER_SCRIPT = `([\s\S]*?)`;/u
+  )?.[1];
+  ackTransferScript = transferQueueSource.match(
+    /export const ACK_ITEM_TRANSFER_SCRIPT = `([\s\S]*?)`;/u
+  )?.[1];
+  assert.ok(
+    enqueueTransferScript,
+    'ENQUEUE_ITEM_TRANSFER_SCRIPT must be exported for this harness'
+  );
+  assert.ok(
+    ackTransferScript,
+    'ACK_ITEM_TRANSFER_SCRIPT must be exported for this harness'
+  );
 });
 
 after(() => {
@@ -191,6 +217,40 @@ async function ackSales({ npcId, saleIds, ttl = '300' }) {
     '1',
     salesKey(npcId),
     JSON.stringify(saleIds),
+    ttl
+  );
+  const text = out.join('\n');
+  return text === '' ? [] : JSON.parse(text);
+}
+
+/**
+ * Runs ENQUEUE_ITEM_TRANSFER_SCRIPT with the documented KEYS/ARGV order
+ * (matching `enqueueItemTransfer`'s call in itemTransferQueue.ts exactly).
+ */
+async function enqueueTransfer({ playerId, transfer, ttl = '300' }) {
+  const out = await redis(
+    'EVAL',
+    enqueueTransferScript,
+    '1',
+    transfersKey(playerId),
+    JSON.stringify(transfer),
+    ttl
+  );
+  return JSON.parse(out.join('\n'));
+}
+
+/**
+ * Runs ACK_ITEM_TRANSFER_SCRIPT with the documented KEYS/ARGV order
+ * (matching `acknowledgeItemTransfers`'s call in itemTransferQueue.ts
+ * exactly).
+ */
+async function ackTransfers({ playerId, transferIds, ttl = '300' }) {
+  const out = await redis(
+    'EVAL',
+    ackTransferScript,
+    '1',
+    transfersKey(playerId),
+    JSON.stringify(transferIds),
     ttl
   );
   const text = out.join('\n');
@@ -522,38 +582,26 @@ test('MAX_PRICE_COPPER times a large granted quantity never renders in scientifi
 });
 
 // ---------------------------------------------------------------------------
-// 8. The restock model (ruling R5): seed 10, sell 2, reseed 10 -> 8 (not 10,
-//    not 6). Reseed 1 -> 0, clamped, never resurrected. A legacy ledger row
-//    without soldQuantity behaves as 0.
+// 8. The stock model, CORRECTED (Slice 3 final review, Critical finding —
+//    controller ruling R5 superseded). R5's model hand-fed
+//    `seededQuantity: 10` back into the seed script after a sale of 2 and
+//    asserted the result was 8 (`10 - 2`) — but that is NOT what the real
+//    client sends: `buildShopLedger` reads `NPCInventoryItem.quantity`,
+//    which `useDmShopSalesSync`'s drain has ALREADY decremented by the sold
+//    amount, so the client's next republish sends `seededQuantity: 8`, not
+//    10. Feeding the old test's `10` a second time double-subtracted every
+//    sale (see `SHOP_SEED_SCRIPT`'s doc comment in shopPurchases.ts for the
+//    full arithmetic). This test models what the client actually sends —
+//    the current live count, already net of sales — at every republish, and
+//    proves stock is neither eroded nor silently restocked by a
+//    change-nothing reseed.
 // ---------------------------------------------------------------------------
-test('restock model: reseeding recomputes remaining from fresh stock minus cumulative sold', async () => {
-  // Legacy row: no soldQuantity field at all, simulating a ledger written
-  // before that field existed. Written directly (bypassing the seed script)
-  // so the FIRST seed call sees it as the "old" row.
-  await redis(
-    'SET',
-    ledgerKey('npc-restock'),
-    JSON.stringify([
-      {
-        id: 'entry-1',
-        name: 'Rope, 50ft',
-        itemKind: 'inventory',
-        priceCopper: 10,
-        remainingQuantity: 999, // irrelevant; old.soldQuantity is what's read
-        item: shopEntry().item,
-      },
-    ])
-  );
-
+test('stock model: republish carries the client-authored live count and never re-subtracts a sale', async () => {
   const seeded = await seedLedger('npc-restock', [
     shopEntry({ id: 'entry-1', seededQuantity: 10 }),
   ]);
   const initial = JSON.parse(seeded.join('\n'));
-  assert.equal(
-    initial[0].remainingQuantity,
-    10,
-    'a legacy row missing soldQuantity must be treated as 0 sold'
-  );
+  assert.equal(initial[0].remainingQuantity, 10);
   assert.equal(initial[0].soldQuantity, 0);
 
   const sale = await purchase({
@@ -565,31 +613,57 @@ test('restock model: reseeding recomputes remaining from fresh stock minus cumul
   });
   assert.equal(sale.remainingQuantity, 8);
 
-  const reseedTo10 = await seedLedger('npc-restock', [
-    shopEntry({ id: 'entry-1', seededQuantity: 10 }),
+  // The real client sends 8 here (its own NPCInventoryItem.quantity, already
+  // decremented by the drain) — never the original 10.
+  const republishUnchanged = await seedLedger('npc-restock', [
+    shopEntry({ id: 'entry-1', seededQuantity: 8 }),
   ]);
-  const after10 = JSON.parse(reseedTo10.join('\n'));
+  const afterRepublish = JSON.parse(republishUnchanged.join('\n'));
   assert.equal(
-    after10[0].remainingQuantity,
+    afterRepublish[0].remainingQuantity,
     8,
-    'republishing unchanged stock must not restock to 10'
+    'republishing the client-authored live count must leave stock exactly ' +
+      'unchanged, never re-subtract the sale a second time (the bug: this ' +
+      'used to compute 8 - 2 = 6)'
   );
-  assert.equal(after10[0].soldQuantity, 2);
-
-  const reseedTo1 = await seedLedger('npc-restock', [
-    shopEntry({ id: 'entry-1', seededQuantity: 1 }),
-  ]);
-  const after1 = JSON.parse(reseedTo1.join('\n'));
   assert.equal(
-    after1[0].remainingQuantity,
+    afterRepublish[0].soldQuantity,
     0,
-    'must clamp at zero, never negative'
+    'soldQuantity is a since-last-publish counter now, reset on every reseed'
   );
+
+  // Reseed-after-sale (the case the critical finding calls out explicitly):
+  // sell again, then republish with the new live count unchanged from what
+  // the sale left. Stock must stay exactly there, not erode further.
+  const secondSale = await purchase({
+    npcId: 'npc-restock',
+    entryId: 'entry-1',
+    requestId: 'restock-2',
+    playerId: 'player-restock',
+    quantity: 1,
+  });
+  assert.equal(secondSale.remainingQuantity, 7);
+
+  const reseedAfterSecondSale = await seedLedger('npc-restock', [
+    shopEntry({ id: 'entry-1', seededQuantity: 7 }),
+  ]);
+  const afterSecondRepublish = JSON.parse(reseedAfterSecondSale.join('\n'));
   assert.equal(
-    after1[0].soldQuantity,
-    2,
-    'cumulative sold must be preserved through the clamp'
+    afterSecondRepublish[0].remainingQuantity,
+    7,
+    'reseeding after a second sale must leave stock at exactly the live ' +
+      'count sent, not erode it toward zero across repeated edits'
   );
+
+  // Genuine restocking (the DM adding inventory) still takes effect
+  // immediately — the live count is written straight through, no clamp
+  // against anything previously stored.
+  const restocked = await seedLedger('npc-restock', [
+    shopEntry({ id: 'entry-1', seededQuantity: 20 }),
+  ]);
+  const afterRestock = JSON.parse(restocked.join('\n'));
+  assert.equal(afterRestock[0].remainingQuantity, 20);
+  assert.equal(afterRestock[0].soldQuantity, 0);
 });
 
 // ---------------------------------------------------------------------------
@@ -810,4 +884,66 @@ test('SALES_ACK_SCRIPT removes only the acknowledged ids and deletes the key whe
 
   const raw = await redis('EXISTS', salesKey('npc-ack-basic'));
   assert.equal(raw[0], '0', 'the key must be deleted, not left as "[]"');
+});
+
+// ---------------------------------------------------------------------------
+// 13. Final review, Important finding: the item-transfer queue's enqueue and
+//     batch-ack used to be a plain GET -> push -> SET and a plain
+//     GET -> filter -> SET/DEL, non-atomic against EACH OTHER on the same
+//     `campaignTransfersKey`. Interleaved, an ack's stale snapshot (read
+//     BEFORE a concurrent enqueue's write landed) could resurrect an
+//     already-acknowledged transfer: `ack GET [T]` -> `enqueue GET [T]` ->
+//     `ack DEL key` -> `enqueue SET [T, gift]`. Moving both into their own
+//     Lua EVALs (ENQUEUE_ITEM_TRANSFER_SCRIPT / ACK_ITEM_TRANSFER_SCRIPT)
+//     closes the window the same way SALES_ACK_SCRIPT already closes the
+//     identical class of race against PURCHASE_SCRIPT's append (test 11
+//     above). Regardless of which of the two concurrent EVALs Redis happens
+//     to run first, the final queue must contain the newly-enqueued gift and
+//     must NOT contain the acknowledged transfer — there is no interleaving
+//     that resurrects it.
+// ---------------------------------------------------------------------------
+test('acknowledging a transfer is atomic against a concurrent enqueue: the acknowledged transfer never resurrects', async () => {
+  const alreadyApplied = {
+    id: 'transfer-shop-already-applied',
+    item: { id: 'item-1', name: 'Rope, 50ft', quantity: 1 },
+    itemKind: 'inventory',
+    fromPlayerName: 'Shop',
+    fromCharacterName: 'Old Tam',
+    fromType: 'npc',
+    sentAt: '2026-09-01T00:00:00.000Z',
+    costCopper: 100,
+  };
+  await redis(
+    'SET',
+    transfersKey('player-transfer-race'),
+    JSON.stringify([alreadyApplied])
+  );
+
+  const gift = {
+    id: 'transfer-gift-1',
+    item: { id: 'item-2', name: 'Potion of Healing', quantity: 1 },
+    itemKind: 'inventory',
+    fromPlayerName: 'Dungeon Master',
+    fromCharacterName: 'The DM',
+    fromType: 'dm',
+    sentAt: '2026-09-01T00:00:01.000Z',
+    costCopper: 0,
+  };
+
+  await Promise.all([
+    ackTransfers({
+      playerId: 'player-transfer-race',
+      transferIds: ['transfer-shop-already-applied'],
+    }),
+    enqueueTransfer({ playerId: 'player-transfer-race', transfer: gift }),
+  ]);
+
+  const finalQueue = await getJson(transfersKey('player-transfer-race'));
+  const finalIds = finalQueue.map(t => t.id);
+  assert.deepEqual(
+    finalIds,
+    ['transfer-gift-1'],
+    'the concurrently-enqueued gift must survive, and the acknowledged ' +
+      'transfer must stay gone, regardless of EVAL execution order'
+  );
 });
