@@ -613,7 +613,9 @@ export function NPCDetailDialog({
     if (open) {
       if (initialTab) {
         setActiveTab(initialTab);
-      } else if (npc?.lastDetailTab) {
+      } else if (npc?.lastDetailTab && npc.lastDetailTab !== 'shop') {
+        // 'shop' is not yet a valid local DetailTab; falls through to the
+        // default until Task 4 widens this component's tab type.
         setActiveTab(npc.lastDetailTab);
       } else {
         setActiveTab('stats');
