@@ -67,6 +67,9 @@ export interface ItemTransfer {
   fromCharacterName: string;
   fromType: 'player' | 'npc' | 'dm';
   sentAt: string; // ISO timestamp
+  /** Integer copper debited from the receiving character's purse when this
+   *  transfer is applied. Absent or 0 means no debit (a gift/loot transfer). */
+  costCopper?: number;
 }
 
 // DM-granted XP award queued for a player (applied idempotently by id)

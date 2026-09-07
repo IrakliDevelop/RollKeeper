@@ -125,6 +125,31 @@ export function campaignFogAppearanceKey(
   return `campaign:${code}:fog-appearance:${battleMapId}`;
 }
 
+// Merchant shop keys (VTT merchants Slice 3). Per-NPC, not campaign-wide, so
+// each is written with its own `{ ex: SLIDING_TTL_SECONDS }` at write time —
+// matching campaignTransfersKey/campaignXpKey/campaignMarkerLootKey — rather
+// than being added to refreshCampaignTTL, which is reserved for the four
+// campaign-wide structures.
+export function campaignShopKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop:${npcId}`;
+}
+
+export function campaignShopLedgerKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop-ledger:${npcId}`;
+}
+
+export function campaignShopSalesKey(code: string, npcId: string): string {
+  return `campaign:${code}:shop-sales:${npcId}`;
+}
+
+export function campaignShopReceiptKey(
+  code: string,
+  npcId: string,
+  requestId: string
+): string {
+  return `campaign:${code}:shop-receipt:${npcId}:${requestId}`;
+}
+
 export function campaignLiveMapRoomsKey(code: string): string {
   return `campaign:${code}:live-maps`;
 }
