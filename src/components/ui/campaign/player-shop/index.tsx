@@ -7,7 +7,11 @@ import type { PublicShopItem } from '@/types/shop';
 import { PlayerShopHeader } from './PlayerShopHeader';
 import { PlayerShopFooter } from './PlayerShopFooter';
 import { ShopItemList } from './ShopItemList';
-import { useShopData, usePurchase } from './PlayerShopDialog.hooks';
+import {
+  useShopData,
+  usePurchase,
+  useSessionSpend,
+} from './PlayerShopDialog.hooks';
 import { resolveShopPreview } from './PlayerShopDialog.utils';
 import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
 
@@ -23,6 +27,14 @@ import type { PlayerShopDialogProps } from './PlayerShopDialog.types';
  * dialog only patches the purchased row's `remainingQuantity` locally (from
  * the receipt) and previews the balance change; it never mutates
  * `character.currency` itself.
+ *
+ * Because that debit lands later — this dialog and the debit hook are never
+ * co-mounted (Slice 3 final review, Important finding) — every card's
+ * affordability check runs against `useSessionSpend`'s `effectivePurse`
+ * (the `purse` prop minus this session's already-committed-but-undebited
+ * purchases), never the raw `purse` prop directly. Without that, a second
+ * or third purchase in the same session would still be checked against the
+ * pre-purchase balance and wrongly appear affordable.
  */
 export function PlayerShopDialog({
   open,
@@ -44,6 +56,15 @@ export function PlayerShopDialog({
     campaignCode,
     npcId,
     playerId
+  );
+  // Corrects the affordability check for a dialog session where more than
+  // one purchase is made — see `useSessionSpend`'s doc comment (Slice 3
+  // final review, Important finding). `purse` itself is never mutated; this
+  // only folds already-committed-but-undebited purchases into what the
+  // dialog treats as spendable.
+  const { effectivePurse, commit: commitSpend } = useSessionSpend(
+    purse,
+    open
   );
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [results, setResults] = useState<
@@ -83,6 +104,7 @@ export function PlayerShopDialog({
       },
     }));
     if (outcome.ok) {
+      commitSpend(outcome.costCopper ?? 0);
       setShop(prevShop =>
         prevShop
           ? {
@@ -102,7 +124,12 @@ export function PlayerShopDialog({
     }
   };
 
-  const preview = resolveShopPreview(shop, focusedEntryId, quantities, purse);
+  const preview = resolveShopPreview(
+    shop,
+    focusedEntryId,
+    quantities,
+    effectivePurse
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -127,7 +154,7 @@ export function PlayerShopDialog({
           <>
             <ShopItemList
               items={shop.items}
-              purse={purse}
+              purse={effectivePurse}
               quantities={quantities}
               purchasingEntryId={purchasingEntryId}
               results={results}
@@ -136,7 +163,7 @@ export function PlayerShopDialog({
             />
 
             <PlayerShopFooter
-              purse={purse}
+              purse={effectivePurse}
               previewLabel={preview?.label ?? null}
               previewCostCopper={preview?.costCopper ?? 0}
               after={preview?.after ?? null}

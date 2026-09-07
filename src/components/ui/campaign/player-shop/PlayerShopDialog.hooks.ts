@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import type { Currency } from '@/types/character';
 import type { PublicShop } from '@/types/shop';
+import { spendCopper } from '@/utils/currency';
 import {
   describePurchaseError,
   GENERIC_PURCHASE_ERROR_MESSAGE,
@@ -73,6 +75,61 @@ export function useShopData(
   }, [campaignCode, npcId, open, initialShop]);
 
   return { shop, loading, error, setShop };
+}
+
+const ZERO_PURSE: Currency = {
+  copper: 0,
+  silver: 0,
+  electrum: 0,
+  gold: 0,
+  platinum: 0,
+};
+
+/**
+ * Tracks purchases COMMITTED during this dialog session but not yet
+ * reflected in the `purse` prop (VTT merchants Slice 3 final review,
+ * Important finding — "a player can commit more purchases than they can pay
+ * for").
+ *
+ * The shop dialog (`PlayerBattleMapCanvas`) and the character-sheet debit
+ * hook (`page.tsx`) are never co-mounted, so a completed purchase's actual
+ * coin debit only lands once the player reopens their character sheet —
+ * every affordability check made against the raw `purse` prop during THIS
+ * session therefore keeps seeing the pre-purchase balance, and a player
+ * with 50 gp could buy three 40 gp items in a row (each individually
+ * affordable against the untouched purse) before any of them are ever
+ * charged. `spendCopper` is not touched, and the real debit still only
+ * happens later via `useItemTransferAutoMerge` — this hook only corrects
+ * what the DIALOG shows as affordable while it's open, by folding each
+ * successful purchase's `costCopper` into a running total and re-deriving
+ * an "effective" purse (`spendCopper(purse, committedCopper)`) for
+ * everything the dialog renders. `null` (committed spend exceeds the known
+ * purse — shouldn't happen once this hook is wired in, since it's the same
+ * total every affordability check already uses, but defensive regardless)
+ * falls back to an empty purse rather than a stale full one.
+ *
+ * Resets to 0 whenever the dialog closes (`open` flips false) — a fresh
+ * session must never carry forward a previous visit's commitments, exactly
+ * like `PlayerShopDialog`'s own `quantities`/`results` reset.
+ */
+export function useSessionSpend(
+  purse: Currency,
+  open: boolean
+): { effectivePurse: Currency; commit: (costCopper: number) => void } {
+  const [committedCopper, setCommittedCopper] = useState(0);
+
+  useEffect(() => {
+    if (!open) setCommittedCopper(0);
+  }, [open]);
+
+  const commit = useCallback((costCopper: number) => {
+    if (!Number.isInteger(costCopper) || costCopper <= 0) return;
+    setCommittedCopper(prev => prev + costCopper);
+  }, []);
+
+  const effectivePurse = spendCopper(purse, committedCopper) ?? ZERO_PURSE;
+
+  return { effectivePurse, commit };
 }
 
 export interface PurchaseOutcome {

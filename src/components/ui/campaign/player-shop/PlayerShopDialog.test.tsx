@@ -229,6 +229,75 @@ describe('shortfall + preview computation', () => {
   });
 });
 
+describe('session-committed spend corrects affordability across multiple purchases (composition fix)', () => {
+  it('marks a second item unaffordable once an earlier purchase this session has committed enough of the purse, even though purse itself is untouched', async () => {
+    // 50 gp purse. Sword (40 gp) and Shield (30 gp) are each individually
+    // affordable against the raw 50 gp purse — the dialog and the
+    // character-sheet debit hook are never co-mounted, so nothing debits
+    // `purse` until the sheet is reopened. Buying the Sword first must still
+    // make the Shield show as unaffordable, because only 10 gp is actually
+    // left to spend this session.
+    const purse: Currency = {
+      platinum: 0,
+      gold: 50,
+      electrum: 0,
+      silver: 0,
+      copper: 0,
+    };
+    const shop = makeShop([
+      makeItem({
+        id: 'sword',
+        name: 'Sword',
+        priceCopper: 4000,
+        remainingQuantity: 1,
+      }),
+      makeItem({
+        id: 'shield',
+        name: 'Shield',
+        priceCopper: 3000,
+        remainingQuantity: 1,
+      }),
+    ]);
+    renderDialog(shop, purse);
+    await screen.findByText('Sword');
+
+    // Both start out affordable against the raw 50 gp purse.
+    expect(screen.getByRole('button', { name: 'Buy · 40 gp' })).not.toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).not.toBeDisabled();
+
+    const fetchMock = vi.fn().mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () =>
+        Promise.resolve({
+          success: true,
+          entryId: 'sword',
+          grantedQuantity: 1,
+          costCopper: 4000,
+          remainingQuantity: 0,
+        }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Bought. The item will appear on your character shortly.'
+        )
+      ).toBeInTheDocument()
+    );
+
+    // Only 10 gp of the 50 gp purse remains uncommitted; the 30 gp Shield
+    // must now read as unaffordable, with a shortfall pill computed against
+    // the SAME effective (post-commitment) total, not the stale 50 gp.
+    const shortfall = 3000 - purseToCopper(spendCopper(purse, 4000)!);
+    expect(screen.getByText(formatShortfall(shortfall))).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
+  });
+});
+
 describe('purchase flow', () => {
   it('surfaces a partial grant instead of a flat success message', async () => {
     renderDialog(makeShop([makeItem({ remainingQuantity: 10 })]));
