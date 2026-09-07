@@ -3,13 +3,15 @@
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
-import { resolvePriceCopper } from '@/utils/itemPricing';
+import {
+  resolvePriceCopper,
+  priceCopperToDenominations,
+} from '@/utils/itemPricing';
 import { cn } from '@/utils/cn';
 import { usePriceDraft } from './ShopStockRow.hooks';
 import {
   defaultPriceCopper,
   getProvenanceLine,
-  priceCopperToDenominations,
   SHOP_STOCK_GRID_COLS,
 } from './NPCShopTab.utils';
 import type { ShopStockRowProps } from './NPCShopTab.types';

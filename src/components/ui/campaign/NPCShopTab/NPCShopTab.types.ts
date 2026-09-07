@@ -6,12 +6,10 @@ export interface NPCShopTabProps {
   readOnly?: boolean;
 }
 
-/** A price split into the three entry denominations the Shop tab edits directly. */
-export interface PriceDenominations {
-  gp: number;
-  sp: number;
-  cp: number;
-}
+/** Relocated to `@/utils/itemPricing` in Task 10 (VTT merchants Slice 3) so
+ *  the player shop dialog can use it too — re-exported here so existing
+ *  imports of `PriceDenominations` from this module keep working. */
+export type { PriceDenominations } from '@/utils/itemPricing';
 
 export interface ShopStockRowProps {
   item: NPCInventoryItem;

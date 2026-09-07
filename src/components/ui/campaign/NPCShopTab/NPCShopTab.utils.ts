@@ -8,8 +8,7 @@ import {
   resolvePriceCopper,
   MAGIC_ITEM_RARITY_DEFAULT_COPPER,
 } from '@/utils/itemPricing';
-import { CURRENCY_VALUES, formatCurrencyFromCopper } from '@/utils/currency';
-import type { PriceDenominations } from './NPCShopTab.types';
+import { formatCurrencyFromCopper } from '@/utils/currency';
 
 /**
  * Shared grid-template for the Stock header row and every `ShopStockRow`.
@@ -21,31 +20,6 @@ import type { PriceDenominations } from './NPCShopTab.types';
  * identical everywhere; only the item-name column flexes.
  */
 export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_4rem_14.5rem_4rem]';
-
-/** Splits an integer copper price into gp/sp/cp for the three entry fields. */
-export function priceCopperToDenominations(copper: number): PriceDenominations {
-  const gp = Math.floor(copper / CURRENCY_VALUES.gold);
-  const afterGold = copper % CURRENCY_VALUES.gold;
-  const sp = Math.floor(afterGold / CURRENCY_VALUES.silver);
-  const cp = afterGold % CURRENCY_VALUES.silver;
-  return { gp, sp, cp };
-}
-
-/**
- * Controller decision (Task 5 brief, R2): the gp/sp/cp entry fields combine
- * into the single integer `priceCopper` written to the item. A missing
- * denomination counts as zero, so editing one field alone still produces a
- * valid price.
- */
-export function denominationsToPriceCopper(
-  entry: Partial<PriceDenominations>
-): number {
-  return (
-    (entry.gp ?? 0) * CURRENCY_VALUES.gold +
-    (entry.sp ?? 0) * CURRENCY_VALUES.silver +
-    (entry.cp ?? 0) * CURRENCY_VALUES.copper
-  );
-}
 
 /**
  * The price a row would resolve to with any manual override stripped —
