@@ -87,6 +87,7 @@ export function ShopStockRow({
         onCheckedChange={checked => onPatch({ forSale: checked })}
         aria-label={`List ${item.name} for sale`}
         size="sm"
+        className="justify-self-center"
       />
 
       <div className="flex items-center gap-1">

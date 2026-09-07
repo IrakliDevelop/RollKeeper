@@ -98,12 +98,13 @@ function payFromCoinsOnHand(coins: Currency, owed: number): number {
  * an *existing* electrum coin (spending it down further) still yields
  * silver as normal, since that doesn't create any new electrum.
  */
-const BREAK_TARGET: Partial<Record<keyof Currency, keyof Currency>> = {
-  silver: 'copper',
-  electrum: 'silver',
-  gold: 'silver',
-  platinum: 'gold',
-};
+const BREAK_TARGET: Record<Exclude<keyof Currency, 'copper'>, keyof Currency> =
+  {
+    silver: 'copper',
+    electrum: 'silver',
+    gold: 'silver',
+    platinum: 'gold',
+  };
 
 /**
  * Breaks the smallest denomination coin on hand larger than copper into
@@ -113,8 +114,9 @@ const BREAK_TARGET: Partial<Record<keyof Currency, keyof Currency>> = {
 function breakSmallestAvailableCoin(coins: Currency): boolean {
   for (let i = 1; i < ASCENDING_DENOMINATIONS.length; i++) {
     const denom = ASCENDING_DENOMINATIONS[i];
+    if (denom === 'copper') continue;
     if (coins[denom] > 0) {
-      const lowerDenom = BREAK_TARGET[denom]!;
+      const lowerDenom = BREAK_TARGET[denom];
       const coinsFromBreak =
         CURRENCY_VALUES[denom] / CURRENCY_VALUES[lowerDenom];
       coins[denom] -= 1;

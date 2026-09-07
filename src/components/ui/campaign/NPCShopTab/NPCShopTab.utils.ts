@@ -20,7 +20,7 @@ import type { PriceDenominations } from './NPCShopTab.types';
  * Minor finding). Fixed widths on the trailing three columns keep them
  * identical everywhere; only the item-name column flexes.
  */
-export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_2.25rem_14.5rem_4rem]';
+export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_4rem_14.5rem_4rem]';
 
 /** Splits an integer copper price into gp/sp/cp for the three entry fields. */
 export function priceCopperToDenominations(copper: number): PriceDenominations {
