@@ -30,7 +30,7 @@ const magicItem = (overrides: Partial<MagicItem> = {}): MagicItem => ({
 });
 
 describe('MAGIC_ITEM_RARITY_DEFAULT_COPPER', () => {
-  it('has exactly the six MagicItemRarity keys, all positive integers', () => {
+  it('has exactly the six MagicItemRarity keys', () => {
     expect(Object.keys(MAGIC_ITEM_RARITY_DEFAULT_COPPER).sort()).toEqual(
       [
         'artifact',
@@ -41,10 +41,20 @@ describe('MAGIC_ITEM_RARITY_DEFAULT_COPPER', () => {
         'very rare',
       ].sort()
     );
-    for (const value of Object.values(MAGIC_ITEM_RARITY_DEFAULT_COPPER)) {
+  });
+
+  it('gives every priceable rarity (all but artifact) a positive integer default', () => {
+    const priceableEntries = Object.entries(
+      MAGIC_ITEM_RARITY_DEFAULT_COPPER
+    ).filter(([rarity]) => rarity !== 'artifact');
+    for (const [, value] of priceableEntries) {
       expect(Number.isInteger(value)).toBe(true);
       expect(value).toBeGreaterThan(0);
     }
+  });
+
+  it('has no default for artifact — RAW priceless, not a fabricated number', () => {
+    expect(MAGIC_ITEM_RARITY_DEFAULT_COPPER.artifact).toBeNull();
   });
 
   it('pins the exact guideline values (in copper)', () => {
@@ -54,22 +64,23 @@ describe('MAGIC_ITEM_RARITY_DEFAULT_COPPER', () => {
       rare: 500_000,
       'very rare': 5_000_000,
       legendary: 50_000_000,
-      artifact: 100_000_000,
+      artifact: null,
     });
   });
 
-  it('is strictly increasing by rarity tier', () => {
-    const order: MagicItemRarity[] = [
+  it('is strictly increasing by rarity tier for every priceable rarity (artifact excluded — has no numeric default)', () => {
+    const priceableOrder: Exclude<MagicItemRarity, 'artifact'>[] = [
       'common',
       'uncommon',
       'rare',
       'very rare',
       'legendary',
-      'artifact',
     ];
-    for (let i = 1; i < order.length; i++) {
-      expect(MAGIC_ITEM_RARITY_DEFAULT_COPPER[order[i]]).toBeGreaterThan(
-        MAGIC_ITEM_RARITY_DEFAULT_COPPER[order[i - 1]]
+    for (let i = 1; i < priceableOrder.length; i++) {
+      expect(
+        MAGIC_ITEM_RARITY_DEFAULT_COPPER[priceableOrder[i]]
+      ).toBeGreaterThan(
+        MAGIC_ITEM_RARITY_DEFAULT_COPPER[priceableOrder[i - 1]] as number
       );
     }
   });
@@ -125,7 +136,7 @@ describe('resolvePriceCopper', () => {
   it.each(
     Object.entries(MAGIC_ITEM_RARITY_DEFAULT_COPPER) as [
       MagicItemRarity,
-      number,
+      number | null,
     ][]
   )(
     'resolves the %s default for a magic item of that rarity',
@@ -134,6 +145,18 @@ describe('resolvePriceCopper', () => {
       expect(resolvePriceCopper(item)).toBe(expected);
     }
   );
+
+  it('resolves an artifact-rarity magic item to null, not a fabricated price', () => {
+    const item = inventoryItem({
+      magicItem: magicItem({ rarity: 'artifact' }),
+    });
+    expect(resolvePriceCopper(item)).toBeNull();
+  });
+
+  it('resolves a mundane row tagged rarity "artifact" (no magicItem) to null', () => {
+    const item = inventoryItem({ rarity: 'artifact' });
+    expect(resolvePriceCopper(item)).toBeNull();
+  });
 
   it('falls back to the rarity default for a mundane row carrying a recognised rarity string (no magicItem)', () => {
     const item = inventoryItem({ rarity: 'uncommon' });
