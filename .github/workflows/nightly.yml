@@ -60,6 +60,9 @@ jobs:
       - name: Loot Redis
         run: npm run test:loot:redis
 
+      - name: Shop Redis
+        run: npm run test:shop:redis
+
       - name: Campaign settings Redis
         run: npm run test:campaign-settings:redis
 

@@ -62,6 +62,7 @@
     "test:calendar:integration": "node --test scripts/calendar-documents.integration.test.mjs",
     "test:calendar:redis": "node --test scripts/calendar-redis.integration.test.mjs",
     "test:loot:redis": "node --test scripts/marker-loot-redis.integration.test.mjs",
+    "test:shop:redis": "node --test scripts/shop-redis.integration.test.mjs",
     "test:magic-item:integration": "node --test scripts/magic-item-documents.integration.test.mjs",
     "test:npc:integration": "node --test scripts/npc-documents.integration.test.mjs",
     "test:encounter:integration": "node --test scripts/encounter-documents.integration.test.mjs",
