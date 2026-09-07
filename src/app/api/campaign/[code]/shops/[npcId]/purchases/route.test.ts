@@ -10,7 +10,7 @@ import { NextRequest } from 'next/server';
 // calls out as already having bitten the sibling `PUT` route once.
 const { redis, rawRedis, purchaseFromShop, authorizeHybridGuestRoute } =
   vi.hoisted(() => ({
-    redis: { get: vi.fn() },
+    redis: { get: vi.fn(), sismember: vi.fn() },
     rawRedis: { get: vi.fn(), eval: vi.fn() },
     purchaseFromShop: vi.fn(),
     authorizeHybridGuestRoute: vi.fn(),
@@ -21,6 +21,7 @@ const sendBattleMapPokeToLiveRooms = vi.hoisted(() => vi.fn());
 vi.mock('@/lib/redis', () => ({
   getRedis: () => redis,
   getRawRedis: () => rawRedis,
+  campaignPlayersKey: (code: string) => `players:${code}`,
   campaignShopKey: (code: string, npcId: string) => `shop:${code}:${npcId}`,
   campaignShopLedgerKey: (code: string, npcId: string) =>
     `shop-ledger:${code}:${npcId}`,
@@ -114,19 +115,34 @@ function guestResolution(legacyPlayerId: string | null) {
 beforeEach(() => {
   vi.clearAllMocks();
   authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
+  redis.sismember.mockResolvedValue(1);
   redis.get.mockResolvedValue(JSON.stringify(makePublicShop()));
   purchaseFromShop.mockResolvedValue(okReceipt());
   sendBattleMapPokeToLiveRooms.mockResolvedValue(undefined);
 });
 
 describe('shop purchase route — request validation', () => {
-  it('rejects a missing/invalid playerId, entryId, or requestId', async () => {
+  it('rejects a missing playerId, entryId, or requestId', async () => {
     for (const key of ['playerId', 'entryId', 'requestId']) {
       const response = await POST(
         request(validBody({ [key]: undefined })),
         params
       );
       expect(response.status).toBe(400);
+    }
+    expect(purchaseFromShop).not.toHaveBeenCalled();
+  });
+
+  it('rejects an empty-string, wrong-type, or over-long playerId/entryId/requestId', async () => {
+    const overLong = 'x'.repeat(201);
+    for (const key of ['playerId', 'entryId', 'requestId']) {
+      for (const value of ['', 42, overLong]) {
+        const response = await POST(
+          request(validBody({ [key]: value })),
+          params
+        );
+        expect(response.status).toBe(400);
+      }
     }
     expect(purchaseFromShop).not.toHaveBeenCalled();
   });
@@ -194,6 +210,35 @@ describe('shop purchase route — auth', () => {
   });
 });
 
+describe('shop purchase route — campaign membership (Critical)', () => {
+  // In legacy mode (the hybrid guest server disabled — the common case in
+  // this test file), `authorizedPlayerId` is nothing but the client's own
+  // asserted `playerId`. Campaign codes are party-shared, not secret, so
+  // without this guard anyone holding `code` + `npcId` could name an
+  // arbitrary player and drain their shop stock / queue a debit against
+  // them. Mirrors `battlemaps/[id]/markers/route.ts`'s identical guard.
+  it('rejects a playerId that is not a member of this campaign', async () => {
+    redis.sismember.mockResolvedValue(0);
+    const response = await POST(
+      request(validBody({ playerId: 'not-a-member' })),
+      params
+    );
+    expect(response.status).toBe(403);
+    expect(purchaseFromShop).not.toHaveBeenCalled();
+  });
+
+  it('checks membership under the campaign players key, for the authorized id', async () => {
+    await POST(request(validBody({ playerId: 'player-1' })), params);
+    expect(redis.sismember).toHaveBeenCalledWith('players:ABC', 'player-1');
+  });
+
+  it('checks membership for a guest bound id, not the raw asserted playerId', async () => {
+    authorizeHybridGuestRoute.mockResolvedValue(guestResolution('player-1'));
+    await POST(request(validBody({ playerId: 'player-1' })), params);
+    expect(redis.sismember).toHaveBeenCalledWith('players:ABC', 'player-1');
+  });
+});
+
 describe('shop purchase route — client identity', () => {
   it('passes the RAW client to purchaseFromShop, never the default client', async () => {
     await POST(request(validBody()), params);
@@ -256,6 +301,19 @@ describe('shop purchase route — receipt ownership', () => {
     expect(response.status).toBe(403);
     const body = await response.json();
     // Never echo the other player's purchase back.
+    expect(body).not.toHaveProperty('grantedQuantity');
+    expect(body).not.toHaveProperty('costCopper');
+    expect(sendBattleMapPokeToLiveRooms).not.toHaveBeenCalled();
+  });
+
+  it('rejects a requestId reused against a different entryId', async () => {
+    purchaseFromShop.mockResolvedValue(okReceipt({ entryId: 'other-item' }));
+    const response = await POST(
+      request(validBody({ playerId: 'player-1', entryId: 'item-1' })),
+      params
+    );
+    expect(response.status).toBe(403);
+    const body = await response.json();
     expect(body).not.toHaveProperty('grantedQuantity');
     expect(body).not.toHaveProperty('costCopper');
     expect(sendBattleMapPokeToLiveRooms).not.toHaveBeenCalled();
@@ -332,6 +390,15 @@ describe('shop purchase route — merchant name fallback', () => {
     await POST(request(validBody()), params);
     expect(purchaseFromShop.mock.calls[0][2]).toEqual(
       expect.objectContaining({ merchantName: 'Old Tam' })
+    );
+  });
+
+  it('falls back to a generic merchant name — never 500s — on a corrupt/non-JSON projection', async () => {
+    redis.get.mockResolvedValue('{not valid json');
+    const response = await POST(request(validBody()), params);
+    expect(response.status).toBe(200);
+    expect(purchaseFromShop.mock.calls[0][2]).toEqual(
+      expect.objectContaining({ merchantName: 'Shop' })
     );
   });
 });

@@ -5,6 +5,7 @@ import {
   requireGuestPlayerBinding,
 } from '@/lib/guestRouteResponses';
 import {
+  campaignPlayersKey,
   campaignShopKey,
   campaignShopLedgerKey,
   campaignShopReceiptKey,
@@ -49,8 +50,7 @@ function isValidId(value: unknown): value is string {
  * (`shopPurchases.ts`); this route is auth, request validation, status
  * mapping, and a best-effort poke.
  *
- * Three defects were found and fixed elsewhere in this slice that apply
- * here verbatim:
+ * Defects found and fixed elsewhere in this slice that apply here verbatim:
  *
  * 1. `purchaseFromShop` must receive `getRawRedis()` (`automaticDeserialization:
  *    false`), never the default `getRedis()` — identical to the
@@ -67,8 +67,10 @@ function isValidId(value: unknown): value is string {
  *    `entryId`/`playerId`/`costCopper` echoed (nothing is granted or
  *    charged to the replayer — no transfer reaches their queue — so this is
  *    an information leak, not a double-spend). `ok: true` is therefore
- *    never trusted alone: `receipt.playerId` must match the authorized
- *    caller before anything is echoed back.
+ *    never trusted alone: both `receipt.playerId` AND `receipt.entryId`
+ *    must match what the caller actually asked for before anything is
+ *    echoed back — a client reusing a `requestId` across two different
+ *    items must not silently get the old item's receipt back either.
  * 3. A non-finite/non-integer `quantity` must be rejected here, before it
  *    reaches the Lua. `PURCHASE_SCRIPT`'s `tonumber(ARGV[4]) or 1` plus its
  *    `< 1`/`math.floor` guards let a `NaN` slip through (every comparison
@@ -76,12 +78,38 @@ function isValidId(value: unknown): value is string {
  *    result, aborting the whole EVAL atomically — nothing is corrupted, but
  *    the failure is opaque. Validated the same way marker loot's claim
  *    route validates its own `quantity` (integer, 1-999).
+ * 4. **Campaign membership.** `authorizedPlayerId` is either the client's
+ *    OWN asserted `playerId` (legacy mode — `SUPABASE_HYBRID_GUEST_ENABLED
+ *    !== 'true'`, which resolves every request to `{ mode: 'legacy' }`
+ *    unconditionally) or a guest's bound id — neither is proof the id names
+ *    an actual member of THIS campaign. Campaign codes are party-shared,
+ *    not secret, so without this check anyone holding `code` + `npcId`
+ *    could POST an arbitrary `playerId`, decrement stock, write sale-log
+ *    rows, and enqueue `costCopper`-carrying transfers against a victim who
+ *    took no action at all. Mirrors
+ *    `battlemaps/[id]/markers/route.ts`'s POST exactly (the only other
+ *    `sismember` check in `src/app/api/campaign/`, guarding the identical
+ *    shape of "client names the player whose queue gets written").
  *
- * The fourth requirement is structural rather than a guard: the request
+ * The last requirement is structural rather than a guard: the request
  * body's `quantity`/`requestId` are the only fields that matter. Nothing
  * else the client asserts (a `costCopper` in the body, say) is ever read —
  * `purchaseFromShop`'s input has no cost field at all, so there is nothing
  * for a forged one to influence.
+ *
+ * **`requestId` stability contract (binding on any caller, including the
+ * player dialog task):** `PURCHASE_SCRIPT`'s receipt-first guard makes a
+ * lost reply fully recoverable, but ONLY if the retry reuses the exact same
+ * `requestId`. If the EVAL commits (stock decremented, transfer enqueued,
+ * receipt written) but the HTTP reply never reaches the client — a timeout,
+ * a connection reset — this route throws and returns 500 while the sale has
+ * already happened. A caller that mints a fresh `requestId` per attempt
+ * turns that lost reply into a genuine double purchase (two decrements, two
+ * sale rows, two transfers); a caller that retries with the SAME
+ * `requestId` gets the original receipt back idempotently, exactly as
+ * designed. The reverse failure (charged with nothing committed) cannot
+ * happen: the debit rides a transfer that only exists once the Lua has
+ * actually committed.
  */
 export async function POST(
   request: NextRequest,
@@ -154,21 +182,46 @@ export async function POST(
     const redis = getRedis();
     const rawRedis = getRawRedis();
 
+    // Defect 4 (Critical): `authorizedPlayerId` above is only an identity
+    // check (does it match a guest's binding, if any) — it is never proof
+    // the id names an actual member of THIS campaign. Campaign codes are
+    // party-shared, not secret, so without this a caller could name any
+    // player, decrement someone else's shop stock, and enqueue a
+    // debit-carrying transfer into an arbitrary player's queue. Mirrors
+    // `battlemaps/[id]/markers/route.ts`'s POST exactly.
+    if (
+      !(await redis.sismember(campaignPlayersKey(code), authorizedPlayerId))
+    ) {
+      return NextResponse.json(
+        { error: 'Player is not a member of this campaign' },
+        { status: 403 }
+      );
+    }
+
     // merchantName lives only on the PUBLIC projection (PublicShop.merchantName
     // — a ShopLedgerEntry has no such field, only per-item `name`), so it must
     // be read back here to stamp onto the enqueued transfer's
     // `fromCharacterName`. Read via the DEFAULT client, exactly like this
     // file's sibling GET (`../route.ts`) reads the same key — `PUT` writes it
     // via `redis.set(shopKey, JSON.stringify(merged), ...)` on the default
-    // client, so the read side must match.
+    // client, so the read side must match. The parse is wrapped locally: a
+    // corrupt/non-JSON projection is exactly the "corrupt" case
+    // `FALLBACK_MERCHANT_NAME`'s doc comment already claims to cover, and
+    // must fall through to that fallback rather than 500ing the whole
+    // purchase over a cosmetic display name.
     const projectionRaw = await redis.get<unknown>(
       campaignShopKey(code, npcId)
     );
-    const projectionParsed =
-      typeof projectionRaw === 'string'
-        ? JSON.parse(projectionRaw)
-        : projectionRaw;
-    const projection = sanitizePublicShop(projectionParsed);
+    let projection: ReturnType<typeof sanitizePublicShop> = null;
+    try {
+      const projectionParsed =
+        typeof projectionRaw === 'string'
+          ? JSON.parse(projectionRaw)
+          : projectionRaw;
+      projection = sanitizePublicShop(projectionParsed);
+    } catch {
+      projection = null;
+    }
     const merchantName = projection?.merchantName ?? FALLBACK_MERCHANT_NAME;
 
     const entryId = body.entryId as string;
@@ -203,11 +256,17 @@ export async function POST(
 
     // Defect 2: the receipt key is not player-scoped, so `ok: true` alone
     // is not proof this purchase belongs to the caller — it could be a
-    // replayed `requestId` from a different player's earlier purchase.
-    // Reject rather than echo back someone else's entryId/costCopper.
-    if (result.receipt.playerId !== authorizedPlayerId) {
+    // replayed `requestId` from a different player's earlier purchase, OR
+    // (same key, different intent) this player's own `requestId` reused
+    // against a different `entryId`. Either way, the receipt reflects
+    // whatever the FIRST call with this `requestId` actually did — reject
+    // rather than echo it back as if it matched the current request.
+    if (
+      result.receipt.playerId !== authorizedPlayerId ||
+      result.receipt.entryId !== entryId
+    ) {
       return NextResponse.json(
-        { error: 'Purchase request does not belong to this player' },
+        { error: 'Purchase request does not match this player/item' },
         { status: 403 }
       );
     }
