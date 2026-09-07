@@ -2,13 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   INVALID_SHOP_LEDGER_SEED_ERROR,
+  isValidShopSale,
+  MAX_SALES_LOG_ENTRIES,
   parseStoredShopLedger,
+  parseStoredShopSales,
   purchaseFromShop,
   seedShopLedger,
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
   validateShopLedgerSeed,
   validateStoredShopLedger,
 } from './shopPurchases';
+import type { ShopSale } from '@/types/shop';
 import type { Redis } from '@upstash/redis';
 
 /** The STORED ledger shape (`ShopLedgerEntry`) — what Redis holds and what
@@ -178,6 +182,81 @@ describe('parseStoredShopLedger', () => {
     expect(() =>
       parseStoredShopLedger(JSON.stringify([{ ...entry, priceCopper: -1 }]))
     ).toThrow('Invalid shop ledger');
+  });
+});
+
+const sale: ShopSale = {
+  id: 'sale-req-1',
+  entryId: 'entry-1',
+  quantity: 2,
+  copper: 200,
+  playerId: 'player-1',
+  at: '2026-09-07T00:00:00Z',
+};
+
+describe('isValidShopSale', () => {
+  it('accepts a well-formed sale', () => {
+    expect(isValidShopSale(sale)).toBe(true);
+  });
+
+  it.each([
+    ['id', { ...sale, id: '' }],
+    ['entryId', { ...sale, entryId: 42 }],
+    ['quantity is zero', { ...sale, quantity: 0 }],
+    ['quantity is fractional', { ...sale, quantity: 1.5 }],
+    ['copper is negative', { ...sale, copper: -1 }],
+    ['copper is fractional', { ...sale, copper: 1.5 }],
+    ['playerId', { ...sale, playerId: '' }],
+    ['at is empty', { ...sale, at: '' }],
+    ['at is missing', { ...sale, at: undefined }],
+  ])('rejects a malformed sale: %s', (_label, malformed) => {
+    expect(isValidShopSale(malformed)).toBe(false);
+  });
+
+  it('rejects a non-object value', () => {
+    expect(isValidShopSale(null)).toBe(false);
+    expect(isValidShopSale('sale-req-1')).toBe(false);
+    expect(isValidShopSale(undefined)).toBe(false);
+  });
+});
+
+describe('parseStoredShopSales', () => {
+  it('returns an empty log for a null/absent value', () => {
+    expect(parseStoredShopSales(null)).toEqual([]);
+  });
+
+  it('normalizes the Redis Lua empty-table encoding to an empty log', () => {
+    expect(parseStoredShopSales('{}')).toEqual([]);
+  });
+
+  it('parses a well-formed stored sales log', () => {
+    expect(parseStoredShopSales(JSON.stringify([sale]))).toEqual([sale]);
+  });
+
+  it('drops only the malformed row, not the whole log — a sale is a fact', () => {
+    const malformed = { ...sale, id: 'sale-req-2', copper: -1 };
+    const valid = { ...sale, id: 'sale-req-3' };
+    const result = parseStoredShopSales(
+      JSON.stringify([sale, malformed, valid])
+    );
+    expect(result).toEqual([sale, valid]);
+  });
+
+  it('returns an empty log for a non-array root value rather than throwing', () => {
+    expect(parseStoredShopSales('{"not":"an array"}')).toEqual([]);
+  });
+
+  it('truncates an oversized log to the most recent MAX_SALES_LOG_ENTRIES rows', () => {
+    const rows: ShopSale[] = Array.from(
+      { length: MAX_SALES_LOG_ENTRIES + 5 },
+      (_, i) => ({ ...sale, id: `sale-req-${i}` })
+    );
+    const result = parseStoredShopSales(JSON.stringify(rows));
+    expect(result).toHaveLength(MAX_SALES_LOG_ENTRIES);
+    expect(result[0].id).toBe('sale-req-5');
+    expect(result[result.length - 1].id).toBe(
+      `sale-req-${MAX_SALES_LOG_ENTRIES + 4}`
+    );
   });
 });
 

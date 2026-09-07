@@ -1,8 +1,16 @@
 import type { Redis } from '@upstash/redis';
 
-import type { ShopLedgerEntry, ShopLedgerSeed } from '@/types/shop';
+import type { ShopLedgerEntry, ShopLedgerSeed, ShopSale } from '@/types/shop';
 
 const MAX_LEDGER_ENTRIES = 500;
+
+/** Mirrors `MAX_SALES_LOG_ENTRIES` inside `PURCHASE_SCRIPT` below — the Lua
+ *  trims the stored sales log to this many rows on every purchase, so a
+ *  well-formed sales log read back here should never exceed it either. Kept
+ *  as its own exported TS constant (the Lua-local one isn't reachable from
+ *  outside the script string) for `parseStoredShopSales`'s defensive cap and
+ *  for Task 12's drain hook to size its own idempotency ledger against. */
+export const MAX_SALES_LOG_ENTRIES = 500;
 
 /**
  * Upper bound on a ledger row's `priceCopper`. `cjson` (Redis's Lua JSON
@@ -479,4 +487,71 @@ export async function purchaseFromShop(
     | { error: 'shop-closed' | 'entry-not-found' | 'insufficient-stock' };
   if ('error' in parsed) return { ok: false, error: parsed.error };
   return { ok: true, receipt: { npcId: input.npcId, ...parsed } };
+}
+
+const MAX_SALE_ID_LENGTH = 200;
+
+/** One row's own shape — the same fields `PURCHASE_SCRIPT` writes at the
+ *  `table.insert(sales, ...)` step above. */
+export function isValidShopSale(value: unknown): value is ShopSale {
+  if (!value || typeof value !== 'object') return false;
+  const sale = value as Record<string, unknown>;
+  return (
+    typeof sale.id === 'string' &&
+    sale.id.length > 0 &&
+    sale.id.length <= MAX_SALE_ID_LENGTH &&
+    typeof sale.entryId === 'string' &&
+    sale.entryId.length > 0 &&
+    sale.entryId.length <= MAX_SALE_ID_LENGTH &&
+    Number.isInteger(sale.quantity) &&
+    (sale.quantity as number) > 0 &&
+    Number.isInteger(sale.copper) &&
+    (sale.copper as number) >= 0 &&
+    typeof sale.playerId === 'string' &&
+    sale.playerId.length > 0 &&
+    sale.playerId.length <= MAX_SALE_ID_LENGTH &&
+    typeof sale.at === 'string' &&
+    sale.at.length > 0
+  );
+}
+
+/**
+ * Parses a stored shop sales log (`campaignShopSalesKey`) for DM-side
+ * reconciliation (Task 12, `useDmShopSalesSync`).
+ *
+ * Deliberately LENIENT, unlike `parseStoredShopLedger`: a sale that already
+ * happened (the server already decremented stock and enqueued the player's
+ * transfer) is a fact the DM's drain must not lose track of just because one
+ * OTHER row in the same log is malformed — this function drops only the
+ * individual rows that fail `isValidShopSale`, rather than throwing and
+ * discarding the whole log the way an invalid ledger entry does. The caller
+ * is expected to log/warn about anything dropped, since a dropped row here
+ * is a coin credit that will never happen (indistinguishable, from this
+ * function's return value alone, from a row that was never there).
+ *
+ * Same `{}`-for-empty-array tolerance as `parseStoredShopLedger` (`cjson`
+ * encodes an empty Lua table as `{}` unless the script writes the literal
+ * array), and the same defensive length cap as `MAX_SALES_LOG_ENTRIES`
+ * (`PURCHASE_SCRIPT` already trims to this size, so a well-formed log is
+ * never longer — an oversized log is treated as corrupt and truncated to the
+ * most recent entries rather than rejected outright, since sales are
+ * append-ordered and the newest rows are the ones a DM drain most needs).
+ */
+export function parseStoredShopSales(raw: string | null): ShopSale[] {
+  if (!raw) return [];
+  const parsed = JSON.parse(raw) as unknown;
+  if (
+    parsed !== null &&
+    typeof parsed === 'object' &&
+    !Array.isArray(parsed) &&
+    Object.keys(parsed).length === 0
+  ) {
+    return [];
+  }
+  if (!Array.isArray(parsed)) return [];
+  const bounded =
+    parsed.length > MAX_SALES_LOG_ENTRIES
+      ? parsed.slice(parsed.length - MAX_SALES_LOG_ENTRIES)
+      : parsed;
+  return bounded.filter(isValidShopSale);
 }
