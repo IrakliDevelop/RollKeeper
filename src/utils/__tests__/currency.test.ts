@@ -159,12 +159,35 @@ describe('spendCopper', () => {
     expect(result).toEqual(purse({ silver: 7, copper: 3 }));
   });
 
-  it('breaking a platinum: no smaller coins on hand forces a cascading break', () => {
+  it('breaking a platinum: no smaller coins on hand forces a cascading break, never manufacturing electrum', () => {
+    // Ruling R11: breaking a coin never creates electrum — gold breaks into
+    // silver, platinum into gold, skipping electrum as a break target.
     const result = spendCopper(purse({ platinum: 1 }), 5);
-    expect(result).toEqual(
-      purse({ gold: 9, electrum: 1, silver: 4, copper: 5 })
-    );
+    expect(result).toEqual(purse({ gold: 9, silver: 9, copper: 5 }));
     expect(purseToCopper(result as Currency)).toBe(995);
+  });
+
+  it('never produces electrum when spending from an electrum-free purse', () => {
+    const result = spendCopper(purse({ gold: 1 }), 1);
+    expect(result).toEqual(purse({ silver: 9, copper: 9 }));
+    expect((result as Currency).electrum).toBe(0);
+    expect(purseToCopper(result as Currency)).toBe(99);
+  });
+
+  it('spends existing electrum on hand rather than leaving it untouched', () => {
+    // {electrum: 2} = 100 cp; paying 50 cp exactly is covered by one
+    // electrum coin already in the purse — no breaking needed.
+    const result = spendCopper(purse({ electrum: 2 }), 50);
+    expect(result).toEqual(purse({ electrum: 1 }));
+  });
+
+  it('breaks an existing electrum coin into silver when needed (does not create new electrum)', () => {
+    // {electrum: 2} = 100 cp; paying 30 cp can't be made from electrum
+    // alone, so one electrum is broken into 5 silver, then 3 of those pay
+    // the debt — reducing electrum on hand, not manufacturing more of it.
+    const result = spendCopper(purse({ electrum: 2 }), 30);
+    expect(result).toEqual(purse({ electrum: 1, silver: 2 }));
+    expect(purseToCopper(result as Currency)).toBe(70);
   });
 
   it('insufficient funds: returns null instead of a partial spend', () => {

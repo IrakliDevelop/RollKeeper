@@ -5,13 +5,14 @@ import { Switch } from '@/components/ui/forms/switch';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { resolvePriceCopper } from '@/utils/itemPricing';
 import { cn } from '@/utils/cn';
+import { usePriceDraft } from './ShopStockRow.hooks';
 import {
   defaultPriceCopper,
-  denominationsToPriceCopper,
   getProvenanceLine,
   priceCopperToDenominations,
+  SHOP_STOCK_GRID_COLS,
 } from './NPCShopTab.utils';
-import type { PriceDenominations, ShopStockRowProps } from './NPCShopTab.types';
+import type { ShopStockRowProps } from './NPCShopTab.types';
 
 const RARITY_BADGE_VARIANT: Record<
   string,
@@ -39,25 +40,16 @@ export function ShopStockRow({
   // than showing 0, since 0 copper is itself a legitimate DM-authored price.
   const placeholder =
     defaultPrice !== null ? priceCopperToDenominations(defaultPrice) : null;
-  const overrideParts =
-    item.priceCopper !== undefined
-      ? priceCopperToDenominations(item.priceCopper)
-      : null;
-
-  const handlePriceChange = (
-    denom: keyof PriceDenominations,
-    value: number | undefined
-  ) => {
-    const base = overrideParts ?? { gp: 0, sp: 0, cp: 0 };
-    onPatch({
-      priceCopper: denominationsToPriceCopper({ ...base, [denom]: value ?? 0 }),
-    });
-  };
+  const { draft, setDenomination } = usePriceDraft(
+    item.priceCopper,
+    priceCopper => onPatch({ priceCopper })
+  );
 
   return (
     <div
       className={cn(
-        'grid grid-cols-[1fr_auto_auto_auto] items-center gap-3 rounded-lg border p-2',
+        'grid items-center gap-3 rounded-lg border p-2',
+        SHOP_STOCK_GRID_COLS,
         priceRequired
           ? 'border-accent-amber-border bg-accent-amber-bg'
           : 'border-divider bg-surface-raised'
@@ -91,7 +83,7 @@ export function ShopStockRow({
 
       <Switch
         checked={!!item.forSale}
-        disabled={readOnly || priceRequired}
+        disabled={readOnly || (priceRequired && !item.forSale)}
         onCheckedChange={checked => onPatch({ forSale: checked })}
         aria-label={`List ${item.name} for sale`}
         size="sm"
@@ -102,8 +94,8 @@ export function ShopStockRow({
           <span key={denom} className="flex items-center gap-0.5">
             <NumberInput
               aria-label={`${item.name} price (${denom})`}
-              value={overrideParts?.[denom]}
-              onChange={v => handlePriceChange(denom, v)}
+              value={draft[denom]}
+              onChange={v => setDenomination(denom, v)}
               placeholder={placeholder ? String(placeholder[denom]) : undefined}
               min={0}
               allowEmpty

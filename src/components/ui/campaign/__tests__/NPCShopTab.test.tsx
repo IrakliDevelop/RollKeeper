@@ -160,6 +160,79 @@ describe('NPCShopTab', () => {
     });
   });
 
+  it('lets a DM un-flag a for-sale row that became unpriceable after its value was cleared', () => {
+    // Reachable today: flag a priced row for sale, then the underlying
+    // item.value goes away (e.g. edited in the Inventory tab). The switch
+    // must stay checked-but-editable so the DM can turn it back off, not
+    // checked-and-stuck.
+    render(
+      <Harness
+        initial={makeNpc({
+          inventory: [makeItem({ forSale: true, value: undefined })],
+        })}
+      />
+    );
+
+    const toggle = screen.getByRole('switch', {
+      name: 'List Test Item for sale',
+    });
+    expect(toggle).toBeChecked();
+    expect(toggle).not.toBeDisabled();
+
+    fireEvent.click(toggle);
+
+    expect(updateNPC).toHaveBeenCalledWith('ABCD', 'npc-1', {
+      inventory: [expect.objectContaining({ id: 'item-1', forSale: false })],
+    });
+  });
+
+  it('clearing all three price fields removes the override entirely (falls through to the placeholder)', () => {
+    render(
+      <Harness
+        initial={makeNpc({
+          inventory: [makeItem({ priceCopper: 345 })],
+        })}
+      />
+    );
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+      { target: { value: '' } }
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Test Item price (sp)' }),
+      { target: { value: '' } }
+    );
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Test Item price (cp)' }),
+      { target: { value: '' } }
+    );
+
+    expect(updateNPC).toHaveBeenLastCalledWith('ABCD', 'npc-1', {
+      inventory: [
+        expect.objectContaining({ id: 'item-1', priceCopper: undefined }),
+      ],
+    });
+    // The badge/copy re-derives from the now-absent override — this item has
+    // no `value` or rarity, so it becomes unpriceable again.
+    expect(screen.getByText('price required')).toBeInTheDocument();
+  });
+
+  it('typing an explicit 0 price persists as a real 0, not as a cleared field', () => {
+    render(<Harness initial={makeNpc({ inventory: [makeItem()] })} />);
+
+    fireEvent.change(
+      screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+      { target: { value: '0' } }
+    );
+
+    expect(updateNPC).toHaveBeenLastCalledWith('ABCD', 'npc-1', {
+      inventory: [expect.objectContaining({ id: 'item-1', priceCopper: 0 })],
+    });
+    // A real 0 cp price makes the row sellable — no longer "price required".
+    expect(screen.queryByText('price required')).not.toBeInTheDocument();
+  });
+
   it('renders the sales log empty state (Slice 2 has no sales data source)', () => {
     render(<Harness initial={makeNpc({ inventory: [] })} />);
 

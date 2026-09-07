@@ -4,9 +4,11 @@ import { Card } from '@/components/ui/layout/card';
 import { Switch } from '@/components/ui/forms/switch';
 import { NPCCurrencyStrip } from '../NPCCurrencyStrip';
 import { useNPCStore } from '@/store/npcStore';
+import { cn } from '@/utils/cn';
 import type { Currency } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
 import { ShopStockRow } from './ShopStockRow';
+import { SHOP_STOCK_GRID_COLS } from './NPCShopTab.utils';
 import type { NPCShopTabProps } from './NPCShopTab.types';
 
 const EMPTY_CURRENCY: Currency = {
@@ -82,11 +84,16 @@ export function NPCShopTab({ npc, readOnly = false }: NPCShopTabProps) {
           </p>
         ) : (
           <div className="space-y-2">
-            <div className="text-muted grid grid-cols-[1fr_auto_auto_auto] gap-3 px-2 text-[10px] font-semibold uppercase">
+            <div
+              className={cn(
+                'text-muted grid gap-3 px-2 text-[10px] font-semibold uppercase',
+                SHOP_STOCK_GRID_COLS
+              )}
+            >
               <span>Item</span>
-              <span>For sale</span>
+              <span className="text-center">For sale</span>
               <span>Price</span>
-              <span>Stock</span>
+              <span className="text-right">Stock</span>
             </div>
             {inventory.map(item => (
               <ShopStockRow

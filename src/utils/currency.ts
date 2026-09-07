@@ -91,15 +91,30 @@ function payFromCoinsOnHand(coins: Currency, owed: number): number {
 }
 
 /**
+ * What breaking one coin of a given denomination yields. Ruling R11: coin
+ * math never *manufactures* electrum by breaking a larger coin — electrum
+ * is only ever spent when the purse already holds it. So gold breaks into
+ * silver and platinum into gold, skipping straight past electrum; breaking
+ * an *existing* electrum coin (spending it down further) still yields
+ * silver as normal, since that doesn't create any new electrum.
+ */
+const BREAK_TARGET: Partial<Record<keyof Currency, keyof Currency>> = {
+  silver: 'copper',
+  electrum: 'silver',
+  gold: 'silver',
+  platinum: 'gold',
+};
+
+/**
  * Breaks the smallest denomination coin on hand larger than copper into
- * coins of the denomination immediately below it. Returns false when there
- * is nothing left to break.
+ * coins of its `BREAK_TARGET` denomination. Returns false when there is
+ * nothing left to break.
  */
 function breakSmallestAvailableCoin(coins: Currency): boolean {
   for (let i = 1; i < ASCENDING_DENOMINATIONS.length; i++) {
     const denom = ASCENDING_DENOMINATIONS[i];
     if (coins[denom] > 0) {
-      const lowerDenom = ASCENDING_DENOMINATIONS[i - 1];
+      const lowerDenom = BREAK_TARGET[denom]!;
       const coinsFromBreak =
         CURRENCY_VALUES[denom] / CURRENCY_VALUES[lowerDenom];
       coins[denom] -= 1;
@@ -123,9 +138,11 @@ function breakSmallestAvailableCoin(coins: Currency): boolean {
  * `{silver: 7, copper: 8}` spending 5 cp pays from the copper on hand and
  * returns `{silver: 7, copper: 3}`, not a re-denominated purse. A purse
  * holding only `{platinum: 1}` spending 5 cp has nothing smaller to pay
- * with, so it cascades platinum -> gold -> electrum -> silver -> copper one
- * break at a time until there's enough small change, landing on
- * `{gold: 9, electrum: 1, silver: 4, copper: 5}` (995 cp).
+ * with, so it cascades platinum -> gold -> silver -> copper one break at a
+ * time until there's enough small change, landing on
+ * `{gold: 9, silver: 9, copper: 5}` (995 cp) — electrum is skipped as a
+ * break target (ruling R11: breaking a coin never manufactures electrum,
+ * though electrum already in the purse is still spent normally).
  */
 export function spendCopper(purse: Currency, copper: number): Currency | null {
   const total = purseToCopper(purse);

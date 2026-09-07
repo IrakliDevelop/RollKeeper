@@ -11,6 +11,17 @@ import {
 import { CURRENCY_VALUES, formatCurrencyFromCopper } from '@/utils/currency';
 import type { PriceDenominations } from './NPCShopTab.types';
 
+/**
+ * Shared grid-template for the Stock header row and every `ShopStockRow`.
+ * Both must reference this constant rather than declaring their own
+ * `grid-cols-[...auto...]` — `auto` tracks size independently per grid
+ * container, so a header row and a body row (or two body rows with
+ * differently-sized content) can drift out of alignment (Task 5 review,
+ * Minor finding). Fixed widths on the trailing three columns keep them
+ * identical everywhere; only the item-name column flexes.
+ */
+export const SHOP_STOCK_GRID_COLS = 'grid-cols-[1fr_2.25rem_14.5rem_4rem]';
+
 /** Splits an integer copper price into gp/sp/cp for the three entry fields. */
 export function priceCopperToDenominations(copper: number): PriceDenominations {
   const gp = Math.floor(copper / CURRENCY_VALUES.gold);
