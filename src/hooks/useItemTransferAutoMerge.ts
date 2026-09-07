@@ -43,6 +43,17 @@ interface UseItemTransferAutoMergeOptions {
    * hook always passes the whole purse `spendCopper` returns rather than a
    * delta — see the note on `spendCopper`'s coin-preserving contract. */
   updateCurrency: (updates: Partial<Currency>) => void;
+  /** Called when a transfer's committed cost exceeds what the purse holds
+   * (see the insufficient-purse branch below) — the caller's hook into
+   * surfacing this to the player, since a `console.error` alone reaches no
+   * one: the item still appears and the purse still empties, and without
+   * this callback nothing in the UI ever explains why. */
+  onInsufficientFunds?: (info: {
+    transferId: string;
+    costCopper: number;
+    heldCopper: number;
+    shortfallCopper: number;
+  }) => void;
 }
 
 /**
@@ -61,6 +72,7 @@ export function useItemTransferAutoMerge({
   acknowledgeTransfers,
   currency,
   updateCurrency,
+  onInsufficientFunds,
 }: UseItemTransferAutoMergeOptions): void {
   // React StrictMode double-invokes a mount effect (run, cleanup, run again)
   // synchronously, with NO re-render — and therefore no fresh
@@ -139,17 +151,31 @@ export function useItemTransferAutoMerge({
       // addInventoryItem/addMagicItem would otherwise leave this id marked
       // "applied" in the persisted ledger with no item to show for it,
       // permanently losing it instead of recovering on the next reload.
+      //
+      // Deliberate fail-open direction: the item add (above) and the
+      // currency write (below, hoisted out of this loop so a batch debits
+      // at most once) are two separate store `set` calls, so a throw from a
+      // *later* transfer's item-add aborts before `updateCurrency` runs —
+      // every item already applied earlier in this pass is free, never
+      // double-charged — and a crash between the two calls persists the
+      // item without its debit rather than the reverse. Both failure modes
+      // favor "free item" over "double charge" on purpose. Do not
+      // restructure this into a single atomic write to close that gap.
       appliedThisMountRef.current.add(transfer.id);
       recordAppliedTransfer(transfer.id);
       toAcknowledge.push(transfer.id);
 
-      // `costCopper` is absent or 0 for gifts/loot and for every transfer
-      // in a multi-unit purchase after the first — treat that as an
-      // explicit no-op rather than round-tripping through `spendCopper`,
-      // which would otherwise re-denominate a purse it has no reason to
-      // touch.
+      // `costCopper` is absent, 0, or non-integer for gifts/loot and for
+      // every transfer in a multi-unit purchase after the first — treat all
+      // of those as an explicit no-op rather than round-tripping through
+      // `spendCopper`, which would otherwise re-denominate a purse it has no
+      // reason to touch. The non-integer guard is defence in depth: this
+      // value is server-authored today, but nothing here re-validates it,
+      // and `spendCopper`'s break loop cannot converge on a fractional
+      // amount — without the guard that would return `null` and drain the
+      // purse to zero for what should have been a no-op.
       const cost = transfer.costCopper ?? 0;
-      if (cost <= 0) continue;
+      if (!Number.isInteger(cost) || cost <= 0) continue;
 
       const spent = spendCopper(purse, cost);
       if (spent) {
@@ -183,6 +209,17 @@ export function useItemTransferAutoMerge({
           'The server already committed this sale, so the item is kept; ' +
           'draining the purse to 0cp rather than granting it for free.'
       );
+      // `console.error` reaches no one in production — there's no error
+      // monitoring sink wired to it in this repo, and the player's only
+      // observable experience otherwise would be an item appearing and
+      // every coin they own silently vanishing. Surface it to the caller so
+      // it can render something the player actually sees.
+      onInsufficientFunds?.({
+        transferId: transfer.id,
+        costCopper: cost,
+        heldCopper: held,
+        shortfallCopper: cost - held,
+      });
       purse = drained;
       purseChanged = true;
     }
@@ -212,5 +249,6 @@ export function useItemTransferAutoMerge({
     acknowledgeTransfers,
     currency,
     updateCurrency,
+    onInsufficientFunds,
   ]);
 }

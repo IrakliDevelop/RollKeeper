@@ -616,5 +616,147 @@ describe('useItemTransferAutoMerge', () => {
         consoleErrorSpy.mockRestore();
       }
     });
+
+    it('calls onInsufficientFunds with the shortfall so the caller can surface it to the player', () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      try {
+        const store = makeStore();
+        const addInventoryItem = vi.fn();
+        const addMagicItem = vi.fn();
+        const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+        const updateCurrency = vi.fn();
+        const onInsufficientFunds = vi.fn();
+        // 40 cp on hand, 300 cp committed cost.
+        const currency: Currency = {
+          copper: 0,
+          silver: 4,
+          electrum: 0,
+          gold: 0,
+          platinum: 0,
+        };
+        const transfer = makeTransfer({ costCopper: 300 });
+
+        renderHook(() =>
+          useItemTransferAutoMerge({
+            transfers: [transfer],
+            appliedTransferIds: store.appliedTransferIds,
+            recordAppliedTransfer: store.recordAppliedTransfer,
+            clearAppliedTransfer: store.clearAppliedTransfer,
+            addInventoryItem,
+            addMagicItem,
+            acknowledgeTransfers,
+            currency,
+            updateCurrency,
+            onInsufficientFunds,
+          })
+        );
+
+        // The console log alone reaches no one — this callback is the
+        // caller's hook into telling the player why every coin they had is
+        // now gone. It must fire with the exact numbers, not just "some
+        // shortfall happened".
+        expect(onInsufficientFunds).toHaveBeenCalledTimes(1);
+        expect(onInsufficientFunds).toHaveBeenCalledWith({
+          transferId: 'transfer-1',
+          costCopper: 300,
+          heldCopper: 40,
+          shortfallCopper: 260,
+        });
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('omitting onInsufficientFunds does not throw on the insufficient-purse path', () => {
+      const consoleErrorSpy = vi
+        .spyOn(console, 'error')
+        .mockImplementation(() => {});
+      try {
+        const store = makeStore();
+        const addInventoryItem = vi.fn();
+        const addMagicItem = vi.fn();
+        const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+        const updateCurrency = vi.fn();
+        const currency: Currency = {
+          copper: 0,
+          silver: 4,
+          electrum: 0,
+          gold: 0,
+          platinum: 0,
+        };
+        const transfer = makeTransfer({ costCopper: 300 });
+
+        expect(() =>
+          renderHook(() =>
+            useItemTransferAutoMerge({
+              transfers: [transfer],
+              appliedTransferIds: store.appliedTransferIds,
+              recordAppliedTransfer: store.recordAppliedTransfer,
+              clearAppliedTransfer: store.clearAppliedTransfer,
+              addInventoryItem,
+              addMagicItem,
+              acknowledgeTransfers,
+              currency,
+              updateCurrency,
+              // onInsufficientFunds intentionally omitted (optional).
+            })
+          )
+        ).not.toThrow();
+
+        expect(updateCurrency).toHaveBeenCalledWith({
+          copper: 0,
+          silver: 0,
+          electrum: 0,
+          gold: 0,
+          platinum: 0,
+        });
+      } finally {
+        consoleErrorSpy.mockRestore();
+      }
+    });
+
+    it('a non-integer costCopper is treated as a no-op rather than draining the purse', () => {
+      const store = makeStore();
+      const addInventoryItem = vi.fn();
+      const addMagicItem = vi.fn();
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+      const updateCurrency = vi.fn();
+      const onInsufficientFunds = vi.fn();
+      // A well-behaved purse that could never actually produce this value —
+      // simulating a malformed/forged costCopper reaching the client. If the
+      // hook naively passed this straight to spendCopper, the break loop
+      // could never converge on a fractional remainder, spendCopper would
+      // return null, and the purse would be wiped for a value that was
+      // never a legitimate charge.
+      const currency: Currency = {
+        copper: 4,
+        silver: 3,
+        electrum: 0,
+        gold: 2,
+        platinum: 0,
+      };
+      const transfer = makeTransfer({ costCopper: 50.5 });
+
+      renderHook(() =>
+        useItemTransferAutoMerge({
+          transfers: [transfer],
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency,
+          updateCurrency,
+          onInsufficientFunds,
+        })
+      );
+
+      expect(addInventoryItem).toHaveBeenCalledTimes(1);
+      expect(updateCurrency).not.toHaveBeenCalled();
+      expect(onInsufficientFunds).not.toHaveBeenCalled();
+    });
   });
 });

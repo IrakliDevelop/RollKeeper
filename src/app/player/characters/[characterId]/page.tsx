@@ -43,6 +43,7 @@ import {
   calculateSkillModifier,
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
+import { formatCurrencyFromCopper } from '@/utils/currency';
 import {
   AbilityName,
   SkillName,
@@ -119,6 +120,35 @@ export default function CharacterSheet() {
       duration: 8000,
     });
   }, [addToast]);
+
+  // A committed item-transfer purchase whose cost exceeded the purse on
+  // hand (see useItemTransferAutoMerge) — the item is kept and the purse is
+  // drained, and this is the only place that tells the player why. Wrapped
+  // in useCallback (not inline at the call site) so its identity is stable
+  // across renders — the hook's effect re-runs whenever any of its callback
+  // props changes identity.
+  const handleInsufficientFunds = useCallback(
+    ({
+      costCopper,
+      heldCopper,
+    }: {
+      transferId: string;
+      costCopper: number;
+      heldCopper: number;
+      shortfallCopper: number;
+    }) => {
+      addToast({
+        type: 'error',
+        title: 'Could not fully pay for item',
+        message:
+          `This item cost ${formatCurrencyFromCopper(costCopper)}, but your purse only had ` +
+          `${heldCopper > 0 ? formatCurrencyFromCopper(heldCopper) : 'nothing'} left. ` +
+          'The item is yours, but every coin you had was spent trying to cover it.',
+        duration: 15000,
+      });
+    },
+    [addToast]
+  );
 
   // Warn if a save fails because localStorage is full (auto-save writes here).
   useStorageQuotaListener(
@@ -387,6 +417,7 @@ export default function CharacterSheet() {
     acknowledgeTransfers,
     currency: character.currency,
     updateCurrency,
+    onInsufficientFunds: handleInsufficientFunds,
   });
 
   // Latch DM effects into local state for the notification toast before
