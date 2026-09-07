@@ -2,10 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { initCrossTabNpcSync } from '@/lib/crossTabNpcSync';
 import { NPC_STORAGE_KEY } from '@/lib/durableDm/npcFamily';
-import {
-  APPLIED_SHOP_SALE_IDS_MAX,
-  MERGED_APPLIED_SHOP_SALE_IDS_MAX,
-} from '@/lib/shopSaleLedgerCaps';
+import { APPLIED_SHOP_SALE_IDS_MAX } from '@/lib/shopSaleLedgerCaps';
 import type { CampaignNPC } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
 
@@ -170,14 +167,12 @@ describe('initCrossTabNpcSync', () => {
   });
 
   it('a stale re-persisted snapshot from a dormant tab cannot evict live local ids (merge cap regression)', () => {
-    // Pins the reviewer's trace against the REAL constants: local is at the
-    // single-tab cap (500 ids, oldest first); a dormant tab wakes and
+    // Local is one short of the shared cap; a dormant tab wakes and
     // re-persists a snapshot containing one ancient id the local tab never
-    // saw. capAppliedSaleIds' 500 cap would evict a still-live local id and
-    // keep the ancient one, letting a sale re-apply. capMergedAppliedSaleIds'
-    // 1000 cap must not.
+    // saw. The merge must have enough headroom left to adopt it without
+    // evicting anything still live locally.
     const localIds = Array.from(
-      { length: APPLIED_SHOP_SALE_IDS_MAX },
+      { length: APPLIED_SHOP_SALE_IDS_MAX - 1 },
       (_, i) => `sale-${i}`
     );
     const store = makeStore({
@@ -199,7 +194,7 @@ describe('initCrossTabNpcSync', () => {
 
   it('the merge cap still bounds unbounded growth by trimming from the front', () => {
     const localIds = Array.from(
-      { length: MERGED_APPLIED_SHOP_SALE_IDS_MAX },
+      { length: APPLIED_SHOP_SALE_IDS_MAX },
       (_, i) => `sale-${i}`
     );
     const store = makeStore({
@@ -214,7 +209,7 @@ describe('initCrossTabNpcSync', () => {
       shopSalesLogByNpc: {},
     });
     const merged = store.getState().appliedShopSaleIds['npc-1'];
-    expect(merged).toHaveLength(MERGED_APPLIED_SHOP_SALE_IDS_MAX);
+    expect(merged).toHaveLength(APPLIED_SHOP_SALE_IDS_MAX);
     expect(merged).not.toContain('sale-0');
     expect(merged[merged.length - 1]).toBe('sale-new');
     dispose();

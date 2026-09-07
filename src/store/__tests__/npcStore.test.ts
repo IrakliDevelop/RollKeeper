@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+import { APPLIED_SHOP_SALE_IDS_MAX } from '@/lib/shopSaleLedgerCaps';
 import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
 import { useNPCStore, migrateNpcPersistedState } from '@/store/npcStore';
 
@@ -1403,15 +1404,36 @@ describe('npcStore — recordAppliedShopSale (Task 12 idempotency ledger)', () =
     });
   });
 
-  it('caps at APPLIED_SHOP_SALE_IDS_MAX (500), evicting oldest first', () => {
-    for (let i = 0; i < 501; i++) {
+  it('caps at APPLIED_SHOP_SALE_IDS_MAX (1000), evicting oldest first', () => {
+    for (let i = 0; i < APPLIED_SHOP_SALE_IDS_MAX + 1; i++) {
       useNPCStore.getState().recordAppliedShopSale('npc-1', `sale-${i}`);
     }
     const ids = useNPCStore.getState().appliedShopSaleIds['npc-1'];
-    expect(ids).toHaveLength(500);
+    expect(ids).toHaveLength(APPLIED_SHOP_SALE_IDS_MAX);
     expect(ids).not.toContain('sale-0');
     expect(ids[0]).toBe('sale-1');
-    expect(ids[ids.length - 1]).toBe('sale-500');
+    expect(ids[ids.length - 1]).toBe(`sale-${APPLIED_SHOP_SALE_IDS_MAX}`);
+  });
+
+  it('does not re-cap below the shared cap after an external merge already grew the ledger to it (Finding 2 regression)', () => {
+    // Simulates the state right after `crossTabNpcSync` merges in a stale
+    // id from a dormant tab, growing the ledger to exactly the shared cap.
+    // The next LOCAL sale must not re-slice the ledger down to some smaller,
+    // separate single-tab cap — both write paths now share one cap, so this
+    // append only evicts the single oldest entry.
+    const grownByMerge = Array.from(
+      { length: APPLIED_SHOP_SALE_IDS_MAX },
+      (_, i) => `merged-${i}`
+    );
+    useNPCStore.setState({
+      appliedShopSaleIds: { 'npc-1': grownByMerge },
+    });
+    useNPCStore.getState().recordAppliedShopSale('npc-1', 'sale-new');
+    const ids = useNPCStore.getState().appliedShopSaleIds['npc-1'];
+    expect(ids).toHaveLength(APPLIED_SHOP_SALE_IDS_MAX);
+    expect(ids).not.toContain('merged-0');
+    expect(ids).toContain('merged-1');
+    expect(ids[ids.length - 1]).toBe('sale-new');
   });
 
   it('persists the ledger and survives a store rehydrate', () => {

@@ -1,3 +1,5 @@
+import { MAX_SALES_LOG_ENTRIES } from '@/lib/shopPurchases';
+
 import type { ShopSaleLogEntry } from '@/types/shop';
 
 /**
@@ -13,59 +15,49 @@ import type { ShopSaleLogEntry } from '@/types/shop';
  * is never part of `NpcPayload` (`Omit<CampaignNPC, 'id' | 'campaignCode'>`),
  * so it can never trip that allowlist no matter how it evolves.
  *
- * Cap mirrors `MAX_SALES_LOG_ENTRIES` (`shopPurchases.ts`) exactly: the
- * server-side sales log this ledger deduplicates against is itself capped at
- * 500 entries per NPC (FIFO, trimmed on every purchase) and is never
- * cleared/acked by the drain hook (see that file's own comment on the
- * append step) — so 500 is already the largest window of un-drained sales
- * that could ever need deduplicating for one NPC at once. FIFO eviction is
- * safe here for the same reason it is for `appliedTransferIds`: an id old
- * enough to fall off a 500-entry ledger has almost certainly already scrolled
- * out of the server's own 500-entry sales window too.
+ * ONE cap governs this ledger end to end — `capAppliedSaleIds` is used by
+ * BOTH `recordAppliedShopSale`'s single-tab append (`npcStore.ts`) AND
+ * `crossTabNpcSync`'s cross-tab union. Earlier this was two separate caps
+ * (500 for the single-tab write, 1000 for the merge), which contradicted
+ * each other: a dormant tab's stale merge could grow the ledger past 500,
+ * and the very next local sale would immediately re-slice it back down to
+ * 500 — dropping the two most-recently-live local ids while keeping
+ * whatever ancient id the merge had just added, restoring the exact
+ * re-application risk this ledger exists to prevent. A single cap used
+ * everywhere removes that contradiction rather than narrowing it.
+ *
+ * Sized at `MAX_SALES_LOG_ENTRIES * 2` (1000): the server-side per-NPC sales
+ * log this ledger deduplicates against is itself capped at
+ * `MAX_SALES_LOG_ENTRIES` (500, `shopPurchases.ts`) — FIFO-trimmed on every
+ * purchase and never cleared/acked by the drain hook (see that file's own
+ * comment on the append step) — so at most 500 sale ids can ever be live and
+ * re-appliable for one NPC at a time. A 1000-entry ledger therefore keeps a
+ * full cap's worth of headroom for a stale or out-of-order contribution from
+ * another tab (`crossTabNpcSync`) to land before any eviction is even
+ * possible, and — because both write paths now share this same cap — that
+ * headroom is a durable property of the ledger rather than something the
+ * next local write could erase.
+ *
+ * FIFO eviction (trim from the front, i.e. treat array position as a proxy
+ * for recency) is exact for `recordAppliedShopSale`'s own appends, which
+ * always add the true newest id. It is only an approximation for
+ * `crossTabNpcSync`'s merge, where an out-of-order or stale contribution
+ * from another tab can land ahead of ids that are actually newer — accepted
+ * there as a bounded approximation (see that module's doc comment), not
+ * eliminated by this cap. A timestamp-ordered ledger would be strictly
+ * better, but `appliedShopSaleIds` deliberately stores bare ids with no
+ * per-id metadata, and adding one here is out of proportion to the risk.
+ *
+ * Storage cost: ~1000 entries × ~45 bytes/id ≈ 45 KB per merchant NPC that
+ * ever accumulates this many sales, held in `localStorage` alongside the
+ * rest of `npcStore`'s persisted state — acceptable for the handful of
+ * long-running merchant NPCs that will ever get near this size.
  */
-export const APPLIED_SHOP_SALE_IDS_MAX = 500;
+export const APPLIED_SHOP_SALE_IDS_MAX = MAX_SALES_LOG_ENTRIES * 2;
 
 export function capAppliedSaleIds(ids: string[]): string[] {
   return ids.length > APPLIED_SHOP_SALE_IDS_MAX
     ? ids.slice(ids.length - APPLIED_SHOP_SALE_IDS_MAX)
-    : ids;
-}
-
-/**
- * Cap for `crossTabNpcSync`'s cross-tab UNION of `appliedShopSaleIds`, kept
- * deliberately larger than `APPLIED_SHOP_SALE_IDS_MAX` and NEVER used by
- * `recordAppliedShopSale` (the single-tab write path keeps the plain 500
- * cap, which stays sound — see below).
- *
- * `capAppliedSaleIds` trims from the FRONT, i.e. it trusts array *position*
- * as a proxy for recency. `recordAppliedShopSale` upholds that: it always
- * appends the true newest id, so trimming the front always evicts the true
- * oldest. A cross-tab merge has no such guarantee — a tab that reactivates
- * after being dormant can re-persist a stale snapshot whose
- * not-yet-seen-locally ids are actually OLDER than everything already in
- * `local`, or two tabs can have independently applied different sales in
- * different orders. Appending those ids and trimming with the 500-cap
- * `capAppliedSaleIds` can then evict a still-live local id while keeping an
- * ancient one, silently defeating the ledger and letting a sale re-apply
- * (double-crediting the merchant's purse — the exact bug this ledger
- * exists to prevent).
- *
- * The server-side per-NPC sales log this ledger deduplicates against is
- * itself capped at 500 entries (`MAX_SALES_LOG_ENTRIES`,
- * `shopPurchases.ts`), so at most 500 sale ids can ever be live and
- * re-appliable for one NPC at a time. Doubling the merge cap to 1000
- * therefore leaves a full cap's worth of headroom for a stale or
- * out-of-order contribution from another tab to land before any eviction
- * is even possible — removing this failure mode rather than merely
- * narrowing it. A timestamp-ordered ledger would be strictly better, but
- * `appliedShopSaleIds` deliberately stores bare ids with no per-id
- * metadata, and adding one here is out of proportion to the risk.
- */
-export const MERGED_APPLIED_SHOP_SALE_IDS_MAX = APPLIED_SHOP_SALE_IDS_MAX * 2;
-
-export function capMergedAppliedSaleIds(ids: string[]): string[] {
-  return ids.length > MERGED_APPLIED_SHOP_SALE_IDS_MAX
-    ? ids.slice(ids.length - MERGED_APPLIED_SHOP_SALE_IDS_MAX)
     : ids;
 }
 

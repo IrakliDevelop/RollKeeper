@@ -1,10 +1,7 @@
 import { NPC_STORAGE_KEY } from '@/lib/durableDm/npcFamily';
 import { npcUsesIndexedDbAuthority } from '@/lib/durableDm/npcLegacyAuthority';
 import { isNpcClientVisible } from '@/lib/durableDm/slice11dFlags';
-import {
-  capMergedAppliedSaleIds,
-  capShopSalesLog,
-} from '@/lib/shopSaleLedgerCaps';
+import { capAppliedSaleIds, capShopSalesLog } from '@/lib/shopSaleLedgerCaps';
 
 import type { CampaignNPC } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
@@ -72,12 +69,11 @@ function mergeNpcsForCampaign(
 
 /**
  * Unions the ledger, appending only ids `local` hasn't seen, then caps with
- * `capMergedAppliedSaleIds` — NOT `capAppliedSaleIds`. See that constant's
- * doc comment for why the merge path needs a larger, separate cap: unlike
- * `recordAppliedShopSale`'s single-tab append (which always adds the true
- * newest id), a merge can receive an out-of-order or stale contribution
- * from another tab, so trusting array position as a recency proxy at the
- * 500 cap can evict a still-live local id.
+ * the SAME `capAppliedSaleIds` cap `recordAppliedShopSale` uses for its own
+ * single-tab append — see that function's doc comment
+ * (`shopSaleLedgerCaps.ts`) for why using two different caps here used to
+ * silently undo the merge's headroom on the very next local write, and why
+ * a single shared cap removes that failure mode rather than narrowing it.
  */
 function mergeAppliedShopSaleIds(
   local: Record<string, string[]>,
@@ -90,7 +86,7 @@ function mergeAppliedShopSaleIds(
     const localSet = new Set(localIds);
     const additions = incomingIds.filter(id => !localSet.has(id));
     if (additions.length === 0) continue;
-    merged[npcId] = capMergedAppliedSaleIds([...localIds, ...additions]);
+    merged[npcId] = capAppliedSaleIds([...localIds, ...additions]);
     changed = true;
   }
   return { merged, changed };
@@ -146,6 +142,23 @@ function mergeShopSalesLogByNpc(
  * `createNpcAwareStorage`. `setState` is called only when something
  * actually changed, so the echo event the other tab receives finds equal
  * state and terminates.
+ *
+ * Two more limitations worth naming now that a merchant's currency rides on
+ * this merge (both apply identically to `crossTabEncounterSync` — they are
+ * pattern-level properties of this `storage`-event merge approach, not
+ * regressions introduced here):
+ *
+ * (a) `setState` — and therefore this tab's own `persist` write — happens
+ *     ONLY when this tab adopted something from the incoming snapshot. If a
+ *     second tab persists a stale snapshot and closes before this tab's own
+ *     next persist can echo back to it, that stale snapshot is simply never
+ *     corrected in `localStorage` — nothing here re-broadcasts a merge
+ *     result to a tab that has already gone away.
+ * (b) The per-record merge is last-writer-wins on `updatedAt`. A concurrent
+ *     edit to the same merchant NPC in the follower tab, timestamped after
+ *     the drain applied a sale's currency credit in the leader tab, wins
+ *     the merge outright and discards that credit — `updatedAt` alone
+ *     cannot express "these two changes should combine."
  */
 export function initCrossTabNpcSync(store: NpcStoreLike): () => void {
   if (typeof window === 'undefined') return () => {};
