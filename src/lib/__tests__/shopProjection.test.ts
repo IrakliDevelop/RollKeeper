@@ -102,19 +102,30 @@ describe('buildPublicShop', () => {
     expect(shop!.entityIds).toEqual(['e1', 'e2']);
   });
 
-  it('picks merchantDescription from npc.description (controller ruling R15)', () => {
+  it('picks merchantDescription from npc.shop.description, NEVER npc.description (controller ruling R17, reversing R15)', () => {
     const npc = makeNpc({
-      description: 'Ironmonger of the Low Market',
+      // The DM's PRIVATE free-text note — must never reach the projection.
+      description: 'Secretly a doppelganger, will betray the party',
+      shop: {
+        open: true,
+        updatedAt: '2026-01-01T00:00:00.000Z',
+        description: 'Ironmonger of the Low Market',
+      },
       inventory: [],
     });
     const shop = buildPublicShop(npc, []);
     expect(shop!.merchantDescription).toBe('Ironmonger of the Low Market');
   });
 
-  it('omits merchantDescription entirely when the NPC has none, rather than an empty string', () => {
-    const npc = makeNpc({ description: undefined, inventory: [] });
+  it('omits merchantDescription entirely when shop.description is absent, even if npc.description is set (it must never leak)', () => {
+    const npc = makeNpc({
+      description: 'Secretly a doppelganger, will betray the party',
+      shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+      inventory: [],
+    });
     const shop = buildPublicShop(npc, []);
     expect('merchantDescription' in shop!).toBe(false);
+    expect(JSON.stringify(shop)).not.toContain('doppelganger');
   });
 
   it('security: a row carrying a full magicItem projects no item key and no DM-only field', () => {

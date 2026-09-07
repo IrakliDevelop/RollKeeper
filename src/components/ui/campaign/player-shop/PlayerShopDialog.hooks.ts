@@ -18,21 +18,38 @@ interface UseShopDataResult {
   setShop: React.Dispatch<React.SetStateAction<PublicShop | null>>;
 }
 
-/** Fetches (and, on `npcId`/`campaignCode` change, re-fetches) a merchant's
- *  public shop via `GET /api/campaign/[code]/shops/[npcId]` while `open` is
- *  true. A `{ shop: null }` response (closed, unpublished, or the ledger's
- *  TTL expired) is a normal, non-error result. */
+/**
+ * Fetches (and, on `npcId`/`campaignCode` change, re-fetches) a merchant's
+ * public shop via `GET /api/campaign/[code]/shops/[npcId]` while `open` is
+ * true. A `{ shop: null }` response (closed, unpublished, or the ledger's
+ * TTL expired) is a normal, non-error result.
+ *
+ * `initialShop`: the token-tap flow (Task 11) already confirms the tapped
+ * entity against a freshly-fetched `PublicShop` — via
+ * `useMerchantShopActivation` — before it ever opens this dialog. Passing
+ * that SAME record here seeds `shop` immediately and skips the fetch this
+ * hook would otherwise issue for the identical URL, so opening the dialog
+ * does not double-fetch the same resource (once to confirm the tap, once
+ * again on mount) — the request waterfall a coordinator review flagged.
+ * `undefined` (the default) preserves the original fetch-on-open behavior
+ * for any caller that doesn't already have a fresh shop in hand.
+ */
 export function useShopData(
   campaignCode: string,
   npcId: string,
-  open: boolean
+  open: boolean,
+  initialShop?: PublicShop | null
 ): UseShopDataResult {
-  const [shop, setShop] = useState<PublicShop | null>(null);
+  const [shop, setShop] = useState<PublicShop | null>(initialShop ?? null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    if (initialShop !== undefined) {
+      setShop(initialShop);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setError(null);
@@ -53,7 +70,7 @@ export function useShopData(
     return () => {
       cancelled = true;
     };
-  }, [campaignCode, npcId, open]);
+  }, [campaignCode, npcId, open, initialShop]);
 
   return { shop, loading, error, setShop };
 }

@@ -3,6 +3,16 @@
  * marker canvas painter and to marker pointer activation, and tearing both
  * down again on unmount / dependency change.
  *
+ * Despite the name, this hook's ACTIVATION half is no longer marker-only
+ * (Task 11, VTT merchants Slice 3): `isExtraActivatable`/`onActivateExtra`
+ * let a second element kind (currently: merchant combatant tokens, see
+ * `useMerchantShopActivation`) share the single `setActivation` slot a
+ * viewport allows — see those parameters' own doc comments for why a
+ * second, independent registration would silently replace this one instead
+ * of composing with it. The PAINTER half (`expectCanvasHtmlTypes`/
+ * `registerHtmlPainter`) remains marker-only; a future second painted
+ * element kind would need its own registration for that half.
+ *
  * Connection-independent: no relay import, no store import, no React state.
  * Registration and activation must work with no relay URL configured
  * (CONSTRAINTS-B, spec §7.2). Wiring this hook into `DmBattleMapCanvas` /
@@ -68,10 +78,17 @@ export interface UseMarkerRegistrationArgs {
    * cannibalize this one instead of adding a second recognized element kind
    * — this parameter exists so a caller shares the one slot instead. Read at
    * gesture time via a ref, same as `isActivationSuppressed`.
+   *
+   * Supplying `isExtraActivatable` WITHOUT `onActivateExtra` is valid but
+   * silently inert: the element still becomes activatable (so it, correctly,
+   * no longer falls through to whatever a lower layer would otherwise do
+   * with the gesture), but the resulting `ElementActivationEvent` is simply
+   * dropped — no callback fires, nothing throws. Always pass both together.
    */
   isExtraActivatable?: (el: Readonly<CanvasElement>) => boolean;
   /** Fired instead of `onActivateMarker` when the activated element matched
-   *  `isExtraActivatable` rather than `isMarkerElement`. */
+   *  `isExtraActivatable` rather than `isMarkerElement`. Has no effect
+   *  without `isExtraActivatable` also supplied (see its doc comment). */
   onActivateExtra?: (event: ElementActivationEvent) => void;
 }
 

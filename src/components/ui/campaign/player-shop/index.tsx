@@ -31,13 +31,14 @@ export function PlayerShopDialog({
   npcId,
   playerId,
   merchantAvatarUrl,
-  merchantDescription,
+  initialShop,
   purse,
 }: PlayerShopDialogProps) {
   const { shop, loading, error, setShop } = useShopData(
     campaignCode,
     npcId,
-    open
+    open,
+    initialShop
   );
   const { purchase, purchasingEntryId } = usePurchase(
     campaignCode,
@@ -108,7 +109,7 @@ export function PlayerShopDialog({
       <DialogContent size="md" className="gap-5">
         <PlayerShopHeader
           merchantName={shop?.merchantName ?? 'Merchant'}
-          merchantDescription={merchantDescription}
+          merchantDescription={shop?.merchantDescription}
           merchantAvatarUrl={merchantAvatarUrl}
         />
 

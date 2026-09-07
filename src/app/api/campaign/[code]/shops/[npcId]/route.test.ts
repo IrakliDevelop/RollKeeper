@@ -14,7 +14,14 @@ const {
   seedShopLedger,
   authorizeHybridGuestRoute,
 } = vi.hoisted(() => ({
-  redis: { get: vi.fn(), set: vi.fn(), del: vi.fn() },
+  redis: {
+    get: vi.fn(),
+    set: vi.fn(),
+    del: vi.fn(),
+    sadd: vi.fn(),
+    srem: vi.fn(),
+    expire: vi.fn(),
+  },
   rawRedis: { get: vi.fn(), eval: vi.fn() },
   verifyDmAuthority: vi.fn(),
   rejectHybridGuestPrivilegeEscalation: vi.fn(),
@@ -28,6 +35,7 @@ vi.mock('@/lib/redis', () => ({
   campaignShopKey: (code: string, npcId: string) => `shop:${code}:${npcId}`,
   campaignShopLedgerKey: (code: string, npcId: string) =>
     `shop-ledger:${code}:${npcId}`,
+  campaignShopsIndexKey: (code: string) => `shops-index:${code}`,
   SLIDING_TTL_SECONDS: 3600,
 }));
 vi.mock('@/lib/dmAuth', () => ({ verifyDmAuthority }));
@@ -134,6 +142,9 @@ beforeEach(() => {
   verifyDmAuthority.mockResolvedValue('ok');
   redis.set.mockResolvedValue('OK');
   redis.del.mockResolvedValue(1);
+  redis.sadd.mockResolvedValue(1);
+  redis.srem.mockResolvedValue(1);
+  redis.expire.mockResolvedValue(1);
   seedShopLedger.mockResolvedValue([storedLedgerEntry]);
   authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
 });
@@ -199,6 +210,11 @@ describe('shop publish route — publishing an open shop', () => {
     ]);
 
     expect(redis.del).not.toHaveBeenCalled();
+
+    // Controller ruling R16 (Task 11): publishing adds npcId to the
+    // player-readable shops index and refreshes its TTL.
+    expect(redis.sadd).toHaveBeenCalledWith('shops-index:ABC', 'npc-1');
+    expect(redis.expire).toHaveBeenCalledWith('shops-index:ABC', 3600);
 
     const body = await response.json();
     expect(body.success).toBe(true);
@@ -321,6 +337,9 @@ describe('shop publish route — closing a shop', () => {
     expect(redis.set).not.toHaveBeenCalled();
     expect(redis.del).toHaveBeenCalledWith('shop:ABC:npc-1');
     expect(redis.del).toHaveBeenCalledWith('shop-ledger:ABC:npc-1');
+    // Controller ruling R16 (Task 11): closing removes npcId from the
+    // player-readable shops index too.
+    expect(redis.srem).toHaveBeenCalledWith('shops-index:ABC', 'npc-1');
     const body = await response.json();
     expect(body).toEqual({ success: true, shop: null });
   });

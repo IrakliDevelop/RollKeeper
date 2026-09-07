@@ -7,7 +7,7 @@ import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
 import { useCharacterStore } from '@/store/characterStore';
 
 import type { CanvasElement } from '@fieldnotes/core';
-import type { PublicShop } from '@/types/shop';
+import type { PublicShop, PublicShopIndexEntry } from '@/types/shop';
 
 // Task 11 (VTT merchants Slice 3): tapping a merchant token opens
 // `PlayerShopDialog`. Mirrors `PlayerBattleMapCanvas.markers.test.tsx`'s
@@ -139,17 +139,18 @@ function tokenEl(overrides: Record<string, unknown>): CanvasElement {
   } as unknown as CanvasElement;
 }
 
-function merchantTokenElement(): CanvasElement {
-  return tokenEl({
-    tokenKind: 'combatant',
-    entityId: 'entity-1',
-    shopNpcId: 'npc-1',
-  });
+/** Any combatant token is activatable at the canvas level (controller ruling
+ *  R16) — the merchant/non-merchant distinction happens entirely via the
+ *  shop index fetch, not on the element itself. */
+function combatantTokenElement(entityId: string): CanvasElement {
+  return tokenEl({ tokenKind: 'combatant', entityId });
 }
 
-function plainCombatantTokenElement(): CanvasElement {
-  return tokenEl({ tokenKind: 'combatant', entityId: 'entity-2' });
-}
+const INDEX_ENTRY: PublicShopIndexEntry = {
+  npcId: 'npc-1',
+  merchantName: 'Brenn',
+  entityIds: ['entity-1'],
+};
 
 const OPEN_SHOP: PublicShop = {
   npcId: 'npc-1',
@@ -174,7 +175,12 @@ describe('PlayerBattleMapCanvas: merchant token tap opens the shop dialog', () =
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       (input: RequestInfo | URL) => {
         const url = String(input);
-        if (url.includes('/shops/')) {
+        if (url === '/api/campaign/CODE/shops') {
+          return Promise.resolve({
+            json: () => Promise.resolve({ shops: [INDEX_ENTRY] }),
+          } as Response);
+        }
+        if (url.startsWith('/api/campaign/CODE/shops/')) {
           return Promise.resolve({
             json: () => Promise.resolve({ shop: OPEN_SHOP }),
           } as Response);
@@ -211,7 +217,7 @@ describe('PlayerBattleMapCanvas: merchant token tap opens the shop dialog', () =
 
     act(() => {
       listener({
-        element: merchantTokenElement(),
+        element: combatantTokenElement('entity-1'),
         world: { x: 0, y: 0 },
         pointerType: 'mouse',
         gesture: 'single',
@@ -227,7 +233,7 @@ describe('PlayerBattleMapCanvas: merchant token tap opens the shop dialog', () =
     vp.destroy();
   });
 
-  it('does not open a dialog for a non-merchant (plain combatant) token tap', async () => {
+  it('does not open a dialog for a combatant token whose entity id is not in the shop index (no confirm fetch either)', async () => {
     stubCanvas();
     const vp = makeViewport();
     const activateSpy = vi.spyOn(vp, 'onElementActivate');
@@ -244,21 +250,31 @@ describe('PlayerBattleMapCanvas: merchant token tap opens the shop dialog', () =
 
     act(() => {
       listener({
-        element: plainCombatantTokenElement(),
+        element: combatantTokenElement('entity-2'),
         world: { x: 0, y: 0 },
         pointerType: 'mouse',
         gesture: 'single',
       });
     });
 
-    // Let any stray microtask settle, then assert no shop fetch happened
-    // and no dialog opened.
+    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+    // The index fetch always happens (any combatant token triggers a
+    // lookup); the confirm fetch never does, since entity-2 isn't in the
+    // index. Waiting for the index call is a real signal to flush past it.
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith('/api/campaign/CODE/shops')
+    );
+    // One more explicit flush for the index response's own .then chain to
+    // finish deciding "no match" before asserting the negative.
     await act(async () => {
       await Promise.resolve();
+      await Promise.resolve();
     });
-    const fetchMock = globalThis.fetch as unknown as ReturnType<typeof vi.fn>;
+
     expect(
-      fetchMock.mock.calls.some(([input]) => String(input).includes('/shops/'))
+      fetchMock.mock.calls.some(([input]) =>
+        String(input).startsWith('/api/campaign/CODE/shops/')
+      )
     ).toBe(false);
     expect(screen.queryByRole('dialog')).toBeNull();
 

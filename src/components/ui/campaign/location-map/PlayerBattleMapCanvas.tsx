@@ -58,7 +58,7 @@ import {
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import {
-  isShopToken,
+  isCombatantToken,
   useMerchantShopActivation,
 } from './useMerchantShopActivation';
 import { PlayerShopDialog } from '@/components/ui/campaign/player-shop';
@@ -472,7 +472,7 @@ export function PlayerBattleMapCanvas({
     gesture: 'single',
     markerDetails: publishedMarkers,
     onActivateMarker: handleMarkerActivate,
-    isExtraActivatable: isShopToken,
+    isExtraActivatable: isCombatantToken,
     onActivateExtra: handleShopTokenActivate,
   });
 
@@ -828,9 +828,12 @@ export function PlayerBattleMapCanvas({
           />
         )}
         {/* Mounted only once a merchant token's tap has been confirmed
-            (Task 11) against the live shop projection — see
-            `useMerchantShopActivation`. `ownCharacterCurrency` guards
-            against opening before this route's own character has loaded. */}
+            (Task 11) against the shop index and the shop's own live
+            projection — see `useMerchantShopActivation`. `initialShop` is
+            that SAME confirmed record, so this dialog never re-fetches the
+            identical URL its own `useShopData` would otherwise fetch on
+            open. `ownCharacterCurrency` guards against opening before this
+            route's own character has loaded. */}
         {openShop && ownCharacterCurrency && (
           <PlayerShopDialog
             open
@@ -840,7 +843,7 @@ export function PlayerBattleMapCanvas({
             campaignCode={campaignCode}
             npcId={openShop.npcId}
             playerId={characterId}
-            merchantDescription={openShop.merchantDescription}
+            initialShop={openShop.shop}
             purse={ownCharacterCurrency}
           />
         )}

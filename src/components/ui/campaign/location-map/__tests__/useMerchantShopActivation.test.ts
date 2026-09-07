@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
 
 import {
-  isShopToken,
+  isCombatantToken,
   useMerchantShopActivation,
 } from '@/components/ui/campaign/location-map/useMerchantShopActivation';
 
 import type { CanvasElement, ElementActivationEvent } from '@fieldnotes/core';
-import type { PublicShop } from '@/types/shop';
+import type { PublicShop, PublicShopIndexEntry } from '@/types/shop';
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -26,11 +26,12 @@ function tokenEl(overrides: Record<string, unknown> = {}): CanvasElement {
   } as unknown as CanvasElement;
 }
 
-function merchantToken(overrides: Record<string, unknown> = {}): CanvasElement {
+function combatantToken(
+  overrides: Record<string, unknown> = {}
+): CanvasElement {
   return tokenEl({
     tokenKind: 'combatant',
     entityId: 'entity-1',
-    shopNpcId: 'npc-1',
     ...overrides,
   });
 }
@@ -44,11 +45,11 @@ function activateEvent(element: CanvasElement): ElementActivationEvent {
   };
 }
 
-function mockFetchShop(shop: PublicShop | null): void {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue({
-    json: () => Promise.resolve({ shop }),
-  } as Response);
-}
+const INDEX_ENTRY: PublicShopIndexEntry = {
+  npcId: 'npc-1',
+  merchantName: 'Brenn',
+  entityIds: ['entity-1'],
+};
 
 const OPEN_SHOP: PublicShop = {
   npcId: 'npc-1',
@@ -58,114 +59,155 @@ const OPEN_SHOP: PublicShop = {
   items: [],
 };
 
-describe('isShopToken', () => {
-  it('is true for a combatant token stamped with a non-empty shopNpcId', () => {
-    expect(isShopToken(merchantToken())).toBe(true);
+/** Mocks the two-hop fetch chain in order: the index GET, then the
+ *  confirming per-npc GET (only reached when a match is found). */
+function mockFetchChain(
+  indexShops: PublicShopIndexEntry[],
+  shop?: PublicShop | null
+) {
+  const fetchMock = vi.fn();
+  fetchMock.mockImplementationOnce(() =>
+    Promise.resolve({ json: () => Promise.resolve({ shops: indexShops }) })
+  );
+  if (shop !== undefined) {
+    fetchMock.mockImplementationOnce(() =>
+      Promise.resolve({ json: () => Promise.resolve({ shop }) })
+    );
+  }
+  vi.stubGlobal('fetch', fetchMock);
+  return fetchMock;
+}
+
+describe('isCombatantToken', () => {
+  it('is true for any combatant token', () => {
+    expect(isCombatantToken(combatantToken())).toBe(true);
   });
 
-  it('is false for a combatant token with no shopNpcId (a plain monster/player token)', () => {
+  it('is false for a player token', () => {
     expect(
-      isShopToken(tokenEl({ tokenKind: 'combatant', entityId: 'entity-1' }))
+      isCombatantToken(tokenEl({ tokenKind: 'player', characterId: 'char-1' }))
     ).toBe(false);
   });
 
-  it('is false for a non-combatant element even if it happens to carry shopNpcId', () => {
-    expect(
-      isShopToken(
-        tokenEl({
-          tokenKind: 'player',
-          entityId: 'entity-1',
-          shopNpcId: 'npc-1',
-        })
-      )
-    ).toBe(false);
-  });
-
-  it('is false when entityId or shopNpcId is an empty string', () => {
-    expect(isShopToken(merchantToken({ entityId: '' }))).toBe(false);
-    expect(isShopToken(merchantToken({ shopNpcId: '' }))).toBe(false);
+  it('is false for an unstamped element', () => {
+    expect(isCombatantToken(tokenEl())).toBe(false);
   });
 });
 
 describe('useMerchantShopActivation', () => {
-  it('opens the shop when the tapped entity id is in the fetched shop entityIds', async () => {
-    mockFetchShop(OPEN_SHOP);
+  it('opens the shop when the index matches and the confirmed shop entityIds includes the tapped entity', async () => {
+    const fetchMock = mockFetchChain([INDEX_ENTRY], OPEN_SHOP);
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
     });
 
-    await waitFor(() => expect(result.current.openShop).not.toBeNull());
     expect(result.current.openShop).toEqual({
       npcId: 'npc-1',
-      merchantName: 'Brenn',
-      merchantDescription: 'Ironmonger of the Low Market',
+      shop: OPEN_SHOP,
     });
-    expect(globalThis.fetch).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/campaign/CODE/shops');
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
       '/api/campaign/CODE/shops/npc-1'
     );
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it('does not open when the tapped element is not a shop token (no fetch at all)', async () => {
-    mockFetchShop(OPEN_SHOP);
+  it('does not fetch at all when the tapped element is not a combatant token', async () => {
+    const fetchMock = mockFetchChain([INDEX_ENTRY], OPEN_SHOP);
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(
-        activateEvent(tokenEl({ tokenKind: 'combatant', entityId: 'entity-1' }))
+    await act(async () => {
+      await result.current.handleActivate(
+        activateEvent(tokenEl({ tokenKind: 'player', characterId: 'c-1' }))
       );
     });
 
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
     expect(result.current.openShop).toBeNull();
   });
 
-  it('does not open when the shop is null (closed/unpublished)', async () => {
-    mockFetchShop(null);
+  it('stops after the index fetch (never confirms) when no index entry matches the tapped entity', async () => {
+    const fetchMock = mockFetchChain([
+      { ...INDEX_ENTRY, entityIds: ['some-other-entity'] },
+    ]);
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
     });
 
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(result.current.openShop).toBeNull();
   });
 
-  it('does not open when the shop is open but its entityIds does not include the tapped entity (stale/mismatched stamp)', async () => {
-    mockFetchShop({ ...OPEN_SHOP, entityIds: ['some-other-entity'] });
+  it('does not open when the index matches but the confirmed shop is null (closed since the index was read)', async () => {
+    const fetchMock = mockFetchChain([INDEX_ENTRY], null);
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
     });
 
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(result.current.openShop).toBeNull();
   });
 
-  it('does not throw and stays closed when the fetch itself rejects', async () => {
-    vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('offline'));
+  it('does not open when the confirmed shop no longer lists the tapped entity — the index is a lookup, never an authority', async () => {
+    const fetchMock = mockFetchChain([INDEX_ENTRY], {
+      ...OPEN_SHOP,
+      entityIds: ['some-other-entity'],
+    });
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
     });
 
-    await waitFor(() => expect(globalThis.fetch).toHaveBeenCalledTimes(1));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(result.current.openShop).toBeNull();
+  });
+
+  it('does not throw and stays closed when the index fetch itself rejects', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('offline')));
+    const { result } = renderHook(() => useMerchantShopActivation('CODE'));
+
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
+    });
+
+    expect(result.current.openShop).toBeNull();
+  });
+
+  it('does not throw and stays closed when the confirming fetch rejects', async () => {
+    const fetchMock = vi
+      .fn()
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          json: () => Promise.resolve({ shops: [INDEX_ENTRY] }),
+        })
+      )
+      .mockRejectedValueOnce(new TypeError('offline'));
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useMerchantShopActivation('CODE'));
+
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
+    });
+
     expect(result.current.openShop).toBeNull();
   });
 
   it('closeShop clears an open shop', async () => {
-    mockFetchShop(OPEN_SHOP);
+    mockFetchChain([INDEX_ENTRY], OPEN_SHOP);
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
-    act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+    await act(async () => {
+      await result.current.handleActivate(activateEvent(combatantToken()));
     });
-    await waitFor(() => expect(result.current.openShop).not.toBeNull());
+    expect(result.current.openShop).not.toBeNull();
 
     act(() => {
       result.current.closeShop();
@@ -173,48 +215,64 @@ describe('useMerchantShopActivation', () => {
     expect(result.current.openShop).toBeNull();
   });
 
-  it('a later tap on a different merchant supersedes an in-flight earlier one, even if the earlier response arrives last', async () => {
-    let resolveFirst: ((value: { shop: PublicShop | null }) => void) | null =
-      null;
-    const fetchSpy = vi
-      .spyOn(globalThis, 'fetch')
+  it('a later tap on a different merchant supersedes an in-flight earlier one, even if the earlier chain resolves last', async () => {
+    let resolveFirstIndex:
+      | ((value: { shops: PublicShopIndexEntry[] }) => void)
+      | null = null;
+    const fetchMock = vi
+      .fn()
+      // First tap's index fetch: parked, resolved manually at the end.
       .mockImplementationOnce(
         () =>
           new Promise(resolve => {
-            resolveFirst = value =>
-              resolve({ json: () => Promise.resolve(value) } as Response);
+            resolveFirstIndex = value =>
+              resolve({ json: () => Promise.resolve(value) });
           })
       )
+      // Second tap's index fetch: resolves immediately with a match.
+      .mockImplementationOnce(() =>
+        Promise.resolve({
+          json: () =>
+            Promise.resolve({
+              shops: [
+                { ...INDEX_ENTRY, npcId: 'npc-2', entityIds: ['entity-2'] },
+              ],
+            }),
+        })
+      )
+      // Second tap's confirm fetch.
       .mockImplementationOnce(() =>
         Promise.resolve({
           json: () =>
             Promise.resolve({
               shop: { ...OPEN_SHOP, npcId: 'npc-2', entityIds: ['entity-2'] },
             }),
-        } as Response)
+        })
       );
+    vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => useMerchantShopActivation('CODE'));
 
     act(() => {
-      result.current.handleActivate(activateEvent(merchantToken()));
+      void result.current.handleActivate(activateEvent(combatantToken()));
     });
-    act(() => {
-      result.current.handleActivate(
-        activateEvent(
-          merchantToken({ entityId: 'entity-2', shopNpcId: 'npc-2' })
-        )
+    await act(async () => {
+      await result.current.handleActivate(
+        activateEvent(combatantToken({ entityId: 'entity-2' }))
       );
     });
 
-    await waitFor(() => expect(result.current.openShop?.npcId).toBe('npc-2'));
+    expect(result.current.openShop?.npcId).toBe('npc-2');
 
-    // The first (slow) request finally resolves — it must NOT clobber the
-    // second tap's already-applied result.
+    // The first (parked) tap's index response finally arrives, matching
+    // ITS OWN entity — it must not clobber the second tap's already-applied
+    // result, nor trigger a stray confirm fetch for a superseded request.
     await act(async () => {
-      resolveFirst?.({ shop: OPEN_SHOP });
+      resolveFirstIndex?.({ shops: [INDEX_ENTRY] });
+      await Promise.resolve();
+      await Promise.resolve();
     });
     expect(result.current.openShop?.npcId).toBe('npc-2');
-    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

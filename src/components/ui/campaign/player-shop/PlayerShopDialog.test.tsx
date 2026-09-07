@@ -34,6 +34,7 @@ function makeShop(items: PublicShopItem[]): PublicShop {
   return {
     npcId: 'npc-1',
     merchantName: 'Halvard Brenn',
+    merchantDescription: 'Ironmonger of the Low Market',
     entityIds: ['entity-1'],
     items,
   };
@@ -65,7 +66,6 @@ function renderDialog(shop: PublicShop, purse: Currency = PURSE) {
       campaignCode="ABCD"
       npcId="npc-1"
       playerId="player-1"
-      merchantDescription="Ironmonger of the Low Market"
       purse={purse}
     />
   );
@@ -133,6 +133,70 @@ describe('PlayerShopDialog card states', () => {
     expect(
       screen.getByRole('button', { name: 'Fewer Chain Shirt' })
     ).toBeDisabled();
+  });
+});
+
+describe('merchant header reads both name and description from the SAME shop record (controller review fix)', () => {
+  it('shows merchantDescription from the fetched shop, not a separately-supplied prop', async () => {
+    renderDialog(makeShop([makeItem()]));
+    await screen.findByText('Halvard Brenn');
+    expect(
+      screen.getByText('Ironmonger of the Low Market')
+    ).toBeInTheDocument();
+  });
+
+  it('omits the description line entirely when the shop record has none', async () => {
+    mockFetchSequence([
+      {
+        body: {
+          shop: {
+            npcId: 'npc-1',
+            merchantName: 'Halvard Brenn',
+            entityIds: ['entity-1'],
+            items: [makeItem()],
+          },
+        },
+      },
+    ]);
+    render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        purse={PURSE}
+      />
+    );
+    await screen.findByText('Halvard Brenn');
+    expect(
+      screen.queryByText('Ironmonger of the Low Market')
+    ).not.toBeInTheDocument();
+  });
+});
+
+describe('initialShop seeds the dialog and skips the redundant fetch (controller review fix)', () => {
+  it('renders immediately from initialShop with no fetch at all', () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <PlayerShopDialog
+        open
+        onOpenChange={() => {}}
+        campaignCode="ABCD"
+        npcId="npc-1"
+        playerId="player-1"
+        initialShop={makeShop([makeItem()])}
+        purse={PURSE}
+      />
+    );
+
+    expect(screen.getByText('Halvard Brenn')).toBeInTheDocument();
+    expect(
+      screen.getByText('Ironmonger of the Low Market')
+    ).toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
 

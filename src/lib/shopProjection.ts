@@ -65,6 +65,16 @@ function toPublicShopItem(
  * independent in the data model (a row can be flagged for sale and still
  * fail to resolve a price), so this is the enforcement point for that
  * invariant, not the authoring UI.
+ *
+ * `merchantDescription` is picked from `npc.shop.description` — NEVER
+ * `npc.description` (controller ruling R17, reversing R15). `npc.description`
+ * is the DM's private free-text note, authored under a "Brief description"
+ * placeholder with nothing indicating it becomes player-visible, and
+ * rendered only in DM surfaces today; publishing it would leak a DM's
+ * private notes (e.g. "secretly a doppelganger") to the whole party the
+ * instant the shop toggle flips. `shop.description` is a dedicated field the
+ * DM authors in the Shop tab (Task 13's job to add UI for) KNOWING it is
+ * player-facing.
  */
 export function buildPublicShop(
   npc: CampaignNPC,
@@ -83,8 +93,8 @@ export function buildPublicShop(
   return {
     npcId: npc.id,
     merchantName: npc.name,
-    ...(npc.description !== undefined
-      ? { merchantDescription: npc.description }
+    ...(npc.shop.description !== undefined
+      ? { merchantDescription: npc.shop.description }
       : {}),
     entityIds,
     items,

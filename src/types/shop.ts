@@ -10,16 +10,33 @@ export interface PublicShop {
   npcId: string;
   merchantName: string;
   /** One-line flavour text shown under the merchant's name (artboard 1b,
-   *  e.g. "Ironmonger of the Low Market"), picked from `CampaignNPC.description`
-   *  at publish time. Intended to be player-visible — not a leak — but it
-   *  still goes through the same explicit field pick as every other public
-   *  field rather than a loose, unsourced prop (controller ruling R15). */
+   *  e.g. "Ironmonger of the Low Market"), picked from `CampaignNPC.shop.description`
+   *  — a dedicated, DM-authored, known-player-facing field — at publish
+   *  time. NEVER `CampaignNPC.description` (the DM's private free-text
+   *  note; controller ruling R17 reverses the earlier R15 source). Goes
+   *  through the same explicit field pick as every other public field
+   *  rather than a loose, unsourced prop. */
   merchantDescription?: string;
   /** Encounter entity ids for this NPC's token(s), resolved DM-side at
    *  publish time so a player's token tap can find the shop without
    *  learning anything about NPC internals. */
   entityIds: string[];
   items: PublicShopItem[];
+}
+
+/**
+ * The player-readable INDEX of one open shop (controller ruling R16) —
+ * `GET /api/campaign/[code]/shops` returns one of these per currently-open
+ * shop. Deliberately minimal (no items, no description): it exists purely
+ * so a player's token tap can resolve `entityId -> npcId` without a token
+ * ever carrying that mapping itself. A LOOKUP, not an authority — a match
+ * here must still be confirmed against the specific shop's own live
+ * `PublicShop.entityIds` (`GET .../shops/[npcId]`) before anything opens.
+ */
+export interface PublicShopIndexEntry {
+  npcId: string;
+  merchantName: string;
+  entityIds: string[];
 }
 
 /**

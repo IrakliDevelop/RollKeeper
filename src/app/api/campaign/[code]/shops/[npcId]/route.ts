@@ -8,6 +8,7 @@ import {
 import {
   campaignShopKey,
   campaignShopLedgerKey,
+  campaignShopsIndexKey,
   getRawRedis,
   getRedis,
   SLIDING_TTL_SECONDS,
@@ -135,17 +136,27 @@ export async function GET(
  * find the shop without the shop payload ever naming NPC internals.
  *
  * `npc.shop.open !== true` deletes the projection and ledger keys outright
- * (unpublish). Otherwise this builds the public projection and a fresh
- * ledger seed from the trusted `npc` object (never a client-supplied
- * projection — the explicit-field-pick security boundary lives in
- * `buildPublicShop`/`buildShopLedger`, not here), seeds the ledger through
- * `SHOP_SEED_SCRIPT` (which validates the seed BEFORE writing — see
- * `seedShopLedger`), and only then writes the public projection, overlaid
- * with the ledger's canonical post-sales `remainingQuantity` so a republish
- * never shows players stale pre-sale stock counts.
+ * (unpublish), and removes `npcId` from the campaign's shops INDEX
+ * (`campaignShopsIndexKey` — controller ruling R16, Task 11: the
+ * player-readable list `GET /shops` reads to resolve a token tap without
+ * the token itself carrying an npcId). Otherwise this builds the public
+ * projection and a fresh ledger seed from the trusted `npc` object (never a
+ * client-supplied projection — the explicit-field-pick security boundary
+ * lives in `buildPublicShop`/`buildShopLedger`, not here), seeds the ledger
+ * through `SHOP_SEED_SCRIPT` (which validates the seed BEFORE writing — see
+ * `seedShopLedger`), adds `npcId` to the shops index, and only then writes
+ * the public projection, overlaid with the ledger's canonical post-sales
+ * `remainingQuantity` so a republish never shows players stale pre-sale
+ * stock counts.
  *
- * Both keys get their OWN `{ ex: SLIDING_TTL_SECONDS }` on write — shop keys
- * are deliberately NOT part of `refreshCampaignTTL` (Task 1).
+ * The projection and ledger keys each get their OWN `{ ex:
+ * SLIDING_TTL_SECONDS }` on write — shop keys are deliberately NOT part of
+ * `refreshCampaignTTL` (Task 1). The shops-index SET gets its TTL refreshed
+ * (`expire`) on every publish for the same reason; membership added before
+ * (never after) the projection write, so a crash between the two leaves the
+ * index pointing at a shop that reads back as `null` and gets lazily
+ * dropped by the list route — never a shop that exists but is invisible to
+ * the index.
  */
 export async function PUT(
   request: NextRequest,
@@ -200,13 +211,19 @@ export async function PUT(
 
     const shopKey = campaignShopKey(code, npcId);
     const ledgerKey = campaignShopLedgerKey(code, npcId);
+    const shopsIndexKey = campaignShopsIndexKey(code);
     const typedNpc = npc as CampaignNPC;
 
-    // Unpublish: shop absent or explicitly closed deletes both keys. This is
-    // the read for `buildPublicShop`'s own null case, checked here first so
-    // a closed shop never even attempts a ledger seed.
+    // Unpublish: shop absent or explicitly closed deletes both keys and
+    // removes this npcId from the player-readable shops index. This is the
+    // read for `buildPublicShop`'s own null case, checked here first so a
+    // closed shop never even attempts a ledger seed.
     if (typedNpc.shop?.open !== true) {
-      await Promise.all([redis.del(shopKey), redis.del(ledgerKey)]);
+      await Promise.all([
+        redis.del(shopKey),
+        redis.del(ledgerKey),
+        redis.srem(shopsIndexKey, npcId),
+      ]);
       return NextResponse.json({ success: true, shop: null });
     }
 
@@ -247,6 +264,16 @@ export async function PUT(
       }
       throw error;
     }
+
+    // Index membership added BEFORE the projection write (see doc comment
+    // above): the failure mode of a crash between the two must be "index
+    // points at a shop that reads back null" (self-heals via the list
+    // route's lazy drop), never "shop exists but no token tap can ever find
+    // it".
+    await Promise.all([
+      redis.sadd(shopsIndexKey, npcId),
+      redis.expire(shopsIndexKey, SLIDING_TTL_SECONDS),
+    ]);
 
     const merged = applyCanonicalShopRemaining(publicShop, ledger);
     await redis.set(shopKey, JSON.stringify(merged), {

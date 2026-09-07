@@ -9,22 +9,30 @@ import {
 
 import { PlayerHandTool } from '../PlayerHandTool';
 import { useMarkerRegistration } from '../useMarkerRegistration';
-import { isShopToken } from '../useMerchantShopActivation';
+import { isCombatantToken } from '../useMerchantShopActivation';
 import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
 
 /**
  * Real-SDK, real-`ElementActivation` proof for Task 11's two binding
  * requirements:
  *
- *  1. A DRAG on a merchant token — the exact gesture `PlayerHandTool` (the
+ *  1. A DRAG on a combatant token — the exact gesture `PlayerHandTool` (the
  *     REAL collision the task-11 brief identifies, not `useTokenInfoMode`)
  *     converts into a hand-off to `SelectTool` and a token move — must never
- *     also register as a tap that opens the shop dialog.
+ *     also register as a tap that could open the shop dialog.
  *  2. Sharing `useMarkerRegistration`'s single `setActivation` slot (via
  *     `isExtraActivatable`/`onActivateExtra`) does not regress the existing
  *     marker single-tap path, proven here against a REAL `Viewport`/
  *     `ElementActivation` rather than the recording double
  *     `useMarkerRegistration.test.tsx` uses.
+ *
+ * `isCombatantToken` (controller ruling R16) matches ANY combatant token —
+ * there is no element-level "merchant" distinction any more (that was the
+ * rejected `shopNpcId` stamp). WHICH combatant token actually has an open
+ * shop is resolved by `useMerchantShopActivation` against the player-
+ * readable shop index, entirely separate from what this file proves: that
+ * the gesture reaches `onActivateExtra` at all, exactly once, only for a
+ * clean tap, and without breaking markers.
  *
  * No `@fieldnotes` module mocks: a real `Viewport`, real `PlayerHandTool` +
  * `SelectTool`, and real `PointerEvent`s dispatched on the wrapper — mirrors
@@ -154,7 +162,7 @@ function drag(
   );
 }
 
-function merchantTokenImage() {
+function combatantTokenImage() {
   return {
     ...createImage({
       position: { x: 100, y: 100 },
@@ -164,7 +172,6 @@ function merchantTokenImage() {
     }),
     entityId: 'entity-1',
     tokenKind: 'combatant',
-    shopNpcId: 'npc-1',
   };
 }
 
@@ -194,14 +201,14 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
     viewport.setTool('hand'); // the default movement tool on the player canvas
   }
 
-  it('a clean tap on a merchant token fires onActivateExtra, never onActivateMarker', () => {
+  it('a clean tap on a combatant token fires onActivateExtra, never onActivateMarker', () => {
     stubCanvas();
     const viewport = mountViewport();
     setupHandAndSelect(viewport);
     const wrapper = viewport.domLayer.parentElement;
     if (!wrapper) throw new Error('expected the viewport wrapper');
 
-    const token = merchantTokenImage();
+    const token = combatantTokenImage();
     viewport.store.add(token);
 
     const activatedExtra: string[] = [];
@@ -211,7 +218,7 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
         viewport,
         gesture: 'single',
         onActivateMarker: e => activatedMarker.push(e.element.id),
-        isExtraActivatable: isShopToken,
+        isExtraActivatable: isCombatantToken,
         onActivateExtra: e => activatedExtra.push(e.element.id),
       })
     );
@@ -222,14 +229,14 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
     expect(activatedMarker).toEqual([]);
   });
 
-  it('a drag on a merchant token (the real PlayerHandTool hand-off) does NOT fire onActivateExtra', () => {
+  it('a drag on a combatant token (the real PlayerHandTool hand-off) does NOT fire onActivateExtra', () => {
     stubCanvas();
     const viewport = mountViewport();
     setupHandAndSelect(viewport);
     const wrapper = viewport.domLayer.parentElement;
     if (!wrapper) throw new Error('expected the viewport wrapper');
 
-    const token = merchantTokenImage();
+    const token = combatantTokenImage();
     viewport.store.add(token);
 
     const activatedExtra: string[] = [];
@@ -237,7 +244,7 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
       useMarkerRegistration({
         viewport,
         gesture: 'single',
-        isExtraActivatable: isShopToken,
+        isExtraActivatable: isCombatantToken,
         onActivateExtra: e => activatedExtra.push(e.element.id),
       })
     );
@@ -251,25 +258,20 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
     expect(activatedExtra).toEqual([]);
   });
 
-  it('a tap on a non-merchant token (no shopNpcId) fires neither callback', () => {
+  it('a tap on a non-combatant element (no tokenKind/entityId) fires neither callback', () => {
     stubCanvas();
     const viewport = mountViewport();
     setupHandAndSelect(viewport);
     const wrapper = viewport.domLayer.parentElement;
     if (!wrapper) throw new Error('expected the viewport wrapper');
 
-    const plainToken = {
-      ...createImage({
-        position: { x: 100, y: 100 },
-        size: { w: 40, h: 40 },
-        src: 'data:image/png;base64,',
-        layerId: 'player-layer',
-      }),
-      entityId: 'entity-2',
-      tokenKind: 'combatant',
-      // no shopNpcId
-    };
-    viewport.store.add(plainToken);
+    const plainShape = createImage({
+      position: { x: 100, y: 100 },
+      size: { w: 40, h: 40 },
+      src: 'data:image/png;base64,',
+      layerId: 'player-layer',
+    });
+    viewport.store.add(plainShape);
 
     const activatedExtra: string[] = [];
     const activatedMarker: string[] = [];
@@ -278,7 +280,7 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
         viewport,
         gesture: 'single',
         onActivateMarker: e => activatedMarker.push(e.element.id),
-        isExtraActivatable: isShopToken,
+        isExtraActivatable: isCombatantToken,
         onActivateExtra: e => activatedExtra.push(e.element.id),
       })
     );
@@ -289,7 +291,7 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
     expect(activatedMarker).toEqual([]);
   });
 
-  it('regression: a marker single-tap still opens with BOTH the marker and shop-token predicates registered together', () => {
+  it('regression: a marker single-tap still opens with BOTH the marker and combatant-token predicates registered together', () => {
     stubCanvas();
     const viewport = mountViewport();
     setupHandAndSelect(viewport);
@@ -312,7 +314,7 @@ describe('merchant token tap vs. drag, over a REAL Viewport with the real Player
         viewport,
         gesture: 'single',
         onActivateMarker: e => activatedMarker.push(e.element.id),
-        isExtraActivatable: isShopToken,
+        isExtraActivatable: isCombatantToken,
         onActivateExtra: e => activatedExtra.push(e.element.id),
       })
     );

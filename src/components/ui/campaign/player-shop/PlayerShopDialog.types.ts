@@ -1,18 +1,19 @@
 import type { Currency } from '@/types/character';
-import type { PublicShopItem } from '@/types/shop';
+import type { PublicShop, PublicShopItem } from '@/types/shop';
 
-/** Task 10 (VTT merchants Slice 3) — the player-facing shop dialog. This
- *  task does NOT wire the token tap that opens it (that's the next task); it
- *  only builds the dialog and its data flow, so every prop the eventual tap
- *  will need to supply is listed here.
+/** Task 10 (VTT merchants Slice 3) — the player-facing shop dialog; Task 11
+ *  wires the token tap that opens it and the `initialShop` seam below
+ *  (controller ruling R16/R17).
  *
- *  `merchantDescription` is deliberately a plain prop, not something read
- *  off `PublicShop` — `PublicShop` (types/shop.ts) carries only
- *  `merchantName`, never a one-line flavour description, so artboard 1b's
- *  "Ironmonger of the Low Market" subtitle has to come from wherever the
- *  future token-tap wiring already has player-visible NPC flavour text
- *  (e.g. a map marker's public label) — outside this task's scope. The
- *  header simply omits the line when it's not supplied.
+ *  The header's one-line flavour text (artboard 1b, e.g. "Ironmonger of the
+ *  Low Market") is read from the fetched/seeded `PublicShop.merchantDescription`
+ *  ALONGSIDE `merchantName` — both from the SAME record — never from a
+ *  separately-supplied prop; two fields of one record read from two
+ *  independently-fetched sources could disagree if the DM republishes
+ *  between them. `merchantDescription` on `PublicShop` is itself sourced
+ *  from `CampaignNPC.shop.description` (a dedicated, DM-authored,
+ *  known-player-facing field), never `CampaignNPC.description` (the DM's
+ *  private free-text note) — see `shopProjection.ts`'s doc comment.
  */
 export interface PlayerShopDialogProps {
   open: boolean;
@@ -21,9 +22,14 @@ export interface PlayerShopDialogProps {
   npcId: string;
   playerId: string;
   merchantAvatarUrl?: string;
-  /** One-line flavour text under the merchant's name (artboard 1b). Omitted
-   *  entirely from the header when absent. */
-  merchantDescription?: string;
+  /**
+   * A shop the caller already fetched and confirmed (Task 11's token-tap
+   * flow always has one) — seeds `useShopData`'s state immediately and
+   * skips its own redundant fetch of the identical `GET .../shops/[npcId]`
+   * URL. `undefined` (the default) falls back to fetching on open, for any
+   * caller that doesn't already have a fresh shop in hand.
+   */
+  initialShop?: PublicShop;
   /** The buyer's current purse (`character.currency` in characterStore).
    *  Read-only here — a purchase's actual coin debit is applied later,
    *  client-side, when the granting transfer is merged

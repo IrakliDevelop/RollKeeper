@@ -2,111 +2,122 @@
 
 import { useCallback, useRef, useState } from 'react';
 
-import { COMBATANT_TOKEN_KIND } from './tokenIdentity';
+import { movableTokenIdentity } from './tokenIdentity';
 
 import type { CanvasElement, ElementActivationEvent } from '@fieldnotes/core';
-import type { PublicShop } from '@/types/shop';
+import type { PublicShop, PublicShopIndexEntry } from '@/types/shop';
 
 /**
- * Player-side token → merchant shop wiring (VTT merchants Slice 3, Task 11).
+ * Player-side token → merchant shop wiring (VTT merchants Slice 3, Task 11;
+ * redesigned per controller ruling R16).
  *
- * A merchant's placed token is recognized purely by an optional `shopNpcId`
- * top-level key riding alongside the existing combatant-token keys
- * (`entityId`/`tokenKind` — see `combatantToken.ts`'s `CombatantTokenKeys`).
- * `shopNpcId` is the merchant's `CampaignNPC.id`, distinct from `entityId`
- * (the encounter entity id) — the two are unrelated identifiers by design
- * (`EncounterEntity.npcSourceId` documents why). Like `entityId`/`tokenKind`,
- * an extra top-level key on a `CanvasElement` survives the FieldNotes store,
- * export, and sync round-trips with no schema change needed.
+ * A merchant's token is visually and structurally indistinguishable from any
+ * other combatant token — this is deliberate: a stamped `shopNpcId` field
+ * was the FIRST approach here, but the controller rejected it (R16) for
+ * three reasons that all still hold: it needs a DM-side authoring step
+ * nothing in this plan owns, it goes stale the moment a DM moves or
+ * replaces a token without re-stamping, and it leaves two facts (the stamp
+ * AND the server's `entityIds`) that must independently agree, where either
+ * one being wrong produces the same silent, feedback-free no-op tap.
  *
- * KNOWN GAP, called out rather than silently assumed: no task in this plan
- * (nor the DM-side "Open for business" publish wiring assigned to Task 13)
- * stamps `shopNpcId` onto a placed combatant token. Until a future change
- * does — a DM-side decision (which token represents which NPC) outside a
- * player-tap task's scope — no real token will ever carry this field, so
- * `isShopToken` below will not match anything placed by today's DM tooling.
- * This module is fully built and tested against that eventual stamp so nothing
- * else needs to change once it exists.
+ * Instead, ANY combatant token tap is checked against a player-readable
+ * index of currently-open shops (`GET /api/campaign/[code]/shops`, one fact:
+ * the server's own record of what's open). A match by `entityId` yields a
+ * candidate `npcId`, which is then confirmed by fetching that shop's own
+ * live projection (`GET /api/campaign/[code]/shops/[npcId]`) — the index is
+ * a LOOKUP, never an authority; only the fetched shop's own `entityIds`
+ * gates opening the dialog. Two fetches per tap, both real and necessary
+ * (list, then the specific record), never a proactive scan across N shops.
+ * `handleActivate` returns the underlying promise chain (assignable to a
+ * `void`-returning event handler; production callers ignore it) purely so
+ * tests can await full settlement instead of racing on it.
  */
 
-interface ShopTokenKeys {
-  entityId: string;
-  shopNpcId: string;
-}
-
-function shopTokenKeys(el: Readonly<CanvasElement>): ShopTokenKeys | null {
-  const rec = el as Partial<{
-    tokenKind: unknown;
-    entityId: unknown;
-    shopNpcId: unknown;
-  }>;
-  if (rec.tokenKind !== COMBATANT_TOKEN_KIND) return null;
-  if (typeof rec.entityId !== 'string' || rec.entityId === '') return null;
-  if (typeof rec.shopNpcId !== 'string' || rec.shopNpcId === '') return null;
-  return { entityId: rec.entityId, shopNpcId: rec.shopNpcId };
-}
-
-/** True for a combatant token additionally stamped with `shopNpcId`. Exported
- *  so the host's `useMarkerRegistration` call can recognize shop tokens via
- *  its `isExtraActivatable` slot instead of a second, competing
- *  `setActivation` registration. */
-export function isShopToken(el: Readonly<CanvasElement>): boolean {
-  return shopTokenKeys(el) !== null;
+/** True for any combatant token (the shape a merchant's token takes — same
+ *  as any other NPC/monster token). Pass as `isExtraActivatable` to
+ *  `useMarkerRegistration` so a tap on one is even considered for
+ *  activation; WHICH combatant tokens have an open shop is resolved at tap
+ *  time against the shop index, never by anything on the element itself. */
+export function isCombatantToken(el: Readonly<CanvasElement>): boolean {
+  return movableTokenIdentity(el)?.kind === 'combatant';
 }
 
 export interface OpenMerchantShop {
   npcId: string;
-  merchantName: string;
-  merchantDescription?: string;
+  /** The confirmed, live `PublicShop` — handed to `PlayerShopDialog` as
+   *  `initialShop` so it never re-fetches the identical URL this hook just
+   *  fetched (the request-waterfall fix from the coordinator review). */
+  shop: PublicShop;
 }
 
 export interface UseMerchantShopActivationResult {
   /** The confirmed-open shop to render `PlayerShopDialog` for, or `null`. */
   openShop: OpenMerchantShop | null;
-  /** Pass as `onActivateExtra` to `useMarkerRegistration`. */
-  handleActivate: (event: ElementActivationEvent) => void;
+  /** Pass as `onActivateExtra` to `useMarkerRegistration`. Returns the
+   *  underlying promise chain for tests to await; production callers may
+   *  ignore the return value (the type it's assigned to is void-returning). */
+  handleActivate: (event: ElementActivationEvent) => Promise<void> | void;
   /** Pass as (or wrap into) the dialog's `onOpenChange(false)`. */
   closeShop: () => void;
 }
 
 /**
- * Confirms a tapped merchant token against the LIVE projection before
- * opening the dialog — exactly one fetch per tap, never a proactive scan or
- * a poll. A stale/mismatched `shopNpcId` stamp, or a shop the DM has since
- * closed, must never open a dialog for the wrong merchant or one with
- * nothing to sell: the fetched shop's own `entityIds` (never the tapped
- * element's say-so) is what gates opening.
+ * Resolves a tapped combatant token to its open shop, if any, via the
+ * player-readable shop index — never a stamp on the token, never a
+ * proactive scan of every NPC. See this module's doc comment for the full
+ * two-fetch design and why an index (not a token field) was chosen.
  */
 export function useMerchantShopActivation(
   campaignCode: string
 ): UseMerchantShopActivationResult {
   const [openShop, setOpenShop] = useState<OpenMerchantShop | null>(null);
-  // Bumped on every tap so a superseded (slower) response from an earlier
-  // tap can never clobber a newer one's result.
+  // Bumped on every tap so a superseded (slower) response chain from an
+  // earlier tap can never clobber a newer one's result, at EITHER hop.
   const requestIdRef = useRef(0);
 
   const handleActivate = useCallback(
-    (event: ElementActivationEvent) => {
-      const keys = shopTokenKeys(event.element);
-      if (!keys) return;
+    (event: ElementActivationEvent): Promise<void> | void => {
+      const identity = movableTokenIdentity(event.element);
+      if (!identity || identity.kind !== 'combatant') return;
+      const entityId = identity.key;
 
       const requestId = ++requestIdRef.current;
-      fetch(`/api/campaign/${campaignCode}/shops/${keys.shopNpcId}`)
-        .then(res => res.json())
-        .then((data: { shop?: PublicShop | null }) => {
+
+      return (async () => {
+        try {
+          const indexRes = await fetch(`/api/campaign/${campaignCode}/shops`);
+          const indexData = (await indexRes.json()) as {
+            shops?: PublicShopIndexEntry[];
+          };
           if (requestIdRef.current !== requestId) return;
-          const shop = data.shop ?? null;
-          if (!shop || !shop.entityIds.includes(keys.entityId)) return;
-          setOpenShop({
-            npcId: shop.npcId,
-            merchantName: shop.merchantName,
-            merchantDescription: shop.merchantDescription,
-          });
-        })
-        .catch(() => {
-          // Best-effort confirmation: a failed fetch just means no dialog
-          // opens this tap — mirrors refreshMarkers' own best-effort catch.
-        });
+
+          const match = (indexData.shops ?? []).find(entry =>
+            entry.entityIds.includes(entityId)
+          );
+          if (!match) return;
+
+          const shopRes = await fetch(
+            `/api/campaign/${campaignCode}/shops/${match.npcId}`
+          );
+          const shopData = (await shopRes.json()) as {
+            shop?: PublicShop | null;
+          };
+          if (requestIdRef.current !== requestId) return;
+
+          const shop = shopData.shop ?? null;
+          // The index is a lookup, not an authority: only the FRESHLY
+          // fetched shop's own entityIds gates opening — a stale index
+          // entry (the shop closed, or was republished without this
+          // entity) must never open a dialog on its say-so alone.
+          if (!shop || !shop.entityIds.includes(entityId)) return;
+
+          setOpenShop({ npcId: shop.npcId, shop });
+        } catch {
+          // Best-effort: a failed lookup/confirmation just means no dialog
+          // opens for this tap — mirrors refreshMarkers' own best-effort
+          // catch elsewhere on this canvas.
+        }
+      })();
     },
     [campaignCode]
   );
