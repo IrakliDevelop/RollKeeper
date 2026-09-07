@@ -513,10 +513,17 @@ export function PlayerBattleMapCanvas({
     // first.
     setCommittedCopper(0);
   }
-  const handleShopPurchaseCommitted = useCallback((costCopper: number) => {
-    if (!Number.isInteger(costCopper) || costCopper <= 0) return;
-    setCommittedCopper(prev => prev + costCopper);
-  }, []);
+  // Signature matches `onPurchaseCommitted`'s `{ costCopper, transferIds }`
+  // payload (VTT merchants follow-ups Task 4); `transferIds` isn't consumed
+  // yet — Task 5 replaces this whole block with `useCommittedShopSpend`,
+  // which reconciles by those ids.
+  const handleShopPurchaseCommitted = useCallback(
+    ({ costCopper }: { costCopper: number; transferIds: string[] }) => {
+      if (!Number.isInteger(costCopper) || costCopper <= 0) return;
+      setCommittedCopper(prev => prev + costCopper);
+    },
+    []
+  );
 
   const activeMarkerElement =
     activeMarkerElementId !== null

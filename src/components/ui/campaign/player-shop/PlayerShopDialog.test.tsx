@@ -68,7 +68,10 @@ function renderDialog(
   shop: PublicShop,
   purse: Currency = PURSE,
   committedCopper = 0,
-  onPurchaseCommitted: (costCopper: number) => void = () => {}
+  onPurchaseCommitted: (commit: {
+    costCopper: number;
+    transferIds: string[];
+  }) => void = () => {}
 ) {
   mockFetchSequence([{ body: { shop } }]);
   render(
@@ -299,7 +302,7 @@ describe('committed spend (owned by the caller) corrects affordability across mu
         playerId="player-1"
         purse={purse}
         committedCopper={committedCopper}
-        onPurchaseCommitted={costCopper =>
+        onPurchaseCommitted={({ costCopper }) =>
           setCommittedCopper(prev => prev + costCopper)
         }
       />
