@@ -6,6 +6,7 @@ import {
   fireEvent,
   cleanup,
   waitFor,
+  act,
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
@@ -705,6 +706,43 @@ describe('NPCShopTab', () => {
         screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
         { target: { value: '5' } }
       );
+
+      await vi.advanceTimersByTimeAsync(600);
+
+      expect(fetchFn).not.toHaveBeenCalled();
+      vi.useRealTimers();
+    });
+
+    it('the fire-time re-check prevents a stale republish when the shop closes by another means after scheduling', async () => {
+      // The race this guards against: a debounced republish is scheduled
+      // (a price edit while open), then something OTHER than this tab's own
+      // "Open for business" toggle sets `shop.open` to false — e.g. a
+      // cross-tab/cross-device NPC sync landing mid-debounce. `setOpen`
+      // itself always cancels a pending debounce, so that path can never
+      // exercise this; only a change that bypasses `setOpen` can, which is
+      // exactly what a live sync does — it writes straight through
+      // `updateNPC`, never through this tab's `useShopPublish`.
+      vi.useFakeTimers();
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(
+        <Harness
+          initial={makeNpc({
+            shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
+            inventory: [makeItem({ value: 100 })],
+          })}
+        />
+      );
+
+      fireEvent.change(
+        screen.getByRole('textbox', { name: 'Test Item price (gp)' }),
+        { target: { value: '5' } }
+      );
+
+      act(() => {
+        updateNPC('ABCD', 'npc-1', {
+          shop: { open: false, updatedAt: '2026-01-02T00:00:00.000Z' },
+        });
+      });
 
       await vi.advanceTimersByTimeAsync(600);
 

@@ -752,11 +752,7 @@ export function NPCDetailDialog({
               <DialogTitle className="text-heading flex items-center gap-2 text-xl font-bold">
                 {npc.name}
                 {npc.shop?.open && (
-                  <Badge
-                    variant="success"
-                    size="sm"
-                    className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text"
-                  >
+                  <Badge variant="primary" size="sm">
                     Open
                   </Badge>
                 )}
