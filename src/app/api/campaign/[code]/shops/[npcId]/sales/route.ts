@@ -9,6 +9,7 @@ import {
   SLIDING_TTL_SECONDS,
 } from '@/lib/redis';
 import {
+  acknowledgeShopSales,
   MAX_SALES_LOG_ENTRIES,
   parseStoredShopSales,
 } from '@/lib/shopPurchases';
@@ -116,15 +117,25 @@ export async function GET(
  * the body here (unlike `GET`'s query param) because a `DELETE` request, in
  * this codebase, is not restricted to a body-less shape — `shared/route.ts`'s
  * `DELETE` already reads `playerId`/`type`/ids from the body the same way.
+ * Like `GET`'s `!dmId` check, an empty string is rejected the same as a
+ * missing field — `dmId` is extracted once and reused for both checks so
+ * the two routes can't drift on this.
  *
- * `getRawRedis()` for both the read AND the write: the read must return the
- * literal JSON string `PURCHASE_SCRIPT`'s `cjson.encode` persisted (same
- * reason as `GET`, above), and the write re-persists that same key in the
- * same Lua-owned representation — using the auto-deserializing default
- * client for just the write would leave the key's read/write path split
- * across two clients for no reason, and every other write to a `cjson`-owned
- * key in this codebase (`SHOP_SEED_SCRIPT`, `PURCHASE_SCRIPT` themselves)
- * goes through the raw client's `EVAL`, never the default client's `set`.
+ * The read-filter-write runs as ONE atomic `EVAL` (`SALES_ACK_SCRIPT` in
+ * `shopPurchases.ts`, via `acknowledgeShopSales`), not a `get` then a
+ * separate `set`/`del` from this handler. An earlier version did the
+ * latter — safe against concurrent acks of the same batch (the task's
+ * whole point), but NOT against a `PURCHASE_SCRIPT` append landing in the
+ * gap between this route's own read and its write: `PURCHASE_SCRIPT`
+ * appends atomically inside its own `EVAL`, so a purchase completing
+ * mid-ack would be invisible to a stale in-JS snapshot, and writing
+ * `filtered` (computed from that snapshot) would silently erase the
+ * newly-appended sale — the exact silent, irrecoverable loss this task
+ * exists to close, just with a one-Redis-round-trip window instead of a
+ * DM's whole absence. See `SALES_ACK_SCRIPT`'s doc comment for the full
+ * account. `getRawRedis()` is required for the same reason `GET`'s read
+ * needs it: the key holds `PURCHASE_SCRIPT`'s literal `cjson`-encoded
+ * string, and `SALES_ACK_SCRIPT` reads/rewrites that same representation.
  */
 export async function DELETE(
   request: NextRequest,
@@ -140,12 +151,13 @@ export async function DELETE(
       unknown
     > | null;
 
-    if (!body || typeof body.dmId !== 'string') {
+    const dmId = body?.dmId;
+    if (typeof dmId !== 'string' || !dmId) {
       return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
     }
 
     const redis = getRedis();
-    const dmAuth = await verifyDmAuthority(redis, code, body.dmId);
+    const dmAuth = await verifyDmAuthority(redis, code, dmId);
     if (dmAuth !== 'ok') {
       return NextResponse.json(
         { error: 'dmId is not authorized for this campaign' },
@@ -153,7 +165,7 @@ export async function DELETE(
       );
     }
 
-    const saleIds = body.saleIds;
+    const saleIds = body?.saleIds;
     if (
       !Array.isArray(saleIds) ||
       saleIds.length > MAX_SALES_LOG_ENTRIES ||
@@ -166,29 +178,19 @@ export async function DELETE(
     }
 
     // An empty batch acknowledges nothing — never treated as "clear the
-    // log" (see doc comment above). Short-circuits before the read so an
-    // empty ack (which the client never intends to send) can't even race
-    // a concurrent purchase's append.
+    // log" (see doc comment above). This guarantee holds regardless of
+    // what `SALES_ACK_SCRIPT` would do with an empty array, because it
+    // short-circuits BEFORE the script ever runs.
     if (saleIds.length === 0) {
       return NextResponse.json({ success: true });
     }
 
-    const key = campaignShopSalesKey(code, npcId);
-    const rawRedis = getRawRedis();
-    const salesRaw = await rawRedis.get<string>(key);
-    const sales = parseStoredShopSales(salesRaw);
-    const idSet = new Set(saleIds);
-    const filtered = sales.filter(sale => !idSet.has(sale.id));
-
-    if (filtered.length !== sales.length) {
-      if (filtered.length === 0) {
-        await rawRedis.del(key);
-      } else {
-        await rawRedis.set(key, JSON.stringify(filtered), {
-          ex: SLIDING_TTL_SECONDS,
-        });
-      }
-    }
+    await acknowledgeShopSales(
+      getRawRedis(),
+      campaignShopSalesKey(code, npcId),
+      saleIds,
+      SLIDING_TTL_SECONDS
+    );
 
     return NextResponse.json({ success: true });
   } catch (error) {

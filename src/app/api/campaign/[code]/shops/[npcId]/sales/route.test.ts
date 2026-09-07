@@ -6,6 +6,19 @@ import { NextRequest, NextResponse } from 'next/server';
 // `verifyDmAuthority` must receive the default client, and the sales log
 // itself must be read via the raw, non-auto-deserializing client (it's
 // written as a literal JSON string by `PURCHASE_SCRIPT`'s `cjson.encode`).
+// `redis` and `rawRedis` are deliberately DISTINCT objects (mirroring the
+// sibling `../route.test.ts`) so call-site client identity is assertable:
+// `verifyDmAuthority` must receive the default client, and the sales log
+// itself must be read/written via the raw, non-auto-deserializing client
+// (it's a literal JSON string owned by `PURCHASE_SCRIPT`'s `cjson.encode`,
+// and — Task 12a review fix — the DELETE handler below now acknowledges via
+// a single atomic `EVAL` (`rawRedis.eval`), never a separate `get`/`set`,
+// so a concurrent `PURCHASE_SCRIPT` append can never be silently erased by
+// a stale in-JS snapshot. `@/lib/shopPurchases` is intentionally NOT
+// mocked in this file — `acknowledgeShopSales`'s KEYS/ARGV-shape and
+// return-parsing are exercised for real here, against a mocked `eval`; the
+// real Lua filtering/atomicity is proven against real Redis in
+// scripts/shop-redis.integration.test.mjs.
 const {
   redis,
   rawRedis,
@@ -13,7 +26,7 @@ const {
   rejectHybridGuestPrivilegeEscalation,
 } = vi.hoisted(() => ({
   redis: { get: vi.fn() },
-  rawRedis: { get: vi.fn(), set: vi.fn(), del: vi.fn() },
+  rawRedis: { get: vi.fn(), eval: vi.fn() },
   verifyDmAuthority: vi.fn(),
   rejectHybridGuestPrivilegeEscalation: vi.fn(),
 }));
@@ -31,6 +44,8 @@ vi.mock('@/lib/guestRouteResponses', async importOriginal => {
     await importOriginal<typeof import('@/lib/guestRouteResponses')>();
   return { ...actual, rejectHybridGuestPrivilegeEscalation };
 });
+
+import { SALES_ACK_SCRIPT } from '@/lib/shopPurchases';
 
 import { DELETE, GET } from './route';
 
@@ -165,12 +180,24 @@ describe('shop sales route — DELETE (acknowledge) auth', () => {
     );
     expect(response.status).toBe(403);
     expect(verifyDmAuthority).not.toHaveBeenCalled();
-    expect(rawRedis.get).not.toHaveBeenCalled();
+    expect(rawRedis.eval).not.toHaveBeenCalled();
   });
 
   it('rejects a request with no dmId', async () => {
     const response = await DELETE(
       deleteRequest({ saleIds: ['sale-req-1'] }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(verifyDmAuthority).not.toHaveBeenCalled();
+  });
+
+  // Minor fix (Task 12a review): DELETE used to accept dmId: '' where the
+  // sibling GET's `!dmId` check already rejected it — an avoidable
+  // divergence from the route this one was written to mirror exactly.
+  it('rejects an empty-string dmId the same as a missing one', async () => {
+    const response = await DELETE(
+      deleteRequest({ dmId: '', saleIds: ['sale-req-1'] }),
       params
     );
     expect(response.status).toBe(400);
@@ -184,7 +211,7 @@ describe('shop sales route — DELETE (acknowledge) auth', () => {
       params
     );
     expect(response.status).toBe(403);
-    expect(rawRedis.get).not.toHaveBeenCalled();
+    expect(rawRedis.eval).not.toHaveBeenCalled();
   });
 
   it('rejects when the campaign itself is missing', async () => {
@@ -202,7 +229,7 @@ describe('shop sales route — DELETE (acknowledge) auth', () => {
       params
     );
     expect(response.status).toBe(400);
-    expect(rawRedis.get).not.toHaveBeenCalled();
+    expect(rawRedis.eval).not.toHaveBeenCalled();
   });
 });
 
@@ -214,66 +241,53 @@ describe('shop sales route — DELETE (acknowledge) behavior', () => {
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
-    // Never even reads the log for an empty batch — nothing to filter.
-    expect(rawRedis.get).not.toHaveBeenCalled();
-    expect(rawRedis.set).not.toHaveBeenCalled();
-    expect(rawRedis.del).not.toHaveBeenCalled();
+    // Never even runs the ack script for an empty batch — this guarantee
+    // must hold regardless of what the Lua script would do with one.
+    expect(rawRedis.eval).not.toHaveBeenCalled();
   });
 
-  it('acknowledges a subset in ONE write, leaving the rest of the log intact', async () => {
-    rawRedis.get.mockResolvedValue(JSON.stringify([sale, saleTwo, saleThree]));
+  // Task 12a review fix, Critical: the ack must be ONE atomic EVAL, never a
+  // separate get-then-set/del from the route — a PURCHASE_SCRIPT append
+  // landing between those two would otherwise be silently erased by a set
+  // computed from a stale snapshot. This asserts the route calls
+  // `SALES_ACK_SCRIPT` exactly once with the documented KEYS/ARGV; the
+  // script's own filtering/atomicity is proven for real in
+  // shopPurchases.test.ts (mocked eval) and
+  // scripts/shop-redis.integration.test.mjs (real Redis, concurrent
+  // append).
+  it('acknowledges via exactly one atomic EVAL call with the documented KEYS/ARGV', async () => {
+    rawRedis.eval.mockResolvedValue(JSON.stringify([saleTwo, saleThree]));
     const response = await DELETE(
       deleteRequest({ dmId: 'dm-1', saleIds: [sale.id] }),
       params
     );
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ success: true });
-    expect(rawRedis.set).toHaveBeenCalledTimes(1);
-    expect(rawRedis.set).toHaveBeenCalledWith(
-      'shop-sales:ABC:npc-1',
-      JSON.stringify([saleTwo, saleThree]),
-      { ex: 60 * 24 * 60 * 60 }
+    expect(rawRedis.eval).toHaveBeenCalledOnce();
+    expect(rawRedis.eval).toHaveBeenCalledWith(
+      SALES_ACK_SCRIPT,
+      ['shop-sales:ABC:npc-1'],
+      [JSON.stringify([sale.id]), 60 * 24 * 60 * 60]
     );
-    expect(rawRedis.del).not.toHaveBeenCalled();
+    // Never the auto-deserializing default client for this key.
+    expect(redis.get).not.toHaveBeenCalled();
   });
 
-  it('acknowledges every id in the log in a single batch call and deletes the key when empty', async () => {
-    rawRedis.get.mockResolvedValue(JSON.stringify([sale, saleTwo]));
+  it('acknowledges every id in the log in a single batch call, not one per id', async () => {
+    rawRedis.eval.mockResolvedValue('[]');
     const response = await DELETE(
       deleteRequest({ dmId: 'dm-1', saleIds: [sale.id, saleTwo.id] }),
       params
     );
     expect(response.status).toBe(200);
-    expect(rawRedis.get).toHaveBeenCalledTimes(1);
-    expect(rawRedis.set).not.toHaveBeenCalled();
-    expect(rawRedis.del).toHaveBeenCalledTimes(1);
-    expect(rawRedis.del).toHaveBeenCalledWith('shop-sales:ABC:npc-1');
-  });
-
-  it('acknowledging ids not present in the log is a harmless no-op write', async () => {
-    rawRedis.get.mockResolvedValue(JSON.stringify([sale]));
-    const response = await DELETE(
-      deleteRequest({ dmId: 'dm-1', saleIds: ['sale-does-not-exist'] }),
-      params
+    expect(rawRedis.eval).toHaveBeenCalledOnce();
+    expect(rawRedis.eval.mock.calls[0][2][0]).toBe(
+      JSON.stringify([sale.id, saleTwo.id])
     );
-    expect(response.status).toBe(200);
-    expect(rawRedis.set).not.toHaveBeenCalled();
-    expect(rawRedis.del).not.toHaveBeenCalled();
-  });
-
-  it('acknowledging against a missing log is a harmless no-op', async () => {
-    rawRedis.get.mockResolvedValue(null);
-    const response = await DELETE(
-      deleteRequest({ dmId: 'dm-1', saleIds: ['sale-req-1'] }),
-      params
-    );
-    expect(response.status).toBe(200);
-    expect(rawRedis.set).not.toHaveBeenCalled();
-    expect(rawRedis.del).not.toHaveBeenCalled();
   });
 
   it('maps an unexpected failure to 500', async () => {
-    rawRedis.get.mockRejectedValue(new Error('redis down'));
+    rawRedis.eval.mockRejectedValue(new Error('redis down'));
     const consoleErrorSpy = vi
       .spyOn(console, 'error')
       .mockImplementation(() => {});

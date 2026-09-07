@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  acknowledgeShopSales,
   INVALID_SHOP_LEDGER_SEED_ERROR,
   isValidShopSale,
   MAX_SALES_LOG_ENTRIES,
@@ -477,5 +478,71 @@ describe('purchaseFromShop', () => {
       60
     );
     expect(result).toEqual({ ok: false, error });
+  });
+});
+
+// Task 12a review fix: the acknowledge route's read-filter-write must be a
+// single atomic EVAL, not a separate `get`/`set` from the caller — a
+// PURCHASE_SCRIPT append landing between those two would otherwise be
+// silently erased by a `set` computed from a stale snapshot. These tests
+// exercise `acknowledgeShopSales`'s wrapper (KEYS/ARGV shape, return-value
+// parsing) with a mocked `eval`, mirroring `seedShopLedger`'s tests above;
+// the real Lua filtering/atomicity is proven against real Redis in
+// scripts/shop-redis.integration.test.mjs.
+describe('acknowledgeShopSales (atomic ack)', () => {
+  it('acknowledges through one Redis script call with the documented KEYS/ARGV', async () => {
+    const remaining = [{ ...sale, id: 'sale-req-2' }];
+    const evalMock = vi.fn().mockResolvedValue(JSON.stringify(remaining));
+    const result = await acknowledgeShopSales(
+      { eval: evalMock } as unknown as Redis,
+      'shop-sales-key',
+      ['sale-req-1'],
+      60
+    );
+    expect(result).toEqual(remaining);
+    expect(evalMock).toHaveBeenCalledOnce();
+    expect(evalMock.mock.calls[0][1]).toEqual(['shop-sales-key']);
+    expect(evalMock.mock.calls[0][2]).toEqual([
+      JSON.stringify(['sale-req-1']),
+      60,
+    ]);
+  });
+
+  it('acknowledging every id in the log normalizes to an empty array', async () => {
+    const evalMock = vi.fn().mockResolvedValue('[]');
+    await expect(
+      acknowledgeShopSales(
+        { eval: evalMock } as unknown as Redis,
+        'shop-sales-key',
+        ['sale-req-1'],
+        60
+      )
+    ).resolves.toEqual([]);
+  });
+
+  it('normalizes the Redis Lua empty-table encoding to an empty log', async () => {
+    const evalMock = vi.fn().mockResolvedValue('{}');
+    await expect(
+      acknowledgeShopSales(
+        { eval: evalMock } as unknown as Redis,
+        'shop-sales-key',
+        ['sale-req-1'],
+        60
+      )
+    ).resolves.toEqual([]);
+  });
+
+  it('passes multiple ids as one encoded batch, never one call per id', async () => {
+    const evalMock = vi.fn().mockResolvedValue('[]');
+    await acknowledgeShopSales(
+      { eval: evalMock } as unknown as Redis,
+      'shop-sales-key',
+      ['sale-1', 'sale-2', 'sale-3'],
+      60
+    );
+    expect(evalMock).toHaveBeenCalledOnce();
+    expect(evalMock.mock.calls[0][2][0]).toBe(
+      JSON.stringify(['sale-1', 'sale-2', 'sale-3'])
+    );
   });
 });

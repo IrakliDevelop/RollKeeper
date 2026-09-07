@@ -555,3 +555,78 @@ export function parseStoredShopSales(raw: string | null): ShopSale[] {
       : parsed;
   return bounded.filter(isValidShopSale);
 }
+
+/**
+ * Atomically removes acknowledged rows from a shop's sales log (VTT
+ * merchants Slice 3, Task 12a — the DM-side acknowledgement that keeps
+ * `campaign:{code}:shop-sales:{npcId}` short in normal operation instead of
+ * relying on `PURCHASE_SCRIPT`'s 500-entry FIFO cap above never being hit).
+ *
+ * A first version of the acknowledge route did this as a plain
+ * `GET` -> filter in JS -> `SET`/`DEL` from the route handler, exactly like
+ * `shared/route.ts`'s batch transfer ack. That is safe against concurrent
+ * ACKS of the same key (the task's whole point), but NOT against a
+ * `PURCHASE_SCRIPT` append landing in the gap between this route's own
+ * `GET` and its `SET`: `PURCHASE_SCRIPT` appends inside a single atomic
+ * `EVAL`, so a purchase that completes mid-ack is invisible to the route's
+ * stale in-JS snapshot, and the route's `SET` of `filtered` (computed from
+ * that stale snapshot) silently erases the newly-appended sale — the exact
+ * silent, irrecoverable loss this task exists to close, just with a
+ * one-round-trip window instead of a DM's whole absence. Moving the
+ * read-filter-write into this script closes that window the same way
+ * `SHOP_SEED_SCRIPT`/`PURCHASE_SCRIPT` already make their own
+ * read-modify-write atomic against each other.
+ */
+export const SALES_ACK_SCRIPT = `
+local raw = redis.call('GET', KEYS[1])
+if not raw then return '[]' end
+local sales = cjson.decode(raw)
+local acked = cjson.decode(ARGV[1])
+local ackedById = {}
+for _, id in ipairs(acked) do
+  ackedById[id] = true
+end
+local remaining = {}
+for _, sale in ipairs(sales) do
+  if not ackedById[sale.id] then
+    table.insert(remaining, sale)
+  end
+end
+if #remaining == 0 then
+  redis.call('DEL', KEYS[1])
+  return '[]'
+end
+local encoded = cjson.encode(remaining)
+redis.call('SET', KEYS[1], encoded, 'EX', ARGV[2])
+return encoded
+`;
+
+/**
+ * Acknowledges (removes) `saleIds` from a shop's sales log in one atomic
+ * Redis round trip — see `SALES_ACK_SCRIPT`'s doc comment for why this must
+ * never be a separate `get`/`set` from the caller.
+ *
+ * `saleIds` is expected non-empty — the "empty batch is a no-op, never
+ * clear-the-log" guarantee is enforced by the caller (the route handler)
+ * BEFORE this is called, deliberately: that guarantee must hold regardless
+ * of what this Lua script does with an empty array, not depend on it.
+ *
+ * `redis` MUST be `getRawRedis()`, exactly like `seedShopLedger` — this
+ * reads and re-persists the same `cjson`-encoded literal string
+ * `PURCHASE_SCRIPT` writes, and the default client's auto-deserialization
+ * would corrupt both the read (`String(raw)` on an already-parsed object)
+ * and any diagnostic use of this function's return value.
+ */
+export async function acknowledgeShopSales(
+  redis: Redis,
+  key: string,
+  saleIds: string[],
+  ttlSeconds: number
+): Promise<ShopSale[]> {
+  const raw = await redis.eval(
+    SALES_ACK_SCRIPT,
+    [key],
+    [JSON.stringify(saleIds), ttlSeconds]
+  );
+  return parseStoredShopSales(String(raw));
+}

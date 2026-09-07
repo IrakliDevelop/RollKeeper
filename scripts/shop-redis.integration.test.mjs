@@ -41,6 +41,7 @@ async function waitForRedis() {
 
 let seedScript;
 let purchaseScript;
+let ackScript;
 let server;
 
 before(async () => {
@@ -74,11 +75,15 @@ before(async () => {
   purchaseScript = source.match(
     /export const PURCHASE_SCRIPT = `([\s\S]*?)`;/u
   )?.[1];
+  ackScript = source.match(
+    /export const SALES_ACK_SCRIPT = `([\s\S]*?)`;/u
+  )?.[1];
   assert.ok(seedScript, 'SHOP_SEED_SCRIPT must be exported for this harness');
   assert.ok(
     purchaseScript,
     'PURCHASE_SCRIPT must be exported for this harness'
   );
+  assert.ok(ackScript, 'SALES_ACK_SCRIPT must be exported for this harness');
 });
 
 after(() => {
@@ -173,6 +178,23 @@ async function purchase({
     ...extraArgv.map(String)
   );
   return JSON.parse(out.join('\n'));
+}
+
+/**
+ * Runs SALES_ACK_SCRIPT with the documented KEYS/ARGV order (matching
+ * `acknowledgeShopSales`'s call in shopPurchases.ts exactly).
+ */
+async function ackSales({ npcId, saleIds, ttl = '300' }) {
+  const out = await redis(
+    'EVAL',
+    ackScript,
+    '1',
+    salesKey(npcId),
+    JSON.stringify(saleIds),
+    ttl
+  );
+  const text = out.join('\n');
+  return text === '' ? [] : JSON.parse(text);
 }
 
 async function getJson(key) {
@@ -662,4 +684,130 @@ test('CHARACTERIZATION: an empty tags array round-trips through cjson as {} (an 
     {},
     'the empty tags array lands as an empty object after the cjson round-trip'
   );
+});
+
+// ---------------------------------------------------------------------------
+// 11. Task 12a review fix (Critical): the sales-log acknowledge must be
+//     atomic against a concurrent PURCHASE_SCRIPT append. A first version of
+//     the DELETE route did `GET` -> filter in JS -> `SET`/`DEL` from the
+//     route handler itself; a purchase landing in the gap between that GET
+//     and SET would be silently erased by a write computed from the stale
+//     snapshot. SALES_ACK_SCRIPT closes that window by doing the whole
+//     read-filter-write inside one EVAL, exactly like PURCHASE_SCRIPT's own
+//     append. Regardless of which of the two concurrent EVALs Redis happens
+//     to run first (Redis serializes both, but the ORDER is not controlled
+//     by this test), the final log must contain the newly-appended sale and
+//     must NOT contain the acknowledged ids — there is no interleaving that
+//     loses either.
+// ---------------------------------------------------------------------------
+test('acknowledging sales is atomic against a concurrent purchase append: the new sale always survives', async () => {
+  await seedLedger('npc-ack-race', [
+    shopEntry({ id: 'entry-1', seededQuantity: 5, priceCopper: 20 }),
+  ]);
+
+  // Two sales already sitting in the log, as if from earlier purchases the
+  // DM has already applied client-side and is now acknowledging.
+  const preExisting = [
+    {
+      id: 'sale-old-1',
+      entryId: 'entry-1',
+      quantity: 1,
+      copper: 20,
+      playerId: 'player-old',
+      at: '2026-09-01T00:00:00.000Z',
+    },
+    {
+      id: 'sale-old-2',
+      entryId: 'entry-1',
+      quantity: 1,
+      copper: 20,
+      playerId: 'player-old',
+      at: '2026-09-01T00:00:01.000Z',
+    },
+  ];
+  await redis('SET', salesKey('npc-ack-race'), JSON.stringify(preExisting));
+
+  const [, purchaseResult] = await Promise.all([
+    ackSales({ npcId: 'npc-ack-race', saleIds: ['sale-old-1', 'sale-old-2'] }),
+    purchase({
+      npcId: 'npc-ack-race',
+      entryId: 'entry-1',
+      requestId: 'ack-race-1',
+      playerId: 'player-new',
+      quantity: 1,
+    }),
+  ]);
+  assert.equal(purchaseResult.grantedQuantity, 1);
+
+  const finalSales = await getJson(salesKey('npc-ack-race'));
+  const finalIds = finalSales.map(s => s.id);
+  assert.deepEqual(
+    finalIds,
+    ['sale-ack-race-1'],
+    'the concurrently-appended sale must survive, and both acknowledged ' +
+      'ids must be gone, regardless of EVAL execution order'
+  );
+});
+
+// ---------------------------------------------------------------------------
+// 12. The acknowledge script's own basic correctness: a subset ack leaves
+//     the rest of the log intact, in one write; acking everything deletes
+//     the key rather than leaving an empty array (matching PURCHASE_SCRIPT's
+//     own "empty array or DEL" convention for zero-length collections).
+// ---------------------------------------------------------------------------
+test('SALES_ACK_SCRIPT removes only the acknowledged ids and deletes the key when nothing remains', async () => {
+  await redis(
+    'SET',
+    salesKey('npc-ack-basic'),
+    JSON.stringify([
+      {
+        id: 'sale-a',
+        entryId: 'entry-1',
+        quantity: 1,
+        copper: 10,
+        playerId: 'player-a',
+        at: '2026-09-01T00:00:00.000Z',
+      },
+      {
+        id: 'sale-b',
+        entryId: 'entry-1',
+        quantity: 1,
+        copper: 10,
+        playerId: 'player-b',
+        at: '2026-09-01T00:00:01.000Z',
+      },
+      {
+        id: 'sale-c',
+        entryId: 'entry-1',
+        quantity: 1,
+        copper: 10,
+        playerId: 'player-c',
+        at: '2026-09-01T00:00:02.000Z',
+      },
+    ])
+  );
+
+  const afterSubset = await ackSales({
+    npcId: 'npc-ack-basic',
+    saleIds: ['sale-b'],
+  });
+  assert.deepEqual(
+    afterSubset.map(s => s.id),
+    ['sale-a', 'sale-c']
+  );
+
+  const stillThere = await getJson(salesKey('npc-ack-basic'));
+  assert.deepEqual(
+    stillThere.map(s => s.id),
+    ['sale-a', 'sale-c']
+  );
+
+  const afterRest = await ackSales({
+    npcId: 'npc-ack-basic',
+    saleIds: ['sale-a', 'sale-c'],
+  });
+  assert.deepEqual(afterRest, []);
+
+  const raw = await redis('EXISTS', salesKey('npc-ack-basic'));
+  assert.equal(raw[0], '0', 'the key must be deleted, not left as "[]"');
 });
