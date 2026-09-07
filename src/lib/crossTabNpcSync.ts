@@ -1,7 +1,10 @@
 import { NPC_STORAGE_KEY } from '@/lib/durableDm/npcFamily';
 import { npcUsesIndexedDbAuthority } from '@/lib/durableDm/npcLegacyAuthority';
 import { isNpcClientVisible } from '@/lib/durableDm/slice11dFlags';
-import { capAppliedSaleIds, capShopSalesLog } from '@/lib/shopSaleLedgerCaps';
+import {
+  capMergedAppliedSaleIds,
+  capShopSalesLog,
+} from '@/lib/shopSaleLedgerCaps';
 
 import type { CampaignNPC } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
@@ -67,6 +70,15 @@ function mergeNpcsForCampaign(
   return { merged, changed };
 }
 
+/**
+ * Unions the ledger, appending only ids `local` hasn't seen, then caps with
+ * `capMergedAppliedSaleIds` — NOT `capAppliedSaleIds`. See that constant's
+ * doc comment for why the merge path needs a larger, separate cap: unlike
+ * `recordAppliedShopSale`'s single-tab append (which always adds the true
+ * newest id), a merge can receive an out-of-order or stale contribution
+ * from another tab, so trusting array position as a recency proxy at the
+ * 500 cap can evict a still-live local id.
+ */
 function mergeAppliedShopSaleIds(
   local: Record<string, string[]>,
   incoming: Record<string, string[]>
@@ -78,7 +90,7 @@ function mergeAppliedShopSaleIds(
     const localSet = new Set(localIds);
     const additions = incomingIds.filter(id => !localSet.has(id));
     if (additions.length === 0) continue;
-    merged[npcId] = capAppliedSaleIds([...localIds, ...additions]);
+    merged[npcId] = capMergedAppliedSaleIds([...localIds, ...additions]);
     changed = true;
   }
   return { merged, changed };
