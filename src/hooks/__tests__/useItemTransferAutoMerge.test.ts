@@ -69,7 +69,7 @@ async function flush() {
 }
 
 describe('useItemTransferAutoMerge', () => {
-  it('applies a new transfer, acknowledges it by id, and clears the ledger entry on success', async () => {
+  it('applies a new transfer, acknowledges it in a batch, and clears the ledger entry on success', async () => {
     const store = makeStore();
     const addInventoryItem = vi.fn();
     const addMagicItem = vi.fn();
@@ -95,9 +95,10 @@ describe('useItemTransferAutoMerge', () => {
     expect(addInventoryItem).toHaveBeenCalledTimes(1);
     expect(addMagicItem).not.toHaveBeenCalled();
     expect(store.recordAppliedTransfer).toHaveBeenCalledWith('transfer-1');
-    // Per-id, not a blanket whole-queue acknowledge.
+    // One batched call carrying the whole set of ids, not a blanket
+    // whole-queue acknowledge and not one call per id.
     expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
-    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
+    expect(acknowledgeTransfers).toHaveBeenCalledWith(['transfer-1']);
     // No cost on this transfer — the purse must not be touched at all.
     expect(updateCurrency).not.toHaveBeenCalled();
 
@@ -165,42 +166,48 @@ describe('useItemTransferAutoMerge', () => {
     // failed) — worth another acknowledge attempt even though nothing was
     // (re-)applied.
     expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
-    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
+    expect(acknowledgeTransfers).toHaveBeenCalledWith(['transfer-1']);
 
     await flush();
     expect(store.clearAppliedTransfer).toHaveBeenCalledWith('transfer-1');
   });
 
-  it('acknowledges each transfer in a batch individually, not with a blanket call', async () => {
-    const store = makeStore();
-    const addInventoryItem = vi.fn();
-    const addMagicItem = vi.fn();
-    const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
-    const updateCurrency = vi.fn();
-    const transfers = [
-      makeTransfer({ id: 'transfer-1' }),
-      makeTransfer({ id: 'transfer-2' }),
-    ];
+  it(
+    'CRITICAL FIX: acknowledges a whole batch in ONE call, never one ' +
+      'request per id — the route does a non-atomic read-filter-write, so ' +
+      'N concurrent per-id acks would race and lose all but the last ' +
+      "writer's removal (see the route's own atomicity test)",
+    async () => {
+      const store = makeStore();
+      const addInventoryItem = vi.fn();
+      const addMagicItem = vi.fn();
+      const acknowledgeTransfers = vi.fn().mockResolvedValue(true);
+      const updateCurrency = vi.fn();
+      // Same shape as a full-size shop purchase batch.
+      const transfers = Array.from({ length: 25 }, (_, i) =>
+        makeTransfer({ id: `wand-${i}` })
+      );
 
-    renderHook(() =>
-      useItemTransferAutoMerge({
-        transfers,
-        appliedTransferIds: store.appliedTransferIds,
-        recordAppliedTransfer: store.recordAppliedTransfer,
-        clearAppliedTransfer: store.clearAppliedTransfer,
-        addInventoryItem,
-        addMagicItem,
-        acknowledgeTransfers,
-        currency: DEFAULT_CURRENCY,
-        updateCurrency,
-      })
-    );
+      renderHook(() =>
+        useItemTransferAutoMerge({
+          transfers,
+          appliedTransferIds: store.appliedTransferIds,
+          recordAppliedTransfer: store.recordAppliedTransfer,
+          clearAppliedTransfer: store.clearAppliedTransfer,
+          addInventoryItem,
+          addMagicItem,
+          acknowledgeTransfers,
+          currency: DEFAULT_CURRENCY,
+          updateCurrency,
+        })
+      );
 
-    expect(acknowledgeTransfers).toHaveBeenCalledTimes(2);
-    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-1');
-    expect(acknowledgeTransfers).toHaveBeenCalledWith('transfer-2');
-    expect(acknowledgeTransfers).not.toHaveBeenCalledWith(undefined);
-  });
+      expect(acknowledgeTransfers).toHaveBeenCalledTimes(1);
+      expect(acknowledgeTransfers).toHaveBeenCalledWith(
+        transfers.map(t => t.id)
+      );
+    }
+  );
 
   it(
     'REGRESSION: after a failed acknowledgeTransfers, remounting does not ' +
@@ -305,6 +312,19 @@ describe('useItemTransferAutoMerge', () => {
     expect(addInventoryItem).toHaveBeenCalledTimes(1);
     expect(updateCurrency).toHaveBeenCalledTimes(1);
     expect(store.recordAppliedTransfer).toHaveBeenCalledTimes(1);
+
+    // StrictMode doubles the ack fan-out — both effect passes reach the
+    // acknowledge step (the second one retries the same id it can already
+    // see as applied) — but the batch-ack fix means each pass still issues
+    // exactly one call carrying the same one-element batch, never a
+    // multi-id batch split across per-id requests. Two idempotent acks for
+    // the identical id set are harmless (the route removes the same id
+    // either way); this is what "largely dissolves" the widened race
+    // window means in practice, not "eliminates the double call."
+    expect(acknowledgeTransfers).toHaveBeenCalledTimes(2);
+    for (const call of acknowledgeTransfers.mock.calls) {
+      expect(call[0]).toEqual(['transfer-1']);
+    }
   });
 
   it('does not record a transfer as applied when addInventoryItem throws (recoverable on the next pass)', () => {

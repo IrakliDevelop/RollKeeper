@@ -27,13 +27,17 @@ interface UseItemTransferAutoMergeOptions {
   addMagicItem: (
     item: Omit<MagicItem, 'id' | 'createdAt' | 'updatedAt'>
   ) => void;
-  /** Acknowledges one transfer by id, clearing it from the server-side
-   * queue. Resolves `true` iff the request actually completed — used to
-   * decide whether `clearAppliedTransfer` is safe to call. May resolve
-   * `false` (network failure) or never settle in time (tab closed) — the
-   * dedup ledger, not this call, is what prevents re-application on the
-   * next mount. */
-  acknowledgeTransfers: (transferId: string) => Promise<boolean>;
+  /** Acknowledges a batch of transfer ids in ONE request, clearing them
+   * from the server-side queue. Must be called with the whole batch at
+   * once, never per-id in a loop — the route does a non-atomic
+   * read-filter-write, so concurrent per-id calls race and silently lose
+   * all but the last writer's removal. Resolves `true` iff the server
+   * actually confirmed it (checked against the HTTP status, not just
+   * "didn't throw") — used to decide whether `clearAppliedTransfer` is
+   * safe to call for each id. May resolve `false` (network/HTTP failure)
+   * or never settle in time (tab closed) — the dedup ledger, not this
+   * call, is what prevents re-application on the next mount. */
+  acknowledgeTransfers: (transferIds: string[]) => Promise<boolean>;
   /** Purse snapshot from the render that scheduled this effect. A purchase
    * debit is applied against this snapshot (and any earlier debit already
    * applied within the same pass — see the running-purse note below), never
@@ -228,15 +232,23 @@ export function useItemTransferAutoMerge({
       updateCurrency(purse);
     }
 
-    // Per-id, not a blanket whole-queue DELETE: acknowledging exactly what
-    // was (re-)confirmed here never destroys a transfer enqueued between
-    // the last poll and now that hasn't been applied yet. Fire-and-forget —
-    // forgetting the ledger entry is a bonus if this lands, not a
+    // ONE batched acknowledge for every id confirmed this pass — not a
+    // blanket whole-queue DELETE (which would destroy a transfer enqueued
+    // between the last poll and now that hasn't been applied yet), and
+    // NOT N separate per-id requests either: the route does a non-atomic
+    // read-filter-write, so concurrent per-id DELETEs race each other and
+    // the last writer silently undoes every other request's removal — a
+    // 25-unit purchase would issue 25 concurrent acks, ~24 of which are
+    // lost, and this hook would still (wrongly) forget those ids from the
+    // ledger because each one individually reported success. Fire-and-
+    // forget — forgetting ledger entries is a bonus if this lands, not a
     // requirement for correctness (the ledger only needs to outlive the
     // in-flight window, and the cap bounds it regardless).
-    for (const id of toAcknowledge) {
-      void acknowledgeTransfers(id).then(ok => {
-        if (ok) clearAppliedTransfer(id);
+    if (toAcknowledge.length > 0) {
+      void acknowledgeTransfers(toAcknowledge).then(ok => {
+        if (ok) {
+          for (const id of toAcknowledge) clearAppliedTransfer(id);
+        }
       });
     }
   }, [

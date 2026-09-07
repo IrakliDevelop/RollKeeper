@@ -816,4 +816,114 @@ describe('DELETE /api/campaign/[code]/shared', () => {
       false
     );
   });
+
+  it('removes every id in one batch request (type=transfers, transferIds)', async () => {
+    seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+      makeTransfer('xfr-1'),
+      makeTransfer('xfr-2'),
+      makeTransfer('xfr-3'),
+    ]);
+
+    const req = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'DELETE',
+      body: {
+        playerId: 'player-1',
+        type: 'transfers',
+        transferIds: ['xfr-1', 'xfr-3'],
+      },
+    });
+    const res = await DELETE(
+      req as NextRequest,
+      createRouteParams({ code: 'TEST' })
+    );
+
+    expect(res.status).toBe(200);
+    const raw = getRedisStore().get(campaignTransfersKey('TEST', 'player-1'))!;
+    const remaining: ItemTransfer[] = JSON.parse(raw);
+    expect(remaining.map(t => t.id)).toEqual(['xfr-2']);
+  });
+
+  it('deletes the transfers key when a batch removes every remaining transfer', async () => {
+    seedRedis(campaignTransfersKey('TEST', 'player-1'), [
+      makeTransfer('xfr-1'),
+      makeTransfer('xfr-2'),
+    ]);
+
+    const req = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'DELETE',
+      body: {
+        playerId: 'player-1',
+        type: 'transfers',
+        transferIds: ['xfr-1', 'xfr-2'],
+      },
+    });
+    await DELETE(req as NextRequest, createRouteParams({ code: 'TEST' }));
+
+    expect(getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))).toBe(
+      false
+    );
+  });
+
+  it(
+    'CRITICAL FIX: a single batch ack of a 25-entry purchase never loses ' +
+      'an entry the way N concurrent single-id acks against this non-atomic ' +
+      'read-filter-write route would',
+    async () => {
+      // Reproduces the exact shape of a full-size shop purchase batch: 25
+      // transfers, one shared queue.
+      const ids = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
+      seedRedis(
+        campaignTransfersKey('TEST', 'player-1'),
+        ids.map(id => makeTransfer(id))
+      );
+
+      // --- Negative control: N concurrent single-id acks race the
+      // route's get -> filter -> set and lose all but the last writer's
+      // removal, because each request reads the list BEFORE any of the
+      // others have written back. This is what useItemTransferAutoMerge
+      // used to do before the batch-ack fix. ---
+      const concurrentRequests = ids.map(id =>
+        DELETE(
+          createNextRequest('/api/campaign/TEST/shared', {
+            method: 'DELETE',
+            body: { playerId: 'player-1', type: 'transfers', transferId: id },
+          }) as NextRequest,
+          createRouteParams({ code: 'TEST' })
+        )
+      );
+      await Promise.all(concurrentRequests);
+
+      const afterConcurrent = getRedisStore().get(
+        campaignTransfersKey('TEST', 'player-1')
+      );
+      const remainingAfterConcurrent: ItemTransfer[] = afterConcurrent
+        ? JSON.parse(afterConcurrent)
+        : [];
+      // This pins the race as reproduced by the in-memory Redis fake used
+      // in this test: it should NOT have cleanly removed all 25 (if it
+      // did, the fake doesn't reproduce non-atomic get/set races, and this
+      // negative control needs a different setup, not deletion).
+      expect(remainingAfterConcurrent.length).toBeGreaterThan(0);
+
+      // --- Re-seed and prove the batch form used a single read-filter-write
+      // instead, removing every id in one request. ---
+      seedRedis(
+        campaignTransfersKey('TEST', 'player-1'),
+        ids.map(id => makeTransfer(id))
+      );
+
+      const batchReq = createNextRequest('/api/campaign/TEST/shared', {
+        method: 'DELETE',
+        body: { playerId: 'player-1', type: 'transfers', transferIds: ids },
+      });
+      await DELETE(
+        batchReq as NextRequest,
+        createRouteParams({ code: 'TEST' })
+      );
+
+      expect(
+        getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))
+      ).toBe(false);
+    }
+  );
 });

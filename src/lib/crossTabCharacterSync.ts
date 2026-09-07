@@ -1,12 +1,16 @@
 import { CHARACTER_ENVELOPE_KEY_PREFIX } from '@/utils/constants';
 import { isStrictlyFresher } from '@/lib/characterFreshness';
-import type { IntentWatermark } from '@/lib/characterCanonicalStorage';
+import {
+  mergeAppliedTransferIds,
+  type IntentWatermark,
+} from '@/lib/characterCanonicalStorage';
 import type { CharacterState } from '@/types/character';
 
 interface CharacterStoreLike {
   getState: () => {
     character: CharacterState;
     loadCharacterState: (characterState: CharacterState) => void;
+    appliedTransferIds: string[];
   };
   setState: (partial: {
     intentWatermarks: Record<string, IntentWatermark>;
@@ -59,22 +63,44 @@ export function initCrossTabCharacterSync(
     }
     if (!incomingCharacter || typeof incomingCharacter.id !== 'string') return;
 
-    const { character, loadCharacterState } = store.getState();
+    const { character, loadCharacterState, appliedTransferIds } =
+      store.getState();
     if (incomingCharacter.id !== character.id) return;
     if (!isStrictlyFresher(incomingCharacter, character)) return;
 
     loadCharacterState(incomingCharacter);
-    // `recordAppliedTransfer` alone never bumps the character's revision (it
-    // doesn't touch `character`), so a write it triggers on its own would
-    // fail the `isStrictlyFresher` gate above and never reach here — but in
-    // practice it's always immediately followed, in the same tick, by the
-    // CANONICAL item-add action for the same transfer, which does bump the
-    // revision. That second write's envelope already reflects the ledger
-    // update, so this branch (reached via the item-add's fresher character)
-    // is where a follower's local ledger actually converges.
+    // NOTE on when this branch actually carries a ledger update: recording
+    // a transfer (`recordAppliedTransfer`) never bumps the character's
+    // revision by itself — it doesn't touch `character` — so a write it
+    // triggers alone fails the `isStrictlyFresher` gate above and never
+    // reaches here. What DOES land here is whichever CANONICAL action for
+    // the SAME transfer runs alongside it and bumps the revision: the
+    // item-add (addInventoryItem/addMagicItem), which now runs BEFORE the
+    // ledger record, so its own envelope is one write too early to carry
+    // it; or, for a transfer with a cost, the LATER updateCurrency write,
+    // whose envelope reflects everything accumulated in the leader's store
+    // by that point, including the ledger update. A zero-cost gift/loot
+    // transfer has no such later write in its own batch, so a follower
+    // does not converge its ledger until some UNRELATED later mutation
+    // happens to bump the revision again — harmless in practice (the
+    // transfer typically clears the live queue via its own acknowledge
+    // long before that matters), but worth knowing if this ever needs to
+    // be tightened.
+    //
+    // Merge, never replace: `appliedTransferIds` is a real ledger now (not
+    // just a monotonically-advancing map like intentWatermarks) —
+    // `clearAppliedTransfer` actually removes entries, so replacing wholesale
+    // could drop an id THIS tab still needs (its own stale `pending` batch
+    // still holds that transfer) with one the incoming write simply hadn't
+    // recorded yet (e.g. the leader is behind, or already cleared it after
+    // its own successful acknowledge). Over-retaining an id costs nothing;
+    // under-retaining re-applies (and, with a cost attached, re-charges) it.
     store.setState({
       intentWatermarks: incomingWatermarks,
-      appliedTransferIds: incomingAppliedTransferIds,
+      appliedTransferIds: mergeAppliedTransferIds(
+        incomingAppliedTransferIds,
+        appliedTransferIds
+      ),
     });
   };
 

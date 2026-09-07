@@ -553,7 +553,7 @@ describe('useSharedCampaignState', () => {
     expect(result.current.sharedState!.transfers).toHaveLength(0);
   });
 
-  it('acknowledgeTransfers(id) sends the transferId and removes only that transfer locally', async () => {
+  it('acknowledgeTransfers(id) sends transferIds as a one-element array and removes only that transfer locally', async () => {
     const state = makeSharedState({
       transfers: [makeTransfer('t-1'), makeTransfer('t-2')],
     });
@@ -585,7 +585,7 @@ describe('useSharedCampaignState', () => {
     expect(JSON.parse(deleteCall![1].body as string)).toMatchObject({
       playerId: 'player-1',
       type: 'transfers',
-      transferId: 't-1',
+      transferIds: ['t-1'],
     });
 
     // t-2 was never acknowledged and must survive — a no-id ack would have
@@ -595,7 +595,53 @@ describe('useSharedCampaignState', () => {
     ]);
   });
 
-  it('acknowledgeTransfers resolves false (without throwing) when the request fails', async () => {
+  it('acknowledgeTransfers([ids]) sends the whole batch in ONE request and removes every matching transfer locally', async () => {
+    const state = makeSharedState({
+      transfers: [
+        makeTransfer('t-1'),
+        makeTransfer('t-2'),
+        makeTransfer('t-3'),
+      ],
+    });
+
+    mockFetchSequence([
+      { status: 200, body: state },
+      { status: 200, body: {} },
+    ]);
+
+    const { result } = renderHook(() =>
+      useSharedCampaignState('CAMP01', 'player-1')
+    );
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    const callsBefore = vi.mocked(globalThis.fetch).mock.calls.length;
+
+    let resolved: boolean | undefined;
+    await act(async () => {
+      resolved = await result.current.acknowledgeTransfers(['t-1', 't-3']);
+    });
+
+    expect(resolved).toBe(true);
+    // Exactly one DELETE request for the whole batch — never one per id.
+    expect(vi.mocked(globalThis.fetch).mock.calls.length).toBe(callsBefore + 1);
+
+    const calls = vi.mocked(globalThis.fetch).mock.calls as unknown as [
+      string,
+      RequestInit,
+    ][];
+    const deleteCall = calls[calls.length - 1];
+    expect(JSON.parse(deleteCall[1].body as string)).toMatchObject({
+      playerId: 'player-1',
+      type: 'transfers',
+      transferIds: ['t-1', 't-3'],
+    });
+
+    expect(result.current.sharedState!.transfers.map(t => t.id)).toEqual([
+      't-2',
+    ]);
+  });
+
+  it('acknowledgeTransfers resolves false (without throwing) when the request fails outright (network error)', async () => {
     const state = makeSharedState({ transfers: [makeTransfer('t-1')] });
 
     mockFetchSequence([{ status: 200, body: state }]);
@@ -618,6 +664,44 @@ describe('useSharedCampaignState', () => {
     // Nothing was actually acknowledged — local state is untouched.
     expect(result.current.sharedState!.transfers).toHaveLength(1);
   });
+
+  it(
+    'CRITICAL FIX: resolves false (does not clear local state) on an HTTP ' +
+      'error response, not just a network failure — fetch only rejects on ' +
+      'the latter, and a 403/400/500 must not be reported as acknowledged',
+    async () => {
+      const state = makeSharedState({ transfers: [makeTransfer('t-1')] });
+
+      mockFetchSequence([{ status: 200, body: state }]);
+
+      const { result } = renderHook(() =>
+        useSharedCampaignState('CAMP01', 'player-1')
+      );
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // A guest-binding rejection, a validation failure, or a server error —
+      // `fetch` resolves normally for all of these; only `res.ok` tells them
+      // apart from success.
+      global.fetch = vi.fn(() =>
+        Promise.resolve({
+          ok: false,
+          status: 403,
+          json: () => Promise.resolve({ error: 'Forbidden' }),
+        })
+      ) as unknown as typeof global.fetch;
+
+      let resolved: boolean | undefined;
+      await act(async () => {
+        resolved = await result.current.acknowledgeTransfers('t-1');
+      });
+
+      expect(resolved).toBe(false);
+      // The server never actually acknowledged this transfer — local state
+      // (and, via the hook's return value, the caller's dedup ledger) must
+      // not be told otherwise.
+      expect(result.current.sharedState!.transfers).toHaveLength(1);
+    }
+  );
 
   // -----------------------------------------------------------------------
   // Polling interval

@@ -580,20 +580,36 @@ export async function DELETE(
     }
 
     if (type === 'transfers') {
-      const { transferId } = body;
-      if (!transferId) {
+      const { transferId, transferIds } = body;
+      // Batch form: one read-filter-write acknowledging every id in a
+      // single request. Required for correctness, not just efficiency — a
+      // client that instead issued one DELETE per id concurrently would
+      // race N `get` → filter → `set` round trips against this same
+      // non-atomic read-modify-write, and the last writer would silently
+      // undo every other request's removal (see `ackXpAward` in
+      // xpAwardQueue.ts, which needs `LREM`'s atomicity for the identical
+      // reason on a different queue).
+      const ids: string[] = Array.isArray(transferIds)
+        ? transferIds.filter((id): id is string => typeof id === 'string')
+        : typeof transferId === 'string'
+          ? [transferId]
+          : [];
+
+      if (ids.length === 0) {
         await redis.del(campaignTransfersKey(code, playerId));
         return NextResponse.json({ success: true });
       }
+
       const key = campaignTransfersKey(code, playerId);
       const raw = await redis.get<string>(key);
       if (raw) {
         const transfers: ItemTransfer[] =
           typeof raw === 'string' ? JSON.parse(raw) : raw;
-        const filtered = transfers.filter(t => t.id !== transferId);
+        const idSet = new Set(ids);
+        const filtered = transfers.filter(t => !idSet.has(t.id));
         if (filtered.length === 0) {
           await redis.del(key);
-        } else {
+        } else if (filtered.length !== transfers.length) {
           await redis.set(key, JSON.stringify(filtered), {
             ex: SLIDING_TTL_SECONDS,
           });

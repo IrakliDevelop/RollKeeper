@@ -20,17 +20,26 @@ interface UseSharedCampaignStateResult {
   acknowledgeMessage: (messageId: string) => Promise<void>;
   acknowledgeDmEffects: () => Promise<void>;
   /**
-   * Acknowledges one transfer by id, or — with no argument — the entire
-   * queue. Prefer passing the id of exactly what was applied: a
-   * no-argument call DELETEs the whole Redis key, destroying any transfer
-   * enqueued between the client's last poll and this call before it's ever
-   * applied (harmless for a gift, a silently lost purchase for one that
-   * carries `costCopper`). Resolves `true` iff the request completed
-   * without throwing (network failure) — unlike the other acknowledge
-   * helpers, callers use this to decide whether it's safe to forget local
-   * dedup state for that id (see `useItemTransferAutoMerge`).
+   * Acknowledges one or more transfers by id in a SINGLE request, or — with
+   * no argument — the entire queue. Always pass exactly the ids that were
+   * applied, as a batch when there's more than one: this route does a
+   * non-atomic read-filter-write, so N separate concurrent calls (one per
+   * id) race each other and the last writer silently undoes every other
+   * call's removal — the batch form does one read-filter-write for the
+   * whole set instead. A no-argument call DELETEs the whole Redis key,
+   * destroying any transfer enqueued between the client's last poll and
+   * this call before it's ever applied (harmless for a gift, a silently
+   * lost purchase for one that carries `costCopper`).
+   *
+   * Resolves `true` iff the server actually confirmed the acknowledge (a
+   * non-2xx response resolves `false`, same as a network failure) — unlike
+   * the other acknowledge helpers, the caller uses this to decide whether
+   * it's safe to forget local dedup state for these ids (see
+   * `useItemTransferAutoMerge`); a false positive here would let the ledger
+   * forget a transfer the server still holds, re-applying (and, for a
+   * purchase, re-charging) it on the next reload.
    */
-  acknowledgeTransfers: (transferId?: string) => Promise<boolean>;
+  acknowledgeTransfers: (transferIds?: string | string[]) => Promise<boolean>;
   /**
    * Acknowledge one XP award by receipt. THROWS on failure (unlike the other
    * acknowledge helpers) — the award processor must stop, not continue.
@@ -253,10 +262,15 @@ export function useSharedCampaignState(
   }, [campaignCode, playerId]);
 
   const acknowledgeTransfers = useCallback(
-    async (transferId?: string): Promise<boolean> => {
+    async (transferIds?: string | string[]): Promise<boolean> => {
       if (!campaignCode || !playerId) return false;
+      const ids = Array.isArray(transferIds)
+        ? transferIds
+        : transferIds
+          ? [transferIds]
+          : undefined;
       try {
-        await fetch(`/api/campaign/${campaignCode}/shared`, {
+        const res = await fetch(`/api/campaign/${campaignCode}/shared`, {
           method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
@@ -265,15 +279,20 @@ export function useSharedCampaignState(
           body: JSON.stringify({
             playerId,
             type: 'transfers',
-            ...(transferId ? { transferId } : {}),
+            ...(ids && ids.length > 0 ? { transferIds: ids } : {}),
           }),
         });
+        // `fetch` only rejects on network failure — a 403 (guest binding),
+        // 400, or 500 resolves normally and would otherwise report success
+        // on an acknowledge the server never actually performed, letting
+        // the caller forget dedup state for a transfer Redis still holds.
+        if (!res.ok) return false;
         setSharedState(prev => {
           if (!prev) return prev;
           return {
             ...prev,
-            transfers: transferId
-              ? prev.transfers.filter(t => t.id !== transferId)
+            transfers: ids
+              ? prev.transfers.filter(t => !ids.includes(t.id))
               : [],
           };
         });

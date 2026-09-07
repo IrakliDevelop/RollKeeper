@@ -83,10 +83,14 @@ describe('cross-tab character envelope sync', () => {
       // This is what closes the gap a reclassified-to-CANONICAL
       // `recordAppliedTransfer` leaves open on its own: a follower tab's
       // own reactive `appliedTransferIds` never updates just because the
-      // leader executed the forwarded intent — it converges here, via the
-      // SAME storage event the leader's paired item-add mutation fires
-      // (recordAppliedTransfer alone never bumps the revision, so a write
-      // it triggers by itself wouldn't reach this listener at all).
+      // leader executed the forwarded intent — it converges here.
+      // `recordAppliedTransfer` alone never bumps the character's revision
+      // (it doesn't touch `character`), so a write it triggers by itself
+      // never reaches this listener at all; what actually carries it here
+      // is whichever CANONICAL action for the same transfer bumps the
+      // revision alongside it (a later `updateCurrency`, for a transfer
+      // with a cost — see the implementation comment for why the item-add
+      // itself is one write too early).
       fireEnvelopeEvent(baseCharacter(6, { name: 'newer' }), {}, [
         'transfer-1',
         'transfer-2',
@@ -97,11 +101,19 @@ describe('cross-tab character envelope sync', () => {
       ]);
     });
 
-    it('replaces (not merges) the local ledger with the incoming one, matching intentWatermarks', () => {
-      useCharacterStore.setState({ appliedTransferIds: ['stale-local-only'] });
+    it('merges the incoming ledger into the local one instead of replacing it (unlike intentWatermarks)', () => {
+      // `appliedTransferIds` is a real ledger with actual removals now
+      // (`clearAppliedTransfer`), not a monotonically-advancing map — a
+      // wholesale replace could drop an id THIS tab still needs (its own
+      // stale `pending` batch still holds that transfer) just because the
+      // incoming write is behind or already cleared it. Over-retaining an
+      // id is always safe; under-retaining re-applies (and, with a cost
+      // attached, re-charges) it.
+      useCharacterStore.setState({ appliedTransferIds: ['local-only'] });
       fireEnvelopeEvent(baseCharacter(6), {}, ['transfer-1']);
       expect(useCharacterStore.getState().appliedTransferIds).toEqual([
         'transfer-1',
+        'local-only',
       ]);
     });
 
@@ -113,10 +125,16 @@ describe('cross-tab character envelope sync', () => {
       ]);
     });
 
-    it('defaults to an empty ledger when the incoming envelope has no appliedTransferIds key (backward compatibility)', () => {
+    it('preserves the local ledger when the incoming envelope has no appliedTransferIds key (backward compatibility)', () => {
+      // An old envelope with no key defaults to an empty list on the
+      // incoming side (`?? []`); merged with the local ledger, that's a
+      // no-op, not a wipe — the pre-merge "replace" behavior would have
+      // dropped 'transfer-1' here even though nothing said to forget it.
       useCharacterStore.setState({ appliedTransferIds: ['transfer-1'] });
       fireEnvelopeEvent(baseCharacter(6, { name: 'newer' }));
-      expect(useCharacterStore.getState().appliedTransferIds).toEqual([]);
+      expect(useCharacterStore.getState().appliedTransferIds).toEqual([
+        'transfer-1',
+      ]);
     });
   });
 });
