@@ -7,7 +7,11 @@ const CAMPAIGN = 'test-campaign';
 describe('npcStore (campaign-scoped)', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   describe('createNPC', () => {
@@ -313,7 +317,11 @@ function createNPCWithSpellcasting(campaignCode: string) {
 
 describe('npcStore — reorderNPCsSubset', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('moves an NPC from one position to another within the subset', () => {
@@ -369,7 +377,11 @@ describe('npcStore — reorderNPCsSubset', () => {
 
 describe('npcStore — updateDeathSaves', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('sets death saves on the target NPC', () => {
@@ -413,7 +425,11 @@ describe('npcStore — updateDeathSaves', () => {
 
 describe('npcStore — spell management', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   describe('addSpellToNPC', () => {
@@ -497,7 +513,11 @@ describe('npcStore — spell management', () => {
 
 describe('npcStore — setNPCSpellSlotUsed', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('sets used slots for the given level', () => {
@@ -532,7 +552,11 @@ describe('npcStore — setNPCSpellSlotUsed', () => {
 
 describe('npcStore — useNPCFreeCast', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('increments freeCastsUsed on the target spell', () => {
@@ -560,7 +584,11 @@ describe('npcStore — useNPCFreeCast', () => {
 
 describe('npcStore — longRestNPC', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('restores HP to max and clears tempHp and deathSaves', () => {
@@ -787,7 +815,11 @@ function createNpcWithResources(resources: NpcResource[]): string {
 
 describe('npcStore — class resources', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   describe('spendNpcResource', () => {
@@ -974,7 +1006,11 @@ function createAbilityNpc(): string {
 describe('npc inventory costs', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('atomically consumes inventory for an unlimited action', () => {
@@ -1009,7 +1045,11 @@ describe('npc inventory costs', () => {
 
 describe('npcStore — entry id enforcement', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('returns a migrated copy instead of mutating persisted NPC state', () => {
@@ -1126,7 +1166,11 @@ describe('npcStore — entry id enforcement', () => {
 
 describe('npcStore — useNpcAbility / restoreNpcAbility', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('increments abilityUsage and returns true; at max returns false without mutation', () => {
@@ -1246,7 +1290,11 @@ describe('npcStore — useNpcAbility / restoreNpcAbility', () => {
 describe('npcStore — merchant shop fields', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('an NPC persisted without shop/forSale round-trips unchanged', () => {
@@ -1318,7 +1366,11 @@ describe('npcStore — merchant shop fields', () => {
 describe('npcStore — recordAppliedShopSale (Task 12 idempotency ledger)', () => {
   beforeEach(() => {
     localStorage.clear();
-    useNPCStore.setState({ npcsByCampaign: {}, appliedShopSaleIds: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('starts empty for an unknown npc', () => {
@@ -1393,7 +1445,11 @@ describe('npcStore — recordAppliedShopSale (Task 12 idempotency ledger)', () =
 
 describe('npcStore — rests reset ability usage', () => {
   beforeEach(() => {
-    useNPCStore.setState({ npcsByCampaign: {} });
+    useNPCStore.setState({
+      npcsByCampaign: {},
+      appliedShopSaleIds: {},
+      shopSalesLogByNpc: {},
+    });
   });
 
   it('long rest clears all usage; short rest clears only short-rest entries', () => {
