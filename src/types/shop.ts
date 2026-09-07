@@ -9,6 +9,12 @@ import type { InventoryItem, MagicItem } from './character';
 export interface PublicShop {
   npcId: string;
   merchantName: string;
+  /** One-line flavour text shown under the merchant's name (artboard 1b,
+   *  e.g. "Ironmonger of the Low Market"), picked from `CampaignNPC.description`
+   *  at publish time. Intended to be player-visible — not a leak — but it
+   *  still goes through the same explicit field pick as every other public
+   *  field rather than a loose, unsourced prop (controller ruling R15). */
+  merchantDescription?: string;
   /** Encounter entity ids for this NPC's token(s), resolved DM-side at
    *  publish time so a player's token tap can find the shop without
    *  learning anything about NPC internals. */

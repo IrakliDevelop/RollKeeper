@@ -83,6 +83,9 @@ export function buildPublicShop(
   return {
     npcId: npc.id,
     merchantName: npc.name,
+    ...(npc.description !== undefined
+      ? { merchantDescription: npc.description }
+      : {}),
     entityIds,
     items,
   };
@@ -233,6 +236,9 @@ export function overlayLiveShopStock(
   return {
     npcId: shop.npcId,
     merchantName: shop.merchantName,
+    ...(shop.merchantDescription !== undefined
+      ? { merchantDescription: shop.merchantDescription }
+      : {}),
     entityIds: [...shop.entityIds],
     items,
   };
@@ -282,6 +288,9 @@ export function sanitizePublicShop(value: unknown): PublicShop | null {
     typeof shop.merchantName !== 'string' ||
     shop.merchantName.length === 0 ||
     shop.merchantName.length > 300 ||
+    (shop.merchantDescription !== undefined &&
+      (typeof shop.merchantDescription !== 'string' ||
+        shop.merchantDescription.length > 300)) ||
     !Array.isArray(shop.entityIds) ||
     shop.entityIds.length > MAX_ENTITY_IDS ||
     !shop.entityIds.every(
@@ -301,6 +310,9 @@ export function sanitizePublicShop(value: unknown): PublicShop | null {
   return {
     npcId: shop.npcId,
     merchantName: shop.merchantName,
+    ...(shop.merchantDescription !== undefined
+      ? { merchantDescription: shop.merchantDescription as string }
+      : {}),
     entityIds: [...(shop.entityIds as string[])],
     items: items.map(item => ({
       id: item.id,

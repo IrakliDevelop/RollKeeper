@@ -57,6 +57,12 @@ import {
 } from './fog/fogAppearancePoll';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
+import {
+  isShopToken,
+  useMerchantShopActivation,
+} from './useMerchantShopActivation';
+import { PlayerShopDialog } from '@/components/ui/campaign/player-shop';
+import type { Currency } from '@/types/character';
 import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
 import MarkerDetailPanel from './MarkerDetailPanel';
@@ -450,12 +456,28 @@ export function PlayerBattleMapCanvas({
   // registration and single-tap activation are connection-independent (spec
   // §7.2) — players can open a marker's read-only panel with no relay URL
   // configured.
+  // Merchant token → shop dialog (Task 11): shares this SAME registration's
+  // `setActivation` slot via `isExtraActivatable`/`onActivateExtra` rather
+  // than a second, independent `useMarkerRegistration`-shaped call — see
+  // that hook's doc comment on why a second call would silently replace
+  // this one instead of adding a recognized element kind.
+  const {
+    openShop,
+    handleActivate: handleShopTokenActivate,
+    closeShop,
+  } = useMerchantShopActivation(campaignCode);
+
   useMarkerRegistration({
     viewport,
     gesture: 'single',
     markerDetails: publishedMarkers,
     onActivateMarker: handleMarkerActivate,
+    isExtraActivatable: isShopToken,
+    onActivateExtra: handleShopTokenActivate,
   });
+
+  const ownCharacterCurrency: Currency | null =
+    character && character.id === characterId ? character.currency : null;
 
   const activeMarkerElement =
     activeMarkerElementId !== null
@@ -803,6 +825,23 @@ export function PlayerBattleMapCanvas({
             state={markerPanelState}
             onClose={handleCloseMarkerPanel}
             onClaimLoot={handleClaimLoot}
+          />
+        )}
+        {/* Mounted only once a merchant token's tap has been confirmed
+            (Task 11) against the live shop projection — see
+            `useMerchantShopActivation`. `ownCharacterCurrency` guards
+            against opening before this route's own character has loaded. */}
+        {openShop && ownCharacterCurrency && (
+          <PlayerShopDialog
+            open
+            onOpenChange={open => {
+              if (!open) closeShop();
+            }}
+            campaignCode={campaignCode}
+            npcId={openShop.npcId}
+            playerId={characterId}
+            merchantDescription={openShop.merchantDescription}
+            purse={ownCharacterCurrency}
           />
         )}
         {viewport && children}

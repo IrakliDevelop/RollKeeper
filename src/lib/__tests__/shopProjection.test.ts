@@ -3,10 +3,11 @@ import { describe, it, expect } from 'vitest';
 import {
   buildPublicShop,
   buildShopLedger,
+  overlayLiveShopStock,
   sanitizePublicShop,
 } from '@/lib/shopProjection';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
-import type { PublicShop, PublicShopItem } from '@/types/shop';
+import type { PublicShop, PublicShopItem, ShopLedgerEntry } from '@/types/shop';
 import type { MagicItem } from '@/types/character';
 
 function makeNpc(overrides: Partial<CampaignNPC> = {}): CampaignNPC {
@@ -99,6 +100,21 @@ describe('buildPublicShop', () => {
     const npc = makeNpc({ inventory: [] });
     const shop = buildPublicShop(npc, ['e1', 'e2']);
     expect(shop!.entityIds).toEqual(['e1', 'e2']);
+  });
+
+  it('picks merchantDescription from npc.description (controller ruling R15)', () => {
+    const npc = makeNpc({
+      description: 'Ironmonger of the Low Market',
+      inventory: [],
+    });
+    const shop = buildPublicShop(npc, []);
+    expect(shop!.merchantDescription).toBe('Ironmonger of the Low Market');
+  });
+
+  it('omits merchantDescription entirely when the NPC has none, rather than an empty string', () => {
+    const npc = makeNpc({ description: undefined, inventory: [] });
+    const shop = buildPublicShop(npc, []);
+    expect('merchantDescription' in shop!).toBe(false);
   });
 
   it('security: a row carrying a full magicItem projects no item key and no DM-only field', () => {
@@ -297,5 +313,81 @@ describe('sanitizePublicShop', () => {
     // permissive validator upstream could not smuggle `item` through.
     const result = sanitizePublicShop(valid);
     expect(result!.items[0]).not.toHaveProperty('item');
+  });
+
+  it('accepts and re-projects merchantDescription field-by-field', () => {
+    const withDescription = {
+      ...valid,
+      merchantDescription: 'Ironmonger of the Low Market',
+    };
+    expect(sanitizePublicShop(withDescription)).toEqual(withDescription);
+  });
+
+  it('omits merchantDescription when absent, rather than inventing one', () => {
+    expect(sanitizePublicShop(valid)).not.toHaveProperty('merchantDescription');
+  });
+
+  it('rejects a non-string or over-long merchantDescription', () => {
+    expect(
+      sanitizePublicShop({ ...valid, merchantDescription: 42 })
+    ).toBeNull();
+    expect(
+      sanitizePublicShop({ ...valid, merchantDescription: 'x'.repeat(301) })
+    ).toBeNull();
+  });
+});
+
+describe('overlayLiveShopStock', () => {
+  const shop: PublicShop = {
+    npcId: 'npc-1',
+    merchantName: 'Merchant Mo',
+    merchantDescription: 'Ironmonger of the Low Market',
+    entityIds: ['entity-1'],
+    items: [
+      {
+        id: 'item-1',
+        name: 'Rope',
+        itemKind: 'inventory',
+        priceCopper: 100,
+        remainingQuantity: 5,
+      },
+    ],
+  };
+
+  function ledgerEntryFor(
+    item: PublicShopItem,
+    remainingQuantity: number
+  ): ShopLedgerEntry {
+    return {
+      ...item,
+      remainingQuantity,
+      soldQuantity: item.remainingQuantity - remainingQuantity,
+      item: {
+        id: item.id,
+        name: item.name,
+        category: 'misc',
+        quantity: remainingQuantity,
+        tags: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-01T00:00:00.000Z',
+      },
+    };
+  }
+
+  it('preserves merchantDescription while overlaying live stock', () => {
+    const overlaid = overlayLiveShopStock(shop, [
+      ledgerEntryFor(shop.items[0], 3),
+    ]);
+    expect(overlaid.merchantDescription).toBe('Ironmonger of the Low Market');
+    expect(overlaid.items[0].remainingQuantity).toBe(3);
+  });
+
+  it('omits merchantDescription when the projection has none', () => {
+    const { merchantDescription: _unused, ...noDescription } = shop;
+    void _unused;
+    const overlaid = overlayLiveShopStock(noDescription, [
+      ledgerEntryFor(shop.items[0], 5),
+    ]);
+    expect('merchantDescription' in overlaid).toBe(false);
   });
 });
