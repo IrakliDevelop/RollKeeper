@@ -4,7 +4,9 @@ import { isBrowserCharacterCutoverParticipant } from '@/lib/indexeddb/characterC
 import { TAB_ID } from '@/lib/tabIdentity';
 import {
   armCanonicalPersistence,
+  capAppliedTransferIds,
   createPerCharacterStorage,
+  mergeAppliedTransferIds,
   mergeWatermarks,
   type IntentWatermark,
 } from '@/lib/characterCanonicalStorage';
@@ -433,6 +435,14 @@ interface CharacterStore {
   intentWatermarks: Record<string, IntentWatermark>;
   /** Watermark advance for intents whose action never called set. */
   noteIntentApplied: (tabId: string, seq: number) => void;
+  /** Ids of item transfers already merged into inventory, oldest first —
+   * persisted alongside the character so a failed/never-sent
+   * `acknowledgeTransfers()` DELETE can't cause the transfer to re-apply on
+   * the next mount. Capped at `APPLIED_TRANSFER_IDS_MAX`, FIFO eviction. */
+  appliedTransferIds: string[];
+  /** Records a transfer id as applied. Idempotent — recording an id already
+   * present is a no-op (order-preserving, does not re-bump it to "newest"). */
+  recordAppliedTransfer: (transferId: string) => void;
   showDeathAnimation: boolean;
   showLevelUpAnimation: boolean;
   levelUpAnimationLevel: number;
@@ -960,6 +970,7 @@ export const useCharacterStore = create<CharacterStore>()(
         hasUnsavedChanges: false,
         hasHydrated: false,
         intentWatermarks: {},
+        appliedTransferIds: [],
         showDeathAnimation: false,
         showLevelUpAnimation: false,
         levelUpAnimationLevel: 1,
@@ -5449,6 +5460,18 @@ export const useCharacterStore = create<CharacterStore>()(
               seq,
             }),
           })),
+
+        recordAppliedTransfer: transferId =>
+          set(state =>
+            state.appliedTransferIds.includes(transferId)
+              ? {}
+              : {
+                  appliedTransferIds: capAppliedTransferIds([
+                    ...state.appliedTransferIds,
+                    transferId,
+                  ]),
+                }
+          ),
       }))
     ),
     {
@@ -5459,6 +5482,7 @@ export const useCharacterStore = create<CharacterStore>()(
         character: state.character,
         lastSaved: state.lastSaved,
         intentWatermarks: state.intentWatermarks,
+        appliedTransferIds: state.appliedTransferIds,
       }),
       // No onRehydrateStorage: the adapter's getItem returns null, the
       // store boots empty, and hydration happens through the explicit
@@ -5511,6 +5535,10 @@ function onPromotedToLeader(characterId: string): void {
       intentWatermarks: mergeWatermarks(
         envelope.intentWatermarks,
         current.intentWatermarks
+      ),
+      appliedTransferIds: mergeAppliedTransferIds(
+        envelope.appliedTransferIds,
+        current.appliedTransferIds
       ),
     }));
   }

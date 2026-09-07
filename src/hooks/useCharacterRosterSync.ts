@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import {
+  mergeAppliedTransferIds,
   mergeWatermarks,
   pickFresherCharacter,
   readCharacterEnvelope,
@@ -109,6 +110,14 @@ export function useCharacterRosterSync({
               intentWatermarks: mergeWatermarks(
                 envelope.intentWatermarks,
                 current.intentWatermarks
+              ),
+              // Same reasoning as watermarks above: adopt the envelope's
+              // applied-transfer ledger even when the roster entry wins
+              // freshness arbitration, so a transfer already merged before
+              // this mount is never re-applied on the next poll.
+              appliedTransferIds: mergeAppliedTransferIds(
+                envelope.appliedTransferIds,
+                current.appliedTransferIds
               ),
             }));
           }

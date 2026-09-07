@@ -216,6 +216,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   clearDeathAnimation: 'LOCAL_UI',
   clearLevelUpAnimation: 'LOCAL_UI',
   noteIntentApplied: 'LOCAL_UI',
+  recordAppliedTransfer: 'LOCAL_UI',
   triggerDeathAnimation: 'LOCAL_UI',
   triggerLevelUpAnimation: 'LOCAL_UI',
   // — queries —

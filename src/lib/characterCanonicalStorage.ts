@@ -13,9 +13,23 @@ export interface IntentWatermark {
   lastSeen: number;
 }
 
+/** Cap on `appliedTransferIds` (dedup ledger for auto-merged item
+ * transfers). The server-side transfer queue is drained and deleted on a
+ * successful acknowledge, so this only needs to outlive the in-flight
+ * window between "applied locally" and "acknowledge confirmed" — not the
+ * campaign. 50 is generous headroom above any plausible burst of pending
+ * transfers (items are sent one at a time) while keeping the persisted
+ * envelope tiny (id strings only). */
+export const APPLIED_TRANSFER_IDS_MAX = 50;
+
 export interface CharacterEnvelope {
   character: CharacterState;
   intentWatermarks: Record<string, IntentWatermark>;
+  /** Ids of item transfers already applied to inventory, oldest first —
+   * persisted so a failed/never-sent `acknowledgeTransfers()` DELETE can't
+   * cause the transfer to re-apply on the next mount (the in-memory ref it
+   * replaces was reset on every remount). Capped, FIFO eviction. */
+  appliedTransferIds: string[];
 }
 
 export const characterEnvelopeKey = (characterId: string): string =>
@@ -34,6 +48,7 @@ interface PersistedShape {
   state?: {
     character?: CharacterState;
     intentWatermarks?: Record<string, IntentWatermark>;
+    appliedTransferIds?: string[];
   };
   version?: number;
 }
@@ -47,6 +62,9 @@ function parseEnvelope(raw: string | null): CharacterEnvelope | null {
     return {
       character,
       intentWatermarks: parsed?.state?.intentWatermarks ?? {},
+      // `?? []` guards a character persisted before this field existed —
+      // it must load as an empty ledger, not throw on a missing key.
+      appliedTransferIds: parsed?.state?.appliedTransferIds ?? [],
     };
   } catch {
     return null;
@@ -93,6 +111,31 @@ export function mergeWatermarks(
       : envMark;
   }
   return merged;
+}
+
+/** Caps an applied-transfer-id ledger to `APPLIED_TRANSFER_IDS_MAX`,
+ * evicting the oldest (front of the array) first. Pure — shared by the
+ * store action and the merge below. */
+export function capAppliedTransferIds(ids: string[]): string[] {
+  return ids.length > APPLIED_TRANSFER_IDS_MAX
+    ? ids.slice(ids.length - APPLIED_TRANSFER_IDS_MAX)
+    : ids;
+}
+
+/** Merges the envelope's applied-transfer-id ledger with the in-memory one
+ * on load, envelope-first (it reflects everything acknowledged/applied
+ * before this mount): union, preserving relative order, deduplicated, then
+ * capped. Mirrors `mergeWatermarks`'s envelope-dominant, never-regress
+ * shape for the flat-list case. */
+export function mergeAppliedTransferIds(
+  envelopeIds: string[],
+  currentIds: string[]
+): string[] {
+  const merged = [...envelopeIds];
+  for (const id of currentIds) {
+    if (!merged.includes(id)) merged.push(id);
+  }
+  return capAppliedTransferIds(merged);
 }
 
 /** Load-time arbitration between the canonical envelope and the roster

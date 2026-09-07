@@ -34,6 +34,7 @@ import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
 import { useHydration } from '@/hooks/useHydration';
 import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
+import { useItemTransferAutoMerge } from '@/hooks/useItemTransferAutoMerge';
 import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
 import {
   calculateModifier,
@@ -49,7 +50,6 @@ import {
   Spell,
   SpellSlots,
   InventoryItem,
-  MagicItem,
 } from '@/types/character';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
@@ -237,6 +237,8 @@ export default function CharacterSheet() {
     addInventoryItem,
     addMagicItem,
     deleteInventoryItem,
+    appliedTransferIds,
+    recordAppliedTransfer,
   } = useCharacterStore();
 
   // Derive campaign days from local calendar (may be overridden by shared state below)
@@ -368,57 +370,19 @@ export default function CharacterSheet() {
     }
   }, [sharedState?.messages, addNote]);
 
-  // Auto-merge incoming item transfers into inventory
-  const processedTransferIdsRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    const transfers = sharedState?.transfers ?? [];
-    if (transfers.length === 0) return;
-
-    let added = false;
-    for (const transfer of transfers) {
-      if (processedTransferIdsRef.current.has(transfer.id)) continue;
-      processedTransferIdsRef.current.add(transfer.id);
-
-      if (transfer.itemKind === 'magic') {
-        const {
-          id: _id,
-          createdAt: _createdAt,
-          updatedAt: _updatedAt,
-          ...item
-        } = transfer.item as MagicItem;
-        void _id;
-        void _createdAt;
-        void _updatedAt;
-        addMagicItem({ ...item, isAttuned: false, isEquipped: false });
-        added = true;
-        continue;
-      }
-
-      const inventoryItem = transfer.item as InventoryItem;
-      addInventoryItem({
-        name: inventoryItem.name,
-        category: inventoryItem.category || 'misc',
-        quantity: inventoryItem.quantity,
-        description: inventoryItem.description,
-        weight: inventoryItem.weight,
-        value: inventoryItem.value,
-        rarity: inventoryItem.rarity,
-        type: inventoryItem.type,
-        location: inventoryItem.location || 'Backpack',
-        tags: inventoryItem.tags || [],
-      });
-      added = true;
-    }
-
-    if (added) {
-      acknowledgeTransfers();
-    }
-  }, [
-    sharedState?.transfers,
+  // Auto-merge incoming item transfers into inventory. Dedupes against
+  // `appliedTransferIds` (persisted on characterStore) instead of an
+  // in-memory ref — see useItemTransferAutoMerge for why: a ref is reset on
+  // every mount, so a failed/never-sent acknowledgeTransfers() DELETE would
+  // otherwise re-apply every transfer still in the queue on the next load.
+  useItemTransferAutoMerge({
+    transfers: sharedState?.transfers,
+    appliedTransferIds,
+    recordAppliedTransfer,
     addInventoryItem,
     addMagicItem,
     acknowledgeTransfers,
-  ]);
+  });
 
   // Latch DM effects into local state for the notification toast before
   // acknowledgment clears them from shared state.
