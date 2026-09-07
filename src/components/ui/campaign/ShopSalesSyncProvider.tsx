@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 
 import { useDmShopSalesSync } from '@/hooks/useDmShopSalesSync';
+import { useShopSalesDrainLeader } from '@/hooks/useShopSalesDrainLeader';
 import { useDmStore } from '@/store/dmStore';
 import { useNPCStore } from '@/store/npcStore';
 import type { CampaignNPC } from '@/types/encounter';
@@ -37,6 +38,16 @@ const EMPTY_NPCS: CampaignNPC[] = [];
  * `npcIds` is every NPC that currently has a `shop` field at all — not just
  * open ones — mirroring `useDmShopSalesSync`'s own doc comment: a sale made
  * while a shop was open can still be un-drained after the DM closes it.
+ *
+ * Still mounts in EVERY campaign tab — it must, so any tab can take over —
+ * but only the tab holding `useShopSalesDrainLeader`'s lock actually drains
+ * (VTT merchants follow-ups, Task 2). A DM with the dashboard open in one tab
+ * and a battlemap in another would otherwise run two independent drains
+ * against the same Redis log; see `shopSalesDrainLock.ts`'s doc comment for
+ * why that double-applies sales. The leader tab also drains immediately on
+ * `visibilitychange`/`focus`: a backgrounded tab's `setInterval` is throttled
+ * to roughly once a minute, and the leader may well be the one in the
+ * background.
  */
 export function ShopSalesSyncProvider({
   campaignCode,
@@ -53,7 +64,26 @@ export function ShopSalesSyncProvider({
     [npcs]
   );
 
-  useDmShopSalesSync({ campaignCode, dmId, npcIds });
+  const isLeader = useShopSalesDrainLeader(campaignCode);
+  const { drainNow } = useDmShopSalesSync({
+    campaignCode,
+    dmId,
+    npcIds,
+    enabled: isLeader,
+  });
+
+  useEffect(() => {
+    if (!isLeader || npcIds.length === 0) return;
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void drainNow();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    };
+  }, [isLeader, drainNow, npcIds.length]);
 
   return <>{children}</>;
 }
