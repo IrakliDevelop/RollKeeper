@@ -17,9 +17,11 @@ export const NPC_MAX_TOTAL_BYTES = 5_242_880;
 export type NpcPayload = Omit<CampaignNPC, 'id' | 'campaignCode'>;
 
 /**
- * The 34-key document allowlist. `satisfies` makes a field that is renamed
- * or dropped from the payload type a compile error instead of a silent
- * `unclassified-field` rejection at runtime.
+ * The 35-key document allowlist. `satisfies` only checks that each listed
+ * key is a valid `keyof NpcPayload` — it does NOT require the list to be
+ * complete, so adding a new optional `CampaignNPC` field does not fail the
+ * type-check here. Any new field must be added to this list by hand, or
+ * `validateNpcPayload` will reject the entire NPC as `unclassified-field`.
  */
 const NPC_DOCUMENT_FIELDS = [
   'name',
@@ -39,6 +41,7 @@ const NPC_DOCUMENT_FIELDS = [
   'tags',
   'hitDice',
   'deathSaves',
+  'shop',
   'initiativeModifier',
   'proficiencyBonus',
   'inventory',
@@ -254,6 +257,16 @@ function isNullableArmorValue(value: unknown) {
   );
 }
 
+/** Merchant shop state: absent means "not a merchant". */
+function isNullableShop(value: unknown) {
+  return (
+    isAbsent(value) ||
+    (record(value) &&
+      typeof value.open === 'boolean' &&
+      isBoundedString(value.updatedAt, MAX_LABEL_LENGTH))
+  );
+}
+
 /**
  * Every child collection carries the same contract: an array of objects, each
  * with a stable string ID of 1-255 characters that is unique within the array.
@@ -368,6 +381,11 @@ export function validateNpcPayload(value: unknown): NpcPayloadValidation {
     return reject(
       'invalid-npc',
       `NPC tempAc must be a number or a string of at most ${MAX_LABEL_LENGTH} characters`
+    );
+  if (!isNullableShop(value.shop))
+    return reject(
+      'invalid-npc',
+      `NPC shop must be an object with a boolean open and an updatedAt string of at most ${MAX_LABEL_LENGTH} characters`
     );
   if (
     !isNullableNumber(value.currentHp) ||

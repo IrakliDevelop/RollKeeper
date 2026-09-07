@@ -614,8 +614,10 @@ export function NPCDetailDialog({
       if (initialTab) {
         setActiveTab(initialTab);
       } else if (npc?.lastDetailTab && npc.lastDetailTab !== 'shop') {
-        // 'shop' is not yet a valid local DetailTab; falls through to the
-        // default until Task 4 widens this component's tab type.
+        // TEMPORARY: delete the `!== 'shop'` exclusion below once DetailTab
+        // includes 'shop' (Task 4). Widening the type alone will NOT surface
+        // a compile error here, and leaving this clause in silently discards
+        // a DM's saved Shop tab.
         setActiveTab(npc.lastDetailTab);
       } else {
         setActiveTab('stats');
