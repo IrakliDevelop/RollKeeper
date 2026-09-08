@@ -319,9 +319,10 @@ const SWORD_SHIELD_SHOP: PublicShop = {
   ],
 };
 
-describe('PlayerBattleMapCanvas: committed spend survives a dialog close/reopen (final review follow-up)', () => {
+describe('PlayerBattleMapCanvas: committed spend survives a dialog close/reopen and a VTT reload', () => {
   beforeEach(() => {
     mockActiveTool = 'hand';
+    sessionStorage.clear();
     seedOwnCharacter({ gold: 50 }); // 50 gp, nothing else
     vi.spyOn(globalThis, 'fetch').mockImplementation(
       (input: RequestInfo | URL, init?: RequestInit) => {
@@ -345,6 +346,7 @@ describe('PlayerBattleMapCanvas: committed spend survives a dialog close/reopen 
                 grantedQuantity: 1,
                 costCopper: 4000,
                 remainingQuantity: 0,
+                transferIds: ['transfer-sword-1'],
               }),
           } as Response);
         }
@@ -439,5 +441,88 @@ describe('PlayerBattleMapCanvas: committed spend survives a dialog close/reopen 
 
     unmount();
     vp.destroy();
+  });
+
+  // The regression this task exists to close: unlike the close/reopen case
+  // above (where PlayerBattleMapCanvas itself stays mounted), a VTT reload
+  // discards this component entirely — `committedCopper` must be
+  // reconstructed from the `sessionStorage` receipt `useCommittedShopSpend`
+  // wrote at purchase time, not merely from in-memory React state.
+  it('buy, then a fresh mount (the reload case): the committed spend still survives', async () => {
+    stubCanvas();
+    const vp = makeViewport();
+    const activateSpy = vi.spyOn(vp, 'onElementActivate');
+
+    const { unmount } = renderPlayer();
+    fireReady(vp);
+
+    const listener = activateSpy.mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+
+    act(() => {
+      listener({
+        element: combatantTokenElement('entity-1'),
+        world: { x: 0, y: 0 },
+        pointerType: 'mouse',
+        gesture: 'single',
+      });
+    });
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await screen.findByText('Sword');
+
+    const user = (await import('@testing-library/user-event')).default.setup({
+      delay: null,
+    });
+    await user.click(screen.getByRole('button', { name: 'Buy · 40 gp' }));
+    await waitFor(() =>
+      expect(
+        screen.getByText(
+          'Bought. The item will appear on your character shortly.'
+        )
+      ).toBeInTheDocument()
+    );
+
+    // Simulate a VTT reload: this whole component instance goes away (no
+    // dialog close first — a real reload doesn't politely close anything)
+    // and a brand new one takes its place with the SAME characterId.
+    unmount();
+    vp.destroy();
+
+    const vp2 = makeViewport();
+    const activateSpy2 = vi.spyOn(vp2, 'onElementActivate');
+    const { unmount: unmount2 } = renderPlayer();
+    fireReady(vp2);
+
+    const listener2 = activateSpy2.mock.calls[0]?.[0];
+    if (!listener2) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() => {
+      listener2({
+        element: combatantTokenElement('entity-1'),
+        world: { x: 0, y: 0 },
+        pointerType: 'mouse',
+        gesture: 'single',
+      });
+    });
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    await screen.findByText('Sword');
+
+    // The purse itself is still untouched (the debit hook never ran here),
+    // but the Shield must read as unaffordable in this BRAND NEW component
+    // instance — the 40 gp already spent on the Sword survived the reload
+    // via the sessionStorage receipt, not via any in-memory state carried
+    // over from before the unmount (there is none).
+    expect(screen.getByRole('button', { name: 'Buy · 30 gp' })).toBeDisabled();
+    expect(screen.getByText("You're 20 gp short")).toBeInTheDocument();
+
+    unmount2();
+    vp2.destroy();
   });
 });

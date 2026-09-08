@@ -49,10 +49,16 @@ export interface PlayerShopDialogProps {
    * tracks or resets this total itself.
    */
   committedCopper: number;
-  /** Called with a purchase's `costCopper` immediately after it succeeds,
-   *  so the caller can fold it into `committedCopper` for every following
-   *  render — including ones after this dialog has closed and reopened. */
-  onPurchaseCommitted: (costCopper: number) => void;
+  /** Called with a purchase's `costCopper` and enqueued `transferIds`
+   *  immediately after it succeeds, so the caller can fold the cost into
+   *  `committedCopper` for every following render — including ones after
+   *  this dialog has closed and reopened — and reconcile that total against
+   *  the pending transfer queue by id once the queue catches up (see
+   *  `useCommittedShopSpend`). */
+  onPurchaseCommitted: (commit: {
+    costCopper: number;
+    transferIds: string[];
+  }) => void;
 }
 
 export type ShopCardState = 'affordable' | 'unaffordable' | 'sold-out';

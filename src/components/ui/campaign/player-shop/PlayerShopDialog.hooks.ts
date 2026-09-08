@@ -80,6 +80,10 @@ export interface PurchaseOutcome {
   grantedQuantity?: number;
   costCopper?: number;
   remainingQuantity?: number;
+  /** One id per transfer the purchase enqueued (empty on failure, or when
+   *  talking to an older deployment that doesn't send the field yet) — see
+   *  `useCommittedShopSpend`, which reconciles against these ids. */
+  transferIds: string[];
   message: string;
 }
 
@@ -141,10 +145,17 @@ export function usePurchase(
           grantedQuantity?: number;
           costCopper?: number;
           remainingQuantity?: number;
+          // Optional: a response from an older deployment legitimately won't
+          // carry this field yet.
+          transferIds?: string[];
         };
 
         if (!response.ok) {
-          return { ok: false, message: describePurchaseError(data.error) };
+          return {
+            ok: false,
+            transferIds: [],
+            message: describePurchaseError(data.error),
+          };
         }
 
         // Success consumes this intent — the next Buy click on this row (even
@@ -160,10 +171,15 @@ export function usePurchase(
           grantedQuantity: granted,
           costCopper: data.costCopper,
           remainingQuantity: data.remainingQuantity,
+          transferIds: data.transferIds ?? [],
           message,
         };
       } catch {
-        return { ok: false, message: GENERIC_PURCHASE_ERROR_MESSAGE };
+        return {
+          ok: false,
+          transferIds: [],
+          message: GENERIC_PURCHASE_ERROR_MESSAGE,
+        };
       } finally {
         setPurchasingEntryId(null);
       }

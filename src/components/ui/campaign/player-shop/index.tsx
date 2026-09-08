@@ -101,7 +101,10 @@ export function PlayerShopDialog({
       },
     }));
     if (outcome.ok) {
-      onPurchaseCommitted(outcome.costCopper ?? 0);
+      onPurchaseCommitted({
+        costCopper: outcome.costCopper ?? 0,
+        transferIds: outcome.transferIds ?? [],
+      });
       setShop(prevShop =>
         prevShop
           ? {

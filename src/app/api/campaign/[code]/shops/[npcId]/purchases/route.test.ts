@@ -329,7 +329,18 @@ describe('shop purchase route — receipt ownership', () => {
       grantedQuantity: 2,
       costCopper: 200,
       remainingQuantity: 8,
+      transferIds: ['transfer-shop-request-1-0'],
     });
+  });
+
+  it('returns the transfer ids the script enqueued, for client-side reconciliation', async () => {
+    purchaseFromShop.mockResolvedValue(
+      okReceipt({ transferIds: ['transfer-shop-req-1-0'] })
+    );
+    const response = await POST(request(validBody()), params);
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.transferIds).toEqual(['transfer-shop-req-1-0']);
   });
 });
 

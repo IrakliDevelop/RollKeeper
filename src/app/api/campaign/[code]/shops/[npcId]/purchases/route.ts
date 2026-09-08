@@ -291,6 +291,10 @@ export async function POST(
       grantedQuantity: result.receipt.grantedQuantity,
       costCopper: result.receipt.costCopper,
       remainingQuantity: result.receipt.remainingQuantity,
+      // The client needs these ids so the VTT's committed-spend total can be
+      // reconciled against the pending transfer queue after a reload (see
+      // useCommittedShopSpend).
+      transferIds: result.receipt.transferIds,
     });
   } catch (error) {
     console.error('Failed to purchase from shop:', error);

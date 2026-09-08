@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ShopSalesSyncProvider } from '@/components/ui/campaign/ShopSalesSyncProvider';
@@ -13,7 +13,10 @@ interface ShopSalesSyncOptions {
   campaignCode: string;
   dmId: string | null | undefined;
   npcIds: string[];
+  enabled?: boolean;
 }
+
+const drainNowMock = vi.fn<() => void>(() => {});
 
 const useDmShopSalesSyncMock = vi.fn<
   (options: ShopSalesSyncOptions) => {
@@ -24,12 +27,21 @@ const useDmShopSalesSyncMock = vi.fn<
 >(() => ({
   lastDrainedAt: null,
   error: null,
-  drainNow: vi.fn(),
+  drainNow: drainNowMock,
 }));
 
 vi.mock('@/hooks/useDmShopSalesSync', () => ({
   useDmShopSalesSync: (options: ShopSalesSyncOptions) =>
     useDmShopSalesSyncMock(options),
+}));
+
+const useShopSalesDrainLeaderMock = vi.fn<
+  (campaignCode: string | null | undefined) => boolean
+>(() => true);
+
+vi.mock('@/hooks/useShopSalesDrainLeader', () => ({
+  useShopSalesDrainLeader: (campaignCode: string | null | undefined) =>
+    useShopSalesDrainLeaderMock(campaignCode),
 }));
 
 function seedNpc(
@@ -61,6 +73,7 @@ function seedNpc(
 describe('ShopSalesSyncProvider', () => {
   beforeEach(() => {
     useDmStore.setState({ dmId: 'dm-1' });
+    useShopSalesDrainLeaderMock.mockReturnValue(true);
   });
 
   afterEach(() => {
@@ -120,5 +133,53 @@ describe('ShopSalesSyncProvider', () => {
     // A per-NPC mount would call the hook 3 times (once per merchant) and
     // multiply the polling cadence against the same Redis keys.
     expect(useDmShopSalesSyncMock).toHaveBeenCalledTimes(1);
+  });
+
+  function setDocumentVisibility(state: 'visible' | 'hidden') {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: state,
+    });
+    document.dispatchEvent(new Event('visibilitychange'));
+  }
+
+  it('passes enabled: false to useDmShopSalesSync when this tab is not the drain leader', () => {
+    useShopSalesDrainLeaderMock.mockReturnValue(false);
+    seedNpc(CAMPAIGN, 'merchant', { shop: { open: true, updatedAt: NOW } });
+
+    render(
+      <ShopSalesSyncProvider campaignCode={CAMPAIGN}>
+        <p>content</p>
+      </ShopSalesSyncProvider>
+    );
+
+    expect(useDmShopSalesSyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: false })
+    );
+  });
+
+  it('passes enabled: true and drains on visibilitychange only when this tab leads', () => {
+    useShopSalesDrainLeaderMock.mockReturnValue(true);
+    seedNpc(CAMPAIGN, 'merchant', { shop: { open: true, updatedAt: NOW } });
+
+    render(
+      <ShopSalesSyncProvider campaignCode={CAMPAIGN}>
+        <p>content</p>
+      </ShopSalesSyncProvider>
+    );
+
+    expect(useDmShopSalesSyncMock).toHaveBeenCalledWith(
+      expect.objectContaining({ enabled: true })
+    );
+
+    act(() => {
+      setDocumentVisibility('hidden');
+    });
+    expect(drainNowMock).not.toHaveBeenCalled();
+
+    act(() => {
+      setDocumentVisibility('visible');
+    });
+    expect(drainNowMock).toHaveBeenCalledTimes(1);
   });
 });

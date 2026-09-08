@@ -95,6 +95,7 @@ import { applyMovementCommit } from './movementCommit';
 import { attachPathBroadcast, attachRemotePaths } from './pathSync';
 import { characterWalkingSpeed } from './movementSpeed';
 import { useCharacterStore } from '@/store/characterStore';
+import { useCommittedShopSpend } from '@/hooks/useCommittedShopSpend';
 import { attachAwarenessSync } from './awarenessSync';
 import type { AwarenessSyncHandle } from './awarenessSync';
 import { attachConnectionScope } from './connectionScope';
@@ -140,9 +141,15 @@ interface PlayerBattleMapCanvasProps {
    * resolves correctly with no producer wired.
    */
   markers?: PublicMarkerDetail[];
+  /** `sharedState.transfers` — the pending item-transfer queue, already
+   *  scoped to this character server-side. Fed into `useCommittedShopSpend`
+   *  alongside the local purchase receipt so the shop dialog's effective
+   *  purse survives a VTT reload, not just a dialog close/reopen. */
+  pendingTransfers?: { id: string; costCopper?: number }[];
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
+const EMPTY_APPLIED_TRANSFER_IDS: string[] = [];
 
 const PLAYER_TOOLS: {
   name: string;
@@ -294,6 +301,7 @@ export function PlayerBattleMapCanvas({
   tokenInfoToggle,
   onExportError,
   markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
+  pendingTransfers,
 }: PlayerBattleMapCanvasProps) {
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
@@ -480,43 +488,22 @@ export function PlayerBattleMapCanvas({
     character && character.id === characterId ? character.currency : null;
 
   // Purchases committed this VTT visit but not yet debited from
-  // `ownCharacterCurrency` (final review follow-up, "player can commit more
-  // purchases than they can pay for" — the fix that landed inside
-  // `PlayerShopDialog` alone reset on every dialog close, which is exactly
-  // when the bug is easiest to hit: buy a 40gp item, close the dialog,
-  // re-tap the SAME token, and the shop reopens with a fresh
-  // `useSessionSpend` seeing the untouched purse again). Lives HERE, one
-  // level above `{openShop && ... && <PlayerShopDialog .../>}`, because
-  // THIS component — not the dialog — stays mounted across an open/close
-  // cycle; `PlayerShopDialog` now reads it as a prop instead of tracking
-  // its own local total.
-  //
-  // Resets to 0 exactly when it should and never otherwise: the debit hook
-  // (`useItemTransferAutoMerge`) only runs on the character-sheet route, so
-  // `ownCharacterCurrency` never itself changes while this canvas stays
-  // mounted — there is no live event to key a reset off. The canvas
-  // UNMOUNTING (navigating to the sheet, applying the debit, then
-  // returning here later) is what actually invalidates this total, and an
-  // unmount already resets `useState` for free. The `characterId` effect
-  // below is pure defense against a roster-switch re-render reusing this
-  // same component instance for a DIFFERENT character without an
-  // intervening unmount — mirroring the identity guard `ownMovementRef`
-  // above already uses for the same reason.
-  const [committedCopper, setCommittedCopper] = useState(0);
-  const committedCopperCharacterIdRef = useRef(characterId);
-  if (committedCopperCharacterIdRef.current !== characterId) {
-    committedCopperCharacterIdRef.current = characterId;
-    // Safe to call during render (React discards this render and re-runs
-    // with the update applied) — the same "adjust state on a prop change"
-    // pattern React's own docs recommend over an effect for this case,
-    // since an effect would let one stale-character render slip through
-    // first.
-    setCommittedCopper(0);
-  }
-  const handleShopPurchaseCommitted = useCallback((costCopper: number) => {
-    if (!Number.isInteger(costCopper) || costCopper <= 0) return;
-    setCommittedCopper(prev => prev + costCopper);
-  }, []);
+  // `ownCharacterCurrency` — see `useCommittedShopSpend`'s doc comment for
+  // why (queue vs. sessionStorage receipt union) and how it survives both
+  // a dialog close/reopen and a full VTT reload. Guarded by the same
+  // `character.id === characterId` identity check as `ownCharacterCurrency`
+  // above, so a stale `characterStore` (e.g. mid roster-switch) can never
+  // sweep receipts against a different character's ledger.
+  const appliedTransferIdsRaw = useCharacterStore(s => s.appliedTransferIds);
+  const appliedTransferIds =
+    character && character.id === characterId
+      ? appliedTransferIdsRaw
+      : EMPTY_APPLIED_TRANSFER_IDS;
+  const { committedCopper, recordCommit } = useCommittedShopSpend({
+    characterId,
+    pendingTransfers,
+    appliedTransferIds,
+  });
 
   const activeMarkerElement =
     activeMarkerElementId !== null
@@ -885,7 +872,7 @@ export function PlayerBattleMapCanvas({
             initialShop={openShop.shop}
             purse={ownCharacterCurrency}
             committedCopper={committedCopper}
-            onPurchaseCommitted={handleShopPurchaseCommitted}
+            onPurchaseCommitted={recordCommit}
           />
         )}
         {viewport && children}
