@@ -5,8 +5,8 @@ import {
   LayerManager,
   createHtmlElement,
   createShape,
-  FogManager,
 } from '@fieldnotes/core';
+import { FogManager } from '@fieldnotes/vtt';
 import type { CanvasElement, Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
@@ -16,6 +16,21 @@ import { useLocationStore } from '@/store/locationStore';
 import type { LocationMap } from '@/types/location';
 
 const autoSaveClear = vi.hoisted(() => vi.fn(async () => {}));
+
+vi.mock('@/lib/fieldnotesVtt', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/fieldnotesVtt')>()),
+  getViewportFogManager: (viewport: { fog: FogManager }) => viewport.fog,
+  getVttGridController: () => ({
+    add: vi.fn(),
+    remove: vi.fn(),
+    update: vi.fn(),
+    syncContext: vi.fn(),
+  }),
+  setViewportFogStyle: (
+    viewport: { setFogStyle: (options: unknown) => void },
+    options: unknown
+  ) => viewport.setFogStyle(options),
+}));
 
 // AutoSave touches storage adapters / timers we don't need here — stub it,
 // keep the rest of @fieldnotes/core real (tools, types).
@@ -132,7 +147,14 @@ function makeStubViewport() {
     }),
     requestRender: vi.fn(),
   };
-  return { vp: vp as unknown as Viewport, store, elementId };
+  return {
+    vp: vp as unknown as Viewport & {
+      fog: FogManager;
+      setFogStyle: ReturnType<typeof vi.fn>;
+    },
+    store,
+    elementId,
+  };
 }
 
 const baseLocation: LocationMap = {

@@ -6,17 +6,14 @@ import {
   HandTool,
   SelectTool,
   ArrowTool,
-  MeasureTool,
   NoteTool,
   ImageTool,
   TextTool,
   ShapeTool,
-  TemplateTool,
   EraserTool,
   LaserTool,
   PingTool,
   AutoSave,
-  FogTool,
   type CameraAnimator,
   type CameraView,
   type ElementActivationEvent,
@@ -26,6 +23,7 @@ import {
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import { FogTool, MeasureTool, TemplateTool } from '@fieldnotes/vtt';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';
 import type { FogAppearance } from '@/types/battlemap';
@@ -121,6 +119,12 @@ import type {
   MarkerDetail,
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
+import {
+  getViewportFogManager,
+  getVttGridController,
+  installVttGridController,
+  setViewportFogStyle,
+} from '@/lib/fieldnotesVtt';
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
  *  selector call that would defeat Zustand's referential equality check. */
@@ -911,6 +915,8 @@ export function useDmLocationEditor(
     async (vp: Viewport) => {
       setViewport(vp);
       vpRef.current = vp;
+      const fogManager = getViewportFogManager(vp);
+      installVttGridController(vp);
 
       // Track selected element for DM-only toggle. `viewport.onSelectionChange`
       // is a persistent, viewport-owned emitter: it works whether or not a
@@ -929,14 +935,18 @@ export function useDmLocationEditor(
       syncSelection();
 
       // AutoSave — persist to store
-      vp.toolManager.register(new FogTool(vp.fog));
-      configureFogView(vp.fog, 'dm', false);
+      vp.toolManager.register(new FogTool(fogManager));
+      configureFogView(fogManager, 'dm', false);
 
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `location-canvas-${location.id}`,
         debounceMs: 1500,
         layerManager: vp.layerManager,
-        fogManager: vp.fog,
+        elementRegistry: vp.elementRegistry,
+        pluginStateManager: vp.plugins,
+        changeEmitters: [
+          { onChange: listener => fogManager.on('change', listener) },
+        ],
       });
 
       // Load existing canvas state from location, or initialize with map background
@@ -988,11 +998,14 @@ export function useDmLocationEditor(
       vp.store.on('update', saveAndMarkDirty);
 
       fogPersistenceCleanupRef.current?.();
-      fogPersistenceCleanupRef.current = attachFogPersistence(vp.fog, () => {
-        const json = vp.exportJSON();
-        onSave(json);
-        setHasUnsyncedChanges(true);
-      });
+      fogPersistenceCleanupRef.current = attachFogPersistence(
+        fogManager,
+        () => {
+          const json = vp.exportJSON();
+          onSave(json);
+          setHasUnsyncedChanges(true);
+        }
+      );
 
       // Reconcile fog bounds after initial load
       try {
@@ -1000,7 +1013,7 @@ export function useDmLocationEditor(
           vp.store,
           location.mapImageSize
         );
-        reconcileMapFogBounds(vp.fog, mapBounds);
+        reconcileMapFogBounds(fogManager, mapBounds);
       } catch (error) {
         fogControlsRef.current.reportError(error);
       }
@@ -1110,7 +1123,7 @@ export function useDmLocationEditor(
           tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
           seedLocal: true,
           fog: {
-            manager: vp.fog,
+            manager: fogManager,
             preserveLocalWhenRemoteMissing: true,
           },
           resolveAudience: el =>
@@ -1406,7 +1419,7 @@ export function useDmLocationEditor(
 
       // Always remove existing grid first
       if (gridEnabled) {
-        vp.removeGrid();
+        getVttGridController(vp).remove();
       }
 
       if (type === 'off') {
@@ -1425,7 +1438,7 @@ export function useDmLocationEditor(
         strokeWidth: 1,
         opacity: gridOpacity,
       };
-      vp.addGrid(settings);
+      getVttGridController(vp).add(settings);
 
       pinGridToMapLayer(vp);
 
@@ -1463,7 +1476,7 @@ export function useDmLocationEditor(
       };
 
       const updatedSettings = { ...currentGs, ...settings };
-      vp.updateGrid(updatedSettings);
+      getVttGridController(vp).update(updatedSettings);
 
       // Sync local state
       if (settings.cellSize != null) setGridCellSize(settings.cellSize);
@@ -1607,7 +1620,7 @@ export function useDmLocationEditor(
       let snapshotUrl: string | undefined;
       const filteredState = '';
 
-      const fogState = vp.fog.getState();
+      const fogState = getViewportFogManager(vp).getState();
       const fogEnabled = fogState !== null;
 
       let blob: Blob | null = null;
@@ -1927,7 +1940,8 @@ export function useDmLocationEditor(
     fogControls,
     handleFogAppearanceChange: useCallback(
       (appearance: FogAppearance) => {
-        getVp()?.setFogStyle(resolveFogRendererOptions(appearance));
+        const vp = getVp();
+        if (vp) setViewportFogStyle(vp, resolveFogRendererOptions(appearance));
         storeUpdateLocation(campaignCode, location.id, {
           fogAppearance: appearance,
         });

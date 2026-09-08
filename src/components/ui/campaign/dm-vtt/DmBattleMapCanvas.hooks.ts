@@ -4,8 +4,6 @@ import {
   SelectTool,
   PencilTool,
   ArrowTool,
-  MeasureTool,
-  TemplateTool,
   NoteTool,
   TextTool,
   ShapeTool,
@@ -13,7 +11,6 @@ import {
   LaserTool,
   PingTool,
   AutoSave,
-  FogTool,
   type CameraAnimator,
   type CameraView,
   type ElementActivationEvent,
@@ -22,6 +19,7 @@ import {
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import { FogTool, MeasureTool, TemplateTool } from '@fieldnotes/vtt';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
 import {
   createManagedBattleMapConnection,
@@ -108,6 +106,10 @@ import type {
 } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
 import { resolveDmPortalDestination } from '@/components/ui/campaign/location-map/markerPortal';
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
+import {
+  getViewportFogManager,
+  installVttGridController,
+} from '@/lib/fieldnotesVtt';
 import {
   attachFogPersistence,
   configureFogView,
@@ -722,6 +724,8 @@ export function useDmBattleMapCanvas({
     (vp: Viewport) => {
       setViewport(vp);
       viewportRef.current = vp;
+      const fogManager = getViewportFogManager(vp);
+      installVttGridController(vp);
 
       const battleMap = useBattleMapStore
         .getState()
@@ -754,16 +758,20 @@ export function useDmBattleMapCanvas({
           });
       }
 
-      vp.toolManager.register(new FogTool(vp.fog));
+      vp.toolManager.register(new FogTool(fogManager));
       // DM preview is deliberately session-only and always resets when a
       // canvas mounts; persisted state never decides the authoring view.
-      configureFogView(vp.fog, 'dm', false);
+      configureFogView(fogManager, 'dm', false);
 
       const autoSave = new AutoSave(vp.store, vp.camera, {
         key: `battlemap-canvas-${battleMapId}`,
         debounceMs: 1500,
         layerManager: vp.layerManager,
-        fogManager: vp.fog,
+        elementRegistry: vp.elementRegistry,
+        pluginStateManager: vp.plugins,
+        changeEmitters: [
+          { onChange: listener => fogManager.on('change', listener) },
+        ],
       });
       autoSave.start();
       autoSaveRef.current = autoSave;
@@ -785,14 +793,17 @@ export function useDmBattleMapCanvas({
       vp.store.on('update', saveOnLocalOps);
 
       fogPersistenceCleanupRef.current?.();
-      fogPersistenceCleanupRef.current = attachFogPersistence(vp.fog, () => {
-        useBattleMapStore
-          .getState()
-          .updateBattleMap(campaignCode, battleMapId, {
-            canvasState: vp.exportJSON(),
-            updatedAt: new Date().toISOString(),
-          });
-      });
+      fogPersistenceCleanupRef.current = attachFogPersistence(
+        fogManager,
+        () => {
+          useBattleMapStore
+            .getState()
+            .updateBattleMap(campaignCode, battleMapId, {
+              canvasState: vp.exportJSON(),
+              updatedAt: new Date().toISOString(),
+            });
+        }
+      );
 
       // Reconcile fog bounds after loading canvas state
       const mapImageSize = useBattleMapStore
@@ -803,7 +814,7 @@ export function useDmBattleMapCanvas({
           vp.store,
           mapImageSize ?? { w: 1024, h: 1024 }
         );
-        reconcileMapFogBounds(vp.fog, fogBounds);
+        reconcileMapFogBounds(fogManager, fogBounds);
       } catch (error) {
         fogControlsRef.current.reportError(error);
       }
@@ -934,7 +945,7 @@ export function useDmBattleMapCanvas({
             }),
           },
           fog: {
-            manager: vp.fog,
+            manager: fogManager,
             preserveLocalWhenRemoteMissing: true,
           },
           onStatus: s => {

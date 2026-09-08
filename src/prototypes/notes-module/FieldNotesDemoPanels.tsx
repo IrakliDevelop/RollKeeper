@@ -23,6 +23,8 @@ import {
   useToolOptions,
   useViewport,
 } from '@fieldnotes/react';
+import { getVttGridController } from '@/lib/fieldnotesVtt';
+import type { GridElement } from '@fieldnotes/vtt';
 import {
   AlignCenterHorizontal,
   AlignCenterVertical,
@@ -306,7 +308,11 @@ export function FieldNotesDemoToolbar({
   const { zoom } = useCamera();
   const elements = useElements();
   const viewport = useViewport();
-  const gridEls = useElements('grid');
+  const gridEls = elements.filter(
+    element =>
+      element.type === 'grid' ||
+      (element.type === 'extension' && element.extensionType === 'vtt:grid')
+  );
   const snapOn = viewport.snapToGrid;
   const { selectedCount, selectedIds } = useSelectionOps();
   const [smartGuidesOn, setSmartGuidesOn] = React.useState(true);
@@ -354,9 +360,9 @@ export function FieldNotesDemoToolbar({
 
   const toggleBattleGrid = () => {
     if (gridEls.length > 0) {
-      viewport.removeGrid();
+      getVttGridController(viewport).remove();
     } else {
-      viewport.addGrid({
+      getVttGridController(viewport).add({
         gridType: 'square',
         cellSize: 70,
         strokeColor: 'rgba(100, 116, 139, 0.45)',
@@ -1296,11 +1302,18 @@ export function FieldNotesDemoLayersPanel({
 }
 
 export function FieldNotesDemoGridControls() {
-  const gridEls = useElements('grid');
+  const extensionEls = useElements('extension');
   const viewport = useViewport();
-  const firstGrid = gridEls[0];
+  const gridAdapter = viewport.elementRegistry.getAdapter('vtt:grid');
+  const gridEls = extensionEls.filter(
+    el => el.type === 'extension' && el.extensionType === 'vtt:grid'
+  );
+  const firstGrid =
+    gridEls[0] && gridAdapter
+      ? (gridAdapter.unwrap(gridEls[0]) as GridElement)
+      : undefined;
   const cellSize =
-    firstGrid && firstGrid.type === 'grid' ? firstGrid.cellSize : 70;
+    firstGrid && 'cellSize' in firstGrid ? Number(firstGrid.cellSize) : 70;
 
   if (gridEls.length === 0) return null;
 
@@ -1315,7 +1328,9 @@ export function FieldNotesDemoGridControls() {
           max={200}
           value={cellSize}
           onChange={e => {
-            viewport.updateGrid({ cellSize: Number(e.target.value) });
+            getVttGridController(viewport).update({
+              cellSize: Number(e.target.value),
+            });
             viewport.requestRender();
           }}
           className="h-1 w-28 cursor-pointer accent-emerald-600"
@@ -1328,7 +1343,7 @@ export function FieldNotesDemoGridControls() {
         <button
           type="button"
           onClick={() => {
-            viewport.updateGrid({ gridType: 'square' });
+            getVttGridController(viewport).update({ gridType: 'square' });
             viewport.requestRender();
           }}
           className={`rounded px-2 py-0.5 ${
@@ -1342,7 +1357,10 @@ export function FieldNotesDemoGridControls() {
         <button
           type="button"
           onClick={() => {
-            viewport.updateGrid({ gridType: 'hex', hexOrientation: 'pointy' });
+            getVttGridController(viewport).update({
+              gridType: 'hex',
+              hexOrientation: 'pointy',
+            });
             viewport.requestRender();
           }}
           className={`rounded px-2 py-0.5 ${

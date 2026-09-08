@@ -1,4 +1,4 @@
-import { createTemplate, smartSnap } from '@fieldnotes/core';
+import { createTemplate } from '@fieldnotes/vtt';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 import { TEMPLATE_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
@@ -9,9 +9,7 @@ import type { AoeShape } from '@/types/spellAoe';
 export interface SpellTemplateConfig {
   shape: AoeShape;
   sizeFeet: number;
-  /** Line-template width; not yet honored — the canvas SDK's createTemplate
-   * has no width param, so line templates render at its default width until
-   * the SDK gains width support. Kept on the type so callers can pass it. */
+  /** Independent line-template width in feet. */
   widthFeet?: number;
   /** Called once after the template lands (tool has already switched to select). */
   onPlaced: () => void;
@@ -45,7 +43,7 @@ export class SpellTemplateTool implements Tool {
       return;
     }
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
-    const origin = smartSnap(world, ctx);
+    const origin = ctx.constraintService?.constrainPoint(world) ?? world;
     const cellPx = cellUnit(ctx);
     // The renderer draws squares as fillRect(cx - r/2, cy - r/2, r, r):
     // `radius` is the FULL side, so a 20ft cube = 20ft across, same formula
@@ -74,7 +72,9 @@ export class SpellTemplateTool implements Tool {
       layerId: ctx.activeLayerId ?? '',
       zIndex: TEMPLATE_ELEMENT_ZINDEX,
     });
-    ctx.store.add(el);
+    const adapter = ctx.elementRegistry?.getAdapter('vtt:template');
+    const runtime = adapter ? adapter.wrap(el) : el;
+    ctx.store.add(runtime);
     this.placedId = el.id;
     this.origin = origin;
     this.aiming = config.shape === 'cone' || config.shape === 'line';
@@ -85,7 +85,18 @@ export class SpellTemplateTool implements Tool {
     if (!this.aiming || !this.placedId || !this.origin) return;
     const world = ctx.camera.screenToWorld({ x: state.x, y: state.y });
     const angle = Math.atan2(world.y - this.origin.y, world.x - this.origin.x);
-    ctx.store.update(this.placedId, { angle });
+    const current = ctx.store.getById(this.placedId);
+    if (
+      current?.type === 'extension' &&
+      current.extensionType === 'vtt:template'
+    ) {
+      ctx.store.update(this.placedId, {
+        data: { ...current.data, angle },
+      });
+    } else {
+      // Compatibility for test/custom stores that have no registered adapter.
+      ctx.store.update(this.placedId, { angle });
+    }
     ctx.requestRender();
   }
 

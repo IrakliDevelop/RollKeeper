@@ -5,17 +5,15 @@ import {
   type RemoteLayerUpdate,
   type ResolveLocalOnly,
 } from '@fieldnotes/sync';
-import type {
-  ElementStore,
-  CanvasElement,
-  FogManager,
-  Layer,
-} from '@fieldnotes/core';
+import type { ElementStore, CanvasElement, Layer } from '@fieldnotes/core';
+import type { FogManager } from '@fieldnotes/vtt';
+import { createFogClientPlugin } from '@fieldnotes/vtt/sync';
 import type { BattleMapRole } from '@/lib/battlemapToken';
 import {
   parseProjectedFogAppearance,
   normalizeFogAppearanceProjectionTimestamp,
 } from '@/lib/fogOfWar';
+import { fieldnotesElementRegistry } from '@/lib/fieldnotesVtt';
 
 export type { RemoteLayerUpdate };
 
@@ -232,7 +230,8 @@ export function createManagedBattleMapConnection(
     // raw-frame parsing or deferred reseeding is needed.
     resolveLocalOnly: opts.seedLocal ? preserveHubUnknown : undefined,
     layers: opts.layers,
-    fog: opts.fog,
+    elementRegistry: fieldnotesElementRegistry,
+    plugins: opts.fog ? [createFogClientPlugin(opts.fog)] : undefined,
     resolveUrl: async () => {
       const result = await mintBattleMapToken(
         opts.campaignCode,

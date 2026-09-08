@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { renderFogStylePreview } from '@fieldnotes/core';
+import { renderFogStylePreview } from '@fieldnotes/vtt';
 import { Shuffle } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { NumberField } from '@/components/ui/forms/NumberInput';

@@ -8,6 +8,7 @@ import { pinGridToMapLayer } from '@/components/ui/campaign/location-map/gridPin
 import type { Viewport } from '@fieldnotes/core';
 import type { BattleMap } from '@/types/battlemap';
 import type { GridSettings } from '@/types/location';
+import { getVttGridController } from '@/lib/fieldnotesVtt';
 
 /** Mirrors the initial useState defaults in DmLocationEditor.hooks.ts:174-181. */
 const DEFAULT_GRID: Omit<GridSettings, 'gridType' | 'hexOrientation'> = {
@@ -43,7 +44,7 @@ export function useDmVttGrid({
       if (!vp || !battleMap) return;
 
       // Always remove the existing grid first, whatever the target.
-      if (battleMap.gridEnabled) vp.removeGrid();
+      if (battleMap.gridEnabled) getVttGridController(vp).remove();
 
       if (target === 'off') {
         updateBattleMap(campaignCode, battleMapId, { gridEnabled: false });
@@ -56,7 +57,7 @@ export function useDmVttGrid({
         gridType: target,
         hexOrientation: target === 'hex' ? 'pointy' : undefined,
       };
-      vp.addGrid(settings);
+      getVttGridController(vp).add(settings);
       pinGridToMapLayer(vp);
 
       updateBattleMap(campaignCode, battleMapId, {

@@ -3,7 +3,7 @@ import {
   toMeasurePresence,
   type MeasureTool,
   type RemoteMeasureOverlayHost,
-} from '@fieldnotes/core';
+} from '@fieldnotes/vtt';
 
 /**
  * Shared-ruler wiring over battle-map presence. Measure traffic is ephemeral

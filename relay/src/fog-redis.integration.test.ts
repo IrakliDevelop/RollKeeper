@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createClient } from 'redis';
 import { createShape } from '@fieldnotes/core';
-import type { FogMetaRecord, FogTileRecord } from '@fieldnotes/sync';
+import type { FogMetaRecord, FogTileRecord } from '@fieldnotes/vtt';
 import { BufferedRedisBackend, type BackendRedis } from './backend.js';
 
 const redisUrl = process.env.REDIS_TEST_URL;
@@ -56,6 +56,7 @@ run('fog persistence against real Redis', () => {
       `${prefix}${value}`,
       `${prefix}${value}:fog:meta`,
       `${prefix}${value}:fog:tiles`,
+      `${prefix}${value}:layers`,
     ]);
     if (keys.length) await client.del(keys);
     await client.quit();
@@ -89,11 +90,17 @@ run('fog persistence against real Redis', () => {
 
   it('atomically clears old-generation tiles on shrink/reset and on disable', async () => {
     const roomId = room('generation');
-    const backend = new BufferedRedisBackend(client as unknown as BackendRedis, {
-      keyPrefix: prefix,
-    });
+    const backend = new BufferedRedisBackend(
+      client as unknown as BackendRedis,
+      {
+        keyPrefix: prefix,
+      }
+    );
     await backend.applyFogMeta(roomId, meta(1, 'gen-old'));
-    await backend.applyFogPatch(roomId, [tile('gen-old', 0), tile('gen-old', 1)]);
+    await backend.applyFogPatch(roomId, [
+      tile('gen-old', 0),
+      tile('gen-old', 1),
+    ]);
     await backend.applyFogMeta(roomId, meta(2, 'gen-new'));
     const reset = await backend.fogSnapshot(roomId);
     expect(reset?.meta.definition?.generation).toBe('gen-new');
@@ -108,17 +115,24 @@ run('fog persistence against real Redis', () => {
 
   it('cleans corrupt records and recovers after a transient Lua failure', async () => {
     const corruptRoom = room('corrupt');
-    await client.hSet(`${prefix}${corruptRoom}:fog:meta`, 'current', '{bad-json');
-    const backend = new BufferedRedisBackend(client as unknown as BackendRedis, {
-      keyPrefix: prefix,
-    });
+    await client.hSet(
+      `${prefix}${corruptRoom}:fog:meta`,
+      'current',
+      '{bad-json'
+    );
+    const backend = new BufferedRedisBackend(
+      client as unknown as BackendRedis,
+      {
+        keyPrefix: prefix,
+      }
+    );
     expect(await backend.fogSnapshot(corruptRoom)).toBeUndefined();
-    expect((await backend.applyFogMeta(corruptRoom, meta(1, 'gen-clean'))).accepted).toBe(
-      true
-    );
-    expect((await backend.fogSnapshot(corruptRoom))?.meta.definition?.generation).toBe(
-      'gen-clean'
-    );
+    expect(
+      (await backend.applyFogMeta(corruptRoom, meta(1, 'gen-clean'))).accepted
+    ).toBe(true);
+    expect(
+      (await backend.fogSnapshot(corruptRoom))?.meta.definition?.generation
+    ).toBe('gen-clean');
 
     const recoveryRoom = room('eval-recovery');
     let fail = true;
@@ -141,21 +155,62 @@ run('fog persistence against real Redis', () => {
       },
     } satisfies BackendRedis;
     const recovering = new BufferedRedisBackend(redis, { keyPrefix: prefix });
-    await expect(recovering.applyFogMeta(recoveryRoom, meta(1, 'gen-r'))).rejects.toThrow(
-      /connection reset/i
-    );
+    await expect(
+      recovering.applyFogMeta(recoveryRoom, meta(1, 'gen-r'))
+    ).rejects.toThrow(/connection reset/i);
     expect(
       (await recovering.applyFogMeta(recoveryRoom, meta(1, 'gen-r'))).accepted
     ).toBe(true);
     await recovering.stopAndFlush();
   });
 
+  it('rejects a stale writer across backend instances and returns the authoritative correction', async () => {
+    const roomId = room('stale-writer');
+    const first = new BufferedRedisBackend(client as unknown as BackendRedis, {
+      keyPrefix: prefix,
+    });
+    const second = new BufferedRedisBackend(client as unknown as BackendRedis, {
+      keyPrefix: prefix,
+    });
+    expect(
+      (await first.applyFogMeta(roomId, meta(5, 'gen-current'))).accepted
+    ).toBe(true);
+
+    const staleMeta = await second.applyFogMeta(roomId, meta(4, 'gen-stale'));
+    expect(staleMeta.accepted).toBe(false);
+    expect(staleMeta.correction).toMatchObject({
+      version: 5,
+      definition: { generation: 'gen-current' },
+    });
+
+    const currentTile = {
+      ...tile('gen-current', 0),
+      version: 5,
+      editor: 'z-writer',
+    };
+    expect((await first.applyFogTile(roomId, currentTile)).accepted).toBe(true);
+    const staleTile = await second.applyFogTile(roomId, {
+      ...tile('gen-current', 0),
+      version: 4,
+      editor: 'a-writer',
+    });
+    expect(staleTile.accepted).toBe(false);
+    expect(staleTile.correction).toMatchObject({
+      version: 5,
+      editor: 'z-writer',
+    });
+    await Promise.all([first.stopAndFlush(), second.stopAndFlush()]);
+  });
+
   it('element activity refreshes element, fog-meta, and fog-tile TTLs', async () => {
     const roomId = room('ttl');
-    const backend = new BufferedRedisBackend(client as unknown as BackendRedis, {
-      keyPrefix: prefix,
-      roomTtlSeconds: 60,
-    });
+    const backend = new BufferedRedisBackend(
+      client as unknown as BackendRedis,
+      {
+        keyPrefix: prefix,
+        roomTtlSeconds: 60,
+      }
+    );
     await backend.applyFogMeta(roomId, meta(1, 'gen-ttl'));
     await backend.applyFogTile(roomId, tile('gen-ttl', 0));
     await backend.stopAndFlush();
@@ -178,6 +233,8 @@ run('fog persistence against real Redis', () => {
     await active.stopAndFlush();
     expect(await client.ttl(`${prefix}${roomId}`)).toBeGreaterThan(50);
     expect(await client.ttl(`${prefix}${roomId}:fog:meta`)).toBeGreaterThan(50);
-    expect(await client.ttl(`${prefix}${roomId}:fog:tiles`)).toBeGreaterThan(50);
+    expect(await client.ttl(`${prefix}${roomId}:fog:tiles`)).toBeGreaterThan(
+      50
+    );
   });
 });

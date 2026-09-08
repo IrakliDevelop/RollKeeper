@@ -36,6 +36,7 @@ describe('exportBattleMap', () => {
     const options = vp.exportImage.mock.calls[0][0];
     expect(options.filter).toBeUndefined();
     expect(options.quality).toBeUndefined();
+    expect(options.renderHooks.imageExport.has('afterElements')).toBe(false);
   });
 
   it('exports the current view via getVisibleRect', async () => {
@@ -77,7 +78,7 @@ describe('exportBattleMap', () => {
     expect(filter({ id: 'secret' })).toBe(false);
     expect(filter({ id: 'revealed' })).toBe(true);
     expect(filter({ id: 'other' })).toBe(true);
-    expect(vp.exportImage.mock.calls[0][0].fog).toBe(false);
+    expect(vp.exportImage.mock.calls[0][0].afterElements).toBeUndefined();
   });
 
   it('renders a supplied fog state explicitly in player mode', async () => {
@@ -101,11 +102,15 @@ describe('exportBattleMap', () => {
       fogState,
       fogStyle,
     });
-    expect(vp.exportImage.mock.calls[0][0].fog).toEqual({
-      state: fogState,
-      mode: 'player',
-      style: fogStyle,
-    });
+    expect(vp.exportImage.mock.calls[0][0].afterElements).toEqual(
+      expect.any(Function)
+    );
+    expect(
+      vp.exportImage.mock.calls[0][0].renderHooks.imageExport.has(
+        'afterElements'
+      )
+    ).toBe(false);
+    expect(vp.exportImage.mock.calls[0][0]).not.toHaveProperty('fog');
   });
 
   it('passes the explicit player style so an open draft cannot leak into the file', async () => {
@@ -121,9 +126,7 @@ describe('exportBattleMap', () => {
       fogStyle,
     });
     expect(vp.exportImage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        fog: { state: fogState, mode: 'player', style: fogStyle },
-      })
+      expect.objectContaining({ afterElements: expect.any(Function) })
     );
   });
 
@@ -137,9 +140,8 @@ describe('exportBattleMap', () => {
       fogState: { definition: { cellSize: 32 } } as never,
       fogStyle: { kind: 'solid', color: '#ff0000' } as never,
     });
-    expect(vp.exportImage).toHaveBeenCalledWith(
-      expect.objectContaining({ fog: false })
-    );
+    expect(vp.exportImage.mock.calls[0][0].afterElements).toBeUndefined();
+    expect(vp.exportImage.mock.calls[0][0]).not.toHaveProperty('fog');
   });
 
   it('plumbs jpeg quality and builds the filename', async () => {

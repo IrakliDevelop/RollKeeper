@@ -1,23 +1,26 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import {
-  FogManager,
-  FogTool,
-  ToolManager,
-  type Viewport,
-} from '@fieldnotes/core';
+import { ToolManager, type Viewport } from '@fieldnotes/core';
+import { FogManager, FogTool } from '@fieldnotes/vtt';
 import { useDmFogControls } from '../useDmFogControls';
 
-function viewportHarness() {
+function viewportHarness(): Viewport & {
+  fog: FogManager;
+  setTool: ReturnType<typeof vi.fn>;
+} {
   const fog = new FogManager();
   const toolManager = new ToolManager();
   toolManager.register(new FogTool(fog));
   const setTool = vi.fn();
   return {
     fog,
+    getService: vi.fn(() => fog),
     toolManager,
     setTool,
-  } as unknown as Viewport & { setTool: ReturnType<typeof vi.fn> };
+  } as unknown as Viewport & {
+    fog: FogManager;
+    setTool: ReturnType<typeof vi.fn>;
+  };
 }
 
 describe('useDmFogControls', () => {

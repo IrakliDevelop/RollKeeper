@@ -227,6 +227,26 @@ describe('BattleMapDisplayPage: shared presence', () => {
     vp.destroy();
   });
 
+  it('keeps an opaque privacy cover over the TV viewport until the authoritative bootstrap is live', () => {
+    stubCanvas();
+    const vp = makeViewport();
+
+    const { unmount, getByTestId, queryByTestId } = render(
+      <BattleMapDisplayPage />
+    );
+    fireReady(vp);
+
+    const cover = getByTestId('battlemap-bootstrap-privacy-cover');
+    expect(cover.style.background).toBe('rgb(0, 0, 0)');
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    expect(queryByTestId('battlemap-bootstrap-privacy-cover')).toBeNull();
+
+    unmount();
+    vp.destroy();
+  });
+
   it('attaches awareness as display: identity-only (no cursor share), announce on live, no share/viewer UI, dispose before stop on unmount', () => {
     stubCanvas();
     const vp = makeViewport();

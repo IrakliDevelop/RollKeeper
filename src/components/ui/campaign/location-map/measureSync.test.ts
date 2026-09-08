@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
-  MeasureTool,
   type Camera,
   type OverlayRenderer,
   type ToolContext,
   type PointerState,
 } from '@fieldnotes/core';
+import { MeasureTool } from '@fieldnotes/vtt';
 import {
   attachMeasureBroadcast,
   attachRemoteMeasurements,

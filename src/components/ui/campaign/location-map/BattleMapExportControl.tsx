@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import type { FogStateV1, FogStyle } from '@fieldnotes/core';
+import type { FogStateV1, FogStyle } from '@fieldnotes/vtt';
 import {
   downloadBlob,
   exportBattleMap,

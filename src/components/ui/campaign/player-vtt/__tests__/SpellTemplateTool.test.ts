@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type {
-  ToolContext,
-  PointerState,
-  TemplateElement,
-} from '@fieldnotes/core';
+import type { ToolContext, PointerState } from '@fieldnotes/core';
+import type { TemplateElement } from '@fieldnotes/vtt';
 import {
   SpellTemplateTool,
   type SpellTemplateConfig,
@@ -22,6 +19,7 @@ function fakeCtx() {
       update: vi.fn((id: string, patch: Record<string, unknown>) => {
         updates.push({ id, patch });
       }),
+      getById: vi.fn((id: string) => added.find(el => el.id === id)),
       remove: vi.fn(),
     },
     requestRender: vi.fn(),
@@ -34,7 +32,11 @@ function fakeCtx() {
   return { ctx, added, updates };
 }
 
-const down = (x: number, y: number) => ({ x, y }) as PointerState;
+const down = (
+  x: number,
+  y: number,
+  pointerType: PointerState['pointerType'] = 'mouse'
+) => ({ x, y, pointerType }) as PointerState;
 
 function armed(config: Partial<SpellTemplateConfig> = {}) {
   const onPlaced = vi.fn();
@@ -93,6 +95,33 @@ describe('SpellTemplateTool', () => {
     tool.onPointerUp(down(10, 10), f.ctx);
     expect(onPlaced).toHaveBeenCalledTimes(1);
     expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
+  });
+
+  it.each(['mouse', 'touch', 'pen'] as const)(
+    'preserves cone aiming for %s pointers',
+    pointerType => {
+      const { tool, onPlaced } = armed({ shape: 'cone', sizeFeet: 15 });
+      tool.onPointerDown(down(0, 0, pointerType), f.ctx);
+      tool.onPointerMove(down(0, 10, pointerType), f.ctx);
+      tool.onPointerUp(down(0, 10, pointerType), f.ctx);
+      expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 2);
+      expect(onPlaced).toHaveBeenCalledOnce();
+    }
+  );
+
+  it('snaps placement through the constraint service without rewriting aim coordinates', () => {
+    const constrainPoint = vi.fn(() => ({ x: 40, y: 80 }));
+    (
+      f.ctx as { constraintService?: { constrainPoint: typeof constrainPoint } }
+    ).constraintService = {
+      constrainPoint,
+    };
+    const { tool } = armed({ shape: 'cone', sizeFeet: 15 });
+    tool.onPointerDown(down(43, 77), f.ctx);
+    tool.onPointerMove(down(140, 80), f.ctx);
+    expect(constrainPoint).toHaveBeenCalledWith({ x: 43, y: 77 });
+    expect(f.added[0].position).toEqual({ x: 40, y: 80 });
+    expect(f.updates[0].patch.angle).toBe(0);
   });
 
   it('does not update angle for circles on move', () => {

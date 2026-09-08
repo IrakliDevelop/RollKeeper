@@ -1,12 +1,12 @@
 import {
   createImage,
   createShape,
-  TemplateTool,
   snapFootprintCenter,
   type Tool,
   type ToolContext,
   type PointerState,
 } from '@fieldnotes/core';
+import { TemplateTool } from '@fieldnotes/vtt';
 import { cellUnit } from './cellUnit';
 import { TOKEN_ELEMENT_ZINDEX, TEMPLATE_ELEMENT_ZINDEX } from './tokenSnap';
 
@@ -219,23 +219,20 @@ export class PlayerTokenTool implements Tool {
  * so a follow-up drag adjusts/moves instead of stamping another template.
  */
 export class PlayerTemplateTool extends TemplateTool {
-  onPointerDown(state: PointerState, ctx: ToolContext): void {
-    // The base class's createTemplate call has no zIndex option, so a
-    // manually drag-sized template lands at the default (0) and can paint
-    // under the map image on remote screens — the same tie-break bug
-    // documented at tokenSnap.ts's TOKEN_ELEMENT_ZINDEX. Elevate any newly
-    // created template element after the base handler runs.
+  onPointerUp(state: PointerState, ctx: ToolContext): void {
+    // The VTT tool commits on pointer-up. Elevate the element within that same
+    // ToolManager gesture transaction so one drag remains one undo step.
     const existingIds = new Set(ctx.store.getAll().map(el => el.id));
-    super.onPointerDown(state, ctx);
+    super.onPointerUp(state, ctx);
     for (const el of ctx.store.getAll()) {
-      if (!existingIds.has(el.id) && el.type === 'template') {
+      if (
+        !existingIds.has(el.id) &&
+        (el.type === 'template' ||
+          (el.type === 'extension' && el.extensionType === 'vtt:template'))
+      ) {
         ctx.store.update(el.id, { zIndex: TEMPLATE_ELEMENT_ZINDEX });
       }
     }
-  }
-
-  onPointerUp(state: PointerState, ctx: ToolContext): void {
-    super.onPointerUp(state, ctx);
     ctx.switchTool?.('select');
   }
 }

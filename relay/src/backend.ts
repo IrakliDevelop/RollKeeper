@@ -1,16 +1,19 @@
-import type { CanvasElement } from '@fieldnotes/core';
-import type {
-  HubBackend,
-  FogApplyResult,
-  FogPatchApplyResult,
-} from '@fieldnotes/sync-server';
-import type {
-  SyncOp,
-  FogSnapshot,
-  FogMetaRecord,
-  FogTileRecord,
-} from '@fieldnotes/sync';
+import type { CanvasElement, ServiceKey } from '@fieldnotes/core';
+import type { HubBackend } from '@fieldnotes/sync-server';
+import type { LayerRecord, SyncOp } from '@fieldnotes/sync';
 import { RedisHubBackend, type RedisHashClient } from '@fieldnotes/sync-redis';
+import {
+  createFogBackendPlugin,
+  FogBackendServiceKey,
+  type FogApplyResult,
+  type FogBackendService,
+  type FogPatchApplyResult,
+} from '@fieldnotes/vtt/redis';
+import type {
+  FogMetaRecord,
+  FogSnapshot,
+  FogTileRecord,
+} from '@fieldnotes/vtt';
 
 /** Minimal Redis surface — node-redis v4 satisfies this directly. */
 export interface BackendRedis {
@@ -35,13 +38,18 @@ export interface BufferedRedisBackendOptions {
   idleEvictMs?: number; // default 21600000 (6 hours)
   /** Retry delay for non-authoritative TTL maintenance. Primarily a test seam. */
   expiryRetryMs?: number; // default 2000
+  /** Bounded final persistence attempts before shutdown reports failure. */
+  shutdownRetryAttempts?: number; // default 3
 }
 
 interface RoomState {
   elements: Map<string, CanvasElement>;
   dirty: Set<string>;
   removed: Set<string>;
+  revisions: Map<string, number>;
+  revisionClock: number;
   hydrated: boolean;
+  hydrating: Promise<void> | null;
   /** A clear whose redis DEL failed; must be retried before any writes land. */
   pendingClear: boolean;
   lastAccess: number;
@@ -63,11 +71,15 @@ interface RoomState {
  * process performs no sweeps — the Redis TTL still bounds persistence.
  */
 export class BufferedRedisBackend implements HubBackend {
+  // Fog/layer plugin services address shared atomic Redis state. The relay's
+  // locality plugin independently marks buffered core element ops as local.
+  readonly sharedAcrossInstances = true;
   private rooms = new Map<string, RoomState>();
   private timer: NodeJS.Timeout | null = null;
   private flushing = false;
   private flushPromise: Promise<void> | null = null;
   private readonly fogBackend: RedisHubBackend;
+  private readonly fogService: FogBackendService;
   private pendingExpires = new Set<string>();
   private expiryTimer: NodeJS.Timeout | null = null;
   private stopping = false;
@@ -87,6 +99,47 @@ export class BufferedRedisBackend implements HubBackend {
     };
     this.fogBackend = new RedisHubBackend(adapter, {
       keyPrefix: opts.keyPrefix ?? 'fieldnotes:room:',
+      plugins: [createFogBackendPlugin()],
+    });
+    const fogService = this.fogBackend.getService(FogBackendServiceKey);
+    if (!fogService)
+      throw new Error('Fog backend plugin did not register its service');
+    this.fogService = {
+      snapshot: room => fogService.snapshot(room),
+      applyMeta: async (room, record) => {
+        const result = await fogService.applyMeta(room, record);
+        if (result.accepted) this.refreshRoomTtl(room);
+        return result;
+      },
+      applyTile: async (room, record) => {
+        const result = await fogService.applyTile(room, record);
+        if (result.accepted) this.refreshRoomTtl(room);
+        return result;
+      },
+      applyPatch: async (room, records) => {
+        const result = await fogService.applyPatch(room, records);
+        if (result.accepted.length > 0) this.refreshRoomTtl(room);
+        return result;
+      },
+    };
+  }
+
+  getService<T>(key: ServiceKey<T>): T | undefined {
+    if (key.id === FogBackendServiceKey.id) return this.fogService as T;
+    return this.fogBackend.getService(key);
+  }
+
+  layerRecords(room: string): Promise<LayerRecord[]> {
+    return this.fogBackend.layerRecords(room);
+  }
+
+  getLayerRecord(room: string, id: string): Promise<LayerRecord | undefined> {
+    return this.fogBackend.getLayerRecord(room, id);
+  }
+
+  applyLayerRecord(room: string, record: LayerRecord): Promise<void> {
+    return this.fogBackend.applyLayerRecord(room, record).then(() => {
+      this.refreshRoomTtl(room);
     });
   }
 
@@ -102,6 +155,10 @@ export class BufferedRedisBackend implements HubBackend {
     return this.key(room) + ':fog:tiles';
   }
 
+  private layersKey(room: string): string {
+    return this.key(room) + ':layers';
+  }
+
   private async ensure(room: string): Promise<RoomState> {
     let st = this.rooms.get(room);
     if (!st) {
@@ -109,26 +166,35 @@ export class BufferedRedisBackend implements HubBackend {
         elements: new Map(),
         dirty: new Set(),
         removed: new Set(),
+        revisions: new Map(),
+        revisionClock: 0,
         hydrated: false,
+        hydrating: null,
         pendingClear: false,
         lastAccess: Date.now(),
       };
       this.rooms.set(room, st);
     }
     st.lastAccess = Date.now();
-    if (!st.hydrated) {
-      const raw = await this.redis.hGetAll(this.key(room));
-      for (const [id, json] of Object.entries(raw)) {
-        if (!st.elements.has(id) && !st.removed.has(id)) {
-          try {
-            st.elements.set(id, JSON.parse(json) as CanvasElement);
-          } catch {
-            // corrupt entry — skip
+    if (!st.hydrated && !st.hydrating) {
+      const roomState = st;
+      roomState.hydrating = (async () => {
+        const raw = await this.redis.hGetAll(this.key(room));
+        for (const [id, json] of Object.entries(raw)) {
+          if (!roomState.elements.has(id) && !roomState.removed.has(id)) {
+            try {
+              roomState.elements.set(id, JSON.parse(json) as CanvasElement);
+            } catch {
+              // corrupt entry — skip
+            }
           }
         }
-      }
-      st.hydrated = true;
+        roomState.hydrated = true;
+      })().finally(() => {
+        roomState.hydrating = null;
+      });
     }
+    if (st.hydrating) await st.hydrating;
     return st;
   }
 
@@ -145,21 +211,25 @@ export class BufferedRedisBackend implements HubBackend {
   async apply(room: string, op: SyncOp): Promise<void> {
     const st = await this.ensure(room);
     if (op.kind === 'upsert') {
+      st.revisions.set(op.element.id, ++st.revisionClock);
       st.elements.set(op.element.id, op.element);
       st.dirty.add(op.element.id);
       st.removed.delete(op.element.id);
       this.schedule();
       this.refreshRoomTtl(room);
     } else if (op.kind === 'remove') {
+      st.revisions.set(op.id, ++st.revisionClock);
       st.elements.delete(op.id);
       st.dirty.delete(op.id);
       st.removed.add(op.id);
       this.schedule();
       this.refreshRoomTtl(room);
     } else if (op.kind === 'clear') {
+      if (this.flushPromise) await this.flushPromise;
       st.elements.clear();
       st.dirty.clear();
       st.removed.clear();
+      st.revisions.clear();
       try {
         await this.redis.del(this.key(room));
         st.pendingClear = false;
@@ -177,34 +247,28 @@ export class BufferedRedisBackend implements HubBackend {
   // ── Fog delegation ──────────────────────────────────────────────────
 
   async fogSnapshot(room: string): Promise<FogSnapshot | undefined> {
-    return this.fogBackend.fogSnapshot(room);
+    return this.fogService.snapshot(room);
   }
 
   async applyFogMeta(
     room: string,
     record: FogMetaRecord
   ): Promise<FogApplyResult<FogMetaRecord>> {
-    const result = await this.fogBackend.applyFogMeta(room, record);
-    if (result.accepted) this.refreshRoomTtl(room);
-    return result;
+    return this.fogService.applyMeta(room, record);
   }
 
   async applyFogTile(
     room: string,
     record: FogTileRecord
   ): Promise<FogApplyResult<FogTileRecord>> {
-    const result = await this.fogBackend.applyFogTile(room, record);
-    if (result.accepted) this.refreshRoomTtl(room);
-    return result;
+    return this.fogService.applyTile(room, record);
   }
 
   async applyFogPatch(
     room: string,
     records: readonly FogTileRecord[]
   ): Promise<FogPatchApplyResult> {
-    const result = await this.fogBackend.applyFogPatch(room, records);
-    if (result.accepted.length > 0) this.refreshRoomTtl(room);
-    return result;
+    return this.fogService.applyPatch(room, records);
   }
 
   // ── TTL maintenance ─────────────────────────────────────────────────
@@ -228,6 +292,7 @@ export class BufferedRedisBackend implements HubBackend {
           this.redis.expire(this.key(room), ttl),
           this.redis.expire(this.fogMetaKey(room), ttl),
           this.redis.expire(this.fogTilesKey(room), ttl),
+          this.redis.expire(this.layersKey(room), ttl),
         ]);
       } catch (err) {
         this.pendingExpires.add(room);
@@ -245,7 +310,7 @@ export class BufferedRedisBackend implements HubBackend {
   // ── Element flush ───────────────────────────────────────────────────
 
   private schedule(): void {
-    if (this.timer) return;
+    if (this.timer || this.stopping) return;
     this.timer = setTimeout(() => {
       this.timer = null;
       void this.flush();
@@ -277,11 +342,18 @@ export class BufferedRedisBackend implements HubBackend {
         }
         if (st.dirty.size === 0 && st.removed.size === 0) continue;
         const toSet: Record<string, string> = {};
+        const setRevisions = new Map<string, number>();
         for (const id of st.dirty) {
           const el = st.elements.get(id);
-          if (el) toSet[id] = JSON.stringify(el);
+          if (el) {
+            toSet[id] = JSON.stringify(el);
+            setRevisions.set(id, st.revisions.get(id) ?? 0);
+          }
         }
         const toDel = [...st.removed];
+        const delRevisions = new Map(
+          toDel.map(id => [id, st.revisions.get(id) ?? 0] as const)
+        );
         st.dirty.clear();
         st.removed.clear();
         try {
@@ -289,8 +361,22 @@ export class BufferedRedisBackend implements HubBackend {
           if (toDel.length > 0) await this.redis.hDel(key, toDel);
           await this.redis.expire(key, this.opts.roomTtlSeconds ?? 172800);
         } catch (err) {
-          for (const id of Object.keys(toSet)) st.dirty.add(id);
-          for (const id of toDel) st.removed.add(id);
+          for (const id of Object.keys(toSet)) {
+            if (
+              st.revisions.get(id) === setRevisions.get(id) &&
+              st.elements.has(id)
+            ) {
+              st.dirty.add(id);
+            }
+          }
+          for (const id of toDel) {
+            if (
+              st.revisions.get(id) === delRevisions.get(id) &&
+              !st.elements.has(id)
+            ) {
+              st.removed.add(id);
+            }
+          }
           this.schedule();
           console.error('[backend] flush failed, will retry:', err);
         }
@@ -324,12 +410,30 @@ export class BufferedRedisBackend implements HubBackend {
       this.expiryTimer = null;
     }
     if (this.flushPromise) await this.flushPromise;
-    await this.flush();
+    const attempts = Math.max(1, this.opts.shutdownRetryAttempts ?? 3);
+    for (let attempt = 0; attempt < attempts; attempt += 1) {
+      await this.flush();
+      const pendingWrites = [...this.rooms.values()].some(
+        st => st.pendingClear || st.dirty.size > 0 || st.removed.size > 0
+      );
+      if (!pendingWrites) break;
+      if (attempt === attempts - 1) {
+        throw new Error('Redis writes remain pending after shutdown retries');
+      }
+      await new Promise(resolve =>
+        setTimeout(resolve, this.opts.expiryRetryMs ?? 2000)
+      );
+    }
     // TTL refreshes are lifecycle maintenance rather than part of accepting a
     // fog write. During shutdown, however, do not abandon a transient failure:
     // drain the queue before the Redis connection is closed by the caller.
-    while (this.pendingExpires.size > 0) {
+    for (let attempt = 0; this.pendingExpires.size > 0; attempt += 1) {
       await this.flushExpires();
+      if (this.pendingExpires.size > 0 && attempt >= attempts - 1) {
+        throw new Error(
+          'Redis TTL refreshes remain pending after shutdown retries'
+        );
+      }
       if (this.pendingExpires.size > 0) {
         await new Promise(resolve =>
           setTimeout(resolve, this.opts.expiryRetryMs ?? 2000)

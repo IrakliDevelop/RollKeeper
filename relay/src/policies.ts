@@ -1,11 +1,11 @@
 import type {
   Authenticate,
   Authorize,
-  AuthorizeFog,
   AuthorizeLayer,
   CanRead,
   OwnedElement,
 } from '@fieldnotes/sync-server';
+import type { FogAuthorizationContext } from '@fieldnotes/vtt/server';
 import { verifyBattleMapToken } from './token.js';
 
 export const DM_AUDIENCE = 'dm';
@@ -19,7 +19,7 @@ export const DM_AUDIENCE = 'dm';
 export function makePolicies(secret: string): {
   authenticate: Authenticate;
   authorize: Authorize;
-  authorizeFog: AuthorizeFog;
+  authorizeFog: (context: FogAuthorizationContext) => boolean;
   authorizeLayer: AuthorizeLayer;
   canRead: CanRead;
 } {
@@ -71,7 +71,7 @@ export function makePolicies(secret: string): {
     return userId !== undefined && layerId === `player-${userId}`;
   };
 
-  const authorizeFog: AuthorizeFog = ({ role, userId }) =>
+  const authorizeFog = ({ role, userId }: FogAuthorizationContext) =>
     role === 'dm' && typeof userId === 'string' && userId.length > 0;
 
   return { authenticate, authorize, authorizeFog, authorizeLayer, canRead };

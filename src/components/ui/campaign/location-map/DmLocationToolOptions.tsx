@@ -4,7 +4,6 @@ import type { DiagonalRule, ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
   LaserToolOptions,
-  MeasureToolOptions,
   NoteToolOptions,
   PathToolOptions,
   PencilToolOptions,
@@ -12,9 +11,9 @@ import type {
   ShapeToolOptions,
   TemplateRenderStyle,
   TemplateShape,
-  TemplateToolOptions,
   TextToolOptions,
 } from '@fieldnotes/core';
+import type { MeasureToolOptions, TemplateToolOptions } from '@fieldnotes/vtt';
 import {
   useActiveTool,
   useSelectionOps,

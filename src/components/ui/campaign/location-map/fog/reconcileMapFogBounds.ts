@@ -1,4 +1,5 @@
-import type { FogManager, Bounds } from '@fieldnotes/core';
+import type { Bounds } from '@fieldnotes/core';
+import type { FogManager } from '@fieldnotes/vtt';
 
 function boundsEqual(a: Bounds, b: Bounds): boolean {
   return a.x === b.x && a.y === b.y && a.w === b.w && a.h === b.h;

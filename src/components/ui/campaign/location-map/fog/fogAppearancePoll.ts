@@ -5,6 +5,7 @@ import {
   normalizeFogAppearanceProjectionTimestamp,
   parseProjectedFogAppearance,
 } from '@/lib/fogOfWar';
+import { setViewportFogStyle } from '@/lib/fieldnotesVtt';
 
 const POLL_INTERVAL_MS = 60_000;
 const requestVersions = new WeakMap<Viewport, number>();
@@ -31,7 +32,7 @@ export function applyFogAppearanceMetadata(
   if (version) appliedProjectionVersions.set(viewport, version);
   const appearance = parseProjectedFogAppearance(raw);
   appliedAppearances.set(viewport, appearance);
-  viewport.setFogStyle(resolveFogRendererOptions(appearance));
+  setViewportFogStyle(viewport, resolveFogRendererOptions(appearance));
 }
 
 /** The last appearance applied to this viewport; Solid until metadata arrives. */

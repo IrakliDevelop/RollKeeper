@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { FieldNotesCanvas } from '@fieldnotes/react';
@@ -27,6 +27,10 @@ import {
   startFogAppearancePoll,
 } from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
+import {
+  createRollKeeperFogPlugin,
+  installVttGridController,
+} from '@/lib/fieldnotesVtt';
 
 function DisplayCanvas() {
   const params = useParams();
@@ -47,6 +51,7 @@ function DisplayCanvas() {
   // is acceptable.
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const toolsRef = useRef([new HandTool()]);
+  const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
 
@@ -62,7 +67,9 @@ function DisplayCanvas() {
   const handleReady = (vp: Viewport) => {
     viewportRef.current = vp;
     setViewport(vp);
-    configureFogView(vp.fog, 'display', false);
+    const fogManager = fogPlugin.manager;
+    installVttGridController(vp);
+    configureFogView(fogManager, 'display', false);
     // Canonical bands so map/annotation elements stack correctly; custom and
     // player layer definitions arrive over layer sync. Read-only view — the
     // 'player' lock stance is irrelevant here.
@@ -82,7 +89,7 @@ function DisplayCanvas() {
       store: vp.store,
       clientId: `display-${code}`,
       tokenRequest: { role: 'display', battleMapId: id, displayKey },
-      fog: { manager: vp.fog },
+      fog: { manager: fogManager },
       layers: {
         applyLayer: makeApplyRemoteLayer(vp, 'display', {
           onApplied: () => vp.requestRender(),
@@ -203,21 +210,27 @@ function DisplayCanvas() {
         tools={toolsRef.current}
         defaultTool="hand"
         onReady={handleReady}
-        options={{ background: { pattern: 'none' }, fog: {} }}
+        options={{
+          background: { pattern: 'none' },
+          plugins: [fogPlugin],
+          requiredCapabilities: ['vtt:fog'],
+        }}
         style={{ width: '100%', height: '100%' }}
       />
       {overlayMessage && (
         <div
+          data-testid="battlemap-bootstrap-privacy-cover"
           style={{
             position: 'fixed',
             inset: 0,
+            zIndex: 100,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
             color: '#fff',
             fontSize: '1.25rem',
             fontFamily: 'system-ui, sans-serif',
-            background: 'rgba(0,0,0,0.75)',
+            background: '#000',
             pointerEvents: 'none',
           }}
         >

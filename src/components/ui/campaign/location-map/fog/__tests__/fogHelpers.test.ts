@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { FogManager } from '@fieldnotes/core';
+import { FogManager } from '@fieldnotes/vtt';
 import { initializeMapFog } from '../initializeMapFog';
 import { reconcileMapFogBounds } from '../reconcileMapFogBounds';
 import { configureFogView } from '../configureFogView';
