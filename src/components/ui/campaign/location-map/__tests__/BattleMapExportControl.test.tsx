@@ -7,7 +7,7 @@ import {
   waitFor,
 } from '@testing-library/react';
 import { BattleMapExportControl } from '../BattleMapExportControl';
-import type { FogStateV1, FogStyle } from '@fieldnotes/core';
+import type { FogStateV1, FogStyle } from '@fieldnotes/vtt';
 
 const vp = { exportImage: vi.fn(), getVisibleRect: vi.fn() };
 

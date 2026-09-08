@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { SelectTool, createImage, createTemplate } from '@fieldnotes/core';
+import { SelectTool, createImage } from '@fieldnotes/core';
+import { createTemplate } from '@fieldnotes/vtt';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
 import { isCombatantToken } from '@/components/ui/campaign/dm-vtt/combatantToken';
 

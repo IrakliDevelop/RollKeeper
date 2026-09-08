@@ -1,5 +1,9 @@
-import type { FogManager, Bounds, FogStateV1 } from '@fieldnotes/core';
-import { recommendedFogCellSize } from '@fieldnotes/core';
+import type { Bounds } from '@fieldnotes/core';
+import {
+  recommendedFogCellSize,
+  type FogManager,
+  type FogStateV1,
+} from '@fieldnotes/vtt';
 
 export function initializeMapFog(
   fogManager: FogManager,

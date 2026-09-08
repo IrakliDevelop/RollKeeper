@@ -7,8 +7,17 @@ import {
 } from '../fogAppearancePoll';
 import type { Viewport } from '@fieldnotes/core';
 
-function fakeViewport(): Viewport {
-  return { setFogStyle: vi.fn() } as unknown as Viewport;
+vi.mock('@/lib/fieldnotesVtt', () => ({
+  setViewportFogStyle: (viewport: TestViewport, options: unknown): void =>
+    viewport.setFogStyle(options),
+}));
+
+type TestViewport = Viewport & {
+  setFogStyle: ReturnType<typeof vi.fn<(options: unknown) => void>>;
+};
+
+function fakeViewport(): TestViewport {
+  return { setFogStyle: vi.fn() } as unknown as TestViewport;
 }
 
 beforeEach(() => {
@@ -48,7 +57,7 @@ describe('fetchAndApplyFogAppearance', () => {
 
   it('applies a projected custom material and falls back to solid for a malformed one', () => {
     const setFogStyle = vi.fn();
-    const viewport = { setFogStyle } as unknown as Viewport;
+    const viewport = { setFogStyle } as unknown as TestViewport;
     const material = { v: 1, kind: 'solid', color: '#ff0000' };
 
     applyFogAppearanceMetadata(
@@ -90,7 +99,9 @@ describe('fetchAndApplyFogAppearance', () => {
     fetchAndApplyFogAppearance(vp, '/test');
     await vi.advanceTimersByTimeAsync(0);
     expect(vp.setFogStyle).toHaveBeenCalledTimes(1);
-    const opts = vi.mocked(vp.setFogStyle).mock.calls[0][0];
+    const opts = vi.mocked(vp.setFogStyle).mock.calls[0][0] as {
+      editorStyle?: unknown;
+    };
     expect(opts.editorStyle).toBeDefined();
   });
 

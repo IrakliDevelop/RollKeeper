@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { SyncOp } from '@fieldnotes/sync';
+import { FogBackendServiceKey } from '@fieldnotes/vtt/redis';
 import { BufferedRedisBackend, type BackendRedis } from './backend.js';
 
 function fakeRedis(seed: Record<string, string> = {}) {
@@ -46,6 +47,27 @@ describe('BufferedRedisBackend', () => {
     expect((await b.get('r1', 'a'))?.id).toBe('a');
     await b.snapshot('r1');
     expect(calls.filter(c => c.method === 'hGetAll')).toHaveLength(1);
+  });
+
+  it('coalesces concurrent hydration so one Redis read establishes the room', async () => {
+    const { redis, calls } = fakeRedis({ a: JSON.stringify(elem('a')) });
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const original = redis.hGetAll;
+    redis.hGetAll = async key => {
+      await gate;
+      return original(key);
+    };
+    const b = new BufferedRedisBackend(redis);
+    const first = b.snapshot('r1');
+    const second = b.get('r1', 'a');
+    expect(calls.filter(call => call.method === 'hGetAll')).toHaveLength(0);
+    release();
+    expect((await first).map(element => element.id)).toEqual(['a']);
+    expect((await second)?.id).toBe('a');
+    expect(calls.filter(call => call.method === 'hGetAll')).toHaveLength(1);
   });
 
   it('does not latch hydrated on a failed hGetAll — the next access retries', async () => {
@@ -105,8 +127,19 @@ describe('BufferedRedisBackend', () => {
         'fieldnotes:room:r1',
         'fieldnotes:room:r1:fog:meta',
         'fieldnotes:room:r1:fog:tiles',
+        'fieldnotes:room:r1:layers',
       ])
     );
+  });
+
+  it('exposes the VTT fog backend service through the generic service API', () => {
+    const { redis } = fakeRedis();
+    const b = new BufferedRedisBackend(redis);
+    const service = b.getService(FogBackendServiceKey);
+    expect(service).toBeDefined();
+    expect(service?.snapshot).toBeTypeOf('function');
+    expect(service?.applyMeta).toBeTypeOf('function');
+    expect(service?.applyTile).toBeTypeOf('function');
   });
 
   it('flushes removals as hDel and drops them from memory immediately', async () => {
@@ -169,6 +202,59 @@ describe('BufferedRedisBackend', () => {
     expect(
       Object.keys(hsets[1].args[1] as Record<string, string>).sort()
     ).toEqual(['a', 'b']);
+  });
+
+  it('does not resurrect a stale upsert when a concurrent remove supersedes a failed flush', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    let fail = true;
+    const original = redis.hSet;
+    redis.hSet = async (key, fields) => {
+      await original(key, fields);
+      await gate;
+      if (fail) throw new Error('transient');
+    };
+    const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
+    await b.apply('r1', up('a'));
+    await vi.advanceTimersByTimeAsync(1000);
+    await b.apply('r1', { kind: 'remove', id: 'a' } as SyncOp);
+    fail = false;
+    release();
+    await vi.advanceTimersByTimeAsync(0);
+    await vi.advanceTimersByTimeAsync(1000);
+
+    const hsets = calls.filter(call => call.method === 'hSet');
+    expect(hsets).toHaveLength(1);
+    expect(
+      calls.filter(call => call.method === 'hDel').at(-1)?.args[1]
+    ).toEqual(['a']);
+    expect(await b.get('r1', 'a')).toBeUndefined();
+  });
+
+  it('fails shutdown safely after bounded retries and keeps writes retryable', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { redis, calls } = fakeRedis();
+    let fail = true;
+    const original = redis.hSet;
+    redis.hSet = async (key, fields) => {
+      await original(key, fields);
+      if (fail) throw new Error('permanent');
+    };
+    const b = new BufferedRedisBackend(redis, {
+      flushIntervalMs: 60_000,
+      shutdownRetryAttempts: 1,
+    });
+    await b.apply('r1', up('a'));
+    await expect(b.stopAndFlush()).rejects.toThrow(/writes remain pending/);
+
+    fail = false;
+    await b.flush();
+    expect(calls.filter(call => call.method === 'hSet')).toHaveLength(2);
+    expect((await b.get('r1', 'a'))?.id).toBe('a');
   });
 
   it('a failed clear sets pendingClear and retries del before writing new upserts', async () => {

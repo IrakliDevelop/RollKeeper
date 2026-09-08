@@ -36,7 +36,7 @@ async function openSeededMap(page: Page): Promise<void> {
                   mapImageUrl: pixel,
                   mapImageSize: { w: 800, h: 600 },
                   canvasState: JSON.stringify({
-                    version: 2,
+                    version: 3,
                     camera: { position: { x: 0, y: 0 }, zoom: 1 },
                     elements: [
                       {

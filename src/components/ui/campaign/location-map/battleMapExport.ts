@@ -1,8 +1,5 @@
-import type {
-  ExportImageOptions,
-  FogStateV1,
-  FogStyle,
-} from '@fieldnotes/core';
+import { createRenderHooks, type ExportImageOptions } from '@fieldnotes/core';
+import { FogRenderer, type FogStateV1, type FogStyle } from '@fieldnotes/vtt';
 
 import { createStandaloneMarkerRegistry } from './markerPainter';
 import { MARKER_HTML_TYPES } from './markerData';
@@ -63,6 +60,10 @@ export async function exportBattleMap(
     scaleMode: 'fit',
     padding: 0,
     format: req.format,
+    // The live fog plugin exports its current editor/player mode. RollKeeper
+    // chooses the audience independently below, so start with an empty hook
+    // surface and add only the requested player fog renderer.
+    renderHooks: createRenderHooks(),
   };
   // A standalone marker-painter registry, built fresh per export call and
   // thrown away with it — nothing subscribes to it, so no disposal is
@@ -84,15 +85,17 @@ export async function exportBattleMap(
   if (req.format === 'jpeg') options.quality = JPEG_QUALITY;
   if (region) options.region = region;
   if (dmOnly) options.filter = el => !dmOnly[el.id];
-  if (req.audience === 'player') {
+  if (req.audience === 'player' && req.fogState) {
     // Always make player rendering explicit. On a DM viewport the live mode
-    // is normally `editor`; allowing the renderer to inherit it leaks the
-    // DM preview into an export. A null state means fog is disabled.
-    options.fog = req.fogState
-      ? { state: req.fogState, mode: 'player', style: req.fogStyle }
-      : false;
-  } else if (req.audience === 'full') {
-    options.fog = false;
+    // is normally `editor`; render through an export-only VTT renderer so the
+    // live viewport never changes mode or exposes its authoring preview.
+    const renderer = new FogRenderer(
+      req.fogStyle ? { playerStyle: req.fogStyle } : undefined
+    );
+    const state = req.fogState;
+    options.afterElements = ctx => {
+      renderer.renderForExport(ctx, state, 'player');
+    };
   }
 
   const blob = await vp.exportImage(options);

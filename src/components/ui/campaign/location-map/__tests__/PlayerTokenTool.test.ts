@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, test } from 'vitest';
-import { TemplateTool } from '@fieldnotes/core';
+import { TemplateTool } from '@fieldnotes/vtt';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -9,6 +9,7 @@ import {
   TOKEN_ELEMENT_ZINDEX,
   TEMPLATE_ELEMENT_ZINDEX,
 } from '@/components/ui/campaign/location-map/tokenSnap';
+import { fieldnotesElementRegistry } from '@/lib/fieldnotesVtt';
 
 import type {
   CanvasElement,
@@ -26,10 +27,20 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
       add: vi.fn((el: CanvasElement) => {
         added.push(el);
         elements.push(el);
+        return el;
       }),
       getAll: vi.fn(() => elements),
+      getById: vi.fn((id: string) =>
+        elements.find(element => element.id === id)
+      ),
       update: vi.fn((id: string, patch: Record<string, unknown>) => {
         updates.push({ id, patch });
+        const element = elements.find(candidate => candidate.id === id);
+        if (element) Object.assign(element, patch);
+      }),
+      remove: vi.fn((id: string) => {
+        const index = elements.findIndex(element => element.id === id);
+        if (index >= 0) elements.splice(index, 1);
       }),
     },
     requestRender: vi.fn(),
@@ -38,6 +49,7 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
     gridType: 'square',
     activeLayerId: 'player-1',
     snapToGrid: false,
+    elementRegistry: fieldnotesElementRegistry,
     ...overrides,
   } as unknown as ToolContext;
   return { ctx, added, elements, updates };
@@ -188,10 +200,9 @@ describe('PlayerTemplateTool zIndex stamping', () => {
     } as unknown as CanvasElement;
     elements.push(preExisting);
 
-    // The SDK base class has no zIndex option; simulate it creating a new
-    // template element via the store, the way the real onPointerDown does.
+    // The VTT base class commits the template on pointer-up.
     const spy = vi
-      .spyOn(TemplateTool.prototype, 'onPointerDown')
+      .spyOn(TemplateTool.prototype, 'onPointerUp')
       .mockImplementation((_state, c) => {
         c.store.add({
           id: 'new-template-1',
@@ -200,7 +211,7 @@ describe('PlayerTemplateTool zIndex stamping', () => {
       });
 
     const tool = new PlayerTemplateTool();
-    tool.onPointerDown(down(10, 10), ctx);
+    tool.onPointerUp(down(10, 10), ctx);
 
     expect(updates).toEqual([
       { id: 'new-template-1', patch: { zIndex: TEMPLATE_ELEMENT_ZINDEX } },
@@ -208,6 +219,33 @@ describe('PlayerTemplateTool zIndex stamping', () => {
 
     spy.mockRestore();
   });
+
+  it.each(['mouse', 'touch', 'pen'] as const)(
+    'keeps drag-to-resize as one completed gesture for %s pointers',
+    pointerType => {
+      const { ctx, elements, updates } = fakeCtx();
+      const tool = new PlayerTemplateTool({ templateShape: 'circle' });
+      const pointer = (x: number, y: number) =>
+        ({ x, y, pointerType }) as PointerState;
+
+      tool.onPointerDown(pointer(0, 0), ctx);
+      tool.onPointerMove(pointer(80, 0), ctx);
+      tool.onPointerUp(pointer(80, 0), ctx);
+
+      expect(elements).toHaveLength(1);
+      expect(elements[0]).toMatchObject({
+        type: 'extension',
+        extensionType: 'vtt:template',
+        data: { radius: 80 },
+        zIndex: TEMPLATE_ELEMENT_ZINDEX,
+      });
+      expect(updates).toContainEqual({
+        id: elements[0].id,
+        patch: { zIndex: TEMPLATE_ELEMENT_ZINDEX },
+      });
+      expect(ctx.switchTool).toHaveBeenCalledWith('select');
+    }
+  );
 });
 
 describe('tokenAvatarUrl', () => {

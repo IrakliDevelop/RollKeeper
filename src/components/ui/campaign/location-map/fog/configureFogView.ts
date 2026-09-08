@@ -1,4 +1,4 @@
-import type { FogManager, FogViewMode } from '@fieldnotes/core';
+import type { FogManager, FogViewMode } from '@fieldnotes/vtt';
 
 export function configureFogView(
   fogManager: FogManager,

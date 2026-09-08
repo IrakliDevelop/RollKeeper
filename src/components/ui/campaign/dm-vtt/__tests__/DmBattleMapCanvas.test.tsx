@@ -16,6 +16,13 @@ import type { BattleMapViewsControlProps } from '@/components/ui/campaign/locati
 import type { MarkerToolControls } from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import type { MarkerPanelState } from '@/components/ui/campaign/location-map/MarkerDetailPanel/MarkerDetailPanel.types';
 
+const setViewportFogStyle = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/fieldnotesVtt', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/fieldnotesVtt')>()),
+  setViewportFogStyle,
+}));
+
 // Full component render (real Canvas -> real Viewport) needs a live canvas
 // element unavailable in jsdom; the connection/attach wiring itself is
 // covered by focusSync.test.ts (attachFocusBroadcast) and DmBattleMapCanvas
@@ -174,7 +181,8 @@ describe('DmBattleMapCanvas wiring', () => {
 
     renderCanvas();
 
-    expect(mockHookState.viewport.setFogStyle).toHaveBeenCalledWith(
+    expect(setViewportFogStyle).toHaveBeenCalledWith(
+      mockHookState.viewport,
       expect.objectContaining({
         editorStyle: expect.objectContaining({ kind: 'procedural' }),
         playerStyle: expect.objectContaining({ kind: 'procedural' }),
@@ -184,7 +192,10 @@ describe('DmBattleMapCanvas wiring', () => {
     expect(toolbarProps?.fogPresetControls?.applied).toBe('cloudy');
     act(() => toolbarProps?.fogPresetControls?.select('solid'));
 
-    expect(mockHookState.viewport.setFogStyle).toHaveBeenLastCalledWith({});
+    expect(setViewportFogStyle).toHaveBeenLastCalledWith(
+      mockHookState.viewport,
+      {}
+    );
     expect(
       useBattleMapStore.getState().getBattleMap(CAMPAIGN_CODE, BATTLE_MAP_ID)
         ?.fogAppearance

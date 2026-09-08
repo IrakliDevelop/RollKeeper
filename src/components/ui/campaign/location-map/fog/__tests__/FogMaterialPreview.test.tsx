@@ -1,10 +1,10 @@
 import { render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { renderFogStylePreview } from '@fieldnotes/core';
+import { renderFogStylePreview } from '@fieldnotes/vtt';
 import { FogMaterialPreview } from '../FogPresetPanel/FogMaterialFields';
 
-vi.mock('@fieldnotes/core', async importOriginal => ({
-  ...(await importOriginal<typeof import('@fieldnotes/core')>()),
+vi.mock('@fieldnotes/vtt', async importOriginal => ({
+  ...(await importOriginal<typeof import('@fieldnotes/vtt')>()),
   renderFogStylePreview: vi.fn(),
 }));
 

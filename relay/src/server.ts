@@ -6,9 +6,11 @@ import type {
   Authenticate,
   HubBackend,
   HubFanout,
+  ServerSyncPlugin,
   SyncHub,
 } from '@fieldnotes/sync-server';
 import { RedisHubFanout } from '@fieldnotes/sync-redis';
+import { createFogServerPlugin } from '@fieldnotes/vtt/server';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
 import { EphemeralHubFanout } from './ephemeral-fanout.js';
@@ -43,6 +45,24 @@ export interface RelayHandle {
   close: () => Promise<void>;
 }
 
+/**
+ * Element mutations are authoritative in this relay's write-behind buffer
+ * until its next Redis flush. Keep their live fan-out on this instance while
+ * VTT fog operations retain the fog plugin's shared locality.
+ */
+export function createBufferedElementLocalityPlugin(): ServerSyncPlugin {
+  return {
+    name: 'rollkeeper-buffer-locality',
+    async process(op, context, next) {
+      const result = await next(op, context);
+      if (op.kind !== 'upsert' && op.kind !== 'remove' && op.kind !== 'clear') {
+        return result;
+      }
+      return { ...result, locality: 'local' };
+    },
+  };
+}
+
 /** Boots the HTTP + WebSocket relay without touching Redis or process.env
  * beyond what the caller passes in — the pieces `server.ts`'s `main()` and
  * the integration tests both need. */
@@ -72,7 +92,20 @@ export async function startRelay(
   });
 
   const policies = makePolicies(opts.secret);
-
+  const plugins = [
+    createFogServerPlugin({
+      authorize: policies.authorizeFog,
+      // Only authenticated RollKeeper battle-map roles receive fog state.
+      // Scene bytes remain independently filtered by `canRead` below.
+      filterSnapshot: (snapshot, viewer) =>
+        viewer.role === 'dm' ||
+        viewer.role === 'player' ||
+        viewer.role === 'display'
+          ? snapshot
+          : null,
+    }),
+    createBufferedElementLocalityPlugin(),
+  ];
   // `Authenticate` may return `AuthResult | null | Promise<AuthResult | null>`
   // (sync-server 0.13 `index.d.ts:164`); the wrapper awaits so both shapes
   // type-check and log correctly.
@@ -92,6 +125,7 @@ export async function startRelay(
     server,
     ...policies,
     authenticate,
+    plugins,
     ...(opts.backend ? { backend: opts.backend } : {}),
     ...(opts.fanout ? { fanout: opts.fanout } : {}),
     ...(opts.presenceThrottleMs !== undefined

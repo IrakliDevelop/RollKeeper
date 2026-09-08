@@ -22,6 +22,11 @@ import {
   useDmBattleMapCanvas,
   type DmBattleMapCanvasProps,
 } from './DmBattleMapCanvas.hooks';
+import {
+  createRollKeeperFogPlugin,
+  getViewportFogManager,
+  setViewportFogStyle,
+} from '@/lib/fieldnotesVtt';
 
 export type { DmBattleMapCanvasProps };
 
@@ -84,6 +89,9 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
     useAppliedFogAppearance(battleMap?.fogAppearance);
+  const [fogPlugin] = useState(() =>
+    createRollKeeperFogPlugin(resolveFogRendererOptions(fogAppearance))
+  );
   useFogAppearanceProjection({
     enabled:
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
@@ -103,14 +111,18 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   });
 
   useEffect(() => {
-    viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
+    if (viewport) {
+      setViewportFogStyle(viewport, resolveFogRendererOptions(fogAppearance));
+    }
     // fogFingerprint stands in for fogAppearance: same material, same effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport, fogFingerprint]);
 
   const handleFogAppearanceChange = useCallback(
     (appearance: FogAppearance) => {
-      viewport?.setFogStyle(resolveFogRendererOptions(appearance));
+      if (viewport) {
+        setViewportFogStyle(viewport, resolveFogRendererOptions(appearance));
+      }
       updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
     },
     [viewport, updateBattleMap, campaignCode, battleMapId]
@@ -136,7 +148,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
           className="h-full w-full"
           snapToGrid
           options={{
-            fog: resolveFogRendererOptions(fogAppearance),
+            plugins: [fogPlugin],
+            requiredCapabilities: ['vtt:fog'],
           }}
         />
         {viewport && (
@@ -181,7 +194,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                     .getBattleMap(campaignCode, battleMapId)?.dmOnlyElements ??
                   {}
                 }
-                getFogState={() => viewport.fog.getState()}
+                getFogState={() => getViewportFogManager(viewport).getState()}
                 getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={onExportError}
               />

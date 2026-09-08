@@ -9,7 +9,12 @@ import { ensureCanonicalLayers, MAP_LAYER_ID } from './layerContract';
  */
 export function pinGridToMapLayer(vp: Viewport) {
   ensureCanonicalLayers(vp, 'dm');
-  for (const g of vp.store.getElementsByType('grid')) {
+  for (const g of vp.store.getAll()) {
+    if (
+      g.type !== 'grid' &&
+      !(g.type === 'extension' && g.extensionType === 'vtt:grid')
+    )
+      continue;
     vp.layerManager.moveElementToLayer(g.id, MAP_LAYER_ID);
     vp.store.update(g.id, { locked: true });
   }

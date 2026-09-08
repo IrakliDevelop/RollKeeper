@@ -3,10 +3,10 @@ import {
   ElementStore,
   LayerManager,
   createImage,
-  createGrid,
   createShape,
   createNote,
 } from '@fieldnotes/core';
+import { createGrid } from '@fieldnotes/vtt';
 import {
   MAP_LAYER_ID,
   ANNOTATIONS_LAYER_ID,

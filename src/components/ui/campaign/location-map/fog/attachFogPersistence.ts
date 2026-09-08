@@ -1,4 +1,4 @@
-import type { FogManager, FogStateV1 } from '@fieldnotes/core';
+import type { FogManager, FogStateV1 } from '@fieldnotes/vtt';
 
 export function attachFogPersistence(
   fogManager: FogManager,

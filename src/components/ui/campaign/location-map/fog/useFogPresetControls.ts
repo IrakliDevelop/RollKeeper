@@ -19,6 +19,7 @@ import {
   parseFogPresetLibrary,
   sortFogPresetsForDisplay,
 } from '@/lib/fogPreset';
+import { setViewportFogStyle } from '@/lib/fieldnotesVtt';
 import type { FogAppearance } from '@/types/battlemap';
 import type {
   CustomFogMaterialV1,
@@ -138,7 +139,9 @@ export function useFogPresetControls(
         frameRef.current = null;
         const next = pendingRef.current;
         pendingRef.current = null;
-        if (next) viewport?.setFogStyle(resolveCustomFogRendererOptions(next));
+        if (next && viewport) {
+          setViewportFogStyle(viewport, resolveCustomFogRendererOptions(next));
+        }
       });
     },
     [viewport]
@@ -146,7 +149,9 @@ export function useFogPresetControls(
 
   const restoreApplied = useCallback(() => {
     cancelPreview();
-    viewport?.setFogStyle(resolveFogRendererOptions(applied));
+    if (viewport) {
+      setViewportFogStyle(viewport, resolveFogRendererOptions(applied));
+    }
   }, [cancelPreview, viewport, applied]);
 
   useEffect(() => () => cancelPreview(), [cancelPreview]);

@@ -8,6 +8,13 @@ import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEd
 import type { DmLocationEditorState } from '@/components/ui/campaign/location-map/DmLocationEditor.hooks';
 import type { LocationMap } from '@/types/location';
 
+const setViewportFogStyle = vi.hoisted(() => vi.fn());
+
+vi.mock('@/lib/fieldnotesVtt', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/fieldnotesVtt')>()),
+  setViewportFogStyle,
+}));
+
 // Full component render (real Canvas -> real Viewport) needs a live canvas
 // element unavailable in jsdom; the editor's own state machine is already
 // covered by DmLocationEditor.hooks.test.ts. Here we stub the hook so this
@@ -143,7 +150,8 @@ describe('DmLocationEditor wiring', () => {
       />
     );
 
-    expect(hookState.viewport?.setFogStyle).toHaveBeenCalledWith(
+    expect(setViewportFogStyle).toHaveBeenCalledWith(
+      hookState.viewport,
       expect.objectContaining({
         editorStyle: expect.objectContaining({ kind: 'procedural' }),
       })

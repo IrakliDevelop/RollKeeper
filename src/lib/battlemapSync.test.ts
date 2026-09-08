@@ -3,14 +3,13 @@ import {
   Camera,
   ElementStore,
   LayerManager,
-  MeasureTool,
   createHtmlElement,
   createShape,
-  FogManager,
   type CanvasElement,
   type Layer,
   type PointerState,
 } from '@fieldnotes/core';
+import { FogManager, MeasureTool } from '@fieldnotes/vtt';
 import {
   createManagedBattleMapConnection,
   isValidClientId,
@@ -2066,5 +2065,63 @@ describe('managed connection fog lifecycle with the published SDK', () => {
 
     dmConnection.stop();
     playerConnection.stop();
+  });
+
+  it('replays an offline DM fog reset after reconnect and rejects the stale snapshot rollback', async () => {
+    vi.useFakeTimers();
+    try {
+      const fog = new FogManager({ idFactory: () => 'local-generation' });
+      const transport = new FakeTransport();
+      const connection = connectionFor('dm-1', 'dm', fog, transport);
+      await vi.advanceTimersByTimeAsync(0);
+      const authoritative = new FogManager({
+        idFactory: () => 'hub-generation',
+      });
+      const hubState = authoritative.initialize({
+        bounds: { x: 0, y: 0, w: 256, h: 256 },
+        base: 'covered',
+        cellSize: 8,
+      });
+      const staleSnapshot = JSON.stringify({
+        from: 'hub',
+        op: {
+          kind: 'snapshot',
+          to: 'dm-1',
+          elements: [],
+          fog: {
+            meta: {
+              version: 1,
+              editor: 'hub',
+              definition: hubState.definition,
+            },
+            tiles: [],
+          },
+        },
+      });
+      transport.emitMessage(staleSnapshot);
+      expect(fog.getState()?.definition.base).toBe('covered');
+
+      transport.emitClose(4401);
+      fog.reset('revealed');
+      expect(fog.getState()?.definition.base).toBe('revealed');
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      const sentBefore = transport.sent.length;
+      transport.emitMessage(staleSnapshot);
+      const replayed = transport.sent
+        .slice(sentBefore)
+        .map(
+          raw =>
+            JSON.parse(raw) as {
+              op: { kind: string; record?: { definition?: { base?: string } } };
+            }
+        )
+        .find(envelope => envelope.op.kind === 'fog-meta');
+      expect(replayed?.op.record?.definition?.base).toBe('revealed');
+      expect(fog.getState()?.definition.base).toBe('revealed');
+      connection.stop();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

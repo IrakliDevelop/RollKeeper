@@ -1,7 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import type { Bounds, FogOperation, FogTool, Viewport } from '@fieldnotes/core';
+import type { Bounds, Viewport } from '@fieldnotes/core';
+import type { FogOperation, FogTool } from '@fieldnotes/vtt';
+import { getViewportFogManager } from '@/lib/fieldnotesVtt';
 import { configureFogView } from './configureFogView';
 import { initializeMapFog } from './initializeMapFog';
 import { reconcileMapFogBounds } from './reconcileMapFogBounds';
@@ -52,6 +54,7 @@ export function useDmFogControls(options: {
   disabledReason?: string;
 }): DmFogControls {
   const { viewport, getBounds } = options;
+  const fogManager = viewport ? getViewportFogManager(viewport) : null;
   const disabled = options.disabled ?? false;
   const [initialized, setInitialized] = useState(false);
   const [operation, setOperationState] = useState<FogOperation>('reveal');
@@ -67,22 +70,23 @@ export function useDmFogControls(options: {
       setInitialized(false);
       return;
     }
-    configureFogView(viewport.fog, 'dm', false);
+    if (!fogManager) return;
+    configureFogView(fogManager, 'dm', false);
     setPreviewState(false);
-    setInitialized(viewport.fog.getState() !== null);
-    const unsubscribe = viewport.fog.on('change', () => {
-      setInitialized(viewport.fog.getState() !== null);
+    setInitialized(fogManager.getState() !== null);
+    const unsubscribe = fogManager.on('change', () => {
+      setInitialized(fogManager.getState() !== null);
     });
     return unsubscribe;
-  }, [viewport]);
+  }, [fogManager, viewport]);
 
   useEffect(() => {
     if (disabled && viewport?.toolManager.activeTool?.name === 'fog') {
-      configureFogView(viewport.fog, 'dm', false);
+      if (fogManager) configureFogView(fogManager, 'dm', false);
       setPreviewState(false);
       viewport.setTool('select');
     }
-  }, [disabled, viewport]);
+  }, [disabled, fogManager, viewport]);
 
   const withDiagnostic = useCallback((run: () => void) => {
     try {
@@ -115,40 +119,42 @@ export function useDmFogControls(options: {
       );
       return;
     }
-    if (!viewport.fog.getState()) {
+    if (!fogManager?.getState()) {
       setPendingAction('enable');
       return;
     }
-    configureFogView(viewport.fog, 'dm', preview);
+    configureFogView(fogManager, 'dm', preview);
     viewport.setTool('fog');
     setDiagnostic(null);
-  }, [disabled, options.disabledReason, preview, viewport]);
+  }, [disabled, fogManager, options.disabledReason, preview, viewport]);
 
   const confirmAction = useCallback(() => {
-    if (!viewport || !pendingAction) return;
+    if (!viewport || !fogManager || !pendingAction) return;
     withDiagnostic(() => {
       if (pendingAction === 'enable') {
-        initializeMapFog(viewport.fog, getBounds());
-        configureFogView(viewport.fog, 'dm', false);
+        initializeMapFog(fogManager, getBounds());
+        configureFogView(fogManager, 'dm', false);
         setPreviewState(false);
         viewport.setTool('fog');
       } else if (pendingAction === 'cover-all') {
-        viewport.fog.reset('covered');
+        fogManager.reset('covered');
       } else if (pendingAction === 'reveal-all') {
-        const { x, y, w, h } = viewport.fog.getState()!.definition.bounds;
-        viewport.fog.applyRegion(
+        const state = fogManager.getState();
+        if (!state) throw new Error('Fog is not initialized');
+        const { x, y, w, h } = state.definition.bounds;
+        fogManager.applyRegion(
           { kind: 'rectangle', from: { x, y }, to: { x: x + w, y: y + h } },
           'reveal'
         );
       } else {
-        viewport.fog.disable();
-        configureFogView(viewport.fog, 'dm', false);
+        fogManager.disable();
+        configureFogView(fogManager, 'dm', false);
         setPreviewState(false);
         viewport.setTool('select');
       }
     });
     setPendingAction(null);
-  }, [getBounds, pendingAction, viewport, withDiagnostic]);
+  }, [fogManager, getBounds, pendingAction, viewport, withDiagnostic]);
 
   return {
     initialized,
@@ -175,14 +181,14 @@ export function useDmFogControls(options: {
     },
     setPreview: next => {
       setPreviewState(next);
-      if (viewport) configureFogView(viewport.fog, 'dm', next);
+      if (fogManager) configureFogView(fogManager, 'dm', next);
     },
     requestAction: setPendingAction,
     confirmAction,
     cancelAction: () => setPendingAction(null),
     reconcileBounds: () => {
-      if (!viewport?.fog.getState()) return;
-      withDiagnostic(() => reconcileMapFogBounds(viewport.fog, getBounds()));
+      if (!fogManager?.getState()) return;
+      withDiagnostic(() => reconcileMapFogBounds(fogManager, getBounds()));
     },
     reportError: error => setDiagnostic(fogDiagnostic(error)),
   };

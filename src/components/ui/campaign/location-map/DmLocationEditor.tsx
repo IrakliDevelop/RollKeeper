@@ -22,6 +22,11 @@ import { useBattleMapStore } from '@/store/battleMapStore';
 import { useFogAppearanceProjection } from './fog/useFogAppearanceProjection';
 import { useToast, ToastContainer } from '@/components/ui/feedback/Toast';
 import type { BattleMap } from '@/types/battlemap';
+import {
+  createRollKeeperFogPlugin,
+  getViewportFogManager,
+  setViewportFogStyle,
+} from '@/lib/fieldnotesVtt';
 
 export default function DmLocationEditor(props: DmLocationEditorProps) {
   const linkEncounter = useBattleMapStore(s => s.linkEncounter);
@@ -108,6 +113,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
   } = useDmLocationEditor(props);
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
     useAppliedFogAppearance(props.location.fogAppearance);
+  const [fogPlugin] = useState(() =>
+    createRollKeeperFogPlugin(resolveFogRendererOptions(fogAppearance))
+  );
   useFogAppearanceProjection({
     enabled:
       mode === 'battlemap' &&
@@ -127,7 +135,9 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
   });
 
   useEffect(() => {
-    viewport?.setFogStyle(resolveFogRendererOptions(fogAppearance));
+    if (viewport) {
+      setViewportFogStyle(viewport, resolveFogRendererOptions(fogAppearance));
+    }
     // fogFingerprint stands in for fogAppearance: same material, same effect.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport, fogFingerprint]);
@@ -197,7 +207,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                 name={props.location.name}
                 mapImageSize={props.location.mapImageSize}
                 getDmOnlyElements={getDmOnlyElements}
-                getFogState={() => viewport.fog.getState()}
+                getFogState={() => getViewportFogManager(viewport).getState()}
                 getFogStyle={() => resolvePlayerFogStyle(fogAppearance)}
                 onError={message =>
                   addToast({ type: 'error', title: 'Export failed', message })
@@ -332,7 +342,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
                   dotRadius: 1,
                 },
                 camera: { minZoom: 0.1, maxZoom: 5 },
-                fog: resolveFogRendererOptions(fogAppearance),
+                plugins: [fogPlugin],
+                requiredCapabilities: ['vtt:fog'],
               }}
               onReady={handleReady}
               className="h-full w-full"

@@ -1,4 +1,4 @@
-import type { FogRendererOptions, FogStyle } from '@fieldnotes/core';
+import type { FogRendererOptions, FogStyle } from '@fieldnotes/vtt';
 import { parseAppliedFogAppearance } from '@/lib/fogOfWar';
 import {
   resolveCustomFogRendererOptions,

@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import WebSocket from 'ws';
 import { createShape } from '@fieldnotes/core';
 import { InMemoryHubFanout, MemoryHubBackend } from '@fieldnotes/sync-server';
-import { startRelay, type RelayHandle } from './server.js';
+import {
+  createBufferedElementLocalityPlugin,
+  startRelay,
+  type RelayHandle,
+} from './server.js';
 import { EphemeralHubFanout } from './ephemeral-fanout.js';
 import { signBattleMapToken } from './token.js';
 import { DM_AUDIENCE } from './policies.js';
@@ -514,6 +518,49 @@ describe('fog multi-instance fan-out (real relay pair)', () => {
     dm.ws.close();
     player.ws.close();
   }, 10_000);
+
+  it('cross-instance production fan-out carries fog but never DM-only element bytes', async () => {
+    const room = nextRoom();
+    const dm = connect('dm', 'dm-1', portA, room);
+    const player = connect('player', 'char1', portB, room);
+    await Promise.all([dm.opened, player.opened]);
+    await admit(dm, player);
+
+    send(dm.ws, {
+      from: 'dm-1',
+      op: {
+        kind: 'upsert',
+        element: {
+          ...createShape({ position: { x: 1, y: 1 }, size: { w: 10, h: 10 } }),
+          id: 'cross-instance-secret-bytes',
+          audience: DM_AUDIENCE,
+        },
+      },
+    });
+    send(
+      dm.ws,
+      fogMeta(
+        'dm-1',
+        1,
+        makeDef('covered', 'gen-private-fanout', {
+          x: 0,
+          y: 0,
+          w: 512,
+          h: 512,
+        })
+      )
+    );
+    await player.waitFor(
+      message => message.op.kind === 'fog-meta' && message.from !== 'hub'
+    );
+
+    expect(JSON.stringify(player.messages)).not.toContain(
+      'cross-instance-secret-bytes'
+    );
+    expect(JSON.stringify(player.messages)).toContain('gen-private-fanout');
+    dm.ws.close();
+    player.ws.close();
+  }, 10_000);
 });
 
 describe('fog authorizeFog policy (unit-level)', () => {
@@ -538,5 +585,39 @@ describe('fog authorizeFog policy (unit-level)', () => {
       false
     );
     expect(authorizeFog({ ...base, role: '', userId: 'x' })).toBe(false);
+  });
+});
+
+describe('buffered element operation locality', () => {
+  it('marks element writes local without changing shared VTT operation locality', async () => {
+    const plugin = createBufferedElementLocalityPlugin();
+    const context = {
+      room: 'R:bm',
+      connectionId: 'dm-1',
+      role: 'dm',
+      userId: 'dm-1',
+      backend: new MemoryHubBackend(),
+      backendPlugin: () => undefined,
+    };
+    const elementOp = {
+      kind: 'upsert' as const,
+      element: createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+      }),
+    };
+    const local = await plugin.process?.(elementOp, context, async op => ({
+      accepted: op,
+      corrections: [],
+    }));
+    const fogOp = fogMeta('dm-1', 1, makeDef('covered', 'gen-locality')).op;
+    const shared = await plugin.process?.(
+      fogOp as Parameters<NonNullable<typeof plugin.process>>[0],
+      context,
+      async op => ({ accepted: op, corrections: [], locality: 'shared' })
+    );
+
+    expect(local?.locality).toBe('local');
+    expect(shared?.locality).toBe('shared');
   });
 });

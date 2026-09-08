@@ -35,12 +35,12 @@ import {
   SelectTool,
   ArrowTool,
   PencilTool,
-  MeasureTool,
   type ElementActivationEvent,
   type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import { MeasureTool } from '@fieldnotes/vtt';
 import { BattleMapMinimap } from './BattleMapMinimap';
 import { BattleMapExportControl } from './BattleMapExportControl';
 import { PlayerHandTool } from './PlayerHandTool';
@@ -102,6 +102,11 @@ import { attachConnectionScope } from './connectionScope';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
 
 import type { MovementResolution } from './movementTool';
+import {
+  createRollKeeperFogPlugin,
+  getViewportFogManager,
+  installVttGridController,
+} from '@/lib/fieldnotesVtt';
 
 interface PlayerBattleMapCanvasProps {
   campaignCode: string;
@@ -303,6 +308,7 @@ export function PlayerBattleMapCanvas({
   markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
   pendingTransfers,
 }: PlayerBattleMapCanvasProps) {
+  const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -576,7 +582,9 @@ export function PlayerBattleMapCanvas({
     // `DmLocationEditor.hooks.ts`) — dev/test-only, no-ops in production.
     exposeStoreForE2E('viewport', vp);
 
-    configureFogView(vp.fog, 'player', false);
+    const fogManager = fogPlugin.manager;
+    installVttGridController(vp);
+    configureFogView(fogManager, 'player', false);
 
     // Canonical bands: map (locked) at the bottom, DM annotations (locked
     // for players) above it, this player's own layer in the player band on
@@ -641,7 +649,7 @@ export function PlayerBattleMapCanvas({
       store: vp.store,
       clientId: characterId,
       tokenRequest: { role: 'player', battleMapId, playerId: characterId },
-      fog: { manager: vp.fog },
+      fog: { manager: fogManager },
       // Layer definitions sync (replaces the unknown-layer mirror): remote
       // layers apply locked for players — hit-test and marquee skip content
       // they cannot edit (the relay rejects their writes to it anyway) —
@@ -789,9 +797,13 @@ export function PlayerBattleMapCanvas({
           defaultTool="hand"
           onReady={handleReady}
           className="h-full w-full"
-          options={{ fog: {} }}
+          options={{
+            plugins: [fogPlugin],
+            requiredCapabilities: ['vtt:fog'],
+          }}
           snapToGrid
         />
+        <BattleMapBootstrapPrivacyCover status={status} />
         {viewport && (
           <PlayerToolbar
             status={status}
@@ -803,7 +815,7 @@ export function PlayerBattleMapCanvas({
               <BattleMapExportControl
                 getViewport={() => viewport}
                 name="battle-map"
-                getFogState={() => viewport.fog.getState()}
+                getFogState={() => getViewportFogManager(viewport).getState()}
                 getFogStyle={() =>
                   resolvePlayerFogStyle(getAppliedFogAppearance(viewport))
                 }
@@ -878,5 +890,34 @@ export function PlayerBattleMapCanvas({
         {viewport && children}
       </div>
     </ViewportContext.Provider>
+  );
+}
+
+/** Opaque until the authoritative element and fog snapshot has been applied. */
+export function BattleMapBootstrapPrivacyCover({
+  status,
+  message,
+}: {
+  status: BattleMapConnectionStatus;
+  message?: string;
+}) {
+  if (status === 'live') return null;
+  return (
+    <div
+      data-testid="battlemap-bootstrap-privacy-cover"
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#fff',
+        background: '#000',
+        pointerEvents: 'none',
+      }}
+    >
+      {message ?? (status === 'denied' ? 'Access denied' : 'Connecting…')}
+    </div>
   );
 }

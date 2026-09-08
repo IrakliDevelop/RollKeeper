@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 
-import { PlayerToolbar } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
+import {
+  BattleMapBootstrapPrivacyCover,
+  PlayerToolbar,
+} from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
 import { PLAYER_TOKEN_KIND } from '@/components/ui/campaign/location-map/PlayerTokenTool';
 
 import type { CanvasElement } from '@fieldnotes/core';
@@ -126,5 +129,18 @@ describe('PlayerToolbar', () => {
       />
     );
     expect(screen.queryByRole('button', { name: /views/i })).toBeNull();
+  });
+
+  it('keeps an opaque privacy cover over the canvas until bootstrap is live', () => {
+    const { rerender } = render(
+      <BattleMapBootstrapPrivacyCover status="connecting" />
+    );
+    const cover = screen.getByTestId('battlemap-bootstrap-privacy-cover');
+    expect(cover).toHaveStyle({ position: 'fixed', background: '#000' });
+
+    rerender(<BattleMapBootstrapPrivacyCover status="live" />);
+    expect(
+      screen.queryByTestId('battlemap-bootstrap-privacy-cover')
+    ).toBeNull();
   });
 });

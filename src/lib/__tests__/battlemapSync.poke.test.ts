@@ -4,7 +4,7 @@ import {
   pokeFeatureFromEnvelope,
   type BattleMapTransport,
 } from '@/lib/battlemapSync';
-import type { ElementStore } from '@fieldnotes/core';
+import { ElementStore } from '@fieldnotes/core';
 
 const POKE_RAW = JSON.stringify({
   from: 'hub',
@@ -69,14 +69,7 @@ describe('managed connection onPoke', () => {
 
   it('invokes onPoke for poke envelopes and ignores everything else', async () => {
     const onPoke = vi.fn();
-    const store = {
-      snapshot: () => [],
-      getById: () => undefined,
-      add: () => {},
-      update: () => {},
-      subscribe: () => () => {},
-      on: () => () => {},
-    } as unknown as ElementStore;
+    const store = new ElementStore();
 
     const conn = createManagedBattleMapConnection({
       relayUrl: 'wss://relay.test',
