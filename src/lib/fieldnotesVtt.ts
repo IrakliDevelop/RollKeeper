@@ -13,8 +13,8 @@ import {
 const registry = getDefaultElementRegistry();
 export const fieldnotesElementRegistry = registry;
 
-// The v3 serializer and sync boundary both use the default registry. Install
-// the VTT codecs before any persisted grid/template state can be parsed.
+// The serializer migration and sync boundary both use the default registry.
+// Install the VTT codecs before persisted grid/template state is parsed.
 const hasGridAdapter = Boolean(registry.getAdapter('vtt:grid'));
 const hasTemplateAdapter = Boolean(registry.getAdapter('vtt:template'));
 if (!hasGridAdapter && !hasTemplateAdapter) {

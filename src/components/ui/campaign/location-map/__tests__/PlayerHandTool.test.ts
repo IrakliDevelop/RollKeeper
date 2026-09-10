@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { SelectTool, createImage } from '@fieldnotes/core';
-import { createTemplate } from '@fieldnotes/vtt';
+import { createTemplate, templateElementTypeDefinition } from '@fieldnotes/vtt';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
 import { isCombatantToken } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
@@ -106,7 +106,7 @@ describe('PlayerHandTool', () => {
       radius: 200,
       layerId: OWN_LAYER,
     });
-    const ctx = fakeCtx([template]);
+    const ctx = fakeCtx([templateElementTypeDefinition.wrap(template)]);
     const tool = new PlayerHandTool(selectTool);
     tool.onPointerDown(down(20, 20), ctx);
     expect(ctx.switchTool).not.toHaveBeenCalled();

@@ -71,7 +71,6 @@ export function exitArrangeMaps(
     if (
       el.layerId === MAP_LAYER_ID &&
       el.type !== 'image' &&
-      el.type !== 'grid' &&
       !(el.type === 'extension' && el.extensionType === 'vtt:grid')
     ) {
       lm.moveElementToLayer(el.id, ANNOTATIONS_LAYER_ID);

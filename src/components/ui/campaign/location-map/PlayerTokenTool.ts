@@ -227,8 +227,8 @@ export class PlayerTemplateTool extends TemplateTool {
     for (const el of ctx.store.getAll()) {
       if (
         !existingIds.has(el.id) &&
-        (el.type === 'template' ||
-          (el.type === 'extension' && el.extensionType === 'vtt:template'))
+        el.type === 'extension' &&
+        el.extensionType === 'vtt:template'
       ) {
         ctx.store.update(el.id, { zIndex: TEMPLATE_ELEMENT_ZINDEX });
       }

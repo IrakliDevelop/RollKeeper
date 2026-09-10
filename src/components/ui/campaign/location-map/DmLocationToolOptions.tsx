@@ -9,11 +9,14 @@ import type {
   PencilToolOptions,
   PingToolOptions,
   ShapeToolOptions,
-  TemplateRenderStyle,
-  TemplateShape,
   TextToolOptions,
 } from '@fieldnotes/core';
-import type { MeasureToolOptions, TemplateToolOptions } from '@fieldnotes/vtt';
+import type {
+  MeasureToolOptions,
+  TemplateRenderStyle,
+  TemplateShape,
+  TemplateToolOptions,
+} from '@fieldnotes/vtt';
 import {
   useActiveTool,
   useSelectionOps,

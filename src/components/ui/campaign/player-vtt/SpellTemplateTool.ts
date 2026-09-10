@@ -1,4 +1,4 @@
-import { createTemplate } from '@fieldnotes/vtt';
+import { createTemplate, templateElementTypeDefinition } from '@fieldnotes/vtt';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 import { TEMPLATE_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
@@ -49,7 +49,7 @@ export class SpellTemplateTool implements Tool {
     // `radius` is the FULL side, so a 20ft cube = 20ft across, same formula
     // as circle (where radius really is a radius).
     const radiusPx = (config.sizeFeet / FEET_PER_CELL) * cellPx;
-    // Line spells render as RECTANGLE templates (core 0.48): a directional
+    // Line spells render as RECTANGLE templates: a directional
     // AoE with independent length and width, so Lightning-Bolt-style lines
     // finally honor their real widthFeet instead of the default line width.
     const isLine = config.shape === 'line';
@@ -72,9 +72,7 @@ export class SpellTemplateTool implements Tool {
       layerId: ctx.activeLayerId ?? '',
       zIndex: TEMPLATE_ELEMENT_ZINDEX,
     });
-    const adapter = ctx.elementRegistry?.getAdapter('vtt:template');
-    const runtime = adapter ? adapter.wrap(el) : el;
-    ctx.store.add(runtime);
+    ctx.store.add(templateElementTypeDefinition.wrap(el));
     this.placedId = el.id;
     this.origin = origin;
     this.aiming = config.shape === 'cone' || config.shape === 'line';
@@ -87,16 +85,13 @@ export class SpellTemplateTool implements Tool {
     const angle = Math.atan2(world.y - this.origin.y, world.x - this.origin.x);
     const current = ctx.store.getById(this.placedId);
     if (
-      current?.type === 'extension' &&
-      current.extensionType === 'vtt:template'
-    ) {
-      ctx.store.update(this.placedId, {
-        data: { ...current.data, angle },
-      });
-    } else {
-      // Compatibility for test/custom stores that have no registered adapter.
-      ctx.store.update(this.placedId, { angle });
-    }
+      current?.type !== 'extension' ||
+      current.extensionType !== 'vtt:template'
+    )
+      return;
+    ctx.store.update(this.placedId, {
+      data: { ...current.data, angle },
+    });
     ctx.requestRender();
   }
 

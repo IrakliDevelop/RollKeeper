@@ -310,8 +310,7 @@ export function FieldNotesDemoToolbar({
   const viewport = useViewport();
   const gridEls = elements.filter(
     element =>
-      element.type === 'grid' ||
-      (element.type === 'extension' && element.extensionType === 'vtt:grid')
+      element.type === 'extension' && element.extensionType === 'vtt:grid'
   );
   const snapOn = viewport.snapToGrid;
   const { selectedCount, selectedIds } = useSelectionOps();
