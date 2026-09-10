@@ -6,7 +6,7 @@ import {
   createShape,
   createNote,
 } from '@fieldnotes/core';
-import { createGrid } from '@fieldnotes/vtt';
+import { createGrid, gridElementTypeDefinition } from '@fieldnotes/vtt';
 import {
   MAP_LAYER_ID,
   ANNOTATIONS_LAYER_ID,
@@ -68,7 +68,7 @@ describe('enter/exitArrangeMaps', () => {
       opacity: 0.5,
       layerId: MAP_LAYER_ID,
     });
-    vp.store.add(grid);
+    vp.store.add(gridElementTypeDefinition.wrap(grid));
     vp.store.update(grid.id, { locked: true });
 
     const session = enterArrangeMaps(vp);
@@ -117,7 +117,7 @@ describe('enter/exitArrangeMaps', () => {
       opacity: 0.5,
       layerId: MAP_LAYER_ID,
     });
-    vp.store.add(grid);
+    vp.store.add(gridElementTypeDefinition.wrap(grid));
 
     const session = enterArrangeMaps(vp);
 

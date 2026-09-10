@@ -61,7 +61,7 @@ function productionState(fog: unknown, extensionFog: unknown): string {
   });
 }
 
-describe('RollKeeper Field Notes VTT v3 boundary', () => {
+describe('RollKeeper Field Notes VTT boundary', () => {
   let container: HTMLDivElement;
 
   beforeEach(() => {
@@ -99,7 +99,7 @@ describe('RollKeeper Field Notes VTT v3 boundary', () => {
     expect(fieldnotesElementRegistry.getAdapter('vtt:template')).toBeDefined();
   });
 
-  it('loads a production-shaped v3 map and dual-writes legacy fog and extension fog', () => {
+  it('loads a production-shaped v3 map and exports canonical v4 state', () => {
     const legacyManager = new FogManager({
       idFactory: () => 'legacy-generation',
     });
@@ -139,17 +139,19 @@ describe('RollKeeper Field Notes VTT v3 boundary', () => {
 
     const exported = JSON.parse(viewport.exportJSON()) as {
       version: number;
-      elements: Array<{ type: string }>;
+      elements: Array<{ type: string; extensionType?: string }>;
       extensions: { fog: { version: number; data: unknown } };
-      fog: unknown;
+      fog?: unknown;
     };
-    expect(exported.version).toBe(3);
+    expect(exported.version).toBe(4);
     expect(
-      exported.elements.map((element: { type: string }) => element.type)
-    ).toEqual(['grid', 'template']);
+      exported.elements.map(element => [element.type, element.extensionType])
+    ).toEqual([
+      ['extension', 'vtt:grid'],
+      ['extension', 'vtt:template'],
+    ]);
     expect(exported.extensions.fog).toEqual({ version: 1, data: extensionFog });
-    expect(exported.fog).toEqual(extensionFog);
-    expect(exported.fog).not.toBe(exported.extensions.fog.data);
+    expect(exported.fog).toBeUndefined();
 
     viewport.destroy();
   });

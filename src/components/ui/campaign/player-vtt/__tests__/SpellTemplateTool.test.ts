@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { ToolContext, PointerState } from '@fieldnotes/core';
+import type {
+  CanvasElement,
+  ToolContext,
+  PointerState,
+} from '@fieldnotes/core';
+import { templateElementTypeDefinition } from '@fieldnotes/vtt';
 import type { TemplateElement } from '@fieldnotes/vtt';
 import {
   SpellTemplateTool,
@@ -7,12 +12,12 @@ import {
 } from '@/components/ui/campaign/player-vtt/SpellTemplateTool';
 
 function fakeCtx() {
-  const added: TemplateElement[] = [];
+  const added: CanvasElement[] = [];
   const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
   const ctx = {
     camera: { screenToWorld: (p: { x: number; y: number }) => p },
     store: {
-      add: vi.fn((el: TemplateElement) => {
+      add: vi.fn((el: CanvasElement) => {
         added.push(el);
         return el;
       }),
@@ -30,6 +35,26 @@ function fakeCtx() {
     snapToGrid: false, // smartSnap becomes identity without grid snap
   } as unknown as ToolContext;
   return { ctx, added, updates };
+}
+
+function placedTemplate(f: ReturnType<typeof fakeCtx>): TemplateElement {
+  const runtime = f.added[0];
+  if (
+    !runtime ||
+    runtime.type !== 'extension' ||
+    runtime.extensionType !== 'vtt:template'
+  ) {
+    throw new Error('Expected a vtt:template extension element');
+  }
+  return templateElementTypeDefinition.unwrap(runtime);
+}
+
+function updatedAngle(f: ReturnType<typeof fakeCtx>): number {
+  const data = f.updates[0]?.patch.data as { angle?: unknown } | undefined;
+  if (typeof data?.angle !== 'number') {
+    throw new Error('Expected a template data angle update');
+  }
+  return data.angle;
 }
 
 const down = (
@@ -61,7 +86,7 @@ describe('SpellTemplateTool', () => {
     const { tool, onPlaced } = armed({ shape: 'circle', sizeFeet: 20 });
     tool.onPointerDown(down(100, 200), f.ctx);
     expect(f.added).toHaveLength(1);
-    const el = f.added[0];
+    const el = placedTemplate(f);
     expect(el.templateShape).toBe('circle');
     expect(el.radius).toBe(160);
     expect(el.radiusFeet).toBe(20);
@@ -77,21 +102,21 @@ describe('SpellTemplateTool', () => {
   });
 
   it('squares use sizeFeet as the SIDE — the renderer draws side = radius (15ft cube @5ft/40px → radius 120px)', () => {
-    // @fieldnotes/core draws squares as fillRect(cx - r/2, cy - r/2, r, r):
+    // The VTT renderer draws squares as fillRect(cx - r/2, cy - r/2, r, r):
     // `radius` IS the full side length, so a 15ft cube spans 3 cells.
     const { tool } = armed({ shape: 'square', sizeFeet: 15 });
     tool.onPointerDown(down(0, 0), f.ctx);
-    expect(f.added[0].templateShape).toBe('square');
-    expect(f.added[0].radius).toBe(120);
+    expect(placedTemplate(f).templateShape).toBe('square');
+    expect(placedTemplate(f).radius).toBe(120);
   });
 
   it('cones aim by drag: angle updates on move, final on release', () => {
     const { tool, onPlaced } = armed({ shape: 'cone', sizeFeet: 15 });
     tool.onPointerDown(down(0, 0), f.ctx);
-    expect(f.added[0].angle).toBe(0);
+    expect(placedTemplate(f).angle).toBe(0);
     tool.onPointerMove(down(10, 10), f.ctx);
     expect(f.updates).toHaveLength(1);
-    expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 4);
+    expect(updatedAngle(f)).toBeCloseTo(Math.PI / 4);
     tool.onPointerUp(down(10, 10), f.ctx);
     expect(onPlaced).toHaveBeenCalledTimes(1);
     expect(f.ctx.switchTool).toHaveBeenCalledWith('select');
@@ -104,7 +129,7 @@ describe('SpellTemplateTool', () => {
       tool.onPointerDown(down(0, 0, pointerType), f.ctx);
       tool.onPointerMove(down(0, 10, pointerType), f.ctx);
       tool.onPointerUp(down(0, 10, pointerType), f.ctx);
-      expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 2);
+      expect(updatedAngle(f)).toBeCloseTo(Math.PI / 2);
       expect(onPlaced).toHaveBeenCalledOnce();
     }
   );
@@ -120,8 +145,8 @@ describe('SpellTemplateTool', () => {
     tool.onPointerDown(down(43, 77), f.ctx);
     tool.onPointerMove(down(140, 80), f.ctx);
     expect(constrainPoint).toHaveBeenCalledWith({ x: 43, y: 77 });
-    expect(f.added[0].position).toEqual({ x: 40, y: 80 });
-    expect(f.updates[0].patch.angle).toBe(0);
+    expect(placedTemplate(f).position).toEqual({ x: 40, y: 80 });
+    expect(updatedAngle(f)).toBe(0);
   });
 
   it('does not update angle for circles on move', () => {
@@ -138,16 +163,16 @@ describe('SpellTemplateTool', () => {
     (f.ctx as { gridType?: string }).gridType = 'hex';
     const { tool } = armed({ shape: 'circle', sizeFeet: 20 });
     tool.onPointerDown(down(0, 0), f.ctx);
-    expect(f.added[0].radius).toBeCloseTo(4 * Math.sqrt(3) * 40, 6);
-    expect(f.added[0].radiusFeet).toBe(20);
+    expect(placedTemplate(f).radius).toBeCloseTo(4 * Math.sqrt(3) * 40, 6);
+    expect(placedTemplate(f).radiusFeet).toBe(20);
   });
 
   it('line spells place as RECTANGLE templates honoring widthFeet (100×10ft @5ft/40px)', () => {
-    // core 0.48: rectangle = directional AoE with independent length/width —
-    // finally renders Lightning-Bolt-style lines at their real width.
+    // Rectangle templates are directional AoEs with independent length/width,
+    // so Lightning-Bolt-style lines render at their real width.
     const { tool } = armed({ shape: 'line', sizeFeet: 100, widthFeet: 10 });
     tool.onPointerDown(down(0, 0), f.ctx);
-    const el = f.added[0];
+    const el = placedTemplate(f);
     expect(el.templateShape).toBe('rectangle');
     expect(el.radius).toBe((100 / 5) * 40);
     expect(el.width).toBe((10 / 5) * 40);
@@ -157,15 +182,15 @@ describe('SpellTemplateTool', () => {
   it('line spells default to 5ft width (one cell)', () => {
     const { tool } = armed({ shape: 'line', sizeFeet: 60 });
     tool.onPointerDown(down(0, 0), f.ctx);
-    expect(f.added[0].templateShape).toBe('rectangle');
-    expect(f.added[0].width).toBe(40);
+    expect(placedTemplate(f).templateShape).toBe('rectangle');
+    expect(placedTemplate(f).width).toBe(40);
   });
 
   it('line (rectangle) placement aims by drag like cones', () => {
     const { tool, onPlaced } = armed({ shape: 'line', sizeFeet: 30 });
     tool.onPointerDown(down(0, 0), f.ctx);
     tool.onPointerMove(down(0, 10), f.ctx);
-    expect(f.updates[0].patch.angle).toBeCloseTo(Math.PI / 2);
+    expect(updatedAngle(f)).toBeCloseTo(Math.PI / 2);
     tool.onPointerUp(down(0, 10), f.ctx);
     expect(onPlaced).toHaveBeenCalledTimes(1);
   });

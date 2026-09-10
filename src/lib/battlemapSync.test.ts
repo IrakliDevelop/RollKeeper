@@ -169,13 +169,20 @@ describe('createManagedBattleMapConnection', () => {
     expect(transportUrls).toEqual([
       'wss://relay.example?room=CODE%3Amap-1&token=test-token',
     ]);
-    // the SyncClient announces itself with the stable clientId
-    const first = JSON.parse(fakeTransport.sent[0]) as {
-      from: string;
-      op: { kind: string };
-    };
-    expect(first.from).toBe('dm-1');
-    expect(first.op.kind).toBe('request-snapshot');
+    // The SyncClient announces its v4 capabilities, then requests the
+    // authoritative snapshot. Both envelopes carry the stable clientId.
+    const initial = fakeTransport.sent.slice(0, 2).map(
+      message =>
+        JSON.parse(message) as {
+          from: string;
+          op: { kind: string };
+        }
+    );
+    expect(initial.map(envelope => envelope.from)).toEqual(['dm-1', 'dm-1']);
+    expect(initial.map(envelope => envelope.op.kind)).toEqual([
+      'capabilities',
+      'request-snapshot',
+    ]);
 
     conn.stop();
   });

@@ -196,7 +196,8 @@ describe('PlayerTemplateTool zIndex stamping', () => {
     const { ctx, elements, updates } = fakeCtx();
     const preExisting = {
       id: 'existing-1',
-      type: 'template',
+      type: 'extension',
+      extensionType: 'vtt:template',
     } as unknown as CanvasElement;
     elements.push(preExisting);
 
@@ -206,7 +207,8 @@ describe('PlayerTemplateTool zIndex stamping', () => {
       .mockImplementation((_state, c) => {
         c.store.add({
           id: 'new-template-1',
-          type: 'template',
+          type: 'extension',
+          extensionType: 'vtt:template',
         } as unknown as CanvasElement);
       });
 
