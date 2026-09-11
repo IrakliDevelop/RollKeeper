@@ -167,7 +167,7 @@ describe('createManagedBattleMapConnection', () => {
       })
     );
     expect(transportUrls).toEqual([
-      'wss://relay.example?room=CODE%3Amap-1&token=test-token',
+      'wss://relay.example?room=CODE_map-1&token=test-token',
     ]);
     // The SyncClient announces its v4 capabilities, then requests the
     // authoritative snapshot. Both envelopes carry the stable clientId.

@@ -5,7 +5,7 @@ import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
 const SECRET = 'lane-test-secret';
-const ROOM = 'CAMP01:bm-1';
+const ROOM = 'CAMP01_bm-1';
 /** Wide window so "inside one window" is provable, not guessed. */
 const THROTTLE_MS = 1000;
 /**

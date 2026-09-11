@@ -5,7 +5,7 @@ import { makePolicies, DM_AUDIENCE } from './policies.js';
 import { signBattleMapToken } from './token.js';
 
 const SECRET = 'test-secret';
-const ROOM = 'ABC123:bm-1';
+const ROOM = 'ABC123_bm-1';
 const { authenticate, authorize, authorizeLayer, canRead } =
   makePolicies(SECRET);
 
@@ -44,7 +44,7 @@ describe('authenticate', () => {
     expect(await authenticate(req(`/?room=${ROOM}`))).toBeNull();
   });
   it('rejects a token for a different room', async () => {
-    const t = tokenFor('dm-1', 'dm', 'OTHER:bm-9');
+    const t = tokenFor('dm-1', 'dm', 'OTHER_bm-9');
     expect(await authenticate(req(`/?room=${ROOM}&token=${t}`))).toBeNull();
   });
   it('rejects an expired token', async () => {

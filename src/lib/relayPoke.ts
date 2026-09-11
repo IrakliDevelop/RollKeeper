@@ -1,4 +1,5 @@
 import { signBattleMapToken } from '@/lib/battlemapToken';
+import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import { listLiveMapRooms, MAX_LIVE_MAP_ROOMS } from '@/lib/liveMapRooms';
 import { campaignSharedKey } from '@/lib/redis';
 
@@ -51,7 +52,7 @@ async function pokeRoom(
   const secret = process.env.BATTLEMAP_RELAY_SECRET;
   if (!relayUrl || !secret) return;
   try {
-    const room = `${code}:${battleMapId}`;
+    const room = battleMapRelayRoom(code, battleMapId);
     const token = signBattleMapToken(
       {
         userId: '@server',

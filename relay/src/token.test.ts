@@ -9,7 +9,7 @@ const SECRET = 'test-secret';
 const payload: BattleMapTokenPayload = {
   userId: 'dm-abc123',
   role: 'dm',
-  room: 'ABC123:bm-xyz',
+  room: 'ABC123_bm-xyz',
   exp: 1_700_000_000_000,
 };
 

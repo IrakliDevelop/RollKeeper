@@ -5,7 +5,7 @@ export type BattleMapRole = 'dm' | 'player' | 'display';
 export interface BattleMapTokenPayload {
   userId: string;
   role: BattleMapRole;
-  /** `${campaignCode}:${battleMapId}` */
+  /** Fieldnotes-safe battle-map room identifier minted by the application. */
   room: string;
   /** Expiry, unix epoch milliseconds */
   exp: number;

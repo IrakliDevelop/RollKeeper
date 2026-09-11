@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
+import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import { recordLiveMapRoom } from '@/lib/liveMapRooms';
 import {
@@ -37,6 +38,15 @@ export async function POST(
     if (!battleMapId) {
       return NextResponse.json(
         { error: 'role and battleMapId are required' },
+        { status: 400 }
+      );
+    }
+    let room: string;
+    try {
+      room = battleMapRelayRoom(code, battleMapId);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid campaign or battle map identifier' },
         { status: 400 }
       );
     }
@@ -79,7 +89,7 @@ export async function POST(
       {
         userId: session.userId,
         role: session.role,
-        room: `${code}:${battleMapId}`,
+        room,
         exp: Date.now() + TOKEN_TTL_MS,
       },
       secret

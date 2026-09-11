@@ -8,6 +8,7 @@ import {
 import type { ElementStore, CanvasElement, Layer } from '@fieldnotes/core';
 import type { FogManager } from '@fieldnotes/vtt';
 import { createFogClientPlugin } from '@fieldnotes/vtt/sync';
+import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import type { BattleMapRole } from '@/lib/battlemapToken';
 import {
   parseProjectedFogAppearance,
@@ -217,7 +218,7 @@ export function createManagedBattleMapConnection(
     return inertDeniedConnection();
   }
 
-  const room = `${opts.campaignCode}:${opts.battleMapId}`;
+  const room = battleMapRelayRoom(opts.campaignCode, opts.battleMapId);
   let stopped = false;
 
   const connection = createManagedSyncConnection({

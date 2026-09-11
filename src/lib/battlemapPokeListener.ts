@@ -2,6 +2,7 @@ import {
   mintBattleMapToken,
   pokeFeatureFromEnvelope,
 } from '@/lib/battlemapSync';
+import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 
 export interface PokeListenerOptions {
   campaignCode: string;
@@ -51,7 +52,7 @@ export function createBattleMapPokeListener(
   let connecting = false;
   let generation = 0;
 
-  const room = `${opts.campaignCode}:${opts.battleMapId}`;
+  const room = battleMapRelayRoom(opts.campaignCode, opts.battleMapId);
 
   const clearRetryTimer = (): void => {
     if (retryTimer) {

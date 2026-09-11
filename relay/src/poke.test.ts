@@ -7,7 +7,7 @@ import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
 const SECRET = 'test-secret';
-const ROOM = 'CAMP1:map-42';
+const ROOM = 'CAMP1_map-42';
 
 function fakeHub(rooms: Record<string, { send: (m: string) => void }[]>) {
   const hub = new SyncHub();
@@ -112,7 +112,7 @@ describe('handlePokeRequest', () => {
     const body = JSON.stringify({
       room: ROOM,
       feature: 'initiative',
-      token: dmToken('CAMP1:other-map'),
+      token: dmToken('CAMP1_other-map'),
     });
     await handlePokeRequest(hub, SECRET, fakeReq(body), res);
     expect(res.statusCode).toBe(401);

@@ -94,10 +94,10 @@ describe('sendInitiativePoke', () => {
     const [url, init] = call as unknown as [string, RequestInit];
     expect(url).toBe('https://relay.example.com/poke');
     const body = JSON.parse(init.body as string);
-    expect(body.room).toBe('CAMP1:map-42');
+    expect(body.room).toBe('CAMP1_map-42');
     expect(body.feature).toBe('initiative');
     const payload = verifyBattleMapToken(body.token, SECRET, 1_000_000);
-    expect(payload).toMatchObject({ role: 'dm', room: 'CAMP1:map-42' });
+    expect(payload).toMatchObject({ role: 'dm', room: 'CAMP1_map-42' });
   });
 
   it('does nothing when no battle map is active', async () => {
@@ -159,7 +159,7 @@ describe('sendInitiativePoke', () => {
     const [url, init] = call as unknown as [string, RequestInit];
     expect(url).toBe('https://relay.example.com/poke');
     const body = JSON.parse(init.body as string);
-    expect(body.room).toBe('CAMP1:map-42');
+    expect(body.room).toBe('CAMP1_map-42');
     expect(body.feature).toBe('players');
   });
 
@@ -192,7 +192,7 @@ describe('sendInitiativePoke', () => {
       const [, init] = call as unknown as [string, RequestInit];
       return JSON.parse(init.body as string).room;
     });
-    expect(rooms.sort()).toEqual(['CAMP1:map-1', 'CAMP1:map-2']);
+    expect(rooms.sort()).toEqual(['CAMP1_map-1', 'CAMP1_map-2']);
     for (const call of fetchFn.mock.calls) {
       const [, init] = call as unknown as [string, RequestInit];
       const body = JSON.parse(init.body as string);
@@ -221,7 +221,7 @@ describe('sendBattleMapPokeToRoom', () => {
     ];
     expect(url).toBe('https://relay.example.com/poke');
     const body = JSON.parse(init.body as string);
-    expect(body.room).toBe(`${CODE}:map-7`);
+    expect(body.room).toBe(`${CODE}_map-7`);
     expect(body.feature).toBe('fog-appearance');
   });
 
@@ -254,7 +254,7 @@ describe('sendBattleMapPokeToRoom', () => {
     );
     const payload = verifyBattleMapToken(body.token, SECRET, now);
     expect(payload).not.toBeNull();
-    expect(payload!.room).toBe(`${CODE}:map-X`);
+    expect(payload!.room).toBe(`${CODE}_map-X`);
     expect(payload!.role).toBe('dm');
   });
 });
@@ -279,7 +279,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     });
 
     expect(fetchFn).toHaveBeenCalledTimes(3);
-    const expectedRooms = ['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3'];
+    const expectedRooms = ['CAMP1_map-1', 'CAMP1_map-2', 'CAMP1_map-3'];
     const actualRooms = fetchFn.mock.calls.map(call => {
       const [, init] = call as unknown as [string, RequestInit];
       return JSON.parse(init.body as string).room;
@@ -306,7 +306,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     });
 
     expect(fetchFn).toHaveBeenCalledTimes(3);
-    const expectedRooms = ['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3'];
+    const expectedRooms = ['CAMP1_map-1', 'CAMP1_map-2', 'CAMP1_map-3'];
     const actualRooms = fetchFn.mock.calls.map(call => {
       const [, init] = call as unknown as [string, RequestInit];
       return JSON.parse(init.body as string).room;
@@ -338,7 +338,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     expect(fetchFn).toHaveBeenCalledTimes(1);
     const [, init] = fetchFn.mock.calls[0] as unknown as [string, RequestInit];
     const body = JSON.parse(init.body as string);
-    expect(body.room).toBe('CAMP1:map-42');
+    expect(body.room).toBe('CAMP1_map-42');
     expect(body.feature).toBe('players');
   });
 
@@ -360,7 +360,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
       return JSON.parse(init.body as string).room;
     });
     expect(rooms.sort()).toEqual(
-      ['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-active'].sort()
+      ['CAMP1_map-1', 'CAMP1_map-2', 'CAMP1_map-active'].sort()
     );
   });
 
@@ -383,7 +383,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
         return JSON.parse(init.body as string).room;
       })
       .sort();
-    expect(rooms).toEqual(['CAMP1:map-1', 'CAMP1:map-active']);
+    expect(rooms).toEqual(['CAMP1_map-1', 'CAMP1_map-active']);
   });
 
   it('caps the union at MAX_LIVE_MAP_ROOMS while always keeping activeBattleMapId, dropping the oldest registry entry to make room', async () => {
@@ -408,10 +408,10 @@ describe('sendBattleMapPokeToLiveRooms', () => {
       const [, init] = call as unknown as [string, RequestInit];
       return JSON.parse(init.body as string).room;
     });
-    expect(rooms).toContain('CAMP1:map-active');
+    expect(rooms).toContain('CAMP1_map-active');
     // The oldest registry entry (last in most-recent-first order) is the one
     // dropped to make room for activeBattleMapId.
-    expect(rooms).not.toContain(`CAMP1:map-${MAX_LIVE_MAP_ROOMS - 1}`);
+    expect(rooms).not.toContain(`CAMP1_map-${MAX_LIVE_MAP_ROOMS - 1}`);
   });
 
   it('sends nothing when the registry is empty and there is no active map', async () => {
@@ -428,7 +428,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     const perRoomFetch = vi.fn(async (...args: Parameters<typeof fetch>) => {
       const init = args[1];
       const body = JSON.parse(init?.body as string);
-      if (body.room === 'CAMP1:map-2') {
+      if (body.room === 'CAMP1_map-2') {
         throw new Error('relay down for map-2');
       }
       return new Response(null, { status: 200 });
@@ -445,7 +445,7 @@ describe('sendBattleMapPokeToLiveRooms', () => {
     const rooms = perRoomFetch.mock.calls.map(
       call => JSON.parse((call[1] as RequestInit).body as string).room
     );
-    expect(rooms.sort()).toEqual(['CAMP1:map-1', 'CAMP1:map-2', 'CAMP1:map-3']);
+    expect(rooms.sort()).toEqual(['CAMP1_map-1', 'CAMP1_map-2', 'CAMP1_map-3']);
   });
 
   it('does nothing when relay env vars are missing', async () => {
