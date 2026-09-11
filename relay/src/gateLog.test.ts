@@ -5,7 +5,7 @@ import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
 const SECRET = 'gate-log-test-secret';
-const ROOM = 'CAMP01:bm-1';
+const ROOM = 'CAMP01_bm-1';
 
 type Envelope = {
   from?: string;

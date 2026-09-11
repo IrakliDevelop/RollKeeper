@@ -4,7 +4,7 @@ import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
 const SECRET = 'test-secret';
-const ROOM = 'CAMP1:map-99';
+const ROOM = 'CAMP1_map-99';
 
 function playerToken(userId: string, room = ROOM) {
   return signBattleMapToken(

@@ -97,7 +97,7 @@ describe('createBattleMapPokeListener', () => {
     });
     expect(FakeWebSocket.instances).toHaveLength(1);
     const ws = FakeWebSocket.instances[0];
-    expect(ws.url).toBe('wss://relay.example?room=CODE%3Amap-1&token=tok-1');
+    expect(ws.url).toBe('wss://relay.example?room=CODE_map-1&token=tok-1');
 
     ws.triggerMessage(pokeEnvelope('players'));
     expect(opts.onPoke).toHaveBeenCalledWith('players');

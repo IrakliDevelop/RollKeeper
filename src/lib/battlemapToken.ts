@@ -5,7 +5,7 @@ export type BattleMapRole = 'dm' | 'player' | 'display';
 export interface BattleMapTokenPayload {
   userId: string;
   role: BattleMapRole;
-  /** `${campaignCode}:${battleMapId}` */
+  /** Safe room returned by `battleMapRelayRoom(campaignCode, battleMapId)`. */
   room: string;
   /** Expiry, unix epoch milliseconds */
   exp: number;

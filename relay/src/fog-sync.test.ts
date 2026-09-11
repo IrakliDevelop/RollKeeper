@@ -14,7 +14,7 @@ import { DM_AUDIENCE } from './policies.js';
 const SECRET = 'fog-sync-test-secret';
 let roomCounter = 0;
 function nextRoom(): string {
-  return `CAMP1:bm-fog-${++roomCounter}`;
+  return `CAMP1_bm-fog-${++roomCounter}`;
 }
 
 // Tile records without a `data` field are valid coordinate/version markers.
@@ -568,7 +568,7 @@ describe('fog authorizeFog policy (unit-level)', () => {
     const { makePolicies } = await import('./policies.js');
     const { authorizeFog } = makePolicies('test');
     const base = {
-      room: 'R:bm',
+      room: 'R_bm',
       op: {
         kind: 'fog-meta' as const,
         record: { version: 1, editor: 'x' },
@@ -592,7 +592,7 @@ describe('buffered element operation locality', () => {
   it('marks element writes local without changing shared VTT operation locality', async () => {
     const plugin = createBufferedElementLocalityPlugin();
     const context = {
-      room: 'R:bm',
+      room: 'R_bm',
       connectionId: 'dm-1',
       role: 'dm',
       userId: 'dm-1',

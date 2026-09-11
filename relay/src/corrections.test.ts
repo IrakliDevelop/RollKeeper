@@ -12,7 +12,7 @@ import { DM_AUDIENCE } from './policies.js';
  */
 
 const SECRET = 'corrections-test-secret';
-const ROOM = 'ROOM1:bm-1';
+const ROOM = 'ROOM1_bm-1';
 const HIDDEN_ID = 'hidden-1';
 const NORMAL_ID = 'normal-1';
 

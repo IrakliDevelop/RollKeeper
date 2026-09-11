@@ -10,7 +10,7 @@ import { signBattleMapToken } from './token.js';
  */
 
 const SECRET = 'layer-sync-test-secret';
-const ROOM = 'ROOM1:bm-layers';
+const ROOM = 'ROOM1_bm-layers';
 
 interface Envelope {
   from: string;

@@ -7,6 +7,7 @@ import {
   seedRedis,
   seedRedisSet,
 } from '@/test/mocks/redis';
+import { verifyBattleMapToken } from '@/lib/battlemapToken';
 
 const { authorizeCampaignMembershipRoute } = vi.hoisted(() => ({
   authorizeCampaignMembershipRoute: vi.fn(),
@@ -174,6 +175,25 @@ describe('live map room registration', () => {
       `campaign:${CODE}:live-maps`,
       expect.objectContaining({ member: 'map-a' })
     );
+    const body = (await response.json()) as { token: string };
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({ room: `${CODE}_map-a` });
+  });
+
+  it('rejects a battleMapId that cannot produce a Fieldnotes-safe room', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map/unsafe',
+        playerId: 'legacy-a',
+      }),
+      params
+    );
+
+    expect(response.status).toBe(400);
+    expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
+    expect(mockRedis.zadd).not.toHaveBeenCalled();
   });
 
   it('records nothing when authorization is rejected', async () => {
