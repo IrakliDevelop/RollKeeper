@@ -78,6 +78,7 @@ interface NPCFormDialogProps {
   ) => void;
   editingNpc?: CampaignNPC | null;
   existingGroups?: string[];
+  entityLabel?: 'NPC' | 'Custom Monster';
 }
 
 const DEFAULT_ABILITY = 10;
@@ -215,6 +216,7 @@ export function NPCFormDialog({
   onSave,
   editingNpc,
   existingGroups = [],
+  entityLabel = 'NPC',
 }: NPCFormDialogProps) {
   // Item database for inventory autocomplete
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
@@ -953,7 +955,7 @@ export function NPCFormDialog({
     [traits, actions, bonusActions, reactions, lairActions].every(list =>
       list.every(isResourceCostValid)
     );
-  const submitLabel = editingNpc ? 'Save Changes' : 'Create NPC';
+  const submitLabel = editingNpc ? 'Save Changes' : `Create ${entityLabel}`;
 
   const editingInventoryItem = editingInventoryItemId
     ? inventoryItems.find(i => i.id === editingInventoryItemId)
@@ -980,7 +982,7 @@ export function NPCFormDialog({
         <DialogContent className="h-[85vh] sm:max-w-4xl">
           <DialogHeader className="flex flex-col gap-3 space-y-0 pr-10 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <DialogTitle className="shrink-0">
-              {editingNpc ? 'Edit NPC' : 'Create NPC'}
+              {editingNpc ? `Edit ${entityLabel}` : `Create ${entityLabel}`}
             </DialogTitle>
             <div className="flex shrink-0 justify-end gap-2">
               <Button
@@ -1100,7 +1102,7 @@ export function NPCFormDialog({
                       {avatarUrl ? (
                         <Image
                           src={avatarUrl}
-                          alt="NPC portrait"
+                          alt={`${entityLabel} portrait`}
                           width={64}
                           height={64}
                           className="h-full w-full object-cover"
@@ -1144,7 +1146,7 @@ export function NPCFormDialog({
                       value={name}
                       onChange={e => setName(e.target.value)}
                       label="Name"
-                      placeholder="NPC name"
+                      placeholder={`${entityLabel} name`}
                       required
                       autoFocus
                     />

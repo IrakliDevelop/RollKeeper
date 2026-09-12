@@ -109,7 +109,7 @@ export function RowBadges({ entity, isOnDeck, lastSynced }: RowBadgesProps) {
         </span>
       )}
 
-      {entity.type === 'npc' && entity.hitDice && (
+      {(entity.type === 'npc' || entity.npcSourceId) && entity.hitDice && (
         <span className="bg-accent-purple-bg text-accent-purple-text inline-flex shrink-0 items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-medium">
           HD {entity.hitDice.current}/{entity.hitDice.max}
         </span>

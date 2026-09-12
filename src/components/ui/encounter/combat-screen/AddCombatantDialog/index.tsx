@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { X, Plus } from 'lucide-react';
 import {
   Dialog,
@@ -18,7 +18,11 @@ import { PlayerTab } from './PlayerTab';
 import { NpcTab } from './NpcTab';
 import { MonsterTab } from './MonsterTab';
 import { CustomTab } from './CustomTab';
-import { buildMonsterEntities, buildCustomEntity } from './buildEntity';
+import {
+  buildMonsterEntities,
+  buildCustomEntity,
+  buildNpcEntity,
+} from './buildEntity';
 import {
   createCustomEditDraft,
   createMonsterEditDraft,
@@ -96,6 +100,10 @@ export function AddCombatantDialog({
   const [cDisposition, setCDisposition] = useState<PlayerDisposition>('enemy');
   const [cDraft, setCDraft] = useState<MonsterEditDraft | null>(null);
   const [cEditing, setCEditing] = useState(false);
+  const customMonsters = useMemo(
+    () => npcs.filter(npc => npc.kind === 'monster'),
+    [npcs]
+  );
 
   const resetMonsterState = () => {
     setSelMonster(null);
@@ -197,6 +205,17 @@ export function AddCombatantDialog({
         playerDisposition: cDisposition,
         statBlock: cDraft?.statBlock,
         proficiencyBonus: cDraft?.proficiencyBonus,
+      })
+    );
+  };
+
+  const handleSavedMonsterAdd = (monster: CampaignNPC) => {
+    handleAdd(
+      buildNpcEntity(monster, {
+        isHidden: cHideName,
+        playerAlias: cAlias || undefined,
+        playerDisposition: cDisposition,
+        campaignCode,
       })
     );
   };
@@ -326,6 +345,8 @@ export function AddCombatantDialog({
               />
             ) : (
               <CustomTab
+                customMonsters={customMonsters}
+                onAddSavedMonster={handleSavedMonsterAdd}
                 name={cName}
                 onNameChange={setCName}
                 type={cType}

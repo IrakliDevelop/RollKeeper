@@ -4,10 +4,13 @@ import React from 'react';
 import { FilePen } from 'lucide-react';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Button } from '@/components/ui/forms/button';
-import type { PlayerDisposition } from '@/types/encounter';
+import type { CampaignNPC, PlayerDisposition } from '@/types/encounter';
 import { SharedOptions } from './SharedOptions';
+import { SavedCreaturePicker } from './SavedCreaturePicker';
 
 interface CustomTabProps {
+  customMonsters: CampaignNPC[];
+  onAddSavedMonster: (monster: CampaignNPC) => void;
   name: string;
   onNameChange: (v: string) => void;
   type: 'npc' | 'monster';
@@ -29,6 +32,8 @@ interface CustomTabProps {
 }
 
 export function CustomTab({
+  customMonsters,
+  onAddSavedMonster,
   name,
   onNameChange,
   type,
@@ -50,6 +55,30 @@ export function CustomTab({
 }: CustomTabProps) {
   return (
     <div className="space-y-3 pb-4">
+      <div className="space-y-2">
+        <div>
+          <h3 className="text-heading text-sm font-bold">
+            Saved custom monsters
+          </h3>
+          <p className="text-muted text-xs">
+            Select one to add its persistent stat block to this encounter.
+          </p>
+        </div>
+        <SavedCreaturePicker
+          creatures={customMonsters}
+          emptyMessage="No custom monsters yet. Create them from the campaign page."
+          onSelect={onAddSavedMonster}
+        />
+      </div>
+
+      <div className="flex items-center gap-3 py-1" aria-hidden="true">
+        <div className="bg-divider h-px flex-1" />
+        <span className="text-faint text-[10px] font-bold tracking-wide uppercase">
+          One-off combatant
+        </span>
+        <div className="bg-divider h-px flex-1" />
+      </div>
+
       {/* Name */}
       <div>
         <label className="text-body mb-1.5 block text-[11px] font-extrabold tracking-[0.06em] uppercase">

@@ -213,6 +213,7 @@ describe('Slice 11D NPC family', () => {
       documentFields: [
         'name',
         'description',
+        'kind',
         'armorClass',
         'maxHp',
         'currentHp',
@@ -671,6 +672,7 @@ describe('Slice 11D NPC family', () => {
   });
 
   const invalidNpcCases: Array<[string, Record<string, unknown>]> = [
+    ['an unknown library kind', { kind: 'dragon' }],
     ['a name over 1000 characters', { name: 'x'.repeat(1001) }],
     ['a non-string name', { name: 42 }],
     ['an absent name', { name: undefined }],

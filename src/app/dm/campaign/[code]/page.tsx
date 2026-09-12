@@ -760,16 +760,31 @@ export default function CampaignViewPage() {
 
         {/* NPC Management */}
         {!loading && !error && (
-          <NPCSection
-            campaignCode={code}
-            players={npcSendTargets}
-            onGiveMagicItemToPlayer={handleGiveLibraryMagicItem}
-            onSendItemToPlayer={(item, npcName) => {
-              setNpcSendingItem(item);
-              setNpcSendingNpcName(npcName);
-              setNpcSendDialogOpen(true);
-            }}
-          />
+          <>
+            <NPCSection
+              campaignCode={code}
+              kind="npc"
+              showLibraryExtras={false}
+              players={npcSendTargets}
+              onSendItemToPlayer={(item, npcName) => {
+                setNpcSendingItem(item);
+                setNpcSendingNpcName(npcName);
+                setNpcSendDialogOpen(true);
+              }}
+            />
+            <NPCSection
+              campaignCode={code}
+              kind="monster"
+              showSpellSlotSettings={false}
+              players={npcSendTargets}
+              onGiveMagicItemToPlayer={handleGiveLibraryMagicItem}
+              onSendItemToPlayer={(item, npcName) => {
+                setNpcSendingItem(item);
+                setNpcSendingNpcName(npcName);
+                setNpcSendDialogOpen(true);
+              }}
+            />
+          </>
         )}
       </main>
 

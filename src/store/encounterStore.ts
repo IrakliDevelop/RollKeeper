@@ -51,7 +51,7 @@ function syncNPCEntityToStore(
 ) {
   const enc = encounters.find(e => e.id === encounterId);
   const entity = enc?.entities.find(e => e.id === entityId);
-  if (entity?.type === 'npc' && entity.npcSourceId && entity.campaignCode) {
+  if (entity?.npcSourceId && entity.campaignCode) {
     useNPCStore.getState().updateNPC(entity.campaignCode, entity.npcSourceId, {
       currentHp: entity.currentHp,
       tempHp: entity.tempHp,
@@ -343,7 +343,7 @@ function isLiveNpcEntry(
 function resolveLinkedNpc(
   entity: EncounterEntity
 ): { npc: import('@/types/encounter').CampaignNPC | null } | null {
-  if (entity.type !== 'npc' || !entity.npcSourceId || !entity.campaignCode) {
+  if (!entity.npcSourceId || !entity.campaignCode) {
     return null;
   }
   const npc =
@@ -527,7 +527,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
                 updates.monsterStatBlock
               );
               const linkedNpc =
-                e.type === 'npc' && e.npcSourceId && e.campaignCode
+                e.npcSourceId && e.campaignCode
                   ? useNPCStore.getState().getNPC(e.campaignCode, e.npcSourceId)
                   : undefined;
               const abilities = reconcileEntityAbilities(
@@ -810,9 +810,13 @@ export const useEncounterStore = create<EncounterStoreState>()(
               const prevHp = currentHp;
               currentHp = Math.max(0, currentHp - remaining);
 
-              // Init death saves for NPCs when HP drops to 0
+              // Init death saves for persistent NPC/custom-monster creatures.
               let deathSaves = e.deathSaves;
-              if (currentHp <= 0 && prevHp > 0 && e.type === 'npc') {
+              if (
+                currentHp <= 0 &&
+                prevHp > 0 &&
+                (e.type === 'npc' || e.npcSourceId)
+              ) {
                 const excessDamage = remaining - prevHp;
                 if (excessDamage >= e.maxHp) {
                   // Massive damage = instant death
@@ -845,9 +849,11 @@ export const useEncounterStore = create<EncounterStoreState>()(
             entityId,
             e => {
               const newHp = Math.min(e.maxHp, e.currentHp + amount);
-              // Clear death saves when healed from 0 HP (NPCs)
+              // Clear death saves when a persistent creature is healed from 0.
               const deathSaves =
-                e.currentHp <= 0 && newHp > 0 && e.type === 'npc'
+                e.currentHp <= 0 &&
+                newHp > 0 &&
+                (e.type === 'npc' || e.npcSourceId)
                   ? undefined
                   : e.deathSaves;
               return { ...e, currentHp: newHp, deathSaves };

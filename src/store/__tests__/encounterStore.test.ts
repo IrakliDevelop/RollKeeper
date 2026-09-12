@@ -434,6 +434,40 @@ describe('encounterStore', () => {
         .entities[0];
       expect(entity.currentHp).toBe(0);
     });
+
+    it('syncs damage and death saves for a linked custom monster', () => {
+      useNPCStore.setState({ npcsByCampaign: {} });
+      const campaignCode = 'MONSTERS';
+      const npcSourceId = useNPCStore.getState().createNPC(campaignCode, {
+        name: 'Ash Drake',
+        kind: 'monster',
+        armorClass: '15',
+        maxHp: 20,
+        speed: '30 ft., fly 60 ft.',
+      });
+      const encId = useEncounterStore
+        .getState()
+        .createEncounter('Drake Fight', campaignCode);
+      const entityId = useEncounterStore.getState().addEntity(
+        encId,
+        createMockEncounterEntity({
+          type: 'monster',
+          currentHp: 20,
+          maxHp: 20,
+          npcSourceId,
+          campaignCode,
+        })
+      );
+
+      useEncounterStore.getState().damageEntity(encId, entityId, 20);
+
+      expect(
+        useNPCStore.getState().getNPC(campaignCode, npcSourceId)
+      ).toMatchObject({
+        currentHp: 0,
+        deathSaves: { successes: 0, failures: 0 },
+      });
+    });
   });
 
   describe('healEntity', () => {

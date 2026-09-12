@@ -40,4 +40,27 @@ describe('encounter entity avatars', () => {
 
     expect(entity.avatarUrl).toBe('https://example.com/vale.png');
   });
+
+  it('labels a saved custom monster as a monster while retaining its NPC source link', () => {
+    const monster: CampaignNPC = {
+      id: 'npc-monster-1',
+      campaignCode: 'TEST',
+      name: 'Ash Drake',
+      kind: 'monster',
+      armorClass: '15',
+      maxHp: 52,
+      speed: '30 ft., fly 60 ft.',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    };
+
+    const entity = buildNpcEntity(monster, {
+      isHidden: false,
+      playerDisposition: 'enemy',
+      campaignCode: 'TEST',
+    });
+
+    expect(entity.type).toBe('monster');
+    expect(entity.npcSourceId).toBe('npc-monster-1');
+  });
 });

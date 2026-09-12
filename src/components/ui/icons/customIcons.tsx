@@ -1,5 +1,31 @@
 import { forwardRef } from 'react';
-import type { LucideIcon, LucideProps } from 'lucide-react';
+import {
+  createLucideIcon,
+  type LucideIcon,
+  type LucideProps,
+} from 'lucide-react';
+
+/** Lucide's Germ icon, included locally until the pinned package exports it. */
+export const GermIcon = createLucideIcon('germ', [
+  ['path', { d: 'm11 2 .925 1.848', key: '1h25bb' }],
+  ['path', { d: 'M13 15h.01', key: '11p6kq' }],
+  ['path', { d: 'm16 21-1-2.472', key: '1jpmg8' }],
+  ['path', { d: 'm19 2-1 1.804', key: '1v9d6m' }],
+  ['path', { d: 'm2 19 2.746-1.373', key: '1c1p4s' }],
+  ['path', { d: 'm22 16-2.474-2.13', key: '1azmv9' }],
+  ['path', { d: 'm22 5-1.804 1', key: '1kxw7j' }],
+  ['path', { d: 'm3 10 2 2', key: '4xslx3' }],
+  ['path', { d: 'M9 16h.01', key: '1z6y7g' }],
+  ['path', { d: 'M9 20v2', key: '1p6o0j' }],
+  [
+    'path',
+    {
+      d: 'M9.33 7.035c-.51 1.478-1.786 2.93-3.09 3.794A5 5 0 009 20a12.1 12.1 0 0011.902-9.916A6 6 0 009.33 7.035',
+      key: 'qtdqii',
+    },
+  ],
+  ['circle', { cx: '15', cy: '9', r: '2', key: '14p4hk' }],
+]);
 
 /** Custom exception: Lucide does not include a wizard-hat/level-up glyph. */
 export const LevelUpIcon = forwardRef<SVGSVGElement, LucideProps>(

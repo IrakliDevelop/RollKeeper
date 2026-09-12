@@ -17,14 +17,20 @@ import {
   Eye,
   Lightbulb,
   Copy,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
+import { GermIcon } from '@/components/ui/icons/customIcons';
 import { Badge } from '@/components/ui/layout/badge';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Input } from '@/components/ui/forms/input';
-import { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
+import type {
+  CampaignCreatureKind,
+  CampaignNPC,
+  NPCInventoryItem,
+} from '@/types/encounter';
 import { parseAcBonus } from '@/utils/calculations';
 import { NPCFormDialog } from './NPCFormDialog';
 import { NPCDetailDialog } from './NPCDetailDialog';
@@ -35,6 +41,9 @@ import type { MagicItem } from '@/types/character';
 
 interface NPCSectionProps {
   campaignCode: string;
+  kind?: CampaignCreatureKind;
+  showSpellSlotSettings?: boolean;
+  showLibraryExtras?: boolean;
   onSendItemToPlayer?: (item: NPCInventoryItem, npcName: string) => void;
   players?: SendItemTarget[];
   onGiveMagicItemToPlayer?: (
@@ -45,6 +54,9 @@ interface NPCSectionProps {
 
 export function NPCSection({
   campaignCode,
+  kind = 'npc',
+  showSpellSlotSettings = true,
+  showLibraryExtras = true,
   onSendItemToPlayer,
   players = [],
   onGiveMagicItemToPlayer,
@@ -60,17 +72,33 @@ export function NPCSection({
   } = useNPCStore();
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
-  const npcSectionOpen = campaign?.dmDashboardUi?.npcSectionOpen ?? true;
+  const [monsterSectionOpen, setMonsterSectionOpen] = useState(true);
+  const [monsterCollapsedGroups, setMonsterCollapsedGroups] = useState<
+    Set<string>
+  >(new Set());
+  const isMonsterLibrary = kind === 'monster';
+  const singularLabel = isMonsterLibrary ? 'Custom Monster' : 'NPC';
+  const pluralLabel = isMonsterLibrary ? 'Custom Monsters' : 'NPCs';
+  const sectionOpen = isMonsterLibrary
+    ? monsterSectionOpen
+    : (campaign?.dmDashboardUi?.npcSectionOpen ?? true);
   const spellSlotDisplayMode: 'inline' | 'tracker' =
     campaign?.dmDashboardUi?.npcInlineSpellSlots === false &&
     campaign?.dmDashboardUi?.npcSeparateSpellSlotTracker === true
       ? 'tracker'
       : 'inline';
-  const collapsedGroups = useMemo(() => {
+  const persistedCollapsedGroups = useMemo(() => {
     const names = campaign?.dmDashboardUi?.npcCollapsedGroupNames;
     return new Set(names ?? []);
   }, [campaign?.dmDashboardUi?.npcCollapsedGroupNames]);
-  const npcs = getNPCsForCampaign(campaignCode);
+  const collapsedGroups = isMonsterLibrary
+    ? monsterCollapsedGroups
+    : persistedCollapsedGroups;
+  const allCreatures = getNPCsForCampaign(campaignCode);
+  const npcs = useMemo(
+    () => allCreatures.filter(npc => (npc.kind ?? 'npc') === kind),
+    [allCreatures, kind]
+  );
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingNpc, setEditingNpc] = useState<CampaignNPC | null>(null);
@@ -99,9 +127,9 @@ export function NPCSection({
     data: Omit<CampaignNPC, 'id' | 'campaignCode' | 'createdAt' | 'updatedAt'>
   ) => {
     if (editingNpc) {
-      updateNPC(campaignCode, editingNpc.id, data);
+      updateNPC(campaignCode, editingNpc.id, { ...data, kind });
     } else {
-      createNPC(campaignCode, data);
+      createNPC(campaignCode, { ...data, kind });
     }
   };
 
@@ -114,6 +142,13 @@ export function NPCSection({
 
   const handleDuplicate = (npc: CampaignNPC) => {
     duplicateNPC(campaignCode, npc.id);
+  };
+
+  const handleMove = (npc: CampaignNPC) => {
+    updateNPC(campaignCode, npc.id, {
+      kind: isMonsterLibrary ? 'npc' : 'monster',
+    });
+    setSelectedNpc(null);
   };
 
   const handleUpdateInventory = (
@@ -140,6 +175,15 @@ export function NPCSection({
   };
 
   const handleGroupToggle = (groupName: string) => {
+    if (isMonsterLibrary) {
+      setMonsterCollapsedGroups(current => {
+        const next = new Set(current);
+        if (next.has(groupName)) next.delete(groupName);
+        else next.add(groupName);
+        return next;
+      });
+      return;
+    }
     const current =
       getCampaign(campaignCode)?.dmDashboardUi?.npcCollapsedGroupNames ?? [];
     const next = new Set(current);
@@ -207,32 +251,43 @@ export function NPCSection({
   // Determine if we should show groups (any NPC has a group)
   const hasAnyGroup = npcs.some(npc => !!npc.group);
 
+  const handleSectionToggle = () => {
+    if (isMonsterLibrary) {
+      setMonsterSectionOpen(open => !open);
+      return;
+    }
+    setDmDashboardUi(campaignCode, { npcSectionOpen: !sectionOpen });
+  };
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <button
             type="button"
-            onClick={() =>
-              setDmDashboardUi(campaignCode, {
-                npcSectionOpen: !npcSectionOpen,
-              })
-            }
+            onClick={handleSectionToggle}
             className="text-muted hover:text-body hover:bg-surface-secondary shrink-0 rounded-md p-1 transition-colors"
-            aria-expanded={npcSectionOpen}
-            aria-controls="dm-campaign-npc-section"
-            title={npcSectionOpen ? 'Collapse NPCs' : 'Expand NPCs'}
+            aria-expanded={sectionOpen}
+            aria-controls={`dm-campaign-${kind}-section`}
+            title={`${sectionOpen ? 'Collapse' : 'Expand'} ${pluralLabel}`}
           >
-            {npcSectionOpen ? (
+            {sectionOpen ? (
               <ChevronDown size={20} />
             ) : (
               <ChevronRight size={20} />
             )}
           </button>
           <div className="flex min-w-0 items-center gap-2">
-            <Drama size={20} className="text-muted shrink-0" />
+            {isMonsterLibrary ? (
+              <GermIcon
+                size={20}
+                className="text-accent-purple-text shrink-0"
+              />
+            ) : (
+              <Drama size={20} className="text-muted shrink-0" />
+            )}
             <h2 className="text-heading text-lg font-semibold">
-              NPCs ({npcs.length})
+              {pluralLabel} ({npcs.length})
             </h2>
           </div>
         </div>
@@ -242,62 +297,69 @@ export function NPCSection({
           onClick={handleCreate}
           leftIcon={<Plus size={16} />}
         >
-          Create NPC
+          Create {singularLabel}
         </Button>
       </div>
 
-      <div className="bg-surface-secondary border-divider mb-4 rounded-lg border px-3 py-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-muted text-xs font-medium tracking-wide uppercase">
-            Spell Slot Display
-          </span>
-          <div className="bg-surface-raised border-divider inline-flex rounded-md border p-1">
-            <Button
-              variant={
-                spellSlotDisplayMode === 'inline' ? 'secondary' : 'ghost'
-              }
-              size="xs"
-              onClick={() =>
-                setDmDashboardUi(campaignCode, {
-                  npcInlineSpellSlots: true,
-                  npcSeparateSpellSlotTracker: false,
-                })
-              }
-            >
-              Inline
-            </Button>
-            <Button
-              variant={
-                spellSlotDisplayMode === 'tracker' ? 'secondary' : 'ghost'
-              }
-              size="xs"
-              onClick={() =>
-                setDmDashboardUi(campaignCode, {
-                  npcInlineSpellSlots: false,
-                  npcSeparateSpellSlotTracker: true,
-                })
-              }
-            >
-              Separate Tracker
-            </Button>
+      {showSpellSlotSettings && (
+        <div className="bg-surface-secondary border-divider mb-4 rounded-lg border px-3 py-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-muted text-xs font-medium tracking-wide uppercase">
+              Spell Slot Display
+            </span>
+            <div className="bg-surface-raised border-divider inline-flex rounded-md border p-1">
+              <Button
+                variant={
+                  spellSlotDisplayMode === 'inline' ? 'secondary' : 'ghost'
+                }
+                size="xs"
+                onClick={() =>
+                  setDmDashboardUi(campaignCode, {
+                    npcInlineSpellSlots: true,
+                    npcSeparateSpellSlotTracker: false,
+                  })
+                }
+              >
+                Inline
+              </Button>
+              <Button
+                variant={
+                  spellSlotDisplayMode === 'tracker' ? 'secondary' : 'ghost'
+                }
+                size="xs"
+                onClick={() =>
+                  setDmDashboardUi(campaignCode, {
+                    npcInlineSpellSlots: false,
+                    npcSeparateSpellSlotTracker: true,
+                  })
+                }
+              >
+                Separate Tracker
+              </Button>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {!npcSectionOpen ? null : npcs.length === 0 ? (
+      {!sectionOpen ? null : npcs.length === 0 ? (
         <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
-          <Drama size={40} className="text-faint mx-auto mb-3" />
-          <p className="text-muted mb-1 text-sm">No NPCs yet</p>
+          {isMonsterLibrary ? (
+            <GermIcon size={40} className="text-faint mx-auto mb-3" />
+          ) : (
+            <Drama size={40} className="text-faint mx-auto mb-3" />
+          )}
+          <p className="text-muted mb-1 text-sm">No {pluralLabel} yet</p>
           <p className="text-faint text-xs">
-            Create persistent NPCs to quickly add them to any encounter.
+            Create persistent {pluralLabel.toLowerCase()} to quickly add them to
+            any encounter.
           </p>
         </div>
       ) : (
-        <div id="dm-campaign-npc-section">
+        <div id={`dm-campaign-${kind}-section`}>
           {/* Search bar */}
           <div className="mb-3">
             <Input
-              placeholder="Search NPCs…"
+              placeholder={`Search ${pluralLabel}…`}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               leftIcon={<Search size={14} />}
@@ -338,7 +400,7 @@ export function NPCSection({
 
           {filteredNpcs.length === 0 ? (
             <p className="text-faint py-6 text-center text-sm">
-              No NPCs match your filters.
+              No {pluralLabel.toLowerCase()} match your filters.
             </p>
           ) : hasAnyGroup ? (
             /* Grouped layout */
@@ -382,8 +444,10 @@ export function NPCSection({
                       renderItem={npc => (
                         <NPCCard
                           npc={npc}
+                          kind={kind}
                           onEdit={() => handleEdit(npc)}
                           onDuplicate={() => handleDuplicate(npc)}
+                          onMove={() => handleMove(npc)}
                           onDelete={() => handleDelete(npc)}
                           onClick={() => setSelectedNpc(npc)}
                         />
@@ -412,8 +476,10 @@ export function NPCSection({
               renderItem={npc => (
                 <NPCCard
                   npc={npc}
+                  kind={kind}
                   onEdit={() => handleEdit(npc)}
                   onDuplicate={() => handleDuplicate(npc)}
+                  onMove={() => handleMove(npc)}
                   onDelete={() => handleDelete(npc)}
                   onClick={() => setSelectedNpc(npc)}
                 />
@@ -428,6 +494,7 @@ export function NPCSection({
         onOpenChange={setDialogOpen}
         onSave={handleSave}
         editingNpc={editingNpc}
+        entityLabel={singularLabel}
         existingGroups={[
           ...new Set(npcs.map(n => n.group).filter((g): g is string => !!g)),
         ]}
@@ -461,9 +528,9 @@ export function NPCSection({
         still mount outside the collapsible. It renders nothing while the client
         flag is off.
       */}
-      <NpcSyncControls />
+      {showLibraryExtras && <NpcSyncControls />}
 
-      {onGiveMagicItemToPlayer && (
+      {showLibraryExtras && onGiveMagicItemToPlayer && (
         <MagicItemLibrarySection
           campaignCode={campaignCode}
           players={players}
@@ -476,14 +543,18 @@ export function NPCSection({
 
 function NPCCard({
   npc,
+  kind,
   onEdit,
   onDuplicate,
+  onMove,
   onDelete,
   onClick,
 }: {
   npc: CampaignNPC;
+  kind: CampaignCreatureKind;
   onEdit: () => void;
   onDuplicate: () => void;
+  onMove: () => void;
   onDelete: () => void;
   onClick: () => void;
 }) {
@@ -529,10 +600,21 @@ function NPCCard({
                     onDuplicate();
                   }}
                   className="text-muted hover:text-body rounded p-1 transition-colors"
-                  title="Duplicate NPC"
+                  title={`Duplicate ${npc.name}`}
                   aria-label={`Duplicate ${npc.name}`}
                 >
                   <Copy size={13} />
+                </button>
+                <button
+                  onClick={e => {
+                    e.stopPropagation();
+                    onMove();
+                  }}
+                  className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
+                  title={`Move ${npc.name} to ${kind === 'npc' ? 'Custom Monsters' : 'NPCs'}`}
+                  aria-label={`Move ${npc.name} to ${kind === 'npc' ? 'Custom Monsters' : 'NPCs'}`}
+                >
+                  <ArrowLeftRight size={13} />
                 </button>
                 <button
                   onClick={e => {
@@ -706,10 +788,21 @@ function NPCCard({
                   onDuplicate();
                 }}
                 className="text-muted hover:text-body rounded p-1 transition-colors"
-                title="Duplicate NPC"
+                title={`Duplicate ${npc.name}`}
                 aria-label={`Duplicate ${npc.name}`}
               >
                 <Copy size={14} />
+              </button>
+              <button
+                onClick={e => {
+                  e.stopPropagation();
+                  onMove();
+                }}
+                className="text-muted hover:text-accent-purple-text rounded p-1 transition-colors"
+                title={`Move ${npc.name} to ${kind === 'npc' ? 'Custom Monsters' : 'NPCs'}`}
+                aria-label={`Move ${npc.name} to ${kind === 'npc' ? 'Custom Monsters' : 'NPCs'}`}
+              >
+                <ArrowLeftRight size={14} />
               </button>
               <button
                 onClick={e => {

@@ -28,6 +28,7 @@ describe('npcStore (campaign-scoped)', () => {
       const npcs = useNPCStore.getState().getNPCsForCampaign(CAMPAIGN);
       expect(npcs).toHaveLength(1);
       expect(npcs[0].name).toBe('Bartender Bob');
+      expect(npcs[0].kind).toBe('npc');
       expect(npcs[0].campaignCode).toBe(CAMPAIGN);
     });
 
@@ -172,6 +173,27 @@ describe('npcStore (campaign-scoped)', () => {
   });
 
   describe('updateNPC', () => {
+    it('moves a creature between NPC and monster libraries without changing its identity or data', () => {
+      const id = useNPCStore.getState().createNPC(CAMPAIGN, {
+        name: 'Mimic Merchant',
+        armorClass: '12',
+        maxHp: 58,
+        speed: '15 ft.',
+        inventory: [{ id: 'coin-purse', name: 'Coins', quantity: 1 }],
+      });
+
+      useNPCStore.getState().updateNPC(CAMPAIGN, id, { kind: 'monster' });
+
+      const moved = useNPCStore.getState().getNPC(CAMPAIGN, id);
+      expect(moved).toMatchObject({
+        id,
+        kind: 'monster',
+        name: 'Mimic Merchant',
+        maxHp: 58,
+        inventory: [{ id: 'coin-purse', name: 'Coins', quantity: 1 }],
+      });
+    });
+
     it('merges updates and preserves unchanged fields', () => {
       const id = useNPCStore.getState().createNPC(CAMPAIGN, {
         name: 'Old Name',

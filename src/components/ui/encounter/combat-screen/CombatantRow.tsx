@@ -53,7 +53,8 @@ function getRowClass(
 
 function getIsDead(entity: EncounterEntity): boolean {
   const isDown = entity.currentHp <= 0 && entity.type !== 'lair';
-  const hasDeathSaves = entity.type === 'player' || entity.type === 'npc';
+  const hasDeathSaves =
+    entity.type === 'player' || entity.type === 'npc' || !!entity.npcSourceId;
   return hasDeathSaves ? entity.deathSaves?.failures === 3 : isDown;
 }
 
