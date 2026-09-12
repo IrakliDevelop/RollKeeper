@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CampaignNPC } from '@/types/encounter';
 import { SavedCreaturePicker } from './SavedCreaturePicker';
 
@@ -32,7 +32,25 @@ const creatures: CampaignNPC[] = [
   },
 ];
 
+afterEach(cleanup);
+
 describe('SavedCreaturePicker', () => {
+  it('advertises name, group, and tag search', () => {
+    render(
+      <SavedCreaturePicker
+        creatures={creatures}
+        emptyMessage="No creatures"
+        onSelect={vi.fn()}
+      />
+    );
+
+    expect(
+      screen.getByRole('textbox', {
+        name: /search saved creatures by name, group, or tag/i,
+      })
+    ).toHaveAttribute('placeholder', 'Search by name, group, or tag…');
+  });
+
   it('filters a large saved-creature list by explicit group selection', async () => {
     const user = userEvent.setup();
     render(

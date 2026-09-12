@@ -70,8 +70,8 @@ export function SavedCreaturePicker({
         <Input
           value={query}
           onChange={event => setQuery(event.target.value)}
-          placeholder="Search by name or group…"
-          aria-label="Search saved creatures by name or group"
+          placeholder="Search by name, group, or tag…"
+          aria-label="Search saved creatures by name, group, or tag"
           leftIcon={<Search size={14} />}
           clearable
           onClear={() => setQuery('')}
