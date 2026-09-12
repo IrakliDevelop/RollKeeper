@@ -17,7 +17,7 @@ export const NPC_MAX_TOTAL_BYTES = 5_242_880;
 export type NpcPayload = Omit<CampaignNPC, 'id' | 'campaignCode'>;
 
 /**
- * The 35-key document allowlist. `satisfies` only checks that each listed
+ * The document allowlist. `satisfies` only checks that each listed
  * key is a valid `keyof NpcPayload` — it does NOT require the list to be
  * complete, so adding a new optional `CampaignNPC` field does not fail the
  * type-check here. Any new field must be added to this list by hand, or
@@ -26,6 +26,7 @@ export type NpcPayload = Omit<CampaignNPC, 'id' | 'campaignCode'>;
 const NPC_DOCUMENT_FIELDS = [
   'name',
   'description',
+  'kind',
   'armorClass',
   'maxHp',
   'currentHp',
@@ -347,6 +348,11 @@ export function validateNpcPayload(value: unknown): NpcPayloadValidation {
     );
   if (!isFiniteNumber(value.maxHp))
     return reject('invalid-npc', 'NPC maxHp must be a number');
+  if (!isAbsent(value.kind) && value.kind !== 'npc' && value.kind !== 'monster')
+    return reject(
+      'invalid-npc',
+      'NPC kind must be either npc or monster when present'
+    );
   if (
     !isBoundedString(value.armorClass, MAX_LABEL_LENGTH) &&
     !isFiniteNumber(value.armorClass)

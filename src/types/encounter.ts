@@ -187,7 +187,7 @@ export interface EncounterEntity {
   // Monster source reference
   monsterSourceId?: string; // ProcessedMonster id for stat block lookup
   monsterStatBlock?: MonsterStatBlock; // Full stat block for display
-  npcSourceId?: string; // CampaignNPC.id for persistent NPC lookup
+  npcSourceId?: string; // CampaignNPC.id for persistent NPC/custom-monster lookup
 
   // Lair action specific
   lairActions?: Array<{
@@ -315,11 +315,21 @@ export interface NPCInventoryItem {
   priceCopper?: number;
 }
 
+/**
+ * Library classification for a DM-authored creature. Older persisted records
+ * have no value and are treated as NPCs so the field is migration-free.
+ */
+export type CampaignCreatureKind = 'npc' | 'monster';
+
 export interface CampaignNPC {
   id: string;
   campaignCode: string;
   name: string;
   description?: string;
+
+  // Which campaign library section owns this creature. This does not change
+  // the shared NPC mechanics or its stable encounter/source identity.
+  kind?: CampaignCreatureKind;
 
   // Core combat stats
   // Free-text AC so the DM can annotate it (e.g. "16 (natural armor)",

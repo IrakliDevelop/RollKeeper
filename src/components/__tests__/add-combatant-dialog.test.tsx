@@ -41,8 +41,32 @@ const npcs: CampaignNPC[] = [
     id: 'npc1',
     campaignCode: 'CAMP1',
     name: 'Town Guard',
+    group: 'City Watch',
     armorClass: '13',
     maxHp: 20,
+    speed: '30 ft.',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'npc2',
+    campaignCode: 'CAMP1',
+    name: 'Forest Scout',
+    group: 'Rangers',
+    armorClass: '14',
+    maxHp: 16,
+    speed: '35 ft.',
+    createdAt: '2024-01-01',
+    updatedAt: '2024-01-01',
+  },
+  {
+    id: 'monster1',
+    campaignCode: 'CAMP1',
+    name: 'Bone Colossus',
+    group: 'Crypt Horrors',
+    kind: 'monster',
+    armorClass: '17',
+    maxHp: 95,
     speed: '30 ft.',
     createdAt: '2024-01-01',
     updatedAt: '2024-01-01',
@@ -240,12 +264,46 @@ describe('AddCombatantDialog', () => {
     fireEvent.click(screen.getByRole('button', { name: /npc/i }));
 
     // Town Guard should appear
-    const deleteBtn = screen.getByTitle('Delete NPC');
+    const deleteBtn = screen.getByRole('button', {
+      name: /delete town guard/i,
+    });
     fireEvent.click(deleteBtn);
 
     expect(confirmSpy).toHaveBeenCalledWith(
       expect.stringContaining('Town Guard')
     );
+  });
+
+  it('searches saved NPCs by name or group and excludes custom monsters', () => {
+    render(<AddCombatantDialog {...defaultProps} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^npc$/i }));
+    const search = screen.getByRole('textbox', {
+      name: /search saved creatures by name or group/i,
+    });
+    expect(screen.getByText('Town Guard')).toBeInTheDocument();
+    expect(screen.getByText('Forest Scout')).toBeInTheDocument();
+    expect(screen.queryByText('Bone Colossus')).not.toBeInTheDocument();
+
+    fireEvent.change(search, { target: { value: 'city watch' } });
+    expect(screen.getByText('Town Guard')).toBeInTheDocument();
+    expect(screen.queryByText('Forest Scout')).not.toBeInTheDocument();
+  });
+
+  it('adds a saved custom monster from the Custom tab with its persistent source link', () => {
+    const onAddEntity = vi.fn();
+    render(<AddCombatantDialog {...defaultProps} onAddEntity={onAddEntity} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /^custom$/i }));
+    fireEvent.click(screen.getByText('Bone Colossus'));
+
+    expect(onAddEntity).toHaveBeenCalledOnce();
+    expect(onAddEntity.mock.calls[0][0]).toMatchObject({
+      name: 'Bone Colossus',
+      type: 'monster',
+      npcSourceId: 'monster1',
+      campaignCode: 'CAMP1',
+    });
   });
 
   it('monster add button is anchored outside the scrollable body', async () => {

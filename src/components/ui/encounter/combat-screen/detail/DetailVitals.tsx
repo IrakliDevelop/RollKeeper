@@ -27,11 +27,11 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const isPlayer = entity.type === 'player';
   const isNonPlayerNonSummon = !isPlayer && !entity.summonId;
   const showDeathSaves =
-    (isPlayer || entity.type === 'npc') &&
+    (isPlayer || entity.type === 'npc' || !!entity.npcSourceId) &&
     entity.currentHp <= 0 &&
     entity.deathSaves != null;
   const canSpendHitDie =
-    entity.type === 'npc' &&
+    (entity.type === 'npc' || entity.npcSourceId != null) &&
     entity.hitDice != null &&
     entity.hitDice.current > 0 &&
     entity.currentHp > 0 &&

@@ -78,7 +78,7 @@ export function buildNpcEntity(
     : [];
 
   return {
-    type: 'npc',
+    type: npc.kind === 'monster' ? 'monster' : 'npc',
     name: npc.name,
     initiative: null,
     initiativeModifier:

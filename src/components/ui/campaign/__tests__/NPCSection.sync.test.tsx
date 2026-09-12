@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { useDmStore } from '@/store/dmStore';
@@ -16,9 +16,18 @@ describe('NPCSection cloud sync mount', () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
   });
 
   beforeEach(() => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })
+    );
     useNPCStore.setState({ npcsByCampaign: {} });
     useDmStore.setState({
       campaigns: [
@@ -75,5 +84,57 @@ describe('NPCSection cloud sync mount', () => {
       render(<NPCSection campaignCode="empty-campaign" players={[]} />)
     ).not.toThrow();
     expect(screen.queryByText('NPC cloud sync')).toBeNull();
+  });
+
+  it('moves a creature between the NPC and custom monster sections in one click', () => {
+    useNPCStore.setState({
+      npcsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'npc-legacy',
+            campaignCode: 'empty-campaign',
+            name: 'Shapechanger',
+            armorClass: '15',
+            maxHp: 44,
+            speed: '30 ft.',
+            inventory: [{ id: 'key', name: 'Vault Key', quantity: 1 }],
+            createdAt: '2026-09-12T00:00:00.000Z',
+            updatedAt: '2026-09-12T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    render(
+      <>
+        <NPCSection
+          campaignCode="empty-campaign"
+          kind="npc"
+          showLibraryExtras={false}
+        />
+        <NPCSection
+          campaignCode="empty-campaign"
+          kind="monster"
+          showSpellSlotSettings={false}
+          showLibraryExtras={false}
+        />
+      </>
+    );
+
+    expect(screen.getByText('NPCs (1)')).toBeInTheDocument();
+    expect(screen.getByText('Custom Monsters (0)')).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: /move shapechanger to custom monsters/i,
+      })
+    );
+    expect(screen.getByText('NPCs (0)')).toBeInTheDocument();
+    expect(screen.getByText('Custom Monsters (1)')).toBeInTheDocument();
+    expect(
+      useNPCStore.getState().getNPC('empty-campaign', 'npc-legacy')
+    ).toMatchObject({
+      kind: 'monster',
+      inventory: [{ id: 'key', name: 'Vault Key', quantity: 1 }],
+    });
   });
 });

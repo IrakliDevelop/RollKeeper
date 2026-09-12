@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState } from 'react';
-import { Plus, Trash2, CircleUserRound } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import type {
@@ -12,6 +12,7 @@ import type {
 import { useNPCStore } from '@/store/npcStore';
 import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
+import { SavedCreaturePicker } from './SavedCreaturePicker';
 
 interface NpcTabProps {
   npcs: CampaignNPC[];
@@ -31,16 +32,24 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
   const [disposition, setDisposition] = useState<PlayerDisposition>('enemy');
 
   const { getNPCsForCampaign, createNPC, deleteNPC } = useNPCStore();
-  const storedNpcs = campaignCode ? getNPCsForCampaign(campaignCode) : [];
-  const allNpcs = [
-    ...npcs,
-    ...storedNpcs.filter(sn => !npcs.some(n => n.id === sn.id)),
-  ];
+  const storedNpcs = useMemo(
+    () => (campaignCode ? getNPCsForCampaign(campaignCode) : []),
+    [campaignCode, getNPCsForCampaign]
+  );
+  const allNpcs = useMemo(
+    () =>
+      [
+        ...npcs,
+        ...storedNpcs.filter(sn => !npcs.some(n => n.id === sn.id)),
+      ].filter(npc => (npc.kind ?? 'npc') === 'npc'),
+    [npcs, storedNpcs]
+  );
 
   const handleCreateNpc = () => {
     if (!npcName.trim() || !campaignCode) return;
     createNPC(campaignCode, {
       name: npcName.trim(),
+      kind: 'npc',
       maxHp: parseInt(npcHp) || 10,
       armorClass: npcAc.trim() || '10',
       speed: npcSpeed.trim() || '30 ft.',
@@ -152,47 +161,14 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
         />
       )}
 
-      {/* NPC rows */}
-      {!creatingNpc && allNpcs.length === 0 && (
-        <p className="text-muted py-8 text-center text-sm">
-          No NPCs yet. Create one to reuse across encounters.
-        </p>
+      {!creatingNpc && (
+        <SavedCreaturePicker
+          creatures={allNpcs}
+          emptyMessage="No NPCs yet. Create one to reuse across encounters."
+          onSelect={handleAddNpc}
+          onDelete={handleDelete}
+        />
       )}
-      {allNpcs.map(npc => (
-        <div
-          key={npc.id}
-          className="border-divider bg-surface-raised hover:border-accent-amber-border flex items-center rounded-[14px] border-[1.5px] text-sm transition-all"
-        >
-          <button
-            onClick={() => handleAddNpc(npc)}
-            className="flex flex-1 items-center gap-2 px-[14px] py-3 text-left"
-          >
-            <div className="bg-accent-amber-bg text-accent-amber-text flex h-[38px] w-[38px] shrink-0 items-center justify-center rounded-[10px]">
-              <CircleUserRound size={19} />
-            </div>
-            <div className="min-w-0 flex-1">
-              <div className="text-heading truncate text-[14.5px] font-bold">
-                {npc.name}
-              </div>
-              {npc.description && (
-                <div className="text-muted truncate text-xs">
-                  {npc.description}
-                </div>
-              )}
-            </div>
-            <div className="text-muted shrink-0 text-right text-[12.5px] font-bold tabular-nums">
-              {npc.maxHp} HP · AC {npc.armorClass}
-            </div>
-          </button>
-          <button
-            onClick={() => handleDelete(npc)}
-            className="text-muted hover:text-accent-red-text shrink-0 p-2.5 transition-colors"
-            title="Delete NPC"
-          >
-            <Trash2 size={14} />
-          </button>
-        </div>
-      ))}
     </div>
   );
 }

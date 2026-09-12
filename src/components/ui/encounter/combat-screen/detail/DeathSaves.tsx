@@ -14,7 +14,7 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
   const ds = entity.deathSaves;
   if (!ds) return null;
 
-  const isNpc = entity.type === 'npc';
+  const isNpc = entity.type === 'npc' || entity.npcSourceId != null;
 
   if (ds.isStabilized) {
     return (

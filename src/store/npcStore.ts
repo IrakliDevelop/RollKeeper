@@ -50,9 +50,12 @@ function getDuplicateName(name: string, existingNpcs: CampaignNPC[]): string {
  * and abilityUsage is pruned to live entry ids and clamped to current maxima.
  */
 function normalizeNpcWrite(npc: CampaignNPC): CampaignNPC {
+  const normalizedKindNpc = { ...npc, kind: npc.kind ?? 'npc' };
   if (!npc.monsterStatBlock) {
     // No stat block → no entries → any remaining usage keys are orphans.
-    return npc.abilityUsage ? { ...npc, abilityUsage: undefined } : npc;
+    return normalizedKindNpc.abilityUsage
+      ? { ...normalizedKindNpc, abilityUsage: undefined }
+      : normalizedKindNpc;
   }
   const statBlock = ensureStatBlockEntryIds(npc.monsterStatBlock);
   let abilityUsage = npc.abilityUsage;
@@ -67,7 +70,11 @@ function normalizeNpcWrite(npc: CampaignNPC): CampaignNPC {
     }
     abilityUsage = next;
   }
-  return { ...npc, monsterStatBlock: statBlock, abilityUsage };
+  return {
+    ...normalizedKindNpc,
+    monsterStatBlock: statBlock,
+    abilityUsage,
+  };
 }
 
 function arrayMove<T>(arr: T[], fromIndex: number, toIndex: number): T[] {
