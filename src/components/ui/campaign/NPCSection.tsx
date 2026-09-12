@@ -18,7 +18,7 @@ import {
   Lightbulb,
   Copy,
   ArrowLeftRight,
-  Skull,
+  Bug,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
@@ -279,7 +279,7 @@ export function NPCSection({
           </button>
           <div className="flex min-w-0 items-center gap-2">
             {isMonsterLibrary ? (
-              <Skull size={20} className="text-accent-purple-text shrink-0" />
+              <Bug size={20} className="text-accent-purple-text shrink-0" />
             ) : (
               <Drama size={20} className="text-muted shrink-0" />
             )}
@@ -341,7 +341,7 @@ export function NPCSection({
       {!sectionOpen ? null : npcs.length === 0 ? (
         <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
           {isMonsterLibrary ? (
-            <Skull size={40} className="text-faint mx-auto mb-3" />
+            <Bug size={40} className="text-faint mx-auto mb-3" />
           ) : (
             <Drama size={40} className="text-faint mx-auto mb-3" />
           )}
