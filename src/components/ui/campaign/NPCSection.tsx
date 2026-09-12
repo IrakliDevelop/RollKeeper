@@ -18,11 +18,11 @@ import {
   Lightbulb,
   Copy,
   ArrowLeftRight,
-  Bug,
 } from 'lucide-react';
 import { useNPCStore } from '@/store/npcStore';
 import { useDmStore } from '@/store/dmStore';
 import { Button } from '@/components/ui/forms/button';
+import { GermIcon } from '@/components/ui/icons/customIcons';
 import { Badge } from '@/components/ui/layout/badge';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Input } from '@/components/ui/forms/input';
@@ -279,7 +279,10 @@ export function NPCSection({
           </button>
           <div className="flex min-w-0 items-center gap-2">
             {isMonsterLibrary ? (
-              <Bug size={20} className="text-accent-purple-text shrink-0" />
+              <GermIcon
+                size={20}
+                className="text-accent-purple-text shrink-0"
+              />
             ) : (
               <Drama size={20} className="text-muted shrink-0" />
             )}
@@ -341,7 +344,7 @@ export function NPCSection({
       {!sectionOpen ? null : npcs.length === 0 ? (
         <div className="border-divider bg-surface-secondary rounded-lg border-2 border-dashed p-8 text-center">
           {isMonsterLibrary ? (
-            <Bug size={40} className="text-faint mx-auto mb-3" />
+            <GermIcon size={40} className="text-faint mx-auto mb-3" />
           ) : (
             <Drama size={40} className="text-faint mx-auto mb-3" />
           )}
