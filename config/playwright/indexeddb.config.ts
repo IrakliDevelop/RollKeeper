@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e-indexeddb',
-  outputDir: 'test-results/indexeddb',
+  testDir: '../../e2e-indexeddb',
+  outputDir: '../../test-results/indexeddb',
   timeout: 60_000,
   retries: 0,
   workers: 1,
@@ -11,14 +11,20 @@ export default defineConfig({
         ['github'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/indexeddb' },
+          {
+            open: 'never',
+            outputFolder: '../../playwright-report/indexeddb',
+          },
         ],
       ]
     : [
         ['list'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/indexeddb' },
+          {
+            open: 'never',
+            outputFolder: '../../playwright-report/indexeddb',
+          },
         ],
       ],
   use: {
@@ -31,6 +37,7 @@ export default defineConfig({
   webServer: {
     command:
       'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true npm run dev -- --port 3107',
+    cwd: '../..',
     url: 'http://localhost:3107/player',
     reuseExistingServer: false,
     timeout: 120_000,

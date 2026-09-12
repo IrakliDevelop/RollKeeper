@@ -49,7 +49,7 @@ feature as "shipped" in user-facing terms.
 
 ## e2e coverage
 
-Dedicated Playwright config: `playwright.fog.config.ts`, run via
+Dedicated Playwright config: `config/playwright/fog.config.ts`, run via
 `npm run test:fog:e2e`.
 
 ## Related sync architecture

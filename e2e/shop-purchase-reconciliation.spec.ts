@@ -22,8 +22,8 @@ import type { Currency } from '../src/types/character';
  * hitting the now-empty shop gets refused server-side.
  *
  * Harness: follows `e2e/marker-loot-locked-claim.spec.ts` for the
- * cross-party relay pattern (`playwright.shop.config.ts` mirrors
- * `playwright.loot.config.ts`'s webServer wiring exactly — this is the only
+ * cross-party relay pattern (`config/playwright/shop.config.ts` mirrors
+ * `config/playwright/loot.config.ts`'s webServer wiring exactly — this is the only
  * other flow in the repo where a canvas element authored by the DM has to
  * reach a second client over the live relay before anything else can
  * happen) and `e2e/token-decoration-overlay.spec.ts` for seeding a
@@ -466,7 +466,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     // Prewarm every route this test hits, sequentially, before the timed
     // interactive flow — see marker-loot-locked-claim.spec.ts's identical
     // loop for why: under `--webpack` (the only dev server this worktree's
-    // symlinked node_modules can start — see playwright.shop.config.ts),
+    // symlinked node_modules can start — see config/playwright/shop.config.ts),
     // each route compiles on first request, and concurrent first-hits from
     // multiple contexts have been observed to trip the dev server's HMR
     // client into a full-page reload mid-navigation.

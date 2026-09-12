@@ -1,10 +1,10 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e-nightly',
+  testDir: '../../e2e-nightly',
   testIgnore: '**/auth/**',
   testMatch: /reconnect-stress/,
-  outputDir: 'test-results/nightly-reconnect',
+  outputDir: '../../test-results/nightly-reconnect',
   timeout: 60_000,
   retries: 0,
   workers: 1,
@@ -15,7 +15,7 @@ export default defineConfig({
           'html',
           {
             open: 'never',
-            outputFolder: 'playwright-report/reconnect-nightly',
+            outputFolder: '../../playwright-report/reconnect-nightly',
           },
         ],
       ]
@@ -25,7 +25,7 @@ export default defineConfig({
           'html',
           {
             open: 'never',
-            outputFolder: 'playwright-report/reconnect-nightly',
+            outputFolder: '../../playwright-report/reconnect-nightly',
           },
         ],
       ],
@@ -37,6 +37,7 @@ export default defineConfig({
   },
   webServer: {
     command: 'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
+    cwd: '../..',
     url: 'http://localhost:3000/player',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

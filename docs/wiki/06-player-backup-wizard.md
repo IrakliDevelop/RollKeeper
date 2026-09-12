@@ -48,7 +48,7 @@ wizard is enabled), `playerBackupManagement.ts`,
 
 `npm run test:indexeddb:e2e` runs both the IndexedDB migration suite and the
 player-backup-recovery Playwright config
-(`playwright.player-backup-recovery.config.ts`) together — the two are
+(`config/playwright/player-backup-recovery.config.ts`) together — the two are
 tested jointly because backup/restore interacts directly with the
 localStorage→IndexedDB cutover state ([03](03-persistence-and-storage-migration.md)).
 Also: `npm run test:db:backup-restore` (Node integration test against a real

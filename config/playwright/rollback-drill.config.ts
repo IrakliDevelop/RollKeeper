@@ -1,8 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e-rollback-drill',
-  outputDir: 'test-results/rollback-drill',
+  testDir: '../../e2e-rollback-drill',
+  outputDir: '../../test-results/rollback-drill',
   timeout: 90_000,
   retries: 0,
   workers: 1,
@@ -11,14 +11,20 @@ export default defineConfig({
         ['github'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/rollback-drill' },
+          {
+            open: 'never',
+            outputFolder: '../../playwright-report/rollback-drill',
+          },
         ],
       ]
     : [
         ['list'],
         [
           'html',
-          { open: 'never', outputFolder: 'playwright-report/rollback-drill' },
+          {
+            open: 'never',
+            outputFolder: '../../playwright-report/rollback-drill',
+          },
         ],
       ],
   use: {
