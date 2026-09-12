@@ -402,7 +402,7 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
   const playerPage = await playerContext.newPage();
 
   try {
-    // Under `--webpack` (see playwright.loot.config.ts for why this spec
+    // Under `--webpack` (see config/playwright/loot.config.ts for why this spec
     // cannot use the default Turbopack dev server), each route compiles on
     // first request. Two contexts requesting different uncompiled routes at
     // once has been observed to trip the dev server's HMR client into a

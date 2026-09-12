@@ -133,7 +133,7 @@ function runPlaywrightPhase(grep) {
         'playwright',
         'test',
         '--config',
-        'playwright.rollback-drill.config.ts',
+        'config/playwright/rollback-drill.config.ts',
         '--grep',
         grep,
       ],

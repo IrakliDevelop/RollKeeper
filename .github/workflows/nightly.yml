@@ -157,7 +157,7 @@ jobs:
         run: npm run test:db:backup-restore
 
       - name: Player backup recovery with repeat
-        run: npx playwright test --config playwright.player-backup-recovery.config.ts --repeat-each=2
+        run: npx playwright test --config config/playwright/player-backup-recovery.config.ts --repeat-each=2
 
       - name: Upload backup-restore failure artifacts
         if: failure()

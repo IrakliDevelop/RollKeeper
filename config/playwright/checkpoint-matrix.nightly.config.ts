@@ -1,8 +1,9 @@
 import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
-  testDir: './e2e-indexeddb',
-  outputDir: 'test-results/player-backup-recovery',
+  testDir: '../../e2e-nightly',
+  outputDir: '../../test-results/nightly-checkpoint',
+  testMatch: /checkpoint-interruption/,
   timeout: 60_000,
   retries: 0,
   workers: 1,
@@ -13,7 +14,7 @@ export default defineConfig({
           'html',
           {
             open: 'never',
-            outputFolder: 'playwright-report/player-backup-recovery',
+            outputFolder: '../../playwright-report/checkpoint-matrix',
           },
         ],
       ]
@@ -23,12 +24,12 @@ export default defineConfig({
           'html',
           {
             open: 'never',
-            outputFolder: 'playwright-report/player-backup-recovery',
+            outputFolder: '../../playwright-report/checkpoint-matrix',
           },
         ],
       ],
   use: {
-    baseURL: 'http://localhost:3109',
+    baseURL: 'http://localhost:3110',
     browserName: 'chromium',
     screenshot: 'only-on-failure',
     trace: 'retain-on-failure',
@@ -36,16 +37,16 @@ export default defineConfig({
   },
   webServer: {
     command:
-      'env NEXT_PUBLIC_PLAYER_BACKUP_WIZARD_VISIBLE=true NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED=true npm run dev -- --port 3109',
-    url: 'http://localhost:3109/player',
+      'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true npm run dev -- --port 3110',
+    cwd: '../..',
+    url: 'http://localhost:3110/player',
     reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [
     {
-      name: 'chromium-player-backup-recovery',
+      name: 'chromium-indexeddb',
       use: { browserName: 'chromium' },
-      testMatch: /player-backup-current-character-recovery/,
     },
   ],
 });

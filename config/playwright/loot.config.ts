@@ -27,7 +27,7 @@ const RELAY_SECRET = process.env.BATTLEMAP_RELAY_SECRET ?? resolveRelaySecret();
  * The app's dev server command, overridable per-environment.
  *
  * Defaults to the repo's own `npm run dev` — the same command
- * `playwright.fog.config.ts` and every other spec's webServer runs. In some
+ * `fog.config.ts` and every other spec's webServer runs. In some
  * environments a symlinked (or otherwise non-standard) `node_modules` can
  * trip Turbopack's project-root/filesystem-boundary check and prevent `next
  * dev` from starting at all (`TurbopackInternalError: Symlink
@@ -40,23 +40,23 @@ const RELAY_SECRET = process.env.BATTLEMAP_RELAY_SECRET ?? resolveRelaySecret();
 const DEV_COMMAND = process.env.ROLLKEEPER_E2E_DEV_COMMAND ?? 'npm run dev';
 
 // Dedicated config for the VTT loot-completion e2e coverage, mirroring the
-// existing `playwright.fog.config.ts` pattern (its own test file, its own
-// webServer wiring) rather than the shared default `playwright.config.ts`.
+// existing `fog.config.ts` pattern (its own test file, its own webServer
+// wiring) rather than the shared root `playwright.config.ts`.
 //
 // This spec is genuinely cross-party: the DM's marker pin only reaches the
 // player's canvas over the live battle-map relay (`relay/`), never over a
 // REST snapshot (see `src/lib/battlemapSync.ts`). So, unlike every other
 // e2e spec in this repo, it needs a second local service besides Redis.
 export default defineConfig({
-  testDir: './e2e',
+  testDir: '../../e2e',
   testMatch: ['marker-loot-locked-claim.spec.ts'],
-  outputDir: 'test-results/loot',
+  outputDir: '../../test-results/loot',
   timeout: 60_000,
   retries: 0,
   workers: 1,
   reporter: [
     ['list'],
-    ['html', { open: 'never', outputFolder: 'playwright-report/loot' }],
+    ['html', { open: 'never', outputFolder: '../../playwright-report/loot' }],
   ],
   use: {
     baseURL: 'http://localhost:3000',
@@ -71,13 +71,14 @@ export default defineConfig({
   webServer: [
     {
       command: `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} REDIS_URL=redis://localhost:6379 npm run dev`,
-      cwd: './relay',
+      cwd: '../../relay',
       url: 'http://localhost:8787/healthz',
       reuseExistingServer: !process.env.CI,
       timeout: 60_000,
     },
     {
       command: `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false UPSTASH_REDIS_REST_URL=http://localhost:8079 UPSTASH_REDIS_REST_TOKEN=local_dev_token BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
+      cwd: '../..',
       url: 'http://localhost:3000/player',
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
