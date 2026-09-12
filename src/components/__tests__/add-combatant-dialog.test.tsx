@@ -274,12 +274,12 @@ describe('AddCombatantDialog', () => {
     );
   });
 
-  it('searches saved NPCs by name or group and excludes custom monsters', () => {
+  it('searches saved NPCs by name, group, or tag and excludes custom monsters', () => {
     render(<AddCombatantDialog {...defaultProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /^npc$/i }));
     const search = screen.getByRole('textbox', {
-      name: /search saved creatures by name or group/i,
+      name: /search saved creatures by name, group, or tag/i,
     });
     expect(screen.getByText('Town Guard')).toBeInTheDocument();
     expect(screen.getByText('Forest Scout')).toBeInTheDocument();
