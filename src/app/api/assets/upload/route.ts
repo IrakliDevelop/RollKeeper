@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
+import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 import {
   MAX_ASSET_UPLOAD_SIZE_BYTES,
@@ -46,50 +47,53 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const formData = await request.formData();
-    const file = formData.get('file') as File | null;
-    const assetId = formData.get('assetId') as string | null;
+    const body = (await request.json()) as {
+      assetId?: string;
+      fileName?: string;
+      fileSize?: number;
+      contentType?: string;
+    };
+    const { assetId, fileName, fileSize, contentType } = body;
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
-    }
-
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    if (!fileName || typeof fileSize !== 'number' || !contentType) {
       return NextResponse.json(
-        { error: `Unsupported file type: ${file.type}` },
+        { error: 'File name, size, and content type are required' },
         { status: 400 }
       );
     }
 
-    if (file.size > MAX_ASSET_UPLOAD_SIZE_BYTES) {
+    if (!ALLOWED_MIME_TYPES.includes(contentType)) {
       return NextResponse.json(
-        { error: `File size must be less than ${MAX_ASSET_UPLOAD_SIZE_MB}MB` },
+        { error: `Unsupported file type: ${contentType}` },
         { status: 400 }
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    if (fileSize <= 0 || fileSize > MAX_ASSET_UPLOAD_SIZE_BYTES) {
+      return NextResponse.json(
+        { error: `File size must not exceed ${MAX_ASSET_UPLOAD_SIZE_MB}MB` },
+        { status: 400 }
+      );
+    }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'bin';
+    const ext = fileName.split('.').pop()?.toLowerCase() || 'bin';
     const timestamp = Date.now();
     const sanitizedId = (assetId || 'unknown').replace(/[^a-zA-Z0-9_:-]/g, '_');
     const key = `notes-assets/${sanitizedId}-${timestamp}.${ext}`;
 
-    await s3.send(
-      new PutObjectCommand({
-        Bucket: bucket,
-        Key: key,
-        Body: buffer,
-        ContentType: file.type,
-        CacheControl: 'public, max-age=31536000, immutable',
-      })
-    );
+    const command = new PutObjectCommand({
+      Bucket: bucket,
+      Key: key,
+      ContentType: contentType,
+      ContentLength: fileSize,
+      CacheControl: 'public, max-age=31536000, immutable',
+    });
+    const uploadUrl = await getSignedUrl(s3, command, { expiresIn: 600 });
 
     const region = process.env.AWS_S3_REGION;
     const url = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
 
-    return NextResponse.json({ url }, { status: 200 });
+    return NextResponse.json({ uploadUrl, url }, { status: 200 });
   } catch (error) {
     console.error('Asset upload error:', error);
     return NextResponse.json(

@@ -20,6 +20,7 @@ import { BattleMapListCard } from '@/components/ui/campaign/battle-map/BattleMap
 import { useBattleMapStore, generateBattleMapId } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
+import { uploadAsset } from '@/utils/uploadAsset';
 
 export default function CampaignBattleMapsPage() {
   const params = useParams();
@@ -58,18 +59,7 @@ export default function CampaignBattleMapsPage() {
 
     try {
       const assetId = generateBattleMapId();
-      const formData = new FormData();
-      formData.append('file', mapFile);
-      formData.append('assetId', assetId);
-
-      const res = await fetch('/api/assets/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) throw new Error('Upload failed');
-
-      const { url } = (await res.json()) as { url: string };
+      const url = await uploadAsset(mapFile, assetId);
 
       const { w, h } = await new Promise<{ w: number; h: number }>(
         (resolve, reject) => {

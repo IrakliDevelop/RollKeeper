@@ -9,6 +9,7 @@ import {
 import { TemplateTool } from '@fieldnotes/vtt';
 import { cellUnit } from './cellUnit';
 import { TOKEN_ELEMENT_ZINDEX, TEMPLATE_ELEMENT_ZINDEX } from './tokenSnap';
+import { uploadAsset } from '@/utils/uploadAsset';
 
 export const PLAYER_TOKEN_KIND = 'player';
 
@@ -129,16 +130,10 @@ export function buildCircularTokenUrl(
     if (!blob) return null;
 
     try {
-      const formData = new FormData();
-      formData.append('file', blob, `token-${cacheKey}.png`);
-      formData.append('assetId', `token-${cacheKey}`);
-      const res = await fetch('/api/assets/upload', {
-        method: 'POST',
-        body: formData,
+      const file = new File([blob], `token-${cacheKey}.png`, {
+        type: 'image/png',
       });
-      if (!res.ok) return null; // S3 not configured — square avatar fallback
-      const data = (await res.json()) as { url?: string };
-      return data.url ?? null;
+      return await uploadAsset(file, `token-${cacheKey}`);
     } catch {
       return null;
     }

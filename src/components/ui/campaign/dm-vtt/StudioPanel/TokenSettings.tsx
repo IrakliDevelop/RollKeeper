@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { uploadAsset } from '@/utils/uploadAsset';
 
 import { TokenAppearanceRow } from './TokenAppearanceRow';
 
@@ -43,22 +44,12 @@ export function TokenSettings({ entity, onChange }: TokenSettingsProps) {
     setUploading(true);
     setUploadError(false);
     try {
-      const formData = new FormData();
-      formData.append('file', file, file.name);
-      formData.append('assetId', `entity-portrait-${entity.id}`);
-      const res = await fetch('/api/assets/upload', {
-        method: 'POST',
-        body: formData,
-      });
-      if (!res.ok) {
-        setUploadError(true);
-        return;
-      }
-      const data = (await res.json()) as { url?: string };
-      if (data.url) {
-        setUrl(data.url);
-        onChange({ avatarUrl: data.url });
-      }
+      const uploadedUrl = await uploadAsset(
+        file,
+        `entity-portrait-${entity.id}`
+      );
+      setUrl(uploadedUrl);
+      onChange({ avatarUrl: uploadedUrl });
     } catch {
       setUploadError(true);
     } finally {
