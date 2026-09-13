@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { uploadAsset } from '@/utils/uploadAsset';
 import {
   HandTool,
   SelectTool,
@@ -387,16 +388,7 @@ export default function FieldNotesCanvasPage({
       // Upload to S3 first so we store a URL, not base64
       let src: string;
       try {
-        const formData = new FormData();
-        formData.append('file', file);
-        formData.append('assetId', `canvas-${Date.now()}`);
-        const res = await fetch('/api/assets/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        if (!res.ok) throw new Error('Upload failed');
-        const data = await res.json();
-        src = data.url;
+        src = await uploadAsset(file, `canvas-${Date.now()}`);
       } catch {
         // S3 not configured — fall back to base64
         src = await new Promise<string>((resolve, reject) => {

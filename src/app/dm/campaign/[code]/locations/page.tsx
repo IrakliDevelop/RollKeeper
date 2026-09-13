@@ -20,6 +20,7 @@ import { LocationListCard } from '@/components/ui/campaign/location-map/Location
 import { useLocationStore, generateLocationId } from '@/store/locationStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
+import { uploadAsset } from '@/utils/uploadAsset';
 
 export default function CampaignLocationsPage() {
   const params = useParams();
@@ -58,20 +59,7 @@ export default function CampaignLocationsPage() {
 
     try {
       const assetId = generateLocationId();
-      const formData = new FormData();
-      formData.append('file', mapFile);
-      formData.append('assetId', assetId);
-
-      const res = await fetch('/api/assets/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error('Upload failed');
-      }
-
-      const { url } = (await res.json()) as { url: string };
+      const url = await uploadAsset(mapFile, assetId);
 
       // Get image dimensions
       const { w, h } = await new Promise<{ w: number; h: number }>(

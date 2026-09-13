@@ -34,6 +34,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
+import { uploadAsset } from '@/utils/uploadAsset';
 import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
@@ -155,16 +156,7 @@ function proxyUrl(url: string): string {
  *  not configured. Returns the canonical (non-proxied) src to store. */
 async function uploadCanvasImage(file: File): Promise<string> {
   try {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('assetId', `canvas-${Date.now()}`);
-    const res = await fetch('/api/assets/upload', {
-      method: 'POST',
-      body: formData,
-    });
-    if (!res.ok) throw new Error('Upload failed');
-    const data = await res.json();
-    return data.url as string;
+    return await uploadAsset(file, `canvas-${Date.now()}`);
   } catch {
     return await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -1655,22 +1647,11 @@ export function useDmLocationEditor(
       if (blob) {
         // Try S3 upload first
         const assetId = `location-${location.id}-${Date.now()}`;
-        const formData = new FormData();
-        formData.append('file', blob, `${assetId}.jpg`);
-        formData.append('assetId', assetId);
-
         try {
-          const uploadRes = await fetch('/api/assets/upload', {
-            method: 'POST',
-            body: formData,
+          const file = new File([blob], `${assetId}.jpg`, {
+            type: 'image/jpeg',
           });
-
-          if (!uploadRes.ok) {
-            throw new Error(`asset upload returned ${uploadRes.status}`);
-          }
-          const data = (await uploadRes.json()) as { url?: string };
-          if (!data.url) throw new Error('asset upload returned no URL');
-          snapshotUrl = data.url;
+          snapshotUrl = await uploadAsset(file, assetId);
         } catch (error) {
           if (fogEnabled) {
             throw new Error(

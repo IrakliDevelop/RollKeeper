@@ -15,6 +15,7 @@ import {
   type TLAssetStore,
 } from 'tldraw';
 import 'tldraw/tldraw.css';
+import { uploadAsset } from '@/utils/uploadAsset';
 import { NoteCardShapeUtil, NOTE_CARD_SHAPE_TYPE } from './NoteCardShape';
 import {
   useProtoNotesStore,
@@ -39,22 +40,7 @@ const STORAGE_KEY = 'tldraw-notes-canvas';
 
 const s3AssetStore: TLAssetStore = {
   async upload(asset, file) {
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('assetId', asset.id);
-
-    const res = await fetch('/api/assets/upload', {
-      method: 'POST',
-      body: formData,
-    });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: 'Upload failed' }));
-      console.error('[tldraw-notes] Asset upload failed:', err);
-      throw new Error(err.error || 'Upload failed');
-    }
-
-    const { url } = await res.json();
+    const url = await uploadAsset(file, asset.id);
     console.log('[tldraw-notes] Asset uploaded to S3:', url);
     return { src: url };
   },
