@@ -8,7 +8,8 @@ import {
 } from '@testing-library/react';
 
 import { DockSpells } from '@/components/ui/campaign/player-vtt/CharacterDock/DockSpells';
-import { useCharacterStore } from '@/store/characterStore';
+import { characterWriterLock } from '@/lib/characterWriterLock';
+import { characterIntentBus, useCharacterStore } from '@/store/characterStore';
 import type { CharacterState, Spell } from '@/types/character';
 
 function makeSpell(
@@ -56,6 +57,15 @@ const HOLD_PERSON = makeSpell({
   level: 2,
   concentration: true,
   duration: 'Concentration, up to 1 minute',
+  isPrepared: true,
+});
+const FAERIE_FIRE = makeSpell({
+  id: 'faerie-fire',
+  name: 'Faerie Fire',
+  level: 1,
+  concentration: true,
+  duration: 'Concentration, up to 1 minute',
+  aoe: { shape: 'square', sizeFeet: 20 },
   isPrepared: true,
 });
 
@@ -123,7 +133,34 @@ describe('DockSpells', () => {
     seedCharacter();
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+  });
+
+  it('casts a cost-free AoE spell from a follower tab', () => {
+    seedCharacter({ spells: [FAERIE_FIRE] });
+    vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(false);
+    const sendSpy = vi.spyOn(characterIntentBus, 'send');
+    const { addToast, onCastPlacement } = renderDock();
+
+    fireEvent.click(castButtonFor('Faerie Fire'));
+    fireEvent.click(screen.getByRole('button', { name: /^cast faerie fire/i }));
+
+    expect(addToast).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'error' })
+    );
+    expect(onCastPlacement).toHaveBeenCalledWith('Faerie Fire', {
+      shape: 'square',
+      sizeFeet: 20,
+    });
+    expect(sendSpy).toHaveBeenCalledWith(getChar().id, 'spendSpellSlot', [1]);
+    expect(sendSpy).not.toHaveBeenCalledWith(
+      getChar().id,
+      'consumeInventoryCost',
+      expect.anything()
+    );
+  });
 
   it('groups spells by level ascending, cantrips first', () => {
     renderDock();
