@@ -30,7 +30,12 @@ export function useCastSpell() {
 
   const castSpell = useCallback(
     (spell: Spell, options: CastSpellOptions) => {
-      if (!consumeInventoryCost(spell.inventoryCost)) return false;
+      // In a follower tab, canonical actions are forwarded to the character's
+      // writer tab and return undefined. Do not forward a no-op inventory
+      // action: treating that undefined as failure used to abort every
+      // cost-free cast in the player VTT before slots or templates updated.
+      if (spell.inventoryCost && !consumeInventoryCost(spell.inventoryCost))
+        return false;
       if (spell.concentration) {
         if (character.concentration.isConcentrating) {
           stopConcentration();
