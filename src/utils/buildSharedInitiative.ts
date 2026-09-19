@@ -87,6 +87,19 @@ function toEntry(
   // Player-facing allegiance (disguise). Defaults to enemy for non-players.
   entry.disposition = entity.playerDisposition ?? 'enemy';
 
+  // Per-entity DM opt-in: exact HP regardless of the campaign-wide mode (even
+  // 'off'). Same death/tier rule the 'exact' mode uses; `hpMode` tells the
+  // player renderers to treat this one row as 'exact'.
+  if (entity.hpVisibleToPlayers === true) {
+    entry.isDead = entity.currentHp <= 0;
+    if (!entry.isDead)
+      entry.hpTier = hpTier(hpPercent(entity.currentHp, entity.maxHp));
+    entry.currentHp = entity.currentHp;
+    entry.maxHp = entity.maxHp;
+    entry.hpMode = 'exact';
+    return entry;
+  }
+
   // Non-players (enemies/NPCs) expose only what the DM's combat config allows.
   if (config.enemyHpDisplay === 'off') return entry;
 
