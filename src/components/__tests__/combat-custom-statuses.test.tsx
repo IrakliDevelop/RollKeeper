@@ -66,15 +66,15 @@ describe('custom combat statuses', () => {
     ]);
   });
 
-  it('offers saved statuses in the combatant condition palette', async () => {
+  it('offers saved conditions in the combatant palette and applies icon + description', async () => {
     const user = userEvent.setup();
     useEncounterStore.getState().setCombatConfig({
       customConditions: [
         {
           id: 'cc-marked',
           name: 'Marked',
-          description: '',
-          icon: 'trending-down',
+          description: 'The hunter always knows where you are.',
+          icon: 'crosshair',
           kind: 'debuff',
         },
       ],
@@ -87,6 +87,8 @@ describe('custom combat statuses', () => {
 
     expect(onAddCondition).toHaveBeenCalledWith(entity.id, {
       name: 'Marked',
+      description: 'The hunter always knows where you are.',
+      icon: 'crosshair',
       kind: 'debuff',
       source: 'dm',
     });

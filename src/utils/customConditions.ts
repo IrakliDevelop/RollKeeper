@@ -6,6 +6,8 @@ import {
 import type {
   CombatConfig,
   CustomCondition,
+  EncounterCondition,
+  EncounterEntity,
   MonsterStatBlock,
 } from '@/types/encounter';
 
@@ -178,6 +180,48 @@ export function resolveInflictableConditions(
     out.push(byId.get(copy.id) ?? copy);
   }
   return out;
+}
+
+export interface CreatureCondition {
+  condition: CustomCondition;
+  /** Name of the first combatant that can inflict it (becomes sourceEntity). */
+  sourceName: string;
+}
+
+/** Every condition any combatant can inflict, deduped by id. */
+export function collectInflictableConditions(
+  entities: EncounterEntity[],
+  library: CustomCondition[]
+): CreatureCondition[] {
+  const seen = new Set<string>();
+  const out: CreatureCondition[] = [];
+  for (const entity of entities) {
+    for (const condition of resolveInflictableConditions(
+      entity.monsterStatBlock,
+      library
+    )) {
+      if (seen.has(condition.id)) continue;
+      seen.add(condition.id);
+      out.push({ condition, sourceName: entity.name });
+    }
+  }
+  return out;
+}
+
+/** The payload handed to EntityActions.onAddCondition for a custom condition. */
+export function toAppliedCondition(
+  condition: CustomCondition,
+  sourceEntity?: string
+): Omit<EncounterCondition, 'id'> {
+  const description = condition.description.trim();
+  return {
+    name: condition.name,
+    ...(description ? { description } : {}),
+    icon: condition.icon,
+    kind: condition.kind,
+    source: 'dm',
+    ...(sourceEntity ? { sourceEntity } : {}),
+  };
 }
 
 /** Save-time cleanup for the library editor. */

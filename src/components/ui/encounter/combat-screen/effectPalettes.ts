@@ -1,6 +1,10 @@
+import type { CustomCondition } from '@/types/encounter';
+
 export interface EffectPaletteEntry {
   name: string;
-  kind: 'buff' | 'debuff';
+  kind: 'buff' | 'debuff' | 'neutral';
+  /** Set for DM library entries: applying carries the icon + description. */
+  condition?: CustomCondition;
 }
 
 export const DEBUFF_PALETTE: EffectPaletteEntry[] = [
