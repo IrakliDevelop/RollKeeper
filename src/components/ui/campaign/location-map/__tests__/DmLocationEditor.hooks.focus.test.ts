@@ -5,6 +5,8 @@ import type { Viewport } from '@fieldnotes/core';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import type { BattleMap } from '@/types/battlemap';
+import { useLocationStore } from '@/store/locationStore';
+import type { LocationMap } from '@/types/location';
 
 /**
  * Ownership-split regression coverage for Task 13's second surface: the
@@ -520,5 +522,154 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     callOrder.length = 0;
     unmount();
     expect(callOrder).not.toContain('connection.stop');
+  });
+});
+
+const liveLocation: LocationMap = {
+  id: 'loc-live-1',
+  campaignCode: 'TEST01',
+  name: 'Live Location',
+  mapImageUrl: '',
+  mapImageSize: { w: 100, h: 100 },
+  canvasState: '',
+  dmOnlyElements: {},
+  gridEnabled: false,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+};
+
+async function setupLocation(
+  options: { selectFirst?: boolean; withPresenceTools?: boolean } = {}
+) {
+  const vp = makeStubViewport();
+  const firstId = vp.store.getAll()[0]!.id;
+  const stub = vp as unknown as {
+    getSelectedIds: () => string[];
+    toolManager: { getTool: (name: string) => unknown };
+  };
+  if (options.selectFirst) stub.getSelectedIds = () => [firstId];
+  if (options.withPresenceTools) {
+    stub.toolManager.getTool = (name: string) =>
+      name === 'laser' || name === 'ping' ? { name } : undefined;
+  }
+  const update = vi.spyOn(vp.store, 'update');
+  const { result, unmount } = renderHook(() =>
+    useDmLocationEditor({
+      location: liveLocation,
+      campaignCode: 'TEST01',
+      dmId: 'dm-1',
+      mode: 'location',
+      onSave: vi.fn(),
+      onSyncToPlayers: vi.fn(),
+    })
+  );
+  result.current.canvasRef.current = {
+    viewport: vp,
+  } as unknown as FieldNotesCanvasRef;
+  await act(async () => {
+    await result.current.handleReady(vp);
+  });
+  return { vp, result, unmount, firstId, update };
+}
+
+function readLiveLocationFlags(): Record<string, boolean> | undefined {
+  return useLocationStore.getState().getLocation('TEST01', liveLocation.id)
+    ?.dmOnlyElements;
+}
+
+describe('useDmLocationEditor — location-mode audience plumbing', () => {
+  const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
+    useDmStore.setState({ campaigns: [] });
+    useBattleMapStore.setState({ battleMaps: {} });
+    useLocationStore.setState({ locations: {} });
+    useLocationStore.getState().addLocation('TEST01', liveLocation);
+    callOrder.length = 0;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    useLocationStore.setState({ locations: {} });
+    if (savedRelayUrl !== undefined) {
+      process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
+    } else {
+      delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    }
+  });
+
+  it('with live sync configured, hiding an element writes the LOCATION flag and re-emits it so the relay sends players a remove', async () => {
+    const { result, firstId, update } = await setupLocation({
+      selectFirst: true,
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readLiveLocationFlags()).toEqual({ [firstId]: true });
+    expect(update).toHaveBeenCalledWith(firstId, {});
+    expect(result.current.hasUnsyncedChanges).toBe(true);
+  });
+
+  it('with NO relay URL, a visibility toggle still does not touch the canvas store', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const { result, firstId, update } = await setupLocation({
+      selectFirst: true,
+    });
+    act(() => {
+      result.current.handleToggleDmOnly();
+    });
+    expect(readLiveLocationFlags()).toEqual({ [firstId]: true });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('hidden placement marks a new LOCAL element DM-only in the location store, never the battle-map store', async () => {
+    const { vp, result } = await setupLocation();
+    act(() => {
+      result.current.handleToggleHiddenPlacement();
+    });
+    const secret = createShape({
+      position: { x: 5, y: 5 },
+      size: { w: 10, h: 10 },
+    });
+    act(() => {
+      vp.store.add(secret);
+    });
+    expect(readLiveLocationFlags()).toEqual({ [secret.id]: true });
+    expect(useBattleMapStore.getState().battleMaps).toEqual({});
+  });
+
+  it('hidden placement ignores remote-origin adds', async () => {
+    const { vp, result } = await setupLocation();
+    act(() => {
+      result.current.handleToggleHiddenPlacement();
+    });
+    const remote = createShape({
+      position: { x: 5, y: 5 },
+      size: { w: 10, h: 10 },
+    });
+    act(() => {
+      vp.store.add(remote, { origin: 'remote' });
+    });
+    expect(readLiveLocationFlags()).toEqual({});
+  });
+
+  it('reveal all clears the location flags and re-emits each surviving element', async () => {
+    const { vp, result, firstId, update } = await setupLocation();
+    act(() => {
+      useLocationStore
+        .getState()
+        .setDmOnly('TEST01', liveLocation.id, firstId, true);
+      useLocationStore
+        .getState()
+        .setDmOnly('TEST01', liveLocation.id, 'gone-element', true);
+    });
+    act(() => {
+      result.current.handleRevealAll();
+    });
+    expect(readLiveLocationFlags()).toEqual({});
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledWith(firstId, {});
+    expect(vp.store.getById('gone-element')).toBeUndefined();
   });
 });

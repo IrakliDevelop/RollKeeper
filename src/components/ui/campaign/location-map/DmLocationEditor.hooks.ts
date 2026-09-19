@@ -90,7 +90,11 @@ import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
 import type { MarkerDataIssue } from './markerPainter';
-import { isElementDmOnly, resolveElementAudience } from './elementAudience';
+import {
+  isElementDmOnly,
+  resolveElementAudience,
+  setElementDmOnly,
+} from './elementAudience';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import {
   CANVAS_WRITING_TOOL_NAMES,
@@ -321,6 +325,11 @@ export function useDmLocationEditor(
 ): DmLocationEditorState {
   const { location, campaignCode, dmId, onSave, onSyncToPlayers } = props;
   const mode = props.mode ?? 'location';
+  // Read per render (tests flip the env between cases). Live sync is what
+  // makes an audience change matter beyond this browser: battle maps always
+  // run it, locations only when the relay is configured.
+  const relayConfigured = Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL);
+  const audienceReemitEnabled = mode === 'battlemap' || relayConfigured;
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -536,6 +545,7 @@ export function useDmLocationEditor(
     campaignCode,
     mapId: location.id,
     getViewport: getMarkerViewport,
+    reemitAudience: audienceReemitEnabled,
   });
 
   // Setup and Play are separate battle-map surfaces. Play publishes marker
@@ -1016,15 +1026,14 @@ export function useDmLocationEditor(
       hiddenPlacementUnsubRef.current?.();
       hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
         if (
-          mode !== 'battlemap' ||
           !hiddenPlacementActiveRef.current ||
           (meta?.origin !== undefined && meta.origin !== 'local')
         ) {
           return;
         }
-        useBattleMapStore
-          .getState()
-          .setDmOnly(campaignCode, location.id, element.id, true);
+        // Mode-aware: the flag must land in the store the audience resolver
+        // reads for THIS map (see elementAudience.ts).
+        setElementDmOnly(mode, campaignCode, location.id, element.id, true);
       });
 
       // Markers are DM-only by DEFAULT, so unlike the hidden-placement
@@ -1516,15 +1525,15 @@ export function useDmLocationEditor(
 
     setMarkerAudienceNotice(null);
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
-    // Location mode: audience affects publication (§6.4). The non-marker
-    // branch does not touch the canvas store, so mark dirty explicitly.
-    if (mode === 'location') {
-      setHasUnsyncedChanges(true);
-      return;
-    }
-    // Battlemap only: re-emit the element so the sync client re-stamps its
-    // audience (hide → relay sends players/display a remove; reveal → an
-    // upsert).
+    // Location mode: audience affects the snapshot publication (§6.4). The
+    // non-marker branch does not touch the canvas store, so mark dirty
+    // explicitly.
+    if (mode === 'location') setHasUnsyncedChanges(true);
+    // No live sync (location mode, relay unset): nothing to re-stamp, and a
+    // canvas write would only fire the save listener on a pure toggle.
+    if (!audienceReemitEnabled) return;
+    // Re-emit the element so the sync client re-stamps its audience (hide →
+    // relay sends players/display a remove; reveal → an upsert).
     const vp = getVp();
     if (vp?.store.getById(selectedElementId)) {
       vp.store.update(selectedElementId, {});
@@ -1537,6 +1546,7 @@ export function useDmLocationEditor(
     storeGetLocation,
     markerWrites,
     mode,
+    audienceReemitEnabled,
     getVp,
   ]);
 
@@ -1549,22 +1559,30 @@ export function useDmLocationEditor(
   }, []);
 
   const handleRevealAll = useCallback(() => {
-    if (mode !== 'battlemap') return;
+    if (!audienceReemitEnabled) return;
     const vp = getVp();
     if (!vp) return;
     const hiddenIds = Object.keys(
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
-        ?.dmOnlyElements ?? {}
+      storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {}
     );
     if (hiddenIds.length === 0) return;
 
-    battleMapStoreUpdate(campaignCode, location.id, { dmOnlyElements: {} });
+    storeUpdateLocation(campaignCode, location.id, { dmOnlyElements: {} });
+    if (mode === 'location') setHasUnsyncedChanges(true);
     // Re-emit surviving elements after clearing their flags. The sync client
     // stamps them for the player audience and publishes an upsert immediately.
     for (const id of hiddenIds) {
       if (vp.store.getById(id)) vp.store.update(id, {});
     }
-  }, [mode, getVp, campaignCode, location.id, battleMapStoreUpdate]);
+  }, [
+    audienceReemitEnabled,
+    getVp,
+    campaignCode,
+    location.id,
+    mode,
+    storeGetLocation,
+    storeUpdateLocation,
+  ]);
 
   const handleClear = useCallback(async () => {
     const vp = getVp();
