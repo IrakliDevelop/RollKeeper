@@ -6,6 +6,7 @@ import {
   createCustomCondition,
   generateCustomConditionId,
   normalizeCombatConfig,
+  resolveInflictableConditions,
   sanitizeCustomCondition,
 } from '../customConditions';
 import type { LegacyCombatConfig } from '../customConditions';
@@ -211,5 +212,44 @@ describe('cleanCustomConditions', () => {
         kind: 'neutral',
       },
     ]);
+  });
+});
+
+describe('resolveInflictableConditions', () => {
+  const copy = {
+    id: 'cc-web',
+    name: 'Webbed',
+    description: 'Old text.',
+    icon: 'link',
+    kind: 'debuff',
+  } as const;
+
+  it('returns [] for a missing stat block or field', () => {
+    expect(resolveInflictableConditions(undefined, [])).toEqual([]);
+    expect(resolveInflictableConditions({}, [])).toEqual([]);
+  });
+
+  it('lets a same-id library entry win so library edits reach every creature', () => {
+    const library = [
+      { ...copy, name: 'Web Snare', description: 'New text.', icon: 'anchor' },
+    ] as const;
+    expect(
+      resolveInflictableConditions({ inflictableConditions: [copy] }, [
+        ...library,
+      ])
+    ).toEqual([library[0]]);
+  });
+
+  it('uses the copy on a device without the library entry', () => {
+    expect(
+      resolveInflictableConditions({ inflictableConditions: [copy] }, [])
+    ).toEqual([copy]);
+  });
+
+  it('sanitizes synced copies and dedupes by id', () => {
+    const dirty = { ...copy, icon: 'not-an-icon' } as unknown as typeof copy;
+    expect(
+      resolveInflictableConditions({ inflictableConditions: [dirty, copy] }, [])
+    ).toEqual([{ ...copy, icon: 'trending-down' }]);
   });
 });

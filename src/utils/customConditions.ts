@@ -3,7 +3,11 @@ import {
   isConditionIconName,
 } from '@/utils/conditionIconRegistry';
 
-import type { CombatConfig, CustomCondition } from '@/types/encounter';
+import type {
+  CombatConfig,
+  CustomCondition,
+  MonsterStatBlock,
+} from '@/types/encounter';
 
 /** Stable selector fallback — never `?? []` inside a Zustand selector. */
 export const EMPTY_CUSTOM_CONDITIONS: CustomCondition[] = [];
@@ -152,6 +156,28 @@ export function normalizeCombatConfig(
   }
 
   return { ...rest, customConditions: conditions };
+}
+
+/**
+ * The ONE resolution rule for creature-attached conditions: a copy whose id
+ * exists in the local library resolves to the library entry (so editing the
+ * library updates every creature on this device); otherwise the copy itself
+ * is used (so creatures still work on a device without the library).
+ */
+export function resolveInflictableConditions(
+  statBlock: Pick<MonsterStatBlock, 'inflictableConditions'> | undefined,
+  library: CustomCondition[]
+): CustomCondition[] {
+  const byId = new Map(library.map(entry => [entry.id, entry]));
+  const seen = new Set<string>();
+  const out: CustomCondition[] = [];
+  for (const raw of statBlock?.inflictableConditions ?? []) {
+    const copy = sanitizeCustomCondition(raw);
+    if (!copy || seen.has(copy.id)) continue;
+    seen.add(copy.id);
+    out.push(byId.get(copy.id) ?? copy);
+  }
+  return out;
 }
 
 /** Save-time cleanup for the library editor. */

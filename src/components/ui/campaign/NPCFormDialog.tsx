@@ -59,8 +59,11 @@ import {
 import { NPCSpellListEditor } from './NPCSpellListEditor';
 import { AbilityListEditor } from './AbilityListEditor';
 import { NpcResourcesEditor } from './NpcResourcesEditor';
+import { NpcInflictsEditor } from './NpcInflictsEditor';
 import type { Spell } from '@/types/character';
-import type { StatBlockEntry } from '@/types/encounter';
+import type { CustomCondition, StatBlockEntry } from '@/types/encounter';
+import { useEncounterStore } from '@/store/encounterStore';
+import { EMPTY_CUSTOM_CONDITIONS } from '@/utils/customConditions';
 import {
   finalizeResourceDrafts,
   isResourceDraftValid,
@@ -279,6 +282,13 @@ export function NPCFormDialog({
   const [immunities, setImmunities] = useState('');
   const [vulnerabilities, setVulnerabilities] = useState('');
   const [conditionImmunities, setConditionImmunities] = useState('');
+  const [inflictableConditions, setInflictableConditions] = useState<
+    CustomCondition[]
+  >([]);
+  const conditionLibrary = useEncounterStore(
+    state => state.combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
+  );
+  const setCombatConfig = useEncounterStore(state => state.setCombatConfig);
   const [senses, setSenses] = useState('');
   const [languages, setLanguages] = useState('');
   const [cr, setCr] = useState('');
@@ -480,6 +490,10 @@ export function NPCFormDialog({
             ? sb.conditionImmunities.join(', ')
             : ''
         );
+        // Stat-block loops must guard `?? []`: older records lack the field.
+        setInflictableConditions(
+          (sb.inflictableConditions ?? []).map(c => ({ ...c }))
+        );
         setSenses(sb.senses || '');
         setLanguages(sb.languages || '');
         setCr(sb.cr || '');
@@ -542,6 +556,7 @@ export function NPCFormDialog({
     setImmunities('');
     setVulnerabilities('');
     setConditionImmunities('');
+    setInflictableConditions([]);
     setSenses('');
     setLanguages('');
     setCr('');
@@ -695,6 +710,7 @@ export function NPCFormDialog({
     setBonusActions(sb.bonusActions.map(autoUses));
     setReactions(sb.reactions.map(autoUses));
     setLairActions([]);
+    setInflictableConditions([]);
     setBestiarySourceId(monster.id);
     setBestiarySourceName(monster.name);
     setBestiaryQuery('');
@@ -749,6 +765,10 @@ export function NPCFormDialog({
     setBonusActions(strip(bonusActions));
     setReactions(strip(reactions));
     setLairActions(strip(lairActions));
+  };
+
+  const handleCreateConditionInLibrary = (condition: CustomCondition) => {
+    setCombatConfig({ customConditions: [...conditionLibrary, condition] });
   };
 
   // ---------- Portrait Upload ----------
@@ -826,6 +846,7 @@ export function NPCFormDialog({
 
     const shouldPersistStatBlock =
       !bestiarySourceId ||
+      inflictableConditions.length > 0 ||
       hasSubstantiveStatBlock(
         scores,
         detailFields,
@@ -887,6 +908,7 @@ export function NPCFormDialog({
         languages: languages || '',
         alignment,
         hpFormula: hpFormula || '',
+        ...(inflictableConditions.length > 0 ? { inflictableConditions } : {}),
       };
     }
 
@@ -1411,6 +1433,14 @@ export function NPCFormDialog({
                         placeholder="Common, Sylvan"
                       />
                     </div>
+
+                    {/* ===== Inflicted custom conditions ===== */}
+                    <NpcInflictsEditor
+                      conditions={inflictableConditions}
+                      library={conditionLibrary}
+                      onChange={setInflictableConditions}
+                      onCreateInLibrary={handleCreateConditionInLibrary}
+                    />
 
                     {/* CR & Proficiency Bonus */}
                     <div className="grid grid-cols-2 gap-2">
