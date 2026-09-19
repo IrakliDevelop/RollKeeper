@@ -14,6 +14,18 @@
  *  - an unreadable answer FAILS CLOSED: a missing record, or a record whose
  *    `dmOnlyElements` is not an object, resolves to the DM audience.
  *
+ * LAYER RULE (location mode only, `resolveElementAudienceWithLayer`): a
+ * location element whose layer the DM has toggled invisible is DM-only ON THE
+ * WIRE, flagged or not. Before live sync, locations reached players as an
+ * exported JPEG that honoured layer visibility, so "hide the layer" has always
+ * been a secrecy control there; delivering those elements and hiding them
+ * presentationally on the player canvas (`layerSync.ts`) would leak them.
+ * Battle maps keep the opposite, deliberate contract — layer visibility is
+ * presentational only — so the layer lookup is never consulted in that mode.
+ * An element with no layer, or one naming a layer that cannot be found, falls
+ * through to the flag answer: a legacy element with `layerId: ''` must not be
+ * blanked.
+ *
  * Pure with respect to React: no hooks, safe to call from sync-client
  * callbacks and store listeners.
  */
@@ -49,6 +61,29 @@ export function resolveElementAudience(
   const flags = readDmOnlyFlags(mode, campaignCode, mapId);
   if (flags === null) return DM_AUDIENCE;
   return flags[elementId] ? DM_AUDIENCE : undefined;
+}
+
+/**
+ * `resolveElementAudience` plus the location-mode layer rule (see the header).
+ * `isLayerHidden` answers `true` only for a layer that exists AND is invisible
+ * — an unknown layer must answer `false` so the element falls through to the
+ * flag resolver, which still fails closed on an unreadable record.
+ */
+export function resolveElementAudienceWithLayer(
+  mode: EditorMode,
+  campaignCode: string,
+  mapId: string,
+  element: { id: string; layerId?: string },
+  isLayerHidden: (layerId: string) => boolean
+): typeof DM_AUDIENCE | undefined {
+  if (
+    mode === 'location' &&
+    element.layerId &&
+    isLayerHidden(element.layerId)
+  ) {
+    return DM_AUDIENCE;
+  }
+  return resolveElementAudience(mode, campaignCode, mapId, element.id);
 }
 
 export function isElementDmOnly(

@@ -137,6 +137,7 @@ import { attachPathBroadcast, attachRemotePaths } from '../pathSync';
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
+import { ANNOTATIONS_LAYER_ID } from '../layerContract';
 
 /** Trimmed from DmLocationEditor.hooks.test.ts's makeStubViewport — real
  * ElementStore/LayerManager (handleReady runs ensureCanonicalLayers /
@@ -536,6 +537,33 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     unmount();
     expect(callOrder).not.toContain('connection.stop');
   });
+
+  it('LAYER VISIBILITY IS PRESENTATIONAL ON BATTLE MAPS: an element on a hidden layer stays public and hiding re-emits nothing (product boundary, unchanged)', async () => {
+    const { vp } = await setup();
+    useBattleMapStore.setState({
+      battleMaps: { TEST01: { 'bm-1': baseBattleMap } },
+    });
+    const opts = vi.mocked(createManagedBattleMapConnection).mock.calls[0]![0];
+    const secret = vp.layerManager.createLayer('Secrets');
+    const el = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 4, h: 4 },
+      layerId: secret.id,
+    });
+    act(() => {
+      vp.store.add(el);
+    });
+    const update = vi.spyOn(vp.store, 'update');
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, false);
+    });
+    expect(update).not.toHaveBeenCalled();
+    expect(
+      opts.resolveAudience?.({ id: el.id, layerId: secret.id } as Parameters<
+        NonNullable<typeof opts.resolveAudience>
+      >[0])
+    ).toBeUndefined();
+  });
 });
 
 const liveLocation: LocationMap = {
@@ -827,5 +855,127 @@ describe('useDmLocationEditor — location-mode live connection', () => {
       'awareness.dispose',
       'connection.stop',
     ]);
+  });
+  it('SECURITY: an element on a DM-invisible layer resolves DM-only even when it carries no dmOnly flag', async () => {
+    const { vp, firstId } = await setupLocation();
+    const opts = vi.mocked(createManagedBattleMapConnection).mock.calls[0]![0];
+    const resolve = (id: string, layerId?: string) =>
+      opts.resolveAudience?.({ id, layerId } as Parameters<
+        NonNullable<typeof opts.resolveAudience>
+      >[0]);
+
+    const secret = vp.layerManager.createLayer('Secrets');
+    expect(resolve(firstId, secret.id)).toBeUndefined();
+
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, false);
+    });
+    expect(resolve(firstId, secret.id)).toBe('dm');
+    // Elements elsewhere are untouched, and an unknown/absent layer id falls
+    // through to the flag resolver (legacy elements are never blanked).
+    expect(resolve(firstId, ANNOTATIONS_LAYER_ID)).toBeUndefined();
+    expect(resolve(firstId, 'layer-deleted')).toBeUndefined();
+    expect(resolve(firstId, '')).toBeUndefined();
+
+    // Showing the layer again reveals it — unless it is flagged DM-only.
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, true);
+    });
+    expect(resolve(firstId, secret.id)).toBeUndefined();
+    act(() => {
+      useLocationStore
+        .getState()
+        .setDmOnly('TEST01', liveLocation.id, firstId, true);
+    });
+    expect(resolve(firstId, secret.id)).toBe('dm');
+  });
+
+  it("re-emits exactly the toggled layer's elements when its visibility flips, in both directions", async () => {
+    const { vp, update } = await setupLocation();
+    const secret = vp.layerManager.createLayer('Secrets');
+    const onSecret = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 4, h: 4 },
+      layerId: secret.id,
+    });
+    const elsewhere = createShape({
+      position: { x: 9, y: 9 },
+      size: { w: 4, h: 4 },
+      layerId: ANNOTATIONS_LAYER_ID,
+    });
+    act(() => {
+      vp.store.add(onSecret);
+      vp.store.add(elsewhere);
+    });
+
+    update.mockClear();
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, false);
+    });
+    expect(update.mock.calls).toEqual([[onSecret.id, {}]]);
+
+    update.mockClear();
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, true);
+    });
+    expect(update.mock.calls).toEqual([[onSecret.id, {}]]);
+
+    // A non-visibility layer edit re-emits nothing.
+    update.mockClear();
+    act(() => {
+      vp.layerManager.renameLayer(secret.id, 'Renamed');
+      vp.layerManager.setLayerLocked(secret.id, true);
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('stops re-emitting after unmount (no listener leak across re-attach)', async () => {
+    const { vp, update, result, unmount } = await setupLocation();
+    const secret = vp.layerManager.createLayer('Secrets');
+    const onSecret = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 4, h: 4 },
+      layerId: secret.id,
+    });
+    act(() => {
+      vp.store.add(onSecret);
+    });
+
+    // Re-attach on the SAME viewport: the old listener must be gone, so one
+    // toggle still produces exactly one re-emit.
+    await act(async () => {
+      await result.current.handleReady(vp);
+    });
+    update.mockClear();
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, false);
+    });
+    expect(update.mock.calls).toEqual([[onSecret.id, {}]]);
+
+    unmount();
+    update.mockClear();
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, true);
+    });
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it('with NO relay URL, a layer visibility toggle re-emits nothing', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const { vp, update } = await setupLocation();
+    const secret = vp.layerManager.createLayer('Secrets');
+    const onSecret = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 4, h: 4 },
+      layerId: secret.id,
+    });
+    act(() => {
+      vp.store.add(onSecret);
+    });
+    update.mockClear();
+    act(() => {
+      vp.layerManager.setLayerVisible(secret.id, false);
+    });
+    expect(update).not.toHaveBeenCalled();
   });
 });

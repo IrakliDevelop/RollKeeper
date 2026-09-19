@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import {
   isElementDmOnly,
   resolveElementAudience,
+  resolveElementAudienceWithLayer,
   setElementDmOnly,
 } from './elementAudience';
 import { DM_AUDIENCE } from './markerData';
@@ -164,5 +165,112 @@ describe('setElementDmOnly', () => {
     expect(
       useLocationStore.getState().getLocation(CODE, MAP_ID)?.dmOnlyElements
     ).toEqual({});
+  });
+});
+
+describe('resolveElementAudienceWithLayer — layer visibility (location mode)', () => {
+  const hiddenLayers = (...ids: string[]) => {
+    const set = new Set(ids);
+    return (layerId: string) => set.has(layerId);
+  };
+
+  it('hides an UNFLAGGED element that sits on an invisible layer', () => {
+    seedLocation(locationFixture({ dmOnlyElements: {} }));
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'note', layerId: 'layer-secrets' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBe(DM_AUDIENCE);
+  });
+
+  it('leaves an element on a VISIBLE layer to the existing resolver', () => {
+    seedLocation(locationFixture({ dmOnlyElements: { secret: true } }));
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'note', layerId: 'layer-annotations' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBeUndefined();
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'secret', layerId: 'layer-annotations' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBe(DM_AUDIENCE);
+  });
+
+  it('falls through for an absent or unknown layer id (legacy elements are not blanked)', () => {
+    seedLocation(locationFixture({ dmOnlyElements: {} }));
+    // `layerId: ''` is what `createShape` writes when no layer is supplied.
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'legacy', layerId: '' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBeUndefined();
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'legacy' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBeUndefined();
+    // A layer id that no longer resolves is reported "not hidden" by the
+    // lookup closure; the flag resolver still answers.
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'legacy', layerId: 'layer-deleted' },
+        hiddenLayers('layer-secrets')
+      )
+    ).toBeUndefined();
+  });
+
+  it('FAILS CLOSED on a missing record even when the layer is visible', () => {
+    expect(
+      resolveElementAudienceWithLayer(
+        'location',
+        CODE,
+        MAP_ID,
+        { id: 'anything', layerId: 'layer-annotations' },
+        hiddenLayers()
+      )
+    ).toBe(DM_AUDIENCE);
+  });
+
+  it('never calls the layer lookup in battlemap mode: an invisible layer stays PUBLIC (unchanged product boundary)', () => {
+    seedBattleMap(battleMapFixture({ dmOnlyElements: {} }));
+    let asked = 0;
+    const lookup = (layerId: string) => {
+      asked += 1;
+      return layerId === 'layer-secrets';
+    };
+    expect(
+      resolveElementAudienceWithLayer(
+        'battlemap',
+        CODE,
+        MAP_ID,
+        { id: 'token', layerId: 'layer-secrets' },
+        lookup
+      )
+    ).toBeUndefined();
+    expect(asked).toBe(0);
   });
 });

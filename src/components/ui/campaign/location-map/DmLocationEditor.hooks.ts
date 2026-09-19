@@ -92,7 +92,7 @@ import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
 import type { MarkerDataIssue } from './markerPainter';
 import {
   isElementDmOnly,
-  resolveElementAudience,
+  resolveElementAudienceWithLayer,
   setElementDmOnly,
 } from './elementAudience';
 import type { MarkerColorKey, MarkerKind } from './markerData';
@@ -1144,9 +1144,17 @@ export function useDmLocationEditor(
           },
           // Mode-aware and FAIL-CLOSED — see elementAudience.ts. Never inline
           // a store read here: a resolver bound to the wrong store answers
-          // "public" for every element of the other store's maps.
+          // "public" for every element of the other store's maps. The layer
+          // lookup is read LIVE off this viewport's LayerManager, and the
+          // location-only layer rule lives in the resolver, not here.
           resolveAudience: el =>
-            resolveElementAudience(mode, campaignCode, location.id, el.id),
+            resolveElementAudienceWithLayer(
+              mode,
+              campaignCode,
+              location.id,
+              el,
+              layerId => vp.layerManager.getLayer(layerId)?.visible === false
+            ),
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct
           // calls; the pin subscription above re-pins bands on every change.
@@ -1181,6 +1189,30 @@ export function useDmLocationEditor(
             scope.push(attachRemoteLaserTrails(vp, connection));
             const remotePings = attachRemotePings(vp, connection);
             scope.push(remotePings.dispose);
+            if (mode === 'location') {
+              // Locations only: hiding a layer is a SECRECY control, so the
+              // elements on it must leave the wire, not just the player's
+              // screen (elementAudience.ts). The resolver answers correctly
+              // for anything emitted AFTER the flip; these elements were
+              // emitted before it, so re-emit them — `store.update(id, {})`,
+              // the same no-op write `handleToggleDmOnly` / `handleRevealAll`
+              // use, which the sync client re-stamps (hide → the relay sends
+              // players a remove; show → an upsert, unless the element is
+              // individually flagged DM-only). `updateLayerDirect` mutates
+              // the layer BEFORE it emits, so `visible` already reads new
+              // here. Connection-scoped: torn down on unmount and before
+              // every re-attach, so a rebuilt viewport never leaves a second
+              // listener behind.
+              scope.push(
+                vp.layerManager.on('update', ({ previous, current }) => {
+                  if (previous.visible === current.visible) return;
+                  for (const element of vp.store.getAll()) {
+                    if (element.layerId !== current.id) continue;
+                    vp.store.update(element.id, {});
+                  }
+                })
+              );
+            }
             if (mode === 'battlemap') {
               scope.push(attachRemoteMeasurements(vp, connection).dispose);
               scope.push(attachRemotePaths(vp, connection).dispose);
