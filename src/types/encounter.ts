@@ -221,6 +221,8 @@ export interface EncounterEntity {
   isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
   playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
   playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
+  /** DM opt-in: players see this entity's exact HP regardless of enemyHpDisplay. */
+  hpVisibleToPlayers?: boolean;
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
   tokenSize?: TokenCellSize; // Battle-map token footprint; absent = 1 (no migration needed)
 

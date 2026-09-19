@@ -109,15 +109,21 @@ export interface SharedTurnEntry {
   displayName: string; // real name, or "Enemy" when hidden && non-player
   type: 'player' | 'monster' | 'npc' | 'lair';
   playerCharacterId?: string; // player entities only — marks "you" + identity
-  currentHp?: number; // players always; non-players only when enemyHpMode is 'exact'
-  maxHp?: number; // players always; non-players only when enemyHpMode is 'exact'
+  currentHp?: number; // players always; non-players only when the effective mode is 'exact'
+  maxHp?: number; // players always; non-players only when the effective mode is 'exact'
   hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied")
   hpPercent?: number; // non-players when enemyHpMode is 'bar' | 'percent' (0-100)
   // Coarse health tier for colour-coding any shown enemy HP indicator. Set for
-  // non-players whenever enemyHpMode !== 'off' (kept coarse so 'label' mode does
-  // not leak an exact percentage).
+  // non-players whenever the effective mode !== 'off' (kept coarse so 'label'
+  // mode does not leak an exact percentage).
   hpTier?: 'high' | 'mid' | 'low' | 'critical';
   isDead?: boolean; // current HP <= 0 (players always; enemies when HP is shared)
+  /**
+   * Per-entry override of SharedInitiativeState.enemyHpMode. Set to 'exact' for
+   * a non-player the DM toggled "show exact HP to players". Old payloads omit
+   * it — renderers resolve the effective mode with resolveEntryHpMode().
+   */
+  hpMode?: EnemyHpDisplay;
   disposition?: 'ally' | 'enemy' | 'neutral'; // player-facing allegiance (non-players)
   // DM-assigned map-correlation identity — lets players match a token on the
   // battle map to its initiative row even when the entity is a hidden enemy;
