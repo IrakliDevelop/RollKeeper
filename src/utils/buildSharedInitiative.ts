@@ -44,7 +44,8 @@ export function toSharedConditions(
     if (c.kind !== undefined) shared.kind = c.kind;
     if (c.stackCount !== undefined && c.stackCount > 1)
       shared.stackCount = c.stackCount;
-    const description = c.description?.trim();
+    const description =
+      typeof c.description === 'string' ? c.description.trim() : '';
     if (description)
       shared.description = description.slice(
         0,

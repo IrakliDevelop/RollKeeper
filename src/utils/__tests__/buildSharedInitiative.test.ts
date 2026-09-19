@@ -456,6 +456,26 @@ describe('buildSharedInitiative', () => {
     ]);
     expect(condition.description).toHaveLength(1000);
   });
+
+  it('does not throw on a corrupt non-string description and omits it', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [
+            {
+              id: 'c1',
+              name: 'Cursed',
+              description: 42 as unknown as string,
+            },
+          ],
+        }),
+      ])
+    );
+    expect(shared.turnOrder[0].conditions).toStrictEqual([{ name: 'Cursed' }]);
+  });
 });
 
 describe('buildSharedInitiative — enemy HP config', () => {
