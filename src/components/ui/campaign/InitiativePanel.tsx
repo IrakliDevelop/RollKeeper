@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { useDraggableY } from '@/hooks/useDraggableY';
 import { getHpBarColor, getHpTierTextColor } from '@/utils/hpColor';
+import { resolveEntryHpMode } from '@/utils/hpState';
 import type { SharedInitiativeState } from '@/types/sharedState';
 
 const OPEN_KEY = 'rollkeeper-initiative-panel-open';
@@ -188,6 +189,9 @@ export function InitiativePanel({
               const hp = entry.currentHp;
               const maxHp = entry.maxHp;
               const hasHp = hp !== undefined && maxHp !== undefined;
+              // A DM per-entity override on the entry wins over the
+              // campaign-wide mode.
+              const hpMode = resolveEntryHpMode(entry, state.enemyHpMode);
               // Right-aligned HP summary. Dead overrides everything.
               const hpText = isDead
                 ? isPlayer
@@ -195,8 +199,7 @@ export function InitiativePanel({
                   : 'Defeated'
                 : hasHp
                   ? `${hp}/${maxHp}`
-                  : entry.hpPercent !== undefined &&
-                      state.enemyHpMode === 'percent'
+                  : entry.hpPercent !== undefined && hpMode === 'percent'
                     ? `${entry.hpPercent}%`
                     : (entry.hpState ?? null);
               // Colour: dead = red; players use neutral (they have a bar);
@@ -216,7 +219,7 @@ export function InitiativePanel({
                     ? Math.min(100, (hp / maxHp) * 100)
                     : 0
                   : !isPlayer &&
-                      state.enemyHpMode === 'bar' &&
+                      hpMode === 'bar' &&
                       entry.hpPercent !== undefined
                     ? entry.hpPercent
                     : null;

@@ -106,4 +106,57 @@ describe('InitiativePanel', () => {
     );
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows exact HP for an enemy the DM toggled visible while the global mode is off', () => {
+    render(
+      <InitiativePanel
+        state={{
+          ...base,
+          enemyHpMode: 'off',
+          turnOrder: [
+            base.turnOrder[0],
+            {
+              entityId: 'm',
+              displayName: 'Ogre',
+              type: 'monster',
+              currentHp: 5,
+              maxHp: 20,
+              hpTier: 'critical',
+              isDead: false,
+              hpMode: 'exact',
+            },
+          ],
+        }}
+        characterId="char-a"
+        onEndTurn={noop}
+      />
+    );
+    expect(screen.getByText('5/20')).toBeInTheDocument();
+  });
+
+  it('resolves the HP mode per entry: entry hpMode wins over the state-level mode', () => {
+    render(
+      <InitiativePanel
+        state={{
+          ...base,
+          enemyHpMode: 'bar',
+          turnOrder: [
+            base.turnOrder[0],
+            {
+              entityId: 'm',
+              displayName: 'Worg',
+              type: 'monster',
+              hpPercent: 42,
+              hpTier: 'mid',
+              hpMode: 'percent',
+            },
+          ],
+        }}
+        characterId="char-a"
+        onEndTurn={noop}
+      />
+    );
+    // State mode 'bar' alone renders no HP text for this row.
+    expect(screen.getByText('42%')).toBeInTheDocument();
+  });
 });

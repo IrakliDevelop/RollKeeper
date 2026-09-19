@@ -353,4 +353,58 @@ describe('CombatPanel', () => {
     );
     expect(screen.getByText(/ROUND/)).toBeInTheDocument();
   });
+
+  it('renders numeric HP for an enemy the DM toggled visible while the global mode is off', () => {
+    const shownEnemy: SharedTurnEntry = {
+      entityId: 'ogre-1',
+      displayName: 'Ogre',
+      type: 'monster',
+      disposition: 'enemy',
+      currentHp: 5,
+      maxHp: 20,
+      hpTier: 'critical',
+      isDead: false,
+      hpMode: 'exact',
+    };
+    render(
+      <CombatPanel
+        state={buildState({ enemyHpMode: 'off', turnOrder: [shownEnemy] })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    expect(screen.getByText('5/20')).toBeInTheDocument();
+  });
+
+  it('resolves the HP mode per entry: entry hpMode wins over the state-level mode', () => {
+    const percentOverride: SharedTurnEntry = {
+      entityId: 'goblin-4',
+      displayName: 'Worg',
+      type: 'monster',
+      disposition: 'enemy',
+      hpPercent: 42,
+      hpTier: 'mid',
+      hpMode: 'percent',
+    };
+    render(
+      <CombatPanel
+        state={buildState({ enemyHpMode: 'bar', turnOrder: [percentOverride] })}
+        characterId={CHARACTER_ID}
+        onEndTurn={noop}
+        collapsed={false}
+        onToggleCollapsed={noop}
+      />
+    );
+
+    // State mode 'bar' alone would draw a bar with no text; the per-entry
+    // 'percent' override renders the percentage text instead.
+    expect(screen.getByText('42%')).toBeInTheDocument();
+    const rows = screen.getAllByRole('listitem');
+    expect(
+      rows[0].querySelector('.bg-surface-raised.rounded-full')
+    ).not.toBeInTheDocument();
+  });
 });
