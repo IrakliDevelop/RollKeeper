@@ -67,4 +67,21 @@ describe('ConditionIconPicker', () => {
       screen.getByRole('button', { name: 'Condition icon: droplet' })
     ).toBeTruthy();
   });
+
+  it('renders without throwing when given an unknown icon name', () => {
+    expect(() =>
+      render(
+        <ConditionIconPicker
+          value={'not-a-real-icon' as unknown as ConditionIconName}
+          onChange={vi.fn()}
+        />
+      )
+    ).not.toThrow();
+
+    expect(
+      screen.getByRole('button', {
+        name: 'Condition icon: not-a-real-icon',
+      })
+    ).toBeTruthy();
+  });
 });

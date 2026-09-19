@@ -7,11 +7,13 @@ import { useMemo, useState } from 'react';
 // self-closes inside the modal dialogs it is used in (same note as
 // calendar/MarkerField.tsx).
 import * as Popover from '@radix-ui/react-popover';
+import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import {
   CONDITION_ICON_NAMES,
   CONDITION_ICON_REGISTRY,
+  DEFAULT_CONDITION_ICON_BY_KIND,
   type ConditionIconName,
 } from '@/utils/conditionIconRegistry';
 
@@ -36,7 +38,13 @@ export function ConditionIconPicker({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const names = useMemo(() => filterIconNames(query), [query]);
-  const Current = CONDITION_ICON_REGISTRY[value];
+  // `value` is typed as `ConditionIconName`, but persisted/cloud-synced data
+  // can carry a name that has since been dropped from the curated registry —
+  // guard the lookup at runtime and fall back to the debuff default icon.
+  const registry: Partial<Record<string, LucideIcon>> = CONDITION_ICON_REGISTRY;
+  const Current =
+    registry[value] ??
+    CONDITION_ICON_REGISTRY[DEFAULT_CONDITION_ICON_BY_KIND.debuff];
 
   const handleOpenChange = (next: boolean) => {
     setOpen(next);
