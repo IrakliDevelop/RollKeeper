@@ -174,6 +174,9 @@ async function uploadCanvasImage(file: File): Promise<string> {
 export interface DmLocationEditorState {
   // Mode
   mode: 'location' | 'battlemap';
+  /** `NEXT_PUBLIC_BATTLEMAP_RELAY_URL` is set — location mode then gets the
+   *  live controls. Always irrelevant to battlemap mode's own gating. */
+  liveSyncConfigured: boolean;
 
   // Refs
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
@@ -670,30 +673,26 @@ export function useDmLocationEditor(
         })
       );
       baseTools.push(new EraserTool({ radius: 12, mode: 'stroke' }));
-      // Ephemeral pointer; trails broadcast as presence while the battlemap
-      // room connection is up (see attachLaserBroadcast).
+    }
+
+    // Presence tools: battle maps always; locations only when live sync is
+    // configured. Ephemeral — trails and taps broadcast as presence while the
+    // room connection is up (attachLaserBroadcast / attachPingBroadcast) and
+    // never enter canvas state.
+    if (mode === 'battlemap' || relayConfigured) {
       baseTools.push(new LaserTool({ color: '#F4C430', width: 3 }));
-      // Ephemeral "look here" pulse; taps broadcast as presence while the
-      // battlemap room connection is up (see attachPingBroadcast).
       baseTools.push(new PingTool({ color: '#F4C430' }));
-      baseTools.push(
-        new DmMarkerTool(markerKindRef, markerColorRef, request =>
-          handlePlaceMarkerRef.current(request)
-        )
-      );
     }
 
     // Both modes: marker anchors are available on all DM map surfaces.
-    if (mode !== 'battlemap') {
-      baseTools.push(
-        new DmMarkerTool(markerKindRef, markerColorRef, request =>
-          handlePlaceMarkerRef.current(request)
-        )
-      );
-    }
+    baseTools.push(
+      new DmMarkerTool(markerKindRef, markerColorRef, request =>
+        handlePlaceMarkerRef.current(request)
+      )
+    );
 
     return baseTools;
-  }, [mode, resolveMovement]);
+  }, [mode, relayConfigured, resolveMovement]);
 
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
 
@@ -1861,6 +1860,7 @@ export function useDmLocationEditor(
 
   return {
     mode,
+    liveSyncConfigured: relayConfigured,
     canvasRef,
     fileInputRef,
     mapImageInputRef,

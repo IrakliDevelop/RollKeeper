@@ -672,4 +672,23 @@ describe('useDmLocationEditor — location-mode audience plumbing', () => {
     expect(update).toHaveBeenCalledWith(firstId, {});
     expect(vp.store.getById('gone-element')).toBeUndefined();
   });
+
+  it('constructs laser + ping (and none of the battlemap-only tools) in location mode when live sync is configured', async () => {
+    const { result } = await setupLocation();
+    const names = result.current.tools.map(tool => tool.name);
+    expect(names).toEqual(expect.arrayContaining(['laser', 'ping']));
+    for (const name of ['measure', 'path', 'template', 'eraser']) {
+      expect(names).not.toContain(name);
+    }
+    expect(result.current.liveSyncConfigured).toBe(true);
+  });
+
+  it('constructs no presence tools in location mode with NO relay URL', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    const { result } = await setupLocation();
+    const names = result.current.tools.map(tool => tool.name);
+    expect(names).not.toContain('laser');
+    expect(names).not.toContain('ping');
+    expect(result.current.liveSyncConfigured).toBe(false);
+  });
 });

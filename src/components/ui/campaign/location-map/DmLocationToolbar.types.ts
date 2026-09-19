@@ -58,4 +58,8 @@ export interface DmLocationToolbarProps {
   presenceControl?: ReactNode;
   /** Fog authoring controls for battle maps and campaign locations. */
   fogControls?: DmFogControls;
+  /** The relay is configured, so location mode gets the live controls
+   *  (presence tools now; presence control, sync chip and hidden placement are
+   *  wired by the editor). Ignored in battlemap mode. */
+  liveSyncConfigured?: boolean;
 }

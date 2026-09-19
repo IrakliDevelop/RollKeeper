@@ -134,6 +134,37 @@ describe('DmLocationToolOptions pencil options', () => {
     const { container } = render(<DmLocationToolOptions mode="location" />);
     expect(container).toBeEmptyDOMElement();
   });
+
+  it('shows laser colors in location mode once live sync is configured', () => {
+    mockActiveTool = 'laser';
+    mockToolOptions = { laser: { color: '#F4C430', width: 3 } };
+    render(<DmLocationToolOptions mode="location" liveSyncConfigured />);
+
+    fireEvent.click(screen.getByTitle('#ef4444'));
+    expect(setOptionsSpies['laser']).toHaveBeenCalledWith({
+      color: '#ef4444',
+    });
+  });
+
+  it('shows ping colors in location mode once live sync is configured', () => {
+    mockActiveTool = 'ping';
+    mockToolOptions = { ping: { color: '#F4C430' } };
+    render(<DmLocationToolOptions mode="location" liveSyncConfigured />);
+
+    fireEvent.click(screen.getByTitle('#3b82f6'));
+    expect(setOptionsSpies['ping']).toHaveBeenCalledWith({
+      color: '#3b82f6',
+    });
+  });
+
+  it('never shows measure options in location mode, even with live sync', () => {
+    mockActiveTool = 'measure';
+    mockToolOptions = { measure: { color: '#FF5722', feetPerCell: 5 } };
+    const { container } = render(
+      <DmLocationToolOptions mode="location" liveSyncConfigured />
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
 });
 
 describe('DmLocationToolOptions fog appearance', () => {
