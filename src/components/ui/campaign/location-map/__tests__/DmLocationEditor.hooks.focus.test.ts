@@ -123,7 +123,17 @@ vi.mock('../focusSync', () => ({
 
 import { attachFocusBroadcast, createLocalCameraAnimator } from '../focusSync';
 import { attachAwarenessSync } from '../awarenessSync';
-import { attachRemoteMeasurements } from '../measureSync';
+import {
+  attachMeasureBroadcast,
+  attachRemoteMeasurements,
+} from '../measureSync';
+import { attachLaserBroadcast, attachRemoteLaserTrails } from '../laserSync';
+import {
+  attachPingBroadcast,
+  attachPingInput,
+  attachRemotePings,
+} from '../pingSync';
+import { attachPathBroadcast, attachRemotePaths } from '../pathSync';
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmLocationEditor } from '../DmLocationEditor.hooks';
@@ -469,7 +479,8 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     expect(callOrder).not.toContain('focusBroadcast.dispose');
   });
 
-  it('never attaches awareness in location mode (no relay connection at all)', async () => {
+  it('never opens a connection in location mode when NO relay URL is configured', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     const vp = makeStubViewport();
     const { result } = renderHook(() =>
       useDmLocationEditor({
@@ -487,7 +498,9 @@ describe('useDmLocationEditor — focus lifecycle ownership (battlemap mode)', (
     await act(async () => {
       await result.current.handleReady(vp);
     });
+    expect(createManagedBattleMapConnection).not.toHaveBeenCalled();
     expect(attachAwarenessSync).not.toHaveBeenCalled();
+    expect(result.current.syncStatus).toBe('disabled');
   });
 
   it('EARLY RECEIVER FAULT: when a receiver constructor throws, earlier receivers are disposed before connection.stop', async () => {
@@ -690,5 +703,129 @@ describe('useDmLocationEditor — location-mode audience plumbing', () => {
     expect(names).not.toContain('laser');
     expect(names).not.toContain('ping');
     expect(result.current.liveSyncConfigured).toBe(false);
+  });
+});
+
+describe('useDmLocationEditor — location-mode live connection', () => {
+  const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+
+  beforeEach(() => {
+    process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
+    useDmStore.setState({ campaigns: [] });
+    useBattleMapStore.setState({ battleMaps: {} });
+    useLocationStore.setState({ locations: {} });
+    useLocationStore.getState().addLocation('TEST01', liveLocation);
+    callOrder.length = 0;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    useLocationStore.setState({ locations: {} });
+    if (savedRelayUrl !== undefined) {
+      process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
+    } else {
+      delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    }
+  });
+
+  it('opens the room for the location id as DM, tagged kind: location, seeding local state and live fog', async () => {
+    await setupLocation();
+    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(1);
+    const opts = vi.mocked(createManagedBattleMapConnection).mock.calls[0]![0];
+    expect(opts.relayUrl).toBe('wss://relay.test');
+    expect(opts.battleMapId).toBe(liveLocation.id);
+    expect(opts.clientId).toBe('dm-1');
+    expect(opts.tokenRequest).toEqual({
+      role: 'dm',
+      battleMapId: liveLocation.id,
+      dmId: 'dm-1',
+      kind: 'location',
+    });
+    expect(opts.seedLocal).toBe(true);
+    expect(opts.fog?.preserveLocalWhenRemoteMissing).toBe(true);
+  });
+
+  it('battlemap mode keeps its token request untagged (byte-compatible)', async () => {
+    await setup();
+    const opts = vi.mocked(createManagedBattleMapConnection).mock.calls[0]![0];
+    expect(opts.tokenRequest).toEqual({
+      role: 'dm',
+      battleMapId: 'bm-1',
+      dmId: 'dm-1',
+    });
+  });
+
+  it('SECURITY: the connection resolves audience from the LOCATION store and fails closed', async () => {
+    const { firstId } = await setupLocation();
+    const opts = vi.mocked(createManagedBattleMapConnection).mock.calls[0]![0];
+    const resolve = (id: string) =>
+      opts.resolveAudience?.({ id } as Parameters<
+        NonNullable<typeof opts.resolveAudience>
+      >[0]);
+
+    expect(resolve(firstId)).toBeUndefined();
+
+    act(() => {
+      useLocationStore
+        .getState()
+        .setDmOnly('TEST01', liveLocation.id, firstId, true);
+    });
+    expect(resolve(firstId)).toBe('dm');
+
+    // A battle map with the same id that says "public" must not matter.
+    act(() => {
+      useBattleMapStore.setState({
+        battleMaps: {
+          TEST01: {
+            [liveLocation.id]: { ...baseBattleMap, id: liveLocation.id },
+          },
+        },
+      });
+      useLocationStore.setState({ locations: {} });
+    });
+    expect(resolve(firstId)).toBe('dm');
+    expect(resolve('never-seen')).toBe('dm');
+  });
+
+  it('attaches laser, ping, ping input and awareness — and none of the battlemap-only helpers', async () => {
+    await setupLocation({ withPresenceTools: true });
+
+    expect(attachRemoteLaserTrails).toHaveBeenCalledTimes(1);
+    expect(attachRemotePings).toHaveBeenCalledTimes(1);
+    expect(attachLaserBroadcast).toHaveBeenCalledTimes(1);
+    expect(attachPingBroadcast).toHaveBeenCalledTimes(1);
+    expect(attachPingInput).toHaveBeenCalledTimes(1);
+    expect(attachAwarenessSync).toHaveBeenCalledTimes(1);
+    // attachPingInput(viewport, overlay, connection, options) — options is 4th.
+    const [, , , pingInputOptions] = vi.mocked(attachPingInput).mock.calls[0]!;
+    expect(pingInputOptions).toMatchObject({ hotkey: 'p' });
+
+    expect(attachRemoteMeasurements).not.toHaveBeenCalled();
+    expect(attachRemotePaths).not.toHaveBeenCalled();
+    expect(attachMeasureBroadcast).not.toHaveBeenCalled();
+    expect(attachPathBroadcast).not.toHaveBeenCalled();
+    expect(attachFocusBroadcast).not.toHaveBeenCalled();
+    expect(createLocalCameraAnimator).not.toHaveBeenCalled();
+  });
+
+  it('surfaces connection status and the awareness roster for the toolbar', async () => {
+    const { result } = await setupLocation();
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    expect(result.current.syncStatus).toBe('live');
+    expect(awarenessHandle.announce).toHaveBeenCalledTimes(1);
+    expect(result.current.awarenessRoster).toBe(awarenessHandle.roster);
+  });
+
+  it('unmount disposes the scope BEFORE stopping the connection', async () => {
+    const { unmount } = await setupLocation();
+    callOrder.length = 0;
+    unmount();
+    expect(callOrder).toEqual([
+      'remotePings.dispose',
+      'awareness.dispose',
+      'connection.stop',
+    ]);
   });
 });

@@ -164,7 +164,7 @@ describe('DmLocationToolbar', () => {
     expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
   });
 
-  it('does not render presenceControl in location mode', () => {
+  it('does not render presenceControl or a live chip in location mode without live sync', () => {
     render(
       <DmLocationToolbar
         {...baseProps}
@@ -173,6 +173,46 @@ describe('DmLocationToolbar', () => {
       />
     );
     expect(screen.queryByTestId('presence-slot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('live-sync-chip')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Place hidden' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('location mode with live sync: presence control, live chip and hidden placement join the snapshot button', () => {
+    const onToggle = vi.fn();
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="location"
+        liveSyncConfigured
+        syncStatus="live"
+        hiddenElementCount={2}
+        onToggleHiddenPlacement={onToggle}
+        presenceControl={<div data-testid="presence-slot" />}
+        viewsControl={<div data-testid="views-control-marker" />}
+      />
+    );
+    expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('live-sync-chip')).toHaveTextContent('Live');
+    expect(
+      screen.getByRole('button', { name: 'Sync to Players' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Place hidden' }));
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Reveal all (2)' })
+    ).toBeInTheDocument();
+    // Still battlemap-only:
+    expect(
+      screen.queryByTestId('views-control-marker')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Open TV Display' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Share with players' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows hidden-placement state and reveals all hidden elements', () => {

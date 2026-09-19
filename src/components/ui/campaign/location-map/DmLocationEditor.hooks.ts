@@ -1103,9 +1103,14 @@ export function useDmLocationEditor(
         });
       }
 
-      // Live sync — battlemap mode only; resolver reads Zustand LIVE via
-      // getState() (a captured snapshot would go stale after the first toggle).
-      if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
+      // Live sync — both modes, whenever the relay is configured. The audience
+      // resolver is mode-aware and fail-closed (elementAudience.ts); it reads
+      // Zustand LIVE via getState() (a captured snapshot would go stale after
+      // the first toggle). Location mode attaches presence + fog only — the
+      // measure/path/focus helpers belong to tools and controls that exist
+      // only on battle maps.
+      const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+      if (relayUrl) {
         // Re-attach: tear down the OLD connection-scoped handles BEFORE
         // stopping the old connection, so their final frames (awareness
         // `cleared`, measure/path clears) ride the still-live socket — the
@@ -1115,12 +1120,23 @@ export function useDmLocationEditor(
         connectionRef.current?.stop();
         connectionRef.current = null;
         const connection = createManagedBattleMapConnection({
-          relayUrl: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
+          relayUrl,
           campaignCode,
           battleMapId: location.id,
           store: vp.store,
           clientId: dmId,
-          tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
+          // `kind` is a live-room registry tag only (liveMapRooms.ts): it keeps
+          // location rooms out of the initiative poke fan-out. Battle maps
+          // send no tag, byte-compatible with every deployed token route.
+          tokenRequest:
+            mode === 'location'
+              ? {
+                  role: 'dm',
+                  battleMapId: location.id,
+                  dmId,
+                  kind: 'location',
+                }
+              : { role: 'dm', battleMapId: location.id, dmId },
           seedLocal: true,
           fog: {
             manager: fogManager,
@@ -1165,8 +1181,10 @@ export function useDmLocationEditor(
             scope.push(attachRemoteLaserTrails(vp, connection));
             const remotePings = attachRemotePings(vp, connection);
             scope.push(remotePings.dispose);
-            scope.push(attachRemoteMeasurements(vp, connection).dispose);
-            scope.push(attachRemotePaths(vp, connection).dispose);
+            if (mode === 'battlemap') {
+              scope.push(attachRemoteMeasurements(vp, connection).dispose);
+              scope.push(attachRemotePaths(vp, connection).dispose);
+            }
             const laserTool = vp.toolManager.getTool<LaserTool>('laser');
             if (laserTool) {
               scope.push(attachLaserBroadcast(laserTool, connection));
@@ -1175,54 +1193,57 @@ export function useDmLocationEditor(
             if (pingTool) {
               scope.push(attachPingBroadcast(pingTool, connection));
             }
-            const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
-            if (measureTool) {
-              const measureBroadcast = attachMeasureBroadcast(
-                measureTool,
-                connection
-              );
-              // Reattachment (viewport/connection rebuild) must not silently
-              // revert to private while the toggle still says shared — apply
-              // the latest value now.
-              measureBroadcast.setSharing(measureSharingRef.current);
-              measureBroadcastRef.current = measureBroadcast;
+            if (mode === 'battlemap') {
+              const measureTool =
+                vp.toolManager.getTool<MeasureTool>('measure');
+              if (measureTool) {
+                const measureBroadcast = attachMeasureBroadcast(
+                  measureTool,
+                  connection
+                );
+                // Reattachment (viewport/connection rebuild) must not silently
+                // revert to private while the toggle still says shared — apply
+                // the latest value now.
+                measureBroadcast.setSharing(measureSharingRef.current);
+                measureBroadcastRef.current = measureBroadcast;
+                scope.push(() => {
+                  measureBroadcastRef.current = null;
+                  measureBroadcast.dispose();
+                });
+              }
+              // Camera focus requests ("bring them here"): broadcast this DM's
+              // sends over presence. Stateless by design — see
+              // attachFocusBroadcast — so there is no re-apply after
+              // (re)attach, unlike measureBroadcast. Broadcast genuinely needs
+              // the connection (unlike the local animator above, which is set
+              // up unconditionally), so it stays gated here.
+              const focusBroadcast = attachFocusBroadcast(connection);
+              focusBroadcastRef.current = focusBroadcast;
               scope.push(() => {
-                measureBroadcastRef.current = null;
-                measureBroadcast.dispose();
+                focusBroadcastRef.current = null;
+                focusBroadcast.dispose();
               });
-            }
-            // Camera focus requests ("bring them here"): broadcast this DM's
-            // sends over presence. Stateless by design — see
-            // attachFocusBroadcast — so there is no re-apply after
-            // (re)attach, unlike measureBroadcast. Broadcast genuinely needs
-            // the connection (unlike the local animator above, which is set
-            // up unconditionally), so it stays gated here.
-            const focusBroadcast = attachFocusBroadcast(connection);
-            focusBroadcastRef.current = focusBroadcast;
-            scope.push(() => {
-              focusBroadcastRef.current = null;
-              focusBroadcast.dispose();
-            });
-            if (movementTool) {
-              const pathBroadcast = attachPathBroadcast(
-                movementTool,
-                connection,
-                {
-                  role: 'dm',
-                  isDmOnlyElement: id =>
-                    isElementDmOnly(mode, campaignCode, location.id, id),
-                  getElement: id => vp.store.getById(id) ?? null,
-                }
-              );
-              // Reattachment must not silently revert to private while the
-              // toggle still says shared — apply the latest value now
-              // (measure precedent).
-              pathBroadcast.setSharing(pathSharingRef.current);
-              pathBroadcastRef.current = pathBroadcast;
-              scope.push(() => {
-                pathBroadcastRef.current = null;
-                pathBroadcast.dispose();
-              });
+              if (movementTool) {
+                const pathBroadcast = attachPathBroadcast(
+                  movementTool,
+                  connection,
+                  {
+                    role: 'dm',
+                    isDmOnlyElement: id =>
+                      isElementDmOnly(mode, campaignCode, location.id, id),
+                    getElement: id => vp.store.getById(id) ?? null,
+                  }
+                );
+                // Reattachment must not silently revert to private while the
+                // toggle still says shared — apply the latest value now
+                // (measure precedent).
+                pathBroadcast.setSharing(pathSharingRef.current);
+                pathBroadcastRef.current = pathBroadcast;
+                scope.push(() => {
+                  pathBroadcastRef.current = null;
+                  pathBroadcast.dispose();
+                });
+              }
             }
 
             // Always-available DM pings: long-press with any tool + "P" at

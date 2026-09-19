@@ -139,6 +139,9 @@ export default function DmLocationToolbar({
         ? [...BASE_TOOL_DEFS, ...PRESENCE_TOOL_DEFS]
         : BASE_TOOL_DEFS;
 
+  // Live controls: always on battle maps; on locations only with a relay.
+  const liveControls = mode === 'battlemap' || liveSyncConfigured;
+
   const handleToolClick = (name: string) => {
     if (name === 'image') {
       onPickImage();
@@ -259,7 +262,7 @@ export default function DmLocationToolbar({
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-1">
-        {mode === 'battlemap' && (
+        {liveControls && (
           <>
             <Button
               variant={hiddenPlacementActive ? 'warning' : 'ghost'}
@@ -368,9 +371,10 @@ export default function DmLocationToolbar({
           )}
           {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && viewsControl}
-          {mode === 'battlemap' && presenceControl}
-          {mode === 'battlemap' && (
+          {liveControls && presenceControl}
+          {liveControls && (
             <span
+              data-testid="live-sync-chip"
               className={`rounded-full px-2 py-0.5 text-xs ${
                 syncStatus === 'live'
                   ? 'bg-accent-emerald-bg text-accent-emerald-text'
