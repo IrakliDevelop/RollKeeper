@@ -153,3 +153,24 @@ export function normalizeCombatConfig(
 
   return { ...rest, customConditions: conditions };
 }
+
+/** Save-time cleanup for the library editor. */
+export function cleanCustomConditions(
+  list: CustomCondition[]
+): CustomCondition[] {
+  const seen = new Set<string>();
+  const out: CustomCondition[] = [];
+  for (const condition of list) {
+    const name = condition.name.trim();
+    if (name === '') continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      ...condition,
+      name,
+      description: condition.description.trim(),
+    });
+  }
+  return out;
+}

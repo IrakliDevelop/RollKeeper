@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   CUSTOM_CONDITION_DESCRIPTION_MAX,
   EMPTY_CUSTOM_CONDITIONS,
+  cleanCustomConditions,
   createCustomCondition,
   generateCustomConditionId,
   normalizeCombatConfig,
@@ -178,5 +179,37 @@ describe('normalizeCombatConfig', () => {
 
   it('exports a stable empty constant for selector fallbacks', () => {
     expect(EMPTY_CUSTOM_CONDITIONS).toEqual([]);
+  });
+});
+
+describe('cleanCustomConditions', () => {
+  it('trims, drops unnamed rows and later case-insensitive duplicates', () => {
+    expect(
+      cleanCustomConditions([
+        {
+          id: 'a',
+          name: '  Marked ',
+          description: ' Seen. ',
+          icon: 'eye',
+          kind: 'neutral',
+        },
+        { id: 'b', name: '', description: 'x', icon: 'skull', kind: 'debuff' },
+        {
+          id: 'c',
+          name: 'marked',
+          description: '',
+          icon: 'skull',
+          kind: 'debuff',
+        },
+      ])
+    ).toEqual([
+      {
+        id: 'a',
+        name: 'Marked',
+        description: 'Seen.',
+        icon: 'eye',
+        kind: 'neutral',
+      },
+    ]);
   });
 });
