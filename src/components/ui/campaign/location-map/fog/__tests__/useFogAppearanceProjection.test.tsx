@@ -46,6 +46,18 @@ describe('writeFogAppearanceProjection', () => {
       'Fog appearance projection failed (403)'
     );
   });
+
+  it('targets the locations route when mapKind is location', async () => {
+    const fetchMock = vi.fn(async () => ({ ok: true }) as Response);
+    vi.stubGlobal('fetch', fetchMock);
+
+    await writeFogAppearanceProjection({ ...baseInput, mapKind: 'location' });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/campaign/CODE%20ONE/locations/map%2Fone/fog-appearance',
+      expect.objectContaining({ method: 'PUT' })
+    );
+  });
 });
 
 describe('useFogAppearanceProjection', () => {

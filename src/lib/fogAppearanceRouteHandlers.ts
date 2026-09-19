@@ -1,0 +1,154 @@
+import { NextRequest, NextResponse } from 'next/server';
+import {
+  getRedis,
+  campaignFogAppearanceKey,
+  SLIDING_TTL_SECONDS,
+  refreshCampaignTTL,
+} from '@/lib/redis';
+import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
+import { sendBattleMapPokeToRoom } from '@/lib/relayPoke';
+import {
+  isFogAppearanceV1,
+  parseBattleMapFogAppearanceProjection,
+  parseProjectedFogAppearance,
+  type BattleMapFogAppearanceProjection,
+} from '@/lib/fogOfWar';
+import type { ProjectedFogAppearance } from '@/types/battlemap';
+
+const MAX_BATTLE_MAP_ID_LENGTH = 200;
+
+function isValidBattleMapId(id: string): boolean {
+  return id.length >= 1 && id.length <= MAX_BATTLE_MAP_ID_LENGTH;
+}
+
+/**
+ * One implementation behind BOTH fog-appearance routes
+ * (`battlemaps/[id]` and `locations/[id]`). The Redis key and the directed
+ * relay poke are id-generic, so a projection written through either route is
+ * what the token mint and every viewer read back.
+ */
+export type FogAppearanceRouteContext = {
+  params: Promise<{ code: string; id: string }>;
+};
+
+export async function handleFogAppearanceGet(
+  request: NextRequest,
+  { params }: FogAppearanceRouteContext
+): Promise<NextResponse> {
+  try {
+    const { code, id } = await params;
+    if (!isValidBattleMapId(id)) {
+      return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
+    }
+
+    const redis = getRedis();
+    const body = Object.fromEntries(new URL(request.url).searchParams);
+    const session = await authorizeBattleMapSession(
+      redis,
+      code,
+      request,
+      {
+        role: (body.role as 'dm' | 'player' | 'display') ?? undefined,
+        dmId: body.dmId,
+        playerId: body.playerId,
+        displayKey: body.displayKey,
+      },
+      { mutation: false }
+    );
+    if (!session.authorized) {
+      return NextResponse.json(
+        { error: session.error },
+        { status: session.status }
+      );
+    }
+
+    let fogAppearance: ProjectedFogAppearance = 'solid';
+    let updatedAt: string | null = null;
+    const raw = await redis.get<BattleMapFogAppearanceProjection>(
+      campaignFogAppearanceKey(code, id)
+    );
+    const projection = parseBattleMapFogAppearanceProjection(raw);
+    if (projection) {
+      fogAppearance = projection.appearance;
+      updatedAt = projection.updatedAt;
+    }
+
+    return NextResponse.json({ fogAppearance, updatedAt });
+  } catch (error) {
+    console.error('Failed to read fog appearance:', error);
+    return NextResponse.json(
+      { error: 'Failed to read fog appearance' },
+      { status: 500 }
+    );
+  }
+}
+
+export async function handleFogAppearancePut(
+  request: NextRequest,
+  { params }: FogAppearanceRouteContext
+): Promise<NextResponse> {
+  try {
+    const { code, id } = await params;
+    if (!isValidBattleMapId(id)) {
+      return NextResponse.json({ error: 'Invalid map id' }, { status: 400 });
+    }
+
+    const body = (await request.json()) as {
+      dmId?: string;
+      appearance?: unknown;
+    };
+    if (!body.dmId) {
+      return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
+    }
+
+    const parsed = parseProjectedFogAppearance(body.appearance);
+    if (parsed === 'solid' && !isFogAppearanceV1(body.appearance)) {
+      return NextResponse.json(
+        { error: 'Invalid fog appearance' },
+        { status: 400 }
+      );
+    }
+    const appearance: ProjectedFogAppearance = parsed;
+
+    const redis = getRedis();
+    const session = await authorizeBattleMapSession(
+      redis,
+      code,
+      request,
+      {
+        role: 'dm',
+        dmId: body.dmId,
+      },
+      { mutation: true }
+    );
+    if (!session.authorized) {
+      return NextResponse.json(
+        { error: session.error },
+        { status: session.status }
+      );
+    }
+
+    const updatedAt = new Date().toISOString();
+    const projection: BattleMapFogAppearanceProjection =
+      typeof appearance === 'string'
+        ? { v: 1, appearance, updatedAt }
+        : { v: 2, appearance, updatedAt };
+    await redis.set(campaignFogAppearanceKey(code, id), projection, {
+      ex: SLIDING_TTL_SECONDS,
+    });
+    await refreshCampaignTTL(redis, code);
+
+    await sendBattleMapPokeToRoom(code, id, 'fog-appearance');
+
+    return NextResponse.json({
+      fogAppearance: appearance,
+      updatedAt: projection.updatedAt,
+    });
+  } catch (error) {
+    console.error('Failed to write fog appearance:', error);
+    return NextResponse.json(
+      { error: 'Failed to write fog appearance' },
+      { status: 500 }
+    );
+  }
+}
