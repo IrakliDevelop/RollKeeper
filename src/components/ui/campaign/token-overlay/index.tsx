@@ -60,7 +60,6 @@ export function TokenDecorationLayer({
     <div
       ref={containerRef}
       className="pointer-events-none absolute inset-0 overflow-hidden select-none"
-      aria-hidden
     >
       <div
         style={{
