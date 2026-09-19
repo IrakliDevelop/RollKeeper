@@ -6,19 +6,18 @@ import type { DetailSectionProps } from './DetailHeader';
 import { DEBUFF_PALETTE, BUFF_PALETTE } from '../effectPalettes';
 import { ActiveEffectChip } from './ActiveEffectChip';
 import { useEncounterStore } from '@/store/encounterStore';
+import { EMPTY_CUSTOM_CONDITIONS } from '@/utils/customConditions';
 
 type PaletteTab = 'conditions' | 'buffs';
-
-// Stable fallback: pre-custom-statuses persisted combatConfig lacks the field,
-// and a per-call `?? []` makes the selector snapshot a fresh reference every
-// render — useSyncExternalStore then loops ("getSnapshot should be cached").
-const EMPTY_CUSTOM_STATUSES: string[] = [];
 
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
-  const customStatuses = useEncounterStore(
-    state => state.combatConfig.customStatuses ?? EMPTY_CUSTOM_STATUSES
+  // Stable fallback: a persisted combatConfig from before the library lacks
+  // the field, and a per-call `?? []` would make the selector snapshot a fresh
+  // reference every render (useSyncExternalStore loop).
+  const customConditions = useEncounterStore(
+    state => state.combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
   );
 
   const activeNames = new Set(entity.conditions.map(c => c.name));
@@ -26,14 +25,18 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
     tab === 'conditions'
       ? [
           ...DEBUFF_PALETTE,
-          ...customStatuses
+          ...customConditions
             .filter(
-              name =>
+              condition =>
                 !DEBUFF_PALETTE.some(
-                  entry => entry.name.toLowerCase() === name.toLowerCase()
+                  entry =>
+                    entry.name.toLowerCase() === condition.name.toLowerCase()
                 )
             )
-            .map(name => ({ name, kind: 'debuff' as const })),
+            .map(condition => ({
+              name: condition.name,
+              kind: 'debuff' as const,
+            })),
         ]
       : BUFF_PALETTE;
 

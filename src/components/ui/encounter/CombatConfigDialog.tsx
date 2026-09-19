@@ -21,11 +21,16 @@ import {
 } from '@/components/ui/forms/radio-group';
 import { useEncounterStore } from '@/store/encounterStore';
 import {
+  type CustomCondition,
   type EnemyHpDisplay,
   type EnemyConditionsDisplay,
   type HpStateBand,
   DEFAULT_HP_STATE_BANDS,
 } from '@/types/encounter';
+import {
+  EMPTY_CUSTOM_CONDITIONS,
+  createCustomCondition,
+} from '@/utils/customConditions';
 
 interface HpDisplayOption {
   value: EnemyHpDisplay;
@@ -81,8 +86,8 @@ export function CombatConfigDialog({
       combatConfig.enemyConditionsDisplay ?? 'off'
     );
   const [bands, setBands] = useState<HpStateBand[]>(combatConfig.hpStateBands);
-  const [customStatuses, setCustomStatuses] = useState<string[]>(
-    combatConfig.customStatuses ?? []
+  const [customConditions, setCustomConditions] = useState<CustomCondition[]>(
+    combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
   );
   const [newStatus, setNewStatus] = useState('');
 
@@ -92,7 +97,9 @@ export function CombatConfigDialog({
       setHpDisplay(combatConfig.enemyHpDisplay);
       setConditionsDisplay(combatConfig.enemyConditionsDisplay ?? 'off');
       setBands(combatConfig.hpStateBands);
-      setCustomStatuses(combatConfig.customStatuses ?? []);
+      setCustomConditions(
+        combatConfig.customConditions ?? EMPTY_CUSTOM_CONDITIONS
+      );
       setNewStatus('');
     }
   }, [open, combatConfig]);
@@ -133,10 +140,12 @@ export function CombatConfigDialog({
     const name = newStatus.trim();
     if (!name) return;
     if (
-      customStatuses.some(status => status.toLowerCase() === name.toLowerCase())
+      customConditions.some(
+        condition => condition.name.toLowerCase() === name.toLowerCase()
+      )
     )
       return;
-    setCustomStatuses(prev => [...prev, name]);
+    setCustomConditions(prev => [...prev, createCustomCondition(name)]);
     setNewStatus('');
   };
 
@@ -149,7 +158,7 @@ export function CombatConfigDialog({
       enemyHpDisplay: hpDisplay,
       hpStateBands: cleaned,
       enemyConditionsDisplay: conditionsDisplay,
-      customStatuses,
+      customConditions,
     });
     onOpenChange(false);
   };
@@ -286,24 +295,24 @@ export function CombatConfigDialog({
               </p>
             </div>
 
-            {customStatuses.length > 0 && (
+            {customConditions.length > 0 && (
               <div className="space-y-2">
-                {customStatuses.map(status => (
+                {customConditions.map(condition => (
                   <div
-                    key={status.toLowerCase()}
+                    key={condition.id}
                     className="bg-surface-secondary flex items-center justify-between rounded-md px-3 py-2"
                   >
-                    <span className="text-body text-sm">{status}</span>
+                    <span className="text-body text-sm">{condition.name}</span>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() =>
-                        setCustomStatuses(prev =>
-                          prev.filter(item => item !== status)
+                        setCustomConditions(prev =>
+                          prev.filter(item => item.id !== condition.id)
                         )
                       }
                       type="button"
-                      aria-label={`Remove ${status}`}
+                      aria-label={`Remove ${condition.name}`}
                     >
                       <Trash2 size={14} className="text-muted" />
                     </Button>

@@ -47,12 +47,12 @@ const entity: EncounterEntity = {
   conditions: [],
 };
 
-describe('DetailEffects — combatConfig.customStatuses selector', () => {
+describe('DetailEffects — combatConfig.customConditions selector', () => {
   beforeEach(() => {
     useEncounterStore.setState({ combatConfig: DEFAULT_COMBAT_CONFIG });
   });
 
-  it('renders without an update loop when persisted combatConfig lacks customStatuses (legacy data)', () => {
+  it('renders without an update loop when persisted combatConfig lacks customConditions (legacy data)', () => {
     // Pre-custom-statuses localStorage hydrates a combatConfig without the
     // field; the selector fallback must stay referentially stable or React's
     // useSyncExternalStore loops ("The result of getSnapshot should be cached").
@@ -74,7 +74,15 @@ describe('DetailEffects — combatConfig.customStatuses selector', () => {
     useEncounterStore.setState({
       combatConfig: {
         ...DEFAULT_COMBAT_CONFIG,
-        customStatuses: ['Marked by Fate'],
+        customConditions: [
+          {
+            id: 'cc-fate',
+            name: 'Marked by Fate',
+            description: '',
+            icon: 'trending-down',
+            kind: 'debuff',
+          },
+        ],
       },
     });
 

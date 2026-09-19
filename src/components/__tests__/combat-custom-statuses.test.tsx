@@ -26,7 +26,7 @@ describe('custom combat statuses', () => {
     useEncounterStore.setState({
       encounters: [],
       activeEncounterId: null,
-      combatConfig: { ...DEFAULT_COMBAT_CONFIG, customStatuses: [] },
+      combatConfig: { ...DEFAULT_COMBAT_CONFIG, customConditions: [] },
     });
   });
 
@@ -43,15 +43,29 @@ describe('custom combat statuses', () => {
     await user.click(screen.getByRole('button', { name: 'Add' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(useEncounterStore.getState().combatConfig.customStatuses).toEqual([
-      'Marked',
+    expect(useEncounterStore.getState().combatConfig.customConditions).toEqual([
+      {
+        id: expect.any(String),
+        name: 'Marked',
+        description: '',
+        icon: 'trending-down',
+        kind: 'debuff',
+      },
     ]);
   });
 
   it('offers saved statuses in the combatant condition palette', async () => {
     const user = userEvent.setup();
     useEncounterStore.getState().setCombatConfig({
-      customStatuses: ['Marked'],
+      customConditions: [
+        {
+          id: 'cc-marked',
+          name: 'Marked',
+          description: '',
+          icon: 'trending-down',
+          kind: 'debuff',
+        },
+      ],
     });
     const onAddCondition = vi.fn();
     const actions = { onAddCondition } as unknown as EntityActions;
