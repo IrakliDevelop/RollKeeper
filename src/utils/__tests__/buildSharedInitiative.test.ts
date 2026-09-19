@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildSharedInitiative } from '../buildSharedInitiative';
+import {
+  buildSharedInitiative,
+  toSharedConditions,
+} from '../buildSharedInitiative';
 import type {
   CombatConfig,
   Encounter,
@@ -372,6 +375,86 @@ describe('buildSharedInitiative', () => {
     );
     expect(shared.enemyConditionsMode).toBe('off');
     expect('conditions' in shared.turnOrder[0]).toBe(false);
+  });
+
+  it('carries description and a validated icon on player conditions', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [
+            {
+              id: 'c1',
+              name: 'Cursed Blood',
+              kind: 'debuff',
+              description: '  Lose 1d4 HP at the start of each turn.  ',
+              icon: 'droplet',
+              source: 'dm',
+              sourceEntity: 'Blood Hag',
+            },
+          ],
+        }),
+      ])
+    );
+    expect(shared.turnOrder[0].conditions).toEqual([
+      {
+        name: 'Cursed Blood',
+        kind: 'debuff',
+        description: 'Lose 1d4 HP at the start of each turn.',
+        icon: 'droplet',
+      },
+    ]);
+  });
+
+  it('keeps enemy descriptions and icons behind the enemyConditionsDisplay gate', () => {
+    const enemy = entity({
+      id: 'm1',
+      conditions: [
+        {
+          id: 'c1',
+          name: 'Webbed',
+          description: 'Restrained by sticky webbing.',
+          icon: 'link',
+        },
+      ],
+    });
+    const hidden = buildSharedInitiative(encounter([enemy]));
+    expect('conditions' in hidden.turnOrder[0]).toBe(false);
+    expect(JSON.stringify(hidden)).not.toContain('sticky webbing');
+
+    const visible = buildSharedInitiative(encounter([enemy]), {
+      enemyHpDisplay: 'off',
+      hpStateBands: [],
+      enemyConditionsDisplay: 'on',
+    });
+    expect(visible.turnOrder[0].conditions).toEqual([
+      {
+        name: 'Webbed',
+        description: 'Restrained by sticky webbing.',
+        icon: 'link',
+      },
+    ]);
+  });
+
+  it('drops an invalid icon and a blank description', () => {
+    const conditions = toSharedConditions([
+      {
+        id: 'c1',
+        name: 'Hexed',
+        description: '   ',
+        icon: 'not-an-icon' as never,
+      },
+    ]);
+    expect(conditions).toEqual([{ name: 'Hexed' }]);
+  });
+
+  it('caps an oversized description before it reaches the wire', () => {
+    const [condition] = toSharedConditions([
+      { id: 'c1', name: 'Wall of Text', description: 'x'.repeat(5000) },
+    ]);
+    expect(condition.description).toHaveLength(1000);
   });
 });
 

@@ -6,6 +6,8 @@ import {
   type EncounterCondition,
   type EncounterEntity,
 } from '@/types/encounter';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
+import { CUSTOM_CONDITION_DESCRIPTION_MAX } from '@/utils/customConditions';
 import { hpPercent, hpStateLabel, hpTier } from '@/utils/hpState';
 import type {
   SharedCondition,
@@ -42,6 +44,14 @@ export function toSharedConditions(
     if (c.kind !== undefined) shared.kind = c.kind;
     if (c.stackCount !== undefined && c.stackCount > 1)
       shared.stackCount = c.stackCount;
+    const description = c.description?.trim();
+    if (description)
+      shared.description = description.slice(
+        0,
+        CUSTOM_CONDITION_DESCRIPTION_MAX
+      );
+    // Persisted/synced entities are untrusted too: only registry names leave.
+    if (isConditionIconName(c.icon)) shared.icon = c.icon;
     return shared;
   });
 }

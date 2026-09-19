@@ -54,6 +54,13 @@ export interface DmEffect {
   name: string;
   action: 'add' | 'remove';
   description?: string;
+  /**
+   * Registry icon name of a DM custom condition. Untrusted on the player
+   * side — validate with isConditionIconName before storing or rendering.
+   * Its presence also tells the player to keep the DM's description instead
+   * of looking up a canonical one.
+   */
+  icon?: string;
   sourceSpell?: string;
   appliedAt: string; // ISO timestamp
 }
@@ -96,11 +103,16 @@ export interface SharedCustomCounter {
 
 // Display-only projection of an EncounterCondition. Deliberately excludes
 // id, duration, rounds, sourceEntity, sourceSpell, and source — none of
-// that leaves the DM.
+// that leaves the DM. `description` and `icon` ARE shared: a condition's text
+// is player-facing by design (token hover panel). Enemy conditions as a whole
+// stay behind enemyConditionsDisplay. `icon` is an untrusted string on the
+// wire: render it through getConditionIcon(), which validates it.
 export interface SharedCondition {
   name: string;
   kind?: 'buff' | 'debuff' | 'neutral';
   stackCount?: number;
+  description?: string;
+  icon?: string;
 }
 
 // A single combatant row shown to players during combat

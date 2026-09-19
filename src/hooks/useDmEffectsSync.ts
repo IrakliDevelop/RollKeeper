@@ -1,10 +1,48 @@
 import { useCallback, useRef } from 'react';
-import type { EncounterEntity, EncounterCondition } from '@/types/encounter';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
+import type { EncounterEntity } from '@/types/encounter';
 import type { DmEffect } from '@/types/sharedState';
 
 interface UseDmEffectsSyncOptions {
   campaignCode: string;
   dmId: string;
+}
+
+/**
+ * DM condition overrides for one player entity:
+ * - `add`: DM-source conditions the player should gain (with the DM's
+ *   description and, for custom conditions, the registry icon)
+ * - `remove`: player-source conditions the DM explicitly removed (suppressed)
+ */
+export function buildDmEffects(
+  entity: EncounterEntity,
+  now: string
+): DmEffect[] {
+  const effects: DmEffect[] = [];
+
+  for (const c of entity.conditions) {
+    if (c.source !== 'dm') continue;
+    effects.push({
+      id: c.id,
+      name: c.name,
+      action: 'add',
+      description: c.description,
+      ...(isConditionIconName(c.icon) ? { icon: c.icon } : {}),
+      sourceSpell: c.sourceSpell,
+      appliedAt: now,
+    });
+  }
+
+  for (const name of entity.suppressedConditions ?? []) {
+    effects.push({
+      id: `remove-${name.toLowerCase().replace(/\s+/g, '-')}`,
+      name,
+      action: 'remove',
+      appliedAt: now,
+    });
+  }
+
+  return effects;
 }
 
 /**
@@ -41,37 +79,6 @@ export function useDmEffectsSync({
     [campaignCode, dmId]
   );
 
-  const buildEffects = useCallback((entity: EncounterEntity): DmEffect[] => {
-    const now = new Date().toISOString();
-    const effects: DmEffect[] = [];
-
-    // Additions: DM-source conditions the player should gain
-    for (const c of entity.conditions) {
-      if (c.source === 'dm') {
-        effects.push({
-          id: c.id,
-          name: c.name,
-          action: 'add',
-          description: c.description,
-          sourceSpell: c.sourceSpell,
-          appliedAt: now,
-        });
-      }
-    }
-
-    // Removals: conditions the DM suppressed
-    for (const name of entity.suppressedConditions ?? []) {
-      effects.push({
-        id: `remove-${name.toLowerCase().replace(/\s+/g, '-')}`,
-        name,
-        action: 'remove',
-        appliedAt: now,
-      });
-    }
-
-    return effects;
-  }, []);
-
   const syncPlayerEffects = useCallback(
     (playerId: string, entity: EncounterEntity) => {
       const existing = pendingRef.current.get(playerId);
@@ -81,12 +88,14 @@ export function useDmEffectsSync({
         playerId,
         setTimeout(() => {
           pendingRef.current.delete(playerId);
-          const effects = buildEffects(entity);
-          pushEffects(playerId, effects);
+          pushEffects(
+            playerId,
+            buildDmEffects(entity, new Date().toISOString())
+          );
         }, 500)
       );
     },
-    [pushEffects, buildEffects]
+    [pushEffects]
   );
 
   return { syncPlayerEffects };
