@@ -110,6 +110,33 @@ describe('characterStore — conditions', () => {
         useCharacterStore.getState().character.conditionsAndDiseases;
       expect(activeConditions).toHaveLength(2);
     });
+
+    it('stores a registry icon passed as the 6th argument', () => {
+      useCharacterStore
+        .getState()
+        .addCondition(
+          'Cursed Blood',
+          'DM',
+          'Lose 1d4 HP each turn.',
+          1,
+          undefined,
+          'droplet'
+        );
+      const cond =
+        useCharacterStore.getState().character.conditionsAndDiseases
+          .activeConditions[0];
+      expect(cond.icon).toBe('droplet');
+    });
+
+    it('ignores an icon outside the registry and omits the key when absent', () => {
+      const store = useCharacterStore.getState();
+      store.addCondition('Hexed', 'DM', 'x', 1, undefined, 'not-an-icon');
+      store.addCondition('Prone', 'XPHB', 'y');
+      const { activeConditions } =
+        useCharacterStore.getState().character.conditionsAndDiseases;
+      expect('icon' in activeConditions[0]).toBe(false);
+      expect('icon' in activeConditions[1]).toBe(false);
+    });
   });
 
   describe('updateCondition', () => {
