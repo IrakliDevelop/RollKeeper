@@ -90,7 +90,7 @@ import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
 import type { MarkerDataIssue } from './markerPainter';
-import { DM_AUDIENCE } from './markerData';
+import { isElementDmOnly, resolveElementAudience } from './elementAudience';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import {
   CANVAS_WRITING_TOOL_NAMES,
@@ -1118,11 +1118,11 @@ export function useDmLocationEditor(
             manager: fogManager,
             preserveLocalWhenRemoteMissing: true,
           },
+          // Mode-aware and FAIL-CLOSED — see elementAudience.ts. Never inline
+          // a store read here: a resolver bound to the wrong store answers
+          // "public" for every element of the other store's maps.
           resolveAudience: el =>
-            useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
-              ?.dmOnlyElements[el.id]
-              ? DM_AUDIENCE
-              : undefined,
+            resolveElementAudience(mode, campaignCode, location.id, el.id),
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct
           // calls; the pin subscription above re-pins bands on every change.
@@ -1202,9 +1202,7 @@ export function useDmLocationEditor(
                 {
                   role: 'dm',
                   isDmOnlyElement: id =>
-                    !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
-                      location.id
-                    ]?.dmOnlyElements[id],
+                    isElementDmOnly(mode, campaignCode, location.id, id),
                   getElement: id => vp.store.getById(id) ?? null,
                 }
               );
