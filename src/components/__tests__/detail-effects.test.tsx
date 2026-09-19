@@ -10,6 +10,13 @@ import type { CustomCondition, MonsterStatBlock } from '@/types/encounter';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
+vi.mock('@/hooks/useOfficialConditions', () => ({
+  useOfficialConditions: () => ({ conditions: [], loading: false }),
+}));
+vi.mock('@/hooks/usePaletteSpellEffects', () => ({
+  usePaletteSpellEffects: () => ({ effects: [], loading: false }),
+}));
+
 afterEach(cleanup);
 
 function makeActions(): EntityActions {
@@ -212,6 +219,7 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
       icon: 'link',
       kind: 'debuff',
       source: 'dm',
+      origin: 'custom',
       sourceEntity: 'Giant Spider',
     });
   });

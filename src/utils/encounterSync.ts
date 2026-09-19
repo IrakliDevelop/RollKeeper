@@ -57,6 +57,7 @@ export function mergePlayerSyncData(
       name: c.name,
       description: c.description,
       source: 'player-sync' as const,
+      ...(c.kind ? { kind: c.kind } : {}),
       // Custom DM conditions keep their icon once the player owns them.
       ...(isConditionIconName(c.icon) ? { icon: c.icon } : {}),
     }));

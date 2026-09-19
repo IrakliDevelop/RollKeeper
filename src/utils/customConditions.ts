@@ -53,7 +53,7 @@ export function sanitizeCustomCondition(
   value: unknown
 ): CustomCondition | null {
   if (!isRecord(value)) return null;
-  const { id, name, description, icon, kind } = value;
+  const { id, name, description, icon, kind, origin, rulesSource } = value;
   if (typeof id !== 'string' || id === '') return null;
   if (typeof name !== 'string' || name.trim() === '') return null;
   const safeKind =
@@ -71,6 +71,10 @@ export function sanitizeCustomCondition(
       ? icon
       : DEFAULT_CONDITION_ICON_BY_KIND[safeKind],
     kind: safeKind,
+    ...(origin === 'official' || origin === 'custom' ? { origin } : {}),
+    ...(typeof rulesSource === 'string' && rulesSource.trim()
+      ? { rulesSource: rulesSource.trim().slice(0, 20) }
+      : {}),
   };
 }
 
@@ -220,6 +224,8 @@ export function toAppliedCondition(
     icon: condition.icon,
     kind: condition.kind,
     source: 'dm',
+    origin: condition.origin ?? 'custom',
+    ...(condition.rulesSource ? { rulesSource: condition.rulesSource } : {}),
     ...(sourceEntity ? { sourceEntity } : {}),
   };
 }

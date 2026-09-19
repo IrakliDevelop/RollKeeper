@@ -69,6 +69,20 @@ describe('resolveDmEffectCondition', () => {
     ).toEqual({ source: 'XPHB', description: 'Canonical poisoned text.' });
   });
 
+  it('an official condition keeps canonical behavior even when it carries a token icon', () => {
+    expect(
+      resolveDmEffectCondition(
+        effect({
+          description: 'Synced rules.',
+          icon: 'biohazard',
+          origin: 'official',
+          rulesSource: 'XPHB',
+        }),
+        CANON
+      )
+    ).toEqual({ source: 'XPHB', description: 'Canonical poisoned text.' });
+  });
+
   it('an unknown icon does not bypass, and unknown names keep the DM text or the default', () => {
     expect(
       resolveDmEffectCondition(
@@ -94,6 +108,17 @@ describe('resolveDmEffectCondition', () => {
 
 describe('useDmConditionOverrides', () => {
   beforeEach(() => {
+    vi.mocked(loadAllConditions).mockResolvedValue([
+      ...CANON,
+      {
+        id: 'prone-xphb',
+        name: 'Prone',
+        source: 'XPHB',
+        description: 'Canonical prone text.',
+        isExhaustion: false,
+        stackable: false,
+      },
+    ]);
     useCharacterStore.setState({
       character: makeCharacter(),
       hasUnsavedChanges: false,
@@ -123,13 +148,20 @@ describe('useDmConditionOverrides', () => {
           icon: 'droplet',
         }),
         effect({ id: 'fx-standard', name: 'Prone', description: 'ignored' }),
+        effect({
+          id: 'fx-buff',
+          name: 'Bless',
+          description: 'Bless spell rules.',
+          kind: 'buff',
+          origin: 'spell',
+        }),
       ],
     });
 
     const active =
       useCharacterStore.getState().character.conditionsAndDiseases
         .activeConditions;
-    expect(active).toHaveLength(2);
+    expect(active).toHaveLength(3);
     expect(active[0]).toMatchObject({
       name: 'Poisoned',
       source: 'DM',
@@ -142,6 +174,50 @@ describe('useDmConditionOverrides', () => {
       description: 'Canonical prone text.',
     });
     expect('icon' in active[1]).toBe(false);
+    expect(active[2]).toMatchObject({
+      name: 'Bless',
+      source: 'DM',
+      description: 'Bless spell rules.',
+      kind: 'buff',
+    });
     expect(onAcknowledged).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for canonical condition data before applying and acknowledging an effect', async () => {
+    let resolveConditions!: (conditions: ProcessedCondition[]) => void;
+    vi.mocked(loadAllConditions).mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          resolveConditions = resolve;
+        })
+    );
+    const onAcknowledged = vi.fn();
+    renderHook(() =>
+      useDmConditionOverrides(
+        [effect({ origin: 'official', icon: 'biohazard' })],
+        onAcknowledged
+      )
+    );
+
+    expect(onAcknowledged).not.toHaveBeenCalled();
+    expect(
+      useCharacterStore.getState().character.conditionsAndDiseases
+        .activeConditions
+    ).toHaveLength(0);
+
+    await act(async () => {
+      resolveConditions(CANON);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => expect(onAcknowledged).toHaveBeenCalledTimes(1));
+    expect(
+      useCharacterStore.getState().character.conditionsAndDiseases
+        .activeConditions[0]
+    ).toMatchObject({
+      name: 'Poisoned',
+      source: 'XPHB',
+      description: 'Canonical poisoned text.',
+    });
   });
 });

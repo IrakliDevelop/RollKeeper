@@ -1,7 +1,14 @@
 'use client';
 
 import React from 'react';
-import { Book, Calendar, FileText, AlertTriangle, Shield } from 'lucide-react';
+import {
+  Book,
+  Calendar,
+  FileText,
+  AlertTriangle,
+  Shield,
+  Sparkles,
+} from 'lucide-react';
 import { ActiveCondition, ActiveDisease } from '@/types/character';
 import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
 import { createSafeHtml } from '@/utils/textFormatting';
@@ -37,6 +44,7 @@ export default function ConditionDetailsModal({
 
   const item = condition || disease;
   const isCondition = !!condition;
+  const isBuff = condition?.kind === 'buff';
   const fullSourceName = SPELL_SOURCE_BOOKS[item!.source] || item!.source;
 
   return (
@@ -54,18 +62,26 @@ export default function ConditionDetailsModal({
           {/* Enhanced Header with Icon and Metadata */}
           <div
             className={`-m-6 mb-6 border-b-2 p-6 ${
-              isCondition
-                ? 'border-accent-red-border from-accent-red-bg to-accent-orange-bg bg-linear-to-r'
-                : 'border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong bg-linear-to-r'
+              isBuff
+                ? 'border-accent-emerald-border from-accent-emerald-bg to-surface-secondary bg-linear-to-r'
+                : isCondition
+                  ? 'border-accent-red-border from-accent-red-bg to-accent-orange-bg bg-linear-to-r'
+                  : 'border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong bg-linear-to-r'
             }`}
           >
             <div className="mb-4 flex items-center gap-3">
               <div
                 className={`flex h-12 w-12 items-center justify-center rounded-lg ${
-                  isCondition ? 'bg-accent-red-bg' : 'bg-accent-purple-bg'
+                  isBuff
+                    ? 'bg-accent-emerald-bg'
+                    : isCondition
+                      ? 'bg-accent-red-bg'
+                      : 'bg-accent-purple-bg'
                 }`}
               >
-                {isCondition ? (
+                {isBuff ? (
+                  <Sparkles className="text-accent-emerald-text h-6 w-6" />
+                ) : isCondition ? (
                   <AlertTriangle className="text-accent-red-text-muted h-6 w-6" />
                 ) : (
                   <Shield className="text-accent-purple-text-muted h-6 w-6" />
@@ -73,11 +89,13 @@ export default function ConditionDetailsModal({
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge
-                  variant={isCondition ? 'danger' : 'primary'}
+                  variant={
+                    isBuff ? 'success' : isCondition ? 'danger' : 'primary'
+                  }
                   size="md"
                   className="tracking-wide uppercase"
                 >
-                  {isCondition ? 'Condition' : 'Disease'}
+                  {isBuff ? 'Buff' : isCondition ? 'Condition' : 'Disease'}
                 </Badge>
                 {condition?.stackable && condition.count > 1 && (
                   <Badge variant="warning" size="md">

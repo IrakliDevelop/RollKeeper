@@ -9,6 +9,7 @@ import {
   Search,
   Trash2,
   Activity,
+  Sparkles,
   X,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
@@ -33,7 +34,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 
-type TabType = 'conditions' | 'diseases';
+type TabType = 'conditions' | 'buffs' | 'diseases';
 
 export default function ConditionsDiseasesManager() {
   const {
@@ -45,7 +46,6 @@ export default function ConditionsDiseasesManager() {
     updateDisease,
     removeDisease,
     setExhaustionVariant,
-    clearAllConditions,
     clearAllDiseases,
   } = useCharacterStore();
 
@@ -93,6 +93,12 @@ export default function ConditionsDiseasesManager() {
       activeDiseases: [],
       exhaustionVariant: '2024' as const,
     };
+  const activeBuffs = activeConditions.filter(
+    condition => condition.kind === 'buff'
+  );
+  const activeDebuffs = activeConditions.filter(
+    condition => condition.kind !== 'buff'
+  );
 
   // Filter conditions and diseases based on search
   const filteredConditions = availableConditions.filter(
@@ -232,7 +238,7 @@ export default function ConditionsDiseasesManager() {
         <div className="mb-4 flex items-center justify-between">
           <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
             <Activity className="text-accent-red-text-muted h-6 w-6" />
-            Conditions & Diseases
+            Conditions & Effects
           </h3>
           <div className="flex items-center gap-2">
             <label className="text-body text-sm font-medium">
@@ -311,25 +317,45 @@ export default function ConditionsDiseasesManager() {
 
       {/* Tabs */}
       <div className="border-divider bg-surface-secondary border-b-2 px-6">
-        <div className="flex gap-1">
+        <div className="grid grid-cols-3 gap-1">
           <button
             onClick={() => {
               setActiveTab('conditions');
               setShowAddPanel(false);
             }}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
               activeTab === 'conditions'
                 ? 'border-accent-red-border-strong text-accent-red-text bg-surface border-b-4'
                 : 'text-muted hover:text-accent-red-text-muted hover:bg-surface-hover'
             }`}
           >
-            <AlertTriangle className="h-4 w-4" />
+            <AlertTriangle className="hidden h-4 w-4 sm:block" />
             Conditions
             <Badge
               variant={activeTab === 'conditions' ? 'danger' : 'secondary'}
               size="sm"
             >
-              {activeConditions.length}
+              {activeDebuffs.length}
+            </Badge>
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('buffs');
+              setShowAddPanel(false);
+            }}
+            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
+              activeTab === 'buffs'
+                ? 'border-accent-emerald-border text-accent-emerald-text bg-surface border-b-4'
+                : 'text-muted hover:text-accent-emerald-text hover:bg-surface-hover'
+            }`}
+          >
+            <Sparkles className="hidden h-4 w-4 sm:block" />
+            Buffs
+            <Badge
+              variant={activeTab === 'buffs' ? 'success' : 'secondary'}
+              size="sm"
+            >
+              {activeBuffs.length}
             </Badge>
           </button>
           <button
@@ -337,13 +363,13 @@ export default function ConditionsDiseasesManager() {
               setActiveTab('diseases');
               setShowAddPanel(false);
             }}
-            className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all ${
+            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
               activeTab === 'diseases'
                 ? 'border-accent-purple-border-strong text-accent-purple-text bg-surface border-b-4'
                 : 'text-muted hover:text-accent-purple-text-muted hover:bg-surface-hover'
             }`}
           >
-            <Shield className="h-4 w-4" />
+            <Shield className="hidden h-4 w-4 sm:block" />
             Diseases
             <Badge
               variant={activeTab === 'diseases' ? 'primary' : 'secondary'}
@@ -365,9 +391,13 @@ export default function ConditionsDiseasesManager() {
                 Active Conditions
               </h4>
               <div className="flex gap-2">
-                {activeConditions.length > 0 && (
+                {activeDebuffs.length > 0 && (
                   <Button
-                    onClick={clearAllConditions}
+                    onClick={() =>
+                      activeDebuffs.forEach(condition =>
+                        removeCondition(condition.id)
+                      )
+                    }
                     variant="ghost"
                     size="sm"
                     leftIcon={<Trash2 className="h-4 w-4" />}
@@ -453,7 +483,7 @@ export default function ConditionsDiseasesManager() {
 
             {/* Active Conditions List */}
             <div className="space-y-3">
-              {activeConditions.map(condition => (
+              {activeDebuffs.map(condition => (
                 <ConditionCard
                   key={condition.id}
                   condition={condition}
@@ -462,12 +492,43 @@ export default function ConditionsDiseasesManager() {
                   onUpdateCount={(id, count) => updateCondition(id, { count })}
                 />
               ))}
-              {activeConditions.length === 0 && (
+              {activeDebuffs.length === 0 && (
                 <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
                   <AlertTriangle className="text-faint mx-auto mb-3 h-12 w-12" />
                   <p className="text-muted font-medium">No active conditions</p>
                   <p className="text-muted mt-1 text-sm">
                     Click &quot;Add Condition&quot; to get started
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : activeTab === 'buffs' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="text-heading text-lg font-bold">Active Buffs</h4>
+                <p className="text-muted text-sm">
+                  Beneficial effects applied by you or the DM.
+                </p>
+              </div>
+            </div>
+            <div className="space-y-3">
+              {activeBuffs.map(buff => (
+                <ConditionCard
+                  key={buff.id}
+                  condition={buff}
+                  onView={openConditionModal}
+                  onRemove={removeCondition}
+                  onUpdateCount={(id, count) => updateCondition(id, { count })}
+                />
+              ))}
+              {activeBuffs.length === 0 && (
+                <div className="border-accent-emerald-border bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
+                  <Sparkles className="text-accent-emerald-text-muted mx-auto mb-3 h-12 w-12" />
+                  <p className="text-muted font-medium">No active buffs</p>
+                  <p className="text-muted mt-1 text-sm">
+                    Buffs such as Bless appear here when applied.
                   </p>
                 </div>
               )}

@@ -6,9 +6,18 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const limit = searchParams.get('limit');
     const offset = searchParams.get('offset');
+    const requestedNames = new Set(
+      searchParams.getAll('name').map(name => name.trim().toLowerCase())
+    );
 
     // Load all spell data
-    const spells = await loadAllSpells();
+    const allSpells = await loadAllSpells();
+    const spells =
+      requestedNames.size > 0
+        ? allSpells.filter(spell =>
+            requestedNames.has(spell.name.toLowerCase())
+          )
+        : allSpells;
 
     // Apply pagination if requested
     if (limit && offset) {

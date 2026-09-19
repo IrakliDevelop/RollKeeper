@@ -63,6 +63,7 @@ import { NpcInflictsEditor } from './NpcInflictsEditor';
 import type { Spell } from '@/types/character';
 import type { CustomCondition, StatBlockEntry } from '@/types/encounter';
 import { useEncounterStore } from '@/store/encounterStore';
+import { useOfficialConditions } from '@/hooks/useOfficialConditions';
 import { EMPTY_CUSTOM_CONDITIONS } from '@/utils/customConditions';
 import {
   finalizeResourceDrafts,
@@ -224,6 +225,8 @@ export function NPCFormDialog({
   // Item database for inventory autocomplete
   const { items: dbItems, loading: dbItemsLoading } = useItemsData();
   const { items: dbMagicItems } = useMagicItemsData();
+  const { conditions: officialConditions, loading: officialConditionsLoading } =
+    useOfficialConditions();
 
   // Active form tab
   const [activeFormTab, setActiveFormTab] = useState<FormTab>('basic');
@@ -1434,10 +1437,12 @@ export function NPCFormDialog({
                       />
                     </div>
 
-                    {/* ===== Inflicted custom conditions ===== */}
+                    {/* ===== Inflicted conditions ===== */}
                     <NpcInflictsEditor
                       conditions={inflictableConditions}
                       library={conditionLibrary}
+                      officialConditions={officialConditions}
+                      officialConditionsLoading={officialConditionsLoading}
                       onChange={setInflictableConditions}
                       onCreateInLibrary={handleCreateConditionInLibrary}
                     />

@@ -17,6 +17,10 @@ export interface EncounterCondition {
   stackCount?: number;
   source?: 'player-sync' | 'dm'; // Where this condition came from
   kind?: 'buff' | 'debuff' | 'neutral';
+  /** Where the rules text came from; absent on legacy/free-form effects. */
+  origin?: 'official' | 'custom' | 'spell';
+  /** Rules source code, e.g. XPHB or PHB. */
+  rulesSource?: string;
   /** DM-chosen registry icon; absent → name/kind lookup in getConditionIcon. */
   icon?: ConditionIconName;
   rounds?: number | null; // remaining rounds; null/undefined = untimed (∞)
@@ -30,6 +34,10 @@ export interface CustomCondition {
   description: string;
   icon: ConditionIconName;
   kind: 'buff' | 'debuff' | 'neutral';
+  /** Official entries are canonical condition snapshots, not library rows. */
+  origin?: 'official' | 'custom';
+  /** Rules source code, e.g. XPHB or PHB. */
+  rulesSource?: string;
 }
 
 export interface MonsterAbility {
@@ -151,9 +159,9 @@ export interface MonsterStatBlock {
   alignment: string;
   hpFormula: string;
   /**
-   * Conditions this creature can inflict — FULL COPIES that keep the id of
-   * their library origin (NPCs cloud-sync, combatConfig does not, so id-only
-   * references would dangle on a second device). Resolve through
+   * Conditions this creature can inflict — FULL COPIES that keep a stable
+   * official or library id (NPCs cloud-sync, combatConfig does not, so id-only
+   * custom references would dangle on a second device). Resolve through
    * resolveInflictableConditions(); always guard `?? []`.
    */
   inflictableConditions?: CustomCondition[];

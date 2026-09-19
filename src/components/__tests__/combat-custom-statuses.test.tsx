@@ -8,6 +8,13 @@ import { useEncounterStore } from '@/store/encounterStore';
 import { DEFAULT_COMBAT_CONFIG, type EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
+vi.mock('@/hooks/useOfficialConditions', () => ({
+  useOfficialConditions: () => ({ conditions: [], loading: false }),
+}));
+vi.mock('@/hooks/usePaletteSpellEffects', () => ({
+  usePaletteSpellEffects: () => ({ effects: [], loading: false }),
+}));
+
 const entity: EncounterEntity = {
   id: 'custom-status-target',
   type: 'npc',
@@ -91,6 +98,7 @@ describe('custom combat statuses', () => {
       icon: 'crosshair',
       kind: 'debuff',
       source: 'dm',
+      origin: 'custom',
     });
   });
 });

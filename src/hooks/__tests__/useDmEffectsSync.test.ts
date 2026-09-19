@@ -31,6 +31,7 @@ describe('buildDmEffects', () => {
         action: 'add',
         description: 'Lose 1d4 HP at the start of each turn.',
         icon: 'droplet',
+        kind: 'debuff',
         appliedAt: NOW,
       },
       { id: 'c2', name: 'Prone', action: 'add', appliedAt: NOW },
