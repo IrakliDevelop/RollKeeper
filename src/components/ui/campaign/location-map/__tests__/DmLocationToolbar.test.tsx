@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 
-import DmLocationToolbar from '@/components/ui/campaign/location-map/DmLocationToolbar';
+import DmLocationToolbar, {
+  DM_LOCATION_BATTLEMAP_ONLY_TOOL_NAMES,
+  DM_LOCATION_PRESENCE_TOOL_NAMES,
+  DM_LOCATION_TOOL_NAMES,
+} from '@/components/ui/campaign/location-map/DmLocationToolbar';
 import {
   MARKER_MIXED_AUDIENCE_MESSAGE,
   MARKER_SHARE_REVEALS_CLASSIFICATION,
@@ -160,7 +164,7 @@ describe('DmLocationToolbar', () => {
     expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
   });
 
-  it('does not render presenceControl in location mode', () => {
+  it('does not render presenceControl or a live chip in location mode without live sync', () => {
     render(
       <DmLocationToolbar
         {...baseProps}
@@ -169,6 +173,46 @@ describe('DmLocationToolbar', () => {
       />
     );
     expect(screen.queryByTestId('presence-slot')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('live-sync-chip')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Place hidden' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('location mode with live sync: presence control, live chip and hidden placement join the snapshot button', () => {
+    const onToggle = vi.fn();
+    render(
+      <DmLocationToolbar
+        {...baseProps}
+        mode="location"
+        liveSyncConfigured
+        syncStatus="live"
+        hiddenElementCount={2}
+        onToggleHiddenPlacement={onToggle}
+        presenceControl={<div data-testid="presence-slot" />}
+        viewsControl={<div data-testid="views-control-marker" />}
+      />
+    );
+    expect(screen.getByTestId('presence-slot')).toBeInTheDocument();
+    expect(screen.getByTestId('live-sync-chip')).toHaveTextContent('Live');
+    expect(
+      screen.getByRole('button', { name: 'Sync to Players' })
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Place hidden' }));
+    expect(onToggle).toHaveBeenCalledOnce();
+    expect(
+      screen.getByRole('button', { name: 'Reveal all (2)' })
+    ).toBeInTheDocument();
+    // Still battlemap-only:
+    expect(
+      screen.queryByTestId('views-control-marker')
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Open TV Display' })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Share with players' })
+    ).not.toBeInTheDocument();
   });
 
   it('shows hidden-placement state and reveals all hidden elements', () => {
@@ -190,6 +234,52 @@ describe('DmLocationToolbar', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Reveal all (3)' }));
     expect(onToggle).toHaveBeenCalledOnce();
     expect(onRevealAll).toHaveBeenCalledOnce();
+  });
+
+  it('exports the presence / battlemap-only split and keeps every name in DM_LOCATION_TOOL_NAMES', () => {
+    expect(DM_LOCATION_PRESENCE_TOOL_NAMES).toEqual(['laser', 'ping']);
+    expect(DM_LOCATION_BATTLEMAP_ONLY_TOOL_NAMES).toEqual([
+      'measure',
+      'path',
+      'template',
+      'eraser',
+    ]);
+    for (const name of [
+      ...DM_LOCATION_PRESENCE_TOOL_NAMES,
+      ...DM_LOCATION_BATTLEMAP_ONLY_TOOL_NAMES,
+    ]) {
+      expect(DM_LOCATION_TOOL_NAMES).toContain(name);
+    }
+  });
+
+  it('offers laser and ping in location mode only when live sync is configured', () => {
+    const { unmount } = render(
+      <DmLocationToolbar {...baseProps} mode="location" />
+    );
+    expect(screen.queryByTitle('Laser pointer')).not.toBeInTheDocument();
+    expect(screen.queryByTitle('Ping (look here)')).not.toBeInTheDocument();
+    unmount();
+
+    render(
+      <DmLocationToolbar {...baseProps} mode="location" liveSyncConfigured />
+    );
+    expect(screen.getByTitle('Laser pointer')).toBeInTheDocument();
+    expect(screen.getByTitle('Ping (look here)')).toBeInTheDocument();
+  });
+
+  it('never offers the battlemap-only tools in location mode, even with live sync', () => {
+    render(
+      <DmLocationToolbar {...baseProps} mode="location" liveSyncConfigured />
+    );
+    for (const title of ['Measure', 'Move', 'Template', 'Eraser']) {
+      expect(screen.queryByTitle(title)).not.toBeInTheDocument();
+    }
+  });
+
+  it('keeps laser and ping in battlemap mode with no relay configured (shipped behaviour)', () => {
+    render(<DmLocationToolbar {...baseProps} mode="battlemap" />);
+    expect(screen.getByTitle('Laser pointer')).toBeInTheDocument();
+    expect(screen.getByTitle('Ping (look here)')).toBeInTheDocument();
   });
 });
 

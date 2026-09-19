@@ -47,14 +47,26 @@ const BASE_TOOL_DEFS = [
   { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
 
-const BATTLEMAP_TOOL_DEFS = [
+/** Battle maps only: grid-distance, movement and cleanup tools. */
+const BATTLEMAP_ONLY_TOOL_DEFS = [
   { name: 'measure', icon: Ruler, label: 'Measure' },
   { name: 'path', icon: Footprints, label: 'Move' },
   { name: 'template', icon: Sparkles, label: 'Template' },
   { name: 'eraser', icon: Eraser, label: 'Eraser' },
+] as const;
+
+/** Ephemeral "look here" tools: battle maps always, locations when live sync
+ *  is configured (they broadcast as relay presence, never as canvas state). */
+const PRESENCE_TOOL_DEFS = [
   { name: 'laser', icon: Zap, label: 'Laser pointer' },
   { name: 'ping', icon: MapPin, label: 'Ping (look here)' },
 ] as const;
+
+export const DM_LOCATION_PRESENCE_TOOL_NAMES: readonly string[] =
+  PRESENCE_TOOL_DEFS.map(def => def.name);
+
+export const DM_LOCATION_BATTLEMAP_ONLY_TOOL_NAMES: readonly string[] =
+  BATTLEMAP_ONLY_TOOL_DEFS.map(def => def.name);
 
 /**
  * Every tool name this toolbar can activate, in both modes. Exported so tests
@@ -63,7 +75,8 @@ const BATTLEMAP_TOOL_DEFS = [
  */
 export const DM_LOCATION_TOOL_NAMES: readonly string[] = [
   ...BASE_TOOL_DEFS,
-  ...BATTLEMAP_TOOL_DEFS,
+  ...BATTLEMAP_ONLY_TOOL_DEFS,
+  ...PRESENCE_TOOL_DEFS,
 ].map(def => def.name);
 
 function formatSyncTime(iso: string): string {
@@ -115,13 +128,19 @@ export default function DmLocationToolbar({
   viewsControl,
   presenceControl,
   fogControls,
+  liveSyncConfigured = false,
 }: DmLocationToolbarProps) {
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const toolDefs =
     mode === 'battlemap'
-      ? [...BASE_TOOL_DEFS, ...BATTLEMAP_TOOL_DEFS]
-      : BASE_TOOL_DEFS;
+      ? [...BASE_TOOL_DEFS, ...BATTLEMAP_ONLY_TOOL_DEFS, ...PRESENCE_TOOL_DEFS]
+      : liveSyncConfigured
+        ? [...BASE_TOOL_DEFS, ...PRESENCE_TOOL_DEFS]
+        : BASE_TOOL_DEFS;
+
+  // Live controls: always on battle maps; on locations only with a relay.
+  const liveControls = mode === 'battlemap' || liveSyncConfigured;
 
   const handleToolClick = (name: string) => {
     if (name === 'image') {
@@ -243,7 +262,7 @@ export default function DmLocationToolbar({
 
       {/* Right group */}
       <div className="ml-auto flex items-center gap-1">
-        {mode === 'battlemap' && (
+        {liveControls && (
           <>
             <Button
               variant={hiddenPlacementActive ? 'warning' : 'ghost'}
@@ -352,9 +371,10 @@ export default function DmLocationToolbar({
           )}
           {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && viewsControl}
-          {mode === 'battlemap' && presenceControl}
-          {mode === 'battlemap' && (
+          {liveControls && presenceControl}
+          {liveControls && (
             <span
+              data-testid="live-sync-chip"
               className={`rounded-full px-2 py-0.5 text-xs ${
                 syncStatus === 'live'
                   ? 'bg-accent-emerald-bg text-accent-emerald-text'

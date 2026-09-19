@@ -6,6 +6,8 @@ import {
   type EncounterCondition,
   type EncounterEntity,
 } from '@/types/encounter';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
+import { CUSTOM_CONDITION_DESCRIPTION_MAX } from '@/utils/customConditions';
 import { hpPercent, hpStateLabel, hpTier } from '@/utils/hpState';
 import type {
   SharedCondition,
@@ -42,6 +44,15 @@ export function toSharedConditions(
     if (c.kind !== undefined) shared.kind = c.kind;
     if (c.stackCount !== undefined && c.stackCount > 1)
       shared.stackCount = c.stackCount;
+    const description =
+      typeof c.description === 'string' ? c.description.trim() : '';
+    if (description)
+      shared.description = description.slice(
+        0,
+        CUSTOM_CONDITION_DESCRIPTION_MAX
+      );
+    // Persisted/synced entities are untrusted too: only registry names leave.
+    if (isConditionIconName(c.icon)) shared.icon = c.icon;
     return shared;
   });
 }
@@ -87,14 +98,21 @@ function toEntry(
   // Player-facing allegiance (disguise). Defaults to enemy for non-players.
   entry.disposition = entity.playerDisposition ?? 'enemy';
 
-  // Non-players (enemies/NPCs) expose only what the DM's combat config allows.
-  if (config.enemyHpDisplay === 'off') return entry;
+  // Per-entity DM opt-in: a toggled entity is shared as 'exact' regardless of
+  // the campaign-wide mode (even 'off'); `hpMode` tells the player renderers
+  // to treat this one row as 'exact'. Everyone else follows the combat config.
+  const hpVisible = entity.hpVisibleToPlayers === true;
+  const mode = hpVisible ? 'exact' : config.enemyHpDisplay;
+  if (hpVisible) entry.hpMode = 'exact';
+
+  // Non-players (enemies/NPCs) expose only what the effective mode allows.
+  if (mode === 'off') return entry;
 
   const pct = hpPercent(entity.currentHp, entity.maxHp);
   entry.isDead = entity.currentHp <= 0;
   if (!entry.isDead) entry.hpTier = hpTier(pct);
 
-  switch (config.enemyHpDisplay) {
+  switch (mode) {
     case 'label':
       entry.hpState = hpStateLabel(
         entity.currentHp,

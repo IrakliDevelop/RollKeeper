@@ -13,6 +13,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
+import {
+  CONDITION_ICON_REGISTRY,
+  isConditionIconName,
+} from '@/utils/conditionIconRegistry';
 import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
 
 interface ConditionCardProps {
@@ -30,6 +34,9 @@ export function ConditionCard({
 }: ConditionCardProps) {
   const fullSourceName =
     SPELL_SOURCE_BOOKS[condition.source] || condition.source;
+  const HeaderIcon = isConditionIconName(condition.icon)
+    ? CONDITION_ICON_REGISTRY[condition.icon]
+    : AlertTriangle;
 
   return (
     <div className="group border-accent-red-border bg-surface-raised hover:border-accent-red-border-strong rounded-lg border-2 p-4 transition-all hover:shadow-md">
@@ -37,7 +44,7 @@ export function ConditionCard({
         <div className="min-w-0 flex-1">
           {/* Header */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <AlertTriangle className="text-accent-red-text-muted h-4 w-4 shrink-0" />
+            <HeaderIcon className="text-accent-red-text-muted h-4 w-4 shrink-0" />
             <h4 className="text-heading truncate font-bold">
               {condition.name}
             </h4>

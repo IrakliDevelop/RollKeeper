@@ -174,4 +174,64 @@ describe('usePlayerTokenDecorations', () => {
     expect(d?.conditions).toBeUndefined();
     expect(d?.isConcentrating).toBeUndefined();
   });
+
+  it("per-entry hpMode 'exact' wins over state mode 'off'", () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [
+          enemy({
+            currentHp: 12,
+            maxHp: 48,
+            hpTier: 'critical',
+            hpMode: 'exact',
+          }),
+        ])
+      )
+    );
+    expect(result.current.get('e1')?.hp).toEqual({
+      kind: 'exact',
+      current: 12,
+      max: 48,
+      percent: 25,
+      tier: 'critical',
+    });
+  });
+
+  it('per-entry hpMode wins over a non-off state mode, entry by entry', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('label', [
+          enemy({
+            entityId: 'shown',
+            currentHp: 12,
+            maxHp: 48,
+            hpTier: 'critical',
+            hpMode: 'exact',
+          }),
+          enemy({ entityId: 'masked', hpState: 'Bloodied', hpTier: 'low' }),
+        ])
+      )
+    );
+    expect(result.current.get('shown')?.hp).toEqual({
+      kind: 'exact',
+      current: 12,
+      max: 48,
+      percent: 25,
+      tier: 'critical',
+    });
+    expect(result.current.get('masked')?.hp).toEqual({
+      kind: 'label',
+      text: 'Bloodied',
+      tier: 'low',
+    });
+  });
+
+  it('falls back to the state mode when hpMode is absent (old payloads)', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [enemy({ currentHp: 12, maxHp: 48, hpTier: 'critical' })])
+      )
+    );
+    expect(result.current.get('e1')?.hp).toBeUndefined();
+  });
 });

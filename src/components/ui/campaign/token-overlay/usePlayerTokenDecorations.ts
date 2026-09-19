@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 
-import { hpPercent, hpTier } from '@/utils/hpState';
+import { hpPercent, hpTier, resolveEntryHpMode } from '@/utils/hpState';
 
 import type { EnemyHpDisplay } from '@/types/encounter';
 import type {
@@ -69,7 +69,7 @@ export function usePlayerTokenDecorations(
     for (const entry of initiative.turnOrder) {
       const deco: TokenDecoration = {
         name: entry.displayName,
-        hp: hpViewFor(entry, initiative.enemyHpMode),
+        hp: hpViewFor(entry, resolveEntryHpMode(entry, initiative.enemyHpMode)),
         isDead: entry.isDead ?? false,
         chessPiece: entry.chessPiece,
         pieceColor: entry.tokenColor,

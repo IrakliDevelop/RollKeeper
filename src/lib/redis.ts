@@ -168,6 +168,12 @@ export function campaignLiveMapRoomsKey(code: string): string {
   return `campaign:${code}:live-maps`;
 }
 
+/** Location relay rooms are kept separate so either room kind can be read
+ * with a hard rank bound instead of scanning the other kind's members. */
+export function campaignLiveLocationRoomsKey(code: string): string {
+  return `campaign:${code}:live-locations`;
+}
+
 export function characterShareKey(characterId: string): string {
   return `character:share:${characterId}`;
 }

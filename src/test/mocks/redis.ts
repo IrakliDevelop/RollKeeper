@@ -332,6 +332,8 @@ vi.mock('@/lib/redis', () => ({
   campaignFogAppearanceKey: (code: string, battleMapId: string) =>
     `campaign:${code}:fog-appearance:${battleMapId}`,
   campaignLiveMapRoomsKey: (code: string) => `campaign:${code}:live-maps`,
+  campaignLiveLocationRoomsKey: (code: string) =>
+    `campaign:${code}:live-locations`,
   characterShareKey: (characterId: string) => `character:share:${characterId}`,
   refreshCampaignTTL: vi.fn(async () => {}),
   SLIDING_TTL_SECONDS: 60 * 24 * 60 * 60,

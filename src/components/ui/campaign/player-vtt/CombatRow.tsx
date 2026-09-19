@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { getHpTierTextColor } from '@/utils/hpColor';
+import { resolveEntryHpMode } from '@/utils/hpState';
 import type { EnemyHpDisplay } from '@/types/encounter';
 import type { SharedTurnEntry } from '@/types/sharedState';
 
@@ -42,6 +43,8 @@ export function CombatRow({
   const isYou = entry.playerCharacterId === characterId;
   const isDead = entry.isDead === true;
   const hasHp = entry.currentHp !== undefined && entry.maxHp !== undefined;
+  // A DM per-entity override on the entry wins over the campaign-wide mode.
+  const hpMode = resolveEntryHpMode(entry, enemyHpMode);
   const isMyActiveTurn = isCurrent && isYou;
 
   // Optimistic end-turn: disable the button the instant it's clicked so a
@@ -93,13 +96,13 @@ export function CombatRow({
           />
         ) : entry.hpState ? (
           <span className="text-faint text-xs">{entry.hpState}</span>
-        ) : entry.hpPercent !== undefined && enemyHpMode === 'percent' ? (
+        ) : entry.hpPercent !== undefined && hpMode === 'percent' ? (
           <span
             className={`text-xs ${entry.hpTier ? getHpTierTextColor(entry.hpTier) : 'text-faint'}`}
           >
             {entry.hpPercent}%
           </span>
-        ) : entry.hpPercent !== undefined && enemyHpMode === 'bar' ? (
+        ) : entry.hpPercent !== undefined && hpMode === 'bar' ? (
           <HPBar
             current={entry.hpPercent}
             max={100}

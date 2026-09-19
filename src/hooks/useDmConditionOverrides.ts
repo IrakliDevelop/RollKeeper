@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
 import { loadAllConditions } from '@/utils/conditionsDiseasesLoader';
 import type { ProcessedCondition } from '@/types/character';
 import type { DmEffect } from '@/types/sharedState';
@@ -21,6 +22,37 @@ function findConditionDescription(
   if (xphb) return xphb.description;
 
   return matches[0].description;
+}
+
+export interface ResolvedDmEffectCondition {
+  source: string;
+  description: string;
+  icon?: string;
+}
+
+/**
+ * What an `add` effect becomes on the sheet. A DM custom condition (it carries
+ * a valid registry icon) keeps the DM's own text and icon — the canonical
+ * lookup is skipped even when its name collides with a 5e condition. A
+ * standard effect is unchanged: canonical XPHB text wins over the DM text.
+ */
+export function resolveDmEffectCondition(
+  effect: DmEffect,
+  conditions: ProcessedCondition[]
+): ResolvedDmEffectCondition {
+  if (isConditionIconName(effect.icon)) {
+    return {
+      source: 'DM',
+      description: effect.description || 'Custom effect applied by DM',
+      icon: effect.icon,
+    };
+  }
+  const canonicalDesc = findConditionDescription(effect.name, conditions);
+  return {
+    source: canonicalDesc ? 'XPHB' : 'DM',
+    description:
+      canonicalDesc || effect.description || 'Custom effect applied by DM',
+  };
 }
 
 /**
@@ -66,22 +98,14 @@ export function useDmConditionOverrides(
       } else if (effect.action === 'add') {
         const alreadyHas = activeConditions.some(c => c.name === effect.name);
         if (!alreadyHas) {
-          const canonicalDesc = findConditionDescription(
-            effect.name,
-            conditionsDb
-          );
-          const source = canonicalDesc ? 'XPHB' : 'DM';
-          const description =
-            canonicalDesc ||
-            effect.description ||
-            'Custom effect applied by DM';
-
+          const resolved = resolveDmEffectCondition(effect, conditionsDb);
           addCondition(
             effect.name,
-            source,
-            description,
+            resolved.source,
+            resolved.description,
             1,
-            effect.sourceSpell ? `Source: ${effect.sourceSpell}` : undefined
+            effect.sourceSpell ? `Source: ${effect.sourceSpell}` : undefined,
+            resolved.icon
           );
           appliedAny = true;
         }

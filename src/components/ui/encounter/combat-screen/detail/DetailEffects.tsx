@@ -2,46 +2,55 @@
 
 import React, { useState } from 'react';
 import { Plus } from 'lucide-react';
-import type { DetailSectionProps } from './DetailHeader';
-import { DEBUFF_PALETTE, BUFF_PALETTE } from '../effectPalettes';
 import { ActiveEffectChip } from './ActiveEffectChip';
-import { useEncounterStore } from '@/store/encounterStore';
+import { CreatureConditionsRow } from './CreatureConditionsRow';
+import {
+  buildEffectPalette,
+  useConditionLibrary,
+  useCreatureConditions,
+  type PaletteTab,
+} from './DetailEffects.hooks';
+import { getConditionIcon } from '@/utils/conditionIcons';
+import { toAppliedCondition } from '@/utils/customConditions';
+import type { DetailSectionProps } from './DetailHeader';
+import type { EffectPaletteEntry } from '../effectPalettes';
 
-type PaletteTab = 'conditions' | 'buffs';
+const PALETTE_TABS: PaletteTab[] = ['conditions', 'buffs'];
 
-// Stable fallback: pre-custom-statuses persisted combatConfig lacks the field,
-// and a per-call `?? []` makes the selector snapshot a fresh reference every
-// render — useSyncExternalStore then loops ("getSnapshot should be cached").
-const EMPTY_CUSTOM_STATUSES: string[] = [];
+function paletteChipClass(tab: PaletteTab, isActive: boolean): string {
+  if (tab === 'conditions') {
+    return isActive
+      ? 'bg-accent-red-bg text-accent-red-text cursor-not-allowed opacity-60'
+      : 'bg-surface-raised text-muted hover:bg-accent-red-bg hover:text-accent-red-text shadow-sm';
+  }
+  return isActive
+    ? 'bg-accent-emerald-bg text-accent-emerald-text cursor-not-allowed opacity-60'
+    : 'bg-surface-raised text-muted hover:bg-accent-emerald-bg hover:text-accent-emerald-text shadow-sm';
+}
 
 export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
-  const customStatuses = useEncounterStore(
-    state => state.combatConfig.customStatuses ?? EMPTY_CUSTOM_STATUSES
-  );
+  const library = useConditionLibrary();
+  const creatureConditions = useCreatureConditions(entity.id, library);
 
   const activeNames = new Set(entity.conditions.map(c => c.name));
-  const palette =
-    tab === 'conditions'
-      ? [
-          ...DEBUFF_PALETTE,
-          ...customStatuses
-            .filter(
-              name =>
-                !DEBUFF_PALETTE.some(
-                  entry => entry.name.toLowerCase() === name.toLowerCase()
-                )
-            )
-            .map(name => ({ name, kind: 'debuff' as const })),
-        ]
-      : BUFF_PALETTE;
+  const palette = buildEffectPalette(tab, library);
 
   const handleAddCustom = () => {
     const name = customInput.trim();
     if (!name) return;
     actions.onAddCondition(entity.id, { name, kind: 'neutral', source: 'dm' });
     setCustomInput('');
+  };
+
+  const handleApplyPalette = (entry: EffectPaletteEntry) => {
+    actions.onAddCondition(
+      entity.id,
+      entry.condition
+        ? toAppliedCondition(entry.condition)
+        : { name: entry.name, kind: entry.kind, source: 'dm' }
+    );
   };
 
   return (
@@ -63,9 +72,20 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
         </div>
       )}
 
+      <CreatureConditionsRow
+        items={creatureConditions}
+        activeNames={activeNames}
+        onApply={item =>
+          actions.onAddCondition(
+            entity.id,
+            toAppliedCondition(item.condition, item.sourceName)
+          )
+        }
+      />
+
       {/* Segmented palette tab */}
       <div className="bg-surface-secondary flex items-center rounded-lg p-0.5">
-        {(['conditions', 'buffs'] as PaletteTab[]).map(t => (
+        {PALETTE_TABS.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -84,27 +104,18 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
       <div className="flex flex-wrap gap-1">
         {palette.map(entry => {
           const isActive = activeNames.has(entry.name);
-          const chipClass = isActive
-            ? tab === 'conditions'
-              ? 'bg-accent-red-bg text-accent-red-text cursor-not-allowed opacity-60'
-              : 'bg-accent-emerald-bg text-accent-emerald-text cursor-not-allowed opacity-60'
-            : tab === 'conditions'
-              ? 'bg-surface-raised text-muted hover:bg-accent-red-bg hover:text-accent-red-text shadow-sm'
-              : 'bg-surface-raised text-muted hover:bg-accent-emerald-bg hover:text-accent-emerald-text shadow-sm';
-
+          const Icon = entry.condition
+            ? getConditionIcon(entry.name, entry.kind, entry.condition.icon)
+            : null;
           return (
             <button
-              key={entry.name}
+              key={entry.condition?.id ?? entry.name}
               disabled={isActive}
-              onClick={() =>
-                actions.onAddCondition(entity.id, {
-                  name: entry.name,
-                  kind: entry.kind,
-                  source: 'dm',
-                })
-              }
-              className={`rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${chipClass}`}
+              title={entry.condition?.description || undefined}
+              onClick={() => handleApplyPalette(entry)}
+              className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${paletteChipClass(tab, isActive)}`}
             >
+              {Icon && <Icon size={11} aria-hidden />}
               {entry.name}
             </button>
           );

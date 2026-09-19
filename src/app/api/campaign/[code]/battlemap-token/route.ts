@@ -3,7 +3,7 @@ import { getRedis, campaignFogAppearanceKey } from '@/lib/redis';
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
-import { recordLiveMapRoom } from '@/lib/liveMapRooms';
+import { recordLiveMapRoom, type LiveMapRoomKind } from '@/lib/liveMapRooms';
 import {
   parseBattleMapFogAppearanceProjection,
   type BattleMapFogAppearanceProjection,
@@ -33,6 +33,7 @@ export async function POST(
       playerId?: string;
       displayKey?: string;
       protocols?: { fog?: number };
+      kind?: string;
     };
     const { battleMapId, protocols } = body;
     if (!battleMapId) {
@@ -83,7 +84,11 @@ export async function POST(
     // succeeds — an unauthorized caller must never write into the registry.
     // recordLiveMapRoom swallows its own errors, so awaiting it here cannot
     // fail the mint; it's awaited only for deterministic ordering in tests.
-    await recordLiveMapRoom(redis, code, battleMapId);
+    // Client-supplied and used ONLY as a registry tag: anything other than
+    // the literal 'location' is a battle map.
+    const kind: LiveMapRoomKind =
+      body.kind === 'location' ? 'location' : 'battlemap';
+    await recordLiveMapRoom(redis, code, battleMapId, { kind });
 
     const token = signBattleMapToken(
       {

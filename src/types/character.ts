@@ -762,6 +762,11 @@ export interface ActiveCondition {
   count: number; // For stackable conditions like exhaustion
   appliedAt: string; // ISO date string
   notes?: string; // Optional player notes
+  /**
+   * Registry icon of a DM custom condition (see conditionIconRegistry).
+   * Plain string: it arrives over sync and is re-validated wherever rendered.
+   */
+  icon?: string;
 }
 
 // Active disease tracking

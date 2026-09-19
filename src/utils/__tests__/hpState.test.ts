@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hpPercent, hpStateLabel } from '../hpState';
+import { hpPercent, hpStateLabel, resolveEntryHpMode } from '../hpState';
 import { DEFAULT_HP_STATE_BANDS } from '@/types/encounter';
 
 describe('hpPercent', () => {
@@ -42,5 +42,19 @@ describe('hpStateLabel', () => {
 
   it('returns empty string when no bands are configured', () => {
     expect(hpStateLabel(50, 120, [])).toBe('');
+  });
+});
+
+describe('resolveEntryHpMode', () => {
+  it('prefers the per-entry override over the state-level mode', () => {
+    expect(resolveEntryHpMode({ hpMode: 'exact' }, 'off')).toBe('exact');
+    expect(resolveEntryHpMode({ hpMode: 'exact' }, 'label')).toBe('exact');
+    expect(resolveEntryHpMode({ hpMode: 'percent' }, 'bar')).toBe('percent');
+  });
+
+  it('falls back to the state-level mode when the entry has no override (old payloads)', () => {
+    expect(resolveEntryHpMode({}, 'off')).toBe('off');
+    expect(resolveEntryHpMode({}, 'label')).toBe('label');
+    expect(resolveEntryHpMode({ hpMode: undefined }, 'exact')).toBe('exact');
   });
 });

@@ -90,7 +90,11 @@ import { buildPublicMarkerDetails } from './markerPublication';
 import { markerRefForElement } from './markerWrites';
 import { MARKER_DEFAULT_COLOR_KEY } from './markerPainter';
 import type { MarkerDataIssue } from './markerPainter';
-import { DM_AUDIENCE } from './markerData';
+import {
+  isElementDmOnly,
+  resolveElementAudienceWithLayer,
+  setElementDmOnly,
+} from './elementAudience';
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import {
   CANVAS_WRITING_TOOL_NAMES,
@@ -170,6 +174,9 @@ async function uploadCanvasImage(file: File): Promise<string> {
 export interface DmLocationEditorState {
   // Mode
   mode: 'location' | 'battlemap';
+  /** `NEXT_PUBLIC_BATTLEMAP_RELAY_URL` is set — location mode then gets the
+   *  live controls. Always irrelevant to battlemap mode's own gating. */
+  liveSyncConfigured: boolean;
 
   // Refs
   canvasRef: React.RefObject<FieldNotesCanvasRef | null>;
@@ -321,6 +328,11 @@ export function useDmLocationEditor(
 ): DmLocationEditorState {
   const { location, campaignCode, dmId, onSave, onSyncToPlayers } = props;
   const mode = props.mode ?? 'location';
+  // Read per render (tests flip the env between cases). Live sync is what
+  // makes an audience change matter beyond this browser: battle maps always
+  // run it, locations only when the relay is configured.
+  const relayConfigured = Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL);
+  const audienceReemitEnabled = mode === 'battlemap' || relayConfigured;
 
   const canvasRef = useRef<FieldNotesCanvasRef>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -536,6 +548,7 @@ export function useDmLocationEditor(
     campaignCode,
     mapId: location.id,
     getViewport: getMarkerViewport,
+    reemitAudience: audienceReemitEnabled,
   });
 
   // Setup and Play are separate battle-map surfaces. Play publishes marker
@@ -660,30 +673,26 @@ export function useDmLocationEditor(
         })
       );
       baseTools.push(new EraserTool({ radius: 12, mode: 'stroke' }));
-      // Ephemeral pointer; trails broadcast as presence while the battlemap
-      // room connection is up (see attachLaserBroadcast).
+    }
+
+    // Presence tools: battle maps always; locations only when live sync is
+    // configured. Ephemeral — trails and taps broadcast as presence while the
+    // room connection is up (attachLaserBroadcast / attachPingBroadcast) and
+    // never enter canvas state.
+    if (mode === 'battlemap' || relayConfigured) {
       baseTools.push(new LaserTool({ color: '#F4C430', width: 3 }));
-      // Ephemeral "look here" pulse; taps broadcast as presence while the
-      // battlemap room connection is up (see attachPingBroadcast).
       baseTools.push(new PingTool({ color: '#F4C430' }));
-      baseTools.push(
-        new DmMarkerTool(markerKindRef, markerColorRef, request =>
-          handlePlaceMarkerRef.current(request)
-        )
-      );
     }
 
     // Both modes: marker anchors are available on all DM map surfaces.
-    if (mode !== 'battlemap') {
-      baseTools.push(
-        new DmMarkerTool(markerKindRef, markerColorRef, request =>
-          handlePlaceMarkerRef.current(request)
-        )
-      );
-    }
+    baseTools.push(
+      new DmMarkerTool(markerKindRef, markerColorRef, request =>
+        handlePlaceMarkerRef.current(request)
+      )
+    );
 
     return baseTools;
-  }, [mode, resolveMovement]);
+  }, [mode, relayConfigured, resolveMovement]);
 
   const getVp = useCallback(() => canvasRef.current?.viewport ?? null, []);
 
@@ -1016,15 +1025,14 @@ export function useDmLocationEditor(
       hiddenPlacementUnsubRef.current?.();
       hiddenPlacementUnsubRef.current = vp.store.on('add', (element, meta) => {
         if (
-          mode !== 'battlemap' ||
           !hiddenPlacementActiveRef.current ||
           (meta?.origin !== undefined && meta.origin !== 'local')
         ) {
           return;
         }
-        useBattleMapStore
-          .getState()
-          .setDmOnly(campaignCode, location.id, element.id, true);
+        // Mode-aware: the flag must land in the store the audience resolver
+        // reads for THIS map (see elementAudience.ts).
+        setElementDmOnly(mode, campaignCode, location.id, element.id, true);
       });
 
       // Markers are DM-only by DEFAULT, so unlike the hidden-placement
@@ -1095,9 +1103,14 @@ export function useDmLocationEditor(
         });
       }
 
-      // Live sync — battlemap mode only; resolver reads Zustand LIVE via
-      // getState() (a captured snapshot would go stale after the first toggle).
-      if (mode === 'battlemap' && process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) {
+      // Live sync — both modes, whenever the relay is configured. The audience
+      // resolver is mode-aware and fail-closed (elementAudience.ts); it reads
+      // Zustand LIVE via getState() (a captured snapshot would go stale after
+      // the first toggle). Location mode attaches presence + fog only — the
+      // measure/path/focus helpers belong to tools and controls that exist
+      // only on battle maps.
+      const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+      if (relayUrl) {
         // Re-attach: tear down the OLD connection-scoped handles BEFORE
         // stopping the old connection, so their final frames (awareness
         // `cleared`, measure/path clears) ride the still-live socket — the
@@ -1107,22 +1120,41 @@ export function useDmLocationEditor(
         connectionRef.current?.stop();
         connectionRef.current = null;
         const connection = createManagedBattleMapConnection({
-          relayUrl: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
+          relayUrl,
           campaignCode,
           battleMapId: location.id,
           store: vp.store,
           clientId: dmId,
-          tokenRequest: { role: 'dm', battleMapId: location.id, dmId },
+          // `kind` is a live-room registry tag only (liveMapRooms.ts): it keeps
+          // location rooms out of the initiative poke fan-out. Battle maps
+          // send no tag, byte-compatible with every deployed token route.
+          tokenRequest:
+            mode === 'location'
+              ? {
+                  role: 'dm',
+                  battleMapId: location.id,
+                  dmId,
+                  kind: 'location',
+                }
+              : { role: 'dm', battleMapId: location.id, dmId },
           seedLocal: true,
           fog: {
             manager: fogManager,
             preserveLocalWhenRemoteMissing: true,
           },
+          // Mode-aware and FAIL-CLOSED — see elementAudience.ts. Never inline
+          // a store read here: a resolver bound to the wrong store answers
+          // "public" for every element of the other store's maps. The layer
+          // lookup is read LIVE off this viewport's LayerManager, and the
+          // location-only layer rule lives in the resolver, not here.
           resolveAudience: el =>
-            useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
-              ?.dmOnlyElements[el.id]
-              ? DM_AUDIENCE
-              : undefined,
+            resolveElementAudienceWithLayer(
+              mode,
+              campaignCode,
+              location.id,
+              el,
+              layerId => vp.layerManager.getLayer(layerId)?.visible === false
+            ),
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct
           // calls; the pin subscription above re-pins bands on every change.
@@ -1157,8 +1189,34 @@ export function useDmLocationEditor(
             scope.push(attachRemoteLaserTrails(vp, connection));
             const remotePings = attachRemotePings(vp, connection);
             scope.push(remotePings.dispose);
-            scope.push(attachRemoteMeasurements(vp, connection).dispose);
-            scope.push(attachRemotePaths(vp, connection).dispose);
+            if (mode === 'location') {
+              // Locations only: hiding a layer is a SECRECY control, so the
+              // elements on it must leave the wire, not just the player's
+              // screen (elementAudience.ts). The resolver answers correctly
+              // for anything emitted AFTER the flip; these elements were
+              // emitted before it, so re-emit them — `store.update(id, {})`,
+              // the same no-op write `handleToggleDmOnly` / `handleRevealAll`
+              // use, which the sync client re-stamps (hide → the relay sends
+              // players a remove; show → an upsert, unless the element is
+              // individually flagged DM-only). `updateLayerDirect` mutates
+              // the layer BEFORE it emits, so `visible` already reads new
+              // here. Connection-scoped: torn down on unmount and before
+              // every re-attach, so a rebuilt viewport never leaves a second
+              // listener behind.
+              scope.push(
+                vp.layerManager.on('update', ({ previous, current }) => {
+                  if (previous.visible === current.visible) return;
+                  for (const element of vp.store.getAll()) {
+                    if (element.layerId !== current.id) continue;
+                    vp.store.update(element.id, {});
+                  }
+                })
+              );
+            }
+            if (mode === 'battlemap') {
+              scope.push(attachRemoteMeasurements(vp, connection).dispose);
+              scope.push(attachRemotePaths(vp, connection).dispose);
+            }
             const laserTool = vp.toolManager.getTool<LaserTool>('laser');
             if (laserTool) {
               scope.push(attachLaserBroadcast(laserTool, connection));
@@ -1167,56 +1225,57 @@ export function useDmLocationEditor(
             if (pingTool) {
               scope.push(attachPingBroadcast(pingTool, connection));
             }
-            const measureTool = vp.toolManager.getTool<MeasureTool>('measure');
-            if (measureTool) {
-              const measureBroadcast = attachMeasureBroadcast(
-                measureTool,
-                connection
-              );
-              // Reattachment (viewport/connection rebuild) must not silently
-              // revert to private while the toggle still says shared — apply
-              // the latest value now.
-              measureBroadcast.setSharing(measureSharingRef.current);
-              measureBroadcastRef.current = measureBroadcast;
+            if (mode === 'battlemap') {
+              const measureTool =
+                vp.toolManager.getTool<MeasureTool>('measure');
+              if (measureTool) {
+                const measureBroadcast = attachMeasureBroadcast(
+                  measureTool,
+                  connection
+                );
+                // Reattachment (viewport/connection rebuild) must not silently
+                // revert to private while the toggle still says shared — apply
+                // the latest value now.
+                measureBroadcast.setSharing(measureSharingRef.current);
+                measureBroadcastRef.current = measureBroadcast;
+                scope.push(() => {
+                  measureBroadcastRef.current = null;
+                  measureBroadcast.dispose();
+                });
+              }
+              // Camera focus requests ("bring them here"): broadcast this DM's
+              // sends over presence. Stateless by design — see
+              // attachFocusBroadcast — so there is no re-apply after
+              // (re)attach, unlike measureBroadcast. Broadcast genuinely needs
+              // the connection (unlike the local animator above, which is set
+              // up unconditionally), so it stays gated here.
+              const focusBroadcast = attachFocusBroadcast(connection);
+              focusBroadcastRef.current = focusBroadcast;
               scope.push(() => {
-                measureBroadcastRef.current = null;
-                measureBroadcast.dispose();
+                focusBroadcastRef.current = null;
+                focusBroadcast.dispose();
               });
-            }
-            // Camera focus requests ("bring them here"): broadcast this DM's
-            // sends over presence. Stateless by design — see
-            // attachFocusBroadcast — so there is no re-apply after
-            // (re)attach, unlike measureBroadcast. Broadcast genuinely needs
-            // the connection (unlike the local animator above, which is set
-            // up unconditionally), so it stays gated here.
-            const focusBroadcast = attachFocusBroadcast(connection);
-            focusBroadcastRef.current = focusBroadcast;
-            scope.push(() => {
-              focusBroadcastRef.current = null;
-              focusBroadcast.dispose();
-            });
-            if (movementTool) {
-              const pathBroadcast = attachPathBroadcast(
-                movementTool,
-                connection,
-                {
-                  role: 'dm',
-                  isDmOnlyElement: id =>
-                    !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
-                      location.id
-                    ]?.dmOnlyElements[id],
-                  getElement: id => vp.store.getById(id) ?? null,
-                }
-              );
-              // Reattachment must not silently revert to private while the
-              // toggle still says shared — apply the latest value now
-              // (measure precedent).
-              pathBroadcast.setSharing(pathSharingRef.current);
-              pathBroadcastRef.current = pathBroadcast;
-              scope.push(() => {
-                pathBroadcastRef.current = null;
-                pathBroadcast.dispose();
-              });
+              if (movementTool) {
+                const pathBroadcast = attachPathBroadcast(
+                  movementTool,
+                  connection,
+                  {
+                    role: 'dm',
+                    isDmOnlyElement: id =>
+                      isElementDmOnly(mode, campaignCode, location.id, id),
+                    getElement: id => vp.store.getById(id) ?? null,
+                  }
+                );
+                // Reattachment must not silently revert to private while the
+                // toggle still says shared — apply the latest value now
+                // (measure precedent).
+                pathBroadcast.setSharing(pathSharingRef.current);
+                pathBroadcastRef.current = pathBroadcast;
+                scope.push(() => {
+                  pathBroadcastRef.current = null;
+                  pathBroadcast.dispose();
+                });
+              }
             }
 
             // Always-available DM pings: long-press with any tool + "P" at
@@ -1518,15 +1577,15 @@ export function useDmLocationEditor(
 
     setMarkerAudienceNotice(null);
     storeToggleDmOnly(campaignCode, location.id, selectedElementId);
-    // Location mode: audience affects publication (§6.4). The non-marker
-    // branch does not touch the canvas store, so mark dirty explicitly.
-    if (mode === 'location') {
-      setHasUnsyncedChanges(true);
-      return;
-    }
-    // Battlemap only: re-emit the element so the sync client re-stamps its
-    // audience (hide → relay sends players/display a remove; reveal → an
-    // upsert).
+    // Location mode: audience affects the snapshot publication (§6.4). The
+    // non-marker branch does not touch the canvas store, so mark dirty
+    // explicitly.
+    if (mode === 'location') setHasUnsyncedChanges(true);
+    // No live sync (location mode, relay unset): nothing to re-stamp, and a
+    // canvas write would only fire the save listener on a pure toggle.
+    if (!audienceReemitEnabled) return;
+    // Re-emit the element so the sync client re-stamps its audience (hide →
+    // relay sends players/display a remove; reveal → an upsert).
     const vp = getVp();
     if (vp?.store.getById(selectedElementId)) {
       vp.store.update(selectedElementId, {});
@@ -1539,6 +1598,7 @@ export function useDmLocationEditor(
     storeGetLocation,
     markerWrites,
     mode,
+    audienceReemitEnabled,
     getVp,
   ]);
 
@@ -1551,22 +1611,30 @@ export function useDmLocationEditor(
   }, []);
 
   const handleRevealAll = useCallback(() => {
-    if (mode !== 'battlemap') return;
+    if (!audienceReemitEnabled) return;
     const vp = getVp();
     if (!vp) return;
     const hiddenIds = Object.keys(
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[location.id]
-        ?.dmOnlyElements ?? {}
+      storeGetLocation(campaignCode, location.id)?.dmOnlyElements ?? {}
     );
     if (hiddenIds.length === 0) return;
 
-    battleMapStoreUpdate(campaignCode, location.id, { dmOnlyElements: {} });
+    storeUpdateLocation(campaignCode, location.id, { dmOnlyElements: {} });
+    if (mode === 'location') setHasUnsyncedChanges(true);
     // Re-emit surviving elements after clearing their flags. The sync client
     // stamps them for the player audience and publishes an upsert immediately.
     for (const id of hiddenIds) {
       if (vp.store.getById(id)) vp.store.update(id, {});
     }
-  }, [mode, getVp, campaignCode, location.id, battleMapStoreUpdate]);
+  }, [
+    audienceReemitEnabled,
+    getVp,
+    campaignCode,
+    location.id,
+    mode,
+    storeGetLocation,
+    storeUpdateLocation,
+  ]);
 
   const handleClear = useCallback(async () => {
     const vp = getVp();
@@ -1845,6 +1913,7 @@ export function useDmLocationEditor(
 
   return {
     mode,
+    liveSyncConfigured: relayConfigured,
     canvasRef,
     fileInputRef,
     mapImageInputRef,

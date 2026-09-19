@@ -1,4 +1,5 @@
-import type { HpStateBand } from '@/types/encounter';
+import type { EnemyHpDisplay, HpStateBand } from '@/types/encounter';
+import type { SharedTurnEntry } from '@/types/sharedState';
 
 /** Current HP as a clamped 0-100 percentage of max. */
 export function hpPercent(current: number, max: number): number {
@@ -33,4 +34,17 @@ export function hpStateLabel(
   const match = sorted.find(b => pct >= b.minPercent);
   // Fall back to the lowest band if somehow nothing matched.
   return (match ?? sorted[sorted.length - 1]).label;
+}
+
+/**
+ * The HP display mode that applies to one shared turn entry. A per-entry
+ * override (the DM toggled "show exact HP to players" on that entity) wins over
+ * the campaign-wide mode; payloads without `hpMode` fall back to the
+ * state-level mode.
+ */
+export function resolveEntryHpMode(
+  entry: Pick<SharedTurnEntry, 'hpMode'>,
+  stateMode: EnemyHpDisplay
+): EnemyHpDisplay {
+  return entry.hpMode ?? stateMode;
 }

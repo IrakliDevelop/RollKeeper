@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
 import { DetailEffects } from '@/components/ui/encounter/combat-screen/detail/DetailEffects';
@@ -26,7 +26,7 @@ describe('custom combat statuses', () => {
     useEncounterStore.setState({
       encounters: [],
       activeEncounterId: null,
-      combatConfig: { ...DEFAULT_COMBAT_CONFIG, customStatuses: [] },
+      combatConfig: { ...DEFAULT_COMBAT_CONFIG, customConditions: [] },
     });
   });
 
@@ -35,23 +35,49 @@ describe('custom combat statuses', () => {
     vi.restoreAllMocks();
   });
 
-  it('saves reusable statuses from combat configuration', async () => {
+  it('saves a full custom condition from the Custom conditions section', async () => {
     const user = userEvent.setup();
     render(<CombatConfigDialog open onOpenChange={vi.fn()} />);
 
-    await user.type(screen.getByLabelText('Status name'), 'Marked');
-    await user.click(screen.getByRole('button', { name: 'Add' }));
+    await user.click(screen.getByRole('button', { name: 'Custom conditions' }));
+    await user.click(screen.getByRole('button', { name: 'Add condition' }));
+    await user.type(screen.getByLabelText('Condition name'), 'Cursed Blood');
+    await user.type(
+      screen.getByLabelText('Condition description'),
+      'Lose 1d4 HP at the start of each turn.'
+    );
+    // Popover-in-Dialog: fireEvent, same as event-dialog-marker.test.tsx.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Condition icon: trending-down' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'droplet' }));
+    // An unnamed row must be dropped on save.
+    await user.click(screen.getByRole('button', { name: 'Add condition' }));
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    expect(useEncounterStore.getState().combatConfig.customStatuses).toEqual([
-      'Marked',
+    expect(useEncounterStore.getState().combatConfig.customConditions).toEqual([
+      {
+        id: expect.any(String),
+        name: 'Cursed Blood',
+        description: 'Lose 1d4 HP at the start of each turn.',
+        icon: 'droplet',
+        kind: 'debuff',
+      },
     ]);
   });
 
-  it('offers saved statuses in the combatant condition palette', async () => {
+  it('offers saved conditions in the combatant palette and applies icon + description', async () => {
     const user = userEvent.setup();
     useEncounterStore.getState().setCombatConfig({
-      customStatuses: ['Marked'],
+      customConditions: [
+        {
+          id: 'cc-marked',
+          name: 'Marked',
+          description: 'The hunter always knows where you are.',
+          icon: 'crosshair',
+          kind: 'debuff',
+        },
+      ],
     });
     const onAddCondition = vi.fn();
     const actions = { onAddCondition } as unknown as EntityActions;
@@ -61,6 +87,8 @@ describe('custom combat statuses', () => {
 
     expect(onAddCondition).toHaveBeenCalledWith(entity.id, {
       name: 'Marked',
+      description: 'The hunter always knows where you are.',
+      icon: 'crosshair',
       kind: 'debuff',
       source: 'dm',
     });

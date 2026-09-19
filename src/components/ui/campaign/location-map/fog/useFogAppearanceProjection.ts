@@ -6,6 +6,10 @@ import {
   fogAppearanceFingerprint,
   toProjectedFogAppearance,
 } from '@/lib/fogOfWar';
+import {
+  fogAppearanceRouteBase,
+  type FogAppearanceMapKind,
+} from './fogAppearanceUrl';
 
 interface FogAppearanceProjectionInput {
   enabled: boolean;
@@ -13,6 +17,8 @@ interface FogAppearanceProjectionInput {
   battleMapId: string;
   dmId: string;
   appearance: FogAppearance;
+  /** Which route family owns this map. Defaults to 'battlemap'. */
+  mapKind?: FogAppearanceMapKind;
   onError?: (error: Error) => void;
 }
 
@@ -20,7 +26,11 @@ export async function writeFogAppearanceProjection(
   input: Omit<FogAppearanceProjectionInput, 'enabled' | 'onError'>
 ): Promise<void> {
   const response = await fetch(
-    `/api/campaign/${encodeURIComponent(input.campaignCode)}/battlemaps/${encodeURIComponent(input.battleMapId)}/fog-appearance`,
+    fogAppearanceRouteBase(
+      input.mapKind ?? 'battlemap',
+      input.campaignCode,
+      input.battleMapId
+    ),
     {
       method: 'PUT',
       headers: {
@@ -46,8 +56,15 @@ export async function writeFogAppearanceProjection(
 export function useFogAppearanceProjection(
   input: FogAppearanceProjectionInput
 ): void {
-  const { enabled, campaignCode, battleMapId, dmId, appearance, onError } =
-    input;
+  const {
+    enabled,
+    campaignCode,
+    battleMapId,
+    dmId,
+    appearance,
+    mapKind = 'battlemap',
+    onError,
+  } = input;
   const queueRef = useRef<Promise<void>>(Promise.resolve());
   const lastQueuedRef = useRef<string | null>(null);
   const onErrorRef = useRef(onError);
@@ -68,7 +85,9 @@ export function useFogAppearanceProjection(
   useEffect(() => {
     if (!enabled) return;
 
-    const key = [campaignCode, battleMapId, dmId, fingerprint].join('\0');
+    const key = [campaignCode, battleMapId, dmId, mapKind, fingerprint].join(
+      '\0'
+    );
     if (lastQueuedRef.current === key) return;
     lastQueuedRef.current = key;
 
@@ -78,6 +97,7 @@ export function useFogAppearanceProjection(
           campaignCode,
           battleMapId,
           dmId,
+          mapKind,
           appearance: appearanceRef.current,
         })
       )
@@ -89,5 +109,5 @@ export function useFogAppearanceProjection(
             : new Error('Fog appearance projection failed')
         );
       });
-  }, [fingerprint, battleMapId, campaignCode, dmId, enabled]);
+  }, [fingerprint, battleMapId, campaignCode, dmId, mapKind, enabled]);
 }

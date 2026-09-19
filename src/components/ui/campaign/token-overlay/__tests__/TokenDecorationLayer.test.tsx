@@ -1,5 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  act,
+  fireEvent,
+  waitFor,
+} from '@testing-library/react';
 
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { decorationKey } from '@/components/ui/campaign/token-overlay/TokenDecorationLayer.hooks';
@@ -110,7 +117,10 @@ describe('TokenDecorationLayer', () => {
     mockCamera = { x: 0, y: 0, zoom: 1 };
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    cleanup();
+  });
 
   it('positions the HP bar inside the token rect, flush to its bottom edge', () => {
     render(
@@ -382,6 +392,45 @@ describe('TokenDecorationLayer', () => {
     expect(strip.className).toContain('overflow-hidden');
     expect((screen.getByText('+2') as HTMLElement).className).toContain(
       'shrink-0'
+    );
+  });
+
+  it('renders a shared custom condition icon and exposes its description', async () => {
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [
+            {
+              name: 'Moonmarked',
+              kind: 'debuff',
+              icon: 'flame',
+              description: 'Synthetic silver light reveals the target.',
+            },
+          ],
+        })}
+        mode="full"
+      />
+    );
+
+    expect(container.querySelector('.lucide-flame')).toBeInTheDocument();
+    const trigger = screen.getByLabelText(
+      'Moonmarked: Synthetic silver light reveals the target.'
+    );
+    expect(trigger).toHaveClass('pointer-events-auto');
+
+    fireEvent.focus(trigger);
+    await waitFor(() =>
+      expect(screen.getByRole('tooltip')).toHaveTextContent(
+        'Moonmarked: Synthetic silver light reveals the target.'
+      )
     );
   });
 

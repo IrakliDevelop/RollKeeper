@@ -58,6 +58,15 @@ export interface UseMarkerWritesArgs {
   campaignCode: string;
   mapId: string;
   getViewport: () => MarkerWritesViewport | null;
+  /**
+   * Whether an audience change re-emits each sibling so a live sync client
+   * re-stamps its audience. Defaults to `mode === 'battlemap'` (the shipped
+   * behaviour). A location editor with live sync configured passes `true`:
+   * without the re-emit the relay never learns that a shared pin was hidden,
+   * and players keep seeing it. This hook still reads no relay configuration
+   * itself — the surface decides.
+   */
+  reemitAudience?: boolean;
 }
 
 export interface MarkerWrites {
@@ -177,16 +186,12 @@ function makeDeps(
   campaignCode: string,
   mapId: string,
   viewport: MarkerWritesViewport | null,
-  removalTracker: MarkerRemovalTracker
+  removalTracker: MarkerRemovalTracker,
+  reemitAudience: boolean
 ): MarkerWriteDeps {
   const store: MarkerElementStoreLike = viewport?.store ?? NO_CANVAS_STORE;
   const transaction = <T>(operation: () => T): T =>
     viewport ? viewport.transaction(operation) : operation();
-
-  // Only battlemap surfaces run a relay connection, so only they need the
-  // per-sibling re-emit after an audience change. See `reemitAudience` in
-  // markerWrites.ts.
-  const reemitAudience = mode === 'battlemap';
 
   if (mode === 'battlemap') {
     const readMap = () =>
@@ -253,6 +258,9 @@ function makeDeps(
 
 export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
   const { mode, campaignCode, mapId, getViewport } = args;
+  // Battlemap surfaces always run a relay; a location surface re-emits only
+  // when its owner says live sync is configured (see UseMarkerWritesArgs).
+  const reemitAudience = args.reemitAudience ?? mode === 'battlemap';
 
   // Subscribe for the returned value only. Both stores are subscribed because
   // hooks cannot be called conditionally; the unselected one yields undefined
@@ -290,10 +298,11 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
         campaignCode,
         mapId,
         viewport,
-        trackerRef.current.tracker
+        trackerRef.current.tracker,
+        reemitAudience
       );
     },
-    [mode, campaignCode, mapId]
+    [mode, campaignCode, mapId, reemitAudience]
   );
 
   const createMarker = useCallback(

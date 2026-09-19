@@ -3,6 +3,8 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   recordLiveMapRoom,
   listLiveMapRooms,
+  liveMapRoomMember,
+  parseLiveMapRoomMember,
   LIVE_MAP_ROOM_WINDOW_MS,
   LIVE_MAP_ROOM_TTL_SECONDS,
   MAX_LIVE_MAP_ROOMS,
@@ -10,11 +12,15 @@ import {
   type LiveMapRoomsReader,
   type LiveMapRoomsWriter,
 } from '@/lib/liveMapRooms';
-import { campaignLiveMapRoomsKey } from '@/lib/redis';
+import {
+  campaignLiveLocationRoomsKey,
+  campaignLiveMapRoomsKey,
+} from '@/lib/redis';
 
 const CODE = 'CAMP1';
 const NOW = 1_700_000_000_000;
 const KEY = campaignLiveMapRoomsKey(CODE);
+const LOCATION_KEY = campaignLiveLocationRoomsKey(CODE);
 
 /**
  * Small in-memory sorted-set fake, behaviorally faithful to the Redis
@@ -213,6 +219,9 @@ describe('listLiveMapRooms', () => {
       (_, i) => `map-${total - 1 - i}`
     );
     expect(result).toEqual(expectedMostRecentFirst);
+    expect(redis.zrange).toHaveBeenCalledWith(KEY, 0, MAX_LIVE_MAP_ROOMS - 1, {
+      rev: true,
+    });
   });
 
   it('filters out non-string members', async () => {
@@ -223,5 +232,98 @@ describe('listLiveMapRooms', () => {
 
     const result = await listLiveMapRooms(redis, CODE, { now: NOW });
     expect(result).toEqual(['map-1', 'map-3']);
+  });
+});
+
+describe('live map room kind tagging', () => {
+  it('encodes battle maps as the bare id and locations with a prefix no id can contain', () => {
+    expect(liveMapRoomMember('battlemap', 'bm-1')).toBe('bm-1');
+    expect(liveMapRoomMember('location', 'loc-1')).toBe('location:loc-1');
+  });
+
+  it('parses an untagged (pre-existing) member as a battle map', () => {
+    expect(parseLiveMapRoomMember('bm-1')).toEqual({
+      kind: 'battlemap',
+      mapId: 'bm-1',
+    });
+    expect(parseLiveMapRoomMember('location:loc-1')).toEqual({
+      kind: 'location',
+      mapId: 'loc-1',
+    });
+  });
+
+  it('records a location room under its tagged member', async () => {
+    const redis = createFakeRedis();
+    await recordLiveMapRoom(redis, CODE, 'loc-1', {
+      now: NOW,
+      kind: 'location',
+    });
+    expect(redis.zadd).toHaveBeenCalledWith(LOCATION_KEY, {
+      score: NOW,
+      member: 'location:loc-1',
+    });
+    expect(redis.expire).toHaveBeenCalledWith(
+      LOCATION_KEY,
+      LIVE_MAP_ROOM_TTL_SECONDS
+    );
+  });
+
+  it('defaults to the battlemap kind when none is given', async () => {
+    const redis = createFakeRedis();
+    await recordLiveMapRoom(redis, CODE, 'bm-1', { now: NOW });
+    expect(redis.zadd).toHaveBeenCalledWith(KEY, {
+      score: NOW,
+      member: 'bm-1',
+    });
+  });
+
+  it('EXCLUDES location rooms from the default listing (the initiative poke fan-out)', async () => {
+    const redis = createFakeRedis();
+    await recordLiveMapRoom(redis, CODE, 'bm-1', { now: NOW - 3 });
+    await recordLiveMapRoom(redis, CODE, 'loc-1', {
+      now: NOW - 2,
+      kind: 'location',
+    });
+    await recordLiveMapRoom(redis, CODE, 'bm-2', { now: NOW - 1 });
+
+    expect(await listLiveMapRooms(redis, CODE, { now: NOW })).toEqual([
+      'bm-2',
+      'bm-1',
+    ]);
+  });
+
+  it('lists location rooms, untagged, when asked for that kind', async () => {
+    const redis = createFakeRedis();
+    await recordLiveMapRoom(redis, CODE, 'bm-1', { now: NOW - 2 });
+    await recordLiveMapRoom(redis, CODE, 'loc-1', {
+      now: NOW - 1,
+      kind: 'location',
+    });
+
+    expect(
+      await listLiveMapRooms(redis, CODE, { now: NOW, kind: 'location' })
+    ).toEqual(['loc-1']);
+    expect(redis.zrange).toHaveBeenCalledWith(
+      LOCATION_KEY,
+      0,
+      MAX_LIVE_MAP_ROOMS - 1,
+      { rev: true }
+    );
+  });
+
+  it('location rooms never consume battle-map fan-out slots', async () => {
+    const redis = createFakeRedis();
+    for (let i = 0; i < MAX_LIVE_MAP_ROOMS; i += 1) {
+      await recordLiveMapRoom(redis, CODE, `bm-${i}`, { now: NOW - 100 + i });
+    }
+    for (let i = 0; i < 10; i += 1) {
+      await recordLiveMapRoom(redis, CODE, `loc-${i}`, {
+        now: NOW - 10 + i,
+        kind: 'location',
+      });
+    }
+    const result = await listLiveMapRooms(redis, CODE, { now: NOW });
+    expect(result).toHaveLength(MAX_LIVE_MAP_ROOMS);
+    expect(result.every(id => id.startsWith('bm-'))).toBe(true);
   });
 });

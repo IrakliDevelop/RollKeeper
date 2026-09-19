@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, EyeOff, Pencil } from 'lucide-react';
+import { Eye, EyeOff, HeartPulse, Pencil } from 'lucide-react';
 import type { PlayerDisposition } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
 
@@ -32,6 +32,11 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
   const [aliasInput, setAliasInput] = useState('');
 
   if (entity.type === 'player') return null;
+
+  const hpVisible = entity.hpVisibleToPlayers === true;
+  const hpToggleLabel = hpVisible
+    ? 'Hide HP from players'
+    : 'Show exact HP to players';
 
   const commitAlias = (value: string) => {
     actions.onUpdate(entity.id, { playerAlias: value.trim() || undefined });
@@ -78,6 +83,23 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
         {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
 
+      <button
+        type="button"
+        onClick={() =>
+          actions.onUpdate(entity.id, { hpVisibleToPlayers: !hpVisible })
+        }
+        aria-pressed={hpVisible}
+        aria-label={hpToggleLabel}
+        className={`rounded p-1 transition-colors ${
+          hpVisible
+            ? 'text-accent-red-text hover:bg-accent-red-bg'
+            : 'text-faint hover:text-muted hover:bg-surface-raised'
+        }`}
+        title={hpToggleLabel}
+      >
+        <HeartPulse size={14} />
+      </button>
+
       {isEditingAlias ? (
         <input
           type="text"
@@ -116,13 +138,14 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
         </button>
       )}
 
-      {(entity.isHidden || entity.playerAlias) && (
+      {(entity.isHidden || entity.playerAlias || hpVisible) && (
         <span className="text-faint text-[10px]">
           Players see:{' '}
           <span className="font-medium">
             {entity.playerAlias?.trim() ||
               (entity.isHidden ? 'Enemy' : entity.name)}
           </span>
+          {hpVisible && ' · exact HP'}
         </span>
       )}
     </div>

@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
-import { buildSharedInitiative } from '../buildSharedInitiative';
-import type { Encounter, EncounterEntity } from '@/types/encounter';
+import {
+  buildSharedInitiative,
+  toSharedConditions,
+} from '../buildSharedInitiative';
+import type {
+  CombatConfig,
+  Encounter,
+  EncounterEntity,
+  EnemyHpDisplay,
+} from '@/types/encounter';
+import type { SharedTurnEntry } from '@/types/sharedState';
 
 function entity(o: Partial<EncounterEntity> & { id: string }): EncounterEntity {
   return {
@@ -367,6 +376,106 @@ describe('buildSharedInitiative', () => {
     expect(shared.enemyConditionsMode).toBe('off');
     expect('conditions' in shared.turnOrder[0]).toBe(false);
   });
+
+  it('carries description and a validated icon on player conditions', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [
+            {
+              id: 'c1',
+              name: 'Cursed Blood',
+              kind: 'debuff',
+              description: '  Lose 1d4 HP at the start of each turn.  ',
+              icon: 'droplet',
+              source: 'dm',
+              sourceEntity: 'Blood Hag',
+            },
+          ],
+        }),
+      ])
+    );
+    expect(shared.turnOrder[0].conditions).toEqual([
+      {
+        name: 'Cursed Blood',
+        kind: 'debuff',
+        description: 'Lose 1d4 HP at the start of each turn.',
+        icon: 'droplet',
+      },
+    ]);
+  });
+
+  it('keeps enemy descriptions and icons behind the enemyConditionsDisplay gate', () => {
+    const enemy = entity({
+      id: 'm1',
+      conditions: [
+        {
+          id: 'c1',
+          name: 'Webbed',
+          description: 'Restrained by sticky webbing.',
+          icon: 'link',
+        },
+      ],
+    });
+    const hidden = buildSharedInitiative(encounter([enemy]));
+    expect('conditions' in hidden.turnOrder[0]).toBe(false);
+    expect(JSON.stringify(hidden)).not.toContain('sticky webbing');
+
+    const visible = buildSharedInitiative(encounter([enemy]), {
+      enemyHpDisplay: 'off',
+      hpStateBands: [],
+      enemyConditionsDisplay: 'on',
+    });
+    expect(visible.turnOrder[0].conditions).toEqual([
+      {
+        name: 'Webbed',
+        description: 'Restrained by sticky webbing.',
+        icon: 'link',
+      },
+    ]);
+  });
+
+  it('drops an invalid icon and a blank description', () => {
+    const conditions = toSharedConditions([
+      {
+        id: 'c1',
+        name: 'Hexed',
+        description: '   ',
+        icon: 'not-an-icon' as never,
+      },
+    ]);
+    expect(conditions).toEqual([{ name: 'Hexed' }]);
+  });
+
+  it('caps an oversized description before it reaches the wire', () => {
+    const [condition] = toSharedConditions([
+      { id: 'c1', name: 'Wall of Text', description: 'x'.repeat(5000) },
+    ]);
+    expect(condition.description).toHaveLength(1000);
+  });
+
+  it('does not throw on a corrupt non-string description and omits it', () => {
+    const shared = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p1',
+          type: 'player',
+          playerCharacterId: 'char-1',
+          conditions: [
+            {
+              id: 'c1',
+              name: 'Cursed',
+              description: 42 as unknown as string,
+            },
+          ],
+        }),
+      ])
+    );
+    expect(shared.turnOrder[0].conditions).toStrictEqual([{ name: 'Cursed' }]);
+  });
 });
 
 describe('buildSharedInitiative — enemy HP config', () => {
@@ -501,5 +610,159 @@ describe('buildSharedInitiative — enemy HP config', () => {
       }),
     ]);
     expect(buildSharedInitiative(e).turnOrder[0].isDead).toBe(true);
+  });
+});
+
+describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
+  const MODES: EnemyHpDisplay[] = ['off', 'label', 'bar', 'percent', 'exact'];
+
+  const bands = [
+    { minPercent: 50, label: 'Healthy' },
+    { minPercent: 0, label: 'Bloodied' },
+  ];
+
+  const config = (mode: EnemyHpDisplay): CombatConfig => ({
+    enemyHpDisplay: mode,
+    hpStateBands: bands,
+    enemyConditionsDisplay: 'off',
+  });
+
+  // 5/20 = 25% -> tier 'critical', label 'Bloodied'.
+  const goblin = (o: Partial<EncounterEntity> = {}): EncounterEntity =>
+    entity({
+      id: 'm',
+      name: 'Goblin',
+      initiative: 5,
+      currentHp: 5,
+      maxHp: 20,
+      ...o,
+    });
+
+  const BASE: SharedTurnEntry = {
+    entityId: 'm',
+    displayName: 'Goblin',
+    type: 'monster',
+    disposition: 'enemy',
+  };
+
+  // Today's exact output per global mode for an untoggled enemy.
+  const UNTOGGLED: Record<EnemyHpDisplay, SharedTurnEntry> = {
+    off: BASE,
+    label: { ...BASE, isDead: false, hpTier: 'critical', hpState: 'Bloodied' },
+    bar: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
+    percent: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
+    exact: {
+      ...BASE,
+      isDead: false,
+      hpTier: 'critical',
+      currentHp: 5,
+      maxHp: 20,
+    },
+  };
+
+  it('toggle on: exposes exact HP + hpMode "exact" under every global mode', () => {
+    for (const mode of MODES) {
+      const result = buildSharedInitiative(
+        encounter([goblin({ hpVisibleToPlayers: true })]),
+        config(mode)
+      );
+      expect(result.turnOrder[0]).toStrictEqual({
+        ...BASE,
+        isDead: false,
+        hpTier: 'critical',
+        currentHp: 5,
+        maxHp: 20,
+        hpMode: 'exact',
+      });
+      // The state-level mode is still the campaign-wide setting.
+      expect(result.enemyHpMode).toBe(mode);
+    }
+  });
+
+  it('toggle off or absent: every global mode output is identical to today', () => {
+    for (const mode of MODES) {
+      for (const flag of [{}, { hpVisibleToPlayers: false }]) {
+        const row = buildSharedInitiative(
+          encounter([goblin(flag)]),
+          config(mode)
+        ).turnOrder[0];
+        expect(row).toStrictEqual(UNTOGGLED[mode]);
+        expect('hpMode' in row).toBe(false);
+      }
+    }
+  });
+
+  it('ignores the flag on player entities', () => {
+    const row = buildSharedInitiative(
+      encounter([
+        entity({
+          id: 'p',
+          name: 'Aragorn',
+          type: 'player',
+          initiative: 20,
+          currentHp: 24,
+          maxHp: 30,
+          playerCharacterId: 'char-a',
+          hpVisibleToPlayers: true,
+        }),
+      ]),
+      config('off')
+    ).turnOrder[0];
+    expect(row).toStrictEqual({
+      entityId: 'p',
+      displayName: 'Aragorn',
+      type: 'player',
+      playerCharacterId: 'char-a',
+      currentHp: 24,
+      maxHp: 30,
+      isDead: false,
+    });
+  });
+
+  it('marks a dead toggled enemy isDead (no tier) even when the global mode is off', () => {
+    const row = buildSharedInitiative(
+      encounter([goblin({ currentHp: 0, hpVisibleToPlayers: true })]),
+      config('off')
+    ).turnOrder[0];
+    expect(row).toStrictEqual({
+      ...BASE,
+      isDead: true,
+      currentHp: 0,
+      maxHp: 20,
+      hpMode: 'exact',
+    });
+  });
+
+  it('an untoggled enemy under "off" still exposes nothing next to a toggled one', () => {
+    const rows = buildSharedInitiative(
+      encounter([
+        goblin({ id: 'shown', initiative: 9, hpVisibleToPlayers: true }),
+        goblin({ id: 'masked', initiative: 5 }),
+      ]),
+      config('off')
+    ).turnOrder;
+    expect(rows.find(r => r.entityId === 'shown')!.hpMode).toBe('exact');
+    expect(rows.find(r => r.entityId === 'masked')).toStrictEqual({
+      ...BASE,
+      entityId: 'masked',
+    });
+  });
+
+  it('the toggle shares HP only — name masking and condition sharing are unchanged', () => {
+    const row = buildSharedInitiative(
+      encounter([
+        goblin({
+          isHidden: true,
+          hpVisibleToPlayers: true,
+          conditions: [{ id: 'c1', name: 'Prone' }],
+          concentrationSpell: 'Hold Person',
+        }),
+      ]),
+      config('off')
+    ).turnOrder[0];
+    expect(row.displayName).toBe('Enemy');
+    expect('conditions' in row).toBe(false);
+    expect('isConcentrating' in row).toBe(false);
+    expect(row.currentHp).toBe(5);
   });
 });

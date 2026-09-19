@@ -6,6 +6,7 @@ import {
 import type { Summon } from '@/types/summon';
 import { CampaignPlayerData } from '@/types/campaign';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
 import { useEncounterStore } from '@/store/encounterStore';
 
 /**
@@ -56,6 +57,8 @@ export function mergePlayerSyncData(
       name: c.name,
       description: c.description,
       source: 'player-sync' as const,
+      // Custom DM conditions keep their icon once the player owns them.
+      ...(isConditionIconName(c.icon) ? { icon: c.icon } : {}),
     }));
 
   // Clean up stale suppressions: if the player no longer has a condition,

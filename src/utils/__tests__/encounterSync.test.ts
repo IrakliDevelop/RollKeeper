@@ -358,6 +358,67 @@ describe('mergePlayerSyncData', () => {
     expect(result2).not.toBeNull();
     expect('avatarUrl' in (result2 as object)).toBe(false);
   });
+
+  it('keeps a registry icon on player-synced conditions and drops an unknown one', () => {
+    const entity = createMockEncounterEntity({
+      type: 'player',
+      conditions: [
+        createMockCondition({
+          id: 'dm-1',
+          name: 'Cursed Blood',
+          source: 'dm',
+          icon: 'droplet',
+        }),
+      ],
+    });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({
+        conditionsAndDiseases: {
+          activeConditions: [
+            {
+              id: 'cursed-blood-1',
+              name: 'Cursed Blood',
+              source: 'DM',
+              description: 'Lose 1d4 HP each turn.',
+              stackable: false,
+              count: 1,
+              appliedAt: '2026-09-19T10:00:00.000Z',
+              icon: 'droplet',
+            },
+            {
+              id: 'hexed-1',
+              name: 'Hexed',
+              source: 'DM',
+              description: 'x',
+              stackable: false,
+              count: 1,
+              appliedAt: '2026-09-19T10:00:00.000Z',
+              icon: 'not-an-icon',
+            },
+          ],
+          activeDiseases: [],
+          exhaustionVariant: '2024',
+        },
+      }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.conditions).toEqual([
+      {
+        id: 'psync-cursed-blood',
+        name: 'Cursed Blood',
+        description: 'Lose 1d4 HP each turn.',
+        source: 'player-sync',
+        icon: 'droplet',
+      },
+      {
+        id: 'psync-hexed',
+        name: 'Hexed',
+        description: 'x',
+        source: 'player-sync',
+      },
+    ]);
+  });
 });
 
 describe('hasPlayerDataChanged', () => {

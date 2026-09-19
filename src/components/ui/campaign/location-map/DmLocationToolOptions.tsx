@@ -123,6 +123,9 @@ interface DmLocationToolOptionsProps {
   fogControls?: DmFogControls;
   /** Fog preset selector/editor/manager. Omitted on surfaces without a viewport. */
   fogPresetControls?: FogPresetControls;
+  /** Location mode only: the relay is configured, so the laser/ping tools
+   *  exist and their colour rows must render. */
+  liveSyncConfigured?: boolean;
 }
 
 export default function DmLocationToolOptions({
@@ -133,6 +136,7 @@ export default function DmLocationToolOptions({
   movementControls,
   fogControls,
   fogPresetControls,
+  liveSyncConfigured = false,
 }: DmLocationToolOptionsProps) {
   const [activeTool] = useActiveTool();
   // Read unconditionally (both DM surfaces render this component inside
@@ -187,6 +191,9 @@ export default function DmLocationToolOptions({
     fogControls !== undefined &&
     (activeTool === 'fog' || fogControls.pendingAction !== null);
 
+  // Mirrors DmLocationToolbar's PRESENCE_TOOL_DEFS gate.
+  const presenceToolsEnabled = mode === 'battlemap' || liveSyncConfigured;
+
   const showOptionsBar =
     showSelectionOptions ||
     showMarkerOptions ||
@@ -196,12 +203,13 @@ export default function DmLocationToolOptions({
     activeTool === 'note' ||
     activeTool === 'text' ||
     activeTool === 'shape' ||
+    (presenceToolsEnabled &&
+      ((activeTool === 'laser' && laserOpts !== undefined) ||
+        (activeTool === 'ping' && pingOpts !== undefined))) ||
     (mode === 'battlemap' &&
       (activeTool === 'measure' ||
         activeTool === 'path' ||
-        activeTool === 'template' ||
-        (activeTool === 'laser' && laserOpts !== undefined) ||
-        (activeTool === 'ping' && pingOpts !== undefined)));
+        activeTool === 'template'));
 
   if (!showOptionsBar) return null;
 

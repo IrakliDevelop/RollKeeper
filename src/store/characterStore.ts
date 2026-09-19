@@ -71,6 +71,7 @@ import {
 } from '@/utils/hpCalculations';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { getActiveClassResources } from '@/utils/classResources';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
 import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
 import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
@@ -576,7 +577,8 @@ interface CharacterStore {
     source: string,
     description: string,
     count?: number,
-    notes?: string
+    notes?: string,
+    icon?: string
   ) => void;
   updateCondition: (
     conditionId: string,
@@ -2409,7 +2411,8 @@ export const useCharacterStore = create<CharacterStore>()(
           source,
           description,
           count = 1,
-          notes
+          notes,
+          icon
         ) => {
           set(state => {
             const newCondition: ActiveCondition = {
@@ -2421,6 +2424,7 @@ export const useCharacterStore = create<CharacterStore>()(
               count,
               appliedAt: new Date().toISOString(),
               notes,
+              ...(isConditionIconName(icon) ? { icon } : {}),
             };
 
             return {

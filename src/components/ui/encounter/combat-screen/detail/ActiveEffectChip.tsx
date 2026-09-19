@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { X, Plus, Minus, Infinity as InfinityIcon } from 'lucide-react';
+import { getConditionIcon } from '@/utils/conditionIcons';
+import { isConditionIconName } from '@/utils/conditionIconRegistry';
 import type { EncounterCondition } from '@/types/encounter';
 import type { EntityActions } from '../types';
 
@@ -17,12 +19,29 @@ function kindDotClass(kind: EncounterCondition['kind']): string {
   return 'bg-muted';
 }
 
+function kindTextClass(kind: EncounterCondition['kind']): string {
+  if (kind === 'buff') return 'text-accent-emerald-text';
+  if (kind === 'debuff') return 'text-accent-red-text';
+  return 'text-muted';
+}
+
 export function ActiveEffectChip({
   cond,
   entityId,
   actions,
 }: ActiveEffectChipProps) {
   const hasRounds = cond.rounds != null;
+
+  const Icon = isConditionIconName(cond.icon)
+    ? getConditionIcon(cond.name, cond.kind, cond.icon)
+    : null;
+  const hoverText =
+    [
+      cond.description?.trim(),
+      cond.sourceSpell ? `From: ${cond.sourceSpell}` : '',
+    ]
+      .filter(Boolean)
+      .join(' — ') || undefined;
 
   const handleDecrease = () => {
     if (typeof cond.rounds !== 'number') return; // ∞ — nothing to count down
@@ -41,11 +60,19 @@ export function ActiveEffectChip({
   return (
     <div
       className="bg-surface-raised border-divider flex items-center gap-0.5 rounded-full border px-2 py-0.5"
-      title={cond.sourceSpell ? `From: ${cond.sourceSpell}` : undefined}
+      title={hoverText}
     >
-      <span
-        className={`h-2 w-2 shrink-0 rounded-full ${kindDotClass(cond.kind)}`}
-      />
+      {Icon ? (
+        <Icon
+          size={11}
+          aria-hidden
+          className={`shrink-0 ${kindTextClass(cond.kind)}`}
+        />
+      ) : (
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${kindDotClass(cond.kind)}`}
+        />
+      )}
       <span className="text-body mx-1 text-xs font-medium">{cond.name}</span>
       {cond.stackCount != null && cond.stackCount > 1 && (
         <span className="text-muted mr-0.5 text-xs">×{cond.stackCount}</span>

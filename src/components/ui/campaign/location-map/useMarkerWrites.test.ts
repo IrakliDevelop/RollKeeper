@@ -442,7 +442,8 @@ describe('useMarkerWrites — the re-emit gate is bound to the surface mode', ()
    */
   function renderForMode(
     mode: 'battlemap' | 'location',
-    viewport: MarkerWritesViewport
+    viewport: MarkerWritesViewport,
+    reemitAudience?: boolean
   ) {
     return renderHook(() =>
       useMarkerWrites({
@@ -450,6 +451,7 @@ describe('useMarkerWrites — the re-emit gate is bound to the surface mode', ()
         campaignCode: CODE,
         mapId: MAP_ID,
         getViewport: () => viewport,
+        ...(reemitAudience === undefined ? {} : { reemitAudience }),
       })
     );
   }
@@ -480,6 +482,26 @@ describe('useMarkerWrites — the re-emit gate is bound to the surface mode', ()
     const update = vi.spyOn(viewport.store, 'update');
 
     const { result } = renderForMode('battlemap', viewport);
+
+    let transition: MarkerAudienceTransition | undefined;
+    act(() => {
+      transition = result.current.setMarkerAudienceForRef('shared-ref', true);
+    });
+
+    expect(transition?.status).toBe('applied');
+    expect(update).toHaveBeenCalledTimes(2);
+    for (const id of transition?.elementIds ?? []) {
+      expect(update).toHaveBeenCalledWith(id, {});
+    }
+  });
+
+  it('location mode WITH reemitAudience: true re-emits once per sibling — a live location must tell the relay about a hide', () => {
+    const viewport = makeViewport();
+    seedSibling(viewport, 'shared-ref');
+    seedSibling(viewport, 'shared-ref');
+    const update = vi.spyOn(viewport.store, 'update');
+
+    const { result } = renderForMode('location', viewport, true);
 
     let transition: MarkerAudienceTransition | undefined;
     act(() => {

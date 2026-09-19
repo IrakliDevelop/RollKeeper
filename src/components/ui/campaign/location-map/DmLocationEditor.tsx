@@ -75,6 +75,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     handlePickMapImage,
     handleMapImageFileSelect,
     mode,
+    liveSyncConfigured,
     handleOpenTvDisplay,
     handleFitToMap,
     arrangeMapsActive,
@@ -117,9 +118,8 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
     createRollKeeperFogPlugin(resolveFogRendererOptions(fogAppearance))
   );
   useFogAppearanceProjection({
-    enabled:
-      mode === 'battlemap' &&
-      Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL),
+    enabled: liveSyncConfigured,
+    mapKind: mode === 'battlemap' ? 'battlemap' : 'location',
     campaignCode: props.campaignCode,
     battleMapId: props.location.id,
     dmId: props.dmId,
@@ -194,6 +194,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             hiddenElementCount={hiddenElementCount}
             onRevealAll={handleRevealAll}
             mode={mode}
+            liveSyncConfigured={liveSyncConfigured}
             onOpenTvDisplay={handleOpenTvDisplay}
             syncStatus={syncStatus}
             sharedWithPlayers={sharedWithPlayers}
@@ -273,6 +274,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
         {viewport && (
           <DmLocationToolOptions
             mode={mode}
+            liveSyncConfigured={liveSyncConfigured}
             selectionControls
             measureSharing={{
               enabled: measureSharing,

@@ -28,6 +28,7 @@ import {
   getEntryAbilityConfig,
 } from '@/utils/statBlockAbilities';
 import { parseRechargeFromName } from '@/utils/encounterConverter';
+import { normalizeCombatConfig } from '@/utils/customConditions';
 import type { NpcResource } from '@/types/encounter';
 
 function generateId(): string {
@@ -404,6 +405,26 @@ export function migrateEncounterPersistedState(
   }
 
   return state;
+}
+
+/**
+ * Hydration merge. The legacy custom-status → customConditions migration lives here
+ * and NOT in `migrate`: bumping the persist version would break the durable
+ * encounter family, which pins ENCOUNTER_PERSIST_VERSION = 2
+ * (src/lib/durableDm/encounterFamily.ts). Everything else is the default
+ * shallow merge.
+ */
+export function mergeEncounterPersistedState<
+  S extends { combatConfig: CombatConfig },
+>(persisted: unknown, current: S): S {
+  const incoming = (persisted ?? {}) as Partial<S>;
+  return {
+    ...current,
+    ...incoming,
+    combatConfig: normalizeCombatConfig(
+      incoming.combatConfig ?? current.combatConfig
+    ),
+  };
 }
 
 export const useEncounterStore = create<EncounterStoreState>()(
@@ -1628,6 +1649,8 @@ export const useEncounterStore = create<EncounterStoreState>()(
       storage: createJSONStorage(() => createEncounterAwareStorage()),
       version: 2,
       migrate: migrateEncounterPersistedState,
+      merge: (persisted, current) =>
+        mergeEncounterPersistedState(persisted, current),
     }
   )
 );

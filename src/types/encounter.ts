@@ -5,6 +5,7 @@ import type {
   ClassResourceIcon,
   ClassResourceColor,
 } from '@/utils/classResources';
+import type { ConditionIconName } from '@/utils/conditionIconRegistry';
 
 export interface EncounterCondition {
   id: string;
@@ -16,7 +17,19 @@ export interface EncounterCondition {
   stackCount?: number;
   source?: 'player-sync' | 'dm'; // Where this condition came from
   kind?: 'buff' | 'debuff' | 'neutral';
+  /** DM-chosen registry icon; absent → name/kind lookup in getConditionIcon. */
+  icon?: ConditionIconName;
   rounds?: number | null; // remaining rounds; null/undefined = untimed (∞)
+}
+
+/** A DM-defined reusable condition (library entry, or a creature's copy of one). */
+export interface CustomCondition {
+  id: string;
+  name: string;
+  /** Player-facing by design: shown on token hover and on the affected sheet. */
+  description: string;
+  icon: ConditionIconName;
+  kind: 'buff' | 'debuff' | 'neutral';
 }
 
 export interface MonsterAbility {
@@ -137,6 +150,13 @@ export interface MonsterStatBlock {
   languages: string;
   alignment: string;
   hpFormula: string;
+  /**
+   * Conditions this creature can inflict — FULL COPIES that keep the id of
+   * their library origin (NPCs cloud-sync, combatConfig does not, so id-only
+   * references would dangle on a second device). Resolve through
+   * resolveInflictableConditions(); always guard `?? []`.
+   */
+  inflictableConditions?: CustomCondition[];
 }
 
 export type EntityType = 'player' | 'npc' | 'monster' | 'lair';
@@ -221,6 +241,8 @@ export interface EncounterEntity {
   isHidden?: boolean; // DM can hide the real name from players (they see a generic label)
   playerAlias?: string; // Optional name players see instead (DM-controlled entities); takes precedence over the hidden generic label
   playerDisposition?: PlayerDisposition; // Allegiance players see (disguise); defaults to enemy for non-players
+  /** DM opt-in: players see this entity's exact HP regardless of enemyHpDisplay. */
+  hpVisibleToPlayers?: boolean;
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
   tokenSize?: TokenCellSize; // Battle-map token footprint; absent = 1 (no migration needed)
 
@@ -274,8 +296,11 @@ export interface CombatConfig {
   enemyHpDisplay: EnemyHpDisplay;
   hpStateBands: HpStateBand[];
   enemyConditionsDisplay: EnemyConditionsDisplay;
-  /** DM-defined condition presets available in every combat. */
-  customStatuses?: string[];
+  /**
+   * DM-defined condition library available in every combat. Optional because
+   * persisted configs predate it — read with EMPTY_CUSTOM_CONDITIONS.
+   */
+  customConditions?: CustomCondition[];
 }
 
 export const DEFAULT_HP_STATE_BANDS: HpStateBand[] = [
@@ -291,7 +316,7 @@ export const DEFAULT_COMBAT_CONFIG: CombatConfig = {
   enemyHpDisplay: 'off',
   hpStateBands: DEFAULT_HP_STATE_BANDS,
   enemyConditionsDisplay: 'off',
-  customStatuses: [],
+  customConditions: [],
 };
 
 export interface NPCInventoryItem {
