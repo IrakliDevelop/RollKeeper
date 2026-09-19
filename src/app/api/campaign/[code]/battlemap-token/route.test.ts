@@ -181,6 +181,44 @@ describe('live map room registration', () => {
     ).toMatchObject({ room: `${CODE}_map-a` });
   });
 
+  it('tags a location room in the registry when the request says kind: location', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'loc-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(mockRedis.zadd).toHaveBeenCalledWith(
+      `campaign:${CODE}:live-maps`,
+      expect.objectContaining({ member: 'location:loc-a' })
+    );
+    const body = (await response.json()) as { token: string };
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({ room: `${CODE}_loc-a` });
+  });
+
+  it('treats an unknown kind as battlemap rather than trusting the client string', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'tv',
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(mockRedis.zadd).toHaveBeenCalledWith(
+      `campaign:${CODE}:live-maps`,
+      expect.objectContaining({ member: 'map-a' })
+    );
+  });
+
   it('rejects a battleMapId that cannot produce a Fieldnotes-safe room', async () => {
     const response = await POST(
       request({

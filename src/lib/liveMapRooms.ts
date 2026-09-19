@@ -75,21 +75,51 @@ export interface LiveMapRoomsWriter {
 }
 
 /**
+ * What a live room is. Absent tag means `battlemap`, so every member written
+ * before this tag existed keeps its meaning.
+ */
+export type LiveMapRoomKind = 'battlemap' | 'location';
+
+/** `:` cannot occur in a map id (`BATTLE_MAP_RELAY_ROOM_PATTERN`), so a
+ *  prefixed member can never collide with a bare battle-map id. */
+const LOCATION_MEMBER_PREFIX = 'location:';
+
+export function liveMapRoomMember(
+  kind: LiveMapRoomKind,
+  mapId: string
+): string {
+  return kind === 'location' ? `${LOCATION_MEMBER_PREFIX}${mapId}` : mapId;
+}
+
+export function parseLiveMapRoomMember(member: string): {
+  kind: LiveMapRoomKind;
+  mapId: string;
+} {
+  return member.startsWith(LOCATION_MEMBER_PREFIX)
+    ? { kind: 'location', mapId: member.slice(LOCATION_MEMBER_PREFIX.length) }
+    : { kind: 'battlemap', mapId: member };
+}
+
+/**
  * Best-effort record that `battleMapId` has a live client in `code`'s
- * campaign, keyed by mint time. Called at token-mint time (a later task).
- * Never throws — a failed write here should not fail token minting.
+ * campaign, keyed by mint time and tagged with its `kind`. Called at
+ * token-mint time (a later task). Never throws — a failed write here should
+ * not fail token minting.
  */
 export async function recordLiveMapRoom(
   redis: LiveMapRoomsWriter,
   code: string,
   battleMapId: string,
-  deps: { now?: number } = {}
+  deps: { now?: number; kind?: LiveMapRoomKind } = {}
 ): Promise<void> {
   const now = deps.now ?? Date.now();
   const key = campaignLiveMapRoomsKey(code);
   try {
     const pipeline = redis.pipeline();
-    pipeline.zadd(key, { score: now, member: battleMapId });
+    pipeline.zadd(key, {
+      score: now,
+      member: liveMapRoomMember(deps.kind ?? 'battlemap', battleMapId),
+    });
     pipeline.expire(key, LIVE_MAP_ROOM_TTL_SECONDS);
     await pipeline.exec();
   } catch (err) {
@@ -101,28 +131,37 @@ export async function recordLiveMapRoom(
  * Best-effort read of the battle-map ids currently considered live for
  * `code`'s campaign — i.e. minted within the last `LIVE_MAP_ROOM_WINDOW_MS`.
  * Prunes stale entries first, then returns at most `MAX_LIVE_MAP_ROOMS`,
- * favoring the most recently minted rooms. Never throws — returns `[]` on
- * any error, so a poke fan-out (a later task) degrades to no-op rather than
- * failing the caller.
+ * favoring the most recently minted rooms. Returns map ids of ONE kind
+ * (default `battlemap`); location rooms are therefore never part of the
+ * initiative/players/shop poke fan-out in `relayPoke.ts`. Never throws —
+ * returns `[]` on any error, so a poke fan-out (a later task) degrades to
+ * no-op rather than failing the caller.
  */
 export async function listLiveMapRooms(
   redis: LiveMapRoomsReader,
   code: string,
-  deps: { now?: number } = {}
+  deps: { now?: number; kind?: LiveMapRoomKind } = {}
 ): Promise<string[]> {
   const now = deps.now ?? Date.now();
+  const kind = deps.kind ?? 'battlemap';
   const key = campaignLiveMapRoomsKey(code);
   try {
     await redis.zremrangebyscore(key, 0, now - LIVE_MAP_ROOM_WINDOW_MS);
-    // rev: true makes rank 0 the highest score, so this rank range is the
-    // MAX_LIVE_MAP_ROOMS most recently minted rooms, most recent first.
-    const members = await redis.zrange(key, 0, MAX_LIVE_MAP_ROOMS - 1, {
-      rev: true,
-    });
-    // With automaticDeserialization on, members can come back non-string.
-    return members.filter(
-      (member): member is string => typeof member === 'string'
-    );
+    // rev: true makes rank 0 the highest score (most recently minted first).
+    // The whole (already pruned, so bounded by the window) set is read and
+    // the cap applied AFTER the kind filter: capping first would let rooms of
+    // the other kind consume fan-out slots.
+    const members = await redis.zrange(key, 0, -1, { rev: true });
+    const ids: string[] = [];
+    for (const member of members) {
+      // With automaticDeserialization on, members can come back non-string.
+      if (typeof member !== 'string') continue;
+      const parsed = parseLiveMapRoomMember(member);
+      if (parsed.kind !== kind) continue;
+      ids.push(parsed.mapId);
+      if (ids.length >= MAX_LIVE_MAP_ROOMS) break;
+    }
+    return ids;
   } catch (err) {
     console.warn('[liveMapRooms] listLiveMapRooms failed:', err);
     return [];

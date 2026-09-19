@@ -33,6 +33,9 @@ export interface BattleMapTokenRequest {
   playerId?: string;
   displayKey?: string;
   protocols?: { fog?: 1 };
+  /** Registry tag only (`liveMapRooms.ts`); omitted means `battlemap`. It
+   *  grants nothing — room authority comes from the signed token. */
+  kind?: 'battlemap' | 'location';
 }
 
 export interface BattleMapTokenResult {
