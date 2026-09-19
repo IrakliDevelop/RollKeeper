@@ -12,11 +12,15 @@ import {
   type LiveMapRoomsReader,
   type LiveMapRoomsWriter,
 } from '@/lib/liveMapRooms';
-import { campaignLiveMapRoomsKey } from '@/lib/redis';
+import {
+  campaignLiveLocationRoomsKey,
+  campaignLiveMapRoomsKey,
+} from '@/lib/redis';
 
 const CODE = 'CAMP1';
 const NOW = 1_700_000_000_000;
 const KEY = campaignLiveMapRoomsKey(CODE);
+const LOCATION_KEY = campaignLiveLocationRoomsKey(CODE);
 
 /**
  * Small in-memory sorted-set fake, behaviorally faithful to the Redis
@@ -215,6 +219,9 @@ describe('listLiveMapRooms', () => {
       (_, i) => `map-${total - 1 - i}`
     );
     expect(result).toEqual(expectedMostRecentFirst);
+    expect(redis.zrange).toHaveBeenCalledWith(KEY, 0, MAX_LIVE_MAP_ROOMS - 1, {
+      rev: true,
+    });
   });
 
   it('filters out non-string members', async () => {
@@ -251,10 +258,14 @@ describe('live map room kind tagging', () => {
       now: NOW,
       kind: 'location',
     });
-    expect(redis.zadd).toHaveBeenCalledWith(KEY, {
+    expect(redis.zadd).toHaveBeenCalledWith(LOCATION_KEY, {
       score: NOW,
       member: 'location:loc-1',
     });
+    expect(redis.expire).toHaveBeenCalledWith(
+      LOCATION_KEY,
+      LIVE_MAP_ROOM_TTL_SECONDS
+    );
   });
 
   it('defaults to the battlemap kind when none is given', async () => {
@@ -292,6 +303,12 @@ describe('live map room kind tagging', () => {
     expect(
       await listLiveMapRooms(redis, CODE, { now: NOW, kind: 'location' })
     ).toEqual(['loc-1']);
+    expect(redis.zrange).toHaveBeenCalledWith(
+      LOCATION_KEY,
+      0,
+      MAX_LIVE_MAP_ROOMS - 1,
+      { rev: true }
+    );
   });
 
   it('location rooms never consume battle-map fan-out slots', async () => {

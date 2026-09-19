@@ -193,7 +193,7 @@ describe('live map room registration', () => {
     );
     expect(response.status).toBe(200);
     expect(mockRedis.zadd).toHaveBeenCalledWith(
-      `campaign:${CODE}:live-maps`,
+      `campaign:${CODE}:live-locations`,
       expect.objectContaining({ member: 'location:loc-a' })
     );
     const body = (await response.json()) as { token: string };

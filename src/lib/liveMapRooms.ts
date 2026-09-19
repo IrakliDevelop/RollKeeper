@@ -1,4 +1,7 @@
-import { campaignLiveMapRoomsKey } from '@/lib/redis';
+import {
+  campaignLiveLocationRoomsKey,
+  campaignLiveMapRoomsKey,
+} from '@/lib/redis';
 
 /**
  * How far back a battle-map room stays a fan-out candidate: a room is "live"
@@ -100,6 +103,12 @@ export function parseLiveMapRoomMember(member: string): {
     : { kind: 'battlemap', mapId: member };
 }
 
+function liveMapRoomsKey(code: string, kind: LiveMapRoomKind): string {
+  return kind === 'location'
+    ? campaignLiveLocationRoomsKey(code)
+    : campaignLiveMapRoomsKey(code);
+}
+
 /**
  * Best-effort record that `battleMapId` has a live client in `code`'s
  * campaign, keyed by mint time and tagged with its `kind`. Called at
@@ -113,12 +122,13 @@ export async function recordLiveMapRoom(
   deps: { now?: number; kind?: LiveMapRoomKind } = {}
 ): Promise<void> {
   const now = deps.now ?? Date.now();
-  const key = campaignLiveMapRoomsKey(code);
+  const kind = deps.kind ?? 'battlemap';
+  const key = liveMapRoomsKey(code, kind);
   try {
     const pipeline = redis.pipeline();
     pipeline.zadd(key, {
       score: now,
-      member: liveMapRoomMember(deps.kind ?? 'battlemap', battleMapId),
+      member: liveMapRoomMember(kind, battleMapId),
     });
     pipeline.expire(key, LIVE_MAP_ROOM_TTL_SECONDS);
     await pipeline.exec();
@@ -144,14 +154,16 @@ export async function listLiveMapRooms(
 ): Promise<string[]> {
   const now = deps.now ?? Date.now();
   const kind = deps.kind ?? 'battlemap';
-  const key = campaignLiveMapRoomsKey(code);
+  const key = liveMapRoomsKey(code, kind);
   try {
     await redis.zremrangebyscore(key, 0, now - LIVE_MAP_ROOM_WINDOW_MS);
     // rev: true makes rank 0 the highest score (most recently minted first).
-    // The whole (already pruned, so bounded by the window) set is read and
-    // the cap applied AFTER the kind filter: capping first would let rooms of
-    // the other kind consume fan-out slots.
-    const members = await redis.zrange(key, 0, -1, { rev: true });
+    // Room kinds use separate keys, so Redis can apply the hard fan-out bound
+    // before returning data. Never replace this with an all-members read: map
+    // ids are registered from authorized token requests over a 12-hour window.
+    const members = await redis.zrange(key, 0, MAX_LIVE_MAP_ROOMS - 1, {
+      rev: true,
+    });
     const ids: string[] = [];
     for (const member of members) {
       // With automaticDeserialization on, members can come back non-string.
