@@ -37,22 +37,32 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
-5. Version coupling: the relay runs `@fieldnotes/sync-server` 0.14.0, `@fieldnotes/sync-redis`
-   0.5.0, `@fieldnotes/core` 0.66.0, `@fieldnotes/sync` 0.12.0. The app's fog-of-war UI requires
-   this relay version. Deploy the relay BEFORE releasing an app build with fog support.
+5. Version coupling: the relay runs `@fieldnotes/core` 0.83.0, `@fieldnotes/vtt` 0.10.0,
+   `@fieldnotes/sync` 0.20.1, `@fieldnotes/sync-server` 0.19.1, and
+   `@fieldnotes/sync-redis` 0.11.0. The web app runs the same core/VTT/sync versions plus
+   `@fieldnotes/react` 0.13.0. Deploy and verify the relay before releasing the coupled web build.
 
-## Fog rollout and rollback
+## VTT v3 rollout and rollback
 
-Deploy the relay before the app so no client can outrun the protocol. The release order is:
+Production changes require an explicit authorization record, named operator, monitored cohort,
+predefined abort thresholds, and exact previous web and relay artifacts. Deploy the relay before the
+app so no client can outrun the protocol. The release order is:
 
-1. Fieldnotes #153 (`c07f928`) and core 0.66.0, sync 0.12.0, sync-server 0.14.0, and sync-redis 0.5.0 must be published. Completed 2026-09-04.
-2. Merge and Railway-deploy the relay fog compatibility PR. Record the deployed commit and verify `/healthz`.
-3. Deploy the fog-capable web app with `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false`.
-4. Set `BATTLEMAP_FOG_PROTOCOL_REQUIRED=true` and verify stale token requests receive HTTP 426 while current DM, player, and display clients reconnect.
-5. Wait at least five minutes (the token lifetime), or rotate `BATTLEMAP_RELAY_SECRET` on both services and verify reconnect, so no pre-upgrade tokens remain.
-6. Run the DM/player/display/location smoke matrix against the deployed app.
+1. Verify the coordinated Field Notes package set above and preserve CanvasState/wire version 3.
+2. Deploy the relay, verify `/healthz`, Redis-backed hydration and fanout, DM-only authorization,
+   filtered snapshots, and failure-safe buffering before deploying the web app.
+3. Deploy the web app, confirm `NEXT_PUBLIC_BATTLEMAP_RELAY_URL`, and verify the resolved package
+   set from the immutable build artifact.
+4. Start with the smallest authorized cohort and run the DM/player/display, reconnect, export,
+   pointer, and mixed-old/new v3 acceptance matrix before expanding.
+5. Soak for 2–4 weeks while recording UTC cohort changes, incidents, artifact drift, monitoring
+   evidence, and rollback events.
 
-To roll back, keep the fog-capable relay and the 0.66 client deployed so existing Redis fog records and CanvasState v3 remain readable. Do not downgrade a client that may persist CanvasState v3 to core 0.65. If the protocol compatibility switch itself causes an incident, set `BATTLEMAP_FOG_PROTOCOL_REQUIRED=false` and retain the upgraded relay/backend throughout.
+Rollback the web and relay to the recorded previous known-good artifacts as a coordinated set. Do
+not partially roll back either side unless the approved runbook proves that combination safe. The
+v3 adoption keeps legacy grid/template wire shapes and dual-writes top-level `fog` plus
+`extensions.fog`, so soak data is intended to remain readable by the previous release; prove that
+with a real rollback rehearsal before rollout rather than relying on the format contract alone.
 
 Useful release evidence:
 
