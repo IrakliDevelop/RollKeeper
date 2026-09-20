@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 
 import type { LucideIcon } from 'lucide-react';
+import type { ConditionIconName } from '@/utils/conditionIconRegistry';
 
 import {
   CONDITION_ICON_REGISTRY,
@@ -46,6 +47,31 @@ const CONDITION_ICONS: Record<string, LucideIcon> = {
   stunned: Sparkles,
   unconscious: Moon,
 };
+
+const CONDITION_ICON_NAMES: Record<string, ConditionIconName> = {
+  blinded: 'eye-off',
+  charmed: 'heart',
+  deafened: 'ear-off',
+  exhaustion: 'battery-low',
+  frightened: 'ghost',
+  grappled: 'grab',
+  incapacitated: 'ban',
+  invisible: 'circle-dashed',
+  paralyzed: 'zap',
+  petrified: 'mountain',
+  poisoned: 'biohazard',
+  prone: 'chevrons-down',
+  restrained: 'link',
+  stunned: 'sparkles',
+  unconscious: 'moon',
+};
+
+/** Stable registry name for persisting a canonical condition icon. */
+export function getCanonicalConditionIconName(
+  name: string
+): ConditionIconName | undefined {
+  return CONDITION_ICON_NAMES[name.trim().toLowerCase()];
+}
 
 const KIND_FALLBACK: Record<ConditionKind, LucideIcon> = {
   buff: TrendingUp,

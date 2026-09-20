@@ -9,19 +9,19 @@ import type { DmEffect } from '@/types/sharedState';
  * Look up the canonical description for a condition name.
  * Prioritizes XPHB (2024) over PHB (2014).
  */
-function findConditionDescription(
+function findCanonicalCondition(
   name: string,
   conditions: ProcessedCondition[]
-): string | null {
+): ProcessedCondition | null {
   const matches = conditions.filter(
     c => c.name.toLowerCase() === name.toLowerCase()
   );
   if (matches.length === 0) return null;
 
   const xphb = matches.find(c => c.source === 'XPHB');
-  if (xphb) return xphb.description;
+  if (xphb) return xphb;
 
-  return matches[0].description;
+  return matches[0];
 }
 
 export interface ResolvedDmEffectCondition {
@@ -40,18 +40,25 @@ export function resolveDmEffectCondition(
   effect: DmEffect,
   conditions: ProcessedCondition[]
 ): ResolvedDmEffectCondition {
-  if (isConditionIconName(effect.icon)) {
+  const isCustom =
+    effect.origin === 'custom' ||
+    (effect.origin === undefined && isConditionIconName(effect.icon));
+  if (isCustom) {
     return {
       source: 'DM',
       description: effect.description || 'Custom effect applied by DM',
       icon: effect.icon,
     };
   }
-  const canonicalDesc = findConditionDescription(effect.name, conditions);
+  const canonical = findCanonicalCondition(effect.name, conditions);
   return {
-    source: canonicalDesc ? 'XPHB' : 'DM',
+    source: canonical?.source ?? effect.rulesSource ?? 'DM',
     description:
-      canonicalDesc || effect.description || 'Custom effect applied by DM',
+      canonical?.description ||
+      effect.description ||
+      (effect.kind === 'buff'
+        ? 'Buff applied by DM'
+        : 'Custom effect applied by DM'),
   };
 }
 
@@ -66,14 +73,24 @@ export function useDmConditionOverrides(
   onAcknowledged: () => void
 ) {
   const [conditionsDb, setConditionsDb] = useState<ProcessedCondition[]>([]);
+  const [conditionsReady, setConditionsReady] = useState(false);
   const acknowledgedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
-    loadAllConditions().then(setConditionsDb);
+    let active = true;
+    loadAllConditions().then(conditions => {
+      if (active) {
+        setConditionsDb(conditions);
+        setConditionsReady(true);
+      }
+    });
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!dmEffects || dmEffects.length === 0) return;
+    if (!conditionsReady || !dmEffects || dmEffects.length === 0) return;
 
     // Build a fingerprint of the current batch to avoid re-processing
     const batchKey = dmEffects
@@ -105,7 +122,8 @@ export function useDmConditionOverrides(
             resolved.description,
             1,
             effect.sourceSpell ? `Source: ${effect.sourceSpell}` : undefined,
-            resolved.icon
+            resolved.icon,
+            effect.kind
           );
           appliedAny = true;
         }
@@ -121,5 +139,5 @@ export function useDmConditionOverrides(
     if (appliedAny) {
       console.log(`Applied ${dmEffects.length} DM effect(s) and acknowledged`);
     }
-  }, [dmEffects, conditionsDb, onAcknowledged]);
+  }, [dmEffects, conditionsDb, conditionsReady, onAcknowledged]);
 }

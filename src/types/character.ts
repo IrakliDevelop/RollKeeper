@@ -762,6 +762,8 @@ export interface ActiveCondition {
   count: number; // For stackable conditions like exhaustion
   appliedAt: string; // ISO date string
   notes?: string; // Optional player notes
+  /** Preserves the encounter presentation so buffs are not shown as debuffs. */
+  kind?: 'buff' | 'debuff' | 'neutral';
   /**
    * Registry icon of a DM custom condition (see conditionIconRegistry).
    * Plain string: it arrives over sync and is re-validated wherever rendered.

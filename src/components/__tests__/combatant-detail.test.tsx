@@ -6,6 +6,37 @@ import { CombatantDetail } from '@/components/ui/encounter/combat-screen/detail/
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
+vi.mock('@/hooks/useOfficialConditions', () => ({
+  useOfficialConditions: () => ({
+    loading: false,
+    conditions: [
+      {
+        id: 'official-blinded',
+        name: 'Blinded',
+        description: 'Canonical blinded rules.',
+        icon: 'eye-off',
+        kind: 'debuff',
+        origin: 'official',
+        rulesSource: 'XPHB',
+      },
+    ],
+  }),
+}));
+vi.mock('@/hooks/usePaletteSpellEffects', () => ({
+  usePaletteSpellEffects: () => ({
+    loading: false,
+    effects: [
+      {
+        name: 'Bless',
+        kind: 'buff',
+        origin: 'spell',
+        description: 'Canonical Bless rules.',
+        rulesSource: "Player's Handbook (2024)",
+      },
+    ],
+  }),
+}));
+
 afterEach(cleanup);
 
 function makeActions(): EntityActions {
@@ -195,8 +226,12 @@ describe('CombatantDetail — monster with full stat block', () => {
 
     expect(actions.onAddCondition).toHaveBeenCalledWith('monster-1', {
       name: 'Blinded',
+      description: 'Canonical blinded rules.',
+      icon: 'eye-off',
       kind: 'debuff',
       source: 'dm',
+      origin: 'official',
+      rulesSource: 'XPHB',
     });
   });
 
@@ -212,6 +247,9 @@ describe('CombatantDetail — monster with full stat block', () => {
       name: 'Bless',
       kind: 'buff',
       source: 'dm',
+      origin: 'spell',
+      description: 'Canonical Bless rules.',
+      rulesSource: "Player's Handbook (2024)",
     });
   });
 

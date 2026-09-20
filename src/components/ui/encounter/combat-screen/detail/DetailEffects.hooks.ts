@@ -48,13 +48,30 @@ export function useCreatureConditions(
 /** Built-in palette for the tab plus the library entries of matching kind. */
 export function buildEffectPalette(
   tab: PaletteTab,
-  library: CustomCondition[]
+  library: CustomCondition[],
+  officialConditions: CustomCondition[] = [],
+  spellEffects: EffectPaletteEntry[] = []
 ): EffectPaletteEntry[] {
   const base = tab === 'conditions' ? DEBUFF_PALETTE : BUFF_PALETTE;
+  const officialByName = new Map(
+    officialConditions.map(condition => [
+      condition.name.toLowerCase(),
+      condition,
+    ])
+  );
+  const spellByName = new Map(
+    spellEffects.map(effect => [effect.name.toLowerCase(), effect])
+  );
+  const hydratedBase = base.map(entry => {
+    const condition = officialByName.get(entry.name.toLowerCase());
+    if (condition) return { ...entry, condition };
+    const spell = spellByName.get(entry.name.toLowerCase());
+    return spell ? { ...entry, ...spell } : entry;
+  });
   const taken = new Set(base.map(entry => entry.name.toLowerCase()));
   const extras = library
     .filter(c => (tab === 'buffs' ? c.kind === 'buff' : c.kind !== 'buff'))
     .filter(c => !taken.has(c.name.toLowerCase()))
     .map(c => ({ name: c.name, kind: c.kind, condition: c }));
-  return [...base, ...extras];
+  return [...hydratedBase, ...extras];
 }

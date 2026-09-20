@@ -28,6 +28,9 @@ export function buildDmEffects(
       action: 'add',
       description: c.description,
       ...(isConditionIconName(c.icon) ? { icon: c.icon } : {}),
+      ...(c.kind ? { kind: c.kind } : {}),
+      ...(c.origin ? { origin: c.origin } : {}),
+      ...(c.rulesSource ? { rulesSource: c.rulesSource } : {}),
       sourceSpell: c.sourceSpell,
       appliedAt: now,
     });

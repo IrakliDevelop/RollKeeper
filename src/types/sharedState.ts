@@ -61,6 +61,9 @@ export interface DmEffect {
    * of looking up a canonical one.
    */
   icon?: string;
+  kind?: 'buff' | 'debuff' | 'neutral';
+  origin?: 'official' | 'custom' | 'spell';
+  rulesSource?: string;
   sourceSpell?: string;
   appliedAt: string; // ISO timestamp
 }

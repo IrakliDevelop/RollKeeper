@@ -76,6 +76,7 @@ export function StatusEffectTray() {
             stackCount={condition.count}
             sourceSpell={condition.source}
             size="md"
+            variant={condition.kind === 'buff' ? 'buff' : 'condition'}
             onRemove={() => removeCondition(condition.id)}
           />
         </div>
@@ -101,7 +102,15 @@ export function StatusEffectTray() {
                 variant="outline"
                 size="lg"
                 onClick={() => {
-                  addCondition(entry.name, 'Self', '', 1);
+                  addCondition(
+                    entry.name,
+                    'Self',
+                    entry.kind === 'buff' ? 'Buff added by player' : '',
+                    1,
+                    undefined,
+                    undefined,
+                    entry.kind
+                  );
                   setAddOpen(false);
                 }}
               >

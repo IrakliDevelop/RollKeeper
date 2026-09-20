@@ -32,6 +32,7 @@ export function ConditionCard({
   onRemove,
   onUpdateCount,
 }: ConditionCardProps) {
+  const isBuff = condition.kind === 'buff';
   const fullSourceName =
     SPELL_SOURCE_BOOKS[condition.source] || condition.source;
   const HeaderIcon = isConditionIconName(condition.icon)
@@ -39,12 +40,24 @@ export function ConditionCard({
     : AlertTriangle;
 
   return (
-    <div className="group border-accent-red-border bg-surface-raised hover:border-accent-red-border-strong rounded-lg border-2 p-4 transition-all hover:shadow-md">
+    <div
+      className={`group bg-surface-raised rounded-lg border-2 p-4 transition-all hover:shadow-md ${
+        isBuff
+          ? 'border-accent-emerald-border hover:border-accent-emerald-border-strong'
+          : 'border-accent-red-border hover:border-accent-red-border-strong'
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           {/* Header */}
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <HeaderIcon className="text-accent-red-text-muted h-4 w-4 shrink-0" />
+            <HeaderIcon
+              className={`h-4 w-4 shrink-0 ${
+                isBuff
+                  ? 'text-accent-emerald-text-muted'
+                  : 'text-accent-red-text-muted'
+              }`}
+            />
             <h4 className="text-heading truncate font-bold">
               {condition.name}
             </h4>
@@ -56,6 +69,11 @@ export function ConditionCard({
             {condition.notes && (
               <Badge variant="info" size="sm" leftIcon={<FileText size={12} />}>
                 Notes
+              </Badge>
+            )}
+            {isBuff && (
+              <Badge variant="success" size="sm">
+                Buff
               </Badge>
             )}
           </div>

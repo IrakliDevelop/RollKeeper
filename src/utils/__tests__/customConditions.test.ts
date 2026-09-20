@@ -345,6 +345,7 @@ describe('toAppliedCondition', () => {
       icon: 'link',
       kind: 'debuff',
       source: 'dm',
+      origin: 'custom',
       sourceEntity: 'Giant Spider',
     });
     expect(toAppliedCondition({ ...webbed, description: '   ' })).toEqual({
@@ -352,6 +353,7 @@ describe('toAppliedCondition', () => {
       icon: 'link',
       kind: 'debuff',
       source: 'dm',
+      origin: 'custom',
     });
   });
 });

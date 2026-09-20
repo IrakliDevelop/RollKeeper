@@ -12,6 +12,8 @@ import {
 } from './DetailEffects.hooks';
 import { getConditionIcon } from '@/utils/conditionIcons';
 import { toAppliedCondition } from '@/utils/customConditions';
+import { useOfficialConditions } from '@/hooks/useOfficialConditions';
+import { usePaletteSpellEffects } from '@/hooks/usePaletteSpellEffects';
 import type { DetailSectionProps } from './DetailHeader';
 import type { EffectPaletteEntry } from '../effectPalettes';
 
@@ -32,10 +34,19 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
   const [tab, setTab] = useState<PaletteTab>('conditions');
   const [customInput, setCustomInput] = useState('');
   const library = useConditionLibrary();
+  const { conditions: officialConditions, loading: officialConditionsLoading } =
+    useOfficialConditions();
+  const { effects: spellEffects, loading: spellEffectsLoading } =
+    usePaletteSpellEffects();
   const creatureConditions = useCreatureConditions(entity.id, library);
 
   const activeNames = new Set(entity.conditions.map(c => c.name));
-  const palette = buildEffectPalette(tab, library);
+  const palette = buildEffectPalette(
+    tab,
+    library,
+    officialConditions,
+    spellEffects
+  );
 
   const handleAddCustom = () => {
     const name = customInput.trim();
@@ -49,7 +60,14 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
       entity.id,
       entry.condition
         ? toAppliedCondition(entry.condition)
-        : { name: entry.name, kind: entry.kind, source: 'dm' }
+        : {
+            name: entry.name,
+            kind: entry.kind,
+            source: 'dm',
+            ...(entry.origin ? { origin: entry.origin } : {}),
+            ...(entry.description ? { description: entry.description } : {}),
+            ...(entry.rulesSource ? { rulesSource: entry.rulesSource } : {}),
+          }
     );
   };
 
@@ -104,14 +122,17 @@ export function DetailEffects({ entity, actions }: DetailSectionProps) {
       <div className="flex flex-wrap gap-1">
         {palette.map(entry => {
           const isActive = activeNames.has(entry.name);
+          const isWaitingForRules =
+            (entry.origin === 'official' && officialConditionsLoading) ||
+            (entry.origin === 'spell' && spellEffectsLoading);
           const Icon = entry.condition
             ? getConditionIcon(entry.name, entry.kind, entry.condition.icon)
             : null;
           return (
             <button
               key={entry.condition?.id ?? entry.name}
-              disabled={isActive}
-              title={entry.condition?.description || undefined}
+              disabled={isActive || isWaitingForRules}
+              title={entry.condition?.description || entry.description}
               onClick={() => handleApplyPalette(entry)}
               className={`flex items-center gap-1 rounded px-2 py-0.5 text-[11px] font-medium transition-colors ${paletteChipClass(tab, isActive)}`}
             >

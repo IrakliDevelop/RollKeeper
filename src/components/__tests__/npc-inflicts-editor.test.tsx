@@ -25,15 +25,26 @@ const venom: CustomCondition = {
   icon: 'droplet',
   kind: 'debuff',
 };
+const poisoned: CustomCondition = {
+  id: 'official-poisoned',
+  name: 'Poisoned',
+  description: 'Canonical poisoned rules.',
+  icon: 'biohazard',
+  kind: 'debuff',
+  origin: 'official',
+  rulesSource: 'XPHB',
+};
 
 function Harness({
   initial = [],
   initialLibrary = [webbed, venom],
+  officialConditions = [],
   onSnapshot = vi.fn(),
   onCreate = vi.fn(),
 }: {
   initial?: CustomCondition[];
   initialLibrary?: CustomCondition[];
+  officialConditions?: CustomCondition[];
   onSnapshot?: (next: CustomCondition[]) => void;
   onCreate?: (condition: CustomCondition) => void;
 }) {
@@ -43,6 +54,7 @@ function Harness({
     <NpcInflictsEditor
       conditions={conditions}
       library={library}
+      officialConditions={officialConditions}
       onChange={next => {
         setConditions(next);
         onSnapshot(next);
@@ -80,6 +92,17 @@ describe('NpcInflictsEditor', () => {
     expect(onSnapshot).toHaveBeenLastCalledWith([webbed, venom]);
     expect(screen.getByText('Webbed')).toBeTruthy();
     expect(screen.getByText('Spider Venom')).toBeTruthy();
+  });
+
+  it('offers canonical conditions separately and attaches their rules text', async () => {
+    const user = userEvent.setup();
+    const onSnapshot = vi.fn();
+    render(<Harness officialConditions={[poisoned]} onSnapshot={onSnapshot} />);
+
+    await pick(user, /Poisoned/);
+
+    expect(onSnapshot).toHaveBeenLastCalledWith([poisoned]);
+    expect(screen.getByText('XPHB')).toBeTruthy();
   });
 
   it('can re-add a condition after removing it and hides already-attached options', async () => {

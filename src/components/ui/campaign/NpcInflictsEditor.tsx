@@ -3,7 +3,12 @@
 import React, { useState } from 'react';
 import { Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import {
+  SelectField,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+} from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
 import { CustomConditionFields } from '@/components/ui/encounter/custom-conditions/CustomConditionFields';
 import { CONDITION_ICON_REGISTRY } from '@/utils/conditionIconRegistry';
@@ -33,6 +38,9 @@ export interface NpcInflictsEditorProps {
   conditions: CustomCondition[];
   /** The local DM library (combatConfig.customConditions). */
   library: CustomCondition[];
+  /** Canonical condition snapshots loaded from the bundled rules data. */
+  officialConditions?: CustomCondition[];
+  officialConditionsLoading?: boolean;
   onChange: (next: CustomCondition[]) => void;
   /** Inline create also adds the new condition to the library. */
   onCreateInLibrary: (condition: CustomCondition) => void;
@@ -41,12 +49,17 @@ export interface NpcInflictsEditorProps {
 export function NpcInflictsEditor({
   conditions,
   library,
+  officialConditions = [],
+  officialConditionsLoading = false,
   onChange,
   onCreateInLibrary,
 }: NpcInflictsEditorProps) {
   const [draft, setDraft] = useState<CustomConditionDraft | null>(null);
   const attachedIds = new Set(conditions.map(c => c.id));
   const available = library.filter(entry => !attachedIds.has(entry.id));
+  const availableOfficial = officialConditions.filter(
+    entry => !attachedIds.has(entry.id)
+  );
   const resolved = resolveInflictableConditions(
     { inflictableConditions: conditions },
     library
@@ -58,7 +71,9 @@ export function NpcInflictsEditor({
       setDraft(EMPTY_DRAFT);
       return;
     }
-    const entry = library.find(item => item.id === value);
+    const entry = [...officialConditions, ...library].find(
+      item => item.id === value
+    );
     if (entry) onChange([...conditions, { ...entry }]);
   };
 
@@ -87,20 +102,41 @@ export function NpcInflictsEditor({
             <SelectItem value={PLACEHOLDER} disabled>
               Add condition…
             </SelectItem>
-            {available.map(entry => (
-              <SelectItem key={entry.id} value={entry.id}>
-                {entry.name}
-              </SelectItem>
-            ))}
-            <SelectItem value={ADD_NEW}>New condition…</SelectItem>
+            <SelectGroup>
+              <SelectLabel>Official conditions</SelectLabel>
+              {officialConditionsLoading ? (
+                <SelectItem value="__loading__" disabled>
+                  Loading official conditions…
+                </SelectItem>
+              ) : (
+                availableOfficial.map(entry => (
+                  <SelectItem
+                    key={entry.id}
+                    value={entry.id}
+                    description={entry.rulesSource}
+                  >
+                    {entry.name}
+                  </SelectItem>
+                ))
+              )}
+            </SelectGroup>
+            <SelectGroup>
+              <SelectLabel>Custom conditions</SelectLabel>
+              {available.map(entry => (
+                <SelectItem key={entry.id} value={entry.id}>
+                  {entry.name}
+                </SelectItem>
+              ))}
+              <SelectItem value={ADD_NEW}>New condition…</SelectItem>
+            </SelectGroup>
           </SelectField>
         </div>
       </div>
 
       {resolved.length === 0 && !draft ? (
         <p className="text-faint text-xs">
-          No inflicted conditions — attach the custom conditions this creature
-          can cause, and they appear as one-click options in combat.
+          No inflicted conditions — attach official or custom effects this
+          creature can cause, and they appear as one-click options in combat.
         </p>
       ) : (
         <div className="space-y-1">
@@ -117,7 +153,9 @@ export function NpcInflictsEditor({
                   {condition.name}
                 </span>
                 <Badge variant="neutral" size="sm">
-                  {condition.kind}
+                  {condition.origin === 'official'
+                    ? condition.rulesSource || 'Official'
+                    : condition.kind}
                 </Badge>
                 <Button
                   variant="ghost"

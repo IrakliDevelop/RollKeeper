@@ -578,7 +578,8 @@ interface CharacterStore {
     description: string,
     count?: number,
     notes?: string,
-    icon?: string
+    icon?: string,
+    kind?: ActiveCondition['kind']
   ) => void;
   updateCondition: (
     conditionId: string,
@@ -2412,7 +2413,8 @@ export const useCharacterStore = create<CharacterStore>()(
           description,
           count = 1,
           notes,
-          icon
+          icon,
+          kind
         ) => {
           set(state => {
             const newCondition: ActiveCondition = {
@@ -2425,6 +2427,7 @@ export const useCharacterStore = create<CharacterStore>()(
               appliedAt: new Date().toISOString(),
               notes,
               ...(isConditionIconName(icon) ? { icon } : {}),
+              ...(kind ? { kind } : {}),
             };
 
             return {

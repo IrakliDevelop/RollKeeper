@@ -62,6 +62,21 @@ describe('GET /api/spells', () => {
     expect(data.hasMore).toBe(false);
   });
 
+  it('filters to repeated exact names for lightweight rules lookups', async () => {
+    const req = new NextRequest(
+      'http://localhost/api/spells?name=Shield&name=Magic%20Missile'
+    );
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(data.spells.map((spell: ProcessedSpell) => spell.name)).toEqual([
+      'Shield',
+      'Magic Missile',
+    ]);
+    expect(data.total).toBe(2);
+  });
+
   it('returns hasMore false when paginated results reach the end exactly', async () => {
     const req = new NextRequest('http://localhost/api/spells?limit=3&offset=0');
 
