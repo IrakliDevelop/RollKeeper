@@ -293,7 +293,7 @@ describe('fog-of-war sync (real relay)', () => {
     const snapshot = await late.waitFor(
       m => m.op.kind === 'snapshot' && m.op.to === 'char-late'
     );
-    const fog = snapshot.op.fog as {
+    const fog = snapshot.op.extensions?.fog?.data as {
       meta: { version: number; definition?: unknown };
       tiles: unknown[];
     };
@@ -414,7 +414,9 @@ describe('fog-of-war sync (real relay)', () => {
     expect(elements.some(e => e.id === 'secret-note')).toBe(false);
     expect(elements.some(e => e.id === 'public-marker')).toBe(true);
 
-    const fog = snapshot.op.fog as { meta: { version: number } };
+    const fog = snapshot.op.extensions?.fog?.data as {
+      meta: { version: number };
+    };
     expect(fog.meta.version).toBe(1);
 
     dm.ws.close();
@@ -450,7 +452,7 @@ describe('fog-of-war sync (real relay)', () => {
     const snapshot = await dm2.waitFor(
       m => m.op.kind === 'snapshot' && m.op.to === 'dm-1'
     );
-    const fog = snapshot.op.fog as {
+    const fog = snapshot.op.extensions?.fog?.data as {
       meta: { version: number; definition?: { generation: string } };
       tiles: unknown[];
     };

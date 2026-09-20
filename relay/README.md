@@ -37,32 +37,35 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
-5. Version coupling: the relay runs `@fieldnotes/core` 0.83.0, `@fieldnotes/vtt` 0.10.0,
-   `@fieldnotes/sync` 0.20.1, `@fieldnotes/sync-server` 0.19.1, and
-   `@fieldnotes/sync-redis` 0.11.0. The web app runs the same core/VTT/sync versions plus
+5. Version coupling: the relay runs `@fieldnotes/core` 0.84.0, `@fieldnotes/vtt` 0.11.0,
+   `@fieldnotes/sync` 0.21.0, `@fieldnotes/sync-server` 0.20.0, and
+   `@fieldnotes/sync-redis` 0.12.0. The web app runs the same core/VTT/sync versions plus
    `@fieldnotes/react` 0.13.0. Deploy and verify the relay before releasing the coupled web build.
 
-## VTT v3 rollout and rollback
+## VTT v4 rollout and rollback
 
 Production changes require an explicit authorization record, named operator, monitored cohort,
 predefined abort thresholds, and exact previous web and relay artifacts. Deploy the relay before the
 app so no client can outrun the protocol. The release order is:
 
-1. Verify the coordinated Field Notes package set above and preserve CanvasState/wire version 3.
+1. Verify the coordinated Field Notes package set above and preserve CanvasState version 4 plus the
+   v4 capability handshake marker (`elementEnvelope: true`).
 2. Deploy the relay, verify `/healthz`, Redis-backed hydration and fanout, DM-only authorization,
    filtered snapshots, and failure-safe buffering before deploying the web app.
 3. Deploy the web app, confirm `NEXT_PUBLIC_BATTLEMAP_RELAY_URL`, and verify the resolved package
    set from the immutable build artifact.
 4. Start with the smallest authorized cohort and run the DM/player/display, reconnect, export,
-   pointer, and mixed-old/new v3 acceptance matrix before expanding.
+   pointer, and immediately-previous/current v4 acceptance matrix before expanding.
 5. Soak for 2–4 weeks while recording UTC cohort changes, incidents, artifact drift, monitoring
    evidence, and rollback events.
 
 Rollback the web and relay to the recorded previous known-good artifacts as a coordinated set. Do
-not partially roll back either side unless the approved runbook proves that combination safe. The
-v3 adoption keeps legacy grid/template wire shapes and dual-writes top-level `fog` plus
-`extensions.fog`, so soak data is intended to remain readable by the previous release; prove that
-with a real rollback rehearsal before rollout rather than relying on the format contract alone.
+not partially roll back either side unless the approved runbook proves that combination safe. This
+release no longer translates legacy v3 grid/template wire shapes or dual-writes top-level `fog`;
+plugin snapshot state exists only under `extensions`. Persisted CanvasState versions 1–3 remain
+readable and migrate to version 4, but that storage migration is not wire-protocol compatibility.
+Prove the exact rollback artifact pair with a real rehearsal before rollout rather than relying on
+the persisted-state migration contract.
 
 Useful release evidence:
 

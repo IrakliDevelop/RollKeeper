@@ -2002,9 +2002,18 @@ describe('managed connection fog lifecycle with the published SDK', () => {
           kind: 'snapshot',
           to: 'player-1',
           elements: [],
-          fog: {
-            meta: { version: 3, editor: 'dm-1', definition: state.definition },
-            tiles: [],
+          extensions: {
+            fog: {
+              version: 1,
+              data: {
+                meta: {
+                  version: 3,
+                  editor: 'dm-1',
+                  definition: state.definition,
+                },
+                tiles: [],
+              },
+            },
           },
         },
       })
@@ -2095,13 +2104,18 @@ describe('managed connection fog lifecycle with the published SDK', () => {
           kind: 'snapshot',
           to: 'dm-1',
           elements: [],
-          fog: {
-            meta: {
+          extensions: {
+            fog: {
               version: 1,
-              editor: 'hub',
-              definition: hubState.definition,
+              data: {
+                meta: {
+                  version: 1,
+                  editor: 'hub',
+                  definition: hubState.definition,
+                },
+                tiles: [],
+              },
             },
-            tiles: [],
           },
         },
       });
