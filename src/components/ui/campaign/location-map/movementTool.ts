@@ -6,7 +6,7 @@ import {
   movementRangeBands,
 } from './movementSpeed';
 import { movableTokenIdentity } from './tokenIdentity';
-import { gridConstraintInfo } from './cellUnit';
+import { cellUnit, gridConstraintInfo } from './cellUnit';
 
 import type { MovableTokenIdentity } from './tokenIdentity';
 import type { CanvasElement, Viewport } from '@fieldnotes/core';
@@ -97,7 +97,9 @@ export function createMovementPathTool(config: MovementToolConfig): PathTool {
           y: el.position.y + el.size.h / 2,
         },
         footprint:
-          cellSize === undefined ? 1 : footprintFromSize(el.size, cellSize),
+          cellSize === undefined
+            ? 1
+            : footprintFromSize(el.size, cellUnit(ctx)),
         anchorKey: el.id,
       };
     },

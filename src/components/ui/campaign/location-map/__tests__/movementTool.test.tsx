@@ -107,6 +107,16 @@ const ctx = {
 const noGridCtx = {
   constraintService: { getConstraintInfo: () => ({}) },
 } as unknown as ToolContext;
+const invalidGridCtx = {
+  constraintService: {
+    getConstraintInfo: () => ({ gridType: 'square', cellSize: 0 }),
+  },
+} as unknown as ToolContext;
+const hexCtx = {
+  constraintService: {
+    getConstraintInfo: () => ({ gridType: 'hex', cellSize: 40 }),
+  },
+} as unknown as ToolContext;
 
 describe('createMovementPathTool', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -135,7 +145,7 @@ describe('createMovementPathTool', () => {
     container.remove();
   });
 
-  it('derives footprints from constraint cellSize and falls back to one without valid grid metadata', () => {
+  it('derives square and hex footprints and falls back to one without valid grid metadata', () => {
     const { vp, container } = makeViewport();
     const token = {
       ...tokenAt(40, 40, 'large-1'),
@@ -154,6 +164,47 @@ describe('createMovementPathTool', () => {
     expect(
       tool.getOptions().resolveStart!({ x: 80, y: 80 }, noGridCtx)?.footprint
     ).toBe(1);
+    expect(
+      tool.getOptions().resolveStart!({ x: 80, y: 80 }, invalidGridCtx)
+        ?.footprint
+    ).toBe(1);
+    vp.destroy();
+    container.remove();
+  });
+
+  it('uses the hex cell width when deriving movement footprints', () => {
+    const { vp, container } = makeViewport();
+    const hexCellWidth = Math.sqrt(3) * 40;
+    const oneCellToken = {
+      ...tokenAt(40, 40, 'hex-one-cell'),
+      size: { w: hexCellWidth, h: hexCellWidth },
+    };
+    const twoCellToken = {
+      ...tokenAt(240, 40, 'hex-two-cell'),
+      size: { w: 2 * hexCellWidth, h: 2 * hexCellWidth },
+    };
+    vp.store.add(oneCellToken);
+    vp.store.add(twoCellToken);
+    const tool = createMovementPathTool({
+      getViewport: () => vp,
+      role: 'dm',
+      resolveMovement: () => null,
+      isDashActive: () => false,
+    });
+
+    expect(
+      tool.getOptions().resolveStart!(
+        { x: 40 + hexCellWidth / 2, y: 40 + hexCellWidth / 2 },
+        hexCtx
+      )?.footprint
+    ).toEqual({ w: 1, h: 1 });
+    expect(
+      tool.getOptions().resolveStart!(
+        { x: 240 + hexCellWidth, y: 40 + hexCellWidth },
+        hexCtx
+      )?.footprint
+    ).toEqual({ w: 2, h: 2 });
+
     vp.destroy();
     container.remove();
   });
