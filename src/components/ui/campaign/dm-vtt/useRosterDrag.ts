@@ -8,7 +8,10 @@ import {
   stampCombatantToken,
 } from './combatantToken';
 
-import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
+import {
+  cellUnit,
+  gridConstraintInfo,
+} from '@/components/ui/campaign/location-map/cellUnit';
 
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import type { ToolContext, Viewport } from '@fieldnotes/core';
@@ -34,7 +37,7 @@ export function ghostFootprintPx(
   ctx: ToolContext | null | undefined,
   zoom: number
 ): number | null {
-  if (!ctx || ctx.gridType !== 'square') return null;
+  if (!ctx || gridConstraintInfo(ctx).gridType !== 'square') return null;
   return cells * cellUnit(ctx) * zoom;
 }
 
@@ -72,9 +75,8 @@ function pastThreshold(
  *
  * RECON (Task 4): `Viewport` (`@fieldnotes/core` dist/index.d.ts) publicly
  * exposes `readonly toolContext: ToolContext`, kept live by the Viewport
- * itself — its grid controller/layer manager write gridSize/gridType/
- * hexOrientation/activeLayerId/snapToGrid into that SAME object as the map
- * changes, and it's the identical object every `Tool` receives in
+ * itself — its grid controller updates the constraint service in that SAME
+ * object as the map changes, and it's the identical object every `Tool` receives in
  * onPointerDown/onPointerUp (e.g. `DmTokenTool`). So `vp.toolContext`
  * already IS the minimal ToolContext view — no need to hand-roll one or
  * re-derive grid values from `getElementsByType('grid')`.

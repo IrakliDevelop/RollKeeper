@@ -1,10 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createShape, toPathPresence } from '@fieldnotes/core';
-import type {
-  CanvasElement,
-  PathEmission,
-  OverlayRenderer,
-} from '@fieldnotes/core';
+import { createShape } from '@fieldnotes/core';
+import { toPathPresence } from '@fieldnotes/vtt';
+import type { CanvasElement, OverlayRenderer } from '@fieldnotes/core';
+import type { PathEmission } from '@fieldnotes/vtt';
 
 import { attachPathBroadcast, attachRemotePaths } from '../pathSync';
 import { COMBATANT_TOKEN_KIND } from '../tokenIdentity';

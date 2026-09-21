@@ -1,4 +1,4 @@
-import type { PathRangeBand } from '@fieldnotes/core';
+import type { PathRangeBand } from '@fieldnotes/vtt';
 
 import { getBuffSpeedBonus } from '@/utils/calculations';
 

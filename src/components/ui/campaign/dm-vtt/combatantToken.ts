@@ -1,8 +1,5 @@
-import {
-  createImage,
-  createShape,
-  snapFootprintCenter,
-} from '@fieldnotes/core';
+import { createImage, createShape } from '@fieldnotes/core';
+import { snapFootprintCenter } from '@fieldnotes/vtt';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 import {

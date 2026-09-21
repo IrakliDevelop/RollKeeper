@@ -19,10 +19,10 @@ import {
   type ElementActivationEvent,
   type FocusAudience,
   type Layer,
-  type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import type { PathTool } from '@fieldnotes/vtt';
 import { FogTool, MeasureTool, TemplateTool } from '@fieldnotes/vtt';
 import type { FieldNotesCanvasRef } from '@fieldnotes/react';
 import { useLocationStore } from '@/store/locationStore';

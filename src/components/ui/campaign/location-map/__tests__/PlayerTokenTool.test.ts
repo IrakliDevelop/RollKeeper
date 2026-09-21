@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, test } from 'vitest';
-import { TemplateTool } from '@fieldnotes/vtt';
+import { GridConstraintService, TemplateTool } from '@fieldnotes/vtt';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
@@ -18,6 +18,22 @@ import type {
 } from '@fieldnotes/core';
 
 function fakeCtx(overrides: Record<string, unknown> = {}) {
+  const {
+    gridSize = 40,
+    gridType = 'square',
+    snapToGrid = false,
+    ...contextOverrides
+  } = overrides as {
+    gridSize?: number;
+    gridType?: 'square' | 'hex';
+    snapToGrid?: boolean;
+  };
+  const grid = new GridConstraintService(() => ({
+    gridType,
+    cellSize: gridSize,
+    cellRadius: gridSize / 2,
+    hexOrientation: 'pointy',
+  }));
   const added: CanvasElement[] = [];
   const elements: CanvasElement[] = [];
   const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
@@ -45,12 +61,16 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
     },
     requestRender: vi.fn(),
     switchTool: vi.fn(),
-    gridSize: 40,
-    gridType: 'square',
+    constraintService: {
+      isActive: snapToGrid,
+      constrainPoint: grid.constrainPoint,
+      getConstraintInfo: grid.getConstraintInfo,
+      hasCapability: () => false,
+      setActive: () => undefined,
+    },
     activeLayerId: 'player-1',
-    snapToGrid: false,
     elementRegistry: fieldnotesElementRegistry,
-    ...overrides,
+    ...contextOverrides,
   } as unknown as ToolContext;
   return { ctx, added, elements, updates };
 }

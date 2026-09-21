@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { GridConstraintService } from '@fieldnotes/vtt';
 import {
   COMBATANT_TOKEN_KIND,
   COMBATANT_TOKEN_ZINDEX,
@@ -19,6 +20,22 @@ import type {
 import type { EncounterEntity } from '@/types/encounter';
 
 function fakeCtx(overrides: Record<string, unknown> = {}) {
+  const {
+    gridSize = 40,
+    gridType = 'square',
+    snapToGrid = false,
+    ...contextOverrides
+  } = overrides as {
+    gridSize?: number;
+    gridType?: 'square' | 'hex';
+    snapToGrid?: boolean;
+  };
+  const grid = new GridConstraintService(() => ({
+    gridType,
+    cellSize: gridSize,
+    cellRadius: gridSize / 2,
+    hexOrientation: 'pointy',
+  }));
   const added: CanvasElement[] = [];
   const ctx = {
     camera: { screenToWorld: (p: { x: number; y: number }) => p },
@@ -32,11 +49,15 @@ function fakeCtx(overrides: Record<string, unknown> = {}) {
     requestRender: vi.fn(),
     switchTool: vi.fn(),
     setCursor: vi.fn(),
-    gridSize: 40,
-    gridType: 'square',
+    constraintService: {
+      isActive: snapToGrid,
+      constrainPoint: grid.constrainPoint,
+      getConstraintInfo: grid.getConstraintInfo,
+      hasCapability: () => false,
+      setActive: () => undefined,
+    },
     activeLayerId: 'dm-layer',
-    snapToGrid: false,
-    ...overrides,
+    ...contextOverrides,
   } as unknown as ToolContext;
   return { ctx, added };
 }
@@ -281,10 +302,20 @@ describe('DmTokenTool', () => {
 });
 
 describe('restampCombatantTokens', () => {
-  const ctx = {
-    gridSize: 40,
+  const grid = new GridConstraintService(() => ({
     gridType: 'square',
-    snapToGrid: true,
+    cellSize: 40,
+    cellRadius: 20,
+    hexOrientation: 'pointy',
+  }));
+  const ctx = {
+    constraintService: {
+      isActive: true,
+      constrainPoint: grid.constrainPoint,
+      getConstraintInfo: grid.getConstraintInfo,
+      hasCapability: () => false,
+      setActive: () => undefined,
+    },
   } as unknown as ToolContext;
 
   function fakeStore(seed: Record<string, unknown>[]) {

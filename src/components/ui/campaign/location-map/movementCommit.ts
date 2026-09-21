@@ -3,7 +3,8 @@ import { movableTokenIdentity } from './tokenIdentity';
 
 import type { MovementResolution } from './movementTool';
 import type { MovableTokenIdentity } from './tokenIdentity';
-import type { PathEmission, Viewport } from '@fieldnotes/core';
+import type { Viewport } from '@fieldnotes/core';
+import type { PathEmission } from '@fieldnotes/vtt';
 
 export interface MovementLogPayload {
   entityId: string;

@@ -1,12 +1,11 @@
 import {
   createImage,
   createShape,
-  snapFootprintCenter,
   type Tool,
   type ToolContext,
   type PointerState,
 } from '@fieldnotes/core';
-import { TemplateTool } from '@fieldnotes/vtt';
+import { snapFootprintCenter, TemplateTool } from '@fieldnotes/vtt';
 import { cellUnit } from './cellUnit';
 import { TOKEN_ELEMENT_ZINDEX, TEMPLATE_ELEMENT_ZINDEX } from './tokenSnap';
 import { uploadAsset } from '@/utils/uploadAsset';

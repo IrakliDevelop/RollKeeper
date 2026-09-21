@@ -1,4 +1,4 @@
-import { PathTool, footprintFromSize } from '@fieldnotes/core';
+import { PathTool, footprintFromSize } from '@fieldnotes/vtt';
 
 import {
   MOVEMENT_BEYOND_COLOR,
@@ -6,6 +6,7 @@ import {
   movementRangeBands,
 } from './movementSpeed';
 import { movableTokenIdentity } from './tokenIdentity';
+import { gridConstraintInfo } from './cellUnit';
 
 import type { MovableTokenIdentity } from './tokenIdentity';
 import type { CanvasElement, Viewport } from '@fieldnotes/core';
@@ -58,7 +59,7 @@ export function movableTokenMatch(
 }
 
 /**
- * A core PathTool configured as RollKeeper's Move tool. resolveStart
+ * A VTT PathTool configured as RollKeeper's Move tool. resolveStart
  * hit-tests through the SDK's own selection geometry (rotation, layer
  * visibility, stroke rules) with `match` INSIDE the topmost-first walk, so
  * a covering non-token element cannot swallow the gesture. DM reaches
@@ -89,13 +90,14 @@ export function createMovementPathTool(config: MovementToolConfig): PathTool {
       tool.setOptions({
         rangeBands: movementRangeBands(walkFeet, config.isDashActive()),
       });
-      const gridSize = ctx.gridSize || 0;
+      const { cellSize } = gridConstraintInfo(ctx);
       return {
         origin: {
           x: el.position.x + el.size.w / 2,
           y: el.position.y + el.size.h / 2,
         },
-        footprint: gridSize > 0 ? footprintFromSize(el.size, gridSize) : 1,
+        footprint:
+          cellSize === undefined ? 1 : footprintFromSize(el.size, cellSize),
         anchorKey: el.id,
       };
     },

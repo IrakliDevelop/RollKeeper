@@ -98,8 +98,15 @@ function makeViewport(): { vp: Viewport; container: HTMLDivElement } {
   return { vp: new Viewport(container), container };
 }
 
-// ToolContext for resolveStart: only gridSize is read.
-const ctx = { gridSize: 40 } as unknown as ToolContext;
+// ToolContext for resolveStart: grid metadata comes from constraintService.
+const ctx = {
+  constraintService: {
+    getConstraintInfo: () => ({ gridType: 'square', cellSize: 40 }),
+  },
+} as unknown as ToolContext;
+const noGridCtx = {
+  constraintService: { getConstraintInfo: () => ({}) },
+} as unknown as ToolContext;
 
 describe('createMovementPathTool', () => {
   afterEach(() => vi.restoreAllMocks());
@@ -124,6 +131,29 @@ describe('createMovementPathTool', () => {
       { feet: 25, color: MOVEMENT_WITHIN_SPEED_COLOR },
       { feet: 50, color: MOVEMENT_DASH_COLOR },
     ]);
+    vp.destroy();
+    container.remove();
+  });
+
+  it('derives footprints from constraint cellSize and falls back to one without valid grid metadata', () => {
+    const { vp, container } = makeViewport();
+    const token = {
+      ...tokenAt(40, 40, 'large-1'),
+      size: { w: 80, h: 80 },
+    };
+    vp.store.add(token);
+    const tool = createMovementPathTool({
+      getViewport: () => vp,
+      role: 'dm',
+      resolveMovement: () => null,
+      isDashActive: () => false,
+    });
+    expect(
+      tool.getOptions().resolveStart!({ x: 80, y: 80 }, ctx)?.footprint
+    ).toEqual({ w: 2, h: 2 });
+    expect(
+      tool.getOptions().resolveStart!({ x: 80, y: 80 }, noGridCtx)?.footprint
+    ).toBe(1);
     vp.destroy();
     container.remove();
   });

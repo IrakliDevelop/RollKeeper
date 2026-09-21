@@ -155,4 +155,40 @@ describe('RollKeeper Field Notes VTT boundary', () => {
 
     viewport.destroy();
   });
+
+  it('migrates v3 top-level fog into canonical v4 extensions after centralized registration', () => {
+    const legacyManager = new FogManager({ idFactory: () => 'legacy-only' });
+    const legacyFog = legacyManager.initialize({
+      bounds: { x: 0, y: 0, w: 256, h: 256 },
+      base: 'covered',
+      cellSize: 16,
+    });
+    const plugin = createRollKeeperFogPlugin();
+    const viewport = new Viewport(container, {
+      elementRegistry: fieldnotesElementRegistry,
+      plugins: [plugin],
+      requiredCapabilities: ['vtt:fog'],
+    });
+
+    viewport.loadJSON(
+      JSON.stringify({
+        version: 3,
+        camera: { position: { x: 0, y: 0 }, zoom: 1 },
+        elements: [],
+        layers: [],
+        activeLayerId: 'default-layer',
+        fog: legacyFog,
+      })
+    );
+
+    const exported = JSON.parse(viewport.exportJSON()) as {
+      version: number;
+      extensions: { fog: { version: number; data: unknown } };
+      fog?: unknown;
+    };
+    expect(exported.version).toBe(4);
+    expect(exported.extensions.fog).toEqual({ version: 1, data: legacyFog });
+    expect(exported.fog).toBeUndefined();
+    viewport.destroy();
+  });
 });

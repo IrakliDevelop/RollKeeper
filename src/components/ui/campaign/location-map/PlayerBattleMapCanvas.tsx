@@ -36,10 +36,10 @@ import {
   ArrowTool,
   PencilTool,
   type ElementActivationEvent,
-  type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import type { PathTool } from '@fieldnotes/vtt';
 import { MeasureTool } from '@fieldnotes/vtt';
 import { BattleMapMinimap } from './BattleMapMinimap';
 import { BattleMapExportControl } from './BattleMapExportControl';

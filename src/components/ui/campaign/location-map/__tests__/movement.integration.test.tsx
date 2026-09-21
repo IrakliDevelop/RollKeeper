@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { Viewport, createShape, toPathPresence } from '@fieldnotes/core';
+import { Viewport, createShape } from '@fieldnotes/core';
+import { GridConstraintService, toPathPresence } from '@fieldnotes/vtt';
 import type {
   CanvasElement,
-  PathEmission,
-  PathTool,
   PointerState,
   ToolContext,
 } from '@fieldnotes/core';
+import type { PathEmission, PathTool } from '@fieldnotes/vtt';
 
 import { createMovementPathTool } from '../movementTool';
 import { applyMovementCommit } from '../movementCommit';
@@ -160,12 +160,23 @@ function pt(x: number, y: number): PointerState {
  * below, so the SDK's own cell-center snap leaves round pointer coordinates
  * unchanged (100 and 340 already land on cell centers). */
 function pathCtx(vp: Viewport): ToolContext {
+  const grid = new GridConstraintService(() => ({
+    gridType: 'square',
+    cellSize: 40,
+    cellRadius: 20,
+    hexOrientation: 'pointy',
+  }));
   return {
     camera: { screenToWorld: (p: { x: number; y: number }) => ({ ...p }) },
     store: vp.store,
     requestRender: vi.fn(),
-    gridSize: 40,
-    gridType: 'square',
+    constraintService: {
+      isActive: true,
+      constrainPoint: grid.constrainPoint,
+      getConstraintInfo: grid.getConstraintInfo,
+      hasCapability: () => false,
+      setActive: () => undefined,
+    },
   } as unknown as ToolContext;
 }
 

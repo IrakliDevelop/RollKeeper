@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
+import { GridConstraintService } from '@fieldnotes/vtt';
 
 import {
   useRosterDrag,
@@ -49,14 +50,24 @@ function fakeViewport(overrides: Partial<ToolContext> = {}): {
   added: CanvasElement[];
 } {
   const added: CanvasElement[] = [];
+  const grid = new GridConstraintService(() => ({
+    gridType: 'square',
+    cellSize: 40,
+    cellRadius: 20,
+    hexOrientation: 'pointy',
+  }));
   const toolContext = {
     camera: { screenToWorld: (p: { x: number; y: number }) => p },
     store: { add: vi.fn((el: CanvasElement) => added.push(el)) },
     requestRender: vi.fn(),
-    gridSize: 40,
-    gridType: 'square',
+    constraintService: {
+      isActive: false,
+      constrainPoint: grid.constrainPoint,
+      getConstraintInfo: grid.getConstraintInfo,
+      hasCapability: () => false,
+      setActive: () => undefined,
+    },
     activeLayerId: 'dm-layer',
-    snapToGrid: false,
     ...overrides,
   } as unknown as ToolContext;
   const vp = {
