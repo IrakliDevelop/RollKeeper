@@ -15,10 +15,10 @@ import {
   type CameraView,
   type ElementActivationEvent,
   type FocusAudience,
-  type PathTool,
   type Tool,
   type Viewport,
 } from '@fieldnotes/core';
+import type { PathTool } from '@fieldnotes/vtt';
 import { FogTool, MeasureTool, TemplateTool } from '@fieldnotes/vtt';
 import { PlayerHandTool } from '@/components/ui/campaign/location-map/PlayerHandTool';
 import {

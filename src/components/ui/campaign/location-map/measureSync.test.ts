@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   type Camera,
+  type ConstraintServiceAccess,
   type OverlayRenderer,
   type ToolContext,
   type PointerState,
@@ -38,6 +39,20 @@ function flushFrame(): void {
 }
 
 function toolCtx(): ToolContext {
+  const constraintService: ConstraintServiceAccess = {
+    isActive: true,
+    constrainPoint: point => point,
+    getConstraintInfo: () => ({
+      type: 'grid',
+      gridType: 'square',
+      cellSize: 1,
+      snapStep: 1,
+      nudgeStep: 1,
+    }),
+    setActive: () => undefined,
+    hasCapability: () => false,
+  };
+
   return {
     // Identity camera: screen coords are world coords.
     camera: {
@@ -45,6 +60,7 @@ function toolCtx(): ToolContext {
     } as unknown as Camera,
     store: {} as ToolContext['store'],
     requestRender: vi.fn(),
+    constraintService,
   };
 }
 
@@ -56,9 +72,8 @@ const pt = (x: number, y: number): PointerState => ({
   shiftKey: false,
 });
 
-// With the identity camera and no grid, start/end pass through unsnapped, so
-// a (0,0)->(3,4) drag always yields worldDistance 5 / cells 5 / feet 25 with
-// the default MeasureTool color.
+// The identity camera plus explicit active 1-unit test grid makes a (0,0)->(3,4)
+// drag equal 5 cells/25 feet; constrainPoint preserves unsnapped coordinates.
 const activeFrame = (
   start: { x: number; y: number },
   end: { x: number; y: number }

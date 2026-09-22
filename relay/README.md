@@ -37,7 +37,7 @@ App side (`.env.local`): `BATTLEMAP_RELAY_SECRET=dev-secret-change-me`,
 2. Set env vars: `BATTLEMAP_RELAY_SECRET` (same as Vercel), `REDIS_URL` (Upstash TCP URL from the Upstash console — the `rediss://` one, not the REST URL), and `NIXPACKS_NO_CACHE=1` (without it, Nixpacks mounts its build cache inside `node_modules/.cache` and `npm ci` fails with `EBUSY` trying to remove it).
 3. Railway builds via `relay/railway.json` and health-checks `/healthz`.
 4. Set `NEXT_PUBLIC_BATTLEMAP_RELAY_URL=wss://<service>.up.railway.app` on Vercel and redeploy the app.
-5. Version coupling: the relay runs `@fieldnotes/core` 0.84.0, `@fieldnotes/vtt` 0.11.0,
+5. Version coupling: the relay runs `@fieldnotes/core` 0.85.0, `@fieldnotes/vtt` 0.12.0,
    `@fieldnotes/sync` 0.21.0, `@fieldnotes/sync-server` 0.20.0, and
    `@fieldnotes/sync-redis` 0.12.0. The web app runs the same core/VTT/sync versions plus
    `@fieldnotes/react` 0.13.0. Deploy and verify the relay before releasing the coupled web build.

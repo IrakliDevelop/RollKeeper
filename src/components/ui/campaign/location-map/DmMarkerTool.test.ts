@@ -20,10 +20,16 @@ const down = (x: number, y: number) =>
 
 /**
  * Builds a real ToolContext backed by real fieldnotes Camera/ElementStore
- * instances (per brief: zero @fieldnotes module mocks). `overrides` layers
- * on top for grid settings the tool reads directly.
+ * instances (per brief: zero @fieldnotes module mocks). Grid metadata comes
+ * from the same constraint-service boundary used at runtime.
  */
-function realCtx(overrides: Partial<ToolContext> = {}) {
+function realCtx(
+  overrides: Partial<ToolContext> & {
+    gridSize?: number;
+    gridType?: 'square' | 'hex';
+  } = {}
+) {
+  const { gridSize = 40, gridType = 'square', ...toolOverrides } = overrides;
   const camera = new Camera();
   const store = new ElementStore();
   const requestRender = vi.fn();
@@ -33,11 +39,11 @@ function realCtx(overrides: Partial<ToolContext> = {}) {
     store,
     requestRender,
     switchTool,
-    gridSize: 40,
-    gridType: 'square',
+    constraintService: {
+      getConstraintInfo: () => ({ gridType, cellSize: gridSize }),
+    },
     activeLayerId: 'dm-1',
-    snapToGrid: false,
-    ...overrides,
+    ...toolOverrides,
   } as unknown as ToolContext;
   return { ctx, camera, store, requestRender, switchTool };
 }
@@ -64,7 +70,7 @@ describe('DmMarkerTool placement', () => {
     });
   });
 
-  it('sizes to the grid cell: square gridSize 60 -> 60', () => {
+  it('sizes to the grid cell: square cellSize 60 -> 60', () => {
     const { ctx } = realCtx({ gridSize: 60, gridType: 'square' });
     const onPlaceMarker = vi.fn<(request: PlaceMarkerRequest) => void>();
     const tool = new DmMarkerTool(
@@ -77,7 +83,7 @@ describe('DmMarkerTool placement', () => {
     expect(onPlaceMarker.mock.calls[0]?.[0]?.size).toEqual({ w: 60, h: 60 });
   });
 
-  it('sizes to the grid cell: hex gridSize 60 -> sqrt(3) * 60', () => {
+  it('sizes to the grid cell: hex cellSize 60 -> sqrt(3) * 60', () => {
     const { ctx } = realCtx({ gridSize: 60, gridType: 'hex' });
     const onPlaceMarker = vi.fn<(request: PlaceMarkerRequest) => void>();
     const tool = new DmMarkerTool(
@@ -92,7 +98,7 @@ describe('DmMarkerTool placement', () => {
     expect(size?.h).toBeCloseTo(103.92304845413263, 6);
   });
 
-  it('sizes to 40x40 when no grid is enabled (gridSize undefined)', () => {
+  it('sizes to 40x40 when no grid cell size is enabled', () => {
     const { ctx } = realCtx({ gridSize: undefined, gridType: undefined });
     const onPlaceMarker = vi.fn<(request: PlaceMarkerRequest) => void>();
     const tool = new DmMarkerTool(

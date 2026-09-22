@@ -5,10 +5,14 @@ import type { ToolContext } from '@fieldnotes/core';
 type Point = { x: number; y: number };
 
 function makeCtx(
-  gridSize: number,
+  cellSize: number,
   gridType: 'square' | 'hex'
-): Pick<ToolContext, 'gridSize' | 'gridType'> {
-  return { gridSize, gridType };
+): Pick<ToolContext, 'constraintService'> {
+  return {
+    constraintService: {
+      getConstraintInfo: () => ({ gridType, cellSize }),
+    },
+  } as unknown as Pick<ToolContext, 'constraintService'>;
 }
 
 describe('dragDistanceFeet', () => {
@@ -53,7 +57,7 @@ describe('dragDistanceFeet', () => {
   });
 
   describe('hex grid', () => {
-    it('calculates 5 ft for a √3×40 move with 40px gridSize', () => {
+    it('calculates 5 ft for a √3×40 move with 40px cells', () => {
       const ctx = makeCtx(40, 'hex');
       const start: Point = { x: 0, y: 0 };
       const moveDistance = Math.sqrt(3) * 40;
@@ -98,11 +102,12 @@ describe('dragDistanceFeet', () => {
       expect(dragDistanceFeet(point, point, ctx)).toBe(0);
     });
 
-    it('uses default gridSize of 40 when not provided', () => {
-      // gridSize genuinely omitted — cellUnit should default it to 40 for square.
-      const ctx: Pick<ToolContext, 'gridSize' | 'gridType'> = {
-        gridType: 'square',
-      };
+    it('uses the default cell size of 40 when metadata omits it', () => {
+      const ctx = {
+        constraintService: {
+          getConstraintInfo: () => ({ gridType: 'square' }),
+        },
+      } as unknown as Pick<ToolContext, 'constraintService'>;
       const start: Point = { x: 0, y: 0 };
       const current: Point = { x: 40, y: 0 };
       // 40px / 40px (default) = 1 cell * 5 ft = 5 ft

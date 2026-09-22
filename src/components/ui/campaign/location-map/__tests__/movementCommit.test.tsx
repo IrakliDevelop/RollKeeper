@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { Viewport, createShape } from '@fieldnotes/core';
-import type { PathEmission } from '@fieldnotes/core';
+import type { PathEmission } from '@fieldnotes/vtt';
 
 import { applyMovementCommit } from '../movementCommit';
 import type { MovementCommitContext } from '../movementCommit';

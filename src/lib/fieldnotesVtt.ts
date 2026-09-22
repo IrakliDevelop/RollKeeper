@@ -90,7 +90,7 @@ export function getVttGridController(viewport: Viewport): GridController {
     requestRender: () => viewport.requestRender(),
     getActiveLayerId: () => viewport.layerManager.activeLayerId,
     toolContext: viewport.toolContext,
-    defaultGridSize: viewport.toolContext.gridSize ?? 24,
+    defaultGridSize: 24,
     elementRegistry: viewport.elementRegistry,
     constraintService: viewport.constraintProxy,
   });

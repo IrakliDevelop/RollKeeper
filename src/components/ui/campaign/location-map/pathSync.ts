@@ -1,13 +1,13 @@
-import { RemotePathOverlay, toPathPresence } from '@fieldnotes/core';
+import { RemotePathOverlay, toPathPresence } from '@fieldnotes/vtt';
 
 import { movableTokenIdentity } from './tokenIdentity';
 
+import type { CanvasElement } from '@fieldnotes/core';
 import type {
-  CanvasElement,
   PathEmission,
   PathTool,
   RemotePathOverlayHost,
-} from '@fieldnotes/core';
+} from '@fieldnotes/vtt';
 
 /**
  * Movement-path presence wiring. Path traffic is ephemeral by contract:

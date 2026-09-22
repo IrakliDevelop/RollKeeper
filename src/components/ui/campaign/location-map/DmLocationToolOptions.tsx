@@ -1,18 +1,19 @@
 'use client';
 
-import type { DiagonalRule, ShapeKind } from '@fieldnotes/core';
+import type { ShapeKind } from '@fieldnotes/core';
 import type {
   ArrowToolOptions,
   LaserToolOptions,
   NoteToolOptions,
-  PathToolOptions,
   PencilToolOptions,
   PingToolOptions,
   ShapeToolOptions,
   TextToolOptions,
 } from '@fieldnotes/core';
 import type {
+  DiagonalRule,
   MeasureToolOptions,
+  PathToolOptions,
   TemplateRenderStyle,
   TemplateShape,
   TemplateToolOptions,

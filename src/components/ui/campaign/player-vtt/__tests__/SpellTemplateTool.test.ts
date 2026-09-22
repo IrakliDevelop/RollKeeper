@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type {
   CanvasElement,
+  ConstraintServiceAccess,
   ToolContext,
   PointerState,
 } from '@fieldnotes/core';
@@ -11,9 +12,26 @@ import {
   type SpellTemplateConfig,
 } from '@/components/ui/campaign/player-vtt/SpellTemplateTool';
 
-function fakeCtx() {
+type FakeCtxOptions = {
+  gridType?: 'square' | 'hex';
+  cellSize?: number;
+  constrainPoint?: ConstraintServiceAccess['constrainPoint'];
+};
+
+function fakeCtx({
+  gridType = 'square',
+  cellSize = 40,
+  constrainPoint = point => point,
+}: FakeCtxOptions = {}) {
   const added: CanvasElement[] = [];
   const updates: Array<{ id: string; patch: Record<string, unknown> }> = [];
+  const constraintService: ConstraintServiceAccess = {
+    isActive: false,
+    setActive: () => undefined,
+    constrainPoint,
+    getConstraintInfo: () => ({ type: 'grid', gridType, cellSize }),
+    hasCapability: () => false,
+  };
   const ctx = {
     camera: { screenToWorld: (p: { x: number; y: number }) => p },
     store: {
@@ -30,9 +48,8 @@ function fakeCtx() {
     requestRender: vi.fn(),
     switchTool: vi.fn(),
     setCursor: vi.fn(),
-    gridSize: 40,
+    constraintService,
     activeLayerId: 'layer-1',
-    snapToGrid: false, // smartSnap becomes identity without grid snap
   } as unknown as ToolContext;
   return { ctx, added, updates };
 }
@@ -136,11 +153,7 @@ describe('SpellTemplateTool', () => {
 
   it('snaps placement through the constraint service without rewriting aim coordinates', () => {
     const constrainPoint = vi.fn(() => ({ x: 40, y: 80 }));
-    (
-      f.ctx as { constraintService?: { constrainPoint: typeof constrainPoint } }
-    ).constraintService = {
-      constrainPoint,
-    };
+    f = fakeCtx({ constrainPoint });
     const { tool } = armed({ shape: 'cone', sizeFeet: 15 });
     tool.onPointerDown(down(43, 77), f.ctx);
     tool.onPointerMove(down(140, 80), f.ctx);
@@ -160,7 +173,7 @@ describe('SpellTemplateTool', () => {
     // Mirrors TemplateTool/computeTemplateResize: snapUnit on hex grids is
     // √3 × gridSize. Using raw gridSize undersized templates by √3 and the
     // resize snap then read a "20 ft" circle back as 10 ft.
-    (f.ctx as { gridType?: string }).gridType = 'hex';
+    f = fakeCtx({ gridType: 'hex' });
     const { tool } = armed({ shape: 'circle', sizeFeet: 20 });
     tool.onPointerDown(down(0, 0), f.ctx);
     expect(placedTemplate(f).radius).toBeCloseTo(4 * Math.sqrt(3) * 40, 6);

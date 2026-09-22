@@ -3,7 +3,11 @@ import { render, cleanup, act } from '@testing-library/react';
 import { TokenDragDistanceBadge } from '@/components/ui/campaign/dm-vtt/TokenDragDistanceBadge';
 import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
-import type { CanvasElement, Viewport } from '@fieldnotes/core';
+import type {
+  CanvasElement,
+  ConstraintServiceAccess,
+  Viewport,
+} from '@fieldnotes/core';
 
 type FakeElement = {
   id: string;
@@ -21,9 +25,20 @@ function makeFakeViewport() {
   let activeToolName: string | null = 'select';
   const elements = new Map<string, FakeElement>();
   let selectedIds: string[] = [];
+  const constraintService: ConstraintServiceAccess = {
+    isActive: false,
+    setActive: () => undefined,
+    constrainPoint: point => point,
+    getConstraintInfo: () => ({
+      type: 'grid',
+      gridType: 'square',
+      cellSize: 50,
+    }),
+    hasCapability: () => false,
+  };
 
   const viewport = {
-    toolContext: { gridSize: 50, gridType: 'square' as const },
+    toolContext: { constraintService },
     toolManager: {
       get activeTool() {
         return activeToolName ? { name: activeToolName } : null;
