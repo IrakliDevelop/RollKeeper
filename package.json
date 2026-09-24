@@ -48,6 +48,7 @@
     "test:auth:e2e": "playwright test --config config/playwright/auth.config.ts && playwright test --config config/playwright/auth.wizard.config.ts",
     "test:loot:e2e": "playwright test --config config/playwright/loot.config.ts",
     "test:shop:e2e": "playwright test --config config/playwright/shop.config.ts",
+    "test:sheet-drawer:e2e": "playwright test --config config/playwright/sheet-drawer.config.ts",
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
     "test:all": "vitest run",
