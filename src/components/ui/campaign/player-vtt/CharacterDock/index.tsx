@@ -24,6 +24,8 @@ export interface CharacterDockProps {
   hasPendingPlacement: boolean;
   onCancelPlacement: () => void;
   onOpenSheet?: () => void;
+  /** Attached to the Sheet button so focus can return to it on drawer close. */
+  sheetButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 /**
@@ -39,6 +41,7 @@ export function CharacterDock({
   hasPendingPlacement,
   onCancelPlacement,
   onOpenSheet,
+  sheetButtonRef,
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
   const toggleBuff = useCharacterStore(state => state.toggleBuff);
@@ -125,11 +128,12 @@ export function CharacterDock({
         </div>
         {onOpenSheet && (
           <Button
+            ref={sheetButtonRef}
             variant="outline"
             size="sm"
             onClick={onOpenSheet}
-            title="Open full sheet"
-            aria-label="Open full sheet"
+            title="Open character sheet"
+            aria-label="Open character sheet"
           >
             <BookOpen className="mr-1 h-3.5 w-3.5" /> Sheet
           </Button>

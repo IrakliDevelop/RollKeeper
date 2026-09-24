@@ -17,9 +17,16 @@ export interface SheetDrawerProps {
     isCrit: boolean
   ) => void;
   onRested: (type: 'short' | 'long') => void;
+  /** Forwarded to SideDrawer; see its focus-return contract. */
+  onCloseAutoFocus?: (event: Event) => void;
 }
 
-export function SheetDrawer({ open, onClose, ...rest }: SheetDrawerProps) {
+export function SheetDrawer({
+  open,
+  onClose,
+  onCloseAutoFocus,
+  ...rest
+}: SheetDrawerProps) {
   const name = useCharacterStore(s => s.character.name);
   return (
     <SideDrawer
@@ -28,6 +35,7 @@ export function SheetDrawer({ open, onClose, ...rest }: SheetDrawerProps) {
         if (!next) onClose();
       }}
       title={`${name} character sheet`}
+      onCloseAutoFocus={onCloseAutoFocus}
     >
       {/* Radix unmounts content when closed, so OwnSheet's lock state resets per open. */}
       <OwnSheet onClose={onClose} {...rest} />

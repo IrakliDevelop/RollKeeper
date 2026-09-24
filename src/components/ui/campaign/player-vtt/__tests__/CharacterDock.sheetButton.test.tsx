@@ -19,14 +19,16 @@ describe('CharacterDock Sheet button', () => {
   it('opens the sheet', () => {
     const onOpenSheet = vi.fn();
     render(<CharacterDock {...baseProps} onOpenSheet={onOpenSheet} />);
-    fireEvent.click(screen.getByRole('button', { name: /open full sheet/i }));
+    fireEvent.click(
+      screen.getByRole('button', { name: /open character sheet/i })
+    );
     expect(onOpenSheet).toHaveBeenCalledTimes(1);
   });
 
   it('hides the button when no handler is given', () => {
     render(<CharacterDock {...baseProps} />);
     expect(
-      screen.queryByRole('button', { name: /open full sheet/i })
+      screen.queryByRole('button', { name: /open character sheet/i })
     ).toBeNull();
   });
 });

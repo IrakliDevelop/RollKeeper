@@ -334,7 +334,9 @@ test.describe('player map sheet drawer', () => {
     await waitForCharacterLoaded(playerPage, characterId);
     await expect(sheetDialog(playerPage)).toBeHidden();
 
-    await playerPage.getByRole('button', { name: 'Open full sheet' }).click();
+    await playerPage
+      .getByRole('button', { name: 'Open character sheet' })
+      .click();
     const reopened = sheetDialog(playerPage);
     await expect(reopened).toBeVisible({ timeout: 10_000 });
     await expect(reopened.getByText(expectedHp, { exact: true })).toBeVisible();
@@ -354,7 +356,7 @@ test.describe('player map sheet drawer', () => {
       playerPage.getByRole('button', { name: 'Collapse character dock' })
     ).toBeVisible();
     await expect(
-      playerPage.getByRole('button', { name: 'Open full sheet' })
+      playerPage.getByRole('button', { name: 'Open character sheet' })
     ).toBeVisible();
   });
 

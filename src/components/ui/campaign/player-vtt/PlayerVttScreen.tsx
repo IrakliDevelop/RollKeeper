@@ -77,7 +77,14 @@ export function PlayerVttScreen({
   const [combatCollapsed, setCombatCollapsed] = useState(defaultCollapsed);
   const [dockCollapsed, setDockCollapsed] = useState(defaultCollapsed);
   const sheetReady = character.id === characterId;
-  const { sheetOpen, openSheet, closeSheet } = useSheetDrawerState({
+  const {
+    sheetOpen,
+    openSheet,
+    openSheetFromDock,
+    closeSheet,
+    sheetButtonRef,
+    handleSheetCloseAutoFocus,
+  } = useSheetDrawerState({
     sheetReady,
     dockCollapsed,
     setDockCollapsed,
@@ -158,12 +165,14 @@ export function PlayerVttScreen({
           connectionLive={connectionStatus === 'live'}
           hasPendingPlacement={pendingPlacement !== null}
           onCancelPlacement={cancelPlacement}
-          onOpenSheet={sheetReady ? openSheet : undefined}
+          onOpenSheet={sheetReady ? openSheetFromDock : undefined}
+          sheetButtonRef={sheetButtonRef}
         />
         <StatusEffectTray />
         <SheetDrawer
           open={sheetOpen}
           onClose={closeSheet}
+          onCloseAutoFocus={handleSheetCloseAutoFocus}
           addToast={addToast}
           showAttackRoll={showAttackRoll}
           onRested={type =>
