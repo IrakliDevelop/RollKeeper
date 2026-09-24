@@ -6,6 +6,7 @@ import type { CharacterState, Spell } from '@/types/character';
 import {
   buildConditionToggles,
   buildFeatureGroups,
+  buildOtherEffects,
   buildProficiencyGroups,
   buildSaveRows,
   buildSkillRows,
@@ -279,6 +280,62 @@ describe('buildConditionToggles', () => {
     expect(toggles).toHaveLength(14);
     expect(toggles.find(t => t.name === 'Prone')!.activeId).toBe('prone-1');
     expect(toggles.some(t => t.name === 'Exhaustion')).toBe(false);
+  });
+});
+
+describe('buildOtherEffects', () => {
+  const cond = (
+    id: string,
+    name: string,
+    extra: Partial<
+      CharacterState['conditionsAndDiseases']['activeConditions'][number]
+    > = {}
+  ) => ({
+    id,
+    name,
+    source: 'Self',
+    description: '',
+    stackable: false,
+    count: 1,
+    appliedAt: '',
+    ...extra,
+  });
+
+  it('keeps non-standard conditions and diseases, dropping standard ones and exhaustion', () => {
+    const base = fixture();
+    const view = buildOtherEffects({
+      ...base,
+      conditionsAndDiseases: {
+        ...base.conditionsAndDiseases,
+        activeConditions: [
+          cond('p', 'Prone'),
+          cond('e', 'Exhaustion', { count: 2 }),
+          cond('b', 'Bless', { kind: 'buff', source: 'Map' }),
+          cond('x', 'Hexed', { count: 3 }),
+        ],
+        activeDiseases: [
+          {
+            id: 'd1',
+            name: 'Sewer Plague',
+            source: 'DMG',
+            description: '',
+            appliedAt: '',
+          },
+        ],
+      },
+    });
+    expect(view.conditions).toEqual([
+      { id: 'b', name: 'Bless', kind: 'buff', count: 1, source: 'Map' },
+      { id: 'x', name: 'Hexed', kind: 'neutral', count: 3, source: 'Self' },
+    ]);
+    expect(view.diseases).toEqual([
+      { id: 'd1', name: 'Sewer Plague', source: 'DMG' },
+    ]);
+  });
+
+  it('is empty when nothing non-standard is active', () => {
+    const view = buildOtherEffects(fixture());
+    expect(view).toEqual({ conditions: [], diseases: [] });
   });
 });
 

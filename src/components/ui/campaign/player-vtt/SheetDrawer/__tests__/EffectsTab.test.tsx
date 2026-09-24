@@ -5,6 +5,7 @@ import {
   fireEvent,
   act,
   cleanup,
+  within,
 } from '@testing-library/react';
 
 import { EffectsTab } from '../tabs/EffectsTab';
@@ -118,5 +119,96 @@ describe('EffectsTab', () => {
       );
     });
     expect(await screen.findByText(/−2 to d20 tests/)).toBeInTheDocument();
+  });
+
+  it('does not create duplicate conditions on a rapid double tap', () => {
+    render(<EffectsTab addToast={vi.fn()} />);
+    const prone = screen.getByRole('button', { name: 'Prone' });
+    // Both clicks land before React re-renders, so the second click still
+    // sees the stale "inactive" closure.
+    act(() => {
+      prone.click();
+      prone.click();
+    });
+    expect(active().filter(c => c.name === 'Prone')).toHaveLength(1);
+  });
+
+  it('lists other active effects and diseases, and removes an effect', () => {
+    const base = getChar();
+    seed({
+      conditionsAndDiseases: {
+        ...base.conditionsAndDiseases,
+        activeConditions: [
+          {
+            id: 'prone-1',
+            name: 'Prone',
+            source: 'Self',
+            description: '',
+            stackable: false,
+            count: 1,
+            appliedAt: '',
+            kind: 'debuff',
+          },
+          {
+            id: 'bless-1',
+            name: 'Bless',
+            source: 'Map',
+            description: '',
+            stackable: false,
+            count: 1,
+            appliedAt: '',
+            kind: 'buff',
+          },
+          {
+            id: 'hex-1',
+            name: 'Hexed',
+            source: 'DM',
+            description: '',
+            stackable: true,
+            count: 2,
+            appliedAt: '',
+          },
+        ],
+        activeDiseases: [
+          {
+            id: 'd1',
+            name: 'Sewer Plague',
+            source: 'DMG',
+            description: '',
+            appliedAt: '',
+          },
+        ],
+      },
+    });
+    render(<EffectsTab addToast={vi.fn()} />);
+    const other = screen.getByRole('region', { name: /other active effects/i });
+    expect(within(other).getByText('Bless')).toBeInTheDocument();
+    expect(within(other).getByText('buff')).toBeInTheDocument();
+    expect(within(other).getByText('×2')).toBeInTheDocument();
+    expect(within(other).queryByText('Prone')).toBeNull();
+    expect(within(other).getByText('Sewer Plague')).toBeInTheDocument();
+    expect(
+      within(other).queryByRole('button', { name: /remove sewer plague/i })
+    ).toBeNull();
+
+    fireEvent.click(
+      within(other).getByRole('button', { name: 'Remove Bless' })
+    );
+    expect(active().some(c => c.name === 'Bless')).toBe(false);
+    expect(active().some(c => c.name === 'Prone')).toBe(true);
+  });
+
+  it('hides the other-effects section when nothing is active', () => {
+    seed({
+      conditionsAndDiseases: {
+        ...getChar().conditionsAndDiseases,
+        activeConditions: [],
+        activeDiseases: [],
+      },
+    });
+    render(<EffectsTab addToast={vi.fn()} />);
+    expect(
+      screen.queryByRole('region', { name: /other active effects/i })
+    ).toBeNull();
   });
 });

@@ -14,14 +14,13 @@ import {
 import type { CharacterState } from '@/types/character';
 import type { SheetRoll } from '../SheetDrawer.types';
 
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
+
 export interface EffectsConcentrationProps {
   character: CharacterState;
   roll?: SheetRoll;
   onEndConcentration: () => void;
 }
-
-const SECTION_CLASS = 'border-divider bg-surface rounded-xl border p-3';
-const HEADING_CLASS = 'text-faint mb-2 text-xs font-bold uppercase';
 
 /** Concentration card: current spell + CON save hint, or the empty state. */
 export function EffectsConcentration({
@@ -34,7 +33,7 @@ export function EffectsConcentration({
   if (!concentration.isConcentrating) {
     return (
       <div className={SECTION_CLASS}>
-        <div className={HEADING_CLASS}>Concentration</div>
+        <h3 className={HEADING_CLASS}>Concentration</h3>
         <p className="text-muted text-sm">
           Not concentrating. Casting a concentration spell shows it here and on
           your token.
@@ -51,9 +50,9 @@ export function EffectsConcentration({
         <div className="flex items-start gap-2">
           <Zap className="text-accent-amber-text mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <div className="text-heading text-sm font-semibold">
+            <h3 className="text-heading text-sm font-semibold">
               Concentrating on {concentration.spellName}
-            </div>
+            </h3>
             <p className="text-faint text-xs">
               Taking damage? Make a Constitution save, DC 10 or half the damage
               (higher).

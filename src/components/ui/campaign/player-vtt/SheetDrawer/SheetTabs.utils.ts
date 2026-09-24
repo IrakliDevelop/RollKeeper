@@ -25,6 +25,7 @@ import type {
 import type {
   ConditionToggleView,
   FeatureGroupView,
+  OtherEffectsView,
   FeatureRowView,
   ProficiencyGroupView,
   SaveRowView,
@@ -238,6 +239,34 @@ export function buildConditionToggles(
       active.find(a => a.name.toLowerCase() === e.name.toLowerCase())?.id ??
       null,
   }));
+}
+
+const STANDARD_CONDITION_NAMES = new Set(
+  DEBUFF_PALETTE.filter(e => e.origin === 'official').map(e =>
+    e.name.toLowerCase()
+  )
+);
+
+/**
+ * Active effects the condition toggles and exhaustion stepper don't cover:
+ * buffs, custom/DM-library conditions, plus read-only diseases.
+ */
+export function buildOtherEffects(c: CharacterState): OtherEffectsView {
+  const conditions = (c.conditionsAndDiseases?.activeConditions ?? [])
+    .filter(a => !STANDARD_CONDITION_NAMES.has(a.name.toLowerCase()))
+    .map(a => ({
+      id: a.id,
+      name: a.name,
+      kind: a.kind ?? 'neutral',
+      count: a.count,
+      source: a.source,
+    }));
+  const diseases = (c.conditionsAndDiseases?.activeDiseases ?? []).map(d => ({
+    id: d.id,
+    name: d.name,
+    source: d.source,
+  }));
+  return { conditions, diseases };
 }
 
 export function exhaustionRulesText(

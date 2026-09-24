@@ -41,4 +41,36 @@ describe('useExhaustionStepper', () => {
       )
     ).toBe(false);
   });
+
+  it('ignores a second increment while the first add is still loading', async () => {
+    const { result } = renderHook(() => useExhaustionStepper());
+    await act(async () => {
+      await Promise.all([
+        result.current.increment(),
+        result.current.increment(),
+      ]);
+    });
+    const exhaustion = () =>
+      getChar().conditionsAndDiseases.activeConditions.filter(
+        c => c.name === 'Exhaustion'
+      );
+    expect(exhaustion()).toHaveLength(1);
+    expect(exhaustion()[0].count).toBe(1);
+
+    await act(() => result.current.increment());
+    expect(exhaustion()).toHaveLength(1);
+    expect(exhaustion()[0].count).toBe(2);
+  });
+
+  it('tolerates a character without conditionsAndDiseases when decrementing', async () => {
+    useCharacterStore.setState({
+      character: {
+        ...makeCharacter(),
+        conditionsAndDiseases: undefined,
+      } as unknown as ReturnType<typeof makeCharacter>,
+    });
+    const { result } = renderHook(() => useExhaustionStepper());
+    expect(result.current.level).toBe(0);
+    expect(() => act(() => result.current.decrement())).not.toThrow();
+  });
 });

@@ -2,26 +2,30 @@
 
 import { useMemo } from 'react';
 
-import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
 
 import { DockBuffs } from '../../CharacterDock/DockBuffs';
 import { EffectsConcentration } from './EffectsConcentration';
+import { EffectsOtherList } from './EffectsOtherList';
 
-import { useCharacterStore } from '@/store/characterStore';
 import { useExhaustionStepper } from '@/hooks/useExhaustionStepper';
+import { useCharacterStore } from '@/store/characterStore';
 
-import { buildConditionToggles, exhaustionRulesText } from '../SheetTabs.utils';
+import {
+  buildConditionToggles,
+  buildOtherEffects,
+  exhaustionRulesText,
+} from '../SheetTabs.utils';
 
+import type { ToastData } from '@/components/ui/feedback/Toast';
 import type { SheetRoll } from '../SheetDrawer.types';
+
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 
 export interface EffectsTabProps {
   addToast: (t: Omit<ToastData, 'id'>) => void;
   roll?: SheetRoll;
 }
-
-const SECTION_CLASS = 'border-divider bg-surface rounded-xl border p-3';
-const HEADING_CLASS = 'text-faint mb-2 text-xs font-bold uppercase';
 
 export function EffectsTab({ addToast, roll }: EffectsTabProps) {
   const character = useCharacterStore(s => s.character);
@@ -35,7 +39,23 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
     () => buildConditionToggles(character),
     [character]
   );
+  const otherEffects = useMemo(() => buildOtherEffects(character), [character]);
   const buffs = character.temporaryBuffs ?? [];
+
+  const handleToggleCondition = (name: string, activeId: string | null) => {
+    if (activeId) {
+      removeCondition(activeId);
+      return;
+    }
+    // Re-check live state: a double tap fires twice before React re-renders,
+    // and the second click's snapshot would still read "inactive".
+    const alreadyActive = (
+      useCharacterStore.getState().character.conditionsAndDiseases
+        ?.activeConditions ?? []
+    ).some(a => a.name.toLowerCase() === name.toLowerCase());
+    if (alreadyActive) return;
+    addCondition(name, 'Self', '', 1, undefined, undefined, 'debuff');
+  };
 
   const handleToggleBuff = (id: string) => {
     const buff = buffs.find(b => b.id === id);
@@ -64,7 +84,7 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
       )}
 
       <div className={SECTION_CLASS}>
-        <div className={HEADING_CLASS}>Conditions</div>
+        <h3 className={HEADING_CLASS}>Conditions</h3>
         <div className="grid grid-cols-3 gap-2">
           {conditionToggles.map(toggle => (
             <Button
@@ -74,17 +94,7 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
               size="sm"
               aria-pressed={!!toggle.activeId}
               onClick={() =>
-                toggle.activeId
-                  ? removeCondition(toggle.activeId)
-                  : addCondition(
-                      toggle.name,
-                      'Self',
-                      '',
-                      1,
-                      undefined,
-                      undefined,
-                      'debuff'
-                    )
+                handleToggleCondition(toggle.name, toggle.activeId)
               }
             >
               {toggle.name}
@@ -94,8 +104,10 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
         <p className="text-faint mt-2 text-[10px]">Also shows on your token.</p>
       </div>
 
+      <EffectsOtherList effects={otherEffects} onRemove={removeCondition} />
+
       <div className={SECTION_CLASS}>
-        <div className={HEADING_CLASS}>Exhaustion</div>
+        <h3 className={HEADING_CLASS}>Exhaustion</h3>
         <div className="flex items-center gap-3">
           <Button
             type="button"

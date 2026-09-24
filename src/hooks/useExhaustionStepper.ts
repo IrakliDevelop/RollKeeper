@@ -1,10 +1,18 @@
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 import { useCharacterStore } from '@/store/characterStore';
 import { getExhaustionByVariant } from '@/utils/conditionsDiseasesLoader';
-import type { ActiveCondition } from '@/types/character';
+import type { ActiveCondition, CharacterState } from '@/types/character';
 
 const EMPTY_ACTIVE_CONDITIONS: ActiveCondition[] = [];
+
+function findExhaustion(
+  character: CharacterState
+): ActiveCondition | undefined {
+  return (character.conditionsAndDiseases?.activeConditions ?? []).find(
+    c => c.name.toLowerCase() === 'exhaustion'
+  );
+}
 
 export interface UseExhaustionStepperResult {
   level: number;
@@ -31,6 +39,9 @@ export function useExhaustionStepper(): UseExhaustionStepperResult {
   const addCondition = useCharacterStore(s => s.addCondition);
   const updateCondition = useCharacterStore(s => s.updateCondition);
   const removeCondition = useCharacterStore(s => s.removeCondition);
+  // Guards the async first add: a second tap while the exhaustion data is
+  // still loading would otherwise add a duplicate condition.
+  const addingRef = useRef(false);
 
   const existing = activeConditions.find(
     c => c.name.toLowerCase() === 'exhaustion'
@@ -38,30 +49,32 @@ export function useExhaustionStepper(): UseExhaustionStepperResult {
   const level = existing?.count ?? 0;
 
   const increment = useCallback(async () => {
-    const current = useCharacterStore
-      .getState()
-      .character.conditionsAndDiseases.activeConditions.find(
-        c => c.name.toLowerCase() === 'exhaustion'
-      );
+    if (addingRef.current) return;
+    const state = useCharacterStore.getState();
+    const current = findExhaustion(state.character);
     if (current) {
       updateCondition(current.id, { count: Math.min(current.count + 1, 6) });
       return;
     }
-    const currentVariant =
-      useCharacterStore.getState().character.conditionsAndDiseases
-        .exhaustionVariant;
-    const data = await getExhaustionByVariant(currentVariant);
-    if (data) {
-      addCondition(data.name, data.source, data.description, 1);
+    addingRef.current = true;
+    try {
+      const data = await getExhaustionByVariant(
+        state.character.conditionsAndDiseases?.exhaustionVariant ?? '2024'
+      );
+      // Another writer may have added exhaustion while we were loading.
+      const added = findExhaustion(useCharacterStore.getState().character);
+      if (added) {
+        updateCondition(added.id, { count: Math.min(added.count + 1, 6) });
+      } else if (data) {
+        addCondition(data.name, data.source, data.description, 1);
+      }
+    } finally {
+      addingRef.current = false;
     }
   }, [addCondition, updateCondition]);
 
   const decrement = useCallback(() => {
-    const current = useCharacterStore
-      .getState()
-      .character.conditionsAndDiseases.activeConditions.find(
-        c => c.name.toLowerCase() === 'exhaustion'
-      );
+    const current = findExhaustion(useCharacterStore.getState().character);
     if (!current) return;
     if (current.count - 1 <= 0) {
       removeCondition(current.id);

@@ -143,3 +143,24 @@ export interface ConditionToggleView {
   name: string;
   activeId: string | null;
 }
+
+/** A non-standard active condition (buff, custom, DM-library) for the Effects tab. */
+export interface OtherConditionView {
+  id: string;
+  name: string;
+  kind: 'buff' | 'debuff' | 'neutral';
+  count: number;
+  source: string;
+}
+
+/** A read-only active disease for the Effects tab. */
+export interface DiseaseView {
+  id: string;
+  name: string;
+  source: string;
+}
+
+export interface OtherEffectsView {
+  conditions: OtherConditionView[];
+  diseases: DiseaseView[];
+}
