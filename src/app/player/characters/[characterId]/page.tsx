@@ -55,6 +55,7 @@ import {
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { NavigationContext } from '@/contexts/NavigationContext';
 import { useSimpleDiceRoll } from '@/hooks/useSimpleDiceRoll';
+import { useSheetRoll } from '@/hooks/useSheetRoll';
 import { useLiveInitiative } from '@/hooks/useLiveInitiative';
 import { useLocationSync } from '@/hooks/useLocationSync';
 import { usePartySync } from '@/hooks/usePartySync';
@@ -111,6 +112,12 @@ export default function CharacterSheet() {
     showLongRest,
     addToast,
   } = useToast();
+
+  const rollD20ForSheet = useSheetRoll({
+    diceReady: diceBoxInitialized,
+    rollDice,
+    showAttackRoll,
+  });
 
   const handleRemovedFromCampaign = useCallback(() => {
     addToast({
@@ -805,174 +812,23 @@ export default function CharacterSheet() {
   };
 
   // Roll saving throw
-  const rollSavingThrow = async (ability: AbilityName) => {
-    const saveModifier = getSavingThrowModifier(ability);
-
-    // Roll 3D dice and use actual result
-    if (diceBoxInitialized) {
-      try {
-        const rollResult = await rollDice(
-          `1d20${saveModifier > 0 ? `+${saveModifier}` : saveModifier}`
-        );
-        if (
-          rollResult &&
-          typeof rollResult === 'object' &&
-          'individualValues' in rollResult
-        ) {
-          const summary = rollResult as RollSummary;
-          const roll = summary.individualValues[0] || 1; // Get the d20 result
-          const isCrit = roll === 20;
-
-          // Use showAttackRoll since it's more appropriate for displaying dice rolls
-          showAttackRoll(
-            `${ABILITY_NAMES[ability]} Save`,
-            roll,
-            saveModifier,
-            isCrit
-          );
-          return;
-        }
-      } catch (error) {
-        console.warn(
-          'Dice animation failed, falling back to random roll:',
-          error
-        );
-      }
-    }
-
-    // Fallback to random roll if animation fails or isn't available
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const isCrit = roll === 20;
-
-    // Use showAttackRoll since it's more appropriate for displaying dice rolls
-    showAttackRoll(
+  const rollSavingThrow = (ability: AbilityName) =>
+    rollD20ForSheet(
       `${ABILITY_NAMES[ability]} Save`,
-      roll,
-      saveModifier,
-      isCrit
+      getSavingThrowModifier(ability)
     );
-  };
-
   // Roll skill check
-  const rollSkillCheck = async (skillName: SkillName) => {
-    const skillModifier = getSkillModifier(skillName);
-
-    // Roll 3D dice and use actual result
-    if (diceBoxInitialized) {
-      try {
-        const rollResult = await rollDice(
-          `1d20${skillModifier > 0 ? `+${skillModifier}` : skillModifier}`
-        );
-        if (
-          rollResult &&
-          typeof rollResult === 'object' &&
-          'individualValues' in rollResult
-        ) {
-          const summary = rollResult as RollSummary;
-          const roll = summary.individualValues[0] || 1; // Get the d20 result
-          const isCrit = roll === 20;
-
-          showAttackRoll(SKILL_NAMES[skillName], roll, skillModifier, isCrit);
-          return;
-        }
-      } catch (error) {
-        console.warn(
-          'Dice animation failed, falling back to random roll:',
-          error
-        );
-      }
-    }
-
-    // Fallback to random roll if animation fails or isn't available
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const isCrit = roll === 20;
-
-    showAttackRoll(SKILL_NAMES[skillName], roll, skillModifier, isCrit);
-  };
-
+  const rollSkillCheck = (skillName: SkillName) =>
+    rollD20ForSheet(SKILL_NAMES[skillName], getSkillModifier(skillName));
   // Roll ability check
-  const rollAbilityCheck = async (ability: AbilityName) => {
-    const abilityModifier = getAbilityModifier(ability);
-
-    // Roll 3D dice and use actual result
-    if (diceBoxInitialized) {
-      try {
-        const rollResult = await rollDice(
-          `1d20${abilityModifier > 0 ? `+${abilityModifier}` : abilityModifier}`
-        );
-        if (
-          rollResult &&
-          typeof rollResult === 'object' &&
-          'individualValues' in rollResult
-        ) {
-          const summary = rollResult as RollSummary;
-          const roll = summary.individualValues[0] || 1; // Get the d20 result
-          const isCrit = roll === 20;
-
-          showAttackRoll(
-            `${ABILITY_NAMES[ability]} Check`,
-            roll,
-            abilityModifier,
-            isCrit
-          );
-          return;
-        }
-      } catch (error) {
-        console.warn(
-          'Dice animation failed, falling back to random roll:',
-          error
-        );
-      }
-    }
-
-    // Fallback to random roll if animation fails or isn't available
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const isCrit = roll === 20;
-
-    showAttackRoll(
+  const rollAbilityCheck = (ability: AbilityName) =>
+    rollD20ForSheet(
       `${ABILITY_NAMES[ability]} Check`,
-      roll,
-      abilityModifier,
-      isCrit
+      getAbilityModifier(ability)
     );
-  };
-
   // Roll initiative
-  const rollInitiative = async () => {
-    const initiativeModifier = getInitiativeModifier();
-
-    // Roll 3D dice and use actual result
-    if (diceBoxInitialized) {
-      try {
-        const rollResult = await rollDice(
-          `1d20${initiativeModifier > 0 ? `+${initiativeModifier}` : initiativeModifier}`
-        );
-        if (
-          rollResult &&
-          typeof rollResult === 'object' &&
-          'individualValues' in rollResult
-        ) {
-          const summary = rollResult as RollSummary;
-          const roll = summary.individualValues[0] || 1; // Get the d20 result
-          const isCrit = roll === 20;
-
-          showAttackRoll('Initiative', roll, initiativeModifier, isCrit);
-          return;
-        }
-      } catch (error) {
-        console.warn(
-          'Dice animation failed, falling back to random roll:',
-          error
-        );
-      }
-    }
-
-    // Fallback to random roll if animation fails or isn't available
-    const roll = Math.floor(Math.random() * 20) + 1;
-    const isCrit = roll === 20;
-
-    showAttackRoll('Initiative', roll, initiativeModifier, isCrit);
-  };
+  const rollInitiative = () =>
+    rollD20ForSheet('Initiative', getInitiativeModifier());
 
   // Check if character has spell capabilities
   const characterHasSpells = hasSpellSlots(

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
@@ -23,6 +23,9 @@ export interface CharacterDockProps {
   connectionLive: boolean;
   hasPendingPlacement: boolean;
   onCancelPlacement: () => void;
+  onOpenSheet?: () => void;
+  /** Attached to the Sheet button so focus can return to it on drawer close. */
+  sheetButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 /**
@@ -37,6 +40,8 @@ export function CharacterDock({
   connectionLive,
   hasPendingPlacement,
   onCancelPlacement,
+  onOpenSheet,
+  sheetButtonRef,
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
   const toggleBuff = useCharacterStore(state => state.toggleBuff);
@@ -121,6 +126,18 @@ export function CharacterDock({
             {character.race} · {className} {level}
           </div>
         </div>
+        {onOpenSheet && (
+          <Button
+            ref={sheetButtonRef}
+            variant="outline"
+            size="sm"
+            onClick={onOpenSheet}
+            title="Open character sheet"
+            aria-label="Open character sheet"
+          >
+            <BookOpen className="mr-1 h-3.5 w-3.5" /> Sheet
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="lg"

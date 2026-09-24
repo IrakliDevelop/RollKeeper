@@ -10,6 +10,7 @@ export default defineConfig({
     '**/fog-of-war.spec.ts',
     '**/marker-loot-locked-claim.spec.ts',
     '**/shop-purchase-reconciliation.spec.ts',
+    '**/map-sheet-drawer.spec.ts',
   ],
   outputDir: 'test-results',
   timeout: 60_000,

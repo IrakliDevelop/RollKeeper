@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 
-import { useOwnTokenPresent } from '@/components/ui/campaign/location-map/useOwnTokenPresent';
+import {
+  useOwnTokenPresent,
+  isOwnPlayerToken,
+} from '@/components/ui/campaign/location-map/useOwnTokenPresent';
+import { PLAYER_TOKEN_KIND } from '@/components/ui/campaign/location-map/PlayerTokenTool';
 
 import type { CanvasElement } from '@fieldnotes/core';
 
@@ -57,5 +61,27 @@ describe('useOwnTokenPresent', () => {
     mockElements = [];
     const { result } = renderHook(() => useOwnTokenPresent('char-1'));
     expect(result.current).toBe(false);
+  });
+});
+
+describe('isOwnPlayerToken', () => {
+  it('matches only stamped player tokens for this character', () => {
+    const el = (o: object) =>
+      ({ id: 'x', type: 'shape', ...o }) as unknown as CanvasElement;
+    expect(
+      isOwnPlayerToken(
+        el({ tokenKind: PLAYER_TOKEN_KIND, characterId: 'c1' }),
+        'c1'
+      )
+    ).toBe(true);
+    expect(
+      isOwnPlayerToken(
+        el({ tokenKind: PLAYER_TOKEN_KIND, characterId: 'c2' }),
+        'c1'
+      )
+    ).toBe(false);
+    expect(
+      isOwnPlayerToken(el({ tokenKind: 'combatant', characterId: 'c1' }), 'c1')
+    ).toBe(false);
   });
 });

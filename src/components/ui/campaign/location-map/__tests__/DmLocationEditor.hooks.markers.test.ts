@@ -237,6 +237,22 @@ function tapMarkerTool(tools: Tool[], vp: Viewport, x = 100, y = 120): void {
   tool?.onPointerUp(pointer(x, y), ctx);
 }
 
+/** `ActivationOptions.gesture` is a per-element resolver as of core 0.87;
+ * resolve it against a marker-shaped element to read back the surface
+ * gesture the hook configured. */
+function resolveGesture(
+  options: ActivationOptions | null | undefined
+): unknown {
+  if (options == null) return undefined;
+  const marker = createHtmlElement({
+    position: { x: 0, y: 0 },
+    size: { w: 40, h: 40 },
+    htmlType: MARKER_HTML_TYPE,
+    data: { ...buildMarkerData({ kind: 'door', ref: 'ref-gesture-probe' }) },
+  });
+  return (options.gesture as (el: CanvasElement) => string | null)(marker);
+}
+
 function markerElements(store: ElementStore): HtmlElement[] {
   return store
     .getAll()
@@ -310,7 +326,7 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
     );
     expect(activationOptions).toHaveLength(1);
     expect(activationOptions[0]).not.toBeNull();
-    expect(activationOptions[0]?.gesture).toBe('double');
+    expect(resolveGesture(activationOptions[0])).toBe('double');
 
     act(() => {
       tapMarkerTool(result.current.tools, vp);
@@ -333,7 +349,7 @@ describe('useDmLocationEditor — markers work with no relay URL configured', ()
     expect(vp.getHtmlPainters().canvasTypes.has(MARKER_HTML_TYPE)).toBe(true);
     expect(activationOptions).toHaveLength(1);
     expect(activationOptions[0]).not.toBeNull();
-    expect(activationOptions[0]?.gesture).toBe('double');
+    expect(resolveGesture(activationOptions[0])).toBe('double');
   });
 
   it('structural: registration is unconditional with respect to mode too (location mode still paints markers)', async () => {

@@ -8,6 +8,13 @@ import {
   waitForStoresReady,
   waitForCharacterLoaded,
 } from './helpers';
+import {
+  seedDm,
+  createCampaign,
+  joinCampaign,
+  coordsForElement,
+  waitForElementSynced,
+} from './helpers/battlemapRelay';
 import { CURRENCY_VALUES, purseToCopper } from '../src/utils/currency';
 
 import type { Currency } from '../src/types/character';
@@ -63,86 +70,6 @@ const BUYER_STARTING_COPPER = BUYER_STARTING_GOLD * CURRENCY_VALUES.gold; // 100
 
 const mapUrl = (code: string) => `/dm/campaign/${code}/battlemaps/${MAP_ID}`;
 const dashboardUrl = (code: string) => `/dm/campaign/${code}`;
-
-/** Seeds a fixed dmId into a fresh origin, before any page reads the store.
- *  Copied verbatim from `marker-loot-locked-claim.spec.ts`. */
-async function seedDm(page: Page): Promise<void> {
-  await page.goto('/player', { waitUntil: 'domcontentloaded' });
-  await page.evaluate(dmId => {
-    window.localStorage.setItem(
-      'rollkeeper-dm-data',
-      JSON.stringify({ state: { dmId, campaigns: [] }, version: 1 })
-    );
-  }, DM_ID);
-}
-
-/** Real POST to the app's own campaign-creation route. Copied verbatim from
- *  `marker-loot-locked-claim.spec.ts`. */
-async function createCampaign(page: Page, name: string): Promise<string> {
-  return page.evaluate(
-    async ({ dmId, name }) => {
-      const res = await fetch('/api/campaign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dmId, campaignName: name }),
-      });
-      if (!res.ok) {
-        throw new Error(`create campaign failed: ${res.status}`);
-      }
-      const data = (await res.json()) as { code: string };
-      return data.code;
-    },
-    { dmId: DM_ID, name }
-  );
-}
-
-/** Real POST to the app's own join route, then mirrors `handleJoinCampaign`
- *  by writing `campaignCode` onto the roster entry — copied verbatim from
- *  `marker-loot-locked-claim.spec.ts`. */
-async function joinCampaign(
-  page: Page,
-  code: string,
-  characterId: string
-): Promise<void> {
-  const result = await page.evaluate(
-    async ({ code, characterId }) => {
-      const character = window
-        .__rkStores!.player.getState()
-        .characters.find(c => c.id === characterId);
-      if (!character) return { ok: false, status: 0, body: 'no character' };
-      const res = await fetch(`/api/campaign/${code}/join`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-rollkeeper-csrf': '1',
-        },
-        body: JSON.stringify({
-          playerId: characterId,
-          playerName: character.characterData.playerName || character.name,
-          characterId,
-          characterName: character.name,
-          characterData: character.characterData,
-        }),
-      });
-      const body = await res.json().catch(() => null);
-      return { ok: res.ok, status: res.status, body };
-    },
-    { code, characterId }
-  );
-  if (!result.ok) {
-    throw new Error(
-      `join campaign failed: ${result.status} ${JSON.stringify(result.body)}`
-    );
-  }
-  await page.evaluate(
-    ({ code, characterId, campaignName }) => {
-      window
-        .__rkStores!.player.getState()
-        .updateCharacter(characterId, { campaignCode: code, campaignName });
-    },
-    { code, characterId, campaignName: CAMPAIGN_NAME }
-  );
-}
 
 /**
  * Seeds the merchant NPC, the encounter entity linking to it
@@ -372,49 +299,9 @@ async function setStartingGold(
   );
 }
 
-/** Live-camera coordinate lookup for a canvas element — copied from
- *  `marker-loot-locked-claim.spec.ts`'s `coordsForElement`. */
-async function coordsForElement(
-  page: Page,
-  elementId: string
-): Promise<{ x: number; y: number }> {
-  return page.evaluate(elId => {
-    const vp = window.__rkStores!.viewport!;
-    const el = vp.store.getById(elId);
-    if (!el) throw new Error(`Element ${elId} not in store`);
-    const center = {
-      x: el.position.x + el.size.w / 2,
-      y: el.position.y + el.size.h / 2,
-    };
-    const screenLocal = {
-      x: center.x * vp.camera.z + vp.camera.x,
-      y: center.y * vp.camera.z + vp.camera.y,
-    };
-    const canvas = document.querySelector('canvas');
-    const wrapper = canvas?.parentElement;
-    const rect = wrapper?.getBoundingClientRect();
-    if (!rect) throw new Error('Canvas wrapper not found');
-    return { x: rect.left + screenLocal.x, y: rect.top + screenLocal.y };
-  }, elementId);
-}
-
 async function tapElement(page: Page, elementId: string): Promise<void> {
   const coords = await coordsForElement(page, elementId);
   await page.mouse.click(coords.x, coords.y);
-}
-
-/** Waits until `elementId` exists in this page's own viewport store —
- *  placed locally on the DM (straight from the seeded canvasState), or
- *  replicated over the relay on a player. */
-async function waitForElementSynced(
-  page: Page,
-  elementId: string
-): Promise<void> {
-  await page.waitForFunction(
-    id => !!window.__rkStores?.viewport?.store.getById(id),
-    elementId,
-    { timeout: 20_000 }
-  );
 }
 
 /** The player shop dialog and the (editable) NPC detail dialog both use the
@@ -490,8 +377,8 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     }
 
     // ---- DM: create the real campaign + seed the shop scenario ----
-    await seedDm(dmMapPage);
-    const code = await createCampaign(dmMapPage, CAMPAIGN_NAME);
+    await seedDm(dmMapPage, DM_ID);
+    const code = await createCampaign(dmMapPage, DM_ID, CAMPAIGN_NAME);
     await seedShopScenario(dmMapPage, code);
 
     // ---- DM: connect to the battle map (pushes the seeded token onto the
@@ -550,7 +437,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     //      map, taps the merchant token ----
     const char1Url = await createCharacter(player1Page, 'Shop Buyer');
     const char1Id = characterIdFromUrl(char1Url);
-    await joinCampaign(player1Page, code, char1Id);
+    await joinCampaign(player1Page, code, char1Id, CAMPAIGN_NAME);
     await setStartingGold(player1Page, char1Id, BUYER_STARTING_GOLD);
 
     await player1Page.goto(
@@ -720,7 +607,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     //      purchases route ----
     const char2Url = await createCharacter(player2Page, 'Second Buyer');
     const char2Id = characterIdFromUrl(char2Url);
-    await joinCampaign(player2Page, code, char2Id);
+    await joinCampaign(player2Page, code, char2Id, CAMPAIGN_NAME);
 
     await player2Page.goto(
       `/player/campaign/${code}/battlemap/${MAP_ID}?character=${char2Id}`,
