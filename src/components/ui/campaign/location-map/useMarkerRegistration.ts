@@ -9,9 +9,14 @@
  * `useMerchantShopActivation`) share the single `setActivation` slot a
  * viewport allows — see those parameters' own doc comments for why a
  * second, independent registration would silently replace this one instead
- * of composing with it. The PAINTER half (`expectCanvasHtmlTypes`/
- * `registerHtmlPainter`) remains marker-only; a future second painted
- * element kind would need its own registration for that half.
+ * of composing with it. Activation now covers a THIRD kind too: sheet
+ * tokens (`sheetTokens`, the player-battle-map sheet drawer) — these always
+ * resolve to the `'double'` gesture regardless of the surface `gesture`,
+ * using core 0.87's per-element gesture resolver (`ActivationOptions.gesture`
+ * as a function of the element, not just a fixed string). The PAINTER half
+ * (`expectCanvasHtmlTypes`/`registerHtmlPainter`) remains marker-only; a
+ * future second painted element kind would need its own registration for
+ * that half.
  *
  * Connection-independent: no relay import, no store import, no React state.
  * Registration and activation must work with no relay URL configured
@@ -90,6 +95,23 @@ export interface UseMarkerRegistrationArgs {
    *  `isExtraActivatable` rather than `isMarkerElement`. Has no effect
    *  without `isExtraActivatable` also supplied (see its doc comment). */
   onActivateExtra?: (event: ElementActivationEvent) => void;
+  /**
+   * Player-sheet tokens: always the double gesture, sharing this one
+   * `setActivation` slot via core's per-element gesture resolver.
+   */
+  sheetTokens?: SheetTokenActivation;
+}
+
+/**
+ * Sheet-token activation, sharing the one `setActivation` slot this hook
+ * owns (VTT sheet drawer). Unlike `isExtraActivatable`/`onActivateExtra`,
+ * sheet tokens do not follow the surface `gesture` — they always resolve to
+ * `'double'`, via core 0.87's per-element gesture resolver.
+ */
+export interface SheetTokenActivation {
+  /** Read at gesture time via a ref. */
+  isActivatable: (el: Readonly<CanvasElement>) => boolean;
+  onActivate: (event: ElementActivationEvent) => void;
 }
 
 /**
@@ -173,6 +195,9 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
   const onActivateExtraRef = useRef(args.onActivateExtra);
   onActivateExtraRef.current = args.onActivateExtra;
 
+  const sheetTokensRef = useRef(args.sheetTokens);
+  sheetTokensRef.current = args.sheetTokens;
+
   const markerStatusesRef = useRef(new Map<string, MarkerDetail['status']>());
   markerStatusesRef.current = new Map(
     (args.markerDetails ?? []).map(detail => [detail.id, detail.status])
@@ -186,20 +211,31 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
     if (viewport === null) return undefined;
 
     /**
-     * `isActivatable`, the SDK's intended host filter. Reads the suppression
-     * veto THROUGH THE REF at gesture time — a value captured when the effect
-     * ran would pin the tool that happened to be active at mount, and the
-     * effect deliberately does not re-run on callback identity changes.
-     *
-     * ORs in `isExtraActivatable` (Task 11) so a second recognized element
-     * kind shares this one `setActivation` slot instead of competing for it
-     * — see that parameter's doc comment on why a second call would be
-     * silently destructive rather than additive.
+     * The surface half of `isActivatable`: markers plus the one extra kind
+     * (Task 11) — both follow the surface `gesture`. Reads the suppression
+     * veto and `isExtraActivatable` THROUGH THE REF at gesture time — a value
+     * captured when the effect ran would pin the tool that happened to be
+     * active at mount, and the effect deliberately does not re-run on
+     * callback identity changes.
+     */
+    const isSurfaceElement = (el: Readonly<CanvasElement>): boolean =>
+      isMarkerElement(el) || isExtraActivatableRef.current?.(el) === true;
+    /** Sheet tokens (VTT sheet drawer) — always the double gesture,
+     * independent of the surface `gesture`. Read at gesture time via a ref,
+     * same as `isSurfaceElement`. */
+    const isSheetToken = (el: Readonly<CanvasElement>): boolean =>
+      sheetTokensRef.current?.isActivatable(el) === true;
+
+    /**
+     * `isActivatable`, the SDK's intended host filter. ORs in the surface
+     * elements and sheet tokens so all three share this one `setActivation`
+     * slot instead of competing for it — see `isExtraActivatable`'s and
+     * `sheetTokens`'s doc comments on why a second call would be silently
+     * destructive rather than additive.
      */
     const isActivatableElement = (el: Readonly<CanvasElement>): boolean => {
       if (isActivationSuppressedRef.current?.() === true) return false;
-      if (isMarkerElement(el)) return true;
-      return isExtraActivatableRef.current?.(el) === true;
+      return isSurfaceElement(el) || isSheetToken(el);
     };
 
     const releaseDeclaration =
@@ -215,7 +251,12 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
       gesture === null
         ? null
         : viewport.setActivation({
-            gesture,
+            gesture: el =>
+              isSurfaceElement(el)
+                ? gesture
+                : isSheetToken(el)
+                  ? 'double'
+                  : null,
             isActivatable: isActivatableElement,
             isCameraBusy: () => isCameraBusyRef.current?.() ?? false,
           });
@@ -223,15 +264,16 @@ export function useMarkerRegistration(args: UseMarkerRegistrationArgs): void {
     // activation emitter is viewport-owned and persistent, so an event raised
     // by some OTHER `setActivation` owner (or by a stale generation) must not
     // open a panel behind a canvas-writing tool either. Dispatches by WHICH
-    // half of `isActivatableElement` matched, so a marker and an extra
-    // element (Task 11: a merchant token) never both fire for the same
-    // activation.
+    // of markers, the extra kind, or sheet tokens matched, so they never
+    // both fire for the same activation.
     const offActivate = viewport.onElementActivate(event => {
       if (!isActivatableElement(event.element)) return;
       if (isMarkerElement(event.element)) {
         onActivateMarkerRef.current?.(event);
-      } else {
+      } else if (isExtraActivatableRef.current?.(event.element) === true) {
         onActivateExtraRef.current?.(event);
+      } else {
+        sheetTokensRef.current?.onActivate(event);
       }
     });
 

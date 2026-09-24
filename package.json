@@ -86,7 +86,7 @@
     "@3d-dice/dice-ui": "^0.5.2",
     "@aws-sdk/client-s3": "^3.922.0",
     "@aws-sdk/s3-request-presigner": "^3.1131.0",
-    "@fieldnotes/core": "0.86.0",
+    "@fieldnotes/core": "0.87.0",
     "@fieldnotes/react": "0.13.0",
     "@fieldnotes/sync": "0.21.0",
     "@fieldnotes/vtt": "0.12.0",

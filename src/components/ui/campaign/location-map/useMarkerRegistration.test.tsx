@@ -283,7 +283,10 @@ describe('useMarkerRegistration', () => {
     );
 
     expect(d.activationOptionsCalls.length).toBe(1);
-    expect(d.activationOptionsCalls[0]?.gesture).toBe('double');
+    const resolveGesture = d.activationOptionsCalls[0]?.gesture as (
+      el: CanvasElement
+    ) => string | null;
+    expect(resolveGesture(markerHtmlElement())).toBe('double');
   });
 
   it('passes the configured gesture to setActivation: single', () => {
@@ -294,7 +297,10 @@ describe('useMarkerRegistration', () => {
     );
 
     expect(d.activationOptionsCalls.length).toBe(1);
-    expect(d.activationOptionsCalls[0]?.gesture).toBe('single');
+    const resolveGesture = d.activationOptionsCalls[0]?.gesture as (
+      el: CanvasElement
+    ) => string | null;
+    expect(resolveGesture(markerHtmlElement())).toBe('single');
   });
 
   it('gesture null never calls setActivation but keeps onElementActivate subscribed; gesture single is the positive control', () => {
@@ -459,9 +465,10 @@ describe('useMarkerRegistration', () => {
     // vacuous (e.g. an effect that never re-runs at all would also pass it).
     rerender({ gesture: 'double', onActivateMarker: second });
     expect(d.calls.length).toBe(8);
-    expect(
-      d.activationOptionsCalls[d.activationOptionsCalls.length - 1]?.gesture
-    ).toBe('double');
+    const lastResolveGesture = d.activationOptionsCalls[
+      d.activationOptionsCalls.length - 1
+    ]?.gesture as (el: CanvasElement) => string | null;
+    expect(lastResolveGesture(markerHtmlElement())).toBe('double');
   });
 
   it('the activation listener forwards only marker-element events to onActivateMarker; a marker event is the positive control', () => {
