@@ -61,4 +61,11 @@ describe('SheetDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: /close sheet/i }));
     expect(p.onClose).toHaveBeenCalled();
   });
+
+  it('renders the Overview body as a tabpanel labelled by its tab', () => {
+    render(<SheetDrawer {...props()} />);
+    const tab = screen.getByRole('tab', { name: /overview/i });
+    const panel = screen.getByRole('tabpanel', { name: /overview/i });
+    expect(tab).toHaveAttribute('aria-controls', panel.id);
+  });
 });

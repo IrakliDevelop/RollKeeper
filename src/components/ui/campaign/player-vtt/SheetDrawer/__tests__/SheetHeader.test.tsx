@@ -53,4 +53,17 @@ describe('SheetHeader', () => {
       screen.getByRole('button', { name: /editing/i })
     ).toBeInTheDocument();
   });
+
+  it('exposes the lock toggle as pressed only while editing', () => {
+    const { rerender } = render(<SheetHeader {...props()} />);
+    expect(screen.getByRole('button', { name: /locked/i })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    rerender(<SheetHeader {...props()} locked={false} />);
+    expect(screen.getByRole('button', { name: /editing/i })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+  });
 });

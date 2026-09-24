@@ -81,6 +81,7 @@ export function SheetHeader({
             variant={locked ? 'outline' : 'warning'}
             size="sm"
             onClick={onToggleLock}
+            aria-pressed={!locked}
             title={locked ? 'Unlock to edit' : 'Lock the sheet'}
           >
             {locked ? (

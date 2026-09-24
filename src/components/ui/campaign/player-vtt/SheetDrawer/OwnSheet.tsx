@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import * as Tabs from '@radix-ui/react-tabs';
 import { Star, Unlock } from 'lucide-react';
 
 import RestDialog from '@/components/ui/character/RestDialog';
@@ -82,24 +83,33 @@ export function OwnSheet({
         <SheetAbilities locked={locked} roll={roll} />
       </div>
 
-      <SheetTabBar tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
+      <Tabs.Root
+        value={activeTab}
+        onValueChange={v => setActiveTab(v as SheetTabId)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <SheetTabBar tabs={TABS} activeTab={activeTab} />
 
-      {!locked && (
-        <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex items-center gap-2 border-b px-5 py-2 text-xs">
-          <Unlock className="h-3.5 w-3.5 shrink-0" />
-          <span className="flex-1">
-            Editing unlocked. Changes save to {name}&apos;s sheet and sync to
-            the DM.
-          </span>
-          <Button variant="ghost" size="sm" onClick={() => setLocked(true)}>
-            Done
-          </Button>
-        </div>
-      )}
+        {!locked && (
+          <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex items-center gap-2 border-b px-5 py-2 text-xs">
+            <Unlock className="h-3.5 w-3.5 shrink-0" />
+            <span className="flex-1">
+              Editing unlocked. Changes save to {name}&apos;s sheet and sync to
+              the DM.
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setLocked(true)}>
+              Done
+            </Button>
+          </div>
+        )}
 
-      <div className="flex-1 overflow-y-auto px-5 py-4">
-        {activeTab === 'overview' && <OverviewTab addToast={addToast} />}
-      </div>
+        <Tabs.Content
+          value="overview"
+          className="flex-1 overflow-y-auto px-5 py-4"
+        >
+          <OverviewTab addToast={addToast} />
+        </Tabs.Content>
+      </Tabs.Root>
 
       <RestDialog
         restType={restType}
