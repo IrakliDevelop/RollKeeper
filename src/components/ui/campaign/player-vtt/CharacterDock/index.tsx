@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { BookOpen, ChevronRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
@@ -23,6 +23,7 @@ export interface CharacterDockProps {
   connectionLive: boolean;
   hasPendingPlacement: boolean;
   onCancelPlacement: () => void;
+  onOpenSheet?: () => void;
 }
 
 /**
@@ -37,6 +38,7 @@ export function CharacterDock({
   connectionLive,
   hasPendingPlacement,
   onCancelPlacement,
+  onOpenSheet,
 }: CharacterDockProps) {
   const character = useCharacterStore(state => state.character);
   const toggleBuff = useCharacterStore(state => state.toggleBuff);
@@ -121,6 +123,17 @@ export function CharacterDock({
             {character.race} · {className} {level}
           </div>
         </div>
+        {onOpenSheet && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onOpenSheet}
+            title="Open full sheet"
+            aria-label="Open full sheet"
+          >
+            <BookOpen className="mr-1 h-3.5 w-3.5" /> Sheet
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="lg"

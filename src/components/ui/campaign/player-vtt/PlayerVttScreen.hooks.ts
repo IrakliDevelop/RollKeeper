@@ -153,7 +153,14 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     [campaignCode, sharedState?.initiative, characterId]
   );
 
-  const { toasts, addToast, dismissToast } = useToast();
+  const {
+    toasts,
+    addToast,
+    dismissToast,
+    showAttackRoll,
+    showShortRest,
+    showLongRest,
+  } = useToast();
   const { pendingPlacement, requestPlacement, cancelPlacement } =
     usePlacementFlow(addToast);
   const spellTemplateConfigRef = useRef<SpellTemplateConfig | null>(null);
@@ -176,5 +183,8 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     toasts,
     addToast,
     dismissToast,
+    showAttackRoll,
+    showShortRest,
+    showLongRest,
   };
 }

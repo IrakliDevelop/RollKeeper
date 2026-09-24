@@ -18,8 +18,10 @@ import { CastingBanner } from './CastingBanner';
 import { CharacterDock } from './CharacterDock';
 import { CombatPanel } from './CombatPanel';
 import { usePlayerVttState } from './PlayerVttScreen.hooks';
+import { SheetDrawer } from './SheetDrawer';
 import { SpellPlacementController } from './SpellPlacementController';
 import { StatusEffectTray } from './StatusEffectTray';
+import { useSheetDrawerState } from './useSheetDrawerState';
 
 interface PlayerVttScreenProps {
   campaignCode: string;
@@ -58,6 +60,9 @@ export function PlayerVttScreen({
     toasts,
     addToast,
     dismissToast,
+    showAttackRoll,
+    showShortRest,
+    showLongRest,
   } = usePlayerVttState(campaignCode, characterId);
 
   const handleReactionAutoReset = useCallback(() => {
@@ -71,6 +76,12 @@ export function PlayerVttScreen({
 
   const [combatCollapsed, setCombatCollapsed] = useState(defaultCollapsed);
   const [dockCollapsed, setDockCollapsed] = useState(defaultCollapsed);
+  const sheetReady = character.id === characterId;
+  const { sheetOpen, openSheet, closeSheet } = useSheetDrawerState({
+    sheetReady,
+    dockCollapsed,
+    setDockCollapsed,
+  });
   const [tokenInfoMode, cycleTokenInfo] = useTokenInfoMode(
     'rollkeeper-vtt-token-info-player'
   );
@@ -105,6 +116,7 @@ export function PlayerVttScreen({
         addToast({ type: 'error', title: 'Export failed', message })
       }
       pendingTransfers={sharedState?.transfers}
+      onOpenOwnSheet={openSheet}
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController
@@ -146,8 +158,18 @@ export function PlayerVttScreen({
           connectionLive={connectionStatus === 'live'}
           hasPendingPlacement={pendingPlacement !== null}
           onCancelPlacement={cancelPlacement}
+          onOpenSheet={sheetReady ? openSheet : undefined}
         />
         <StatusEffectTray />
+        <SheetDrawer
+          open={sheetOpen}
+          onClose={closeSheet}
+          addToast={addToast}
+          showAttackRoll={showAttackRoll}
+          onRested={type =>
+            type === 'short' ? showShortRest() : showLongRest()
+          }
+        />
         {initiativePrompt.showPrompt && initiativePrompt.request && (
           <InitiativeRollPrompt
             request={initiativePrompt.request}
