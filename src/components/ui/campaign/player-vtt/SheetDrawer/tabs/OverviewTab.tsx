@@ -14,13 +14,11 @@ import {
   buildSlotSummary,
 } from '../SheetDrawer.utils';
 import { SheetResources } from '../SheetResources';
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 
 export interface OverviewTabProps {
   addToast: (t: Omit<ToastData, 'id'>) => void;
 }
-
-const SECTION_CLASS = 'border-divider bg-surface rounded-xl border p-3';
-const HEADING_CLASS = 'text-faint mb-2 text-xs font-bold uppercase';
 
 export function OverviewTab({ addToast }: OverviewTabProps) {
   const character = useCharacterStore(s => s.character);
@@ -39,7 +37,7 @@ export function OverviewTab({ addToast }: OverviewTabProps) {
 
       {hitDice.length > 0 && (
         <div className={SECTION_CLASS}>
-          <div className={HEADING_CLASS}>Hit Dice</div>
+          <h3 className={HEADING_CLASS}>Hit Dice</h3>
           <div className="space-y-2">
             {hitDice.map(d => (
               <div key={d.dieType} className="flex items-center gap-2">
@@ -83,7 +81,7 @@ export function OverviewTab({ addToast }: OverviewTabProps) {
 
       {slotSummary.length > 0 && (
         <div className={SECTION_CLASS}>
-          <div className={HEADING_CLASS}>Spell Slots</div>
+          <h3 className={HEADING_CLASS}>Spell Slots</h3>
           <div className="flex flex-wrap gap-3">
             {slotSummary.map(slot => (
               <div key={slot.label} className="flex items-center gap-1.5">
@@ -133,7 +131,7 @@ export function OverviewTab({ addToast }: OverviewTabProps) {
       </div>
 
       <div className={SECTION_CLASS}>
-        <div className={HEADING_CLASS}>Senses & Passives</div>
+        <h3 className={HEADING_CLASS}>Senses & Passives</h3>
         <div className="flex flex-wrap gap-2">
           {passives.map(p => (
             <span

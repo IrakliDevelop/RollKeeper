@@ -63,10 +63,11 @@ export function SpellsTab({
   const pactMagic = character.pactMagic;
 
   const togglePrepared = (id: string) => {
-    // Read fresh state rather than the render snapshot — this can fire after
-    // other spell-slot mutations landed via `useCharacterStore.getState()`
-    // elsewhere in the same tick.
-    const freshSpells = useCharacterStore.getState().character.spells;
+    // getState() avoids acting on a stale render snapshot within this tab,
+    // but the whole-array write is still an absolute value under the
+    // cross-tab single-writer model (same as the full sheet's
+    // SpellManagement). A canonical toggleSpellPrepared action is a follow-up.
+    const freshSpells = useCharacterStore.getState().character.spells ?? [];
     updateCharacter({
       spells: freshSpells.map(s =>
         s.id === id
@@ -107,6 +108,7 @@ export function SpellsTab({
       {pactMagic && pactMagic.slots.max > 0 && (
         <SpellSlotPipsRow
           heading={`Pact slots (${SLOT_ORDINAL[pactMagic.level] ?? pactMagic.level} level)`}
+          groupLabel="Pact slots"
           max={pactMagic.slots.max}
           used={pactMagic.slots.used}
           spendLabel="Spend pact slot"
@@ -117,7 +119,7 @@ export function SpellsTab({
       )}
 
       <SpellGroupList
-        spellsCount={character.spells.length}
+        spellsCount={character.spells?.length ?? 0}
         search={search}
         groups={groups}
         locked={locked}

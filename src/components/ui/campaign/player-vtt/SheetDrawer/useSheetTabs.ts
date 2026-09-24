@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Activity, Award, Dices, Sparkles, Star } from 'lucide-react';
 
-import type { CharacterState } from '@/types/character';
+import { useCharacterStore } from '@/store/characterStore';
 import { isSpellcaster } from '@/utils/calculations';
 
 import {
@@ -23,14 +23,25 @@ function readStoredTab(): SheetTabId {
   return 'overview';
 }
 
+function writeStoredTab(tab: SheetTabId) {
+  try {
+    window.localStorage.setItem(SHEET_TAB_STORAGE_KEY, tab);
+  } catch {
+    // localStorage unavailable — the tab still works, just doesn't persist.
+  }
+}
+
 /**
  * Builds the sheet's tab list (Spells only for casters) and persists the
- * active tab across opens, falling back to Overview when the stored or
- * requested tab isn't in the current list.
+ * user's tab choice across opens. When the stored or requested tab isn't in
+ * the current list the sheet shows Overview without overwriting the stored
+ * preference, so e.g. 'spells' survives a visit to a non-caster.
  */
-export function useSheetTabs(character: CharacterState) {
-  const [activeTab, setActiveTab] = useState<SheetTabId>(readStoredTab);
-  const showSpellsTab = isSpellcaster(character) || character.spells.length > 0;
+export function useSheetTabs() {
+  const [activeTab, setActiveTabState] = useState<SheetTabId>(readStoredTab);
+  const showSpellsTab = useCharacterStore(
+    s => isSpellcaster(s.character) || (s.character.spells?.length ?? 0) > 0
+  );
 
   const tabs: SheetTabDefinition[] = useMemo(
     () =>
@@ -48,17 +59,14 @@ export function useSheetTabs(character: CharacterState) {
     [showSpellsTab]
   );
 
+  const setActiveTab = useCallback((tab: SheetTabId) => {
+    setActiveTabState(tab);
+    writeStoredTab(tab);
+  }, []);
+
   const effectiveTab = tabs.some(t => t.id === activeTab)
     ? activeTab
     : 'overview';
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(SHEET_TAB_STORAGE_KEY, effectiveTab);
-    } catch {
-      // localStorage unavailable — the tab still works, just doesn't persist.
-    }
-  }, [effectiveTab]);
 
   return { tabs, activeTab: effectiveTab, setActiveTab, showSpellsTab };
 }

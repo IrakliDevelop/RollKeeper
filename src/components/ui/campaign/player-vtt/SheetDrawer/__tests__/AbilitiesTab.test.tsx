@@ -77,6 +77,32 @@ describe('AbilitiesTab', () => {
     });
   });
 
+  it('announces the current skill proficiency level', () => {
+    render(<AbilitiesTab locked={false} />);
+    expect(
+      screen.getByRole('button', { name: 'Stealth proficiency: none' })
+    ).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: /stealth proficiency/i })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Stealth proficiency: proficient' })
+    ).toBeInTheDocument();
+  });
+
+  it('labels locked proficiency dots as images and shows a Skills heading', () => {
+    render(<AbilitiesTab locked />);
+    expect(
+      screen.getByRole('img', { name: /stealth proficiency: /i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('img', { name: /wisdom save proficiency: /i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('heading', { level: 3 }).map(h => h.textContent)
+    ).toEqual(['Saving Throws', 'Proficiencies & Languages', 'Skills']);
+  });
+
   it('toggles save proficiency when unlocked', () => {
     render(<AbilitiesTab locked={false} />);
     fireEvent.click(

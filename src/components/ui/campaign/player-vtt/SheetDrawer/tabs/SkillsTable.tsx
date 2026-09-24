@@ -7,6 +7,7 @@ import { formatModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
 import { MaybeRollElement } from '../MaybeRollElement';
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildSkillRows, nextSkillLevel } from '../SheetTabs.utils';
 import type {
   SheetRoll,
@@ -21,6 +22,9 @@ export interface SkillsTableProps {
 }
 
 const DOT_LABEL = ['Not proficient', 'Proficient', 'Expertise'];
+const LEVEL_NAME = ['none', 'proficient', 'expertise'];
+/** Shared by header and rows so the columns line up. */
+const GRID_CLASS = 'grid grid-cols-[1.25rem_1fr_2.5rem_3rem_2.5rem] gap-2';
 
 function dotClassName(level: SkillProfLevel): string {
   if (level === 2) {
@@ -54,13 +58,19 @@ export function SkillsTable({ locked, roll }: SkillsTableProps) {
   };
 
   return (
-    <div className="border-divider bg-surface rounded-xl border p-3">
-      <div className="text-faint mb-2 grid grid-cols-[auto_1fr_auto_auto_auto] gap-2 text-xs font-bold uppercase">
+    <div className={SECTION_CLASS}>
+      <h3 className={HEADING_CLASS}>Skills</h3>
+      <div
+        className={cn(
+          GRID_CLASS,
+          'text-faint mb-2 text-xs font-bold uppercase'
+        )}
+      >
         <span />
         <span>Skill</span>
         <span>Abl</span>
-        <span>Mod</span>
-        <span>Pass</span>
+        <span className="text-right">Mod</span>
+        <span className="text-right">Pass</span>
       </div>
       <div className="space-y-1">
         {rows.map(row => (
@@ -90,10 +100,12 @@ function SkillRow({
 }) {
   const dotClass = cn('h-2.5 w-2.5 rounded-full', dotClassName(row.level));
   return (
-    <div className="grid grid-cols-[auto_1fr_auto_auto_auto] items-center gap-2 text-sm">
+    <div className={cn(GRID_CLASS, 'items-center text-sm')}>
       {locked ? (
         <span
+          role="img"
           className="flex h-5 w-5 items-center justify-center"
+          aria-label={`${row.name} proficiency: ${LEVEL_NAME[row.level]}`}
           title={`${DOT_LABEL[row.level]} · unlock to change`}
         >
           <span className={dotClass} />
@@ -101,7 +113,7 @@ function SkillRow({
       ) : (
         <button
           type="button"
-          aria-label={`${row.name} proficiency`}
+          aria-label={`${row.name} proficiency: ${LEVEL_NAME[row.level]}`}
           title="Tap to cycle proficiency"
           onClick={onCycle}
           className="flex h-5 w-5 items-center justify-center"

@@ -101,6 +101,13 @@ describe('FeaturesTab', () => {
     );
   });
 
+  it('labels feature pips as a group with remaining of max', () => {
+    render(<FeaturesTab />);
+    expect(
+      screen.getByRole('group', { name: /^second wind uses: \d+ of \d+$/i })
+    ).toBeInTheDocument();
+  });
+
   it('expands a description', () => {
     render(<FeaturesTab />);
     const toggle = screen.getByRole('button', { name: /darkvision/i });

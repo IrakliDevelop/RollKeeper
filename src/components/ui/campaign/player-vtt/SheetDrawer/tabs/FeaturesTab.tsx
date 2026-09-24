@@ -6,10 +6,12 @@ import { Badge } from '@/components/ui/layout/badge';
 import { useCharacterStore } from '@/store/characterStore';
 import { cn } from '@/utils/cn';
 
-import type { FeatureRowView } from '../SheetDrawer.types';
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildFeatureGroups } from '../SheetTabs.utils';
 
-const SECTION_CLASS = 'border-divider bg-surface rounded-xl border p-3';
+import type { FeatureRowView } from '../SheetDrawer.types';
+
+const PIP_BUTTON_CLASS = 'inline-flex h-6 w-6 items-center justify-center';
 
 function FeaturePips({
   feature,
@@ -22,7 +24,11 @@ function FeaturePips({
 }) {
   const remaining = feature.maxUses - feature.usedUses;
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <div
+      role="group"
+      aria-label={`${feature.name} uses: ${remaining} of ${feature.maxUses}`}
+      className="mt-1 flex flex-wrap"
+    >
       {Array.from({ length: feature.maxUses }, (_, index) =>
         index < remaining ? (
           <button
@@ -30,16 +36,20 @@ function FeaturePips({
             type="button"
             aria-label={`Use ${feature.name}`}
             onClick={onSpend}
-            className="bg-accent-emerald-text-muted border-accent-emerald-border h-3 w-3 rounded-full border"
-          />
+            className={PIP_BUTTON_CLASS}
+          >
+            <span className="bg-accent-emerald-text-muted border-accent-emerald-border h-3 w-3 rounded-full border" />
+          </button>
         ) : (
           <button
             key={index}
             type="button"
             aria-label={`Restore ${feature.name}`}
             onClick={onRestore}
-            className="border-divider h-3 w-3 rounded-full border"
-          />
+            className={PIP_BUTTON_CLASS}
+          >
+            <span className="border-divider h-3 w-3 rounded-full border" />
+          </button>
         )
       )}
     </div>
@@ -69,9 +79,7 @@ export function FeaturesTab() {
     <div className="space-y-3">
       {groups.map(group => (
         <div key={group.key} className={SECTION_CLASS}>
-          <h3 className="text-faint mb-2 text-xs font-bold uppercase">
-            {group.label}
-          </h3>
+          <h3 className={HEADING_CLASS}>{group.label}</h3>
           <div className="space-y-2">
             {group.features.map(feature => {
               const isOpen = expanded === feature.id;
@@ -104,6 +112,8 @@ export function FeaturesTab() {
                           ? expendFeature(feature.id)
                           : expendTrait(feature.id)
                       }
+                      // Absolute usedUses write under the cross-tab single-writer
+                      // model (as on the full sheet); a canonical restore action is a follow-up.
                       onRestore={() =>
                         feature.kind === 'extended'
                           ? updateExtendedFeature(feature.id, {
@@ -120,7 +130,7 @@ export function FeaturesTab() {
                     <div id={descId} className="text-body mt-2 text-sm">
                       {feature.description ? (
                         <div
-                          className="prose-sm"
+                          className="prose prose-sm text-body max-w-none"
                           dangerouslySetInnerHTML={{
                             __html: feature.description,
                           }}

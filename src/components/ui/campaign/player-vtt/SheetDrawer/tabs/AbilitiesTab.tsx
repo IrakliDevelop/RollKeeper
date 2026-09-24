@@ -6,6 +6,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { formatModifier } from '@/utils/calculations';
 
 import { MaybeRollElement } from '../MaybeRollElement';
+import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildProficiencyGroups, buildSaveRows } from '../SheetTabs.utils';
 import { SkillsTable } from './SkillsTable';
 import type {
@@ -18,9 +19,6 @@ export interface AbilitiesTabProps {
   locked: boolean;
   roll?: SheetRoll;
 }
-
-const SECTION_CLASS = 'rounded-xl border border-divider bg-surface p-3';
-const HEADING_CLASS = 'text-faint mb-2 text-xs font-bold uppercase';
 
 export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
   const character = useCharacterStore(s => s.character);
@@ -37,7 +35,7 @@ export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
     <div className="space-y-3">
       <div className="grid gap-3 sm:grid-cols-2">
         <div className={SECTION_CLASS}>
-          <div className={HEADING_CLASS}>Saving Throws</div>
+          <h3 className={HEADING_CLASS}>Saving Throws</h3>
           <div className="space-y-1.5">
             {saveRows.map(row => (
               <SaveRow
@@ -54,7 +52,7 @@ export function AbilitiesTab({ locked, roll }: AbilitiesTabProps) {
         </div>
 
         <div className={SECTION_CLASS}>
-          <div className={HEADING_CLASS}>Proficiencies & Languages</div>
+          <h3 className={HEADING_CLASS}>Proficiencies & Languages</h3>
           {proficiencyGroups.length === 0 ? (
             <div className="text-muted text-sm">None recorded</div>
           ) : (
@@ -90,7 +88,9 @@ function SaveRow({
     <div className="flex items-center gap-2 text-sm">
       {locked ? (
         <span
+          role="img"
           className={dotClass}
+          aria-label={`${row.name} save proficiency: ${row.proficient ? 'proficient' : 'none'}`}
           title={`${row.proficient ? 'Proficient' : 'Not proficient'} · unlock to change`}
         />
       ) : (

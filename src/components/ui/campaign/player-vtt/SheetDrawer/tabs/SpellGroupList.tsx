@@ -61,6 +61,7 @@ export function SpellGroupList({
           </h3>
           {group.slot && (
             <SpellSlotPipsRow
+              groupLabel={`${SLOT_ORDINAL[group.level] ?? group.level}-level slots`}
               max={group.slot.max}
               used={group.slot.used}
               spendLabel={`Spend ${SLOT_ORDINAL[group.level] ?? group.level}-level slot`}

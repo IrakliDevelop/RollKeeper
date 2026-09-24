@@ -112,6 +112,26 @@ describe('SheetDrawer', () => {
     );
   });
 
+  it('keeps a stored Spells preference while viewing a non-caster', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'spells');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(window.localStorage.getItem('rollkeeper-map-sheet-tab')).toBe(
+      'spells'
+    );
+  });
+
+  it('persists a tab the user selects', () => {
+    render(<SheetDrawer {...props()} />);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /features/i }));
+    expect(window.localStorage.getItem('rollkeeper-map-sheet-tab')).toBe(
+      'features'
+    );
+  });
+
   it('renders every tab panel', () => {
     render(<SheetDrawer {...props()} />);
     for (const name of [/abilities/i, /features/i, /effects/i]) {

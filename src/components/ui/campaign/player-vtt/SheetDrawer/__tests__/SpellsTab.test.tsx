@@ -184,6 +184,17 @@ describe('SpellsTab', () => {
     expect(getChar().pactMagic!.slots.used).toBe(0);
   });
 
+  it('labels each slot pip set as a group with remaining of max', () => {
+    seedCaster({ pactMagic: { level: 2, slots: { max: 2, used: 1 } } });
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    expect(
+      screen.getByRole('group', { name: /^1st-level slots: \d+ of \d+$/ })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('group', { name: 'Pact slots: 1 of 2' })
+    ).toBeInTheDocument();
+  });
+
   it('shows the no-spells empty state', () => {
     seedCaster({ spells: [] });
     render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);

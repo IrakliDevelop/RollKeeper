@@ -46,14 +46,13 @@ export function OwnSheet({
   onRested,
   spellCasting,
 }: OwnSheetProps) {
-  const character = useCharacterStore(s => s.character);
-  const name = character.name;
+  const name = useCharacterStore(s => s.character.name);
   const takeShortRest = useCharacterStore(s => s.takeShortRest);
   const takeLongRest = useCharacterStore(s => s.takeLongRest);
 
   const [locked, setLocked] = useState(true);
   const [restType, setRestType] = useState<'short' | 'long' | null>(null);
-  const { tabs, activeTab, setActiveTab } = useSheetTabs(character);
+  const { tabs, activeTab, setActiveTab } = useSheetTabs();
 
   const roll = useSheetRoll({ diceReady: false, showAttackRoll });
   const rollOrUndefined = SHEET_DICE_ROLLS_ENABLED ? roll : undefined;
