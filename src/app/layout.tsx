@@ -49,7 +49,7 @@ export const metadata: Metadata = {
   icons: {
     icon: '/rollkeeper_favicon.svg',
     shortcut: '/rollkeeper_favicon.svg',
-    apple: '/rollkeeper_favicon.svg',
+    apple: '/apple-touch-icon.png',
   },
 };
 
