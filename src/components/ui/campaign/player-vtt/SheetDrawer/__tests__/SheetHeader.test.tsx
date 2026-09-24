@@ -54,6 +54,15 @@ describe('SheetHeader', () => {
     ).toBeInTheDocument();
   });
 
+  it('pins the level badge to the portrait wrapper, which does not stretch', () => {
+    render(<SheetHeader {...props()} />);
+    const portrait = screen.getByTestId('sheet-portrait');
+    expect(portrait).toHaveClass('self-start');
+    expect(portrait).toContainElement(
+      screen.getByTitle(/^Character level \d+$/)
+    );
+  });
+
   it('exposes the lock toggle as pressed only while editing', () => {
     const { rerender } = render(<SheetHeader {...props()} />);
     expect(screen.getByRole('button', { name: /locked/i })).toHaveAttribute(

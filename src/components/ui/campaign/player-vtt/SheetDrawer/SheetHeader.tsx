@@ -29,7 +29,10 @@ export function SheetHeader({
 
   return (
     <div className="border-divider flex gap-3 border-b px-5 pt-4 pb-3">
-      <div className="relative shrink-0">
+      <div
+        data-testid="sheet-portrait"
+        className="relative h-14 w-14 shrink-0 self-start"
+      >
         {view.avatar ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
