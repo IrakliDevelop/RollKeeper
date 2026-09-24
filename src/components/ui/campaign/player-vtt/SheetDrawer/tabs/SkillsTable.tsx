@@ -7,7 +7,7 @@ import { formatModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
 import { MaybeRollElement } from '../MaybeRollElement';
-import { buildSkillRows } from '../SheetTabs.utils';
+import { buildSkillRows, nextSkillLevel } from '../SheetTabs.utils';
 import type {
   SheetRoll,
   SkillProfLevel,
@@ -69,16 +69,12 @@ export function SkillsTable({ locked, roll }: SkillsTableProps) {
             row={row}
             locked={locked}
             roll={roll}
-            onCycle={() => setLevel(row.skill, nextLevel(row.level))}
+            onCycle={() => setLevel(row.skill, nextSkillLevel(row.level))}
           />
         ))}
       </div>
     </div>
   );
-}
-
-function nextLevel(level: SkillProfLevel): SkillProfLevel {
-  return level === 2 ? 0 : ((level + 1) as SkillProfLevel);
 }
 
 function SkillRow({

@@ -89,7 +89,10 @@ function SaveRow({
   return (
     <div className="flex items-center gap-2 text-sm">
       {locked ? (
-        <span className={dotClass} />
+        <span
+          className={dotClass}
+          title={`${row.proficient ? 'Proficient' : 'Not proficient'} · unlock to change`}
+        />
       ) : (
         <button
           type="button"

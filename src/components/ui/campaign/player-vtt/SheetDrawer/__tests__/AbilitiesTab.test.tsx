@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  cleanup,
+  within,
+} from '@testing-library/react';
 
 import { AbilitiesTab } from '../tabs/AbilitiesTab';
 import { useCharacterStore } from '@/store/characterStore';
@@ -77,6 +83,23 @@ describe('AbilitiesTab', () => {
       screen.getByRole('button', { name: /wisdom save proficiency/i })
     );
     expect(getChar().savingThrows.wisdom.proficient).toBe(true);
+  });
+
+  it('shows an explanatory title on the locked save proficiency dot', () => {
+    seed({
+      savingThrows: {
+        ...getChar().savingThrows,
+        wisdom: { proficient: false },
+      },
+    });
+    render(<AbilitiesTab locked />);
+    expect(
+      screen.queryByRole('button', { name: /wisdom save proficiency/i })
+    ).toBeNull();
+    const wisdomRow = screen.getByText('Wisdom').parentElement as HTMLElement;
+    expect(
+      within(wisdomRow).getByTitle('Not proficient · unlock to change')
+    ).toBeInTheDocument();
   });
 
   it('rolls a skill when a roll function is provided', () => {
