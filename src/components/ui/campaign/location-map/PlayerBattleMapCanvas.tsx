@@ -42,6 +42,7 @@ import {
 import type { PathTool } from '@fieldnotes/vtt';
 import { MeasureTool } from '@fieldnotes/vtt';
 import { BattleMapMinimap } from './BattleMapMinimap';
+import { PlayerMapToolControls } from './PlayerMapToolControls';
 import { BattleMapExportControl } from './BattleMapExportControl';
 import { PlayerHandTool } from './PlayerHandTool';
 import {
@@ -221,9 +222,9 @@ export function PlayerToolbar({
   return (
     <div
       data-testid="player-toolbar"
-      className="bg-surface-raised border-divider absolute top-3 left-1/2 z-10 flex -translate-x-1/2 items-center gap-3 rounded-xl border p-1 shadow-lg"
+      className="bg-surface-raised border-divider pointer-events-auto relative z-10 flex max-w-full min-w-0 items-center gap-3 rounded-xl border p-1 shadow-lg"
     >
-      <div className="flex items-center gap-1">
+      <div className="scrollbar-thin flex min-w-0 items-center gap-1 overflow-x-auto overscroll-x-contain">
         {PLAYER_TOOLS.map(({ name, label, Icon }) => {
           const isTokenHint = name === 'token' && needsTokenHint;
           return (
@@ -232,7 +233,7 @@ export function PlayerToolbar({
               variant={activeTool === name ? 'primary' : 'ghost'}
               onClick={() => setTool(name)}
               className={cn(
-                'min-h-[44px] min-w-[44px] p-0',
+                'min-h-[44px] min-w-[44px] shrink-0 p-0',
                 isTokenHint &&
                   'bg-accent-emerald-bg text-accent-emerald-text animate-pulse'
               )}
@@ -247,7 +248,7 @@ export function PlayerToolbar({
       {(hasSelection ||
         (tokenInfoToggle && TokenInfoIcon) ||
         exportControl) && (
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           {hasSelection && (
             <Button
               variant="danger"
@@ -274,7 +275,7 @@ export function PlayerToolbar({
         </div>
       )}
       <span
-        className={`rounded-full px-2 py-0.5 text-xs ${
+        className={`shrink-0 rounded-full px-2 py-0.5 text-xs ${
           status === 'live'
             ? 'bg-accent-emerald-bg text-accent-emerald-text'
             : status === 'denied'
@@ -805,37 +806,37 @@ export function PlayerBattleMapCanvas({
         />
         <BattleMapBootstrapPrivacyCover status={status} />
         {viewport && (
-          <PlayerToolbar
-            status={status}
-            hasSelection={hasSelection}
-            onDeleteSelected={handleDeleteSelected}
-            tokenInfoToggle={tokenInfoToggle}
-            characterId={characterId}
-            exportControl={
-              <BattleMapExportControl
-                getViewport={() => viewport}
-                name="battle-map"
-                getFogState={() => getViewportFogManager(viewport).getState()}
-                getFogStyle={() =>
-                  resolvePlayerFogStyle(getAppliedFogAppearance(viewport))
-                }
-                onError={onExportError}
-              />
-            }
-          />
-        )}
-        {viewport && (
-          <div className="border-divider absolute top-16 left-1/2 z-10 max-w-[92vw] -translate-x-1/2 overflow-hidden rounded-xl border shadow-lg">
-            <DmLocationToolOptions
-              mode="battlemap"
-              movementControls={{
-                dash: {
-                  enabled: movementDash,
-                  onChange: handleSetMovementDash,
-                },
-              }}
+          <PlayerMapToolControls>
+            <PlayerToolbar
+              status={status}
+              hasSelection={hasSelection}
+              onDeleteSelected={handleDeleteSelected}
+              tokenInfoToggle={tokenInfoToggle}
+              characterId={characterId}
+              exportControl={
+                <BattleMapExportControl
+                  getViewport={() => viewport}
+                  name="battle-map"
+                  getFogState={() => getViewportFogManager(viewport).getState()}
+                  getFogStyle={() =>
+                    resolvePlayerFogStyle(getAppliedFogAppearance(viewport))
+                  }
+                  onError={onExportError}
+                />
+              }
             />
-          </div>
+            <div className="border-divider pointer-events-auto max-w-full overflow-x-auto overscroll-x-contain rounded-xl border shadow-lg">
+              <DmLocationToolOptions
+                mode="battlemap"
+                movementControls={{
+                  dash: {
+                    enabled: movementDash,
+                    onChange: handleSetMovementDash,
+                  },
+                }}
+              />
+            </div>
+          </PlayerMapToolControls>
         )}
         {!hideBackButton && (
           <div className="absolute top-3 left-3 z-10">
