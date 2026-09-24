@@ -35,6 +35,7 @@ import {
   SelectTool,
   ArrowTool,
   PencilTool,
+  type CanvasElement,
   type ElementActivationEvent,
   type Tool,
   type Viewport,
@@ -86,7 +87,7 @@ import {
   buildCircularTokenUrl,
 } from './PlayerTokenTool';
 import { useOwnTokenBackfill } from './useOwnTokenBackfill';
-import { useOwnTokenPresent } from './useOwnTokenPresent';
+import { useOwnTokenPresent, isOwnPlayerToken } from './useOwnTokenPresent';
 import {
   SpellTemplateTool,
   type SpellTemplateConfig,
@@ -152,6 +153,8 @@ interface PlayerBattleMapCanvasProps {
    *  alongside the local purchase receipt so the shop dialog's effective
    *  purse survives a VTT reload, not just a dialog close/reopen. */
   pendingTransfers?: { id: string; costCopper?: number }[];
+  /** Own-token double-tap → open the character sheet drawer (VTT sheet drawer). */
+  onOpenOwnSheet?: () => void;
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
@@ -308,6 +311,7 @@ export function PlayerBattleMapCanvas({
   onExportError,
   markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
   pendingTransfers,
+  onOpenOwnSheet,
 }: PlayerBattleMapCanvasProps) {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
   const [publishedMarkers, setPublishedMarkers] =
@@ -375,6 +379,12 @@ export function PlayerBattleMapCanvas({
   // Read at placement time by the (single, canvas-retained) token tool.
   const characterIdRef = useRef<string | null>(characterId);
   characterIdRef.current = characterId;
+
+  // Read at gesture time via `sheetTokens` below — never captured, so a
+  // parent re-render that hands in a new `onOpenOwnSheet` identity never
+  // tears down and re-creates the marker registration effect.
+  const onOpenOwnSheetRef = useRef(onOpenOwnSheet);
+  onOpenOwnSheetRef.current = onOpenOwnSheet;
 
   const refreshMarkers = useCallback(async () => {
     try {
@@ -482,6 +492,22 @@ export function PlayerBattleMapCanvas({
     closeShop,
   } = useMerchantShopActivation(campaignCode);
 
+  // Own-token double-tap → sheet drawer (VTT sheet drawer): shares this SAME
+  // registration's `setActivation` slot via `sheetTokens` rather than a
+  // second, independent `useMarkerRegistration`-shaped call — see that
+  // hook's doc comment on why a second call would silently replace this one
+  // instead of adding a recognized element kind. Inert (never activatable)
+  // while no `onOpenOwnSheet` is supplied.
+  const sheetTokens = useMemo(
+    () => ({
+      isActivatable: (el: Readonly<CanvasElement>) =>
+        onOpenOwnSheetRef.current !== undefined &&
+        isOwnPlayerToken(el as CanvasElement, characterId),
+      onActivate: () => onOpenOwnSheetRef.current?.(),
+    }),
+    [characterId]
+  );
+
   useMarkerRegistration({
     viewport,
     gesture: 'single',
@@ -489,6 +515,7 @@ export function PlayerBattleMapCanvas({
     onActivateMarker: handleMarkerActivate,
     isExtraActivatable: isCombatantToken,
     onActivateExtra: handleShopTokenActivate,
+    sheetTokens,
   });
 
   const ownCharacterCurrency: Currency | null =

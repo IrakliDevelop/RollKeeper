@@ -10,7 +10,9 @@ import { ViewportContext } from '@fieldnotes/react';
 import MarkerDetailPanel from '../MarkerDetailPanel';
 import { MARKER_TOOL_NAME } from '../DmMarkerTool';
 import { MARKER_HTML_TYPE, buildMarkerData } from '../markerData';
+import { PLAYER_TOKEN_KIND } from '../PlayerTokenTool';
 import type { PublicMarkerDetail } from '@/types/battlemap';
+import type { CanvasElement } from '@fieldnotes/core';
 
 // Task B11 — three negative properties about the player surface, each with a
 // same-file, same-harness positive control per CONSTRAINTS-B:
@@ -586,6 +588,167 @@ describe('PlayerBattleMapCanvas: claiming loot surfaces a partial grant', () => 
         body: expect.stringContaining('"quantity":8'),
       })
     );
+
+    unmount();
+    vp.destroy();
+  });
+});
+
+/**
+ * Task 2 (battlemap sheet drawer PR1): own-token double-tap → `onOpenOwnSheet`.
+ * Reuses this file's established pattern of spying on a real `Viewport`'s
+ * methods to inspect what `useMarkerRegistration` wired up, plus one new
+ * technique: spying (call-through) on `vp.setActivation` to capture the real
+ * `ActivationOptions` the effect passed in, so `isActivatable`/`gesture` can
+ * be asserted directly instead of only inferred from side effects. The
+ * activation-dispatch path (double-tap → `onOpenOwnSheet`) is still proven
+ * end-to-end via `vp.onElementActivate`, as the other describe blocks in
+ * this file do.
+ */
+describe('PlayerBattleMapCanvas: own-token double-tap opens the sheet drawer', () => {
+  beforeEach(() => {
+    mockActiveTool = 'hand';
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  function tokenEl(overrides: Record<string, unknown> = {}): CanvasElement {
+    return {
+      id: `tok-${Math.random()}`,
+      type: 'shape',
+      position: { x: 0, y: 0 },
+      size: { w: 40, h: 40 },
+      zIndex: 0,
+      locked: false,
+      layerId: 'l1',
+      ...overrides,
+    } as unknown as CanvasElement;
+  }
+
+  /** The `isActivatable`/`gesture` functions from the most recent real
+   *  `vp.setActivation(...)` call the registration effect made. */
+  function activationOptions(vp: Viewport) {
+    const options = vi.mocked(vp.setActivation).mock.calls.at(-1)?.[0];
+    if (!options) {
+      throw new Error(
+        'expected useMarkerRegistration to have called setActivation'
+      );
+    }
+    return options;
+  }
+
+  function resolveGesture(
+    options: ReturnType<typeof activationOptions>,
+    el: CanvasElement
+  ): string | null {
+    return typeof options.gesture === 'function'
+      ? options.gesture(el)
+      : options.gesture;
+  }
+
+  function isActivatable(
+    options: ReturnType<typeof activationOptions>,
+    el: CanvasElement
+  ): boolean {
+    if (!options.isActivatable) {
+      throw new Error(
+        'expected setActivation options to include isActivatable'
+      );
+    }
+    return options.isActivatable(el);
+  }
+
+  it('an own stamped player token is activatable (gesture "double"), and a double activation calls onOpenOwnSheet', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    vi.spyOn(vp, 'setActivation');
+    vi.spyOn(vp, 'onElementActivate');
+    const onOpenOwnSheet = vi.fn();
+
+    const { unmount } = renderPlayer({ characterId: 'char-1', onOpenOwnSheet });
+    fireReady(vp);
+
+    const own = tokenEl({
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'char-1',
+    });
+    act(() => {
+      vp.store.add(own);
+    });
+
+    const options = activationOptions(vp);
+    expect(isActivatable(options, own)).toBe(true);
+    expect(resolveGesture(options, own)).toBe('double');
+
+    const listener = vi.mocked(vp.onElementActivate).mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() =>
+      listener({
+        element: own,
+        world: { x: 0, y: 0 },
+        pointerType: 'touch',
+        gesture: 'double',
+      })
+    );
+
+    expect(onOpenOwnSheet).toHaveBeenCalledTimes(1);
+
+    unmount();
+    vp.destroy();
+  });
+
+  it("a combatant token, and another character's player token, are not sheet tokens", () => {
+    stubCanvas();
+    const vp = makeViewport();
+    vi.spyOn(vp, 'setActivation');
+    const onOpenOwnSheet = vi.fn();
+
+    const { unmount } = renderPlayer({ characterId: 'char-1', onOpenOwnSheet });
+    fireReady(vp);
+
+    const combatant = tokenEl({ tokenKind: 'combatant', entityId: 'npc-1' });
+    const otherPlayer = tokenEl({
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'char-2',
+    });
+
+    const options = activationOptions(vp);
+    // Both ARE activatable overall (the combatant token via the merchant
+    // `isExtraActivatable` path), but neither is a SHEET token: the merchant
+    // path's gesture follows the surface `gesture` ('single'), never 'double',
+    // and the other character's token matches no activatable predicate at all.
+    expect(resolveGesture(options, combatant)).toBe('single');
+    expect(isActivatable(options, otherPlayer)).toBe(false);
+
+    unmount();
+    vp.destroy();
+  });
+
+  it('without onOpenOwnSheet, an own stamped player token is not a sheet token', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    vi.spyOn(vp, 'setActivation');
+
+    // No `onOpenOwnSheet` supplied.
+    const { unmount } = renderPlayer({ characterId: 'char-1' });
+    fireReady(vp);
+
+    const own = tokenEl({
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'char-1',
+    });
+
+    const options = activationOptions(vp);
+    expect(isActivatable(options, own)).toBe(false);
+    expect(resolveGesture(options, own)).toBe(null);
 
     unmount();
     vp.destroy();

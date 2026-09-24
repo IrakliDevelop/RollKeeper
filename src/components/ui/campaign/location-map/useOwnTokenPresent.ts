@@ -8,7 +8,10 @@ import { PLAYER_TOKEN_KIND } from './PlayerTokenTool';
 
 import type { CanvasElement } from '@fieldnotes/core';
 
-function isOwnPlayerToken(el: CanvasElement, characterId: string): boolean {
+export function isOwnPlayerToken(
+  el: CanvasElement,
+  characterId: string
+): boolean {
   const rec = el as Partial<{ tokenKind: unknown; characterId: unknown }>;
   return rec.tokenKind === PLAYER_TOKEN_KIND && rec.characterId === characterId;
 }
