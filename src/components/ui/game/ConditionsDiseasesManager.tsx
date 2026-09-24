@@ -13,10 +13,10 @@ import {
   X,
 } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
+import { useExhaustionStepper } from '@/hooks/useExhaustionStepper';
 import {
   loadAllConditions,
   loadAllDiseases,
-  getExhaustionByVariant,
 } from '@/utils/conditionsDiseasesLoader';
 import {
   ProcessedCondition,
@@ -66,6 +66,8 @@ export default function ConditionsDiseasesManager() {
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [showAddPanel, setShowAddPanel] = useState(false);
+
+  const exhaustion = useExhaustionStepper();
 
   // Load conditions and diseases data
   useEffect(() => {
@@ -186,29 +188,10 @@ export default function ConditionsDiseasesManager() {
   };
 
   const handleExhaustionChange = (delta: number) => {
-    const existing = activeConditions.find(
-      c => c.name.toLowerCase() === 'exhaustion'
-    );
-
-    if (!existing && delta > 0) {
-      // Add exhaustion if it doesn't exist
-      getExhaustionByVariant(exhaustionVariant).then(exhaustionData => {
-        if (exhaustionData) {
-          addCondition(
-            exhaustionData.name,
-            exhaustionData.source,
-            exhaustionData.description,
-            1
-          );
-        }
-      });
-    } else if (existing) {
-      const newCount = Math.max(0, Math.min(6, existing.count + delta));
-      if (newCount === 0) {
-        removeCondition(existing.id);
-      } else {
-        updateCondition(existing.id, { count: newCount });
-      }
+    if (delta > 0) {
+      void exhaustion.increment();
+    } else {
+      exhaustion.decrement();
     }
   };
 
