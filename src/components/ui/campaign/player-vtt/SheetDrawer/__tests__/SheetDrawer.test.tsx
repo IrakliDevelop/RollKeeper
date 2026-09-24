@@ -62,6 +62,13 @@ describe('SheetDrawer', () => {
     expect(p.onClose).toHaveBeenCalled();
   });
 
+  it('hides in-app dice rolling while it is behind the flag', () => {
+    render(<SheetDrawer {...props()} />);
+    expect(
+      screen.queryByRole('button', { name: /roll initiative/i })
+    ).toBeNull();
+  });
+
   it('renders the Overview body as a tabpanel labelled by its tab', () => {
     render(<SheetDrawer {...props()} />);
     const tab = screen.getByRole('tab', { name: /overview/i });

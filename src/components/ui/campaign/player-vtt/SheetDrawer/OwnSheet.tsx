@@ -11,7 +11,11 @@ import { useSheetRoll } from '@/hooks/useSheetRoll';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { SheetAbilities } from './SheetAbilities';
-import { SHEET_TAB_STORAGE_KEY, type SheetTabId } from './SheetDrawer.types';
+import {
+  SHEET_DICE_ROLLS_ENABLED,
+  SHEET_TAB_STORAGE_KEY,
+  type SheetTabId,
+} from './SheetDrawer.types';
 import { SheetHeader } from './SheetHeader';
 import { SheetTabBar, type SheetTabDefinition } from './SheetTabBar';
 import { SheetVitals } from './SheetVitals';
@@ -79,8 +83,14 @@ export function OwnSheet({
       />
 
       <div className="space-y-3 px-5 pb-4">
-        <SheetVitals addToast={addToast} roll={roll} />
-        <SheetAbilities locked={locked} roll={roll} />
+        <SheetVitals
+          addToast={addToast}
+          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
+        />
+        <SheetAbilities
+          locked={locked}
+          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
+        />
       </div>
 
       <Tabs.Root

@@ -28,6 +28,18 @@ describe('SheetAbilities', () => {
     expect(roll.mock.calls[1][0]).toBe('Strength Save');
   });
 
+  it('renders checks and saves as non-interactive when roll is not provided', () => {
+    render(<SheetAbilities locked />);
+    expect(
+      screen.queryByRole('button', { name: /roll strength check/i })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /roll strength save/i })
+    ).toBeNull();
+    expect(screen.getByText('+1')).toBeInTheDocument();
+    expect(screen.getByText(/save \+1/i)).toBeInTheDocument();
+  });
+
   it('shows score inputs only when unlocked and writes through updateAbilityScore', () => {
     const { rerender } = render(<SheetAbilities locked roll={vi.fn()} />);
     expect(

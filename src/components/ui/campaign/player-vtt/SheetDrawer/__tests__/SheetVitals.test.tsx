@@ -32,4 +32,12 @@ describe('SheetVitals', () => {
     fireEvent.click(screen.getByRole('button', { name: /roll initiative/i }));
     expect(roll).toHaveBeenCalledWith('Initiative', 4);
   });
+
+  it('renders initiative as non-interactive when roll is not provided', () => {
+    render(<SheetVitals addToast={vi.fn()} />);
+    expect(
+      screen.queryByRole('button', { name: /roll initiative/i })
+    ).toBeNull();
+    expect(screen.getByText('+4')).toBeInTheDocument();
+  });
 });

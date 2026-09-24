@@ -13,7 +13,7 @@ import { buildVitalsView } from './SheetDrawer.utils';
 
 export interface SheetVitalsProps {
   addToast: (t: Omit<ToastData, 'id'>) => void;
-  roll: (label: string, modifier: number) => Promise<void>;
+  roll?: (label: string, modifier: number) => Promise<void>;
 }
 
 const TILE_CLASS =
@@ -49,15 +49,26 @@ export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
           </div>
           <div className={LABEL_CLASS}>AC</div>
         </div>
-        <button
-          type="button"
-          aria-label="Roll initiative"
-          onClick={() => roll('Initiative', view.initiative)}
-          className={TILE_CLASS}
-        >
-          <div className={VALUE_CLASS}>{formatModifier(view.initiative)}</div>
-          <div className={LABEL_CLASS}>Init</div>
-        </button>
+        {roll ? (
+          <button
+            type="button"
+            aria-label="Roll initiative"
+            onClick={() => roll('Initiative', view.initiative)}
+            className={TILE_CLASS}
+          >
+            <div className={VALUE_CLASS}>
+              {formatModifier(view.initiative)}
+            </div>
+            <div className={LABEL_CLASS}>Init</div>
+          </button>
+        ) : (
+          <div className={TILE_CLASS}>
+            <div className={VALUE_CLASS}>
+              {formatModifier(view.initiative)}
+            </div>
+            <div className={LABEL_CLASS}>Init</div>
+          </div>
+        )}
         <div className={TILE_CLASS}>
           <div className={VALUE_CLASS}>{view.speed} ft</div>
           <div className={LABEL_CLASS}>Speed</div>

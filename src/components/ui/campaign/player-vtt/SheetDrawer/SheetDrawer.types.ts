@@ -4,6 +4,9 @@ export type SheetTabId = 'overview'; // PR 2/3 extend the union
 
 export const SHEET_TAB_STORAGE_KEY = 'rollkeeper-map-sheet-tab';
 
+// Players roll physical dice at the table; flip to true when integrated dice rolling ships.
+export const SHEET_DICE_ROLLS_ENABLED = false;
+
 export interface SheetHeaderView {
   initial: string;
   avatar?: string;

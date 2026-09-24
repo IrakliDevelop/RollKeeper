@@ -12,7 +12,7 @@ import type { AbilityCellView } from './SheetDrawer.types';
 
 export interface SheetAbilitiesProps {
   locked: boolean;
-  roll: (label: string, modifier: number) => Promise<void>;
+  roll?: (label: string, modifier: number) => Promise<void>;
 }
 
 export function SheetAbilities({ locked, roll }: SheetAbilitiesProps) {
@@ -43,22 +43,31 @@ function AbilityCell({
 }: {
   cell: AbilityCellView;
   locked: boolean;
-  roll: (label: string, modifier: number) => Promise<void>;
+  roll?: (label: string, modifier: number) => Promise<void>;
   onScoreChange: (value: number) => void;
 }) {
   return (
     <div className="border-divider bg-surface flex flex-col items-center gap-1 rounded-lg border p-2 text-center">
-      <button
-        type="button"
-        aria-label={`Roll ${cell.name} check`}
-        onClick={() => roll(`${cell.name} Check`, cell.modifier)}
-        className="w-full"
-      >
-        <div className="text-faint text-xs uppercase">{cell.abbr}</div>
-        <div className="text-heading text-lg font-bold">
-          {formatModifier(cell.modifier)}
+      {roll ? (
+        <button
+          type="button"
+          aria-label={`Roll ${cell.name} check`}
+          onClick={() => roll(`${cell.name} Check`, cell.modifier)}
+          className="w-full"
+        >
+          <div className="text-faint text-xs uppercase">{cell.abbr}</div>
+          <div className="text-heading text-lg font-bold">
+            {formatModifier(cell.modifier)}
+          </div>
+        </button>
+      ) : (
+        <div className="w-full">
+          <div className="text-faint text-xs uppercase">{cell.abbr}</div>
+          <div className="text-heading text-lg font-bold">
+            {formatModifier(cell.modifier)}
+          </div>
         </div>
-      </button>
+      )}
 
       {locked ? (
         <span className="text-muted text-xs">{cell.score}</span>
@@ -73,22 +82,36 @@ function AbilityCell({
         />
       )}
 
-      <button
-        type="button"
-        aria-label={`Roll ${cell.name} save`}
-        onClick={() => roll(`${cell.name} Save`, cell.save)}
-        className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase"
-      >
-        <span
-          className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            cell.saveProficient
-              ? 'bg-accent-emerald-text-muted'
-              : 'border-divider border'
-          )}
-        />
-        SAVE {formatModifier(cell.save)}
-      </button>
+      {roll ? (
+        <button
+          type="button"
+          aria-label={`Roll ${cell.name} save`}
+          onClick={() => roll(`${cell.name} Save`, cell.save)}
+          className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase"
+        >
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              cell.saveProficient
+                ? 'bg-accent-emerald-text-muted'
+                : 'border-divider border'
+            )}
+          />
+          SAVE {formatModifier(cell.save)}
+        </button>
+      ) : (
+        <div className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase">
+          <span
+            className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              cell.saveProficient
+                ? 'bg-accent-emerald-text-muted'
+                : 'border-divider border'
+            )}
+          />
+          SAVE {formatModifier(cell.save)}
+        </div>
+      )}
     </div>
   );
 }
