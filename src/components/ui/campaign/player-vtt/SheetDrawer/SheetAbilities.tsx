@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, type ReactNode } from 'react';
 
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { useCharacterStore } from '@/store/characterStore';
@@ -35,6 +35,32 @@ export function SheetAbilities({ locked, roll }: SheetAbilitiesProps) {
   );
 }
 
+function MaybeRollElement({
+  onRoll,
+  ariaLabel,
+  className,
+  children,
+}: {
+  onRoll?: () => void;
+  ariaLabel: string;
+  className: string;
+  children: ReactNode;
+}) {
+  if (onRoll) {
+    return (
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        onClick={onRoll}
+        className={className}
+      >
+        {children}
+      </button>
+    );
+  }
+  return <div className={className}>{children}</div>;
+}
+
 function AbilityCell({
   cell,
   locked,
@@ -48,26 +74,18 @@ function AbilityCell({
 }) {
   return (
     <div className="border-divider bg-surface flex flex-col items-center gap-1 rounded-lg border p-2 text-center">
-      {roll ? (
-        <button
-          type="button"
-          aria-label={`Roll ${cell.name} check`}
-          onClick={() => roll(`${cell.name} Check`, cell.modifier)}
-          className="w-full"
-        >
-          <div className="text-faint text-xs uppercase">{cell.abbr}</div>
-          <div className="text-heading text-lg font-bold">
-            {formatModifier(cell.modifier)}
-          </div>
-        </button>
-      ) : (
-        <div className="w-full">
-          <div className="text-faint text-xs uppercase">{cell.abbr}</div>
-          <div className="text-heading text-lg font-bold">
-            {formatModifier(cell.modifier)}
-          </div>
+      <MaybeRollElement
+        ariaLabel={`Roll ${cell.name} check`}
+        className="w-full"
+        onRoll={
+          roll ? () => roll(`${cell.name} Check`, cell.modifier) : undefined
+        }
+      >
+        <div className="text-faint text-xs uppercase">{cell.abbr}</div>
+        <div className="text-heading text-lg font-bold">
+          {formatModifier(cell.modifier)}
         </div>
-      )}
+      </MaybeRollElement>
 
       {locked ? (
         <span className="text-muted text-xs">{cell.score}</span>
@@ -82,36 +100,21 @@ function AbilityCell({
         />
       )}
 
-      {roll ? (
-        <button
-          type="button"
-          aria-label={`Roll ${cell.name} save`}
-          onClick={() => roll(`${cell.name} Save`, cell.save)}
-          className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase"
-        >
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              cell.saveProficient
-                ? 'bg-accent-emerald-text-muted'
-                : 'border-divider border'
-            )}
-          />
-          SAVE {formatModifier(cell.save)}
-        </button>
-      ) : (
-        <div className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase">
-          <span
-            className={cn(
-              'h-1.5 w-1.5 rounded-full',
-              cell.saveProficient
-                ? 'bg-accent-emerald-text-muted'
-                : 'border-divider border'
-            )}
-          />
-          SAVE {formatModifier(cell.save)}
-        </div>
-      )}
+      <MaybeRollElement
+        ariaLabel={`Roll ${cell.name} save`}
+        className="text-faint flex w-full items-center justify-center gap-1 text-[10px] uppercase"
+        onRoll={roll ? () => roll(`${cell.name} Save`, cell.save) : undefined}
+      >
+        <span
+          className={cn(
+            'h-1.5 w-1.5 rounded-full',
+            cell.saveProficient
+              ? 'bg-accent-emerald-text-muted'
+              : 'border-divider border'
+          )}
+        />
+        SAVE {formatModifier(cell.save)}
+      </MaybeRollElement>
     </div>
   );
 }
