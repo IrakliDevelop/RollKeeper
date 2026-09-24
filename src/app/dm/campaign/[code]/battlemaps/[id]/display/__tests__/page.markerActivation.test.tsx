@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, cleanup, act } from '@testing-library/react';
 import { Viewport, createHtmlElement } from '@fieldnotes/core';
+import type { ActivationOptions, CanvasElement } from '@fieldnotes/core';
 
 import BattleMapDisplayPage from '../page';
 import { PlayerBattleMapCanvas } from '@/components/ui/campaign/location-map/PlayerBattleMapCanvas';
@@ -116,6 +117,22 @@ function makeViewport(): Viewport {
   return new Viewport(container);
 }
 
+/** `ActivationOptions.gesture` is a per-element resolver as of core 0.87;
+ * resolve it against a marker-shaped element to read back the surface
+ * gesture the hook configured. */
+function resolveGesture(
+  options: ActivationOptions | null | undefined
+): unknown {
+  if (options == null) return undefined;
+  const marker = createHtmlElement({
+    position: { x: 0, y: 0 },
+    size: { w: 40, h: 40 },
+    htmlType: MARKER_HTML_TYPE,
+    data: { ...buildMarkerData({ kind: 'door', ref: 'ref-gesture-probe' }) },
+  });
+  return (options.gesture as (el: CanvasElement) => string | null)(marker);
+}
+
 /** Pulls the `onReady` callback the (mocked) `FieldNotesCanvas` most
  * recently received, and invokes it with a real `Viewport` inside `act`. */
 function fireReady(vp: Viewport): void {
@@ -166,7 +183,7 @@ describe('marker activation: the display page never activates; the player canvas
     fireReady(vp);
 
     expect(activationSpy).toHaveBeenCalledTimes(1);
-    expect(activationSpy.mock.calls[0]?.[0]?.gesture).toBe('single');
+    expect(resolveGesture(activationSpy.mock.calls[0]?.[0])).toBe('single');
 
     vp.destroy();
   });
