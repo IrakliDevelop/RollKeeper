@@ -1,4 +1,9 @@
-import type { AbilityName } from '@/types/character';
+import type {
+  AbilityName,
+  SkillName,
+  Spell,
+  SpellSlot,
+} from '@/types/character';
 import type { SpellAoe } from '@/types/spellAoe';
 
 export type SheetTabId =
@@ -78,4 +83,63 @@ export interface SlotSummaryView {
 export interface PassiveView {
   label: string;
   value: string;
+}
+
+export interface SaveRowView {
+  ability: AbilityName;
+  name: string;
+  modifier: number;
+  proficient: boolean;
+}
+
+// none | proficient | expertise
+export type SkillProfLevel = 0 | 1 | 2;
+
+export interface SkillRowView {
+  skill: SkillName;
+  name: string;
+  abilityAbbr: string;
+  modifier: number;
+  passive: number;
+  level: SkillProfLevel;
+}
+
+export interface ProficiencyGroupView {
+  label: string;
+  items: string[];
+}
+
+export interface SpellRowView {
+  spell: Spell;
+  prepared: boolean;
+  alwaysPrepared: boolean;
+  castable: boolean;
+}
+
+export interface SpellGroupView {
+  level: number;
+  label: string;
+  slot: SpellSlot | null;
+  spells: SpellRowView[];
+}
+
+export interface FeatureRowView {
+  id: string;
+  kind: 'extended' | 'trait';
+  name: string;
+  tag: string;
+  description: string;
+  maxUses: number;
+  usedUses: number;
+}
+
+export interface FeatureGroupView {
+  key: string;
+  label: string;
+  features: FeatureRowView[];
+}
+
+export interface ConditionToggleView {
+  name: string;
+  activeId: string | null;
 }
