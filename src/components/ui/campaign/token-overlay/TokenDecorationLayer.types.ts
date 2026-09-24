@@ -2,7 +2,7 @@ import type { ChessPiece } from '@/types/encounter';
 import type { SharedCondition } from '@/types/sharedState';
 import type { HpTier } from '@/utils/hpState';
 
-/** Token decoration visibility: full (bar + chips), compact (bar only), off (nothing). */
+/** Full: bars, conditions, chips. Compact: bars + conditions, chips on reveal. Off: nothing. */
 export type TokenInfoMode = 'full' | 'compact' | 'off';
 
 /** How a token's HP renders: bar-only, bar+numbers, or a state chip ("Bloodied"). */
