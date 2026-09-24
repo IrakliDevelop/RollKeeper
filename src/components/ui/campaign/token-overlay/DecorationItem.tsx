@@ -1,12 +1,13 @@
 'use client';
 
-import { memo } from 'react';
+import { memo, useEffect, useRef, useState, type MouseEvent } from 'react';
 
 import { getHpTierBarColor } from '@/utils/hpColor';
 
 import { ChipRow } from './ChipRow';
 import { ConcentrationRing } from './ConcentrationRing';
 import { ConditionStrip } from './ConditionStrip';
+import { TokenConditionsDialog } from './TokenConditionsDialog';
 import { DeadGlyph, PieceGlyph, ReactionUsedGlyph } from './TokenGlyphs';
 
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
@@ -23,6 +24,7 @@ interface DecorationItemProps {
   cell: number;
   /** Compact mode only: render the chip row for this rect (hovered/revealed). */
   showChipRow?: boolean;
+  zoom?: number;
 }
 
 type BarLikeHp = Extract<TokenHpView, { kind: 'bar' | 'exact' }>;
@@ -66,9 +68,10 @@ function InTokenBar({
  * a centered skull when dead, a condition icon strip inside the top edge, a
  * concentration ring around the token, and a chip row below the token with
  * the name plus an exact-numbers or label-state chip. In full mode the chip
- * row and condition strip are always shown; in compact mode they only appear
- * when `showChipRow` is set (the token is hovered or tap-revealed — see
- * `useCompactReveal`), where the chip row instead lists condition names. The
+ * row is always shown; in compact mode it appears when `showChipRow` is set
+ * (the token is hovered or tap-revealed — see `useCompactReveal`). Condition
+ * icons remain visible in both modes; the revealed row offers a larger
+ * touch target to inspect all conditions. The
  * concentration ring and the reaction-used corner badge show in both full and
  * compact modes. Dead entities keep skull precedence: no strip, no ring, no
  * piece glyph, no reaction badge.
@@ -79,7 +82,15 @@ export const DecorationItem = memo(function DecorationItem({
   mode,
   cell,
   showChipRow,
+  zoom = 1,
 }: DecorationItemProps) {
+  const [conditionsOpen, setConditionsOpen] = useState(false);
+  const conditionTrigger = useRef<HTMLButtonElement | null>(null);
+  const handleInspectConditions = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    conditionTrigger.current = event.currentTarget;
+    setConditionsOpen(true);
+  };
   const showBar =
     !deco.isDead &&
     deco.hp &&
@@ -87,6 +98,9 @@ export const DecorationItem = memo(function DecorationItem({
   const shouldShowChipRow = mode === 'full' || showChipRow === true;
   const conditions = deco.isDead ? undefined : deco.conditions;
   const hasConditions = conditions !== undefined && conditions.length > 0;
+  useEffect(() => {
+    if (!hasConditions) setConditionsOpen(false);
+  }, [hasConditions]);
   return (
     <div
       data-testid={`token-decoration-${rect.key}`}
@@ -102,8 +116,13 @@ export const DecorationItem = memo(function DecorationItem({
       {!deco.isDead && deco.chessPiece && (
         <PieceGlyph rect={rect} deco={deco} />
       )}
-      {hasConditions && shouldShowChipRow && (
-        <ConditionStrip rect={rect} cell={cell} conditions={conditions} />
+      {hasConditions && (
+        <ConditionStrip
+          rect={rect}
+          cell={cell}
+          conditions={conditions}
+          onInspect={handleInspectConditions}
+        />
       )}
       {/* After ConditionStrip: this layer stacks by DOM order (no z-index),
           and a full-width strip would otherwise paint over the corner badge. */}
@@ -120,6 +139,22 @@ export const DecorationItem = memo(function DecorationItem({
               ? conditions.map(c => c.name)
               : undefined
           }
+          onInspectConditions={
+            hasConditions ? handleInspectConditions : undefined
+          }
+          zoom={zoom}
+        />
+      )}
+      {hasConditions && (
+        <TokenConditionsDialog
+          open={conditionsOpen}
+          onOpenChange={setConditionsOpen}
+          name={deco.name}
+          conditions={conditions}
+          onCloseAutoFocus={event => {
+            event.preventDefault();
+            conditionTrigger.current?.focus();
+          }}
         />
       )}
     </div>

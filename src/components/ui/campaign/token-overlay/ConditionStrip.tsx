@@ -1,5 +1,7 @@
 'use client';
 
+import type { MouseEventHandler } from 'react';
+import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
 import { getConditionIcon } from '@/utils/conditionIcons';
 
@@ -12,30 +14,39 @@ interface ConditionStripProps {
   rect: DecoratedTokenRect;
   cell: number;
   conditions: SharedCondition[];
+  onInspect: MouseEventHandler<HTMLButtonElement>;
 }
 
 /**
  * Row of condition icon bubbles inside the token's top edge (mirroring the
- * HP bar inside the bottom edge). Caps at 4 icons + a "+N" overflow chip.
+ * HP bar inside the bottom edge). Reserves room for a clickable overflow
+ * count so every condition remains reachable even on a small token.
  */
 export function ConditionStrip({
   rect,
   cell,
   conditions,
+  onInspect,
 }: ConditionStripProps) {
   const inset = Math.max(2, 0.05 * cell);
   const size = 0.26 * cell;
-  const shown = conditions.slice(0, MAX_ICONS);
+  const gap = 0.03 * cell;
+  const available = Math.max(size, rect.w - 2 * inset);
+  const slots = Math.max(1, Math.floor((available + gap) / (size + gap)));
+  const limit = Math.min(MAX_ICONS, slots);
+  const shownCount =
+    conditions.length > limit ? Math.min(MAX_ICONS, slots - 1) : limit;
+  const shown = conditions.slice(0, shownCount);
   const overflow = conditions.length - shown.length;
   return (
     <TooltipProvider>
       <span
-        className="absolute flex flex-row items-center overflow-hidden"
+        className="absolute flex flex-row items-center"
         style={{
           left: rect.x + inset,
           top: rect.y + inset,
-          gap: 0.03 * cell,
-          maxWidth: rect.w - 2 * inset,
+          gap,
+          maxWidth: available,
         }}
       >
         {shown.map((c, i) => {
@@ -49,11 +60,15 @@ export function ConditionStrip({
               content={tooltipText}
               side="top"
               delayDuration={150}
+              className="max-w-xs break-words whitespace-pre-wrap"
             >
-              <span
+              <Button
+                variant="ghost"
                 aria-label={tooltipText}
-                tabIndex={0}
-                className="bg-surface-raised/90 border-divider text-body focus-visible:ring-ring pointer-events-auto relative flex shrink-0 items-center justify-center rounded-full border focus-visible:ring-2 focus-visible:outline-none"
+                aria-haspopup="dialog"
+                onPointerDown={event => event.stopPropagation()}
+                onClick={onInspect}
+                className="bg-surface-raised/90 border-divider text-body pointer-events-auto relative shrink-0 rounded-full border p-0"
                 style={{ width: size, height: size }}
               >
                 <Icon style={{ width: size * 0.7, height: size * 0.7 }} />
@@ -70,21 +85,26 @@ export function ConditionStrip({
                     {c.stackCount}
                   </span>
                 )}
-              </span>
+              </Button>
             </Tooltip>
           );
         })}
         {overflow > 0 && (
-          <span
-            className="bg-surface-raised/90 border-divider text-body flex shrink-0 items-center justify-center rounded-full border font-semibold"
+          <Button
+            variant="ghost"
+            aria-label={`View all ${conditions.length} conditions`}
+            aria-haspopup="dialog"
+            onPointerDown={event => event.stopPropagation()}
+            onClick={onInspect}
+            className="bg-surface-raised/90 border-divider text-body pointer-events-auto shrink-0 rounded-full border p-0 font-semibold"
             style={{
               height: size,
+              width: size,
               fontSize: size * 0.55,
-              padding: `0 ${size * 0.25}px`,
             }}
           >
             +{overflow}
-          </span>
+          </Button>
         )}
       </span>
     </TooltipProvider>

@@ -4,9 +4,10 @@ import {
   screen,
   cleanup,
   act,
-  fireEvent,
   waitFor,
+  within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { TokenDecorationLayer } from '@/components/ui/campaign/token-overlay';
 import { decorationKey } from '@/components/ui/campaign/token-overlay/TokenDecorationLayer.hooks';
@@ -115,6 +116,14 @@ describe('TokenDecorationLayer', () => {
   beforeEach(() => {
     mockElements = [tokenEl()];
     mockCamera = { x: 0, y: 0, zoom: 1 };
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
   });
 
   afterEach(() => {
@@ -366,7 +375,7 @@ describe('TokenDecorationLayer', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('renders condition icons inside the token top edge in full mode, capped at 4 with overflow', () => {
+  it('fits condition icons and the overflow control inside a small token', () => {
     const { container } = render(
       <TokenDecorationLayer
         decorations={deco({
@@ -382,28 +391,20 @@ describe('TokenDecorationLayer', () => {
         mode="full"
       />
     );
-    // 4 icon bubbles + one "+2" overflow chip
-    expect(screen.getByText('+2')).toBeInTheDocument();
-    const strip = screen.getByText('+2').parentElement as HTMLElement;
+    // Two icons plus overflow fit a 40px token; four icons would clip overflow.
+    expect(screen.getByText('+4')).toBeInTheDocument();
+    const strip = screen.getByText('+4').parentElement as HTMLElement;
     // inset = max(2, 0.05*40) = 2 → strip anchored at rect.x+2 / rect.y+2
     expect(strip.style.left).toBe('102px');
     expect(strip.style.top).toBe('202px');
-    expect(container.querySelectorAll('svg').length).toBeGreaterThanOrEqual(4);
-    expect(strip.className).toContain('overflow-hidden');
-    expect((screen.getByText('+2') as HTMLElement).className).toContain(
-      'shrink-0'
-    );
+    expect(container.querySelectorAll('svg').length).toBe(2);
+    expect(
+      screen.getByRole('button', { name: 'View all 6 conditions' })
+    ).toBeInTheDocument();
   });
 
   it('renders a shared custom condition icon and exposes its description', async () => {
-    vi.stubGlobal(
-      'ResizeObserver',
-      class {
-        observe() {}
-        unobserve() {}
-        disconnect() {}
-      }
-    );
+    const user = userEvent.setup();
     const { container } = render(
       <TokenDecorationLayer
         decorations={deco({
@@ -426,7 +427,7 @@ describe('TokenDecorationLayer', () => {
     );
     expect(trigger).toHaveClass('pointer-events-auto');
 
-    fireEvent.focus(trigger);
+    await user.hover(trigger);
     await waitFor(() =>
       expect(screen.getByRole('tooltip')).toHaveTextContent(
         'Moonmarked: Synthetic silver light reveals the target.'
@@ -447,6 +448,32 @@ describe('TokenDecorationLayer', () => {
     expect(container.querySelectorAll('svg').length).toBe(2);
   });
 
+  it.each([
+    [20, '+6', 0],
+    [80, '+2', 4],
+  ])('keeps overflow reachable on a %ipx token', (width, count, icons) => {
+    mockElements = [tokenEl({ size: { w: width, h: width } })];
+    const { container } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [
+            { name: 'Poisoned' },
+            { name: 'Prone' },
+            { name: 'Stunned' },
+            { name: 'Blinded' },
+            { name: 'Charmed' },
+            { name: 'Deafened' },
+          ],
+        })}
+        mode="compact"
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'View all 6 conditions' })
+    ).toHaveTextContent(count);
+    expect(container.querySelectorAll('svg')).toHaveLength(icons);
+  });
+
   it('shows a stack count on stacked conditions', () => {
     render(
       <TokenDecorationLayer
@@ -459,7 +486,7 @@ describe('TokenDecorationLayer', () => {
     expect(screen.getByText('3')).toBeInTheDocument();
   });
 
-  it('hides the condition strip in compact mode until revealed, and lists names in the reveal', () => {
+  it('shows condition icons in compact mode before the name row is revealed', () => {
     render(
       <TokenDecorationLayer
         decorations={deco({
@@ -468,8 +495,118 @@ describe('TokenDecorationLayer', () => {
         mode="compact"
       />
     );
-    // Nothing revealed: no name chip row, no condition names
+    expect(
+      screen.getByRole('button', { name: 'Poisoned' })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Prone' })).toBeInTheDocument();
+    expect(screen.queryByText('Ogre')).not.toBeInTheDocument();
     expect(screen.queryByText('Poisoned · Prone')).not.toBeInTheDocument();
+  });
+
+  it('opens every condition from overflow and restores focus after Escape', async () => {
+    const user = userEvent.setup();
+    render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [
+            { name: 'Poisoned', description: 'Disadvantage on attacks.' },
+            { name: 'Prone' },
+            { name: 'Moonmarked', description: 'Visible in silver light.' },
+            { name: 'Exhaustion', stackCount: 3 },
+          ],
+        })}
+        mode="compact"
+      />
+    );
+    const overflow = screen.getByRole('button', {
+      name: 'View all 4 conditions',
+    });
+    await user.click(overflow);
+    const dialog = screen.getByRole('dialog', { name: 'Ogre — Conditions' });
+    expect(
+      within(dialog).getByText('Visible in silver light.')
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText('Exhaustion ×3')).toBeInTheDocument();
+    expect(within(dialog).getAllByRole('listitem')).toHaveLength(4);
+    expect(
+      within(dialog).queryByRole('button', { name: /remove/i })
+    ).toBeNull();
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(overflow).toHaveFocus();
+  });
+
+  it('opens descriptions by tapping an icon and updates an open dialog from shared state', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Moonmarked', description: 'First effect.' }],
+        })}
+        mode="compact"
+      />
+    );
+    const trigger = screen.getByRole('button', {
+      name: 'Moonmarked: First effect.',
+    });
+    await user.pointer([
+      { keys: '[TouchA>]', target: trigger },
+      { keys: '[/TouchA]' },
+    ]);
+    expect(screen.getByRole('dialog')).toHaveTextContent('First effect.');
+    rerender(
+      <TokenDecorationLayer
+        decorations={deco({
+          conditions: [{ name: 'Moonmarked', description: 'Changed effect.' }],
+        })}
+        mode="compact"
+      />
+    );
+    expect(screen.getByRole('dialog')).toHaveTextContent('Changed effect.');
+    rerender(<TokenDecorationLayer decorations={deco()} mode="compact" />);
+    expect(screen.queryByRole('dialog')).toBeNull();
+    rerender(
+      <TokenDecorationLayer
+        decorations={deco({ conditions: [{ name: 'Prone' }] })}
+        mode="compact"
+      />
+    );
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('reveals a zoom-independent touch target after tapping a player token', async () => {
+    const user = userEvent.setup();
+    mockElements = [
+      tokenEl({
+        tokenKind: 'player',
+        characterId: 'ent-1',
+        entityId: undefined,
+      }),
+    ];
+    mockCamera.zoom = 0.5;
+    render(
+      <TokenDecorationLayer
+        decorations={deco({
+          name: 'Ally',
+          conditions: [{ name: 'Blessed', description: 'A shared blessing.' }],
+        })}
+        mode="compact"
+      />
+    );
+    firePointer('pointerdown', 60, 110);
+    const trigger = screen.getByRole('button', {
+      name: 'View conditions for Ally',
+    });
+    expect(parseFloat(trigger.style.minHeight) * mockCamera.zoom).toBe(44);
+    await user.pointer([
+      { keys: '[TouchA>]', target: trigger },
+      { keys: '[/TouchA]' },
+    ]);
+    expect(
+      screen.getByRole('dialog', { name: 'Ally — Conditions' })
+    ).toHaveTextContent('A shared blessing.');
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
   });
 
   it('renders a concentration ring in full and compact modes, but not when dead', () => {

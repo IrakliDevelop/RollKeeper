@@ -1,5 +1,7 @@
 'use client';
 
+import type { MouseEventHandler } from 'react';
+import { Button } from '@/components/ui/forms/button';
 import { getHpTierTextColor } from '@/utils/hpColor';
 
 import type { DecoratedTokenRect } from './TokenDecorationLayer.hooks';
@@ -17,12 +19,16 @@ export function ChipRow({
   cell,
   deco,
   conditionNames,
+  onInspectConditions,
+  zoom = 1,
 }: {
   rect: DecoratedTokenRect;
   cell: number;
   deco: TokenDecoration;
   /** Compact-reveal only: joined condition names shown as one chip. */
   conditionNames?: string[];
+  onInspectConditions?: MouseEventHandler<HTMLButtonElement>;
+  zoom?: number;
 }) {
   const showHpChip = !deco.isDead && deco.hp;
   return (
@@ -76,6 +82,19 @@ export function ChipRow({
         >
           {conditionNames.join(' · ')}
         </span>
+      )}
+      {onInspectConditions && (
+        <Button
+          variant="outline"
+          className="pointer-events-auto h-auto rounded-full px-2 py-1"
+          style={{ minHeight: 44 / zoom, fontSize: 14 / zoom }}
+          aria-label={`View conditions for ${deco.name || 'token'}`}
+          aria-haspopup="dialog"
+          onPointerDown={event => event.stopPropagation()}
+          onClick={onInspectConditions}
+        >
+          View conditions
+        </Button>
       )}
     </div>
   );

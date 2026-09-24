@@ -77,6 +77,7 @@ export function TokenDecorationLayer({
               deco={deco}
               mode={mode}
               cell={cell}
+              zoom={camera.zoom}
               showChipRow={mode === 'compact' && rect.id === activeId}
             />
           );
