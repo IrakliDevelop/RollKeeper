@@ -11,7 +11,7 @@ import {
 } from '@/utils/calculations';
 
 import { AcEditDialog } from './AcEditDialog';
-import { parseHpAmount } from './DockVitals.utils';
+import { useHpAmountEditor } from './useHpAmountEditor';
 import { QuickCombatStrip } from './QuickCombatStrip';
 import { HpCard } from './HpCard';
 
@@ -22,15 +22,12 @@ export interface DockVitalsProps {
 export function DockVitals({ addToast }: DockVitalsProps) {
   const {
     character,
-    applyDamageToCharacter,
-    applyHealingToCharacter,
-    addTemporaryHPToCharacter,
     addHeroicInspiration,
     updateHeroicInspiration,
     useHeroicInspiration: spendHeroicInspiration,
     toggleReaction,
   } = useCharacterStore();
-  const [amount, setAmount] = useState('');
+  const hpEditor = useHpAmountEditor(addToast);
   const [acOpen, setAcOpen] = useState(false);
 
   const {
@@ -52,30 +49,6 @@ export function DockVitals({ addToast }: DockVitalsProps) {
     : 1;
   const hasUsedReaction = character.reaction?.hasUsedReaction ?? false;
 
-  const applyAmount = (
-    apply: (n: number) => void,
-    toastTitle: (n: number) => string
-  ) => {
-    const n = parseHpAmount(amount);
-    if (n === null) return;
-    apply(n);
-    setAmount('');
-    // Read the post-apply state back so the toast reflects the actual
-    // result (temp-first damage, heal capping at max, etc.) rather than
-    // just echoing the typed amount.
-    const { current, max, temporary } =
-      useCharacterStore.getState().character.hitPoints;
-    const message = `HP ${current}/${max}${temporary > 0 ? ` +${temporary} temp` : ''}`;
-    addToast({ type: 'info', title: toastTitle(n), message });
-  };
-
-  const handleApplyDamage = () =>
-    applyAmount(applyDamageToCharacter, n => `Took ${n} damage`);
-  const handleApplyHeal = () =>
-    applyAmount(applyHealingToCharacter, n => `Healed ${n} HP`);
-  const handleApplyTemp = () =>
-    applyAmount(addTemporaryHPToCharacter, n => `+${n} temp HP`);
-
   const handleUseHeroic = () => {
     spendHeroicInspiration();
     const r1 = 1 + Math.floor(Math.random() * 20);
@@ -94,11 +67,11 @@ export function DockVitals({ addToast }: DockVitalsProps) {
         hpMax={hpMax}
         hpTemp={hpTemp}
         hpPercent={hpPercent}
-        amount={amount}
-        onAmountChange={setAmount}
-        onDamage={handleApplyDamage}
-        onHeal={handleApplyHeal}
-        onTemp={handleApplyTemp}
+        amount={hpEditor.amount}
+        onAmountChange={hpEditor.setAmount}
+        onDamage={hpEditor.onDamage}
+        onHeal={hpEditor.onHeal}
+        onTemp={hpEditor.onTemp}
       />
 
       <div className="grid grid-cols-2 gap-2">
