@@ -170,4 +170,71 @@ describe('SpellsTab', () => {
     expect(screen.queryByText('Magic Missile')).toBeNull();
     expect(screen.getByText('Fire Bolt')).toBeInTheDocument();
   });
+
+  it('spends and restores a pact slot by tapping pips', () => {
+    seedCaster({ pactMagic: { level: 2, slots: { max: 2, used: 0 } } });
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /spend pact slot/i })[0]
+    );
+    expect(getChar().pactMagic!.slots.used).toBe(1);
+    fireEvent.click(
+      screen.getAllByRole('button', { name: /restore pact slot/i })[0]
+    );
+    expect(getChar().pactMagic!.slots.used).toBe(0);
+  });
+
+  it('shows the no-spells empty state', () => {
+    seedCaster({ spells: [] });
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    expect(screen.getByText(/no spells yet/i)).toBeInTheDocument();
+  });
+
+  it('shows the no-matches empty state', () => {
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    fireEvent.change(
+      screen.getByRole('searchbox', { name: /search spells/i }),
+      { target: { value: 'nonexistent spell' } }
+    );
+    expect(
+      screen.getByText(/no spells match “nonexistent spell”/i)
+    ).toBeInTheDocument();
+  });
+
+  it('unprepares a prepared leveled spell when unlocked', () => {
+    render(
+      <SpellsTab locked={false} addToast={vi.fn()} spellCasting={casting()} />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /unprepare magic missile/i })
+    );
+    expect(
+      getChar().spells.find(s => s.name === 'Magic Missile')!.isPrepared
+    ).toBe(false);
+  });
+
+  it('gives the disabled Cast button an explanatory title', () => {
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    expect(
+      screen.getByRole('button', { name: /cast shield/i })
+    ).toHaveAttribute('title', 'Not prepared or no slots left');
+  });
+
+  it('shows no prepare toggle for an always-prepared spell', () => {
+    const domainSpell = makeSpell({
+      id: 'domainspell',
+      name: 'Bless',
+      level: 1,
+      isPrepared: false,
+      isAlwaysPrepared: true,
+    });
+    seedCaster({ spells: [FIRE_BOLT, MAGIC_MISSILE, SHIELD, domainSpell] });
+    render(
+      <SpellsTab locked={false} addToast={vi.fn()} spellCasting={casting()} />
+    );
+    expect(screen.queryByRole('button', { name: /prepare bless/i })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /unprepare bless/i })
+    ).toBeNull();
+  });
 });

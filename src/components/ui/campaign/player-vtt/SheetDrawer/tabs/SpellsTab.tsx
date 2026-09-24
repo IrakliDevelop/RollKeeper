@@ -63,8 +63,12 @@ export function SpellsTab({
   const pactMagic = character.pactMagic;
 
   const togglePrepared = (id: string) => {
+    // Read fresh state rather than the render snapshot — this can fire after
+    // other spell-slot mutations landed via `useCharacterStore.getState()`
+    // elsewhere in the same tick.
+    const freshSpells = useCharacterStore.getState().character.spells;
     updateCharacter({
-      spells: character.spells.map(s =>
+      spells: freshSpells.map(s =>
         s.id === id
           ? {
               ...s,

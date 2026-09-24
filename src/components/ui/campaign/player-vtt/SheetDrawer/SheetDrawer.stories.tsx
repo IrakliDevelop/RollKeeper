@@ -2,12 +2,16 @@ import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { SheetDrawer } from '.';
+import { SHEET_TAB_STORAGE_KEY } from './SheetDrawer.types';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type {
   CharacterState,
+  ExtendedFeature,
   MulticlassInfo,
+  Spell,
   SpellSlots,
+  TemporaryBuff,
 } from '@/types/character';
 
 const EMPTY_SLOTS: SpellSlots = {
@@ -31,6 +35,83 @@ function classInfo(overrides: Partial<MulticlassInfo>): MulticlassInfo {
     ...overrides,
   };
 }
+
+function spell(
+  overrides: Partial<Spell> & Pick<Spell, 'id' | 'name' | 'level'>
+): Spell {
+  return {
+    school: 'Divination',
+    castingTime: '1 action',
+    range: '60 feet',
+    components: { verbal: true, somatic: true, material: false },
+    duration: 'Instantaneous',
+    description: 'Story fixture spell.',
+    createdAt: '',
+    updatedAt: '',
+    ...overrides,
+  };
+}
+
+// A cantrip (for the "Cantrips" group heading) plus one prepared and one
+// unprepared leveled spell, so the Spells tab story exercises the prepare
+// toggle and the pip row for a real slot.
+const KAELEN_SPELLS: Spell[] = [
+  spell({
+    id: 'guidance',
+    name: 'Guidance',
+    level: 0,
+    castingTime: '1 action',
+    range: 'Touch',
+    duration: 'Concentration, up to 1 minute',
+    description: 'Touch a willing creature and give it a boost to a check.',
+  }),
+  spell({
+    id: 'huntersmark',
+    name: "Hunter's Mark",
+    level: 1,
+    castingTime: '1 bonus action',
+    range: '90 feet',
+    duration: 'Concentration, up to 1 hour',
+    description: 'You choose a creature and mystically mark it as your quarry.',
+    concentration: true,
+    isPrepared: true,
+  }),
+  spell({
+    id: 'curewounds',
+    name: 'Cure Wounds',
+    level: 1,
+    school: 'Evocation',
+    range: 'Touch',
+    description: 'A creature you touch regains hit points.',
+    isPrepared: false,
+  }),
+];
+
+const KAELEN_FEATURES: ExtendedFeature[] = [
+  {
+    id: 'second-wind',
+    name: 'Second Wind',
+    sourceType: 'class',
+    maxUses: 1,
+    usedUses: 0,
+    restType: 'short',
+    displayOrder: 0,
+    description: '<p>Regain 1d10 + fighter level hit points.</p>',
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const KAELEN_BUFFS: TemporaryBuff[] = [
+  {
+    id: 'buff-marked-quarry',
+    name: "Hunter's Mark",
+    effects: [],
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
 
 // Ranger 6 / Fighter 1 (not the brief's literal "Ranger 5 / Fighter 2"): the
 // store's multiclass spell-slot recompute in `loadCharacterState` derives
@@ -64,6 +145,9 @@ const kaelenFixture: CharacterState = makeCharacter({
   },
   concentration: { isConcentrating: true, spellName: "Hunter's Mark" },
   heroicInspiration: { count: 1, maxCount: 1 },
+  spells: KAELEN_SPELLS,
+  extendedFeatures: KAELEN_FEATURES,
+  temporaryBuffs: KAELEN_BUFFS,
 });
 
 const nonCasterFixture: CharacterState = makeCharacter({
@@ -86,6 +170,20 @@ function withCharacter(character: CharacterState): Decorator {
     return <Story />;
   }
   return CharacterSeedDecorator;
+}
+
+/** Pre-selects a tab by seeding the persisted-tab localStorage key before
+ *  the drawer mounts — same key `useSheetTabs` reads on first render. */
+function withStoredTab(tabId: string): Decorator {
+  function StoredTabDecorator(Story: Parameters<Decorator>[0]) {
+    try {
+      window.localStorage.setItem(SHEET_TAB_STORAGE_KEY, tabId);
+    } catch {
+      // localStorage unavailable — the story still renders, just on Overview.
+    }
+    return <Story />;
+  }
+  return StoredTabDecorator;
 }
 
 function body() {
@@ -188,5 +286,69 @@ export const NonCaster: Story = {
       ).toBeInTheDocument()
     );
     await expect(screen.queryByText(/spell slots/i)).not.toBeInTheDocument();
+  },
+};
+
+export const AbilitiesTabStory: Story = {
+  name: 'Abilities tab',
+  decorators: [withStoredTab('abilities'), withCharacter(kaelenFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /abilities/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(screen.getByText('Stealth')).toBeInTheDocument();
+  },
+};
+
+export const SpellsTabStory: Story = {
+  name: 'Spells tab',
+  decorators: [withStoredTab('spells'), withCharacter(kaelenFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /spells/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(
+      screen.getByRole('heading', { name: 'Cantrips', level: 3 })
+    ).toBeInTheDocument();
+  },
+};
+
+export const FeaturesTabStory: Story = {
+  name: 'Features tab',
+  decorators: [withStoredTab('features'), withCharacter(kaelenFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /features/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(screen.getByText('Second Wind')).toBeInTheDocument();
+  },
+};
+
+export const EffectsTabStory: Story = {
+  name: 'Effects tab',
+  decorators: [withStoredTab('effects'), withCharacter(kaelenFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /effects/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(
+      screen.getByRole('button', { name: 'Prone' })
+    ).toBeInTheDocument();
   },
 };

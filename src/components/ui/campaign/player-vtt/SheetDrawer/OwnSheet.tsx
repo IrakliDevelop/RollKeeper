@@ -19,7 +19,11 @@ import {
 import { SheetHeader } from './SheetHeader';
 import { SheetTabBar } from './SheetTabBar';
 import { SheetVitals } from './SheetVitals';
+import { AbilitiesTab } from './tabs/AbilitiesTab';
+import { EffectsTab } from './tabs/EffectsTab';
+import { FeaturesTab } from './tabs/FeaturesTab';
 import { OverviewTab } from './tabs/OverviewTab';
+import { SpellsTab } from './tabs/SpellsTab';
 import { useSheetTabs } from './useSheetTabs';
 
 export interface OwnSheetProps {
@@ -40,10 +44,6 @@ export function OwnSheet({
   addToast,
   showAttackRoll,
   onRested,
-  // Held here, not yet consumed — Task 7 wires this into the Spells tab
-  // content (`SpellsTab`), which is still a `null` placeholder in PR 2's
-  // Task 1.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   spellCasting,
 }: OwnSheetProps) {
   const character = useCharacterStore(s => s.character);
@@ -56,6 +56,7 @@ export function OwnSheet({
   const { tabs, activeTab, setActiveTab } = useSheetTabs(character);
 
   const roll = useSheetRoll({ diceReady: false, showAttackRoll });
+  const rollOrUndefined = SHEET_DICE_ROLLS_ENABLED ? roll : undefined;
 
   return (
     <div className="flex h-full flex-col">
@@ -68,14 +69,8 @@ export function OwnSheet({
       />
 
       <div className="space-y-3 px-5 pb-4">
-        <SheetVitals
-          addToast={addToast}
-          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
-        />
-        <SheetAbilities
-          locked={locked}
-          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
-        />
+        <SheetVitals addToast={addToast} roll={rollOrUndefined} />
+        <SheetAbilities locked={locked} roll={rollOrUndefined} />
       </div>
 
       <Tabs.Root
@@ -104,7 +99,6 @@ export function OwnSheet({
         >
           <OverviewTab addToast={addToast} />
         </Tabs.Content>
-        {/* Later tasks in PR 2 replace `null` with each tab's real content. */}
         {tabs
           .filter(tab => tab.id !== 'overview')
           .map(tab => (
@@ -113,7 +107,21 @@ export function OwnSheet({
               value={tab.id}
               className="flex-1 overflow-y-auto px-5 py-4"
             >
-              {null}
+              {tab.id === 'abilities' && (
+                <AbilitiesTab locked={locked} roll={rollOrUndefined} />
+              )}
+              {tab.id === 'spells' && (
+                <SpellsTab
+                  locked={locked}
+                  addToast={addToast}
+                  spellCasting={spellCasting}
+                  roll={rollOrUndefined}
+                />
+              )}
+              {tab.id === 'features' && <FeaturesTab />}
+              {tab.id === 'effects' && (
+                <EffectsTab addToast={addToast} roll={rollOrUndefined} />
+              )}
             </Tabs.Content>
           ))}
       </Tabs.Root>
