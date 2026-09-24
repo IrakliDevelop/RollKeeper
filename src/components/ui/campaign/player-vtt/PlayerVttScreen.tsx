@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -107,6 +107,16 @@ export function PlayerVttScreen({
     [refetchNow, refetchPartyHpNow]
   );
 
+  const spellCasting = useMemo(
+    () => ({
+      onCastPlacement: requestPlacement,
+      connectionLive: connectionStatus === 'live',
+      hasPendingPlacement: pendingPlacement !== null,
+      onCancelPlacement: cancelPlacement,
+    }),
+    [requestPlacement, connectionStatus, pendingPlacement, cancelPlacement]
+  );
+
   return (
     <PlayerBattleMapCanvas
       campaignCode={campaignCode}
@@ -178,6 +188,7 @@ export function PlayerVttScreen({
           onRested={type =>
             type === 'short' ? showShortRest() : showLongRest()
           }
+          spellCasting={spellCasting}
         />
         {initiativePrompt.showPrompt && initiativePrompt.request && (
           <InitiativeRollPrompt

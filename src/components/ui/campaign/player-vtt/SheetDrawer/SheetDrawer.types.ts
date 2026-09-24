@@ -1,8 +1,31 @@
 import type { AbilityName } from '@/types/character';
+import type { SpellAoe } from '@/types/spellAoe';
 
-export type SheetTabId = 'overview'; // PR 2/3 extend the union
+export type SheetTabId =
+  | 'overview'
+  | 'abilities'
+  | 'spells'
+  | 'features'
+  | 'effects';
+
+export const SHEET_TAB_IDS: readonly SheetTabId[] = [
+  'overview',
+  'abilities',
+  'spells',
+  'features',
+  'effects',
+];
 
 export const SHEET_TAB_STORAGE_KEY = 'rollkeeper-map-sheet-tab';
+
+export type SheetRoll = (label: string, modifier: number) => Promise<void>;
+
+export interface SheetSpellCastingProps {
+  onCastPlacement: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
+  connectionLive: boolean;
+  hasPendingPlacement: boolean;
+  onCancelPlacement: () => void;
+}
 
 // Players roll physical dice at the table; flip to true when integrated dice rolling ships.
 export const SHEET_DICE_ROLLS_ENABLED = false;

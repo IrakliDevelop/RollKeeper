@@ -103,6 +103,12 @@ const meta: Meta<typeof SheetDrawer> = {
     addToast: fn(),
     showAttackRoll: fn(),
     onRested: fn(),
+    spellCasting: {
+      onCastPlacement: fn(),
+      connectionLive: true,
+      hasPendingPlacement: false,
+      onCancelPlacement: fn(),
+    },
   },
 };
 

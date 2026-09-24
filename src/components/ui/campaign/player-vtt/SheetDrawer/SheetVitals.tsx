@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 import { Shield } from 'lucide-react';
 
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -9,6 +9,7 @@ import { formatModifier } from '@/utils/calculations';
 
 import { useHpAmountEditor } from '../CharacterDock/useHpAmountEditor';
 import { HpCard } from '../CharacterDock/HpCard';
+import { MaybeRollElement } from './MaybeRollElement';
 import { buildVitalsView } from './SheetDrawer.utils';
 
 export interface SheetVitalsProps {
@@ -20,30 +21,6 @@ const TILE_CLASS =
   'border-divider bg-surface rounded-lg border p-2 text-center';
 const VALUE_CLASS = 'text-heading text-xl font-bold';
 const LABEL_CLASS = 'text-faint text-xs uppercase';
-
-function MaybeRollTile({
-  onRoll,
-  ariaLabel,
-  children,
-}: {
-  onRoll?: () => void;
-  ariaLabel: string;
-  children: ReactNode;
-}) {
-  if (onRoll) {
-    return (
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={onRoll}
-        className={TILE_CLASS}
-      >
-        {children}
-      </button>
-    );
-  }
-  return <div className={TILE_CLASS}>{children}</div>;
-}
 
 export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
   const character = useCharacterStore(s => s.character);
@@ -73,15 +50,14 @@ export function SheetVitals({ addToast, roll }: SheetVitalsProps) {
           </div>
           <div className={LABEL_CLASS}>AC</div>
         </div>
-        <MaybeRollTile
+        <MaybeRollElement
           ariaLabel="Roll initiative"
-          onRoll={
-            roll ? () => roll('Initiative', view.initiative) : undefined
-          }
+          className={TILE_CLASS}
+          onRoll={roll ? () => roll('Initiative', view.initiative) : undefined}
         >
           <div className={VALUE_CLASS}>{formatModifier(view.initiative)}</div>
           <div className={LABEL_CLASS}>Init</div>
-        </MaybeRollTile>
+        </MaybeRollElement>
         <div className={TILE_CLASS}>
           <div className={VALUE_CLASS}>{view.speed} ft</div>
           <div className={LABEL_CLASS}>Speed</div>

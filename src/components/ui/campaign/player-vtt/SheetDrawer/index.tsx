@@ -5,6 +5,7 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { OwnSheet } from './OwnSheet';
+import type { SheetSpellCastingProps } from './SheetDrawer.types';
 
 export interface SheetDrawerProps {
   open: boolean;
@@ -17,6 +18,7 @@ export interface SheetDrawerProps {
     isCrit: boolean
   ) => void;
   onRested: (type: 'short' | 'long') => void;
+  spellCasting: SheetSpellCastingProps;
   /** Forwarded to SideDrawer; see its focus-return contract. */
   onCloseAutoFocus?: (event: Event) => void;
 }

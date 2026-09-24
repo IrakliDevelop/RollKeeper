@@ -10,6 +10,12 @@ const props = () => ({
   addToast: vi.fn(),
   showAttackRoll: vi.fn(),
   onRested: vi.fn(),
+  spellCasting: {
+    onCastPlacement: vi.fn(),
+    connectionLive: true,
+    hasPendingPlacement: false,
+    onCancelPlacement: vi.fn(),
+  },
 });
 beforeEach(() => {
   window.localStorage.clear();
@@ -74,5 +80,23 @@ describe('SheetDrawer', () => {
     const tab = screen.getByRole('tab', { name: /overview/i });
     const panel = screen.getByRole('tabpanel', { name: /overview/i });
     expect(tab).toHaveAttribute('aria-controls', panel.id);
+  });
+
+  it('falls back to overview when the stored tab is unknown', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'bogus');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('restores a stored known tab', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'effects');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /effects/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
   });
 });
