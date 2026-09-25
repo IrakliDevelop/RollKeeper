@@ -16,7 +16,7 @@ export interface CombatantDetailProps {
   onOpenSheet?: () => void;
 }
 
-function RegionalEffects({ effects }: { effects: string[] }) {
+export function RegionalEffects({ effects }: { effects: string[] }) {
   if (effects.length === 0) return null;
   return (
     <div className="border-divider space-y-1 border-t p-4">

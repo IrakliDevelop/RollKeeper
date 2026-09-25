@@ -62,10 +62,14 @@ function sbField(
   return undefined;
 }
 
-export function DetailCombatInfo({ entity, actions }: DetailSectionProps) {
+export function DetailCombatInfo({
+  entity,
+  actions,
+  readOnly = false,
+}: DetailSectionProps & { readOnly?: boolean }) {
   const sb = entity.monsterStatBlock;
   const isPlayer = entity.type === 'player';
-  const canEdit = !isPlayer && sb != null;
+  const canEdit = !readOnly && !isPlayer && sb != null;
 
   const resistances =
     (sb != null ? sbField(sb, 'resistances') : undefined) ??

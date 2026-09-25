@@ -8,6 +8,9 @@ export interface CreatureVitalsProps {
   editing: boolean;
 }
 
+/** Shared props for the creature drawer's tab content components. */
+export type CreatureTabProps = CreatureVitalsProps;
+
 export interface CreatureBadge {
   label: 'Monster' | 'NPC' | 'Summon' | 'Lair';
   tone: 'purple' | 'amber' | 'blue' | 'emerald';
