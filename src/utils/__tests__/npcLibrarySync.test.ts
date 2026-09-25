@@ -263,7 +263,7 @@ describe('buildNpcLibraryPatch — stat block scalars', () => {
     expect(buildNpcLibraryPatch(before, after, npc)).toEqual({ maxHp: 60 });
   });
 
-  it('does not throw on a legacy NPC block missing bonusActions/lairActions', () => {
+  it('does not throw on a legacy NPC block missing bonusActions/lairActions, and leaves those sections absent', () => {
     const before = makeEntity({ monsterStatBlock: makeStatBlock({ str: 18 }) });
     const after = makeEntity({ monsterStatBlock: makeStatBlock({ str: 20 }) });
     const legacyBlock = makeStatBlock({
@@ -279,6 +279,24 @@ describe('buildNpcLibraryPatch — stat block scalars', () => {
     expect(() => buildNpcLibraryPatch(before, after, npc)).not.toThrow();
     const patch = buildNpcLibraryPatch(before, after, npc);
     expect(patch?.monsterStatBlock?.str).toBe(20);
+    // No entries in these sections changed, so the patch must leave the
+    // legacy NPC's missing sections absent rather than coercing them to [].
+    expect(patch?.monsterStatBlock?.bonusActions).toBeUndefined();
+    expect(patch?.monsterStatBlock?.lairActions).toBeUndefined();
+  });
+
+  it('syncs top-level speed even when the NPC has no stat block', () => {
+    const before = makeEntity({
+      monsterStatBlock: makeStatBlock({ speed: '30 ft.' }),
+    });
+    const after = makeEntity({
+      monsterStatBlock: makeStatBlock({ speed: '30 ft., fly 60 ft.' }),
+    });
+    const npc = makeNpc({ monsterStatBlock: undefined, speed: '30 ft.' });
+
+    expect(buildNpcLibraryPatch(before, after, npc)).toEqual({
+      speed: '30 ft., fly 60 ft.',
+    });
   });
 });
 

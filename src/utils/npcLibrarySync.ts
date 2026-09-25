@@ -72,6 +72,15 @@ function valuesDiffer(a: unknown, b: unknown): boolean {
   return a !== b;
 }
 
+/** Typed write helper so callers don't need `as unknown as Record<...>` casts. */
+function assignKey<K extends keyof MonsterStatBlock>(
+  target: MonsterStatBlock,
+  key: K,
+  value: MonsterStatBlock[K]
+): void {
+  target[key] = value;
+}
+
 /** Merges after's changed stat-block scalars/entries onto a clone of the NPC's block. */
 function buildStatBlockPatch(
   beforeBlock: MonsterStatBlock,
@@ -80,20 +89,27 @@ function buildStatBlockPatch(
 ): MonsterStatBlock {
   const result = structuredClone(npcBlock);
 
+  // The scalar keys span several unrelated value types (numbers, strings,
+  // string arrays, the save-proficiency union array), so a union-typed loop
+  // variable can't drive `assignKey`'s generic inference cleanly here — an
+  // explicit cast stays simplest for this one loop.
+  const mutableResult = result as unknown as Record<string, unknown>;
   for (const key of STAT_BLOCK_SCALAR_KEYS) {
     const beforeValue = beforeBlock[key];
     const afterValue = afterBlock[key];
     if (key === 'saveProficiencies') {
       if (JSON.stringify(beforeValue) !== JSON.stringify(afterValue)) {
-        (result as unknown as Record<string, unknown>)[key] = afterValue;
+        mutableResult[key] = afterValue;
       }
       continue;
     }
     if (valuesDiffer(beforeValue, afterValue)) {
-      (result as unknown as Record<string, unknown>)[key] = afterValue;
+      mutableResult[key] = afterValue;
     }
   }
 
+  // Only write a section when one of its entries actually changed; otherwise
+  // leave the NPC's section exactly as cloned (including absent/legacy).
   for (const section of STAT_BLOCK_ENTRY_SECTIONS) {
     const beforeEntries = beforeBlock[section] ?? [];
     const afterEntries = afterBlock[section] ?? [];
@@ -108,17 +124,22 @@ function buildStatBlockPatch(
       if (entry.id) npcIds.add(entry.id);
     }
 
-    let sectionEntries = result[section] ?? [];
+    const replacements = new Map<string, StatBlockEntry>();
     for (const afterEntry of afterEntries) {
-      if (!afterEntry.id) continue;
-      if (!npcIds.has(afterEntry.id)) continue;
+      if (!afterEntry.id || !npcIds.has(afterEntry.id)) continue;
       const beforeEntry = beforeById.get(afterEntry.id);
       if (JSON.stringify(beforeEntry) === JSON.stringify(afterEntry)) continue;
-      sectionEntries = sectionEntries.map(entry =>
-        entry.id === afterEntry.id ? afterEntry : entry
-      );
+      replacements.set(afterEntry.id, afterEntry);
     }
-    (result as unknown as Record<string, unknown>)[section] = sectionEntries;
+
+    if (replacements.size === 0) continue;
+
+    const updatedEntries = npcEntries.map(entry =>
+      entry.id && replacements.has(entry.id)
+        ? replacements.get(entry.id)!
+        : entry
+    );
+    assignKey(result, section, updatedEntries);
   }
 
   return result;
@@ -164,28 +185,31 @@ export function buildNpcLibraryPatch(
     patch.proficiencyBonus = after.proficiencyBonus;
   }
 
-  if (
-    before.monsterStatBlock !== after.monsterStatBlock &&
-    npc.monsterStatBlock &&
-    before.monsterStatBlock &&
-    after.monsterStatBlock
-  ) {
-    const statBlockPatch = buildStatBlockPatch(
-      before.monsterStatBlock,
-      after.monsterStatBlock,
-      npc.monsterStatBlock
-    );
-    if (
-      JSON.stringify(statBlockPatch) !== JSON.stringify(npc.monsterStatBlock)
-    ) {
-      patch.monsterStatBlock = statBlockPatch;
-    }
-
+  if (before.monsterStatBlock && after.monsterStatBlock) {
+    // Speed lives on the stat block but also mirrors onto the NPC's
+    // top-level `speed` — sync it regardless of whether the NPC has a
+    // monsterStatBlock at all.
     if (
       before.monsterStatBlock.speed !== after.monsterStatBlock.speed &&
       npc.speed !== after.monsterStatBlock.speed
     ) {
       patch.speed = after.monsterStatBlock.speed;
+    }
+
+    if (
+      before.monsterStatBlock !== after.monsterStatBlock &&
+      npc.monsterStatBlock
+    ) {
+      const statBlockPatch = buildStatBlockPatch(
+        before.monsterStatBlock,
+        after.monsterStatBlock,
+        npc.monsterStatBlock
+      );
+      if (
+        JSON.stringify(statBlockPatch) !== JSON.stringify(npc.monsterStatBlock)
+      ) {
+        patch.monsterStatBlock = statBlockPatch;
+      }
     }
   }
 
