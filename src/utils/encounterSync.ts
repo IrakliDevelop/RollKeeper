@@ -110,6 +110,7 @@ export function mergePlayerSyncData(
     inspirationCount,
     hasUsedReaction,
     deathSaves,
+    hpSharedWithParty: char.shareHpWithParty !== false,
     ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     conditions: mergedConditions,
     suppressedConditions:
@@ -145,6 +146,7 @@ export function hasPlayerDataChanged(
   if (updates.hasUsedReaction !== entity.hasUsedReaction) return true;
   if (updates.avatarUrl !== undefined && updates.avatarUrl !== entity.avatarUrl)
     return true;
+  if (updates.hpSharedWithParty !== entity.hpSharedWithParty) return true;
 
   // Compare death saves
   if (updates.deathSaves !== undefined || entity.deathSaves !== undefined) {
