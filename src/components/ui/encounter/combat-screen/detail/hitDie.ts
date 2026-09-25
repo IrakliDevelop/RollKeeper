@@ -2,6 +2,14 @@ import type { EncounterEntity } from '@/types/encounter';
 import { rollHitDie } from '../spendHitDie';
 import type { EntityActions } from '../types';
 
+/** Tailwind text color for current/max HP, by percentage remaining. */
+export function hpColorClass(current: number, max: number): string {
+  const pct = max > 0 ? (current / max) * 100 : 0;
+  if (pct > 50) return 'text-accent-emerald-text';
+  if (pct > 25) return 'text-accent-amber-text';
+  return 'text-accent-red-text';
+}
+
 /** Death saves show for players and NPCs (or npc-sourced monsters) down at 0 HP. */
 export function showDeathSaves(entity: EncounterEntity): boolean {
   return (

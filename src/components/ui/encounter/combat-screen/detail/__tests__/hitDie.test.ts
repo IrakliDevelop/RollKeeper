@@ -1,6 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { canSpendHitDie, showDeathSaves, spendHitDie } from '../hitDie';
+import {
+  canSpendHitDie,
+  hpColorClass,
+  showDeathSaves,
+  spendHitDie,
+} from '../hitDie';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../../types';
 
@@ -46,6 +51,32 @@ function makeActions(): EntityActions {
     onShortRest: vi.fn(),
   };
 }
+
+describe('hpColorClass', () => {
+  it('is emerald above 50% remaining', () => {
+    expect(hpColorClass(11, 20)).toBe('text-accent-emerald-text');
+  });
+
+  it('is amber at exactly 50% remaining (boundary goes amber, not emerald)', () => {
+    expect(hpColorClass(10, 20)).toBe('text-accent-amber-text');
+  });
+
+  it('is amber between 25% and 50% remaining', () => {
+    expect(hpColorClass(6, 20)).toBe('text-accent-amber-text');
+  });
+
+  it('is red at exactly 25% remaining (boundary goes red, not amber)', () => {
+    expect(hpColorClass(5, 20)).toBe('text-accent-red-text');
+  });
+
+  it('is red at or below 25% remaining, including 0', () => {
+    expect(hpColorClass(0, 20)).toBe('text-accent-red-text');
+  });
+
+  it('is red when max is 0 (avoids divide-by-zero producing a false-positive color)', () => {
+    expect(hpColorClass(0, 0)).toBe('text-accent-red-text');
+  });
+});
 
 describe('showDeathSaves', () => {
   it('is true for a player at 0 HP with death saves', () => {

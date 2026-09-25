@@ -9,14 +9,12 @@ import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
 import { DeathSaves } from './DeathSaves';
 import { ConcentrationReaction } from './ConcentrationReaction';
-import { canSpendHitDie, showDeathSaves, spendHitDie } from './hitDie';
-
-function hpColorClass(current: number, max: number): string {
-  const pct = max > 0 ? (current / max) * 100 : 0;
-  if (pct > 50) return 'text-accent-emerald-text';
-  if (pct > 25) return 'text-accent-amber-text';
-  return 'text-accent-red-text';
-}
+import {
+  canSpendHitDie,
+  hpColorClass,
+  showDeathSaves,
+  spendHitDie,
+} from './hitDie';
 
 export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);

@@ -6,19 +6,13 @@ import { X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import { DamageControls } from '@/components/ui/encounter/combat-screen/detail/DamageControls';
+import { hpColorClass } from '@/components/ui/encounter/combat-screen/detail/hitDie';
 import {
   HEADING_CLASS,
   SECTION_CLASS,
 } from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
-
-function hpColorClass(current: number, max: number): string {
-  const pct = max > 0 ? (current / max) * 100 : 0;
-  if (pct > 50) return 'text-accent-emerald-text';
-  if (pct > 25) return 'text-accent-amber-text';
-  return 'text-accent-red-text';
-}
 
 /** HP card: big current/max HP, temp-HP pill, HP bar, and damage/heal/temp controls. */
 export function CreatureHpCard({
