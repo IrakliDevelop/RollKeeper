@@ -11,6 +11,7 @@ export default defineConfig({
     '**/marker-loot-locked-claim.spec.ts',
     '**/shop-purchase-reconciliation.spec.ts',
     '**/map-sheet-drawer.spec.ts',
+    '**/dm-creature-drawer.spec.ts',
   ],
   outputDir: 'test-results',
   timeout: 60_000,
