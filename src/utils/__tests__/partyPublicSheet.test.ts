@@ -162,11 +162,33 @@ describe('buildPartyPublicSheet', () => {
     expect(sheet!.passivePerception).toBe(16);
     expect(sheet!.conditions).toEqual(['Prone', 'Exhaustion 2']);
     expect(sheet!.concentration).toBe("Hunter's Mark");
-    expect(sheet!.equippedGear).toEqual([
-      'Attuned Ring',
-      'Secret Armor',
-      'Secret Sword',
-    ]);
+    // Attuned-but-not-equipped items are not "equipped gear".
+    expect(sheet!.equippedGear).toEqual(['Secret Armor', 'Secret Sword']);
+  });
+
+  it('dedupes conditions by display string', () => {
+    const condition = {
+      source: 'XPHB',
+      description: '',
+      stackable: false,
+      count: 1,
+      appliedAt: '',
+    };
+    const sheet = buildPartyPublicSheet(
+      fixture({
+        conditionsAndDiseases: {
+          activeConditions: [
+            { ...condition, id: 'c1', name: 'Poisoned' },
+            { ...condition, id: 'c2', name: 'Poisoned', source: 'PHB' },
+            { ...condition, id: 'c3', name: 'Prone' },
+          ],
+          activeDiseases: [],
+          exhaustionVariant: '2014',
+        },
+      })
+    );
+
+    expect(sheet!.conditions).toEqual(['Poisoned', 'Prone']);
   });
 
   it('dedupes and sorts equipped gear names across sources', () => {

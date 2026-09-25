@@ -30,10 +30,14 @@ export function buildPartyPublicSheet(
   if (c.sharePartyView === false) return null;
 
   const activeConditions = c.conditionsAndDiseases?.activeConditions ?? [];
-  const conditions = activeConditions.map(condition =>
-    condition.stackable && condition.count > 1
-      ? `${condition.name} ${condition.count}`
-      : condition.name
+  const conditions = Array.from(
+    new Set(
+      activeConditions.map(condition =>
+        condition.stackable && condition.count > 1
+          ? `${condition.name} ${condition.count}`
+          : condition.name
+      )
+    )
   );
 
   const weaponNames = (c.weapons ?? [])
@@ -43,7 +47,7 @@ export function buildPartyPublicSheet(
     .filter(a => a.isEquipped)
     .map(a => a.name);
   const magicItemNames = (c.magicItems ?? [])
-    .filter(m => m.isEquipped || m.isAttuned)
+    .filter(m => m.isEquipped)
     .map(m => m.name);
 
   const equippedGear = Array.from(
