@@ -87,4 +87,100 @@ describe('useSheetDrawerState', () => {
 
     expect(setDockCollapsed).not.toHaveBeenCalled();
   });
+
+  it('openSheet and openSheetFromDock set openTarget to { kind: "own" }', () => {
+    const setDockCollapsed = vi.fn();
+    const { result } = renderHook(() =>
+      useSheetDrawerState({
+        sheetReady: true,
+        dockCollapsed: false,
+        setDockCollapsed,
+      })
+    );
+
+    expect(result.current.openTarget).toBeNull();
+
+    act(() => {
+      result.current.openSheet();
+    });
+
+    expect(result.current.openTarget).toEqual({ kind: 'own' });
+  });
+
+  it('openPartySheet opens the sheet with a party target and collapses the dock', () => {
+    const setDockCollapsed = vi.fn();
+    const { result } = renderHook(() =>
+      useSheetDrawerState({
+        sheetReady: true,
+        dockCollapsed: false,
+        setDockCollapsed,
+      })
+    );
+
+    act(() => {
+      result.current.openPartySheet('char-2');
+    });
+
+    expect(result.current.sheetOpen).toBe(true);
+    expect(result.current.openTarget).toEqual({
+      kind: 'party',
+      characterId: 'char-2',
+    });
+    expect(setDockCollapsed).toHaveBeenCalledWith(true);
+  });
+
+  it('switching target while already open updates openTarget without re-collapsing the dock', () => {
+    const setDockCollapsed = vi.fn();
+    const { result } = renderHook(() =>
+      useSheetDrawerState({
+        sheetReady: true,
+        dockCollapsed: false,
+        setDockCollapsed,
+      })
+    );
+
+    act(() => {
+      result.current.openSheet();
+    });
+    expect(result.current.openTarget).toEqual({ kind: 'own' });
+    setDockCollapsed.mockClear();
+
+    act(() => {
+      result.current.openPartySheet('char-2');
+    });
+
+    expect(result.current.sheetOpen).toBe(true);
+    expect(result.current.openTarget).toEqual({
+      kind: 'party',
+      characterId: 'char-2',
+    });
+    expect(setDockCollapsed).not.toHaveBeenCalled();
+
+    act(() => {
+      result.current.openSheet();
+    });
+    expect(result.current.openTarget).toEqual({ kind: 'own' });
+    expect(setDockCollapsed).not.toHaveBeenCalled();
+  });
+
+  it('closeSheet clears openTarget', () => {
+    const setDockCollapsed = vi.fn();
+    const { result } = renderHook(() =>
+      useSheetDrawerState({
+        sheetReady: true,
+        dockCollapsed: false,
+        setDockCollapsed,
+      })
+    );
+
+    act(() => {
+      result.current.openPartySheet('char-2');
+    });
+    act(() => {
+      result.current.closeSheet();
+    });
+
+    expect(result.current.sheetOpen).toBe(false);
+    expect(result.current.openTarget).toBeNull();
+  });
 });
