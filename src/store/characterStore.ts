@@ -723,6 +723,7 @@ interface CharacterStore {
   updateDaysSpent: (days: number) => void; // Set days spent directly
   incrementDaysSpent: (amount?: number) => void; // Add days (default: 1)
   toggleShareHpWithParty: () => void; // Toggle HP sharing with party members
+  setSharePartyView: (enabled: boolean) => void; // Set whether party members can open the read-only sheet view
 
   updateCharacterBackground: (updates: Partial<CharacterBackground>) => void;
 
@@ -4075,6 +4076,18 @@ export const useCharacterStore = create<CharacterStore>()(
             saveStatus: 'saving' as SaveStatus,
           }));
         },
+
+        setSharePartyView: enabled =>
+          set(state => {
+            if ((state.character.sharePartyView ?? true) === enabled) {
+              return state;
+            }
+            return {
+              character: { ...state.character, sharePartyView: enabled },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving' as const,
+            };
+          }),
 
         updateCharacterBackground: updates => {
           set(state => ({
