@@ -139,6 +139,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   updateDaysSpent: 'CANONICAL',
   incrementDaysSpent: 'CANONICAL',
   toggleShareHpWithParty: 'CANONICAL',
+  setSharePartyView: 'CANONICAL',
   updateCharacterBackground: 'CANONICAL',
   // — weapons —
   addWeapon: 'CANONICAL',

@@ -49,6 +49,7 @@ export function PlayerVttScreen({
     sharedState,
     refetchNow,
     liveInitiative,
+    partyMembers,
     refetchPartyHpNow,
     handleEndTurn,
     pendingPlacement,
@@ -79,8 +80,10 @@ export function PlayerVttScreen({
   const sheetReady = character.id === characterId;
   const {
     sheetOpen,
+    openTarget,
     openSheet,
     openSheetFromDock,
+    openPartySheet,
     closeSheet,
     sheetButtonRef,
     handleSheetCloseAutoFocus,
@@ -134,6 +137,7 @@ export function PlayerVttScreen({
       }
       pendingTransfers={sharedState?.transfers}
       onOpenOwnSheet={openSheet}
+      onOpenPartySheet={openPartySheet}
     >
       <TokenDecorationLayer decorations={decorations} mode={tokenInfoMode} />
       <SpellPlacementController
@@ -189,6 +193,8 @@ export function PlayerVttScreen({
             type === 'short' ? showShortRest() : showLongRest()
           }
           spellCasting={spellCasting}
+          openTarget={openTarget}
+          partyMembers={partyMembers}
         />
         {initiativePrompt.showPrompt && initiativePrompt.request && (
           <InitiativeRollPrompt

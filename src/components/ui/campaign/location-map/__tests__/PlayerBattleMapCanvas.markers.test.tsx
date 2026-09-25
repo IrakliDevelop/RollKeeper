@@ -705,7 +705,7 @@ describe('PlayerBattleMapCanvas: own-token double-tap opens the sheet drawer', (
     vp.destroy();
   });
 
-  it("a combatant token, and another character's player token, are not sheet tokens", () => {
+  it('a combatant token is not a sheet token: the merchant path follows the surface gesture, never double', () => {
     stubCanvas();
     const vp = makeViewport();
     vi.spyOn(vp, 'setActivation');
@@ -715,18 +715,82 @@ describe('PlayerBattleMapCanvas: own-token double-tap opens the sheet drawer', (
     fireReady(vp);
 
     const combatant = tokenEl({ tokenKind: 'combatant', entityId: 'npc-1' });
+
+    const options = activationOptions(vp);
+    // Activatable overall via the merchant `isExtraActivatable` path, but not
+    // a SHEET token: its gesture follows the surface `gesture` ('single').
+    expect(resolveGesture(options, combatant)).toBe('single');
+
+    unmount();
+    vp.destroy();
+  });
+
+  it("without onOpenPartySheet, another character's player token is not activatable", () => {
+    stubCanvas();
+    const vp = makeViewport();
+    vi.spyOn(vp, 'setActivation');
+    const onOpenOwnSheet = vi.fn();
+
+    const { unmount } = renderPlayer({ characterId: 'char-1', onOpenOwnSheet });
+    fireReady(vp);
+
     const otherPlayer = tokenEl({
       tokenKind: PLAYER_TOKEN_KIND,
       characterId: 'char-2',
     });
 
     const options = activationOptions(vp);
-    // Both ARE activatable overall (the combatant token via the merchant
-    // `isExtraActivatable` path), but neither is a SHEET token: the merchant
-    // path's gesture follows the surface `gesture` ('single'), never 'double',
-    // and the other character's token matches no activatable predicate at all.
-    expect(resolveGesture(options, combatant)).toBe('single');
     expect(isActivatable(options, otherPlayer)).toBe(false);
+
+    unmount();
+    vp.destroy();
+  });
+
+  it('with onOpenPartySheet, another character\'s player token is activatable (gesture "double"), and activation calls onOpenPartySheet with that characterId — never onOpenOwnSheet', () => {
+    stubCanvas();
+    const vp = makeViewport();
+    vi.spyOn(vp, 'setActivation');
+    vi.spyOn(vp, 'onElementActivate');
+    const onOpenOwnSheet = vi.fn();
+    const onOpenPartySheet = vi.fn();
+
+    const { unmount } = renderPlayer({
+      characterId: 'char-1',
+      onOpenOwnSheet,
+      onOpenPartySheet,
+    });
+    fireReady(vp);
+
+    const otherPlayer = tokenEl({
+      tokenKind: PLAYER_TOKEN_KIND,
+      characterId: 'char-2',
+    });
+    act(() => {
+      vp.store.add(otherPlayer);
+    });
+
+    const options = activationOptions(vp);
+    expect(isActivatable(options, otherPlayer)).toBe(true);
+    expect(resolveGesture(options, otherPlayer)).toBe('double');
+
+    const listener = vi.mocked(vp.onElementActivate).mock.calls[0]?.[0];
+    if (!listener) {
+      throw new Error(
+        'expected useMarkerRegistration to have subscribed via onElementActivate'
+      );
+    }
+    act(() =>
+      listener({
+        element: otherPlayer,
+        world: { x: 0, y: 0 },
+        pointerType: 'touch',
+        gesture: 'double',
+      })
+    );
+
+    expect(onOpenPartySheet).toHaveBeenCalledTimes(1);
+    expect(onOpenPartySheet).toHaveBeenCalledWith('char-2');
+    expect(onOpenOwnSheet).not.toHaveBeenCalled();
 
     unmount();
     vp.destroy();

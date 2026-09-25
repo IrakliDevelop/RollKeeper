@@ -725,6 +725,7 @@ export interface CharacterState {
 
   daysSpent: number; // Number of in-game days spent in the campaign
   shareHpWithParty?: boolean; // Whether to share HP with party members (default true)
+  sharePartyView?: boolean; // Whether to share the read-only party sheet view with party members (default true)
   spellSlotsExpanded?: boolean; // Whether the full Spell Slot Tracker panel is expanded (default false)
   stackableInspiration?: boolean; // House-rule: allow holding more than one Heroic Inspiration. Default false. When in a campaign, materialized from the DM's setting.
 

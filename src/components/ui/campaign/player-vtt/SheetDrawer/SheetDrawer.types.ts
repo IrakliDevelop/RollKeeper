@@ -29,6 +29,15 @@ export const SHEET_TAB_STORAGE_KEY = 'rollkeeper-map-sheet-tab';
 
 export type SheetRoll = (label: string, modifier: number) => Promise<void>;
 
+/**
+ * Which character's sheet the drawer is showing: the viewer's own sheet, or
+ * (Task 4+) another party member's read-only limited view, identified by
+ * `characterId`.
+ */
+export type SheetOpenTarget =
+  | { kind: 'own' }
+  | { kind: 'party'; characterId: string };
+
 export interface SheetSpellCastingProps {
   onCastPlacement: (spellName: string, aoe: NonNullable<SpellAoe>) => void;
   connectionLive: boolean;

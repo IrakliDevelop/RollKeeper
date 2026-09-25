@@ -8,6 +8,7 @@ import {
 } from './SheetDrawer.types';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
+import type { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import type {
   ArmorItem,
   CharacterState,
@@ -305,6 +306,37 @@ function withInventoryView(mode: 'list' | 'grid'): Decorator {
   return InventoryViewDecorator;
 }
 
+// A party ally sharing their full public sheet — for the PartySheet branch's
+// "shared" story.
+const SHARED_ALLY: PartyMemberHP = {
+  characterId: 'ally-elowen',
+  characterName: 'Elowen Brightwood',
+  playerName: 'Priya',
+  className: 'Cleric',
+  level: 5,
+  armorClass: 18,
+  hitPoints: { current: 18, max: 40, temporary: 0 },
+  lastSynced: '2025-01-01T00:00:00.000Z',
+  publicSheet: {
+    subtitle: 'Cleric 5',
+    hpState: 'Bloodied',
+    speed: 30,
+    passivePerception: 15,
+    conditions: ['Prone'],
+    concentration: 'Bless',
+    equippedGear: ['Mace', 'Shield', 'Holy Symbol'],
+  },
+};
+
+// The same ally with `sharePartyView` opted out — `publicSheet` is null.
+const NOT_SHARED_ALLY: PartyMemberHP = {
+  ...SHARED_ALLY,
+  characterId: 'ally-dorric',
+  characterName: 'Dorric Stonefist',
+  playerName: 'Malik',
+  publicSheet: null,
+};
+
 function body() {
   // The drawer portals to document.body via Radix — query the whole document,
   // not the Storybook canvas element.
@@ -537,5 +569,49 @@ export const OverviewFavoritesStory: Story = {
     await expect(favorites.getByText('Longbow')).toBeInTheDocument();
     await expect(favorites.getByText('Guidance')).toBeInTheDocument();
     await expect(favorites.getByText('Second Wind')).toBeInTheDocument();
+  },
+};
+
+export const Party: Story = {
+  name: 'Party member (shared)',
+  decorators: [withCharacter(kaelenFixture)],
+  args: {
+    openTarget: { kind: 'party', characterId: SHARED_ALLY.characterId },
+    partyMembers: [SHARED_ALLY],
+  },
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: /elowen brightwood limited view/i })
+      ).toBeInTheDocument()
+    );
+    await expect(screen.getByText(/played by priya/i)).toBeInTheDocument();
+    await expect(screen.getByText('Bloodied')).toBeInTheDocument();
+    await expect(screen.getByText('Bless')).toBeInTheDocument();
+    await expect(screen.getByText('Holy Symbol')).toBeInTheDocument();
+    // This fixture has shareHpWithParty on (hitPoints non-null), so the exact
+    // reading renders alongside the coarse word.
+    await expect(screen.getByText('18/40')).toBeInTheDocument();
+  },
+};
+
+export const PartyNotShared: Story = {
+  name: 'Party member (not shared)',
+  decorators: [withCharacter(kaelenFixture)],
+  args: {
+    openTarget: { kind: 'party', characterId: NOT_SHARED_ALLY.characterId },
+    partyMembers: [NOT_SHARED_ALLY],
+  },
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: /dorric stonefist limited view/i })
+      ).toBeInTheDocument()
+    );
+    await expect(
+      screen.getByText(/dorric stonefist hasn't shared their sheet/i)
+    ).toBeInTheDocument();
   },
 };

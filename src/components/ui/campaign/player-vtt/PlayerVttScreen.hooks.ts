@@ -172,6 +172,7 @@ export function usePlayerVttState(campaignCode: string, characterId: string) {
     sharedState,
     refetchNow,
     liveInitiative,
+    partyMembers,
     refetchPartyHpNow,
     handleEndTurn,
     pendingPlacement,

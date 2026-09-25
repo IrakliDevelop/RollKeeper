@@ -13,12 +13,144 @@ import {
 } from '@/test/helpers';
 import { GET } from '../route';
 import { NextRequest } from 'next/server';
+import type { CharacterState } from '@/types/character';
 
 vi.mock('@upstash/redis', () => ({ Redis: vi.fn(() => mockRedis) }));
+
+const { authorizeCampaignMembershipRoute, authorizeHybridGuestRoute } =
+  vi.hoisted(() => ({
+    authorizeCampaignMembershipRoute: vi.fn(),
+    authorizeHybridGuestRoute: vi.fn(),
+  }));
+
+vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
+  authorizeCampaignMembershipRoute,
+}));
+vi.mock('@/lib/supabase/guestSessionServer', () => ({
+  authorizeHybridGuestRoute,
+}));
+
+function accountMember(role: 'owner' | 'dm' | 'player') {
+  return {
+    mode: 'account' as const,
+    principal: {
+      campaignId: 'campaign-a',
+      accountId: 'account-a',
+      role,
+      status: 'active' as const,
+      epoch: 1,
+      legacyPlayerId: role === 'player' ? 'player-1' : null,
+      legacyCharacterId: null,
+      characterId: null,
+    },
+  };
+}
+
+function seedOnePlayer() {
+  seedRedis('campaign:ABC123', createMockCampaignData());
+  seedRedisSet('campaign:ABC123:players', ['player-1']);
+  seedRedis('campaign:ABC123:player:player-1', createMockPlayerData());
+}
+
+async function getParty() {
+  const req = createNextRequest('/api/campaign/ABC123/party-hp');
+  return GET(req as NextRequest, createRouteParams({ code: 'ABC123' }));
+}
+
+describe('GET /api/campaign/[code]/party-hp — authorization', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
+  });
+
+  it('denies a non-member in account-membership mode without reading party data', async () => {
+    seedOnePlayer();
+    authorizeCampaignMembershipRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 401,
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(data.error).toBe('Account membership is required');
+    expect(data.members).toBeUndefined();
+    expect(mockRedis.smembers).not.toHaveBeenCalled();
+    expect(authorizeHybridGuestRoute).not.toHaveBeenCalled();
+  });
+
+  it.each(['player', 'dm', 'owner'] as const)(
+    'allows an account-mode %s member and skips the legacy guest gate',
+    async role => {
+      seedOnePlayer();
+      authorizeCampaignMembershipRoute.mockResolvedValue(accountMember(role));
+
+      const res = await getParty();
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.members).toHaveLength(1);
+      expect(data.members[0].publicSheet).not.toBeNull();
+      expect(authorizeCampaignMembershipRoute).toHaveBeenCalledWith(
+        'ABC123',
+        false
+      );
+      expect(authorizeHybridGuestRoute).not.toHaveBeenCalled();
+    }
+  );
+
+  it('legacy mode runs the hybrid guest gate and returns party data', async () => {
+    seedOnePlayer();
+
+    const res = await getParty();
+
+    expect(res.status).toBe(200);
+    expect(authorizeHybridGuestRoute).toHaveBeenCalledWith(
+      expect.anything(),
+      'ABC123',
+      'party:read'
+    );
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('legacy mode allows a bound guest session', async () => {
+    seedOnePlayer();
+    authorizeHybridGuestRoute.mockResolvedValue({
+      mode: 'guest',
+      principal: { legacyPlayerId: 'player-1' },
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members).toHaveLength(1);
+  });
+
+  it('legacy mode denies an unauthorized guest session', async () => {
+    seedOnePlayer();
+    authorizeHybridGuestRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 403,
+      clearCookie: false,
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(data.members).toBeUndefined();
+  });
+});
 
 describe('GET /api/campaign/[code]/party-hp', () => {
   beforeEach(() => {
     resetRedis();
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
   });
 
   it('returns 404 when campaign does not exist', async () => {
@@ -109,6 +241,7 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     expect(member.hitPoints.temporary).toBe(5);
     expect(member.armorClass).toBe(16);
     expect(member.lastSynced).toBe('2025-01-01T12:00:00.000Z');
+    expect(member.publicSheet).not.toBeNull();
   });
 
   it('returns HP data for multiple players sorted by character name', async () => {
@@ -379,6 +512,269 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     // Only player-2 should appear; null result for player-1 is skipped
     expect(data.members).toHaveLength(1);
     expect(data.members[0].playerName).toBe('Dave');
+  });
+
+  it('includes a publicSheet by default', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1']);
+    seedRedis('campaign:ABC123:player:player-1', createMockPlayerData());
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members[0].publicSheet).not.toBeNull();
+    expect(typeof data.members[0].publicSheet.hpState).toBe('string');
+    expect(Array.isArray(data.members[0].publicSheet.equippedGear)).toBe(true);
+  });
+
+  it('publicSheet is null when sharePartyView is false', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        characterData: {
+          ...createMockPlayerData().characterData,
+          sharePartyView: false,
+        },
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members[0].publicSheet).toBeNull();
+  });
+
+  it('publicSheet has hpState even when shareHpWithParty is false and hitPoints is hidden', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        characterData: {
+          ...createMockPlayerData().characterData,
+          shareHpWithParty: false,
+        },
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members[0].hitPoints).toBeNull();
+    expect(data.members[0].publicSheet).not.toBeNull();
+    expect(typeof data.members[0].publicSheet.hpState).toBe('string');
+    expect(data.members[0].publicSheet.hpState.length).toBeGreaterThan(0);
+    // The public sheet never carries exact HP numbers, even indirectly.
+    const serialized = JSON.stringify(data.members[0].publicSheet);
+    expect(serialized).not.toContain('"current"');
+    expect(serialized).not.toContain('"max"');
+  });
+
+  it('does not leak secrets (spell names, unequipped inventory, notes, currency, condition notes) via publicSheet', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        characterData: {
+          ...createMockPlayerData().characterData,
+          weapons: [
+            {
+              id: 'w1',
+              name: 'SECRET_UNEQUIPPED_WEAPON',
+              category: 'martial',
+              weaponType: ['melee'],
+              damage: [{ dice: '1d8', type: 'slashing' }],
+              enhancementBonus: 0,
+              properties: [],
+              isEquipped: false,
+              createdAt: '',
+              updatedAt: '',
+            },
+          ],
+          armorItems: [],
+          magicItems: [
+            {
+              id: 'm1',
+              name: 'SECRET_UNATTUNED_ITEM',
+              category: 'wondrous',
+              rarity: 'rare',
+              description: '',
+              properties: [],
+              requiresAttunement: true,
+              isAttuned: false,
+              isEquipped: false,
+              createdAt: '',
+              updatedAt: '',
+            },
+            {
+              id: 'm2',
+              name: 'Ring of Warmth',
+              category: 'ring',
+              rarity: 'uncommon',
+              description: 'SECRET_ITEM_DESC',
+              properties: [],
+              requiresAttunement: true,
+              isAttuned: true,
+              isEquipped: true,
+              createdAt: '',
+              updatedAt: '',
+            },
+          ],
+          concentration: {
+            isConcentrating: true,
+            spellName: 'Bless',
+          },
+          spells: [
+            {
+              id: 's1',
+              name: 'SECRET_SPELL_NAME',
+              level: 3,
+              school: 'Evocation',
+              castingTime: '1 action',
+              range: '60 feet',
+              components: { verbal: true, somatic: true, material: false },
+              duration: 'Instantaneous',
+              description: '',
+              createdAt: '',
+              updatedAt: '',
+            },
+            {
+              id: 's2',
+              name: 'SECRET_SPELL_NAME_2',
+              level: 1,
+              school: 'Abjuration',
+              castingTime: '1 action',
+              range: 'Self',
+              components: { verbal: true, somatic: true, material: false },
+              duration: '1 minute',
+              description: '',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ],
+          notes: [
+            {
+              id: 'n1',
+              title: 'Secret',
+              content: 'SECRET_NOTE_CONTENT',
+              category: 'note',
+              createdAt: '',
+              updatedAt: '',
+            },
+          ],
+          currency: {
+            gold: 999999,
+            silver: 0,
+            copper: 0,
+            electrum: 0,
+            platinum: 0,
+          },
+          conditionsAndDiseases: {
+            activeConditions: [
+              {
+                id: 'c1',
+                name: 'Poisoned',
+                source: 'PHB',
+                description: 'SECRET_CONDITION_DESCRIPTION',
+                stackable: false,
+                count: 1,
+                appliedAt: '',
+                notes: 'SECRET_CONDITION_NOTES',
+              },
+            ],
+            activeDiseases: [],
+            exhaustionVariant: '2014',
+          },
+        },
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    const serialized = JSON.stringify(data.members[0].publicSheet);
+    expect(serialized).not.toContain('SECRET_UNEQUIPPED_WEAPON');
+    expect(serialized).not.toContain('SECRET_UNATTUNED_ITEM');
+    expect(serialized).not.toContain('SECRET_ITEM_DESC');
+    expect(serialized).not.toContain('SECRET_SPELL_NAME');
+    expect(serialized).not.toContain('SECRET_SPELL_NAME_2');
+    expect(serialized).not.toContain('SECRET_NOTE_CONTENT');
+    expect(serialized).not.toContain('999999');
+    expect(serialized).not.toContain('SECRET_CONDITION_DESCRIPTION');
+    expect(serialized).not.toContain('SECRET_CONDITION_NOTES');
+    // The condition name itself is fine to include.
+    expect(data.members[0].publicSheet.conditions).toContain('Poisoned');
+    // The attuned+equipped magic item's name is fine to include (it's gear),
+    // but only its name — never its description.
+    expect(data.members[0].publicSheet.equippedGear).toContain(
+      'Ring of Warmth'
+    );
+    // Concentration exposes only the spell being concentrated on — no other
+    // known/prepared spell names leak in.
+    expect(data.members[0].publicSheet.concentration).toBe('Bless');
+  });
+
+  it('a malformed characterData (e.g. missing skills/abilities) does not 500 the whole party list — that member just gets publicSheet: null', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1', 'player-2']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        playerId: 'player-1',
+        characterId: 'char-broken',
+        characterName: 'Broken',
+        characterData: { id: 'char-broken', name: 'Broken' } as CharacterState,
+      })
+    );
+    seedRedis(
+      'campaign:ABC123:player:player-2',
+      createMockPlayerData({
+        playerId: 'player-2',
+        characterId: 'char-ok',
+        characterName: 'Healthy',
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members).toHaveLength(2);
+    const broken = data.members.find(
+      (m: { characterName: string }) => m.characterName === 'Broken'
+    );
+    const healthy = data.members.find(
+      (m: { characterName: string }) => m.characterName === 'Healthy'
+    );
+    expect(broken.publicSheet).toBeNull();
+    expect(healthy.publicSheet).not.toBeNull();
   });
 
   it('returns 500 on Redis error', async () => {

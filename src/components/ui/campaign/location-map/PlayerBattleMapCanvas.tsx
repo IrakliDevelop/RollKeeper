@@ -82,12 +82,13 @@ import { attachFocusReceiver } from './focusSync';
 import {
   PlayerTokenTool,
   PlayerTemplateTool,
+  PLAYER_TOKEN_KIND,
   tokenColorForId,
   tokenAvatarUrl,
   buildCircularTokenUrl,
 } from './PlayerTokenTool';
 import { useOwnTokenBackfill } from './useOwnTokenBackfill';
-import { useOwnTokenPresent, isOwnPlayerToken } from './useOwnTokenPresent';
+import { useOwnTokenPresent } from './useOwnTokenPresent';
 import {
   SpellTemplateTool,
   type SpellTemplateConfig,
@@ -155,6 +156,9 @@ interface PlayerBattleMapCanvasProps {
   pendingTransfers?: { id: string; costCopper?: number }[];
   /** Own-token double-tap → open the character sheet drawer (VTT sheet drawer). */
   onOpenOwnSheet?: () => void;
+  /** A party member's token double-tap → open their read-only limited-view
+   *  sheet, keyed by that token's `characterId`. */
+  onOpenPartySheet?: (characterId: string) => void;
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
@@ -312,6 +316,7 @@ export function PlayerBattleMapCanvas({
   markers: suppliedMarkers = EMPTY_PUBLIC_MARKERS,
   pendingTransfers,
   onOpenOwnSheet,
+  onOpenPartySheet,
 }: PlayerBattleMapCanvasProps) {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
   const [publishedMarkers, setPublishedMarkers] =
@@ -385,6 +390,8 @@ export function PlayerBattleMapCanvas({
   // tears down and re-creates the marker registration effect.
   const onOpenOwnSheetRef = useRef(onOpenOwnSheet);
   onOpenOwnSheetRef.current = onOpenOwnSheet;
+  const onOpenPartySheetRef = useRef(onOpenPartySheet);
+  onOpenPartySheetRef.current = onOpenPartySheet;
 
   const refreshMarkers = useCallback(async () => {
     try {
@@ -492,18 +499,33 @@ export function PlayerBattleMapCanvas({
     closeShop,
   } = useMerchantShopActivation(campaignCode);
 
-  // Own-token double-tap → sheet drawer (VTT sheet drawer): shares this SAME
-  // registration's `setActivation` slot via `sheetTokens` rather than a
-  // second, independent `useMarkerRegistration`-shaped call — see that
-  // hook's doc comment on why a second call would silently replace this one
-  // instead of adding a recognized element kind. Inert (never activatable)
-  // while no `onOpenOwnSheet` is supplied.
+  // Own-token AND party-member-token double-tap → sheet drawer (VTT sheet
+  // drawer): shares this SAME registration's `setActivation` slot via
+  // `sheetTokens` rather than a second, independent
+  // `useMarkerRegistration`-shaped call — see that hook's doc comment on why
+  // a second call would silently replace this one instead of adding a
+  // recognized element kind. A given player token is only activatable while
+  // the matching handler is supplied: this client's own token needs
+  // `onOpenOwnSheet`, another party member's needs `onOpenPartySheet`.
   const sheetTokens = useMemo(
     () => ({
-      isActivatable: (el: Readonly<CanvasElement>) =>
-        onOpenOwnSheetRef.current !== undefined &&
-        isOwnPlayerToken(el as CanvasElement, characterId),
-      onActivate: () => onOpenOwnSheetRef.current?.(),
+      isActivatable: (el: Readonly<CanvasElement>) => {
+        const rec = el as Partial<{ tokenKind: unknown; characterId: unknown }>;
+        if (
+          rec.tokenKind !== PLAYER_TOKEN_KIND ||
+          typeof rec.characterId !== 'string'
+        )
+          return false;
+        return rec.characterId === characterId
+          ? onOpenOwnSheetRef.current !== undefined
+          : onOpenPartySheetRef.current !== undefined;
+      },
+      onActivate: (e: ElementActivationEvent) => {
+        const id = (e.element as Partial<{ characterId: string }>).characterId;
+        if (!id) return;
+        if (id === characterId) onOpenOwnSheetRef.current?.();
+        else onOpenPartySheetRef.current?.(id);
+      },
     }),
     [characterId]
   );

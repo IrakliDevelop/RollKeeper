@@ -38,6 +38,26 @@ function hits(worldX: number, worldY: number, el: CanvasElement): boolean {
 }
 
 /**
+ * Screen-px distance a press must travel before the pan tool starts moving
+ * the camera. Mirrors fieldnotes' own (unexported) `DEFAULT_ACTIVATION_SLOP_PX`
+ * used by its ElementActivation tap/double-tap detection: `Camera.pan`
+ * notifies listeners on every call — including a 0px or sub-slop jitter move
+ * — which bumps `cameraRevision`, and ElementActivation discards a tap whose
+ * revision changed between pointerdown and pointerup. Without this dead
+ * zone, HandTool's unconditional per-move `camera.pan` call made every tap
+ * or double-tap on a non-grabbable element (another player's token, a
+ * merchant/marker) register as a pan and silently eat the tap.
+ */
+const PAN_START_SLOP_PX = 8;
+
+function distance(
+  a: { x: number; y: number },
+  b: { x: number; y: number }
+): number {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+/**
  * Pan tool that hands off to Select when the press lands on something the
  * player can actually move (their TOKEN — see TOKEN_TYPES): the SAME
  * gesture starts dragging the element, and the toolbar flips to Select.
@@ -49,6 +69,16 @@ function hits(worldX: number, worldY: number, el: CanvasElement): boolean {
  * `el => isCombatantToken(el)` so only combatant tokens hand off to Select.
  */
 export class PlayerHandTool extends HandTool {
+  /**
+   * Reference screen point deltas are computed from while panning: the press
+   * point until the slop is crossed, then the most recent pointer position.
+   * `null` whenever this tool isn't tracking an in-progress pan (no press
+   * yet, or the press was handed off to Select).
+   */
+  private panAnchor: { x: number; y: number } | null = null;
+  /** Whether the pan slop has been crossed for the current press. */
+  private panStarted = false;
+
   constructor(
     private readonly selectTool: SelectTool,
     private readonly isGrabbable: (
@@ -69,6 +99,49 @@ export class PlayerHandTool extends HandTool {
       this.selectTool.onPointerDown(state, ctx);
       return;
     }
+    this.panAnchor = { x: state.x, y: state.y };
+    this.panStarted = false;
     super.onPointerDown(state, ctx);
+  }
+
+  onPointerMove(state: PointerState, ctx: ToolContext): void {
+    if (!this.panAnchor) return;
+    const here = { x: state.x, y: state.y };
+
+    if (!this.panStarted) {
+      // Dead zone: don't move the camera (and never call camera.pan) until
+      // the press has moved more than the slop distance from where it
+      // started — a tap, double-tap, or sub-slop jitter must not pan.
+      if (distance(this.panAnchor, here) <= PAN_START_SLOP_PX) return;
+      this.panStarted = true;
+      // Pan by the full accumulated delta since the press so crossing the
+      // slop doesn't lose the movement that happened inside the dead zone.
+      ctx.camera.pan(here.x - this.panAnchor.x, here.y - this.panAnchor.y);
+      this.panAnchor = here;
+      return;
+    }
+
+    const dx = here.x - this.panAnchor.x;
+    const dy = here.y - this.panAnchor.y;
+    if (dx === 0 && dy === 0) return;
+    this.panAnchor = here;
+    ctx.camera.pan(dx, dy);
+  }
+
+  onPointerUp(state: PointerState, ctx: ToolContext): void {
+    this.resetPan();
+    super.onPointerUp(state, ctx);
+  }
+
+  // A tool switch mid-press never delivers this tool's pointerup; drop the
+  // pan so reactivating doesn't resume from a stale anchor.
+  onDeactivate(ctx: ToolContext): void {
+    this.resetPan();
+    super.onDeactivate(ctx);
+  }
+
+  private resetPan(): void {
+    this.panAnchor = null;
+    this.panStarted = false;
   }
 }

@@ -62,6 +62,12 @@ function fakeCtx(elements: CanvasElement[]) {
 const down = (x: number, y: number) =>
   ({ x, y, buttons: 1 }) as unknown as PointerState;
 
+const move = (x: number, y: number) =>
+  ({ x, y, buttons: 1 }) as unknown as PointerState;
+
+const up = (x: number, y: number) =>
+  ({ x, y, buttons: 0 }) as unknown as PointerState;
+
 describe('PlayerHandTool', () => {
   let selectTool: SelectTool;
   let selectDown: ReturnType<typeof vi.spyOn>;
@@ -136,6 +142,83 @@ describe('PlayerHandTool', () => {
       tool.onPointerDown(down(20, 20), ctx);
       expect(ctx.switchTool).not.toHaveBeenCalled();
       expect(selectDown).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('pan dead zone (on empty canvas / DM content)', () => {
+    it('press, small moves within 8px (including a 0-delta move), then release: camera.pan is never called', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(100, 100), ctx); // 0-delta move
+      tool.onPointerMove(move(103, 104), ctx); // dist 5, still in dead zone
+      tool.onPointerMove(move(104, 105), ctx); // dist ~6.4, still in dead zone
+      tool.onPointerMove(move(105, 105), ctx); // dist ~7.07, still within slop
+      tool.onPointerUp(up(105, 105), ctx);
+      expect(ctx.camera.pan).not.toHaveBeenCalled();
+    });
+
+    it('press, then move 20px: the camera ends up panned by the full 20px', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx);
+      const calls = (ctx.camera.pan as ReturnType<typeof vi.fn>).mock.calls;
+      const totalDx = calls.reduce((sum, [dx]) => sum + dx, 0);
+      const totalDy = calls.reduce((sum, [, dy]) => sum + dy, 0);
+      expect(totalDx).toBe(20);
+      expect(totalDy).toBe(0);
+      tool.onPointerUp(up(120, 100), ctx);
+    });
+
+    it('after crossing the slop, further moves pan incrementally', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx); // crosses slop, pans by 20
+      expect(ctx.camera.pan).toHaveBeenCalledTimes(1);
+      expect(ctx.camera.pan).toHaveBeenLastCalledWith(20, 0);
+      tool.onPointerMove(move(125, 100), ctx); // incremental 5px
+      expect(ctx.camera.pan).toHaveBeenCalledTimes(2);
+      expect(ctx.camera.pan).toHaveBeenLastCalledWith(5, 0);
+      tool.onPointerUp(up(125, 100), ctx);
+    });
+
+    it('never calls camera.pan with a zero delta once panning has started', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx); // crosses slop, pans by 20
+      expect(ctx.camera.pan).toHaveBeenCalledTimes(1);
+      tool.onPointerMove(move(120, 100), ctx); // 0-delta move after slop crossed
+      expect(ctx.camera.pan).toHaveBeenCalledTimes(1);
+      tool.onPointerUp(up(120, 100), ctx);
+    });
+
+    it('resets dead-zone state on pointerup, so a fresh press needs to cross the slop again', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx); // crosses slop, pans by 20
+      tool.onPointerUp(up(120, 100), ctx);
+      (ctx.camera.pan as ReturnType<typeof vi.fn>).mockClear();
+
+      tool.onPointerDown(down(50, 50), ctx);
+      tool.onPointerMove(move(53, 53), ctx); // dist ~4.2, within slop again
+      expect(ctx.camera.pan).not.toHaveBeenCalled();
+    });
+
+    it('deactivating mid-press drops the pan, so a later move without a new press never pans', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx); // crosses slop, pans by 20
+      tool.onDeactivate(ctx);
+      (ctx.camera.pan as ReturnType<typeof vi.fn>).mockClear();
+
+      tool.onActivate(ctx);
+      tool.onPointerMove(move(160, 100), ctx);
+      expect(ctx.camera.pan).not.toHaveBeenCalled();
     });
   });
 });

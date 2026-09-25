@@ -516,3 +516,389 @@ test.describe('player map sheet drawer', () => {
     ).toBeHidden();
   });
 });
+
+/**
+ * PR4 — party limited view: player A double-clicks player B's token and gets
+ * a read-only "limited view" of B (never B's full sheet), which honours B's
+ * `shareHpWithParty` / `sharePartyView` opt-outs once B's next campaign sync
+ * reaches the party-hp route; a DM combatant token never opens a sheet.
+ *
+ * Own DM + two-player setup (same relay harness as the describe above, and
+ * `shop-purchase-reconciliation.spec.ts`'s multi-player pattern). B's roster
+ * entry gets `syncEnabled`/`autoSync` — what the real join UI
+ * (`/player` `handleJoinCampaign`) sets and the `joinCampaign` helper skips —
+ * so B's store edits are pushed to the campaign by the normal auto-save →
+ * sync path rather than a hand-rolled POST.
+ */
+const PARTY_CAMPAIGN_NAME = 'Party View E2E Campaign';
+const PARTY_DM_ID = 'dm-party-view-e2e';
+const PARTY_A_NAME = 'Party Viewer';
+const PARTY_B_NAME = 'Party Shared';
+const COMBATANT_TOKEN_ID = 'token-party-view-combatant';
+const COMBATANT_ENTITY_ID = 'entity-party-view-combatant';
+const COMBATANT_ENCOUNTER_ID = 'enc-party-view-e2e';
+
+/** Adds a DM combatant token (`tokenKind: 'combatant'`) plus its encounter
+ *  entity on top of `seedBattleMap`'s blank map — the raw shape
+ *  `token-decoration-overlay.spec.ts` proves the DM VTT hydrates. */
+async function seedCombatantToken(page: Page, code: string): Promise<void> {
+  const now = new Date().toISOString();
+  await page.evaluate(
+    ({ code, mapId, tokenId, entityId, encounterId, now }) => {
+      const raw = window.localStorage.getItem('rollkeeper-battlemap-data');
+      if (!raw) throw new Error('battle map not seeded');
+      const parsed = JSON.parse(raw);
+      const map = parsed.state.battleMaps[code][mapId];
+      const canvas = JSON.parse(map.canvasState);
+      canvas.elements.push({
+        id: tokenId,
+        type: 'shape',
+        position: { x: 320, y: 260 },
+        size: { w: 80, h: 80 },
+        zIndex: 1000,
+        locked: false,
+        layerId: 'layer-annotations',
+        shape: 'ellipse',
+        strokeColor: '#1e293b',
+        strokeWidth: 2,
+        fillColor: '#c0392b',
+        tokenKind: 'combatant',
+        entityId,
+      });
+      map.canvasState = JSON.stringify(canvas);
+      map.linkedEncounterIds = [encounterId];
+      window.localStorage.setItem(
+        'rollkeeper-battlemap-data',
+        JSON.stringify(parsed)
+      );
+      window.localStorage.setItem(
+        'rollkeeper-encounter-data',
+        JSON.stringify({
+          state: {
+            encounters: [
+              {
+                id: encounterId,
+                name: 'Party View E2E Encounter',
+                campaignCode: code,
+                entities: [
+                  {
+                    id: entityId,
+                    type: 'monster',
+                    name: 'E2E Ogre',
+                    initiative: null,
+                    initiativeModifier: 0,
+                    currentHp: 30,
+                    maxHp: 30,
+                    tempHp: 0,
+                    armorClass: 11,
+                    conditions: [],
+                    color: '#c0392b',
+                  },
+                ],
+                currentTurn: 0,
+                round: 0,
+                isActive: false,
+                sortOrder: 'initiative',
+                createdAt: now,
+                updatedAt: now,
+              },
+            ],
+            activeEncounterId: encounterId,
+          },
+          version: 2,
+        })
+      );
+    },
+    {
+      code,
+      mapId: MAP_ID,
+      tokenId: COMBATANT_TOKEN_ID,
+      entityId: COMBATANT_ENTITY_ID,
+      encounterId: COMBATANT_ENCOUNTER_ID,
+      now,
+    }
+  );
+}
+
+interface PartyMemberSnapshot {
+  characterId: string;
+  hitPoints: { current: number; max: number } | null;
+  publicSheet?: { hpState: string } | null;
+}
+
+/** The real party roster endpoint `usePartySync` polls. */
+async function fetchPartyMember(
+  page: Page,
+  code: string,
+  characterId: string
+): Promise<PartyMemberSnapshot | null> {
+  return page.evaluate(
+    async ({ code, characterId }) => {
+      const res = await fetch(`/api/campaign/${code}/party-hp`);
+      if (!res.ok) return null;
+      const data = (await res.json()) as { members?: PartyMemberSnapshot[] };
+      return data.members?.find(m => m.characterId === characterId) ?? null;
+    },
+    { code, characterId }
+  );
+}
+
+/** A screen point inside `targetId`'s ellipse but outside `avoidId`'s bounds
+ *  — the combatant and B's token can overlap after the player camera fits
+ *  the map, and B's token must not absorb the double click. */
+async function coordsInsideElementAvoiding(
+  page: Page,
+  targetId: string,
+  avoidId: string
+): Promise<{ x: number; y: number }> {
+  return page.evaluate(
+    ({ targetId, avoidId }) => {
+      const vp = window.__rkStores!.viewport!;
+      const target = vp.store.getById(targetId);
+      const avoid = vp.store.getById(avoidId);
+      if (!target || !avoid) throw new Error('Element not in store');
+      const wrapper = document.querySelector('canvas')?.parentElement;
+      const rect = wrapper?.getBoundingClientRect();
+      if (!rect) throw new Error('Canvas wrapper not found');
+      const cx = target.position.x + target.size.w / 2;
+      const cy = target.position.y + target.size.h / 2;
+      // Candidates at 35% of the radius-span out from the centre (well
+      // inside the ellipse), centre first.
+      const offsets = [
+        [0, 0],
+        [0.35, 0],
+        [-0.35, 0],
+        [0, 0.35],
+        [0, -0.35],
+        [0.25, 0.25],
+        [-0.25, 0.25],
+        [0.25, -0.25],
+        [-0.25, -0.25],
+      ];
+      for (const [dx, dy] of offsets) {
+        const wx = cx + dx * target.size.w;
+        const wy = cy + dy * target.size.h;
+        const insideAvoid =
+          wx >= avoid.position.x &&
+          wx <= avoid.position.x + avoid.size.w &&
+          wy >= avoid.position.y &&
+          wy <= avoid.position.y + avoid.size.h;
+        if (insideAvoid) continue;
+        const x = rect.left + wx * vp.camera.z + vp.camera.x;
+        const y = rect.top + wy * vp.camera.z + vp.camera.y;
+        if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom)
+          continue;
+        // Not under the dock / toolbar / minimap overlays.
+        if (!wrapper!.contains(document.elementFromPoint(x, y))) continue;
+        return { x, y };
+      }
+      throw new Error(`No clear point on ${targetId} outside ${avoidId}`);
+    },
+    { targetId, avoidId }
+  );
+}
+
+function limitedViewDialog(page: Page, name: string) {
+  return page.getByRole('dialog', { name: `${name} limited view` });
+}
+
+test.describe('player map party limited view', () => {
+  let dmContext: BrowserContext;
+  let contextA: BrowserContext;
+  let contextB: BrowserContext;
+  let dmPage: Page;
+  let pageA: Page;
+  let pageB: Page;
+  let code: string;
+  let characterIdB: string;
+  let tokenIdB: string;
+  let hpB: { current: number; max: number };
+
+  test.beforeAll(async ({ browser }) => {
+    const viewport = { width: 1440, height: 1000 };
+    dmContext = await browser.newContext({ viewport });
+    contextA = await browser.newContext({ viewport });
+    contextB = await browser.newContext({ viewport });
+    dmPage = await dmContext.newPage();
+    pageA = await contextA.newPage();
+    pageB = await contextB.newPage();
+
+    // Sequential prewarm — see the describe above.
+    for (const path of [
+      '/player',
+      '/dm',
+      '/dm/campaign/warm/battlemaps/warm',
+      '/player/characters/new',
+    ]) {
+      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+    }
+    for (const p of [pageA, pageB]) {
+      for (const path of [
+        '/player',
+        '/player/characters/new',
+        '/player/campaign/warm/battlemap/warm',
+      ]) {
+        await p.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      }
+    }
+
+    // ---- DM: campaign + map with one combatant token, parked on the relay ----
+    await seedDm(dmPage, PARTY_DM_ID);
+    code = await createCampaign(dmPage, PARTY_DM_ID, PARTY_CAMPAIGN_NAME);
+    await seedBattleMap(dmPage, code);
+    await seedCombatantToken(dmPage, code);
+    await dmPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
+    await dmPage.waitForFunction(
+      () => !!window.__rkStores?.viewport,
+      undefined,
+      { timeout: 15_000 }
+    );
+    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
+      timeout: 20_000,
+    });
+    await waitForElementSynced(dmPage, COMBATANT_TOKEN_ID);
+
+    // ---- Player A: character + join ----
+    const characterIdA = characterIdFromUrl(
+      await createCharacter(pageA, PARTY_A_NAME)
+    );
+    await joinCampaign(pageA, code, characterIdA, PARTY_CAMPAIGN_NAME);
+
+    // ---- Player B: character + join, with campaign auto-sync on ----
+    characterIdB = characterIdFromUrl(
+      await createCharacter(pageB, PARTY_B_NAME)
+    );
+    await joinCampaign(pageB, code, characterIdB, PARTY_CAMPAIGN_NAME);
+    await pageB.evaluate(id => {
+      window
+        .__rkStores!.player.getState()
+        .updateCharacter(id, { syncEnabled: true, autoSync: true });
+    }, characterIdB);
+    hpB = await readHp(pageB);
+    expect(hpB.max).toBeGreaterThan(0);
+
+    // ---- Player B: open the map and place their token ----
+    await openPlayerMap(pageB, code, characterIdB);
+    await toolbarButton(pageB, /^Place (token|your token on the map)$/).click();
+    const canvasB = pageB.locator('canvas').first();
+    const boxB = await canvasB.boundingBox();
+    if (!boxB) throw new Error('Player B canvas has no bounding box');
+    await pageB.mouse.click(
+      boxB.x + boxB.width * 0.45,
+      boxB.y + boxB.height * 0.5
+    );
+    tokenIdB = await waitForOwnTokenId(pageB, characterIdB);
+    await waitForElementSynced(dmPage, tokenIdB);
+
+    // ---- Player A: open the map; B's token and the combatant arrive ----
+    await openPlayerMap(pageA, code, characterIdA);
+    await waitForElementSynced(pageA, tokenIdB);
+    await waitForElementSynced(pageA, COMBATANT_TOKEN_ID);
+  });
+
+  test.afterAll(async () => {
+    await dmContext?.close();
+    await contextA?.close();
+    await contextB?.close();
+  });
+
+  test("double-clicking another player's token opens their limited view", async () => {
+    await toolbarButton(pageA, 'Pan').click();
+    const coords = await coordsForElement(pageA, tokenIdB);
+    await pageA.mouse.dblclick(coords.x, coords.y);
+
+    const dialog = limitedViewDialog(pageA, PARTY_B_NAME);
+    await expect(dialog).toBeVisible({ timeout: 10_000 });
+    await expect(
+      dialog.getByRole('heading', { name: PARTY_B_NAME, exact: true })
+    ).toBeVisible();
+    await expect(dialog.getByText(/Limited view · played by /)).toBeVisible();
+    // Full HP → the top band's word.
+    await expect(dialog.getByText('Unharmed', { exact: true })).toBeVisible();
+    // HP sharing defaults on, so the exact numbers ride along too.
+    await expect(
+      dialog.getByText(`${hpB.current}/${hpB.max}`, { exact: true })
+    ).toBeVisible();
+    // Never B's full, editable sheet.
+    await expect(sheetDialog(pageA)).toHaveCount(0);
+    await expect(
+      dialog.getByRole('textbox', { name: 'HP amount' })
+    ).toHaveCount(0);
+  });
+
+  test('turning off HP sharing hides the exact HP in the limited view', async () => {
+    await pageB.evaluate(() => {
+      window.__rkStores!.character.getState().toggleShareHpWithParty();
+    });
+    // B's auto-save → campaign sync lands on the party-hp route.
+    await expect
+      .poll(
+        async () => {
+          const member = await fetchPartyMember(pageA, code, characterIdB);
+          return member ? member.hitPoints : 'missing';
+        },
+        { timeout: 20_000 }
+      )
+      .toBeNull();
+
+    // A's open limited view refreshes (relay 'players' poke or the 20s
+    // party poll) — the HP word stays, the numbers go.
+    const dialog = limitedViewDialog(pageA, PARTY_B_NAME);
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText(`${hpB.current}/${hpB.max}`, { exact: true })
+    ).toHaveCount(0, { timeout: 30_000 });
+    await expect(dialog.getByText('Unharmed', { exact: true })).toBeVisible();
+  });
+
+  test("turning off sheet sharing shows that B hasn't shared their sheet", async () => {
+    await pageB.evaluate(() => {
+      window.__rkStores!.character.getState().setSharePartyView(false);
+    });
+    await expect
+      .poll(
+        async () => {
+          const member = await fetchPartyMember(pageA, code, characterIdB);
+          return member ? member.publicSheet : 'missing';
+        },
+        { timeout: 20_000 }
+      )
+      .toBeNull();
+
+    const dialog = limitedViewDialog(pageA, PARTY_B_NAME);
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByText(`${PARTY_B_NAME} hasn't shared their sheet.`)
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(dialog.getByText('Unharmed', { exact: true })).toHaveCount(0);
+  });
+
+  test('double-clicking a DM combatant token opens no sheet', async () => {
+    const open = limitedViewDialog(pageA, PARTY_B_NAME);
+    await open.getByRole('button', { name: 'Close sheet' }).click();
+    await expect(open).toBeHidden({ timeout: 5_000 });
+
+    await toolbarButton(pageA, 'Pan').click();
+    const coords = await coordsInsideElementAvoiding(
+      pageA,
+      COMBATANT_TOKEN_ID,
+      tokenIdB
+    );
+    await pageA.mouse.dblclick(coords.x, coords.y);
+    // Give a (wrongly) opening drawer time to animate in before asserting
+    // absence — the same settle the single-click scenario above uses.
+    await pageA.waitForTimeout(400);
+    await expect(
+      pageA.getByRole('dialog', { name: /limited view|character sheet/i })
+    ).toHaveCount(0);
+
+    // Control: the same gesture (Pan tool, double click on a synced token)
+    // still opens B's limited view, so the absence above is not a dead
+    // gesture path.
+    const coordsB = await coordsForElement(pageA, tokenIdB);
+    await pageA.mouse.dblclick(coordsB.x, coordsB.y);
+    await expect(limitedViewDialog(pageA, PARTY_B_NAME)).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+});

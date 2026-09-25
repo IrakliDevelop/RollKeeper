@@ -265,6 +265,7 @@ export default function CharacterSheet() {
     updateDaysSpent,
     incrementDaysSpent,
     toggleShareHpWithParty,
+    setSharePartyView,
     // Easter egg animations
     showDeathAnimation,
     clearDeathAnimation,
@@ -952,6 +953,8 @@ export default function CharacterSheet() {
                 characterData={character}
                 shareHpWithParty={character.shareHpWithParty ?? true}
                 onToggleShareHp={toggleShareHpWithParty}
+                sharePartyView={character.sharePartyView ?? true}
+                onSharePartyViewChange={setSharePartyView}
               />
             }
           />

@@ -3,6 +3,27 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { SheetDrawer } from '..';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
+import type { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
+
+const PARTY_MEMBER: PartyMemberHP = {
+  characterId: 'ally-1',
+  characterName: 'Brindle',
+  playerName: 'Sam',
+  className: 'Cleric',
+  level: 4,
+  armorClass: 17,
+  hitPoints: { current: 25, max: 32, temporary: 0 },
+  lastSynced: '2025-01-01T00:00:00.000Z',
+  publicSheet: {
+    subtitle: 'Cleric 4',
+    hpState: 'Healthy',
+    speed: 30,
+    passivePerception: 14,
+    conditions: [],
+    concentration: null,
+    equippedGear: ['Mace'],
+  },
+};
 
 const props = () => ({
   open: true,
@@ -157,5 +178,94 @@ describe('SheetDrawer', () => {
     // spells: []) is not a caster.
     render(<SheetDrawer {...props()} />);
     expect(screen.queryByRole('tab', { name: /spells/i })).toBeNull();
+  });
+
+  it('renders OwnSheet for the own target (default)', () => {
+    render(<SheetDrawer {...props()} openTarget={{ kind: 'own' }} />);
+    expect(
+      screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+  });
+
+  it('renders PartySheet for a party target, resolved from partyMembers', () => {
+    render(
+      <SheetDrawer
+        {...props()}
+        openTarget={{ kind: 'party', characterId: 'ally-1' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /brindle limited view/i })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Brindle')).toBeInTheDocument();
+    expect(
+      screen.getByText(/limited view.*played by sam/i)
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+  });
+
+  it('falls back to a generic party title and missing-member state when the id has no match', () => {
+    render(
+      <SheetDrawer
+        {...props()}
+        openTarget={{ kind: 'party', characterId: 'nope' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /party member limited view/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/isn't in the party list yet/i)
+    ).toBeInTheDocument();
+  });
+
+  it('switches between own and party views while staying open', () => {
+    const p = props();
+    const { rerender } = render(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'own' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+
+    rerender(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'party', characterId: 'ally-1' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /brindle limited view/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /kaelen voss/i })).toBeNull();
+    expect(
+      screen.getByText(/limited view.*played by sam/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Mace')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(p.onClose).not.toHaveBeenCalled();
+
+    rerender(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'own' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/played by sam/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(p.onClose).not.toHaveBeenCalled();
   });
 });

@@ -9,6 +9,7 @@ import {
   Wifi,
   WifiOff,
   Heart,
+  Eye,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
@@ -28,6 +29,8 @@ interface SyncIndicatorProps {
   characterData: CharacterState;
   shareHpWithParty: boolean;
   onToggleShareHp: () => void;
+  sharePartyView: boolean;
+  onSharePartyViewChange: (enabled: boolean) => void;
 }
 
 function formatSyncTime(dateString: string | null): string {
@@ -68,6 +71,8 @@ export function SyncIndicator({
   characterData,
   shareHpWithParty,
   onToggleShareHp,
+  sharePartyView,
+  onSharePartyViewChange,
 }: SyncIndicatorProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [displayTime, setDisplayTime] = useState(formatSyncTime(lastSyncedAt));
@@ -165,13 +170,37 @@ export function SyncIndicator({
               <div className="flex items-center gap-2">
                 <Heart
                   size={14}
-                  className={shareHpWithParty ? 'text-red-500' : 'text-muted'}
+                  className={
+                    shareHpWithParty ? 'text-accent-red-text' : 'text-muted'
+                  }
                 />
                 <span className="text-heading text-sm">Share HP</span>
               </div>
               <Switch
                 checked={shareHpWithParty}
                 onCheckedChange={onToggleShareHp}
+                aria-label="Share HP with party"
+              />
+            </div>
+
+            {/* Share sheet with party toggle */}
+            <div
+              className="flex items-center justify-between"
+              title="Let party members open a limited view of this character on the battle map"
+            >
+              <div className="flex items-center gap-2">
+                <Eye
+                  size={14}
+                  className={
+                    sharePartyView ? 'text-accent-blue-text' : 'text-muted'
+                  }
+                />
+                <span className="text-heading text-sm">Share sheet</span>
+              </div>
+              <Switch
+                checked={sharePartyView}
+                onCheckedChange={onSharePartyViewChange}
+                aria-label="Share sheet with party"
               />
             </div>
 

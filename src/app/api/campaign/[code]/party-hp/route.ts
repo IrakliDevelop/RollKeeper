@@ -11,6 +11,11 @@ import { DeathSavingThrows } from '@/types/character';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
 import { guestDeniedResponse } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
+import {
+  safeBuildPartyPublicSheet,
+  PartyPublicSheet,
+} from '@/utils/partyPublicSheet';
 
 export interface PartyMemberHP {
   characterId: string;
@@ -27,6 +32,8 @@ export interface PartyMemberHP {
     deathSaves?: DeathSavingThrows;
   } | null;
   lastSynced: string;
+  // Optional: older/deployed-skew clients and servers may not send this yet.
+  publicSheet?: PartyPublicSheet | null;
 }
 
 export async function GET(
@@ -35,7 +42,20 @@ export async function GET(
 ) {
   try {
     const { code } = await params;
-    const guest = await authorizeHybridGuestRoute(request, code, 'party:read');
+    // Same read gate as /shared: in account-membership mode only campaign
+    // members may read the party (incl. publicSheet); legacy campaigns keep
+    // the hybrid guest check.
+    const membership = await authorizeCampaignMembershipRoute(code, false);
+    if (membership.mode === 'denied') {
+      return NextResponse.json(
+        { error: 'Account membership is required' },
+        { status: membership.status }
+      );
+    }
+    const guest =
+      membership.mode === 'legacy'
+        ? await authorizeHybridGuestRoute(request, code, 'party:read')
+        : ({ mode: 'legacy' } as const);
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
 
@@ -96,6 +116,7 @@ export async function GET(
                   deathSaves: char.hitPoints?.deathSaves,
                 },
             lastSynced: parsed.lastSynced,
+            publicSheet: safeBuildPartyPublicSheet(char),
           });
         }
       }
@@ -105,7 +126,10 @@ export async function GET(
 
     await refreshCampaignTTL(redis, code);
 
-    return NextResponse.json({ members });
+    return NextResponse.json(
+      { members },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
   } catch (error) {
     console.error('Error fetching party HP:', error);
     return NextResponse.json(
