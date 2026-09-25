@@ -29,6 +29,7 @@ import {
 } from '@/utils/statBlockAbilities';
 import { parseRechargeFromName } from '@/utils/encounterConverter';
 import { normalizeCombatConfig } from '@/utils/customConditions';
+import { buildNpcLibraryPatch } from '@/utils/npcLibrarySync';
 import type { NpcResource } from '@/types/encounter';
 
 function generateId(): string {
@@ -67,6 +68,22 @@ function syncNPCEntityToStore(
         : undefined,
     });
   }
+}
+
+// Sync a library-linked combatant's stat edits back to its NPC record (AC,
+// max HP, initiative/proficiency bonus, and matched stat-block scalars/
+// entries). Pure delegation to buildNpcLibraryPatch for the "what changed"
+// decision — this just handles the "when" (linked + NPC still exists).
+function syncEntityStatsToLibrary(
+  before: EncounterEntity | undefined,
+  after: EncounterEntity | undefined
+) {
+  if (!before || !after?.npcSourceId || !after.campaignCode) return;
+  const npcStore = useNPCStore.getState();
+  const npc = npcStore.getNPC(after.campaignCode, after.npcSourceId);
+  if (!npc) return;
+  const patch = buildNpcLibraryPatch(before, after, npc);
+  if (patch) npcStore.updateNPC(after.campaignCode, after.npcSourceId, patch);
 }
 
 interface EncounterStoreState {
@@ -535,6 +552,9 @@ export const useEncounterStore = create<EncounterStoreState>()(
       },
 
       updateEntity: (encounterId, entityId, updates) => {
+        const before = get()
+          .encounters.find(e => e.id === encounterId)
+          ?.entities.find(e => e.id === entityId);
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -567,6 +587,10 @@ export const useEncounterStore = create<EncounterStoreState>()(
             }
           ),
         }));
+        const after = get()
+          .encounters.find(e => e.id === encounterId)
+          ?.entities.find(e => e.id === entityId);
+        syncEntityStatsToLibrary(before, after);
       },
 
       // Combat flow
@@ -885,6 +909,9 @@ export const useEncounterStore = create<EncounterStoreState>()(
       },
 
       setEntityHp: (encounterId, entityId, current, max) => {
+        const before = get()
+          .encounters.find(e => e.id === encounterId)
+          ?.entities.find(e => e.id === entityId);
         set(state => ({
           encounters: updateEntityInEncounter(
             state.encounters,
@@ -898,6 +925,10 @@ export const useEncounterStore = create<EncounterStoreState>()(
           ),
         }));
         syncNPCEntityToStore(get().encounters, encounterId, entityId);
+        const after = get()
+          .encounters.find(e => e.id === encounterId)
+          ?.entities.find(e => e.id === entityId);
+        syncEntityStatsToLibrary(before, after);
       },
 
       addTempHp: (encounterId, entityId, amount) => {
