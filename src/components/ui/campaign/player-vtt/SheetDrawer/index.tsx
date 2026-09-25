@@ -6,6 +6,7 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { useCharacterStore } from '@/store/characterStore';
 
 import { OwnSheet } from './OwnSheet';
+import { PartySheet } from './PartySheet';
 import type {
   SheetOpenTarget,
   SheetSpellCastingProps,
@@ -25,12 +26,12 @@ export interface SheetDrawerProps {
   spellCasting: SheetSpellCastingProps;
   /** Forwarded to SideDrawer; see its focus-return contract. */
   onCloseAutoFocus?: (event: Event) => void;
-  /** Which character's sheet is showing — own or (Task 4+) a party member's
-   *  limited view. Not yet consumed for branching here: this drawer still
-   *  always renders `OwnSheet` (Task 4 adds the `PartySheet` branch). */
+  /** Which character's sheet is showing — own, or another party member's
+   *  read-only limited view (`PartySheet`), resolved from `partyMembers` by
+   *  `characterId`. */
   openTarget?: SheetOpenTarget | null;
-  /** The live party roster, forwarded through for the Task 4 `PartySheet`
-   *  branch to resolve `openTarget.characterId` against. */
+  /** The live party roster the `PartySheet` branch resolves
+   *  `openTarget.characterId` against. */
   partyMembers?: PartyMemberHP[];
 }
 
@@ -42,27 +43,39 @@ export function SheetDrawer({
   showAttackRoll,
   onRested,
   spellCasting,
+  openTarget,
+  partyMembers = [],
 }: SheetDrawerProps) {
-  const name = useCharacterStore(s => s.character.name);
+  const ownName = useCharacterStore(s => s.character.name);
+  const isParty = openTarget?.kind === 'party';
+  const partyMember = isParty
+    ? partyMembers.find(m => m.characterId === openTarget.characterId)
+    : undefined;
+  const title = isParty
+    ? `${partyMember?.characterName ?? 'Party member'} limited view`
+    : `${ownName} character sheet`;
+
   return (
     <SideDrawer
       open={open}
       onOpenChange={next => {
         if (!next) onClose();
       }}
-      title={`${name} character sheet`}
+      title={title}
       onCloseAutoFocus={onCloseAutoFocus}
     >
-      {/* Radix unmounts content when closed, so OwnSheet's lock state resets per open.
-          `openTarget`/`partyMembers` are accepted above but not yet consumed here —
-          Task 4 branches on `openTarget.kind` to render `PartySheet` instead. */}
-      <OwnSheet
-        onClose={onClose}
-        addToast={addToast}
-        showAttackRoll={showAttackRoll}
-        onRested={onRested}
-        spellCasting={spellCasting}
-      />
+      {/* Radix unmounts content when closed, so OwnSheet's lock state resets per open. */}
+      {isParty ? (
+        <PartySheet member={partyMember} onClose={onClose} />
+      ) : (
+        <OwnSheet
+          onClose={onClose}
+          addToast={addToast}
+          showAttackRoll={showAttackRoll}
+          onRested={onRested}
+          spellCasting={spellCasting}
+        />
+      )}
     </SideDrawer>
   );
 }
