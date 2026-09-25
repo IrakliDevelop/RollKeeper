@@ -86,12 +86,28 @@ function toEntry(
     if (entity.concentrationSpell) entry.isConcentrating = true;
   }
 
-  // Players always expose identity + exact HP (their own sheet is authoritative).
+  // Players always expose identity. HP is exact by default (their own sheet
+  // is authoritative) unless the player has opted out via
+  // character.shareHpWithParty === false (mirrored onto the entity as
+  // hpSharedWithParty by mergePlayerSyncData) — undefined/true keep today's
+  // exact behavior for legacy entities that predate the field.
   if (isPlayer) {
     entry.playerCharacterId = entity.playerCharacterId;
-    entry.currentHp = entity.currentHp;
-    entry.maxHp = entity.maxHp;
     entry.isDead = entity.currentHp <= 0;
+    if (entity.hpSharedWithParty === false) {
+      entry.hpMode = 'label';
+      entry.hpState = hpStateLabel(
+        entity.currentHp,
+        entity.maxHp,
+        config.hpStateBands
+      );
+      if (!entry.isDead) {
+        entry.hpTier = hpTier(hpPercent(entity.currentHp, entity.maxHp));
+      }
+    } else {
+      entry.currentHp = entity.currentHp;
+      entry.maxHp = entity.maxHp;
+    }
     return entry;
   }
 

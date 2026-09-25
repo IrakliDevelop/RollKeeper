@@ -233,6 +233,14 @@ export interface EncounterEntity {
   inspirationCount?: number; // Heroic inspiration dice from player
   deathSaves?: { successes: number; failures: number; isStabilized: boolean };
   hasUsedReaction?: boolean; // Whether player has used their reaction this round
+  /**
+   * Mirrors the synced player's `character.shareHpWithParty`: true when the
+   * player shares exact HP with the rest of the party, false when they've
+   * opted out. Undefined (never synced) is treated as shared. Consumed by
+   * buildSharedInitiative to mask this player's HP from other players —
+   * never affects what the DM sees.
+   */
+  hpSharedWithParty?: boolean;
 
   // Player-synced defenses & senses
   damageResistances?: string[];

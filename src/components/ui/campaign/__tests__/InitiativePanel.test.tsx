@@ -159,4 +159,32 @@ describe('InitiativePanel', () => {
     // State mode 'bar' alone renders no HP text for this row.
     expect(screen.getByText('42%')).toBeInTheDocument();
   });
+
+  it('shows the HP-state word (not exact HP) for a player who opted out of sharing', () => {
+    render(
+      <InitiativePanel
+        state={{
+          ...base,
+          turnOrder: [
+            {
+              entityId: 'a',
+              displayName: 'Aragorn',
+              type: 'player',
+              playerCharacterId: 'char-a',
+              hpMode: 'label',
+              hpState: 'Bloodied',
+              hpTier: 'low',
+              isDead: false,
+            },
+          ],
+        }}
+        characterId="char-b"
+        onEndTurn={noop}
+      />
+    );
+    expect(screen.getByText('Bloodied')).toBeInTheDocument();
+    expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
+    // Tier-coloured, like an enemy's label row — not the neutral player shade.
+    expect(screen.getByText('Bloodied')).toHaveClass('text-accent-orange-text');
+  });
 });

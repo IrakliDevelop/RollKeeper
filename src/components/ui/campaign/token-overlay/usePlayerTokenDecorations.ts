@@ -19,16 +19,26 @@ function hpViewFor(
   mode: EnemyHpDisplay
 ): TokenHpView | undefined {
   if (entry.type === 'player') {
-    if (entry.currentHp === undefined || entry.maxHp === undefined)
-      return undefined;
-    const percent = hpPercent(entry.currentHp, entry.maxHp);
-    return {
-      kind: 'exact',
-      current: entry.currentHp,
-      max: entry.maxHp,
-      percent,
-      tier: hpTier(percent),
-    };
+    // The common case: the player shares HP (default), or this is a legacy
+    // entry that predates the opt-out — exact HP regardless of the campaign
+    // enemy-HP policy (a player's own sheet is authoritative).
+    if (entry.currentHp !== undefined && entry.maxHp !== undefined) {
+      const percent = hpPercent(entry.currentHp, entry.maxHp);
+      return {
+        kind: 'exact',
+        current: entry.currentHp,
+        max: entry.maxHp,
+        percent,
+        tier: hpTier(percent),
+      };
+    }
+    // Opted out of HP sharing: buildSharedInitiative sets hpMode: 'label'
+    // and carries hpState/hpTier instead of exact numbers — mirror the
+    // enemy 'label' branch below. A missing field (stale share, or dead)
+    // omits the chip rather than breaking it.
+    return mode === 'label' && entry.hpState && entry.hpTier
+      ? { kind: 'label', text: entry.hpState, tier: entry.hpTier }
+      : undefined;
   }
   // Non-players: exactly what the DM's enemyHpDisplay policy shares — a
   // missing field for the mode (stale share) omits the row, never breaks it.

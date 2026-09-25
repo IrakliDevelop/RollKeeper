@@ -131,6 +131,77 @@ describe('useLiveInitiative', () => {
     expect(selfEntry?.maxHp).toBe(44);
   });
 
+  it("overlays the viewer's own exact HP over their own masked (opted-out) row", () => {
+    // The viewer opted out of sharing, so their initiative row arrives
+    // masked (no currentHp/maxHp, label mode) — same as any other player
+    // would see it. Their own character sheet is still authoritative for
+    // their own dock/panel, so the local overlay must restore exact HP.
+    const initiative = makeInitiative({
+      turnOrder: [
+        {
+          entityId: 'entity-self',
+          displayName: 'Hero',
+          type: 'player',
+          playerCharacterId: SELF_ID,
+          hpMode: 'label',
+          hpState: 'Bloodied',
+          hpTier: 'low',
+          isDead: false,
+        },
+      ],
+    });
+    const character = makeCharacter({
+      hitPoints: {
+        current: 5,
+        max: 44,
+        temporary: 0,
+        calculationMode: 'manual',
+      },
+    });
+    const { result } = renderHook(() =>
+      useLiveInitiative(initiative, character, SELF_ID, [])
+    );
+
+    const selfEntry = result.current!.turnOrder.find(
+      e => e.entityId === 'entity-self'
+    );
+    expect(selfEntry?.currentHp).toBe(5);
+    expect(selfEntry?.maxHp).toBe(44);
+  });
+
+  it('leaves another opted-out party member masked when party-hp has no entry for them', () => {
+    // party-hp already omits hitPoints for an opted-out member, so
+    // useLiveInitiative never puts them in the live map — their masked
+    // row must pass through untouched.
+    const initiative = makeInitiative({
+      turnOrder: [
+        {
+          entityId: 'entity-other',
+          displayName: 'Gandalf',
+          type: 'player',
+          playerCharacterId: OTHER_ID,
+          hpMode: 'label',
+          hpState: 'Healthy',
+          hpTier: 'high',
+          isDead: false,
+        },
+      ],
+    });
+    const member = makePartyMember({
+      hitPoints: null as unknown as PartyMemberHP['hitPoints'],
+    });
+    const { result } = renderHook(() =>
+      useLiveInitiative(initiative, null, SELF_ID, [member])
+    );
+
+    const otherEntry = result.current!.turnOrder.find(
+      e => e.entityId === 'entity-other'
+    );
+    expect('currentHp' in otherEntry!).toBe(false);
+    expect('maxHp' in otherEntry!).toBe(false);
+    expect(otherEntry?.hpState).toBe('Healthy');
+  });
+
   it('returns null when sharedInitiative is null', () => {
     const { result } = renderHook(() =>
       useLiveInitiative(null, makeCharacter(), SELF_ID, [])

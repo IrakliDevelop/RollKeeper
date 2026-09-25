@@ -122,6 +122,36 @@ describe('mergePlayerSyncData', () => {
     expect(result.armorClass).toBe(19);
   });
 
+  it('copies shareHpWithParty: false as hpSharedWithParty: false', () => {
+    const entity = createMockEncounterEntity({ type: 'player' });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({ shareHpWithParty: false }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.hpSharedWithParty).toBe(false);
+  });
+
+  it('copies shareHpWithParty: true as hpSharedWithParty: true', () => {
+    const entity = createMockEncounterEntity({ type: 'player' });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({ shareHpWithParty: true }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.hpSharedWithParty).toBe(true);
+  });
+
+  it('defaults hpSharedWithParty to true when shareHpWithParty is undefined', () => {
+    const entity = createMockEncounterEntity({ type: 'player' });
+    const playerData = createMockPlayerData({
+      characterData: createMockCharacterState({ shareHpWithParty: undefined }),
+    });
+
+    const result = mergePlayerSyncData(entity, playerData)!;
+    expect(result.hpSharedWithParty).toBe(true);
+  });
+
   it('returns concentration spell when active', () => {
     const entity = createMockEncounterEntity({ type: 'player' });
     const playerData = createMockPlayerData({
@@ -549,6 +579,75 @@ describe('hasPlayerDataChanged', () => {
         armorClass: 15,
         concentrationSpell: undefined,
         conditions: [],
+      })
+    ).toBe(false);
+  });
+
+  it('returns true when the player toggles hpSharedWithParty off (all else unchanged)', () => {
+    const entity = createMockEncounterEntity({
+      currentHp: 20,
+      maxHp: 20,
+      tempHp: 0,
+      armorClass: 15,
+      concentrationSpell: undefined,
+      conditions: [],
+      hpSharedWithParty: true,
+    });
+    expect(
+      hasPlayerDataChanged(entity, {
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        concentrationSpell: undefined,
+        conditions: [],
+        hpSharedWithParty: false,
+      })
+    ).toBe(true);
+  });
+
+  it('returns true when the player toggles hpSharedWithParty back on (all else unchanged)', () => {
+    const entity = createMockEncounterEntity({
+      currentHp: 20,
+      maxHp: 20,
+      tempHp: 0,
+      armorClass: 15,
+      concentrationSpell: undefined,
+      conditions: [],
+      hpSharedWithParty: false,
+    });
+    expect(
+      hasPlayerDataChanged(entity, {
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        concentrationSpell: undefined,
+        conditions: [],
+        hpSharedWithParty: true,
+      })
+    ).toBe(true);
+  });
+
+  it('returns false when hpSharedWithParty is unchanged', () => {
+    const entity = createMockEncounterEntity({
+      currentHp: 20,
+      maxHp: 20,
+      tempHp: 0,
+      armorClass: 15,
+      concentrationSpell: undefined,
+      conditions: [],
+      hpSharedWithParty: true,
+    });
+    expect(
+      hasPlayerDataChanged(entity, {
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        concentrationSpell: undefined,
+        conditions: [],
+        hpSharedWithParty: true,
       })
     ).toBe(false);
   });

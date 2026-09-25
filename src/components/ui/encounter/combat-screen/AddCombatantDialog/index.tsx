@@ -46,6 +46,7 @@ export interface AddCombatantDialogProps {
     maxHp: number;
     dexterity: number;
     avatarUrl?: string;
+    shareHpWithParty?: boolean;
   }>;
   npcs: CampaignNPC[];
   playerColors?: Record<string, string>;

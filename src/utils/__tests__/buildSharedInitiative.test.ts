@@ -766,3 +766,94 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
     expect(row.currentHp).toBe(5);
   });
 });
+
+describe('buildSharedInitiative — player hpSharedWithParty opt-out', () => {
+  const bands = [
+    { minPercent: 50, label: 'Healthy' },
+    { minPercent: 0, label: 'Bloodied' },
+  ];
+  const config: CombatConfig = {
+    enemyHpDisplay: 'off',
+    hpStateBands: bands,
+    enemyConditionsDisplay: 'off',
+  };
+
+  it('opted-out player has no currentHp/maxHp, hpMode "label", and the expected hpState/hpTier', () => {
+    const enc = encounter([
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 18,
+        currentHp: 6,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+        hpSharedWithParty: false,
+      }),
+    ]);
+    const row = buildSharedInitiative(enc, config).turnOrder[0];
+    // Omitted entirely — not just undefined-valued — so a naive
+    // `JSON.stringify`/spread of the payload can't resurface them.
+    expect('currentHp' in row).toBe(false);
+    expect('maxHp' in row).toBe(false);
+    expect(row.hpMode).toBe('label');
+    // 6/30 = 20% -> below the 50 band -> 'Bloodied'
+    expect(row.hpState).toBe('Bloodied');
+    expect(row.hpTier).toBe('critical');
+    expect(row.playerCharacterId).toBe('char-a');
+  });
+
+  it('marks an opted-out player isDead at 0 HP, and omits hpTier', () => {
+    const enc = encounter([
+      entity({
+        id: 'p',
+        type: 'player',
+        currentHp: 0,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+        hpSharedWithParty: false,
+      }),
+    ]);
+    const row = buildSharedInitiative(enc, config).turnOrder[0];
+    expect(row.isDead).toBe(true);
+    expect(row.hpTier).toBeUndefined();
+    expect('currentHp' in row).toBe(false);
+    expect('maxHp' in row).toBe(false);
+  });
+
+  it('shared (hpSharedWithParty: true) player is unchanged from today', () => {
+    const enc = encounter([
+      entity({
+        id: 'p',
+        type: 'player',
+        currentHp: 24,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+        hpSharedWithParty: true,
+      }),
+    ]);
+    const row = buildSharedInitiative(enc, config).turnOrder[0];
+    expect(row.currentHp).toBe(24);
+    expect(row.maxHp).toBe(30);
+    expect(row.isDead).toBe(false);
+    expect('hpMode' in row).toBe(false);
+    expect(row.hpState).toBeUndefined();
+    expect(row.hpTier).toBeUndefined();
+  });
+
+  it('legacy player (hpSharedWithParty undefined) is unchanged from today', () => {
+    const enc = encounter([
+      entity({
+        id: 'p',
+        type: 'player',
+        currentHp: 24,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+      }),
+    ]);
+    const row = buildSharedInitiative(enc, config).turnOrder[0];
+    expect(row.currentHp).toBe(24);
+    expect(row.maxHp).toBe(30);
+    expect('hpMode' in row).toBe(false);
+  });
+});

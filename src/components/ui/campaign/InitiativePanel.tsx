@@ -202,11 +202,11 @@ export function InitiativePanel({
                   : entry.hpPercent !== undefined && hpMode === 'percent'
                     ? `${entry.hpPercent}%`
                     : (entry.hpState ?? null);
-              // Colour: dead = red; players use neutral (they have a bar);
-              // enemies use their coarse health tier.
+              // Colour: dead = red; an exact-HP bar carries its own colour
+              // (neutral text), otherwise tint the text by health tier.
               const hpTextColor = isDead
                 ? 'text-accent-red-text font-medium'
-                : isPlayer
+                : hasHp
                   ? 'text-faint'
                   : entry.hpTier
                     ? getHpTierTextColor(entry.hpTier)

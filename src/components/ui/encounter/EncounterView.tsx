@@ -1,12 +1,6 @@
 'use client';
 
-import React, {
-  useState,
-  useEffect,
-  useMemo,
-  useRef,
-  useCallback,
-} from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -263,6 +257,7 @@ export function EncounterView({
     maxHp: p.characterData?.hitPoints?.max ?? 0,
     dexterity: p.characterData?.abilities?.dexterity ?? 10,
     avatarUrl: p.characterData?.avatar,
+    shareHpWithParty: p.characterData?.shareHpWithParty,
   }));
 
   // Build player sync timestamp map for freshness indicators
@@ -270,16 +265,12 @@ export function EncounterView({
     campaignPlayers.map(p => [p.playerId, p.lastSynced])
   );
 
-  // Sync live player data into encounter entities
-  const syncRef = useRef(false);
+  // Sync live player data into encounter entities — including on the first
+  // load that has both an encounter and player data, so a stale/legacy
+  // entity (e.g. missing hpSharedWithParty) gets the current opt-out flag
+  // before the next initiative publish rather than one poll cycle late.
   useEffect(() => {
     if (!encounter || campaignPlayers.length === 0) return;
-    // Prevent running on first mount before data is loaded
-    if (!syncRef.current) {
-      syncRef.current = true;
-      return;
-    }
-
     applyPlayersToEncounter(encounterId, campaignPlayers);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaignPlayers]);
