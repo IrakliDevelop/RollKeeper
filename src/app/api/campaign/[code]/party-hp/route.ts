@@ -11,6 +11,10 @@ import { DeathSavingThrows } from '@/types/character';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
 import { guestDeniedResponse } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import {
+  buildPartyPublicSheet,
+  PartyPublicSheet,
+} from '@/utils/partyPublicSheet';
 
 export interface PartyMemberHP {
   characterId: string;
@@ -27,6 +31,7 @@ export interface PartyMemberHP {
     deathSaves?: DeathSavingThrows;
   } | null;
   lastSynced: string;
+  publicSheet: PartyPublicSheet | null;
 }
 
 export async function GET(
@@ -96,6 +101,7 @@ export async function GET(
                   deathSaves: char.hitPoints?.deathSaves,
                 },
             lastSynced: parsed.lastSynced,
+            publicSheet: buildPartyPublicSheet(char),
           });
         }
       }

@@ -12,6 +12,7 @@ import {
   calculateSavingThrowModifier,
   getProficiencyBonus,
 } from '@/utils/calculations';
+import { characterSubtitle } from '@/utils/characterSummary';
 import { hpPercent } from '@/utils/hpState';
 
 import type {
@@ -49,17 +50,6 @@ function totalLevel(c: CharacterState): number {
   return c.totalLevel || c.level || 1;
 }
 
-function classLine(c: CharacterState): string {
-  const classes = c.classes ?? [];
-  if (classes.length === 0)
-    return `${c.class?.name ?? 'Adventurer'} ${totalLevel(c)}`;
-  return classes
-    .map(
-      k => `${k.className} ${k.level}${k.subclass ? ` (${k.subclass})` : ''}`
-    )
-    .join(' / ');
-}
-
 export function buildHeaderView(c: CharacterState): SheetHeaderView {
   const active = c.conditionsAndDiseases?.activeConditions ?? [];
   const exhaustion = active.find(x => x.name.toLowerCase() === 'exhaustion');
@@ -68,7 +58,7 @@ export function buildHeaderView(c: CharacterState): SheetHeaderView {
     avatar: c.avatar,
     name: c.name,
     level: totalLevel(c),
-    subtitle: [c.race, classLine(c), c.background].filter(Boolean).join(' · '),
+    subtitle: characterSubtitle(c),
     concentration: c.concentration?.isConcentrating
       ? (c.concentration.spellName ?? 'Concentrating')
       : null,
