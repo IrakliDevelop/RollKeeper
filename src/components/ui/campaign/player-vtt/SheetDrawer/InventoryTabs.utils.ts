@@ -11,6 +11,7 @@ import { calculateTotalWeight } from '@/utils/encumbrance';
 import type {
   ArmorItem,
   CharacterState,
+  ChargePool,
   Currency,
   InventoryItem,
   MagicItem,
@@ -78,18 +79,35 @@ function isConsumableInventoryItem(item: InventoryItem): boolean {
   );
 }
 
+interface ChargeLike {
+  id: string;
+  name: string;
+  usedCharges: number;
+}
+
+function buildCharges<T extends ChargeLike>(
+  charges: T[] | undefined,
+  level: number,
+  maxFn: (charge: T, level: number) => number
+): InventoryChargeView[] {
+  return (charges ?? []).map(charge => ({
+    chargeId: charge.id,
+    name: charge.name,
+    max: maxFn(charge, level),
+    used: charge.usedCharges,
+  }));
+}
+
+function poolTextFor(pool: ChargePool | undefined): string | null {
+  if (!pool) return null;
+  return `Charges ${pool.maxCharges - pool.usedCharges} / ${pool.maxCharges}`;
+}
+
 function weaponToEntry(
   c: CharacterState,
   w: Weapon,
   level: number
 ): InventoryEntryView {
-  const charges: InventoryChargeView[] = (w.charges ?? []).map(charge => ({
-    chargeId: charge.id,
-    name: charge.name,
-    max: calculateWeaponChargeMax(charge, level),
-    used: charge.usedCharges,
-  }));
-  const pool = w.chargePool;
   return {
     id: w.id,
     kind: 'weapon',
@@ -104,10 +122,8 @@ function weaponToEntry(
     attuned: !!w.isAttuned,
     consumable: false,
     attackText: `${getWeaponAttackString(c, w)} · ${getWeaponDamageString(c, w)}`,
-    charges,
-    poolText: pool
-      ? `Charges ${pool.maxCharges - pool.usedCharges} / ${pool.maxCharges}`
-      : null,
+    charges: buildCharges(w.charges, level, calculateWeaponChargeMax),
+    poolText: poolTextFor(w.chargePool),
   };
 }
 
@@ -133,13 +149,11 @@ function armorToEntry(a: ArmorItem): InventoryEntryView {
 }
 
 function magicItemToEntry(m: MagicItem, level: number): InventoryEntryView {
-  const charges: InventoryChargeView[] = (m.charges ?? []).map(charge => ({
-    chargeId: charge.id,
-    name: charge.name,
-    max: calculateMagicItemChargeMax(charge, level),
-    used: charge.usedCharges,
-  }));
-  const pool = m.chargePool;
+  // Potion/scroll magic items are grouped into Consumables (see kind: 'magic'
+  // distinguishing them from InventoryItem-backed consumables), but they carry
+  // no `quantity` and adjustItemQuantity only targets inventoryItems, so they
+  // must never claim to be quantity-consumable — that would let a Use control
+  // silently no-op.
   return {
     id: m.id,
     kind: 'magic',
@@ -152,12 +166,10 @@ function magicItemToEntry(m: MagicItem, level: number): InventoryEntryView {
     equipped: !!m.isEquipped,
     attunable: !!m.requiresAttunement,
     attuned: !!m.isAttuned,
-    consumable: isConsumableMagicItem(m),
+    consumable: false,
     attackText: null,
-    charges,
-    poolText: pool
-      ? `Charges ${pool.maxCharges - pool.usedCharges} / ${pool.maxCharges}`
-      : null,
+    charges: buildCharges(m.charges, level, calculateMagicItemChargeMax),
+    poolText: poolTextFor(m.chargePool),
   };
 }
 

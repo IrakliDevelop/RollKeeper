@@ -139,7 +139,10 @@ describe('buildInventoryGroups', () => {
     expect(groups.find(g => g.key === 'magic')).toBeUndefined();
     const consumables = groups.find(g => g.key === 'consumables')!;
     expect(consumables.entries).toHaveLength(1);
-    expect(consumables.entries[0].consumable).toBe(true);
+    // Potion/scroll magic items have no `quantity` and are not tracked by
+    // adjustItemQuantity, so they must never report consumable: true — that
+    // would let a Use control target a quantity that doesn't exist.
+    expect(consumables.entries[0].consumable).toBe(false);
     expect(consumables.entries[0].kind).toBe('magic');
   });
 
@@ -275,6 +278,11 @@ describe('buildInventorySummary', () => {
   it('defaults attunementMax to 3 when unset, else uses attunementSlots.max', () => {
     const c = fixture({ attunementSlots: { used: 0, max: 5 } });
     expect(buildInventorySummary(c).attunementMax).toBe(5);
+  });
+
+  it('defaults attunementMax to 3 when attunementSlots is missing entirely', () => {
+    const c = fixture({ attunementSlots: undefined });
+    expect(buildInventorySummary(c).attunementMax).toBe(3);
   });
 });
 
