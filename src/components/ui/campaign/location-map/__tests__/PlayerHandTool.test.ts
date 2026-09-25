@@ -207,5 +207,18 @@ describe('PlayerHandTool', () => {
       tool.onPointerMove(move(53, 53), ctx); // dist ~4.2, within slop again
       expect(ctx.camera.pan).not.toHaveBeenCalled();
     });
+
+    it('deactivating mid-press drops the pan, so a later move without a new press never pans', () => {
+      const ctx = fakeCtx([dmElement(0, 0)]);
+      const tool = new PlayerHandTool(selectTool);
+      tool.onPointerDown(down(100, 100), ctx);
+      tool.onPointerMove(move(120, 100), ctx); // crosses slop, pans by 20
+      tool.onDeactivate(ctx);
+      (ctx.camera.pan as ReturnType<typeof vi.fn>).mockClear();
+
+      tool.onActivate(ctx);
+      tool.onPointerMove(move(160, 100), ctx);
+      expect(ctx.camera.pan).not.toHaveBeenCalled();
+    });
   });
 });

@@ -129,8 +129,19 @@ export class PlayerHandTool extends HandTool {
   }
 
   onPointerUp(state: PointerState, ctx: ToolContext): void {
+    this.resetPan();
+    super.onPointerUp(state, ctx);
+  }
+
+  // A tool switch mid-press never delivers this tool's pointerup; drop the
+  // pan so reactivating doesn't resume from a stale anchor.
+  onDeactivate(ctx: ToolContext): void {
+    this.resetPan();
+    super.onDeactivate(ctx);
+  }
+
+  private resetPan(): void {
     this.panAnchor = null;
     this.panStarted = false;
-    super.onPointerUp(state, ctx);
   }
 }
