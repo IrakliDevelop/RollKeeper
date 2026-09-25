@@ -106,6 +106,11 @@ describe('OverviewFavorites', () => {
     );
   });
 
+  it('shows the consumable quantity next to a pinned consumable row', () => {
+    render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
+    expect(screen.getByText('consumable · ×3')).toBeInTheDocument();
+  });
+
   it('spends a pinned feature use via its pip', () => {
     render(<OverviewFavorites addToast={vi.fn()} spellCasting={casting()} />);
     fireEvent.click(screen.getByRole('button', { name: /use second wind/i }));

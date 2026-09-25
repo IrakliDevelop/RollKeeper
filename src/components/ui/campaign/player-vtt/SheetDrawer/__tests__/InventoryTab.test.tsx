@@ -174,6 +174,46 @@ describe('InventoryTab', () => {
     ).toHaveAttribute('aria-pressed', 'true');
   });
 
+  it('labels charge pips with "charges", not "slots"', () => {
+    seed({
+      weapons: [
+        weapon({
+          charges: [
+            {
+              id: 'c1',
+              name: 'Blink',
+              maxCharges: 2,
+              usedCharges: 1,
+              restType: 'long',
+            },
+          ],
+        }),
+      ],
+    });
+    render(<InventoryTab locked addToast={vi.fn()} />);
+    expect(
+      screen.getByRole('group', { name: 'Blink charges: 1 of 2' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('1 of 2 charges')).toBeInTheDocument();
+    expect(screen.queryByText('1 of 2 slots')).toBeNull();
+  });
+
+  it('shows the quantity stepper for a consumable item alongside its Use button', () => {
+    render(<InventoryTab locked addToast={vi.fn()} />);
+    expect(
+      screen.getByRole('button', { name: 'Use Ration' })
+    ).toBeInTheDocument();
+    const increase = screen.getByRole('button', { name: 'Increase Ration' });
+    const decrease = screen.getByRole('button', { name: 'Decrease Ration' });
+    expect(increase).toBeInTheDocument();
+    expect(decrease).toBeInTheDocument();
+
+    fireEvent.click(increase);
+    expect(
+      getChar().inventoryItems.find(i => i.id === 'ration1')!.quantity
+    ).toBe(4);
+  });
+
   it('disables attune once attunement slots are full', () => {
     seed({
       attunementSlots: { max: 1, used: 1 },
@@ -236,6 +276,30 @@ describe('InventoryTab', () => {
     expect(addSpy.mock.calls.every(([key]) => key === 'gold')).toBe(true);
     expect(summed).toBe(150);
     expect(subtractSpy).not.toHaveBeenCalled();
+  });
+
+  it('clamps a negative typed currency value so it never subtracts past the clamped amount (32 -> -5)', () => {
+    seed({
+      currency: { copper: 0, silver: 0, electrum: 0, gold: 32, platinum: 0 },
+    });
+    const addSpy = vi
+      .spyOn(useCharacterStore.getState(), 'addCurrency')
+      .mockImplementation(() => {});
+    const subtractSpy = vi
+      .spyOn(useCharacterStore.getState(), 'subtractCurrency')
+      .mockImplementation(() => {});
+    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    const input = screen.getByLabelText('Gold pieces');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '-5' } });
+
+    const added = addSpy.mock.calls.reduce((sum, [, n]) => sum + n, 0);
+    const subtracted = subtractSpy.mock.calls.reduce(
+      (sum, [, n]) => sum + n,
+      0
+    );
+    // Clamped to 0 before the delta is computed: -32, not -37.
+    expect(added - subtracted).toBe(-32);
   });
 
   it('filters entries by search', () => {

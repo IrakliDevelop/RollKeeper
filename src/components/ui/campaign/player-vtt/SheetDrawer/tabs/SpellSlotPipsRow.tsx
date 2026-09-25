@@ -13,6 +13,8 @@ export interface SpellSlotPipsRowProps {
   restoreLabel: string;
   onSpend: () => void;
   onRestore: () => void;
+  /** Unit noun for the trailing count text, e.g. "slots" or "charges". */
+  unit?: string;
 }
 
 /** Tappable slot pips row: filled pips spend a slot, empty pips restore one. */
@@ -25,6 +27,7 @@ export function SpellSlotPipsRow({
   restoreLabel,
   onSpend,
   onRestore,
+  unit = 'slots',
 }: SpellSlotPipsRowProps) {
   if (max === 0) return null;
   const remaining = max - used;
@@ -62,7 +65,7 @@ export function SpellSlotPipsRow({
         })}
       </div>
       <span className="text-faint text-xs">
-        {remaining} of {max} slots
+        {remaining} of {max} {unit}
       </span>
     </div>
   );

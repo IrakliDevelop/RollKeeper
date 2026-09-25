@@ -56,8 +56,13 @@ function CoinInput({ coinKey, value }: CoinInputProps) {
 
   const handleChange = (next: number | undefined) => {
     if (next === undefined) return;
-    const diff = next - lastEmittedRef.current;
-    lastEmittedRef.current = next;
+    // Min/max on NumberInput are only enforced on blur, so a mid-typed
+    // negative value (e.g. "-5") would otherwise reach here as-is and
+    // produce an oversized delta against the last-emitted value. Clamp to a
+    // non-negative integer before computing the delta.
+    const clamped = Math.max(0, Math.trunc(next));
+    const diff = clamped - lastEmittedRef.current;
+    lastEmittedRef.current = clamped;
     if (diff > 0) addCurrency(coinKey, diff);
     else if (diff < 0) subtractCurrency(coinKey, -diff);
   };

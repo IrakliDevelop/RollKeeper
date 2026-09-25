@@ -66,7 +66,7 @@ export function InventoryEntryControls({
   return (
     <>
       <div className="mt-2 flex flex-wrap items-center gap-2">
-        {kind === 'item' && !entry.consumable && (
+        {kind === 'item' && (
           <div className="flex items-center gap-1">
             <Button
               type="button"
@@ -145,6 +145,7 @@ export function InventoryEntryControls({
           used={charge.used}
           spendLabel={`Use charge of ${charge.name}`}
           restoreLabel={`Restore charge of ${charge.name}`}
+          unit="charges"
           onSpend={() =>
             kind === 'weapon'
               ? expendWeaponCharge(id, charge.chargeId)

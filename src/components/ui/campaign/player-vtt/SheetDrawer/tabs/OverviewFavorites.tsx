@@ -63,7 +63,11 @@ export function OverviewFavorites({
                 <div className="text-heading truncate text-sm font-semibold">
                   {row.name}
                 </div>
-                <div className="text-muted truncate text-xs">{row.meta}</div>
+                <div className="text-muted truncate text-xs">
+                  {row.kind === 'item' && row.entry.consumable
+                    ? `${row.meta} · ×${row.entry.quantity ?? 0}`
+                    : row.meta}
+                </div>
 
                 {row.kind === 'item' && row.entry.attackText && (
                   <div className="text-body mt-0.5 text-xs">
