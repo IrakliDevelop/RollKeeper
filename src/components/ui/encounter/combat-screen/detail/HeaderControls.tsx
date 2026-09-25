@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { Eye, EyeOff, HeartPulse, Pencil } from 'lucide-react';
 import type { PlayerDisposition } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
+import { playersSeeLabel, playersSeeSuffix } from './playersSee';
 
 const DISPOSITIONS: Array<{
   value: PlayerDisposition;
@@ -141,11 +142,8 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
       {(entity.isHidden || entity.playerAlias || hpVisible) && (
         <span className="text-faint text-[10px]">
           Players see:{' '}
-          <span className="font-medium">
-            {entity.playerAlias?.trim() ||
-              (entity.isHidden ? 'Enemy' : entity.name)}
-          </span>
-          {hpVisible && ' · exact HP'}
+          <span className="font-medium">{playersSeeLabel(entity)}</span>
+          {playersSeeSuffix(entity)}
         </span>
       )}
     </div>
