@@ -34,6 +34,8 @@ export interface CampaignPlayer {
   maxHp: number;
   dexterity: number;
   avatarUrl?: string;
+  /** Mirrors character.shareHpWithParty; undefined/true means shared. */
+  shareHpWithParty?: boolean;
 }
 
 export function buildPlayerEntity(
@@ -56,6 +58,7 @@ export function buildPlayerEntity(
     isHidden: false,
     color: playerColors?.[player.id],
     avatarUrl: player.avatarUrl,
+    hpSharedWithParty: player.shareHpWithParty !== false,
   };
 }
 
