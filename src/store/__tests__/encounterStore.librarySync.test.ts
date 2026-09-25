@@ -218,4 +218,91 @@ describe('encounterStore — NPC library write-back', () => {
       npc.monsterStatBlock!.actions.some(a => a.name.startsWith('Roar'))
     ).toBe(false);
   });
+
+  describe('final-review coverage', () => {
+    function getEntity(encId: string, entityId: string) {
+      return useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+    }
+
+    it('an owned entry edited via updateEntity reaches the NPC', () => {
+      const { npcId, encId, entityId } = setupLinkedEntity();
+      const sb = structuredClone(getEntity(encId, entityId).monsterStatBlock!);
+      sb.actions = sb.actions.map(a =>
+        a.id === 'entry-bite' ? { ...a, text: 'Bigger bite.' } : a
+      );
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      expect(
+        getNpc(npcId).monsterStatBlock!.actions.find(a => a.id === 'entry-bite')
+          ?.text
+      ).toBe('Bigger bite.');
+    });
+
+    it('two entities from the same NPC editing different fields both land', () => {
+      const { npcId, encId, entityId } = setupLinkedEntity();
+      const npc = getNpc(npcId);
+      const second = buildNpcEntity(npc, {
+        isHidden: false,
+        playerDisposition: 'enemy',
+        campaignCode: CAMPAIGN,
+      });
+      const secondId = useEncounterStore.getState().addEntity(encId, second);
+
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { armorClass: 18 });
+      const sb = structuredClone(getEntity(encId, secondId).monsterStatBlock!);
+      sb.str = 20;
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, secondId, { monsterStatBlock: sb });
+
+      const fresh = getNpc(npcId);
+      expect(fresh.armorClass).toBe('18 (natural armor)');
+      expect(fresh.monsterStatBlock!.str).toBe(20);
+    });
+
+    it('a library edit made after add survives an unrelated entity edit', () => {
+      const { npcId, encId, entityId } = setupLinkedEntity();
+      const npc = getNpc(npcId);
+      useNPCStore.getState().updateNPC(CAMPAIGN, npcId, {
+        monsterStatBlock: { ...npc.monsterStatBlock!, skills: 'Stealth +5' },
+      });
+      const sb = structuredClone(getEntity(encId, entityId).monsterStatBlock!);
+      sb.str = 18;
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      const fresh = getNpc(npcId);
+      expect(fresh.monsterStatBlock!.str).toBe(18);
+      expect(fresh.monsterStatBlock!.skills).toBe('Stealth +5');
+    });
+
+    it('a byte-identical stat-block save never calls updateNPC', () => {
+      const { encId, entityId } = setupLinkedEntity();
+      const sb = structuredClone(getEntity(encId, entityId).monsterStatBlock!);
+      const spy = vi.spyOn(useNPCStore.getState(), 'updateNPC');
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      expect(spy).not.toHaveBeenCalled();
+      spy.mockRestore();
+    });
+
+    it('a stat-block speed edit also sets the NPC top-level speed', () => {
+      const { npcId, encId, entityId } = setupLinkedEntity();
+      const sb = structuredClone(getEntity(encId, entityId).monsterStatBlock!);
+      sb.speed = '50 ft., climb 30 ft.';
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      const fresh = getNpc(npcId);
+      expect(fresh.speed).toBe('50 ft., climb 30 ft.');
+      expect(fresh.monsterStatBlock!.speed).toBe('50 ft., climb 30 ft.');
+    });
+  });
 });

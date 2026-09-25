@@ -424,3 +424,74 @@ describe('buildNpcLibraryPatch — speed', () => {
     expect(patch?.monsterStatBlock?.speed).toBe('30 ft., fly 60 ft.');
   });
 });
+
+describe('buildNpcLibraryPatch — cost links on pushed entries', () => {
+  const beforeBlock = () =>
+    makeStatBlock({
+      actions: [
+        { id: 'action-1', name: 'Bite', text: '+5 to hit, 1d8+4 piercing.' },
+      ],
+    });
+  const editedAction = {
+    id: 'action-1',
+    name: 'Bite',
+    text: '+7 to hit, 1d8+6 piercing.',
+    resourceCost: { resourceId: 'res-1', amount: 1 },
+    inventoryCost: { inventoryItemId: 'item-1', quantity: 1 },
+  };
+  const resource = {
+    id: 'res-1',
+    name: 'Rage',
+    icon: 'flame',
+    color: 'red',
+    displayStyle: 'pips',
+    max: 2,
+    used: 0,
+  } as unknown as NonNullable<CampaignNPC['resources']>[number];
+  const item = { id: 'item-1', name: 'Arrow', quantity: 20 };
+
+  it('drops resourceCost/inventoryCost whose ids the NPC does not have', () => {
+    const before = makeEntity({ monsterStatBlock: beforeBlock() });
+    const after = makeEntity({
+      monsterStatBlock: makeStatBlock({ actions: [editedAction] }),
+    });
+    const npc = makeNpc({ monsterStatBlock: beforeBlock() });
+
+    const patch = buildNpcLibraryPatch(before, after, npc);
+
+    expect(patch?.monsterStatBlock?.actions).toEqual([
+      { id: 'action-1', name: 'Bite', text: '+7 to hit, 1d8+6 piercing.' },
+    ]);
+  });
+
+  it('keeps cost links whose ids the NPC owns', () => {
+    const before = makeEntity({ monsterStatBlock: beforeBlock() });
+    const after = makeEntity({
+      monsterStatBlock: makeStatBlock({ actions: [editedAction] }),
+    });
+    const npc = makeNpc({
+      monsterStatBlock: beforeBlock(),
+      resources: [resource],
+      inventory: [item],
+    });
+
+    const patch = buildNpcLibraryPatch(before, after, npc);
+
+    expect(patch?.monsterStatBlock?.actions).toEqual([editedAction]);
+  });
+
+  it('does not mutate the entity entry when dropping a link', () => {
+    const before = makeEntity({ monsterStatBlock: beforeBlock() });
+    const after = makeEntity({
+      monsterStatBlock: makeStatBlock({ actions: [{ ...editedAction }] }),
+    });
+    const npc = makeNpc({ monsterStatBlock: beforeBlock() });
+
+    buildNpcLibraryPatch(before, after, npc);
+
+    expect(after.monsterStatBlock!.actions[0].resourceCost).toEqual({
+      resourceId: 'res-1',
+      amount: 1,
+    });
+  });
+});

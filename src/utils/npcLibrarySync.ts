@@ -81,12 +81,35 @@ function assignKey<K extends keyof MonsterStatBlock>(
   target[key] = value;
 }
 
+/**
+ * Copy of `entry` with any resource/inventory cost link the NPC can't
+ * resolve dropped — the library must never reference ids it doesn't own.
+ */
+function stripUnownedCostLinks(
+  entry: StatBlockEntry,
+  npc: CampaignNPC
+): StatBlockEntry {
+  const { resourceCost, inventoryCost, ...rest } = entry;
+  const keepResource =
+    resourceCost != null &&
+    (npc.resources ?? []).some(r => r.id === resourceCost.resourceId);
+  const keepInventory =
+    inventoryCost != null &&
+    (npc.inventory ?? []).some(i => i.id === inventoryCost.inventoryItemId);
+  return {
+    ...rest,
+    ...(keepResource ? { resourceCost } : {}),
+    ...(keepInventory ? { inventoryCost } : {}),
+  };
+}
+
 /** Merges after's changed stat-block scalars/entries onto a clone of the NPC's block. */
 function buildStatBlockPatch(
   beforeBlock: MonsterStatBlock,
   afterBlock: MonsterStatBlock,
-  npcBlock: MonsterStatBlock
+  npc: CampaignNPC & { monsterStatBlock: MonsterStatBlock }
 ): MonsterStatBlock {
+  const npcBlock = npc.monsterStatBlock;
   const result = structuredClone(npcBlock);
 
   // The scalar keys span several unrelated value types (numbers, strings,
@@ -129,7 +152,7 @@ function buildStatBlockPatch(
       if (!afterEntry.id || !npcIds.has(afterEntry.id)) continue;
       const beforeEntry = beforeById.get(afterEntry.id);
       if (JSON.stringify(beforeEntry) === JSON.stringify(afterEntry)) continue;
-      replacements.set(afterEntry.id, afterEntry);
+      replacements.set(afterEntry.id, stripUnownedCostLinks(afterEntry, npc));
     }
 
     if (replacements.size === 0) continue;
@@ -196,18 +219,14 @@ export function buildNpcLibraryPatch(
       patch.speed = after.monsterStatBlock.speed;
     }
 
-    if (
-      before.monsterStatBlock !== after.monsterStatBlock &&
-      npc.monsterStatBlock
-    ) {
+    const npcBlock = npc.monsterStatBlock;
+    if (before.monsterStatBlock !== after.monsterStatBlock && npcBlock) {
       const statBlockPatch = buildStatBlockPatch(
         before.monsterStatBlock,
         after.monsterStatBlock,
-        npc.monsterStatBlock
+        { ...npc, monsterStatBlock: npcBlock }
       );
-      if (
-        JSON.stringify(statBlockPatch) !== JSON.stringify(npc.monsterStatBlock)
-      ) {
+      if (JSON.stringify(statBlockPatch) !== JSON.stringify(npcBlock)) {
         patch.monsterStatBlock = statBlockPatch;
       }
     }
