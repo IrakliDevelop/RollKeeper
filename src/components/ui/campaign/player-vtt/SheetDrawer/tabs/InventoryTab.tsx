@@ -63,7 +63,11 @@ export function InventoryTab({ locked, addToast }: InventoryTabProps) {
     [character, search]
   );
   const hasAnyItems = useMemo(
-    () => buildInventoryGroups(character, '').length > 0,
+    () =>
+      (character.weapons?.length ?? 0) > 0 ||
+      (character.armorItems?.length ?? 0) > 0 ||
+      (character.magicItems?.length ?? 0) > 0 ||
+      (character.inventoryItems?.length ?? 0) > 0,
     [character]
   );
   const summary = useMemo(() => buildInventorySummary(character), [character]);

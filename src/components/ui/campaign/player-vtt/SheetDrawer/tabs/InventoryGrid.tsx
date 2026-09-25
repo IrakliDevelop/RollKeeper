@@ -14,6 +14,7 @@ import type {
   InventoryEntryView,
   InventoryGroupView,
 } from '../SheetDrawer.types';
+import { useConsumableUse } from './useConsumableUse';
 
 export interface InventoryGridProps {
   groups: InventoryGroupView[];
@@ -42,22 +43,19 @@ function InventoryGridTile({
     isSheetFavorite(s.character, 'item', entry.id)
   );
   const setSheetFavorite = useCharacterStore(s => s.setSheetFavorite);
-  const adjustItemQuantity = useCharacterStore(s => s.adjustItemQuantity);
+  const consumeItem = useConsumableUse(addToast);
 
   const quantity = entry.quantity ?? 0;
   const isUsable = entry.kind === 'item' && entry.consumable;
   const tileClass =
     TILE_CLASS[entry.rarity ? rarityBadgeVariant(entry.rarity) : 'neutral'];
 
+  // The whole tile is itself a button (for a single, large tap target), so a
+  // separate FavoriteStar button can't be nested inside it — the tile's own
+  // tap toggles the pin instead, unless the entry is a usable consumable.
   const handleTap = () => {
     if (isUsable) {
-      if (quantity <= 0) return;
-      adjustItemQuantity(entry.id, -1);
-      addToast({
-        type: 'info',
-        title: `Used ${entry.name}`,
-        message: `${quantity - 1} left`,
-      });
+      consumeItem(entry.id, entry.name, quantity);
       return;
     }
     setSheetFavorite('item', entry.id, !pinned);

@@ -207,6 +207,14 @@ describe('InventoryTab', () => {
     expect(getChar().currency.gold).toBe(15);
   });
 
+  it('commits a currency decrease against live store state (10 -> 4 gold)', () => {
+    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    fireEvent.change(screen.getByLabelText('Gold pieces'), {
+      target: { value: '4' },
+    });
+    expect(getChar().currency.gold).toBe(4);
+  });
+
   it('filters entries by search', () => {
     render(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.change(
