@@ -51,4 +51,27 @@ describe('overlayLiveHp', () => {
   it('passes null through', () => {
     expect(overlayLiveHp(null, {})).toBeNull();
   });
+
+  it('leaves an opted-out player row masked when there is no live entry for it', () => {
+    // Mirrors what buildSharedInitiative emits for a player with
+    // hpSharedWithParty === false — no currentHp/maxHp at all, plus the
+    // label-mode fields. There is no `party-hp` entry for this id (the
+    // route already omits hidden HP), so overlayLiveHp must not fabricate
+    // exact numbers for it.
+    const state = makeState([
+      {
+        playerCharacterId: 'char-hidden',
+        hpMode: 'label',
+        hpState: 'Bloodied',
+        hpTier: 'low',
+        isDead: false,
+      },
+    ]);
+    const out = overlayLiveHp(state, {})!;
+    const row = out.turnOrder[0];
+    expect('currentHp' in row).toBe(false);
+    expect('maxHp' in row).toBe(false);
+    expect(row.hpMode).toBe('label');
+    expect(row.hpState).toBe('Bloodied');
+  });
 });

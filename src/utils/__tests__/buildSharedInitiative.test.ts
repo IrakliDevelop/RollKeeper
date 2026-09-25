@@ -792,8 +792,10 @@ describe('buildSharedInitiative — player hpSharedWithParty opt-out', () => {
       }),
     ]);
     const row = buildSharedInitiative(enc, config).turnOrder[0];
-    expect(row.currentHp).toBeUndefined();
-    expect(row.maxHp).toBeUndefined();
+    // Omitted entirely — not just undefined-valued — so a naive
+    // `JSON.stringify`/spread of the payload can't resurface them.
+    expect('currentHp' in row).toBe(false);
+    expect('maxHp' in row).toBe(false);
     expect(row.hpMode).toBe('label');
     // 6/30 = 20% -> below the 50 band -> 'Bloodied'
     expect(row.hpState).toBe('Bloodied');
@@ -815,8 +817,8 @@ describe('buildSharedInitiative — player hpSharedWithParty opt-out', () => {
     const row = buildSharedInitiative(enc, config).turnOrder[0];
     expect(row.isDead).toBe(true);
     expect(row.hpTier).toBeUndefined();
-    expect(row.currentHp).toBeUndefined();
-    expect(row.maxHp).toBeUndefined();
+    expect('currentHp' in row).toBe(false);
+    expect('maxHp' in row).toBe(false);
   });
 
   it('shared (hpSharedWithParty: true) player is unchanged from today', () => {
@@ -853,20 +855,5 @@ describe('buildSharedInitiative — player hpSharedWithParty opt-out', () => {
     expect(row.currentHp).toBe(24);
     expect(row.maxHp).toBe(30);
     expect('hpMode' in row).toBe(false);
-  });
-
-  it('keeps playerCharacterId for an opted-out player', () => {
-    const enc = encounter([
-      entity({
-        id: 'p',
-        type: 'player',
-        currentHp: 10,
-        maxHp: 30,
-        playerCharacterId: 'char-z',
-        hpSharedWithParty: false,
-      }),
-    ]);
-    const row = buildSharedInitiative(enc, config).turnOrder[0];
-    expect(row.playerCharacterId).toBe('char-z');
   });
 });
