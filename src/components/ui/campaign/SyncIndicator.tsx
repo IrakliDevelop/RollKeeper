@@ -170,13 +170,16 @@ export function SyncIndicator({
               <div className="flex items-center gap-2">
                 <Heart
                   size={14}
-                  className={shareHpWithParty ? 'text-red-500' : 'text-muted'}
+                  className={
+                    shareHpWithParty ? 'text-accent-red-text' : 'text-muted'
+                  }
                 />
                 <span className="text-heading text-sm">Share HP</span>
               </div>
               <Switch
                 checked={shareHpWithParty}
                 onCheckedChange={onToggleShareHp}
+                aria-label="Share HP with party"
               />
             </div>
 
@@ -188,13 +191,16 @@ export function SyncIndicator({
               <div className="flex items-center gap-2">
                 <Eye
                   size={14}
-                  className={sharePartyView ? 'text-blue-500' : 'text-muted'}
+                  className={
+                    sharePartyView ? 'text-accent-blue-text' : 'text-muted'
+                  }
                 />
                 <span className="text-heading text-sm">Share sheet</span>
               </div>
               <Switch
                 checked={sharePartyView}
                 onCheckedChange={onSharePartyViewChange}
+                aria-label="Share sheet with party"
               />
             </div>
 

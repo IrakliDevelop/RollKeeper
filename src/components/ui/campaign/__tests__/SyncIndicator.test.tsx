@@ -75,3 +75,26 @@ describe('SyncIndicator — Share sheet toggle', () => {
     expect(onSharePartyViewChange).toHaveBeenCalledWith(false);
   });
 });
+
+describe('SyncIndicator — share toggles accessibility', () => {
+  it('gives both share switches accessible names', async () => {
+    render(<SyncIndicator {...baseProps()} />);
+    await openMenu();
+    expect(screen.getByRole('switch', { name: 'Share sheet with party' })).toBe(
+      getShareSheetToggle()
+    );
+    expect(
+      screen.getByRole('switch', { name: 'Share HP with party' })
+    ).toHaveAttribute('aria-checked', 'true');
+  });
+
+  it('uses semantic accent tokens for the enabled share icons', async () => {
+    const { container } = render(<SyncIndicator {...baseProps()} />);
+    await openMenu();
+    const root = container.ownerDocument.body;
+    expect(root.querySelector('.text-blue-500')).toBeNull();
+    expect(root.querySelector('svg.text-red-500')).toBeNull();
+    expect(root.querySelector('svg.text-accent-blue-text')).not.toBeNull();
+    expect(root.querySelector('svg.text-accent-red-text')).not.toBeNull();
+  });
+});
