@@ -34,6 +34,7 @@ import { useLocationStore } from '@/store/locationStore';
 import type { BattleMap, MarkerDetail } from '@/types/battlemap';
 import type { LocationMap } from '@/types/location';
 import { buildMarkerPortalTarget } from '@/components/ui/campaign/location-map/markerPortal';
+import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/dm-vtt/combatantToken';
 
 // Only RollKeeper's own transport module is stubbed, so the relay-configured
 // positive control opens no socket. Every `@fieldnotes` module — including the
@@ -301,6 +302,20 @@ function fakeCtx(): CanvasRenderingContext2D {
     textAlign: '',
     textBaseline: '',
   } as unknown as CanvasRenderingContext2D;
+}
+
+/** A combatant token element shaped exactly as `stampCombatantToken` and
+ *  `isCombatantToken` expect: a shape carrying `tokenKind`/`entityId`. */
+function combatantTokenElement(entityId: string): CanvasElement {
+  const shape = createShape({
+    position: { x: 0, y: 0 },
+    size: { w: 40, h: 40 },
+  });
+  return {
+    ...shape,
+    entityId,
+    tokenKind: COMBATANT_TOKEN_KIND,
+  } as CanvasElement;
 }
 
 function seedMarkerPin(store: ElementStore, ref: string): HtmlElement {
@@ -1380,5 +1395,97 @@ describe('useDmBattleMapCanvas — portal state is wired to the marker panel', (
     expect(ps!.locationChoices).toBeDefined();
     // No portal target set, so resolved is undefined.
     expect(ps!.resolved).toBeUndefined();
+  });
+});
+
+// ─── Combatant token activation (double-click → creature drawer) ──────────
+
+describe('useDmBattleMapCanvas — double-click activation on combatant tokens', () => {
+  beforeEach(() => {
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
+    useBattleMapStore.setState({
+      battleMaps: { [CODE]: { [MAP_ID]: battleMapFixture() } },
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    useBattleMapStore.setState({ battleMaps: {} });
+    vi.clearAllMocks();
+  });
+
+  it('a combatant token is activatable when onOpenCombatant is supplied, and activating it calls onOpenCombatant with the entity id', () => {
+    const harness = makeStubViewport();
+    const onOpenCombatant = vi.fn();
+    const { result } = renderHook(() =>
+      useDmBattleMapCanvas({ ...baseProps(), onOpenCombatant })
+    );
+    act(() => {
+      result.current.handleReady(harness.vp);
+    });
+
+    const token = combatantTokenElement('e1');
+    const options = harness.activationOptions.at(-1);
+    expect(options).toBeTruthy();
+    expect(options?.isActivatable?.(token)).toBe(true);
+
+    act(() => {
+      harness.emitActivate(token);
+    });
+
+    expect(onOpenCombatant).toHaveBeenCalledExactlyOnceWith('e1');
+  });
+
+  it('a combatant token is NOT activatable when onOpenCombatant is absent', () => {
+    const { vp, activationOptions } = setup();
+
+    const token = combatantTokenElement('e1');
+    const options = activationOptions.at(-1);
+    expect(options).toBeTruthy();
+    expect(options?.isActivatable?.(token)).toBe(false);
+    void vp;
+  });
+
+  it('marker activation still works when onOpenCombatant is also supplied', () => {
+    const harness = makeStubViewport();
+    const onOpenCombatant = vi.fn();
+    const { result } = renderHook(() =>
+      useDmBattleMapCanvas({ ...baseProps(), onOpenCombatant })
+    );
+    act(() => {
+      result.current.handleReady(harness.vp);
+    });
+
+    act(() => {
+      tapMarkerTool(result.current.tools, harness.vp);
+    });
+    const pin = markerElements(harness.store)[0] as HtmlElement;
+
+    expect(result.current.markerPanelOpen).toBe(false);
+    act(() => {
+      harness.emitActivate(pin);
+    });
+
+    expect(result.current.markerPanelOpen).toBe(true);
+    expect(onOpenCombatant).not.toHaveBeenCalled();
+  });
+
+  it('a non-token element is not activatable through sheetTokens even with onOpenCombatant supplied', () => {
+    const harness = makeStubViewport();
+    const onOpenCombatant = vi.fn();
+    const { result } = renderHook(() =>
+      useDmBattleMapCanvas({ ...baseProps(), onOpenCombatant })
+    );
+    act(() => {
+      result.current.handleReady(harness.vp);
+    });
+
+    const shape = createShape({
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+    });
+    const options = harness.activationOptions.at(-1);
+    expect(options).toBeTruthy();
+    expect(options?.isActivatable?.(shape)).toBe(false);
   });
 });

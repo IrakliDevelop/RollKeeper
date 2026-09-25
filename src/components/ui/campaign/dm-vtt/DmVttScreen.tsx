@@ -9,6 +9,9 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
+import { CreatureDrawer } from './CreatureDrawer';
+import { sheetPillEntity } from './CreatureDrawer/CreatureDrawer.utils';
+import { CreatureSheetPill } from './CreatureSheetPill';
 import { useDmVttScreen } from './DmVttScreen.hooks';
 import { DmVttNpcDialog } from './DmVttNpcDialog';
 import { DmVttTopBar } from './DmVttTopBar';
@@ -53,6 +56,13 @@ export function DmVttScreen({
   );
   const decorations = useDmTokenDecorations(vtt.linkedEntities);
 
+  const pillEntity = sheetPillEntity({
+    entities: vtt.encounter?.entities,
+    selectedEntityId: vtt.selectedEntityId,
+    drawerOpen: vtt.creatureDrawer.entity !== null,
+    placementPending: vtt.pendingPlacement !== null,
+  });
+
   const gridMode: DmVttGridMode = vtt.battleMap?.gridEnabled
     ? (vtt.battleMap.gridSettings?.gridType ?? 'hex')
     : 'off';
@@ -67,6 +77,7 @@ export function DmVttScreen({
       onViewportReady={vtt.onViewportReady}
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
+      onOpenCombatant={vtt.creatureDrawer.open}
       tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
       onExportError={message =>
         vtt.addToast({ type: 'error', title: 'Export failed', message })
@@ -111,6 +122,12 @@ export function DmVttScreen({
           hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
         />
         <RosterDragGhost drag={vtt.drag} />
+        {pillEntity && (
+          <CreatureSheetPill
+            name={pillEntity.name}
+            onOpen={() => vtt.creatureDrawer.open(pillEntity.id)}
+          />
+        )}
         {vtt.actions && (
           <StudioPanel
             encounter={vtt.encounter}
@@ -139,6 +156,15 @@ export function DmVttScreen({
           canvasEl={vtt.getCanvasEl()}
         />
       </div>
+      {vtt.actions && (
+        <CreatureDrawer
+          entity={vtt.creatureDrawer.entity}
+          actions={vtt.actions}
+          isTurn={vtt.activeEntity?.id === vtt.creatureDrawer.entity?.id}
+          onClose={vtt.creatureDrawer.close}
+          onTokenIdentityChange={vtt.updateTokenIdentity}
+        />
+      )}
       <ToastContainer toasts={vtt.toasts} onDismiss={vtt.dismissToast} />
       <DmVttNpcDialog
         campaignCode={campaignCode}

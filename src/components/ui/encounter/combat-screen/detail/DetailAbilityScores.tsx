@@ -3,32 +3,24 @@
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import {
-  parseSavesString,
-  removeSaveOverride,
+  ABILITY_KEYS,
+  abilitySaveValue,
+  computeSaveProficiencies,
+  resetSavePatch,
+  saveProficiencyPatch,
+  signedModifier,
   type AbilityKey,
 } from './DetailAbilityScores.utils';
 import type { DetailSectionProps } from './DetailHeader';
 
 const ABILITY_LABELS = ['STR', 'DEX', 'CON', 'INT', 'WIS', 'CHA'] as const;
-const ABILITY_KEYS: AbilityKey[] = ['str', 'dex', 'con', 'int', 'wis', 'cha'];
-
-function signedMod(score: number): string {
-  const mod = Math.floor((score - 10) / 2);
-  return mod >= 0 ? `+${mod}` : `${mod}`;
-}
-
-function signed(value: number): string {
-  return value >= 0 ? `+${value}` : `${value}`;
-}
 
 export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
   const sb = entity.monsterStatBlock;
   if (!sb) return null;
 
-  const saveByAbility = parseSavesString(sb.saves);
+  const { proficiencies, saveByAbility } = computeSaveProficiencies(sb);
   const isPlayer = entity.type === 'player';
-  const inferredProficiencies = ABILITY_KEYS.filter(key => saveByAbility[key]);
-  const proficiencies = sb.saveProficiencies ?? inferredProficiencies;
 
   const handleChange = (key: AbilityKey, val: number | undefined) => {
     if (val !== undefined && sb) {
@@ -39,25 +31,19 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
   };
 
   const setProficient = (key: AbilityKey, proficient: boolean) => {
-    const next = proficient
-      ? [...new Set([...proficiencies, key])]
-      : proficiencies.filter(candidate => candidate !== key);
     actions.onUpdate(entity.id, {
-      monsterStatBlock: {
-        ...sb,
-        saveProficiencies: next,
-        saves: proficient ? sb.saves : removeSaveOverride(sb.saves, key),
-      },
+      monsterStatBlock: saveProficiencyPatch(
+        sb,
+        proficiencies,
+        key,
+        proficient
+      ),
     });
   };
 
   const resetSave = (key: AbilityKey) => {
     actions.onUpdate(entity.id, {
-      monsterStatBlock: {
-        ...sb,
-        saveProficiencies: proficiencies,
-        saves: removeSaveOverride(sb.saves, key),
-      },
+      monsterStatBlock: resetSavePatch(sb, proficiencies, key),
     });
   };
 
@@ -71,10 +57,13 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
           const score = sb[key];
           const override = saveByAbility[key];
           const proficient = proficiencies.includes(key);
-          const calculated =
-            Math.floor((score - 10) / 2) +
-            (proficient ? (entity.proficiencyBonus ?? 0) : 0);
-          const save = override ?? signed(calculated);
+          const save = abilitySaveValue(
+            sb,
+            key,
+            proficiencies,
+            saveByAbility,
+            entity.proficiencyBonus
+          );
           return (
             <div
               key={key}
@@ -96,7 +85,7 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                 />
               )}
               <span className="text-accent-emerald-text-muted text-[10px]">
-                {signedMod(score)}
+                {signedModifier(score)}
               </span>
               {!isPlayer && (
                 <label className="text-muted flex items-center gap-0.5 text-[9px] font-semibold">

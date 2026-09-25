@@ -1,25 +1,15 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { FilePen } from 'lucide-react';
 import type { DetailSectionProps } from './DetailHeader';
 import { LegendarySection } from './LegendarySection';
 import { StatBlockTraits } from './StatBlockTraits';
 import { DetailResources } from './NpcResourceList';
-import type { StatBlockEntry } from '@/types/encounter';
-import { StatBlockEditor } from '../AddCombatantDialog/StatBlockEditor';
-import type { MonsterEditDraft } from '../AddCombatantDialog/monsterEditDraft';
-import { Button } from '@/components/ui/forms/button';
-import {
-  Dialog,
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/feedback/dialog';
+import { useStatBlockEditDialog } from './StatBlockEditDialog';
+import { statBlockEntryHandlers } from './statBlockEntryHandlers';
 
-function LairActionsSection({ entity, actions }: DetailSectionProps) {
+export function LairActionsSection({ entity, actions }: DetailSectionProps) {
   const lairActions = entity.lairActions;
   if (!lairActions || lairActions.length === 0) return null;
 
@@ -58,7 +48,13 @@ function LairActionsSection({ entity, actions }: DetailSectionProps) {
 }
 
 export function DetailActions({ entity, actions }: DetailSectionProps) {
-  const [editDraft, setEditDraft] = useState<MonsterEditDraft | null>(null);
+  const {
+    open: openEditor,
+    dialog,
+    canEdit: canEditBlock,
+  } = useStatBlockEditDialog(entity, actions);
+  const { onUseEntry, onUseAbilityEntry, onRestoreAbilityEntry } =
+    statBlockEntryHandlers(entity, actions);
   const isLair = entity.type === 'lair';
 
   if (isLair) {
@@ -77,20 +73,6 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
     entity.spellcasting != null;
 
   if (!hasContent) return null;
-
-  const canEditBlock =
-    entity.type !== 'player' && entity.monsterStatBlock != null;
-
-  const openEditor = () => {
-    if (!entity.monsterStatBlock) return;
-    setEditDraft({
-      statBlock: structuredClone(entity.monsterStatBlock),
-      initiativeModifier: entity.initiativeModifier,
-      initiativeDirty: true,
-      proficiencyBonus: entity.proficiencyBonus ?? 2,
-      proficiencyDirty: true,
-    });
-  };
 
   return (
     <div className="border-divider space-y-4 border-t p-4">
@@ -113,66 +95,13 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
             resources={entity.resources}
             inventory={entity.inventory}
             abilities={entity.abilities}
-            onUseEntry={(entry: StatBlockEntry) => {
-              if (entry.inventoryCost && entry.id) {
-                actions.onUseInventoryEntry?.(entity.id, entry.id);
-              } else if (entry.resourceCost) {
-                actions.onSpendResource(
-                  entity.id,
-                  entry.resourceCost.resourceId,
-                  entry.resourceCost.amount
-                );
-              }
-            }}
-            onUseAbilityEntry={(entry: StatBlockEntry) => {
-              if (entry.id) actions.onUseAbility(entity.id, entry.id);
-            }}
-            onRestoreAbilityEntry={(entry: StatBlockEntry) => {
-              if (entry.id) actions.onRestoreAbility(entity.id, entry.id);
-            }}
+            onUseEntry={onUseEntry}
+            onUseAbilityEntry={onUseAbilityEntry}
+            onRestoreAbilityEntry={onRestoreAbilityEntry}
           />
         </div>
       )}
-      <Dialog
-        open={editDraft !== null}
-        onOpenChange={open => !open && setEditDraft(null)}
-      >
-        <DialogContent className="h-[85vh] sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Edit {entity.name}</DialogTitle>
-          </DialogHeader>
-          <DialogBody className="min-h-0 overflow-y-auto">
-            {editDraft && (
-              <StatBlockEditor
-                monsterName={entity.name}
-                draft={editDraft}
-                onDraftChange={setEditDraft}
-                onReset={openEditor}
-                onBack={() => setEditDraft(null)}
-                resetLabel="Reset changes"
-              />
-            )}
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="secondary" onClick={() => setEditDraft(null)}>
-              Cancel
-            </Button>
-            <Button
-              onClick={() => {
-                if (!editDraft) return;
-                actions.onUpdate(entity.id, {
-                  monsterStatBlock: editDraft.statBlock,
-                  initiativeModifier: editDraft.initiativeModifier,
-                  proficiencyBonus: editDraft.proficiencyBonus,
-                });
-                setEditDraft(null);
-              }}
-            >
-              Save stat block
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {dialog}
     </div>
   );
 }

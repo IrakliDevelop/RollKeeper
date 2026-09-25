@@ -13,6 +13,7 @@ import {
   AutoSave,
   type CameraAnimator,
   type CameraView,
+  type CanvasElement,
   type ElementActivationEvent,
   type FocusAudience,
   type Tool,
@@ -144,6 +145,8 @@ export interface DmBattleMapCanvasProps {
   tokenInfoToggle: { mode: TokenInfoMode | null; onCycle: () => void };
   /** Surfaces export-control failures (e.g. no viewport, blob export threw). */
   onExportError: (message: string) => void;
+  /** Double-click on a combatant token → open its creature drawer. Absent = tokens not activatable. */
+  onOpenCombatant?: (entityId: string) => void;
 }
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
@@ -233,6 +236,7 @@ export function useDmBattleMapCanvas({
   onViewportReady,
   tokenConfigRef,
   onSelectionChange,
+  onOpenCombatant,
 }: DmBattleMapCanvasProps): DmBattleMapCanvasState {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   useEffect(() => {
@@ -484,6 +488,24 @@ export function useDmBattleMapCanvas({
     );
   }, []);
 
+  // Combatant tokens → creature drawer (Task 1): always the double gesture,
+  // sharing `useMarkerRegistration`'s one `setActivation` slot via
+  // `sheetTokens`, same pattern as `PlayerBattleMapCanvas.sheetTokens`. A
+  // token is only activatable while `onOpenCombatant` is supplied.
+  const onOpenCombatantRef = useRef(onOpenCombatant);
+  onOpenCombatantRef.current = onOpenCombatant;
+  const sheetTokens = useMemo(
+    () => ({
+      isActivatable: (el: Readonly<CanvasElement>) =>
+        isCombatantToken(el) && onOpenCombatantRef.current !== undefined,
+      onActivate: (e: ElementActivationEvent) => {
+        const el = e.element;
+        if (isCombatantToken(el)) onOpenCombatantRef.current?.(el.entityId);
+      },
+    }),
+    []
+  );
+
   // OUTSIDE the `if (relayUrl)` guard in `handleReady`, and NOT part of
   // `laserCleanups` or any other connection-scoped cleanup: painter
   // registration and activation are connection-independent (spec §7.2).
@@ -503,6 +525,7 @@ export function useDmBattleMapCanvas({
       CANVAS_WRITING_TOOL_NAMES.has(
         viewportRef.current?.toolManager.activeTool?.name ?? ''
       ),
+    sheetTokens,
   });
 
   const activeMarkerElement =

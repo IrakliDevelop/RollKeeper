@@ -5,18 +5,16 @@ import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { effectiveAc } from '@/utils/calculations';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { rollHitDie } from '../spendHitDie';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
 import { DeathSaves } from './DeathSaves';
 import { ConcentrationReaction } from './ConcentrationReaction';
-
-function hpColorClass(current: number, max: number): string {
-  const pct = max > 0 ? (current / max) * 100 : 0;
-  if (pct > 50) return 'text-accent-emerald-text';
-  if (pct > 25) return 'text-accent-amber-text';
-  return 'text-accent-red-text';
-}
+import {
+  canSpendHitDie,
+  hpColorClass,
+  showDeathSaves,
+  spendHitDie,
+} from './hitDie';
 
 export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
@@ -26,16 +24,6 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
   const isPlayer = entity.type === 'player';
   const isNonPlayerNonSummon = !isPlayer && !entity.summonId;
-  const showDeathSaves =
-    (isPlayer || entity.type === 'npc' || !!entity.npcSourceId) &&
-    entity.currentHp <= 0 &&
-    entity.deathSaves != null;
-  const canSpendHitDie =
-    (entity.type === 'npc' || entity.npcSourceId != null) &&
-    entity.hitDice != null &&
-    entity.hitDice.current > 0 &&
-    entity.currentHp > 0 &&
-    entity.currentHp < entity.maxHp;
 
   const commitMaxHp = (raw: string) => {
     const val = parseInt(raw, 10);
@@ -178,18 +166,14 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
       <ConcentrationReaction entity={entity} actions={actions} />
 
       {/* Death saves (players read-only, NPCs interactive) */}
-      {showDeathSaves && <DeathSaves entity={entity} actions={actions} />}
+      {showDeathSaves(entity) && (
+        <DeathSaves entity={entity} actions={actions} />
+      )}
 
       {/* Spend hit die */}
-      {canSpendHitDie && (
+      {canSpendHitDie(entity) && (
         <button
-          onClick={() => {
-            const result = rollHitDie(entity);
-            if (result) {
-              actions.onHeal(entity.id, result.healAmount);
-              actions.onUpdate(entity.id, { hitDice: result.hitDice });
-            }
-          }}
+          onClick={() => spendHitDie(entity, actions)}
           className="text-accent-purple-text bg-accent-purple-bg hover:bg-accent-purple-bg-strong flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
         >
           <Plus size={11} aria-hidden />

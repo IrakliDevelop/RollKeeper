@@ -6,6 +6,7 @@ import { useToast } from '@/components/ui/feedback/Toast';
 import { useNPCStore } from '@/store/npcStore';
 
 import { useCombatantTokens } from './useCombatantTokens';
+import { useCreatureDrawerState } from './useCreatureDrawerState';
 import { useDmVttActions } from './useDmVttActions';
 import { useDmVttDragPlacement } from './useDmVttDragPlacement';
 import { useDmVttGrid } from './useDmVttGrid';
@@ -84,6 +85,8 @@ export function useDmVttScreen({
     (playerCharacterId: string) => setViewingPlayerId(playerCharacterId),
     []
   );
+
+  const creatureDrawer = useCreatureDrawerState({ encounter, onViewPlayer });
 
   const actions = useDmVttActions({ campaignCode, dmId, encounter, onViewNPC });
 
@@ -179,6 +182,7 @@ export function useDmVttScreen({
       onClose: () => setViewingNpc(null),
     },
     onViewPlayer,
+    creatureDrawer,
     // Looked up at render time so each poke-driven players refresh
     // live-updates an open dialog (same freshness as the encounter page).
     playerDialog: {

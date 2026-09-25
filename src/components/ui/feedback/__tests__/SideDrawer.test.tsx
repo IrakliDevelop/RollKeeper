@@ -45,6 +45,24 @@ describe('SideDrawer', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('stays open when onEscapeKeyDown prevents the default', () => {
+    const onOpenChange = vi.fn();
+    const onEscapeKeyDown = vi.fn((e: KeyboardEvent) => e.preventDefault());
+    render(
+      <SideDrawer
+        open
+        onOpenChange={onOpenChange}
+        onEscapeKeyDown={onEscapeKeyDown}
+        title="t"
+      >
+        <p>body</p>
+      </SideDrawer>
+    );
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+    expect(onEscapeKeyDown).toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
   it('is non-modal: no overlay blocks the page', () => {
     render(
       <>
