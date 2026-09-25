@@ -110,6 +110,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   resetExtendedFeatures: 'CANONICAL',
   reorderExtendedFeatures: 'CANONICAL',
   toggleFavoriteFeature: 'CANONICAL',
+  setSheetFavorite: 'CANONICAL',
   migrateTraitsToExtendedFeatures: 'CANONICAL',
   // — languages / tools / immunities / senses —
   addLanguage: 'CANONICAL',
@@ -174,6 +175,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   updateInventoryItem: 'CANONICAL',
   deleteInventoryItem: 'CANONICAL',
   updateItemQuantity: 'CANONICAL',
+  adjustItemQuantity: 'CANONICAL',
   reorderInventoryItems: 'CANONICAL',
   updateCurrency: 'CANONICAL',
   addCurrency: 'CANONICAL',

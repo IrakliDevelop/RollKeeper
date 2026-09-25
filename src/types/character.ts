@@ -560,6 +560,15 @@ export interface Currency {
   platinum: number;
 }
 
+// Pinned entries shown on the sheet drawer's favorites strip. Spell and
+// feature membership mirrors the legacy flags (spellbook.favoriteSpells,
+// favoriteFeatureIds); this list adds items and preserves pin order.
+export type SheetFavoriteKind = 'item' | 'spell' | 'feature';
+export interface SheetFavorite {
+  kind: SheetFavoriteKind;
+  id: string;
+}
+
 // Main character state interface
 export interface CharacterState {
   id: string;
@@ -661,6 +670,7 @@ export interface CharacterState {
   // Extended Features (new system)
   extendedFeatures: ExtendedFeature[];
   favoriteFeatureIds: string[];
+  sheetFavorites?: SheetFavorite[];
 
   // Rich Text Content
   features: RichTextContent[];
