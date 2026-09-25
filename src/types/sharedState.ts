@@ -124,19 +124,23 @@ export interface SharedTurnEntry {
   displayName: string; // real name, or "Enemy" when hidden && non-player
   type: 'player' | 'monster' | 'npc' | 'lair';
   playerCharacterId?: string; // player entities only — marks "you" + identity
-  currentHp?: number; // players always; non-players only when the effective mode is 'exact'
-  maxHp?: number; // players always; non-players only when the effective mode is 'exact'
-  hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied")
+  currentHp?: number; // players who share HP (default) always; non-players only when the effective mode is 'exact'
+  maxHp?: number; // players who share HP (default) always; non-players only when the effective mode is 'exact'
+  hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied"); also an opted-out player (hpMode 'label')
   hpPercent?: number; // non-players when enemyHpMode is 'bar' | 'percent' (0-100)
-  // Coarse health tier for colour-coding any shown enemy HP indicator. Set for
-  // non-players whenever the effective mode !== 'off' (kept coarse so 'label'
-  // mode does not leak an exact percentage).
+  // Coarse health tier for colour-coding any shown HP indicator. Set for
+  // non-players whenever the effective mode !== 'off', and for an opted-out
+  // player when alive (kept coarse so 'label' mode does not leak an exact
+  // percentage).
   hpTier?: 'high' | 'mid' | 'low' | 'critical';
   isDead?: boolean; // current HP <= 0 (players always; enemies when HP is shared)
   /**
    * Per-entry override of SharedInitiativeState.enemyHpMode. Set to 'exact' for
-   * a non-player the DM toggled "show exact HP to players". Old payloads omit
-   * it — renderers resolve the effective mode with resolveEntryHpMode().
+   * a non-player the DM toggled "show exact HP to players", or to 'label' for
+   * a player who opted out of HP sharing (character.shareHpWithParty ===
+   * false) — their currentHp/maxHp are omitted and hpState/hpTier carry the
+   * masked view instead. Old payloads omit it — renderers resolve the
+   * effective mode with resolveEntryHpMode().
    */
   hpMode?: EnemyHpDisplay;
   disposition?: 'ally' | 'enemy' | 'neutral'; // player-facing allegiance (non-players)
