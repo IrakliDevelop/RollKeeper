@@ -110,10 +110,20 @@ describe('FeaturesTab', () => {
 
   it('expands a description', () => {
     render(<FeaturesTab />);
-    const toggle = screen.getByRole('button', { name: /darkvision/i });
+    const toggle = screen.getByRole('button', { name: /^darkvision/i });
     expect(toggle).toHaveAttribute('aria-expanded', 'false');
     fireEvent.click(toggle);
     expect(screen.getByText('See in the dark.')).toBeInTheDocument();
+  });
+
+  it('pins a feature via its star, mirroring the legacy favorite flag', () => {
+    render(<FeaturesTab />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pin Second Wind' }));
+    expect(getChar().sheetFavorites).toContainEqual({
+      kind: 'feature',
+      id: 'sw',
+    });
+    expect(getChar().favoriteFeatureIds).toContain('sw');
   });
 
   it('shows an empty state', () => {

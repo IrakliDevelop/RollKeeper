@@ -219,3 +219,30 @@ export interface InventorySummaryView {
 export type InventoryViewMode = 'list' | 'grid';
 
 export const INVENTORY_VIEW_STORAGE_KEY = 'rollkeeper-map-sheet-inventory-view';
+
+export type FavoriteRowView =
+  | {
+      key: string;
+      kind: 'item';
+      id: string;
+      name: string;
+      meta: string;
+      entry: InventoryEntryView;
+    }
+  | {
+      key: string;
+      kind: 'spell';
+      id: string;
+      name: string;
+      meta: string;
+      spell: Spell;
+      castable: boolean;
+    }
+  | {
+      key: string;
+      kind: 'feature';
+      id: string;
+      name: string;
+      meta: string;
+      feature: FeatureRowView;
+    };

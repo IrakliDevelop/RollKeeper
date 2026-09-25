@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { cn } from '@/utils/cn';
 
 import type { SpellRowView } from '../SheetDrawer.types';
+import { FavoriteStar } from './FavoriteStar';
 
 export interface SpellListRowProps {
   row: SpellRowView;
@@ -88,6 +89,8 @@ export function SpellListRow({
       >
         Cast
       </Button>
+
+      <FavoriteStar kind="spell" id={spell.id} name={spell.name} />
     </div>
   );
 }

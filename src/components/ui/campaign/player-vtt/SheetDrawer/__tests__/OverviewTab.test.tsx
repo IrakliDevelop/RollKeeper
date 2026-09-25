@@ -3,6 +3,16 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { OverviewTab } from '../tabs/OverviewTab';
 import { useCharacterStore } from '@/store/characterStore';
 import type { CharacterState } from '@/types/character';
+import type { SheetSpellCastingProps } from '../SheetDrawer.types';
+
+function casting(): SheetSpellCastingProps {
+  return {
+    onCastPlacement: vi.fn(),
+    connectionLive: true,
+    hasPendingPlacement: false,
+    onCancelPlacement: vi.fn(),
+  };
+}
 
 function seed(overrides: Partial<CharacterState> = {}) {
   const base = useCharacterStore.getState().character;
@@ -37,7 +47,7 @@ describe('OverviewTab', () => {
   beforeEach(() => seed());
 
   it('spends a hit die through the store', () => {
-    render(<OverviewTab addToast={vi.fn()} />);
+    render(<OverviewTab addToast={vi.fn()} spellCasting={casting()} />);
     fireEvent.click(screen.getByRole('button', { name: /spend d10/i }));
     expect(useCharacterStore.getState().character.hitDicePools!.d10.used).toBe(
       2
@@ -45,7 +55,7 @@ describe('OverviewTab', () => {
   });
 
   it('toggles heroic inspiration', () => {
-    render(<OverviewTab addToast={vi.fn()} />);
+    render(<OverviewTab addToast={vi.fn()} spellCasting={casting()} />);
     fireEvent.click(
       screen.getByRole('button', { name: /heroic inspiration/i })
     );
@@ -55,14 +65,14 @@ describe('OverviewTab', () => {
   });
 
   it('hides the spell slot section for non-casters', () => {
-    render(<OverviewTab addToast={vi.fn()} />);
+    render(<OverviewTab addToast={vi.fn()} spellCasting={casting()} />);
     expect(screen.queryByText(/spell slots/i)).toBeNull();
   });
 
   it('disables hit die spend when none remain', () => {
     cleanup();
     seed({ hitDicePools: { d10: { max: 2, used: 2 } } });
-    render(<OverviewTab addToast={vi.fn()} />);
+    render(<OverviewTab addToast={vi.fn()} spellCasting={casting()} />);
     expect(screen.getByRole('button', { name: /spend d10/i })).toBeDisabled();
   });
 });

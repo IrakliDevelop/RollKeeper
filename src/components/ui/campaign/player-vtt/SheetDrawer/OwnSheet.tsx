@@ -96,7 +96,7 @@ export function OwnSheet({
           value="overview"
           className="flex-1 overflow-y-auto px-5 py-4"
         >
-          <OverviewTab addToast={addToast} />
+          <OverviewTab addToast={addToast} spellCasting={spellCasting} />
         </Tabs.Content>
         {tabs
           .filter(tab => tab.id !== 'overview')

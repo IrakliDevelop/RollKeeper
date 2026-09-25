@@ -8,12 +8,15 @@ import { cn } from '@/utils/cn';
 
 import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
 import { buildFeatureGroups } from '../SheetTabs.utils';
+import { FavoriteStar } from './FavoriteStar';
+import { useFeatureUses } from './useFeatureUses';
 
 import type { FeatureRowView } from '../SheetDrawer.types';
 
 const PIP_BUTTON_CLASS = 'inline-flex h-6 w-6 items-center justify-center';
 
-function FeaturePips({
+/** Use/restore pips for a feature's remaining uses, shared with the Overview tab's pinned favorites. */
+export function FeaturePips({
   feature,
   onSpend,
   onRestore,
@@ -58,10 +61,7 @@ function FeaturePips({
 
 export function FeaturesTab() {
   const character = useCharacterStore(s => s.character);
-  const expendFeature = useCharacterStore(s => s.useExtendedFeature);
-  const updateExtendedFeature = useCharacterStore(s => s.updateExtendedFeature);
-  const expendTrait = useCharacterStore(s => s.useTrackableTrait);
-  const updateTrackableTrait = useCharacterStore(s => s.updateTrackableTrait);
+  const { spend, restore } = useFeatureUses();
 
   const [expanded, setExpanded] = useState<string | null>(null);
 
@@ -89,40 +89,33 @@ export function FeaturesTab() {
                   key={feature.id}
                   className="border-divider rounded-lg border p-2"
                 >
-                  <button
-                    type="button"
-                    aria-expanded={isOpen}
-                    aria-controls={descId}
-                    onClick={() => setExpanded(isOpen ? null : feature.id)}
-                    className="flex w-full items-center justify-between gap-2 text-left"
-                  >
-                    <span className="text-heading text-sm font-semibold">
-                      {feature.name}
-                    </span>
-                    {feature.tag && (
-                      <Badge variant="neutral">{feature.tag}</Badge>
-                    )}
-                  </button>
+                  <div className="flex items-start gap-2">
+                    <button
+                      type="button"
+                      aria-expanded={isOpen}
+                      aria-controls={descId}
+                      onClick={() => setExpanded(isOpen ? null : feature.id)}
+                      className="flex min-w-0 flex-1 items-center justify-between gap-2 text-left"
+                    >
+                      <span className="text-heading text-sm font-semibold">
+                        {feature.name}
+                      </span>
+                      {feature.tag && (
+                        <Badge variant="neutral">{feature.tag}</Badge>
+                      )}
+                    </button>
+                    <FavoriteStar
+                      kind="feature"
+                      id={feature.id}
+                      name={feature.name}
+                    />
+                  </div>
 
                   {feature.maxUses > 0 && (
                     <FeaturePips
                       feature={feature}
-                      onSpend={() =>
-                        feature.kind === 'extended'
-                          ? expendFeature(feature.id)
-                          : expendTrait(feature.id)
-                      }
-                      // Absolute usedUses write under the cross-tab single-writer
-                      // model (as on the full sheet); a canonical restore action is a follow-up.
-                      onRestore={() =>
-                        feature.kind === 'extended'
-                          ? updateExtendedFeature(feature.id, {
-                              usedUses: feature.usedUses - 1,
-                            })
-                          : updateTrackableTrait(feature.id, {
-                              usedUses: feature.usedUses - 1,
-                            })
-                      }
+                      onSpend={() => spend(feature)}
+                      onRestore={() => restore(feature)}
                     />
                   )}
 
