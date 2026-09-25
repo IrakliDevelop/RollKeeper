@@ -1,4 +1,12 @@
 import type { EncounterEntity } from '@/types/encounter';
+import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+
+/** Shared props for the vitals section components (HP card, stat tiles, status row). */
+export interface CreatureVitalsProps {
+  entity: EncounterEntity;
+  actions: EntityActions;
+  editing: boolean;
+}
 
 export interface CreatureBadge {
   label: 'Monster' | 'NPC' | 'Summon' | 'Lair';
