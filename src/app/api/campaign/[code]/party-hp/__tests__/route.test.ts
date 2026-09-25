@@ -13,6 +13,7 @@ import {
 } from '@/test/helpers';
 import { GET } from '../route';
 import { NextRequest } from 'next/server';
+import type { CharacterState } from '@/types/character';
 
 vi.mock('@upstash/redis', () => ({ Redis: vi.fn(() => mockRedis) }));
 
@@ -449,6 +450,10 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     expect(data.members[0].publicSheet).not.toBeNull();
     expect(typeof data.members[0].publicSheet.hpState).toBe('string');
     expect(data.members[0].publicSheet.hpState.length).toBeGreaterThan(0);
+    // The public sheet never carries exact HP numbers, even indirectly.
+    const serialized = JSON.stringify(data.members[0].publicSheet);
+    expect(serialized).not.toContain('"current"');
+    expect(serialized).not.toContain('"max"');
   });
 
   it('does not leak secrets (spell names, unequipped inventory, notes, currency, condition notes) via publicSheet', async () => {
@@ -488,7 +493,24 @@ describe('GET /api/campaign/[code]/party-hp', () => {
               createdAt: '',
               updatedAt: '',
             },
+            {
+              id: 'm2',
+              name: 'Ring of Warmth',
+              category: 'ring',
+              rarity: 'uncommon',
+              description: 'SECRET_ITEM_DESC',
+              properties: [],
+              requiresAttunement: true,
+              isAttuned: true,
+              isEquipped: true,
+              createdAt: '',
+              updatedAt: '',
+            },
           ],
+          concentration: {
+            isConcentrating: true,
+            spellName: 'Bless',
+          },
           spells: [
             {
               id: 's1',
@@ -499,6 +521,19 @@ describe('GET /api/campaign/[code]/party-hp', () => {
               range: '60 feet',
               components: { verbal: true, somatic: true, material: false },
               duration: 'Instantaneous',
+              description: '',
+              createdAt: '',
+              updatedAt: '',
+            },
+            {
+              id: 's2',
+              name: 'SECRET_SPELL_NAME_2',
+              level: 1,
+              school: 'Abjuration',
+              castingTime: '1 action',
+              range: 'Self',
+              components: { verbal: true, somatic: true, material: false },
+              duration: '1 minute',
               description: '',
               createdAt: '',
               updatedAt: '',
@@ -552,13 +587,63 @@ describe('GET /api/campaign/[code]/party-hp', () => {
     const serialized = JSON.stringify(data.members[0].publicSheet);
     expect(serialized).not.toContain('SECRET_UNEQUIPPED_WEAPON');
     expect(serialized).not.toContain('SECRET_UNATTUNED_ITEM');
+    expect(serialized).not.toContain('SECRET_ITEM_DESC');
     expect(serialized).not.toContain('SECRET_SPELL_NAME');
+    expect(serialized).not.toContain('SECRET_SPELL_NAME_2');
     expect(serialized).not.toContain('SECRET_NOTE_CONTENT');
     expect(serialized).not.toContain('999999');
     expect(serialized).not.toContain('SECRET_CONDITION_DESCRIPTION');
     expect(serialized).not.toContain('SECRET_CONDITION_NOTES');
     // The condition name itself is fine to include.
     expect(data.members[0].publicSheet.conditions).toContain('Poisoned');
+    // The attuned+equipped magic item's name is fine to include (it's gear),
+    // but only its name — never its description.
+    expect(data.members[0].publicSheet.equippedGear).toContain(
+      'Ring of Warmth'
+    );
+    // Concentration exposes only the spell being concentrated on — no other
+    // known/prepared spell names leak in.
+    expect(data.members[0].publicSheet.concentration).toBe('Bless');
+  });
+
+  it('a malformed characterData (e.g. missing skills/abilities) does not 500 the whole party list — that member just gets publicSheet: null', async () => {
+    seedRedis('campaign:ABC123', createMockCampaignData());
+    seedRedisSet('campaign:ABC123:players', ['player-1', 'player-2']);
+    seedRedis(
+      'campaign:ABC123:player:player-1',
+      createMockPlayerData({
+        playerId: 'player-1',
+        characterId: 'char-broken',
+        characterName: 'Broken',
+        characterData: { id: 'char-broken', name: 'Broken' } as CharacterState,
+      })
+    );
+    seedRedis(
+      'campaign:ABC123:player:player-2',
+      createMockPlayerData({
+        playerId: 'player-2',
+        characterId: 'char-ok',
+        characterName: 'Healthy',
+      })
+    );
+
+    const req = createNextRequest('/api/campaign/ABC123/party-hp');
+    const res = await GET(
+      req as NextRequest,
+      createRouteParams({ code: 'ABC123' })
+    );
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members).toHaveLength(2);
+    const broken = data.members.find(
+      (m: { characterName: string }) => m.characterName === 'Broken'
+    );
+    const healthy = data.members.find(
+      (m: { characterName: string }) => m.characterName === 'Healthy'
+    );
+    expect(broken.publicSheet).toBeNull();
+    expect(healthy.publicSheet).not.toBeNull();
   });
 
   it('returns 500 on Redis error', async () => {

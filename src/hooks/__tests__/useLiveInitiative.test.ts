@@ -69,7 +69,6 @@ function makePartyMember(
     armorClass: 13,
     hitPoints: { current: 12, max: 80, temporary: 0 },
     lastSynced: '2025-01-01T00:00:00.000Z',
-    publicSheet: null,
     ...overrides,
   };
 }

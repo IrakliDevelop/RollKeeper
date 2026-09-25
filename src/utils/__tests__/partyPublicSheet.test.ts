@@ -8,7 +8,10 @@ import type {
   Weapon,
 } from '@/types/character';
 
-import { buildPartyPublicSheet } from '../partyPublicSheet';
+import {
+  buildPartyPublicSheet,
+  safeBuildPartyPublicSheet,
+} from '../partyPublicSheet';
 
 function fixture(overrides: Partial<CharacterState> = {}): CharacterState {
   const base = useCharacterStore.getState().character;
@@ -211,5 +214,38 @@ describe('buildPartyPublicSheet', () => {
     expect(sheet).not.toBeNull();
     expect(sheet!.equippedGear).toEqual([]);
     expect(sheet!.conditions).toEqual([]);
+  });
+
+  it('leaves hpState empty when max HP is zero or missing, instead of a misleading "Down"', () => {
+    const zeroMax = buildPartyPublicSheet(
+      fixture({
+        hitPoints: {
+          current: 0,
+          max: 0,
+          temporary: 0,
+          calculationMode: 'auto',
+        },
+      })
+    );
+    expect(zeroMax!.hpState).toBe('');
+
+    const missingHp = buildPartyPublicSheet(
+      fixture({ hitPoints: undefined } as Partial<CharacterState>)
+    );
+    expect(missingHp!.hpState).toBe('');
+  });
+});
+
+describe('safeBuildPartyPublicSheet', () => {
+  it('returns null instead of throwing when required fields are missing (untrusted persisted data)', () => {
+    const malformed = { id: 'char-x', name: 'Broken' } as CharacterState;
+
+    expect(() => buildPartyPublicSheet(malformed)).toThrow();
+    expect(safeBuildPartyPublicSheet(malformed)).toBeNull();
+  });
+
+  it('otherwise behaves the same as buildPartyPublicSheet', () => {
+    const c = fixture();
+    expect(safeBuildPartyPublicSheet(c)).toEqual(buildPartyPublicSheet(c));
   });
 });

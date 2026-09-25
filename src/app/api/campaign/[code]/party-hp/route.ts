@@ -12,7 +12,7 @@ import { calculateCharacterArmorClass } from '@/utils/calculations';
 import { guestDeniedResponse } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import {
-  buildPartyPublicSheet,
+  safeBuildPartyPublicSheet,
   PartyPublicSheet,
 } from '@/utils/partyPublicSheet';
 
@@ -31,7 +31,8 @@ export interface PartyMemberHP {
     deathSaves?: DeathSavingThrows;
   } | null;
   lastSynced: string;
-  publicSheet: PartyPublicSheet | null;
+  // Optional: older/deployed-skew clients and servers may not send this yet.
+  publicSheet?: PartyPublicSheet | null;
 }
 
 export async function GET(
@@ -101,7 +102,7 @@ export async function GET(
                   deathSaves: char.hitPoints?.deathSaves,
                 },
             lastSynced: parsed.lastSynced,
-            publicSheet: buildPartyPublicSheet(char),
+            publicSheet: safeBuildPartyPublicSheet(char),
           });
         }
       }

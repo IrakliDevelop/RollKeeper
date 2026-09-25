@@ -12,7 +12,7 @@ import {
   calculateSavingThrowModifier,
   getProficiencyBonus,
 } from '@/utils/calculations';
-import { characterSubtitle } from '@/utils/characterSummary';
+import { characterSubtitle, totalLevel } from '@/utils/characterSummary';
 import { hpPercent } from '@/utils/hpState';
 
 import type {
@@ -45,10 +45,6 @@ const ORDINAL = [
   '8th',
   '9th',
 ];
-
-function totalLevel(c: CharacterState): number {
-  return c.totalLevel || c.level || 1;
-}
 
 export function buildHeaderView(c: CharacterState): SheetHeaderView {
   const active = c.conditionsAndDiseases?.activeConditions ?? [];

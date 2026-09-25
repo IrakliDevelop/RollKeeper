@@ -51,14 +51,17 @@ export function buildPartyPublicSheet(
   ).sort((a, b) => a.localeCompare(b));
 
   const hp = c.hitPoints;
+  // A band is meaningless without a positive max (missing/zero-max HP on
+  // malformed or not-yet-initialized persisted data) — show nothing rather
+  // than a misleading "Down".
+  const hpState =
+    hp && hp.max > 0
+      ? hpStateLabel(hp.current ?? 0, hp.max, DEFAULT_HP_STATE_BANDS)
+      : '';
 
   return {
     subtitle: characterSubtitle(c),
-    hpState: hpStateLabel(
-      hp?.current ?? 0,
-      hp?.max ?? 0,
-      DEFAULT_HP_STATE_BANDS
-    ),
+    hpState,
     speed: (c.speed ?? 0) + getBuffSpeedBonus(c),
     passivePerception: calculatePassivePerception(c),
     conditions,
@@ -67,4 +70,22 @@ export function buildPartyPublicSheet(
       : null,
     equippedGear,
   };
+}
+
+/**
+ * Same as {@link buildPartyPublicSheet}, but never throws. Persisted
+ * character data comes from Redis as untrusted client JSON — a malformed or
+ * partial record (e.g. missing `skills`/`abilities`) must not 500 the whole
+ * party list. Use this from routes; call `buildPartyPublicSheet` directly
+ * only where the caller already trusts the shape (e.g. tests).
+ */
+export function safeBuildPartyPublicSheet(
+  c: CharacterState
+): PartyPublicSheet | null {
+  try {
+    return buildPartyPublicSheet(c);
+  } catch (error) {
+    console.error('Failed to build party public sheet:', error);
+    return null;
+  }
 }

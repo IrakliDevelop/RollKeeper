@@ -1,6 +1,7 @@
 import type { CharacterState } from '@/types/character';
 
-function totalLevel(c: CharacterState): number {
+/** Total character level, preferring the summed multiclass total. */
+export function totalLevel(c: CharacterState): number {
   return c.totalLevel || c.level || 1;
 }
 

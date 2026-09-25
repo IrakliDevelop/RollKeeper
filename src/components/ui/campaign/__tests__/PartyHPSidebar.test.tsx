@@ -13,7 +13,6 @@ const MEMBER: PartyMemberHP = {
   armorClass: 16,
   hitPoints: { current: 20, max: 30, temporary: 0 },
   lastSynced: '2025-01-01T00:00:00.000Z',
-  publicSheet: null,
 };
 
 describe('PartyHPSidebar', () => {
