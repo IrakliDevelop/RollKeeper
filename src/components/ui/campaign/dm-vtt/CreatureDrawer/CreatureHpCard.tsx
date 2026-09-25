@@ -4,7 +4,6 @@ import React from 'react';
 import { X } from 'lucide-react';
 
 import { HPBar } from '@/components/shared/combat/HPBar';
-import { NumberField } from '@/components/ui/forms/NumberInput';
 import { DamageControls } from '@/components/ui/encounter/combat-screen/detail/DamageControls';
 import { hpColorClass } from '@/components/ui/encounter/combat-screen/detail/hitDie';
 import {
@@ -12,6 +11,7 @@ import {
   SECTION_CLASS,
 } from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
+import { CreatureMaxHpField } from './CreatureMaxHpField';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
 
 /** HP card: big current/max HP, temp-HP pill, HP bar, and damage/heal/temp controls. */
@@ -32,14 +32,9 @@ export function CreatureHpCard({
         </span>
         <span className="text-muted text-sm font-medium">/</span>
         {editing ? (
-          <NumberField
-            value={entity.maxHp}
-            onChange={v => {
-              if (v != null && v > 0) actions.onSetMaxHp(entity.id, v);
-            }}
-            min={1}
-            className="bg-surface-raised text-heading w-14 rounded px-1 py-0.5 text-center text-sm font-medium shadow-sm"
-            aria-label="Max HP"
+          <CreatureMaxHpField
+            maxHp={entity.maxHp}
+            onCommit={v => actions.onSetMaxHp(entity.id, v)}
           />
         ) : (
           <span className="text-muted text-sm tabular-nums">

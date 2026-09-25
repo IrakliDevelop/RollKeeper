@@ -173,6 +173,42 @@ describe('CreatureStatTiles editing', () => {
     });
   });
 
+  it('skips the speed patch when unchanged', () => {
+    const actions = makeActions();
+    render(
+      <CreatureStatTiles
+        {...baseProps({
+          actions,
+          editing: true,
+          entity: makeEntity({
+            monsterStatBlock: makeStatBlock({ speed: '30 ft.' }),
+          }),
+        })}
+      />
+    );
+    fireEvent.blur(screen.getByLabelText('Speed'));
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('resyncs the speed field when the stat block speed changes elsewhere', () => {
+    const p = baseProps({
+      editing: true,
+      entity: makeEntity({
+        monsterStatBlock: makeStatBlock({ speed: '30 ft.' }),
+      }),
+    });
+    const { rerender } = render(<CreatureStatTiles {...p} />);
+    rerender(
+      <CreatureStatTiles
+        {...p}
+        entity={makeEntity({
+          monsterStatBlock: makeStatBlock({ speed: '40 ft., fly 60 ft.' }),
+        })}
+      />
+    );
+    expect(screen.getByLabelText('Speed')).toHaveValue('40 ft., fly 60 ft.');
+  });
+
   it('patches proficiency bonus', () => {
     const actions = makeActions();
     render(<CreatureStatTiles {...baseProps({ actions, editing: true })} />);

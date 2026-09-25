@@ -3,17 +3,15 @@
 import React from 'react';
 
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { signed } from '@/components/ui/encounter/combat-screen/detail/DetailAbilityScores.utils';
 import { effectiveAc } from '@/utils/calculations';
 import {
   HEADING_CLASS,
   SECTION_CLASS,
 } from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
+import { useDraftValue } from './useDraftValue';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
-
-function signed(n: number): string {
-  return n >= 0 ? `+${n}` : `${n}`;
-}
 
 function StatTile({
   label,
@@ -39,10 +37,12 @@ export function CreatureStatTiles({
   const sb = entity.monsterStatBlock;
   const tempAc = entity.tempAc ?? 0;
 
-  const updateSpeed = (value: string) => {
-    if (!sb) return;
+  const [speed, setSpeed] = useDraftValue(sb?.speed ?? '');
+
+  const commitSpeed = () => {
+    if (!sb || speed === (sb.speed ?? '')) return;
     actions.onUpdate(entity.id, {
-      monsterStatBlock: { ...sb, speed: value },
+      monsterStatBlock: { ...sb, speed },
     });
   };
 
@@ -117,8 +117,9 @@ export function CreatureStatTiles({
           {editing && sb ? (
             <input
               type="text"
-              defaultValue={sb.speed ?? ''}
-              onBlur={e => updateSpeed(e.target.value)}
+              value={speed}
+              onChange={e => setSpeed(e.target.value)}
+              onBlur={commitSpeed}
               className="bg-surface-raised border-divider text-body w-full rounded border px-2 py-0.5 text-xs"
               aria-label="Speed"
             />

@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 
 import { CreatureHpCard } from '../CreatureHpCard';
 import type { EncounterEntity } from '@/types/encounter';
@@ -104,13 +105,66 @@ describe('CreatureHpCard', () => {
     expect(screen.queryByLabelText('Max HP')).not.toBeInTheDocument();
   });
 
-  it('commits max HP via NumberField in editing mode', () => {
+  it('buffers max HP typing and commits once on blur', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(
+      <CreatureHpCard
+        {...baseProps({
+          actions,
+          editing: true,
+          entity: makeEntity({ currentHp: 45, maxHp: 45 }),
+        })}
+      />
+    );
+    const input = screen.getByLabelText('Max HP');
+    await user.clear(input);
+    await user.type(input, '50');
+    expect(actions.onSetMaxHp).not.toHaveBeenCalled();
+    await user.tab();
+    expect(actions.onSetMaxHp).toHaveBeenCalledExactlyOnceWith('e1', 50);
+  });
+
+  it('commits max HP once on Enter', async () => {
+    const user = userEvent.setup();
     const actions = makeActions();
     render(<CreatureHpCard {...baseProps({ actions, editing: true })} />);
-    fireEvent.change(screen.getByLabelText('Max HP'), {
-      target: { value: '25' },
-    });
-    expect(actions.onSetMaxHp).toHaveBeenCalledWith('e1', 25);
+    const input = screen.getByLabelText('Max HP');
+    await user.clear(input);
+    await user.type(input, '25{Enter}');
+    expect(actions.onSetMaxHp).toHaveBeenCalledExactlyOnceWith('e1', 25);
+  });
+
+  it('reverts max HP on Escape without committing', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(<CreatureHpCard {...baseProps({ actions, editing: true })} />);
+    const input = screen.getByLabelText('Max HP');
+    await user.clear(input);
+    await user.type(input, '99{Escape}');
+    expect(input).toHaveValue('20');
+    await user.tab();
+    expect(actions.onSetMaxHp).not.toHaveBeenCalled();
+  });
+
+  it('does not commit an emptied or unchanged max HP', async () => {
+    const user = userEvent.setup();
+    const actions = makeActions();
+    render(<CreatureHpCard {...baseProps({ actions, editing: true })} />);
+    const input = screen.getByLabelText('Max HP');
+    await user.clear(input);
+    await user.tab();
+    expect(input).toHaveValue('20');
+    await user.click(input);
+    await user.tab();
+    expect(actions.onSetMaxHp).not.toHaveBeenCalled();
+  });
+
+  it('resyncs the max HP field when maxHp changes elsewhere', () => {
+    const p = baseProps({ editing: true });
+    const { rerender } = render(<CreatureHpCard {...p} />);
+    rerender(<CreatureHpCard {...p} entity={makeEntity({ maxHp: 30 })} />);
+    expect(screen.getByLabelText('Max HP')).toHaveValue('30');
   });
 
   it('clears temp HP via the pill button', () => {

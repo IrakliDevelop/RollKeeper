@@ -221,10 +221,10 @@ describe('CreatureDrawer parity — vitals', () => {
     const { actions, user } = renderDrawer();
     await startEditing(user);
 
-    fireEvent.change(screen.getByLabelText('Max HP'), {
-      target: { value: '50' },
-    });
-    expect(actions.onSetMaxHp).toHaveBeenCalledWith(ID, 50);
+    const maxHp = screen.getByLabelText('Max HP');
+    await user.clear(maxHp);
+    await user.type(maxHp, '50{Enter}');
+    expect(actions.onSetMaxHp).toHaveBeenCalledExactlyOnceWith(ID, 50);
 
     fireEvent.change(screen.getByLabelText('Armor class'), {
       target: { value: '17' },

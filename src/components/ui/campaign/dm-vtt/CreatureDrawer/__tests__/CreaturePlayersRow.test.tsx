@@ -107,8 +107,17 @@ describe('CreaturePlayersRow', () => {
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       playerAlias: 'Mystery Foe',
     });
+  });
 
-    vi.mocked(actions.onUpdate).mockClear();
+  it('clears an existing alias to undefined', () => {
+    const actions = makeActions();
+    render(
+      <CreaturePlayersRow
+        entity={makeEntity({ playerAlias: 'Old' })}
+        actions={actions}
+      />
+    );
+    const input = screen.getByPlaceholderText('Alias players see…');
     fireEvent.change(input, { target: { value: '   ' } });
     fireEvent.blur(input);
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
@@ -116,12 +125,70 @@ describe('CreaturePlayersRow', () => {
     });
   });
 
+  it('skips onUpdate when the trimmed alias is unchanged', () => {
+    const actions = makeActions();
+    render(
+      <CreaturePlayersRow
+        entity={makeEntity({ playerAlias: 'Shade' })}
+        actions={actions}
+      />
+    );
+    const input = screen.getByPlaceholderText('Alias players see…');
+    fireEvent.blur(input);
+    fireEvent.change(input, { target: { value: ' Shade ' } });
+    fireEvent.blur(input);
+    expect(actions.onUpdate).not.toHaveBeenCalled();
+  });
+
+  it('resyncs the alias field when playerAlias changes elsewhere', () => {
+    const actions = makeActions();
+    const { rerender } = render(
+      <CreaturePlayersRow
+        entity={makeEntity({ playerAlias: 'Shade' })}
+        actions={actions}
+      />
+    );
+    rerender(
+      <CreaturePlayersRow
+        entity={makeEntity({ playerAlias: 'Wraith' })}
+        actions={actions}
+      />
+    );
+    expect(screen.getByPlaceholderText('Alias players see…')).toHaveValue(
+      'Wraith'
+    );
+  });
+
+  it('exposes the hidden-name toggle state and label', () => {
+    const { rerender } = render(
+      <CreaturePlayersRow entity={makeEntity()} actions={makeActions()} />
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Name visible to players — click to hide',
+      })
+    ).toHaveAttribute('aria-pressed', 'false');
+    rerender(
+      <CreaturePlayersRow
+        entity={makeEntity({ isHidden: true })}
+        actions={makeActions()}
+      />
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Name hidden from players — click to reveal',
+      })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('commits the alias on Enter', () => {
     const actions = makeActions();
     render(<CreaturePlayersRow entity={makeEntity()} actions={actions} />);
     const input = screen.getByPlaceholderText('Alias players see…');
+    input.focus();
     fireEvent.change(input, { target: { value: 'Mystery Foe' } });
     fireEvent.keyDown(input, { key: 'Enter' });
+    expect(input).not.toHaveFocus();
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', {
       playerAlias: 'Mystery Foe',
     });

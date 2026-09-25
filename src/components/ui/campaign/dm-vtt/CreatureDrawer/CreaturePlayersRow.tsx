@@ -12,6 +12,7 @@ import {
   playersSeeLabel,
   playersSeeSuffix,
 } from '@/components/ui/encounter/combat-screen/detail/playersSee';
+import { useDraftValue } from './useDraftValue';
 import type { PlayerDisposition, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
@@ -52,8 +53,15 @@ export function CreaturePlayersRow({
     ? 'Hide HP from players'
     : 'Show exact HP to players';
 
-  const commitAlias = (value: string) => {
-    actions.onUpdate(entity.id, { playerAlias: value.trim() || undefined });
+  const hiddenLabel = entity.isHidden
+    ? 'Name hidden from players — click to reveal'
+    : 'Name visible to players — click to hide';
+  const [alias, setAlias] = useDraftValue(entity.playerAlias ?? '');
+
+  const commitAlias = () => {
+    const next = alias.trim();
+    if (next === (entity.playerAlias ?? '').trim()) return;
+    actions.onUpdate(entity.id, { playerAlias: next || undefined });
   };
 
   return (
@@ -92,11 +100,9 @@ export function CreaturePlayersRow({
               ? 'text-accent-amber-text hover:bg-accent-amber-bg'
               : 'text-faint hover:text-muted hover:bg-surface-raised'
           }`}
-          title={
-            entity.isHidden
-              ? 'Name hidden from players — click to reveal'
-              : 'Name visible to players — click to hide'
-          }
+          aria-pressed={!!entity.isHidden}
+          aria-label={hiddenLabel}
+          title={hiddenLabel}
         >
           {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
         </button>
@@ -120,13 +126,11 @@ export function CreaturePlayersRow({
 
         <Input
           type="text"
-          defaultValue={entity.playerAlias ?? ''}
-          onBlur={e => commitAlias(e.target.value)}
+          value={alias}
+          onChange={e => setAlias(e.target.value)}
+          onBlur={commitAlias}
           onKeyDown={e => {
-            if (e.key === 'Enter') {
-              commitAlias((e.target as HTMLInputElement).value);
-              (e.target as HTMLInputElement).blur();
-            }
+            if (e.key === 'Enter') e.currentTarget.blur();
           }}
           placeholder="Alias players see…"
           aria-label="Alias players see"
