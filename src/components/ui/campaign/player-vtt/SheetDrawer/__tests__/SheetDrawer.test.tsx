@@ -221,4 +221,51 @@ describe('SheetDrawer', () => {
       screen.getByText(/isn't in the party list yet/i)
     ).toBeInTheDocument();
   });
+
+  it('switches between own and party views while staying open', () => {
+    const p = props();
+    const { rerender } = render(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'own' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+
+    rerender(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'party', characterId: 'ally-1' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /brindle limited view/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: /kaelen voss/i })).toBeNull();
+    expect(
+      screen.getByText(/limited view.*played by sam/i)
+    ).toBeInTheDocument();
+    expect(screen.getByText('Mace')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(p.onClose).not.toHaveBeenCalled();
+
+    rerender(
+      <SheetDrawer
+        {...p}
+        openTarget={{ kind: 'own' }}
+        partyMembers={[PARTY_MEMBER]}
+      />
+    );
+    expect(
+      screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/played by sam/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(p.onClose).not.toHaveBeenCalled();
+  });
 });

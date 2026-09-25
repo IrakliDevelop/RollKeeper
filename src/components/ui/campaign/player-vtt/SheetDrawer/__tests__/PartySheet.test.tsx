@@ -49,10 +49,39 @@ describe('PartySheet', () => {
     expect(screen.getByText('Longsword')).toBeInTheDocument();
     expect(screen.getByText('Chain Mail')).toBeInTheDocument();
 
-    expect(screen.getByText(/alice controls this sheet/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'Alice controls this sheet. This view shows only what they share with the party.'
+      )
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: /close sheet/i })
     ).toBeInTheDocument();
+  });
+
+  it('renders repeated condition names without React key collisions', () => {
+    const consoleError = vi
+      .spyOn(console, 'error')
+      .mockImplementation(() => {});
+    render(
+      <PartySheet
+        member={{
+          ...SHARED_MEMBER,
+          publicSheet: {
+            ...SHARED_MEMBER.publicSheet!,
+            conditions: ['Prone', 'Prone'],
+          },
+        }}
+        onClose={vi.fn()}
+      />
+    );
+
+    expect(screen.getAllByText('Prone')).toHaveLength(2);
+    const keyWarnings = consoleError.mock.calls.filter(args =>
+      String(args[0]).includes('same key')
+    );
+    expect(keyWarnings).toEqual([]);
+    consoleError.mockRestore();
   });
 
   it('hides exact HP and shows only the HP word when hitPoints is not shared', () => {
