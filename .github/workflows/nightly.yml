@@ -133,6 +133,49 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  sheet-drawer-e2e:
+    name: Map sheet drawer e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install relay dependencies
+        run: npm ci --prefix relay
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Start Redis and serverless-redis-http
+        run: docker compose up -d
+
+      - name: Map sheet drawer e2e
+        env:
+          BATTLEMAP_RELAY_SECRET: dev-secret-change-me
+        run: npm run test:sheet-drawer:e2e
+
+      - name: Stop Redis and serverless-redis-http
+        if: always()
+        run: docker compose stop
+
+      - name: Upload sheet drawer failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-sheet-drawer-failure-artifacts
+          path: |
+            playwright-report/sheet-drawer/
+            test-results/sheet-drawer/
+          if-no-files-found: warn
+          retention-days: 14
+
   backup-restore-drill:
     name: Backup and restore drill
     runs-on: ubuntu-latest
