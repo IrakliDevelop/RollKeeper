@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { CreatureDrawer, type CreatureDrawerProps } from '..';
@@ -163,5 +169,62 @@ describe('CreatureDrawer', () => {
     expect(tabs[0]).toHaveTextContent('Lair');
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByText('Magma Eruption')).toBeInTheDocument();
+  });
+
+  it('uses the spec drawer width (600px tablet, 680px desktop)', () => {
+    render(<CreatureDrawer {...props()} />);
+    const dialog = screen.getByRole('dialog');
+    expect(dialog).toHaveClass('w-[min(600px,100vw)]');
+    expect(dialog).toHaveClass('xl:w-[min(680px,100vw)]');
+    expect(dialog).not.toHaveClass('w-[min(580px,100vw)]');
+  });
+
+  it('returns focus to the opener when it is still on the page', async () => {
+    const p = props({ entity: null });
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const { rerender } = render(<CreatureDrawer {...p} />);
+    rerender(<CreatureDrawer {...p} entity={GOBLIN} />);
+    await waitFor(() => expect(opener).not.toHaveFocus());
+    rerender(<CreatureDrawer {...p} entity={null} />);
+    await waitFor(() => expect(opener).toHaveFocus());
+    opener.remove();
+  });
+
+  it('moves focus into the Studio panel when the opener unmounted', async () => {
+    const p = props({ entity: null });
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    const panel = document.createElement('div');
+    panel.dataset.testid = 'dm-vtt-studio-panel';
+    const panelButton = document.createElement('button');
+    panel.appendChild(panelButton);
+    document.body.appendChild(panel);
+    opener.focus();
+    const { rerender } = render(<CreatureDrawer {...p} />);
+    rerender(<CreatureDrawer {...p} entity={GOBLIN} />);
+    await waitFor(() => expect(opener).not.toHaveFocus());
+    opener.remove(); // the Sheet pill unmounts while the drawer is open
+    rerender(<CreatureDrawer {...p} entity={null} />);
+    await waitFor(() => expect(panelButton).toHaveFocus());
+    panel.remove();
+  });
+
+  it('closes without throwing when neither the opener nor the Studio panel exist', async () => {
+    const p = props({ entity: null });
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    const { rerender } = render(<CreatureDrawer {...p} />);
+    rerender(<CreatureDrawer {...p} entity={GOBLIN} />);
+    await waitFor(() => expect(opener).not.toHaveFocus());
+    opener.remove();
+    rerender(<CreatureDrawer {...p} entity={null} />);
+    await waitFor(() =>
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    );
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(document.body).toHaveFocus();
   });
 });

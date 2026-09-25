@@ -126,7 +126,10 @@ export function CreatureSheet({
 
         {isLair ? (
           <Tabs.Content value="lair" className={TAB_CONTENT_CLASS}>
-            <LairTab {...tabProps} />
+            <LairTab
+              {...tabProps}
+              onTokenIdentityChange={onTokenIdentityChange}
+            />
           </Tabs.Content>
         ) : (
           <>

@@ -10,6 +10,7 @@ import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
 import { CreatureDrawer } from './CreatureDrawer';
+import { sheetPillEntity } from './CreatureDrawer/CreatureDrawer.utils';
 import { CreatureSheetPill } from './CreatureSheetPill';
 import { useDmVttScreen } from './DmVttScreen.hooks';
 import { DmVttNpcDialog } from './DmVttNpcDialog';
@@ -55,15 +56,12 @@ export function DmVttScreen({
   );
   const decorations = useDmTokenDecorations(vtt.linkedEntities);
 
-  const selectedEntity = vtt.encounter?.entities.find(
-    e => e.id === vtt.selectedEntityId
-  );
-  const sheetPillEntity =
-    selectedEntity &&
-    selectedEntity.type !== 'player' &&
-    vtt.creatureDrawer.entity === null
-      ? selectedEntity
-      : null;
+  const pillEntity = sheetPillEntity({
+    entities: vtt.encounter?.entities,
+    selectedEntityId: vtt.selectedEntityId,
+    drawerOpen: vtt.creatureDrawer.entity !== null,
+    placementPending: vtt.pendingPlacement !== null,
+  });
 
   const gridMode: DmVttGridMode = vtt.battleMap?.gridEnabled
     ? (vtt.battleMap.gridSettings?.gridType ?? 'hex')
@@ -124,10 +122,10 @@ export function DmVttScreen({
           hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
         />
         <RosterDragGhost drag={vtt.drag} />
-        {sheetPillEntity && (
+        {pillEntity && (
           <CreatureSheetPill
-            name={sheetPillEntity.name}
-            onOpen={() => vtt.creatureDrawer.open(sheetPillEntity.id)}
+            name={pillEntity.name}
+            onOpen={() => vtt.creatureDrawer.open(pillEntity.id)}
           />
         )}
         {vtt.actions && (

@@ -31,3 +31,24 @@ export function creatureMetaLine(entity: EncounterEntity): string | null {
   if (!sb) return null;
   return [sb.size, sb.type, sb.alignment].filter(Boolean).join(' · ');
 }
+
+/**
+ * The entity the top-center "Sheet · name" pill offers, or null: the
+ * selected non-player combatant, only while the drawer is closed and no token
+ * placement is pending (`PlacementBanner` sits in the same spot).
+ */
+export function sheetPillEntity({
+  entities,
+  selectedEntityId,
+  drawerOpen,
+  placementPending,
+}: {
+  entities: EncounterEntity[] | undefined;
+  selectedEntityId: string | null;
+  drawerOpen: boolean;
+  placementPending: boolean;
+}): EncounterEntity | null {
+  if (drawerOpen || placementPending || !selectedEntityId) return null;
+  const selected = entities?.find(e => e.id === selectedEntityId);
+  return selected && selected.type !== 'player' ? selected : null;
+}

@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { creatureBadge, creatureMetaLine } from '../CreatureDrawer.utils';
+import {
+  creatureBadge,
+  creatureMetaLine,
+  sheetPillEntity,
+} from '../CreatureDrawer.utils';
 import type { EncounterEntity, MonsterStatBlock } from '@/types/encounter';
 
 function makeEntity(overrides: Partial<EncounterEntity> = {}): EncounterEntity {
@@ -95,5 +99,32 @@ describe('creatureMetaLine', () => {
       monsterStatBlock: makeStatBlock({ alignment: '' }),
     });
     expect(creatureMetaLine(entity)).toBe('Small · humanoid');
+  });
+});
+
+describe('sheetPillEntity', () => {
+  const goblin = makeEntity();
+  const player = makeEntity({ id: 'p1', type: 'player' });
+  const entities = [goblin, player];
+  const base = {
+    entities,
+    selectedEntityId: 'e1',
+    drawerOpen: false,
+    placementPending: false,
+  };
+
+  it('returns the selected non-player entity', () => {
+    expect(sheetPillEntity(base)).toBe(goblin);
+  });
+
+  it('hides for players, no selection, or an open drawer', () => {
+    expect(sheetPillEntity({ ...base, selectedEntityId: 'p1' })).toBeNull();
+    expect(sheetPillEntity({ ...base, selectedEntityId: null })).toBeNull();
+    expect(sheetPillEntity({ ...base, entities: undefined })).toBeNull();
+    expect(sheetPillEntity({ ...base, drawerOpen: true })).toBeNull();
+  });
+
+  it('hides while a token placement is pending (PlacementBanner owns that spot)', () => {
+    expect(sheetPillEntity({ ...base, placementPending: true })).toBeNull();
   });
 });

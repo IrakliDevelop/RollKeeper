@@ -530,7 +530,7 @@ describe('CreatureDrawer parity — Effects tab', () => {
 
 describe('CreatureDrawer parity — variants', () => {
   it('lair entities get the reduced layout: a single Lair tab with Use', async () => {
-    const { actions, user } = renderDrawer(LAIR);
+    const { actions, onTokenIdentityChange, user } = renderDrawer(LAIR);
     const tabs = screen.getAllByRole('tab');
     expect(tabs).toHaveLength(1);
     expect(tabs[0]).toHaveTextContent('Lair');
@@ -547,6 +547,11 @@ describe('CreatureDrawer parity — variants', () => {
     await user.click(screen.getByRole('button', { name: 'Ally' }));
     expect(actions.onUpdate).toHaveBeenCalledWith(LAIR.id, {
       playerDisposition: 'ally',
+    });
+    // Token appearance stays reachable for lairs, as in the Studio panel.
+    await user.click(screen.getByTitle('Knight'));
+    expect(onTokenIdentityChange).toHaveBeenCalledWith(LAIR, {
+      chessPiece: 'knight',
     });
   });
 
