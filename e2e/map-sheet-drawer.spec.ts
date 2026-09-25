@@ -32,10 +32,11 @@ import {
  * run so the live relay room — which is how the player's own placed token
  * comes back after a reload — is never torn down.
  *
- * The five scenarios share one DM/player setup and run serially, in order:
+ * The six scenarios share one DM/player setup and run serially, in order:
  * each builds on the state the previous one left behind (drawer open →
  * damaged + reopened → closed → token single-clicked, reopening the drawer
- * → Prone toggled and reloaded).
+ * → Prone toggled and reloaded → an inventory item increased and pinned,
+ * surfacing under Overview favorites after a reload).
  */
 
 const CAMPAIGN_NAME = 'Sheet Drawer E2E Campaign';
@@ -429,5 +430,89 @@ test.describe('player map sheet drawer', () => {
     // Leave no residual state behind.
     await reopenedProne.click();
     await expect(reopenedProne).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('pinning an inventory item surfaces it under Overview favorites', async () => {
+    const INVENTORY_ITEM_NAME = 'Trail Rations';
+
+    // Left open on the Effects tab by the previous test.
+    const dialog = sheetDialog(playerPage);
+    await expect(dialog).toBeVisible();
+
+    // There's no UI path to add inventory items from the sheet drawer, so
+    // seed one plain (non-consumable) item through the store handle, same
+    // as other specs seed setup-only state.
+    await playerPage.evaluate(name => {
+      window.__rkStores!.character.getState().addInventoryItem({
+        name,
+        category: 'gear',
+        quantity: 1,
+        tags: [],
+      });
+    }, INVENTORY_ITEM_NAME);
+
+    await dialog.getByRole('tab', { name: /inventory/i }).click();
+    await dialog
+      .getByRole('button', { name: `Increase ${INVENTORY_ITEM_NAME}` })
+      .click();
+    await dialog
+      .getByRole('button', { name: `Pin ${INVENTORY_ITEM_NAME}` })
+      .click();
+    await expect(
+      dialog.getByRole('button', { name: `Unpin ${INVENTORY_ITEM_NAME}` })
+    ).toBeVisible();
+
+    // A real character mutation: it must be on disk (the canonical
+    // per-character envelope) before the reload.
+    await playerPage.waitForFunction(
+      ({ id, name }) => {
+        const raw = window.localStorage.getItem(`rollkeeper-character:${id}`);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as {
+          state?: {
+            character?: {
+              inventoryItems?: { name: string; quantity: number }[];
+              sheetFavorites?: { kind: string; id: string }[];
+            };
+          };
+        };
+        const item = parsed.state?.character?.inventoryItems?.find(
+          i => i.name === name
+        );
+        const pinned = parsed.state?.character?.sheetFavorites?.some(
+          f => f.kind === 'item'
+        );
+        return item?.quantity === 2 && !!pinned;
+      },
+      { id: characterId, name: INVENTORY_ITEM_NAME },
+      { timeout: 10_000 }
+    );
+
+    await playerPage.reload({ waitUntil: 'networkidle' });
+    await waitForStoresReady(playerPage);
+    await waitForCharacterLoaded(playerPage, characterId);
+    await expect(sheetDialog(playerPage)).toBeHidden();
+
+    await playerPage
+      .getByRole('button', { name: 'Open character sheet' })
+      .click();
+    const reopened = sheetDialog(playerPage);
+    await expect(reopened).toBeVisible({ timeout: 10_000 });
+
+    // The stored tab preference is 'inventory' from the click above —
+    // explicitly return to Overview, where pinned items surface.
+    await reopened.getByRole('tab', { name: /overview/i }).click();
+    await expect(
+      reopened.getByText(INVENTORY_ITEM_NAME, { exact: true })
+    ).toBeVisible();
+
+    // Leave no residual state behind.
+    const unpin = reopened.getByRole('button', {
+      name: `Unpin ${INVENTORY_ITEM_NAME}`,
+    });
+    await unpin.click();
+    await expect(
+      reopened.getByText(INVENTORY_ITEM_NAME, { exact: true })
+    ).toBeHidden();
   });
 });

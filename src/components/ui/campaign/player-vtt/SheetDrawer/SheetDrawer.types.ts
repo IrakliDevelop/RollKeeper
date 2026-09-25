@@ -1,5 +1,7 @@
 import type {
   AbilityName,
+  Currency,
+  MagicItemRarity,
   SkillName,
   Spell,
   SpellSlot,
@@ -10,6 +12,7 @@ export type SheetTabId =
   | 'overview'
   | 'abilities'
   | 'spells'
+  | 'inventory'
   | 'features'
   | 'effects';
 
@@ -17,6 +20,7 @@ export const SHEET_TAB_IDS: readonly SheetTabId[] = [
   'overview',
   'abilities',
   'spells',
+  'inventory',
   'features',
   'effects',
 ];
@@ -164,3 +168,83 @@ export interface OtherEffectsView {
   conditions: OtherConditionView[];
   diseases: DiseaseView[];
 }
+
+export type InventoryEntryKind = 'weapon' | 'armor' | 'magic' | 'item';
+
+export type InventoryGroupKey =
+  | 'weapons'
+  | 'armor'
+  | 'magic'
+  | 'consumables'
+  | 'gear';
+
+export interface InventoryChargeView {
+  chargeId: string;
+  name: string;
+  max: number;
+  used: number;
+}
+
+export interface InventoryEntryView {
+  id: string;
+  kind: InventoryEntryKind;
+  name: string;
+  meta: string;
+  rarity: MagicItemRarity | null;
+  quantity: number | null;
+  weightText: string | null;
+  equippable: boolean;
+  equipped: boolean;
+  attunable: boolean;
+  attuned: boolean;
+  consumable: boolean;
+  attackText: string | null; // e.g. "+7 to hit · 1d8+4 piercing"
+  charges: InventoryChargeView[];
+  poolText: string | null; // e.g. "Charges 3 / 7"
+}
+
+export interface InventoryGroupView {
+  key: InventoryGroupKey;
+  label: string;
+  entries: InventoryEntryView[];
+}
+
+export interface InventorySummaryView {
+  currency: { key: keyof Currency; label: string; value: number }[]; // pp, gp, ep, sp, cp order
+  weight: number;
+  capacity: number;
+  weightPercent: number;
+  attuned: number;
+  attunementMax: number;
+}
+
+export type InventoryViewMode = 'list' | 'grid';
+
+export const INVENTORY_VIEW_STORAGE_KEY = 'rollkeeper-map-sheet-inventory-view';
+
+export type FavoriteRowView =
+  | {
+      key: string;
+      kind: 'item';
+      id: string;
+      name: string;
+      meta: string;
+      entry: InventoryEntryView;
+    }
+  | {
+      key: string;
+      kind: 'spell';
+      id: string;
+      name: string;
+      meta: string;
+      spell: Spell;
+      castable: boolean;
+    }
+  | {
+      key: string;
+      kind: 'feature';
+      id: string;
+      name: string;
+      meta: string;
+      feature: FeatureRowView;
+    };

@@ -15,12 +15,15 @@ import {
 } from '../SheetDrawer.utils';
 import { SheetResources } from '../SheetResources';
 import { HEADING_CLASS, SECTION_CLASS } from '../sheetSectionStyles';
+import type { SheetSpellCastingProps } from '../SheetDrawer.types';
+import { OverviewFavorites } from './OverviewFavorites';
 
 export interface OverviewTabProps {
   addToast: (t: Omit<ToastData, 'id'>) => void;
+  spellCasting: SheetSpellCastingProps;
 }
 
-export function OverviewTab({ addToast }: OverviewTabProps) {
+export function OverviewTab({ addToast, spellCasting }: OverviewTabProps) {
   const character = useCharacterStore(s => s.character);
   const spendHitDie = useCharacterStore(s => s.useHitDie);
   const addHeroicInspiration = useCharacterStore(s => s.addHeroicInspiration);
@@ -33,6 +36,8 @@ export function OverviewTab({ addToast }: OverviewTabProps) {
 
   return (
     <div className="space-y-3">
+      <OverviewFavorites addToast={addToast} spellCasting={spellCasting} />
+
       <SheetResources />
 
       {hitDice.length > 0 && (

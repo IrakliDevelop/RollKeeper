@@ -11,6 +11,7 @@ import {
   SKILL_ABILITY_MAP,
   SKILL_NAMES,
 } from '@/utils/constants';
+import { resolveSheetFavorites } from '@/utils/sheetFavorites';
 
 import { FEATURE_SOURCE_LABELS } from '@/types/character';
 import type {
@@ -22,11 +23,13 @@ import type {
   SpellSlots,
 } from '@/types/character';
 
+import { buildInventoryGroups } from './InventoryTabs.utils';
 import type {
   ConditionToggleView,
+  FavoriteRowView,
   FeatureGroupView,
-  OtherEffectsView,
   FeatureRowView,
+  OtherEffectsView,
   ProficiencyGroupView,
   SaveRowView,
   SkillProfLevel,
@@ -146,6 +149,13 @@ export function hasSlotForSpell(c: CharacterState, spell: Spell): boolean {
   );
 }
 
+function isSpellCastable(c: CharacterState, spell: Spell): boolean {
+  return (
+    (spell.level === 0 || !!spell.isPrepared || !!spell.isAlwaysPrepared) &&
+    hasSlotForSpell(c, spell)
+  );
+}
+
 export function buildSpellGroups(
   c: CharacterState,
   query: string
@@ -156,9 +166,7 @@ export function buildSpellGroups(
     if (q && !spell.name.toLowerCase().includes(q)) continue;
     const prepared = !!spell.isPrepared;
     const alwaysPrepared = !!spell.isAlwaysPrepared;
-    const castable =
-      (spell.level === 0 || prepared || alwaysPrepared) &&
-      hasSlotForSpell(c, spell);
+    const castable = isSpellCastable(c, spell);
     const rows = byLevel.get(spell.level) ?? [];
     rows.push({ spell, prepared, alwaysPrepared, castable });
     byLevel.set(spell.level, rows);
@@ -277,4 +285,68 @@ export function exhaustionRulesText(
   if (level >= 6) return 'Death';
   if (variant === '2014') return EXHAUSTION_2014[level];
   return `−${2 * level} to d20 tests, −${5 * level} ft speed`;
+}
+
+/**
+ * Pinned favorites for the Overview tab, in pin order. Item pins aren't
+ * pruned when the underlying item is deleted (see `resolveSheetFavorites`),
+ * so a dangling id here is simply skipped rather than resolved to a row.
+ */
+export function buildFavoriteRows(c: CharacterState): FavoriteRowView[] {
+  const favorites = resolveSheetFavorites(c);
+  if (favorites.length === 0) return [];
+
+  const entriesById = new Map(
+    buildInventoryGroups(c, '')
+      .flatMap(g => g.entries)
+      .map(entry => [entry.id, entry])
+  );
+  const spellsById = new Map((c.spells ?? []).map(spell => [spell.id, spell]));
+  const featuresById = new Map(
+    buildFeatureGroups(c).flatMap(g =>
+      g.features.map(
+        feature => [feature.id, { feature, group: g.label }] as const
+      )
+    )
+  );
+
+  const rows: FavoriteRowView[] = [];
+  for (const favorite of favorites) {
+    if (favorite.kind === 'item') {
+      const entry = entriesById.get(favorite.id);
+      if (!entry) continue;
+      rows.push({
+        key: `item:${favorite.id}`,
+        kind: 'item',
+        id: favorite.id,
+        name: entry.name,
+        meta: entry.meta,
+        entry,
+      });
+    } else if (favorite.kind === 'spell') {
+      const spell = spellsById.get(favorite.id);
+      if (!spell) continue;
+      rows.push({
+        key: `spell:${favorite.id}`,
+        kind: 'spell',
+        id: favorite.id,
+        name: spell.name,
+        meta: `${spell.school} · ${spell.castingTime}`,
+        spell,
+        castable: isSpellCastable(c, spell),
+      });
+    } else {
+      const match = featuresById.get(favorite.id);
+      if (!match) continue;
+      rows.push({
+        key: `feature:${favorite.id}`,
+        kind: 'feature',
+        id: favorite.id,
+        name: match.feature.name,
+        meta: match.group,
+        feature: match.feature,
+      });
+    }
+  }
+  return rows;
 }

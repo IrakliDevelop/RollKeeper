@@ -35,6 +35,7 @@ import {
   Language,
   AbilityName,
   TemporaryBuff,
+  SheetFavoriteKind,
 } from '@/types/character';
 import type { DmXpAward } from '@/types/sharedState';
 import { ProcessedSpell } from '@/types/spells';
@@ -72,6 +73,7 @@ import {
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
 import { getActiveClassResources } from '@/utils/classResources';
 import { isConditionIconName } from '@/utils/conditionIconRegistry';
+import { resolveSheetFavorites } from '@/utils/sheetFavorites';
 import { isApplyingExternal, withExternalApply } from '@/lib/characterRevision';
 import { initCrossTabCharacterSync } from '@/lib/crossTabCharacterSync';
 import { exposeStoreForE2E } from '@/lib/e2eStoreHandles';
@@ -313,6 +315,12 @@ function migrateCharacterData(character: unknown): CharacterState {
     }
     if (!Array.isArray(result.favoriteFeatureIds)) {
       result.favoriteFeatureIds = [];
+    }
+    if (
+      result.sheetFavorites !== undefined &&
+      !Array.isArray(result.sheetFavorites)
+    ) {
+      delete result.sheetFavorites;
     }
     // Ensure defenses arrays exist
     if (!Array.isArray(result.damageImmunities)) {
@@ -654,6 +662,11 @@ interface CharacterStore {
     sourceType?: string
   ) => void;
   toggleFavoriteFeature: (id: string) => void;
+  setSheetFavorite: (
+    kind: SheetFavoriteKind,
+    id: string,
+    pinned: boolean
+  ) => void;
   migrateTraitsToExtendedFeatures: () => void;
 
   // Language management
@@ -766,6 +779,7 @@ interface CharacterStore {
   updateInventoryItem: (id: string, updates: Partial<InventoryItem>) => void;
   deleteInventoryItem: (id: string) => void;
   updateItemQuantity: (id: string, quantity: number) => void;
+  adjustItemQuantity: (id: string, delta: number) => void;
   consumeInventoryCost: (
     cost?: import('@/types/character').InventoryCost
   ) => boolean;
@@ -3288,6 +3302,41 @@ export const useCharacterStore = create<CharacterStore>()(
           });
         },
 
+        setSheetFavorite: (kind, id, pinned) => {
+          set(state => {
+            const current = resolveSheetFavorites(state.character);
+            const has = current.some(f => f.kind === kind && f.id === id);
+            if (pinned === has) return state;
+            const toggle = (ids: string[]) =>
+              pinned ? [...ids, id] : ids.filter(existing => existing !== id);
+            const next = pinned
+              ? [...current, { kind, id }]
+              : current.filter(f => !(f.kind === kind && f.id === id));
+            const favoriteFeatureIds = state.character.favoriteFeatureIds ?? [];
+            const favoriteSpells =
+              state.character.spellbook?.favoriteSpells ?? [];
+            return {
+              character: {
+                ...state.character,
+                sheetFavorites: next,
+                ...(kind === 'feature'
+                  ? { favoriteFeatureIds: toggle(favoriteFeatureIds) }
+                  : {}),
+                ...(kind === 'spell'
+                  ? {
+                      spellbook: {
+                        ...state.character.spellbook,
+                        favoriteSpells: toggle(favoriteSpells),
+                      },
+                    }
+                  : {}),
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
         migrateTraitsToExtendedFeatures: () => {
           set(state => {
             const existingTraits = state.character.trackableTraits || [];
@@ -4842,6 +4891,34 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           }));
+        },
+
+        adjustItemQuantity: (id, delta) => {
+          set(state => {
+            if (!Number.isFinite(delta) || delta === 0) return state;
+            const item = state.character.inventoryItems.find(
+              candidate => candidate.id === id
+            );
+            if (!item) return state;
+            const quantity = Math.max(0, item.quantity + Math.trunc(delta));
+            if (quantity === item.quantity) return state;
+            return {
+              character: {
+                ...state.character,
+                inventoryItems: state.character.inventoryItems.map(candidate =>
+                  candidate.id === id
+                    ? {
+                        ...candidate,
+                        quantity,
+                        updatedAt: new Date().toISOString(),
+                      }
+                    : candidate
+                ),
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         reorderInventoryItems: (

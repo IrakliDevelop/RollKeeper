@@ -231,6 +231,16 @@ describe('SpellsTab', () => {
     ).toHaveAttribute('title', 'Not prepared or no slots left');
   });
 
+  it('pins a spell via its star, mirroring the legacy favorite flag', () => {
+    render(<SpellsTab locked addToast={vi.fn()} spellCasting={casting()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Pin Fire Bolt' }));
+    expect(getChar().sheetFavorites).toContainEqual({
+      kind: 'spell',
+      id: 'firebolt',
+    });
+    expect(getChar().spellbook?.favoriteSpells).toContain('firebolt');
+  });
+
   it('shows no prepare toggle for an always-prepared spell', () => {
     const domainSpell = makeSpell({
       id: 'domainspell',

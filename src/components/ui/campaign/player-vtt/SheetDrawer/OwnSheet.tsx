@@ -22,6 +22,7 @@ import { SheetVitals } from './SheetVitals';
 import { AbilitiesTab } from './tabs/AbilitiesTab';
 import { EffectsTab } from './tabs/EffectsTab';
 import { FeaturesTab } from './tabs/FeaturesTab';
+import { InventoryTab } from './tabs/InventoryTab';
 import { OverviewTab } from './tabs/OverviewTab';
 import { SpellsTab } from './tabs/SpellsTab';
 import { useSheetTabs } from './useSheetTabs';
@@ -96,7 +97,7 @@ export function OwnSheet({
           value="overview"
           className="flex-1 overflow-y-auto px-5 py-4"
         >
-          <OverviewTab addToast={addToast} />
+          <OverviewTab addToast={addToast} spellCasting={spellCasting} />
         </Tabs.Content>
         {tabs
           .filter(tab => tab.id !== 'overview')
@@ -116,6 +117,9 @@ export function OwnSheet({
                   spellCasting={spellCasting}
                   roll={rollOrUndefined}
                 />
+              )}
+              {tab.id === 'inventory' && (
+                <InventoryTab locked={locked} addToast={addToast} />
               )}
               {tab.id === 'features' && <FeaturesTab />}
               {tab.id === 'effects' && (

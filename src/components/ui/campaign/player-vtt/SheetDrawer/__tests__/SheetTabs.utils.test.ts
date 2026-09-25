@@ -5,6 +5,7 @@ import type { CharacterState, Spell } from '@/types/character';
 
 import {
   buildConditionToggles,
+  buildFavoriteRows,
   buildFeatureGroups,
   buildOtherEffects,
   buildProficiencyGroups,
@@ -349,5 +350,104 @@ describe('exhaustionRulesText', () => {
     expect(exhaustionRulesText(2, '2014')).toBe(
       'Disadvantage on ability checks; speed halved'
     );
+  });
+});
+
+describe('buildFavoriteRows', () => {
+  const spell = (o: Partial<Spell>): Spell => ({
+    id: o.name!,
+    name: o.name!,
+    level: 1,
+    school: 'Evocation',
+    castingTime: '1 action',
+    range: '60 feet',
+    components: { verbal: true, somatic: true, material: false },
+    duration: 'Instantaneous',
+    description: '',
+    createdAt: '',
+    updatedAt: '',
+    ...o,
+  });
+
+  function favoritesFixture(): CharacterState {
+    const base = fixture();
+    return {
+      ...base,
+      sheetFavorites: [
+        { kind: 'feature', id: 'sw' },
+        { kind: 'item', id: 'rope1' },
+        { kind: 'spell', id: 'Shield' },
+        { kind: 'item', id: 'ghost-item' },
+        { kind: 'spell', id: 'ghost-spell' },
+        { kind: 'feature', id: 'ghost-feature' },
+      ],
+      favoriteFeatureIds: ['sw'],
+      spellbook: { ...base.spellbook, favoriteSpells: ['Shield'] },
+      inventoryItems: [
+        {
+          id: 'rope1',
+          name: 'Rope, 50ft',
+          category: 'gear',
+          quantity: 2,
+          tags: [],
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+      spellSlots: { ...base.spellSlots, 1: { max: 1, used: 0 } },
+      spells: [spell({ name: 'Shield', level: 1, isPrepared: true })],
+      extendedFeatures: [
+        {
+          id: 'sw',
+          name: 'Second Wind',
+          sourceType: 'class',
+          maxUses: 1,
+          usedUses: 0,
+          restType: 'short',
+          displayOrder: 0,
+          description: '',
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+    } as CharacterState;
+  }
+
+  it('resolves pinned rows in pin order, skipping dangling ids', () => {
+    const rows = buildFavoriteRows(favoritesFixture());
+    expect(rows.map(r => [r.kind, r.id])).toEqual([
+      ['feature', 'sw'],
+      ['item', 'rope1'],
+      ['spell', 'Shield'],
+    ]);
+  });
+
+  it('carries the underlying view for each favorite kind', () => {
+    const [feature, item, spellRow] = buildFavoriteRows(favoritesFixture());
+    expect(feature.kind).toBe('feature');
+    expect(item.kind).toBe('item');
+    expect(spellRow.kind).toBe('spell');
+    if (feature.kind === 'feature') {
+      expect(feature.feature.name).toBe('Second Wind');
+    }
+    if (item.kind === 'item') {
+      expect(item.entry.name).toBe('Rope, 50ft');
+    }
+    if (spellRow.kind === 'spell') {
+      expect(spellRow.spell.name).toBe('Shield');
+      expect(spellRow.castable).toBe(true);
+    }
+  });
+
+  it('labels feature rows with their source group, not the uses tag', () => {
+    const [feature] = buildFavoriteRows(favoritesFixture());
+    expect(feature.meta).toBe('Class Features');
+    if (feature.kind === 'feature') {
+      expect(feature.meta).not.toBe(feature.feature.tag);
+    }
+  });
+
+  it('is empty when nothing is pinned', () => {
+    expect(buildFavoriteRows(fixture())).toEqual([]);
   });
 });

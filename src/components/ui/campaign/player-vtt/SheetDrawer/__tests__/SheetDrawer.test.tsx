@@ -134,10 +134,22 @@ describe('SheetDrawer', () => {
 
   it('renders every tab panel', () => {
     render(<SheetDrawer {...props()} />);
-    for (const name of [/abilities/i, /features/i, /effects/i]) {
+    for (const name of [/abilities/i, /features/i, /effects/i, /inventory/i]) {
       fireEvent.mouseDown(screen.getByRole('tab', { name }));
       expect(screen.getByRole('tabpanel', { name })).not.toBeEmptyDOMElement();
     }
+  });
+
+  it('shows the Inventory tab and restores it from storage', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'inventory');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /inventory/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(
+      screen.getByRole('tabpanel', { name: /inventory/i })
+    ).not.toBeEmptyDOMElement();
   });
 
   it('hides the Spells tab for non-casters', () => {
