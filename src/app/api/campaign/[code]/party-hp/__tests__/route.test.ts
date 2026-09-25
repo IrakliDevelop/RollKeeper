@@ -17,9 +17,140 @@ import type { CharacterState } from '@/types/character';
 
 vi.mock('@upstash/redis', () => ({ Redis: vi.fn(() => mockRedis) }));
 
+const { authorizeCampaignMembershipRoute, authorizeHybridGuestRoute } =
+  vi.hoisted(() => ({
+    authorizeCampaignMembershipRoute: vi.fn(),
+    authorizeHybridGuestRoute: vi.fn(),
+  }));
+
+vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
+  authorizeCampaignMembershipRoute,
+}));
+vi.mock('@/lib/supabase/guestSessionServer', () => ({
+  authorizeHybridGuestRoute,
+}));
+
+function accountMember(role: 'owner' | 'dm' | 'player') {
+  return {
+    mode: 'account' as const,
+    principal: {
+      campaignId: 'campaign-a',
+      accountId: 'account-a',
+      role,
+      status: 'active' as const,
+      epoch: 1,
+      legacyPlayerId: role === 'player' ? 'player-1' : null,
+      legacyCharacterId: null,
+      characterId: null,
+    },
+  };
+}
+
+function seedOnePlayer() {
+  seedRedis('campaign:ABC123', createMockCampaignData());
+  seedRedisSet('campaign:ABC123:players', ['player-1']);
+  seedRedis('campaign:ABC123:player:player-1', createMockPlayerData());
+}
+
+async function getParty() {
+  const req = createNextRequest('/api/campaign/ABC123/party-hp');
+  return GET(req as NextRequest, createRouteParams({ code: 'ABC123' }));
+}
+
+describe('GET /api/campaign/[code]/party-hp — authorization', () => {
+  beforeEach(() => {
+    resetRedis();
+    vi.clearAllMocks();
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
+  });
+
+  it('denies a non-member in account-membership mode without reading party data', async () => {
+    seedOnePlayer();
+    authorizeCampaignMembershipRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 401,
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(401);
+    expect(data.error).toBe('Account membership is required');
+    expect(data.members).toBeUndefined();
+    expect(mockRedis.smembers).not.toHaveBeenCalled();
+    expect(authorizeHybridGuestRoute).not.toHaveBeenCalled();
+  });
+
+  it.each(['player', 'dm', 'owner'] as const)(
+    'allows an account-mode %s member and skips the legacy guest gate',
+    async role => {
+      seedOnePlayer();
+      authorizeCampaignMembershipRoute.mockResolvedValue(accountMember(role));
+
+      const res = await getParty();
+      const data = await res.json();
+
+      expect(res.status).toBe(200);
+      expect(data.members).toHaveLength(1);
+      expect(data.members[0].publicSheet).not.toBeNull();
+      expect(authorizeCampaignMembershipRoute).toHaveBeenCalledWith(
+        'ABC123',
+        false
+      );
+      expect(authorizeHybridGuestRoute).not.toHaveBeenCalled();
+    }
+  );
+
+  it('legacy mode runs the hybrid guest gate and returns party data', async () => {
+    seedOnePlayer();
+
+    const res = await getParty();
+
+    expect(res.status).toBe(200);
+    expect(authorizeHybridGuestRoute).toHaveBeenCalledWith(
+      expect.anything(),
+      'ABC123',
+      'party:read'
+    );
+    expect(res.headers.get('Cache-Control')).toBe('no-store');
+  });
+
+  it('legacy mode allows a bound guest session', async () => {
+    seedOnePlayer();
+    authorizeHybridGuestRoute.mockResolvedValue({
+      mode: 'guest',
+      principal: { legacyPlayerId: 'player-1' },
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.members).toHaveLength(1);
+  });
+
+  it('legacy mode denies an unauthorized guest session', async () => {
+    seedOnePlayer();
+    authorizeHybridGuestRoute.mockResolvedValue({
+      mode: 'denied',
+      status: 403,
+      clearCookie: false,
+    });
+
+    const res = await getParty();
+    const data = await res.json();
+
+    expect(res.status).toBe(403);
+    expect(data.members).toBeUndefined();
+  });
+});
+
 describe('GET /api/campaign/[code]/party-hp', () => {
   beforeEach(() => {
     resetRedis();
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
   });
 
   it('returns 404 when campaign does not exist', async () => {
