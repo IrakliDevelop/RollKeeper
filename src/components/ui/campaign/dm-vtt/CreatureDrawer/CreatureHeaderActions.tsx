@@ -61,48 +61,50 @@ export function CreatureHeaderActions({
         </Button>
       </div>
 
-      {!isLair && (
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => actions.onShortRest(entity.id)}
-            aria-label="Short rest"
-            title="Short rest"
-          >
-            <Coffee className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => actions.onLongRest(entity.id)}
-            aria-label="Long rest"
-            title="Long rest"
-          >
-            <Moon className="h-3.5 w-3.5" />
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleRemove}
-            aria-label="Remove from combat"
-            title="Remove from combat"
-          >
-            <Trash2 className="text-accent-red-text h-3.5 w-3.5" />
-          </Button>
-          {npcSourceId && onViewNPC && (
+      <div className="flex items-center gap-1">
+        {!isLair && (
+          <>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => onViewNPC(npcSourceId, entity.id)}
-              aria-label="View NPC details"
-              title="View NPC details"
+              onClick={() => actions.onShortRest(entity.id)}
+              aria-label="Short rest"
+              title="Short rest"
             >
-              <Eye className="h-3.5 w-3.5" />
+              <Coffee className="h-3.5 w-3.5" />
             </Button>
-          )}
-        </div>
-      )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => actions.onLongRest(entity.id)}
+              aria-label="Long rest"
+              title="Long rest"
+            >
+              <Moon className="h-3.5 w-3.5" />
+            </Button>
+          </>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleRemove}
+          aria-label="Remove from combat"
+          title="Remove from combat"
+        >
+          <Trash2 className="text-accent-red-text h-3.5 w-3.5" />
+        </Button>
+        {npcSourceId && onViewNPC && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onViewNPC(npcSourceId, entity.id)}
+            aria-label="View NPC details"
+            title="View NPC details"
+          >
+            <Eye className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

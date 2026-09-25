@@ -184,7 +184,7 @@ describe('CreatureHeader', () => {
     expect(onClose).toHaveBeenCalled();
   });
 
-  it('hides rest buttons, remove, and the lock toggle for a lair entity', () => {
+  it('hides rest buttons and the lock toggle for a lair entity, but keeps Remove', () => {
     render(
       <CreatureHeader
         {...baseProps({ entity: makeEntity({ type: 'lair' }) })}
@@ -197,14 +197,28 @@ describe('CreatureHeader', () => {
       screen.queryByRole('button', { name: 'Long rest' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Remove from combat' })
-    ).not.toBeInTheDocument();
-    expect(
       screen.queryByRole('button', { name: 'Play' })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Close sheet' })
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Remove from combat' })
+    ).toBeInTheDocument();
+  });
+
+  it('still shows Eye for a lair entity when npcSourceId and onViewNPC exist — parity with DetailHeader', () => {
+    const actions = makeActions({ onViewNPC: vi.fn() });
+    render(
+      <CreatureHeader
+        {...baseProps({
+          actions,
+          entity: makeEntity({ type: 'lair', npcSourceId: 'npc-1' }),
+        })}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'View NPC details' }));
+    expect(actions.onViewNPC).toHaveBeenCalledWith('npc-1', 'e1');
   });
 
   it('shows "Their turn" badge and the concentration chip when applicable', () => {
