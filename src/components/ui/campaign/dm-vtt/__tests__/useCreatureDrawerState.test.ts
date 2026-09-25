@@ -48,6 +48,23 @@ describe('useCreatureDrawerState', () => {
     expect(result.current.entity).toBeNull();
   });
 
+  it('open() with a player entity without a playerCharacterId is a no-op', () => {
+    const encounter = createMockEncounter({
+      entities: [
+        createMockEncounterEntity({ id: 'p2', name: 'Guest', type: 'player' }),
+      ],
+    });
+    const onViewPlayer = vi.fn();
+    const { result } = renderHook(() =>
+      useCreatureDrawerState({ encounter, onViewPlayer })
+    );
+
+    act(() => result.current.open('p2'));
+
+    expect(onViewPlayer).not.toHaveBeenCalled();
+    expect(result.current.entity).toBeNull();
+  });
+
   it('open() with an unknown id is a no-op', () => {
     const encounter = createMockEncounter({
       entities: [

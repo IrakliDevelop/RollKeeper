@@ -42,8 +42,9 @@ export function useCreatureDrawerState({
     (entityId: string) => {
       const target = encounter?.entities.find(e => e.id === entityId);
       if (!target) return; // unknown id: no-op
-      if (target.type === 'player' && target.playerCharacterId) {
-        onViewPlayer(target.playerCharacterId);
+      if (target.type === 'player') {
+        // Players never get the creature drawer; show their sheet when linked.
+        if (target.playerCharacterId) onViewPlayer(target.playerCharacterId);
         return;
       }
       setOpenEntityId(entityId);
