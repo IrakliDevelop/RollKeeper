@@ -305,4 +305,73 @@ describe('encounterStore — NPC library write-back', () => {
       expect(fresh.monsterStatBlock!.speed).toBe('50 ft., climb 30 ft.');
     });
   });
+
+  describe('entity abilities re-reconcile after a stat-block write-back', () => {
+    function getEntity(encId: string, entityId: string) {
+      return useEncounterStore
+        .getState()
+        .encounters.find(e => e.id === encId)!
+        .entities.find(e => e.id === entityId)!;
+    }
+
+    function setupTeleport() {
+      return setupLinkedEntity({
+        monsterStatBlock: statBlock({
+          actions: [
+            { id: 'entry-bite', name: 'Bite', text: 'Bite attack.' },
+            { id: 'entry-tp', name: 'Teleport (3/Day)', text: 'Blink.' },
+          ],
+        }),
+      });
+    }
+
+    function renameEntry(
+      encId: string,
+      entityId: string,
+      id: string,
+      name: string
+    ) {
+      const sb = structuredClone(getEntity(encId, entityId).monsterStatBlock!);
+      sb.actions = sb.actions.map(a => (a.id === id ? { ...a, name } : a));
+      useEncounterStore
+        .getState()
+        .updateEntity(encId, entityId, { monsterStatBlock: sb });
+    }
+
+    it('3/Day → 2/Day lowers entity maxUses and clamps usedUses to the NPC', () => {
+      const { npcId, encId, entityId } = setupTeleport();
+      for (let i = 0; i < 3; i++) {
+        useEncounterStore.getState().useAbility(encId, entityId, 'entry-tp');
+      }
+      expect(getNpc(npcId).abilityUsage?.['entry-tp']).toBe(3);
+
+      renameEntry(encId, entityId, 'entry-tp', 'Teleport (2/Day)');
+
+      expect(getNpc(npcId).abilityUsage?.['entry-tp']).toBe(2);
+      const tp = getEntity(encId, entityId).abilities!.find(
+        a => a.id === 'entry-tp'
+      )!;
+      expect(tp.maxUses).toBe(2);
+      expect(tp.usedUses).toBe(2);
+      expect(tp.source).toBe('npc');
+    });
+
+    it('making an owned untracked entry trackable creates the entity ability', () => {
+      const { npcId, encId, entityId } = setupTeleport();
+      expect(
+        getEntity(encId, entityId).abilities!.some(a => a.id === 'entry-bite')
+      ).toBe(false);
+
+      renameEntry(encId, entityId, 'entry-bite', 'Bite (1/Day)');
+
+      expect(
+        getNpc(npcId).monsterStatBlock!.actions.find(a => a.id === 'entry-bite')
+          ?.name
+      ).toBe('Bite (1/Day)');
+      const bite = getEntity(encId, entityId).abilities!.find(
+        a => a.id === 'entry-bite'
+      );
+      expect(bite).toMatchObject({ maxUses: 1, usedUses: 0, source: 'npc' });
+    });
+  });
 });

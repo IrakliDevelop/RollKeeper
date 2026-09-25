@@ -30,7 +30,7 @@ import {
 import { parseRechargeFromName } from '@/utils/encounterConverter';
 import { normalizeCombatConfig } from '@/utils/customConditions';
 import { buildNpcLibraryPatch } from '@/utils/npcLibrarySync';
-import type { NpcResource } from '@/types/encounter';
+import type { CampaignNPC, NpcResource } from '@/types/encounter';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
@@ -74,16 +74,39 @@ function syncNPCEntityToStore(
 // max HP, initiative/proficiency bonus, and matched stat-block scalars/
 // entries). Pure delegation to buildNpcLibraryPatch for the "what changed"
 // decision — this just handles the "when" (linked + NPC still exists).
+// Returns the patch that was written (null when nothing was written).
 function syncEntityStatsToLibrary(
   before: EncounterEntity | undefined,
   after: EncounterEntity | undefined
-) {
-  if (!before || !after?.npcSourceId || !after.campaignCode) return;
+): Partial<CampaignNPC> | null {
+  if (!before || !after?.npcSourceId || !after.campaignCode) return null;
   const npcStore = useNPCStore.getState();
   const npc = npcStore.getNPC(after.campaignCode, after.npcSourceId);
-  if (!npc) return;
+  if (!npc) return null;
   const patch = buildNpcLibraryPatch(before, after, npc);
   if (patch) npcStore.updateNPC(after.campaignCode, after.npcSourceId, patch);
+  return patch;
+}
+
+// After a stat-block write-back the NPC's config (and its normalized,
+// clamped abilityUsage) may have changed, so the reconcile done inside the
+// entity edit (against the pre-write NPC) is stale. Rebuild abilities from
+// the FRESH NPC and copy its authoritative usage — never re-apply it.
+function reconcileAbilitiesWithNpc(
+  entity: EncounterEntity,
+  npc: CampaignNPC
+): EncounterEntity['abilities'] {
+  if (!entity.monsterStatBlock) return entity.abilities;
+  const usage = npc.abilityUsage ?? {};
+  return reconcileEntityAbilities(
+    entity.monsterStatBlock,
+    entity.abilities ?? [],
+    id => findEntryById(npc.monsterStatBlock, id)
+  ).map(a =>
+    a.source === 'npc'
+      ? { ...a, usedUses: Math.min(usage[a.id] ?? 0, a.maxUses ?? 0) }
+      : a
+  );
 }
 
 interface EncounterStoreState {
@@ -590,7 +613,21 @@ export const useEncounterStore = create<EncounterStoreState>()(
         const after = get()
           .encounters.find(e => e.id === encounterId)
           ?.entities.find(e => e.id === entityId);
-        syncEntityStatsToLibrary(before, after);
+        const patch = syncEntityStatsToLibrary(before, after);
+        if (!patch?.monsterStatBlock) return;
+        if (!after?.campaignCode || !after.npcSourceId) return;
+        const freshNpc = useNPCStore
+          .getState()
+          .getNPC(after.campaignCode, after.npcSourceId);
+        if (!freshNpc) return;
+        set(state => ({
+          encounters: updateEntityInEncounter(
+            state.encounters,
+            encounterId,
+            entityId,
+            e => ({ ...e, abilities: reconcileAbilitiesWithNpc(e, freshNpc) })
+          ),
+        }));
       },
 
       // Combat flow
