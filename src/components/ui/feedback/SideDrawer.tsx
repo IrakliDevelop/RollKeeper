@@ -19,6 +19,11 @@ export interface SideDrawerProps {
    * is still in the DOM).
    */
   onCloseAutoFocus?: (event: Event) => void;
+  /**
+   * Runs on Escape before the drawer closes. Call `event.preventDefault()`
+   * to keep it open (e.g. while the user is editing a field).
+   */
+  onEscapeKeyDown?: (event: KeyboardEvent) => void;
 }
 
 /**
@@ -37,6 +42,7 @@ export function SideDrawer({
   children,
   className,
   onCloseAutoFocus,
+  onEscapeKeyDown,
 }: SideDrawerProps) {
   const returnFocusRef = useRef<HTMLElement | null>(null);
 
@@ -64,6 +70,7 @@ export function SideDrawer({
           onInteractOutside={e => e.preventDefault()}
           onOpenAutoFocus={handleOpenAutoFocus}
           onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={onEscapeKeyDown}
           aria-describedby={undefined}
           className={cn(
             'bg-surface-raised border-divider text-body fixed top-0 right-0 bottom-0 z-40 flex w-[min(580px,100vw)] flex-col border-l shadow-2xl xl:w-[min(640px,100vw)]',

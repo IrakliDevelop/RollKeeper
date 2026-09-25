@@ -47,8 +47,6 @@ export function CreaturePlayersRow({
   entity,
   actions,
 }: CreaturePlayersRowProps) {
-  if (entity.type === 'lair') return null;
-
   const hpVisible = entity.hpVisibleToPlayers === true;
   const hpToggleLabel = hpVisible
     ? 'Hide HP from players'

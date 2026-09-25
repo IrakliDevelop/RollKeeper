@@ -49,14 +49,18 @@ function makeActions(): EntityActions {
 }
 
 describe('CreaturePlayersRow', () => {
-  it('returns null for a lair entity', () => {
-    const { container } = render(
+  it('renders for a lair entity (Studio lair layout keeps HeaderControls)', () => {
+    const actions = makeActions();
+    render(
       <CreaturePlayersRow
         entity={makeEntity({ type: 'lair' })}
-        actions={makeActions()}
+        actions={actions}
       />
     );
-    expect(container).toBeEmptyDOMElement();
+    fireEvent.click(screen.getByRole('button', { name: 'Neutral' }));
+    expect(actions.onUpdate).toHaveBeenCalledWith(expect.any(String), {
+      playerDisposition: 'neutral',
+    });
   });
 
   it('sets playerDisposition when a segment is clicked, aria-pressed on the active one', () => {

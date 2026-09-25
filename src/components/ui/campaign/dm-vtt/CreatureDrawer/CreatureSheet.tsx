@@ -43,7 +43,8 @@ export interface CreatureSheetProps {
  * Drawer body: pinned header + players row, then a scrolling area with the
  * vitals, abilities, tab bar, editing banner, and tab content. Owns the
  * Play/Editing lock, the active tab, and the single stat block editor dialog.
- * Lair entities get the reduced layout (header plus a single Lair tab).
+ * Lair entities get the reduced layout (header, players row, and a single
+ * Lair tab).
  */
 export function CreatureSheet({
   entity,
@@ -85,11 +86,9 @@ export function CreatureSheet({
           onToggleEditing={() => setEditing(e => !e)}
           onClose={onClose}
         />
-        {!isLair && (
-          <div className="px-4 pb-3">
-            <CreaturePlayersRow entity={entity} actions={actions} />
-          </div>
-        )}
+        <div className="px-4 pb-3">
+          <CreaturePlayersRow entity={entity} actions={actions} />
+        </div>
       </div>
 
       <Tabs.Root

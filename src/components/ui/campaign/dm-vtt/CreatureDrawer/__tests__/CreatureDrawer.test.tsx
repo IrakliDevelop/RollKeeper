@@ -92,6 +92,29 @@ describe('CreatureDrawer', () => {
     expect(p.onClose).toHaveBeenCalled();
   });
 
+  it('Escape inside an editable field cancels that edit, not the drawer', async () => {
+    const user = userEvent.setup();
+    const p = props();
+    render(<CreatureDrawer {...p} />);
+    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    const input = screen.getByLabelText('Combatant name');
+    await user.type(input, '{Escape}');
+    expect(screen.queryByLabelText('Combatant name')).not.toBeInTheDocument();
+    expect(p.onClose).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole('dialog', { name: 'Goblin sheet' })
+    ).toBeInTheDocument();
+  });
+
+  it('Escape on a non-editable element still closes the drawer', async () => {
+    const user = userEvent.setup();
+    const p = props();
+    render(<CreatureDrawer {...p} />);
+    screen.getByRole('button', { name: 'Close sheet' }).focus();
+    await user.keyboard('{Escape}');
+    expect(p.onClose).toHaveBeenCalled();
+  });
+
   it('calls onClose from the close button', async () => {
     const user = userEvent.setup();
     const p = props();

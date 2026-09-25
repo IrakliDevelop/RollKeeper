@@ -188,6 +188,13 @@ describe('CreatureDrawer parity — players row', () => {
     });
     expect(screen.getByText(/players see:/i)).toBeInTheDocument();
   });
+
+  it('previews the alias in "Players see"', () => {
+    renderDrawer({ ...FULL_CREATURE, playerAlias: 'Hooded Stranger' });
+    expect(screen.getByText(/players see:/i)).toHaveTextContent(
+      'Players see: Hooded Stranger'
+    );
+  });
 });
 
 describe('CreatureDrawer parity — vitals', () => {
@@ -536,6 +543,11 @@ describe('CreatureDrawer parity — variants', () => {
       within(rowOf('Magma Eruption', 2)).getByRole('button', { name: 'Use' })
     );
     expect(actions.onUseLairAction).toHaveBeenCalledWith(LAIR.id, 'magma');
+
+    await user.click(screen.getByRole('button', { name: 'Ally' }));
+    expect(actions.onUpdate).toHaveBeenCalledWith(LAIR.id, {
+      playerDisposition: 'ally',
+    });
   });
 
   it('summons show no Damage/Heal controls', () => {
