@@ -215,6 +215,29 @@ describe('InventoryTab', () => {
     expect(getChar().currency.gold).toBe(4);
   });
 
+  it('sends per-keystroke deltas against the last emitted value while the store is stale (0 -> 150 gold)', () => {
+    seed({
+      currency: { copper: 0, silver: 0, electrum: 0, gold: 0, platinum: 0 },
+    });
+    // Follower-tab simulation: the store does not update between keystrokes.
+    const addSpy = vi
+      .spyOn(useCharacterStore.getState(), 'addCurrency')
+      .mockImplementation(() => {});
+    const subtractSpy = vi
+      .spyOn(useCharacterStore.getState(), 'subtractCurrency')
+      .mockImplementation(() => {});
+    render(<InventoryTab locked={false} addToast={vi.fn()} />);
+    const input = screen.getByLabelText('Gold pieces');
+    fireEvent.focus(input);
+    for (const value of ['1', '15', '150']) {
+      fireEvent.change(input, { target: { value } });
+    }
+    const summed = addSpy.mock.calls.reduce((sum, [, n]) => sum + n, 0);
+    expect(addSpy.mock.calls.every(([key]) => key === 'gold')).toBe(true);
+    expect(summed).toBe(150);
+    expect(subtractSpy).not.toHaveBeenCalled();
+  });
+
   it('filters entries by search', () => {
     render(<InventoryTab locked addToast={vi.fn()} />);
     fireEvent.change(
@@ -238,6 +261,16 @@ describe('InventoryTab', () => {
     expect(
       screen.getByText(/no items match “nonexistent gizmo”/i)
     ).toBeInTheDocument();
+  });
+
+  it('shows no pin star on usable consumable grid tiles, even when pinned', () => {
+    seed({ sheetFavorites: [{ kind: 'item', id: 'ration1' }] });
+    render(<InventoryTab locked addToast={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Grid view' }));
+    const useTile = screen.getByRole('button', { name: 'Use Ration' });
+    expect(useTile.querySelector('svg')).toBeNull();
+    const pinTile = screen.getByRole('button', { name: 'Pin Rope, 50ft' });
+    expect(pinTile.querySelector('svg')).not.toBeNull();
   });
 
   it('persists the view toggle to localStorage and grid Use works', () => {

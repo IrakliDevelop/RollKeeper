@@ -144,6 +144,23 @@ describe('buildInventoryGroups', () => {
     // would let a Use control target a quantity that doesn't exist.
     expect(consumables.entries[0].consumable).toBe(false);
     expect(consumables.entries[0].kind).toBe('magic');
+    expect(consumables.entries[0].equippable).toBe(false);
+  });
+
+  it('keeps non-consumable magic items equippable and marks scrolls not equippable', () => {
+    const c = fixture({
+      magicItems: [
+        magicItem(),
+        magicItem({ id: 's1', name: 'Scroll of Fireball', category: 'scroll' }),
+      ],
+    });
+    const groups = buildInventoryGroups(c, '');
+    expect(groups.find(g => g.key === 'magic')!.entries[0].equippable).toBe(
+      true
+    );
+    expect(
+      groups.find(g => g.key === 'consumables')!.entries[0].equippable
+    ).toBe(false);
   });
 
   it('routes an inventory item with category consumable to Consumables', () => {

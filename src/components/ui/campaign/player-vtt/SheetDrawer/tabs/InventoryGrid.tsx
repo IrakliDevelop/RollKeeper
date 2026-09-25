@@ -52,7 +52,8 @@ function InventoryGridTile({
 
   // The whole tile is itself a button (for a single, large tap target), so a
   // separate FavoriteStar button can't be nested inside it — the tile's own
-  // tap toggles the pin instead, unless the entry is a usable consumable.
+  // tap toggles the pin instead. Usable consumables tap to Use and show no
+  // pin star at all (pin them from the list view).
   const handleTap = () => {
     if (isUsable) {
       consumeItem(entry.id, entry.name, quantity);
@@ -76,13 +77,15 @@ function InventoryGridTile({
         tileClass
       )}
     >
-      <Star
-        aria-hidden="true"
-        className={cn(
-          'absolute top-1.5 right-1.5 h-3.5 w-3.5',
-          pinned ? 'text-accent-amber-text fill-current' : 'text-faint'
-        )}
-      />
+      {!isUsable && (
+        <Star
+          aria-hidden="true"
+          className={cn(
+            'absolute top-1.5 right-1.5 h-3.5 w-3.5',
+            pinned ? 'text-accent-amber-text fill-current' : 'text-faint'
+          )}
+        />
+      )}
       {entry.equipped && (
         <span
           aria-hidden="true"

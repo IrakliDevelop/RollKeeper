@@ -153,7 +153,7 @@ function magicItemToEntry(m: MagicItem, level: number): InventoryEntryView {
   // distinguishing them from InventoryItem-backed consumables), but they carry
   // no `quantity` and adjustItemQuantity only targets inventoryItems, so they
   // must never claim to be quantity-consumable — that would let a Use control
-  // silently no-op.
+  // silently no-op. They aren't equippable gear either.
   return {
     id: m.id,
     kind: 'magic',
@@ -162,7 +162,7 @@ function magicItemToEntry(m: MagicItem, level: number): InventoryEntryView {
     rarity: m.rarity,
     quantity: null,
     weightText: null,
-    equippable: true,
+    equippable: !isConsumableMagicItem(m),
     equipped: !!m.isEquipped,
     attunable: !!m.requiresAttunement,
     attuned: !!m.isAttuned,
