@@ -22,6 +22,7 @@ import { SheetVitals } from './SheetVitals';
 import { AbilitiesTab } from './tabs/AbilitiesTab';
 import { EffectsTab } from './tabs/EffectsTab';
 import { FeaturesTab } from './tabs/FeaturesTab';
+import { InventoryTab } from './tabs/InventoryTab';
 import { OverviewTab } from './tabs/OverviewTab';
 import { SpellsTab } from './tabs/SpellsTab';
 import { useSheetTabs } from './useSheetTabs';
@@ -116,6 +117,9 @@ export function OwnSheet({
                   spellCasting={spellCasting}
                   roll={rollOrUndefined}
                 />
+              )}
+              {tab.id === 'inventory' && (
+                <InventoryTab locked={locked} addToast={addToast} />
               )}
               {tab.id === 'features' && <FeaturesTab />}
               {tab.id === 'effects' && (

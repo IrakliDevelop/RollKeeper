@@ -12,6 +12,7 @@ export type SheetTabId =
   | 'overview'
   | 'abilities'
   | 'spells'
+  | 'inventory'
   | 'features'
   | 'effects';
 
@@ -19,6 +20,7 @@ export const SHEET_TAB_IDS: readonly SheetTabId[] = [
   'overview',
   'abilities',
   'spells',
+  'inventory',
   'features',
   'effects',
 ];

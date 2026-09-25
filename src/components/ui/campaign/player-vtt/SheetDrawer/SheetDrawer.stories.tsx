@@ -2,16 +2,23 @@ import type { Decorator, Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
 import { SheetDrawer } from '.';
-import { SHEET_TAB_STORAGE_KEY } from './SheetDrawer.types';
+import {
+  INVENTORY_VIEW_STORAGE_KEY,
+  SHEET_TAB_STORAGE_KEY,
+} from './SheetDrawer.types';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type {
+  ArmorItem,
   CharacterState,
   ExtendedFeature,
+  InventoryItem,
+  MagicItem,
   MulticlassInfo,
   Spell,
   SpellSlots,
   TemporaryBuff,
+  Weapon,
 } from '@/types/character';
 
 const EMPTY_SLOTS: SpellSlots = {
@@ -150,6 +157,103 @@ const kaelenFixture: CharacterState = makeCharacter({
   temporaryBuffs: KAELEN_BUFFS,
 });
 
+const KAELEN_WEAPONS: Weapon[] = [
+  {
+    id: 'longbow',
+    name: 'Longbow',
+    category: 'martial',
+    weaponType: ['ranged'],
+    damage: [{ dice: '1d8', type: 'piercing' }],
+    enhancementBonus: 0,
+    properties: ['ammunition', 'heavy', 'two-handed'],
+    isEquipped: true,
+    weight: 2,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const KAELEN_ARMOR: ArmorItem[] = [
+  {
+    id: 'studded-leather',
+    name: 'Studded Leather',
+    category: 'light',
+    type: 'studded-leather',
+    baseAC: 12,
+    stealthDisadvantage: false,
+    enhancementBonus: 0,
+    isEquipped: true,
+    weight: 13,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const KAELEN_MAGIC_ITEMS: MagicItem[] = [
+  {
+    id: 'ring-of-protection',
+    name: 'Ring of Protection',
+    category: 'ring',
+    rarity: 'rare',
+    description: 'A magic ring that grants a +1 bonus to AC and saving throws.',
+    properties: [],
+    requiresAttunement: true,
+    isAttuned: true,
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const KAELEN_INVENTORY_ITEMS: InventoryItem[] = [
+  {
+    id: 'rope-hempen',
+    name: 'Rope, Hempen (50 feet)',
+    category: 'misc',
+    quantity: 1,
+    weight: 10,
+    tags: ['adventuring gear'],
+    createdAt: '',
+    updatedAt: '',
+  },
+  {
+    id: 'potion-of-healing',
+    name: 'Potion of Healing',
+    category: 'consumable',
+    quantity: 2,
+    weight: 0.5,
+    tags: [],
+    createdAt: '',
+    updatedAt: '',
+  },
+];
+
+const inventoryFixture: CharacterState = {
+  ...kaelenFixture,
+  weapons: KAELEN_WEAPONS,
+  armorItems: KAELEN_ARMOR,
+  magicItems: KAELEN_MAGIC_ITEMS,
+  inventoryItems: KAELEN_INVENTORY_ITEMS,
+  currency: { copper: 0, silver: 0, electrum: 0, gold: 25, platinum: 0 },
+  attunementSlots: { max: 3, used: 1 },
+};
+
+const favoritesFixture: CharacterState = {
+  ...inventoryFixture,
+  sheetFavorites: [
+    { kind: 'item', id: 'longbow' },
+    // Guidance (not Hunter's Mark) — Hunter's Mark's name is also shown by
+    // the header's concentration badge (kaelenFixture.concentration), which
+    // would make it ambiguous for a story's play function to query.
+    { kind: 'spell', id: 'guidance' },
+    { kind: 'feature', id: 'second-wind' },
+  ],
+  // resolveSheetFavorites (src/utils/sheetFavorites.ts) treats the legacy
+  // flags as authoritative for spell/feature membership — sheetFavorites
+  // alone isn't enough for those two kinds.
+  favoriteFeatureIds: ['second-wind'],
+  spellbook: { ...kaelenFixture.spellbook, favoriteSpells: ['guidance'] },
+};
+
 const nonCasterFixture: CharacterState = makeCharacter({
   name: 'Borin Ironfist',
   race: 'Dwarf',
@@ -184,6 +288,21 @@ function withStoredTab(tabId: string): Decorator {
     return <Story />;
   }
   return StoredTabDecorator;
+}
+
+/** Pre-selects the Inventory tab's grid view by seeding its persisted
+ *  localStorage key before the drawer mounts — same pattern as
+ *  `withStoredTab`, for `INVENTORY_VIEW_STORAGE_KEY`. */
+function withInventoryView(mode: 'list' | 'grid'): Decorator {
+  function InventoryViewDecorator(Story: Parameters<Decorator>[0]) {
+    try {
+      window.localStorage.setItem(INVENTORY_VIEW_STORAGE_KEY, mode);
+    } catch {
+      // localStorage unavailable — the story still renders, just on list view.
+    }
+    return <Story />;
+  }
+  return InventoryViewDecorator;
 }
 
 function body() {
@@ -350,5 +469,73 @@ export const EffectsTabStory: Story = {
     await expect(
       screen.getByRole('button', { name: 'Prone' })
     ).toBeInTheDocument();
+  },
+};
+
+export const InventoryTabStory: Story = {
+  name: 'Inventory tab',
+  decorators: [withStoredTab('inventory'), withCharacter(inventoryFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /inventory/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(screen.getByText('Longbow')).toBeInTheDocument();
+    await expect(screen.getByText('Studded Leather')).toBeInTheDocument();
+    await expect(screen.getByText('Ring of Protection')).toBeInTheDocument();
+    await expect(
+      screen.getByText('Rope, Hempen (50 feet)')
+    ).toBeInTheDocument();
+  },
+};
+
+export const InventoryTabGridStory: Story = {
+  name: 'Inventory tab (grid)',
+  decorators: [
+    withStoredTab('inventory'),
+    withInventoryView('grid'),
+    withCharacter(inventoryFixture),
+  ],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(screen.getByRole('tab', { name: /inventory/i })).toHaveAttribute(
+        'aria-selected',
+        'true'
+      )
+    );
+    await expect(
+      screen.getByRole('button', { name: 'Grid view' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    await expect(screen.getByText('Potion of Healing')).toBeInTheDocument();
+  },
+};
+
+export const OverviewFavoritesStory: Story = {
+  name: 'Overview with favorites',
+  // Explicit — otherwise it'd inherit whatever tab the previous story in
+  // this file left in the persisted-tab localStorage key.
+  decorators: [withStoredTab('overview'), withCharacter(favoritesFixture)],
+  play: async () => {
+    const screen = body();
+    await waitFor(() =>
+      expect(
+        screen.getByRole('dialog', { name: /kaelen voss/i })
+      ).toBeInTheDocument()
+    );
+    // Scoped to the Favorites section: "Second Wind" is also a built-in
+    // Fighter class resource rendered by SheetResources just below it on
+    // this same tab, so an unscoped query would match both.
+    const favoritesHeading = screen.getByRole('heading', {
+      name: 'Favorites',
+      level: 3,
+    });
+    const favorites = within(favoritesHeading.closest('div')!);
+    await expect(favorites.getByText('Longbow')).toBeInTheDocument();
+    await expect(favorites.getByText('Guidance')).toBeInTheDocument();
+    await expect(favorites.getByText('Second Wind')).toBeInTheDocument();
   },
 };

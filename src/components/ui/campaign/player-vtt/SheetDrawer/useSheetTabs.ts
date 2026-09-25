@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
-import { Activity, Award, Dices, Sparkles, Star } from 'lucide-react';
+import { Activity, Award, Backpack, Dices, Sparkles, Star } from 'lucide-react';
 
 import { useCharacterStore } from '@/store/characterStore';
 import { isSpellcaster } from '@/utils/calculations';
@@ -53,6 +53,7 @@ export function useSheetTabs() {
           label: 'Spells',
           icon: Sparkles,
         },
+        { id: 'inventory' as const, label: 'Inventory', icon: Backpack },
         { id: 'features' as const, label: 'Features', icon: Award },
         { id: 'effects' as const, label: 'Effects', icon: Activity },
       ].filter((tab): tab is SheetTabDefinition => Boolean(tab)),
