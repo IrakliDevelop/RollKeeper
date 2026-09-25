@@ -163,6 +163,38 @@ describe('ActionsTab', () => {
     expect(actions.onUseAbility).toHaveBeenCalledWith('e1', 'breath');
   });
 
+  it('renders each section heading once (no outer card heading duplicating the inner one)', () => {
+    const entity = makeEntity({
+      legendaryActions: {
+        maxActions: 3,
+        usedActions: 0,
+        actions: [{ id: 't', name: 'Tail', cost: 1, description: '' }],
+      },
+      lairActions: [
+        { id: 'la', name: 'Quake', description: '', usedThisRound: false },
+      ],
+      resources: [
+        {
+          id: 'r',
+          name: 'Ki',
+          icon: 'zap',
+          color: 'blue',
+          displayStyle: 'pool',
+          maxUses: 2,
+          usesExpended: 0,
+          shortRestReset: 'all',
+        },
+      ],
+    });
+    render(
+      <ActionsTab entity={entity} actions={makeActions()} editing={false} />
+    );
+
+    expect(screen.getAllByText(/^legendary actions$/i)).toHaveLength(1);
+    expect(screen.getAllByText(/^lair actions/i)).toHaveLength(1);
+    expect(screen.getAllByText(/resources$/i)).toHaveLength(1);
+  });
+
   it('renders an empty state when nothing applies', () => {
     render(
       <ActionsTab

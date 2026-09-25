@@ -9,6 +9,7 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
+import { CreatureDrawer } from './CreatureDrawer';
 import { CreatureSheetPill } from './CreatureSheetPill';
 import { useDmVttScreen } from './DmVttScreen.hooks';
 import { DmVttNpcDialog } from './DmVttNpcDialog';
@@ -157,6 +158,15 @@ export function DmVttScreen({
           canvasEl={vtt.getCanvasEl()}
         />
       </div>
+      {vtt.actions && (
+        <CreatureDrawer
+          entity={vtt.creatureDrawer.entity}
+          actions={vtt.actions}
+          isTurn={vtt.activeEntity?.id === vtt.creatureDrawer.entity?.id}
+          onClose={vtt.creatureDrawer.close}
+          onTokenIdentityChange={vtt.updateTokenIdentity}
+        />
+      )}
       <ToastContainer toasts={vtt.toasts} onDismiss={vtt.dismissToast} />
       <DmVttNpcDialog
         campaignCode={campaignCode}

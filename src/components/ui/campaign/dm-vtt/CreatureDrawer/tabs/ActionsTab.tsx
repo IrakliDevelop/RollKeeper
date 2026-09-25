@@ -29,7 +29,11 @@ function hasTraitContent(
   );
 }
 
-/** Actions tab: legendary/lair actions, class resources, and stat block traits/actions. */
+/**
+ * Actions tab: legendary/lair actions, class resources, and stat block
+ * traits/actions. The legendary, lair, and resource cards carry no outer
+ * heading — those sections render their own.
+ */
 export function ActionsTab({ entity, actions }: CreatureTabProps) {
   const sb = entity.monsterStatBlock;
   const { onUseEntry, onUseAbilityEntry, onRestoreAbilityEntry } =
@@ -48,19 +52,16 @@ export function ActionsTab({ entity, actions }: CreatureTabProps) {
     <div className="space-y-3">
       {hasLegendary && (
         <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Legendary Actions</h3>
           <LegendarySection entity={entity} actions={actions} />
         </div>
       )}
       {hasLairActions && (
         <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Lair Actions</h3>
           <LairActionsSection entity={entity} actions={actions} />
         </div>
       )}
       {hasResources && (
         <div className={SECTION_CLASS}>
-          <h3 className={HEADING_CLASS}>Resources</h3>
           <DetailResources entity={entity} actions={actions} />
         </div>
       )}
