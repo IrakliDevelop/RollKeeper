@@ -9,6 +9,7 @@ import { useTokenInfoMode } from '@/components/ui/campaign/token-overlay/useToke
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 
 import { DmBattleMapCanvas } from './DmBattleMapCanvas';
+import { CreatureSheetPill } from './CreatureSheetPill';
 import { useDmVttScreen } from './DmVttScreen.hooks';
 import { DmVttNpcDialog } from './DmVttNpcDialog';
 import { DmVttTopBar } from './DmVttTopBar';
@@ -53,6 +54,16 @@ export function DmVttScreen({
   );
   const decorations = useDmTokenDecorations(vtt.linkedEntities);
 
+  const selectedEntity = vtt.encounter?.entities.find(
+    e => e.id === vtt.selectedEntityId
+  );
+  const sheetPillEntity =
+    selectedEntity &&
+    selectedEntity.type !== 'player' &&
+    vtt.creatureDrawer.entity === null
+      ? selectedEntity
+      : null;
+
   const gridMode: DmVttGridMode = vtt.battleMap?.gridEnabled
     ? (vtt.battleMap.gridSettings?.gridType ?? 'hex')
     : 'off';
@@ -67,6 +78,7 @@ export function DmVttScreen({
       onViewportReady={vtt.onViewportReady}
       tokenConfigRef={vtt.tokenConfigRef}
       onSelectionChange={vtt.onSelectionChange}
+      onOpenCombatant={vtt.creatureDrawer.open}
       tokenInfoToggle={{ mode: tokenInfoMode, onCycle: cycleTokenInfo }}
       onExportError={message =>
         vtt.addToast({ type: 'error', title: 'Export failed', message })
@@ -111,6 +123,12 @@ export function DmVttScreen({
           hasLinkedEncounter={vtt.linkedEncounterIds.length > 0}
         />
         <RosterDragGhost drag={vtt.drag} />
+        {sheetPillEntity && (
+          <CreatureSheetPill
+            name={sheetPillEntity.name}
+            onOpen={() => vtt.creatureDrawer.open(sheetPillEntity.id)}
+          />
+        )}
         {vtt.actions && (
           <StudioPanel
             encounter={vtt.encounter}
