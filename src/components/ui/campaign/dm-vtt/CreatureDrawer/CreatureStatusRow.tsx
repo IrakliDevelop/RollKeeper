@@ -15,6 +15,7 @@ import {
   SECTION_CLASS,
 } from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
 
+import { CreatureConcentrationBanner } from './CreatureConcentrationBanner';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
 
 /** Concentration/reaction, death saves (when applicable), and the Spend Hit Die control. */
@@ -23,6 +24,7 @@ export function CreatureStatusRow({ entity, actions }: CreatureVitalsProps) {
     <div className={`${SECTION_CLASS} space-y-2`}>
       <p className={HEADING_CLASS}>Status</p>
       <ConcentrationReaction entity={entity} actions={actions} />
+      <CreatureConcentrationBanner entity={entity} />
 
       {showDeathSaves(entity) && (
         <DeathSaves entity={entity} actions={actions} />

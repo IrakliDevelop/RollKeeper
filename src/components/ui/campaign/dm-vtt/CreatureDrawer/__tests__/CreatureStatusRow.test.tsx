@@ -64,6 +64,74 @@ function baseProps(
 }
 
 describe('CreatureStatusRow', () => {
+  it('shows no concentration banner when not concentrating', () => {
+    render(<CreatureStatusRow {...baseProps()} />);
+    expect(screen.queryByText(/concentrating on/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a read-only concentration banner with the CON save hint and value', () => {
+    render(
+      <CreatureStatusRow
+        {...baseProps({
+          entity: makeEntity({
+            concentrationSpell: 'Hold Person',
+            proficiencyBonus: 3,
+            monsterStatBlock: {
+              str: 10,
+              dex: 10,
+              con: 14,
+              int: 10,
+              wis: 10,
+              cha: 10,
+              saveProficiencies: ['con'],
+            } as never,
+          }),
+        })}
+      />
+    );
+    const banner = screen.getByRole('status', { name: /concentration/i });
+    expect(banner).toHaveTextContent('Concentrating on Hold Person');
+    expect(banner).toHaveTextContent(
+      'On damage: CON save, DC 10 or half the damage, whichever is higher.'
+    );
+    expect(banner).toHaveTextContent('CON save +5');
+    expect(
+      screen.queryByRole('button', { name: /roll/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it('uses a CON save override from the stat block saves string', () => {
+    render(
+      <CreatureStatusRow
+        {...baseProps({
+          entity: makeEntity({
+            concentrationSpell: 'Bless',
+            monsterStatBlock: {
+              str: 10,
+              dex: 10,
+              con: 8,
+              int: 10,
+              wis: 10,
+              cha: 10,
+              saves: 'CON +7',
+            } as never,
+          }),
+        })}
+      />
+    );
+    expect(screen.getByText('CON save +7')).toBeInTheDocument();
+  });
+
+  it('omits the CON save value without a stat block', () => {
+    render(
+      <CreatureStatusRow
+        {...baseProps({ entity: makeEntity({ concentrationSpell: 'Bless' }) })}
+      />
+    );
+    expect(screen.getByText('Concentrating on Bless')).toBeInTheDocument();
+    expect(screen.queryByText(/CON save [+-]/)).not.toBeInTheDocument();
+  });
+
   it('renders the concentration input for a non-player', () => {
     render(<CreatureStatusRow {...baseProps()} />);
     expect(screen.getByPlaceholderText('None')).toBeInTheDocument();
