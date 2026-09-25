@@ -1,12 +1,13 @@
 'use client';
 
-import { useMemo, type ReactNode } from 'react';
+import { useMemo } from 'react';
 
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { useCharacterStore } from '@/store/characterStore';
 import { formatModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
+import { MaybeRollElement } from './MaybeRollElement';
 import { buildAbilityCells } from './SheetDrawer.utils';
 import type { AbilityCellView } from './SheetDrawer.types';
 
@@ -33,32 +34,6 @@ export function SheetAbilities({ locked, roll }: SheetAbilitiesProps) {
       ))}
     </div>
   );
-}
-
-function MaybeRollElement({
-  onRoll,
-  ariaLabel,
-  className,
-  children,
-}: {
-  onRoll?: () => void;
-  ariaLabel: string;
-  className: string;
-  children: ReactNode;
-}) {
-  if (onRoll) {
-    return (
-      <button
-        type="button"
-        aria-label={ariaLabel}
-        onClick={onRoll}
-        className={className}
-      >
-        {children}
-      </button>
-    );
-  }
-  return <div className={className}>{children}</div>;
 }
 
 function AbilityCell({

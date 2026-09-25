@@ -15,6 +15,8 @@ import {
 } from '@/utils/classResources';
 import { cn } from '@/utils/cn';
 
+import { HEADING_CLASS, SECTION_CLASS } from './sheetSectionStyles';
+
 /**
  * Class resources (Rage, Lay on Hands, Second Wind, …) for the map sheet's
  * Overview tab. Not DockResources — that component is the dock's compact
@@ -34,10 +36,8 @@ export function SheetResources() {
   if (resources.length === 0) return null;
 
   return (
-    <div className="border-divider bg-surface rounded-xl border p-3">
-      <div className="text-faint mb-2 text-xs font-bold uppercase">
-        Class Resources
-      </div>
+    <div className={SECTION_CLASS}>
+      <h3 className={HEADING_CLASS}>Class Resources</h3>
       <div className="space-y-2.5">
         {resources.map(resource => (
           <ResourceRow

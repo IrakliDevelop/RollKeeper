@@ -10,6 +10,12 @@ const props = () => ({
   addToast: vi.fn(),
   showAttackRoll: vi.fn(),
   onRested: vi.fn(),
+  spellCasting: {
+    onCastPlacement: vi.fn(),
+    connectionLive: true,
+    hasPendingPlacement: false,
+    onCancelPlacement: vi.fn(),
+  },
 });
 beforeEach(() => {
   window.localStorage.clear();
@@ -74,5 +80,70 @@ describe('SheetDrawer', () => {
     const tab = screen.getByRole('tab', { name: /overview/i });
     const panel = screen.getByRole('tabpanel', { name: /overview/i });
     expect(tab).toHaveAttribute('aria-controls', panel.id);
+  });
+
+  it('falls back to overview when the stored tab is unknown', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'bogus');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('restores a stored known tab', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'effects');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /effects/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('falls back to overview when the stored tab is not offered to this character', () => {
+    // Default seeded character is a non-caster (class.spellcaster: 'none',
+    // spells: []) — the Spells tab isn't in its tab list, so a stored
+    // 'spells' tab must fall back to Overview.
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'spells');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('keeps a stored Spells preference while viewing a non-caster', () => {
+    window.localStorage.setItem('rollkeeper-map-sheet-tab', 'spells');
+    render(<SheetDrawer {...props()} />);
+    expect(screen.getByRole('tab', { name: /overview/i })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    expect(window.localStorage.getItem('rollkeeper-map-sheet-tab')).toBe(
+      'spells'
+    );
+  });
+
+  it('persists a tab the user selects', () => {
+    render(<SheetDrawer {...props()} />);
+    fireEvent.mouseDown(screen.getByRole('tab', { name: /features/i }));
+    expect(window.localStorage.getItem('rollkeeper-map-sheet-tab')).toBe(
+      'features'
+    );
+  });
+
+  it('renders every tab panel', () => {
+    render(<SheetDrawer {...props()} />);
+    for (const name of [/abilities/i, /features/i, /effects/i]) {
+      fireEvent.mouseDown(screen.getByRole('tab', { name }));
+      expect(screen.getByRole('tabpanel', { name })).not.toBeEmptyDOMElement();
+    }
+  });
+
+  it('hides the Spells tab for non-casters', () => {
+    // Default seeded character (Fighter-shaped, class.spellcaster: 'none',
+    // spells: []) is not a caster.
+    render(<SheetDrawer {...props()} />);
+    expect(screen.queryByRole('tab', { name: /spells/i })).toBeNull();
   });
 });

@@ -18,11 +18,13 @@ import {
 
 /**
  * End-to-end coverage for the player battle-map sheet drawer (battlemap
- * sheet drawer PR1, Task 11): a real player on the live-relay battle map
- * places their own token, double-clicks it to open the non-modal
- * character-sheet drawer (without dragging the token), applies damage from
- * the drawer that survives a reload, closes it with Escape (restoring the
- * dock), and a single click on the token does NOT open it.
+ * sheet drawer PR1, Task 11; PR2 Task 7 added the Effects-tab persistence
+ * scenario): a real player on the live-relay battle map places their own
+ * token, double-clicks it to open the non-modal character-sheet drawer
+ * (without dragging the token), applies damage from the drawer that
+ * survives a reload, closes it with Escape (restoring the dock), a single
+ * click on the token does NOT open it, and toggling a condition in the
+ * Effects tab survives a reload too.
  *
  * Harness: `e2e/shop-purchase-reconciliation.spec.ts`'s relay pattern
  * (`config/playwright/sheet-drawer.config.ts` mirrors `shop.config.ts`'s
@@ -30,9 +32,10 @@ import {
  * run so the live relay room — which is how the player's own placed token
  * comes back after a reload — is never torn down.
  *
- * The four scenarios share one DM/player setup and run serially, in order:
+ * The five scenarios share one DM/player setup and run serially, in order:
  * each builds on the state the previous one left behind (drawer open →
- * damaged + reopened → closed → token single-clicked).
+ * damaged + reopened → closed → token single-clicked, reopening the drawer
+ * → Prone toggled and reloaded).
  */
 
 const CAMPAIGN_NAME = 'Sheet Drawer E2E Campaign';
@@ -374,5 +377,57 @@ test.describe('player map sheet drawer', () => {
     // opens the drawer, so the single click above was not a miss.
     await playerPage.mouse.dblclick(coords.x, coords.y);
     await expect(sheetDialog(playerPage)).toBeVisible({ timeout: 10_000 });
+  });
+
+  test('toggling a condition in the Effects tab persists across a reload', async () => {
+    // Left open by the previous test's control double click.
+    const dialog = sheetDialog(playerPage);
+    await expect(dialog).toBeVisible();
+
+    await dialog.getByRole('tab', { name: /effects/i }).click();
+    const prone = dialog.getByRole('button', { name: 'Prone' });
+    await prone.click();
+    await expect(prone).toHaveAttribute('aria-pressed', 'true');
+
+    // A real character mutation: it must be on disk (the canonical
+    // per-character envelope) before the reload.
+    await playerPage.waitForFunction(
+      id => {
+        const raw = window.localStorage.getItem(`rollkeeper-character:${id}`);
+        if (!raw) return false;
+        const parsed = JSON.parse(raw) as {
+          state?: {
+            character?: {
+              conditionsAndDiseases?: {
+                activeConditions?: { name: string }[];
+              };
+            };
+          };
+        };
+        return !!parsed.state?.character?.conditionsAndDiseases?.activeConditions?.some(
+          c => c.name === 'Prone'
+        );
+      },
+      characterId,
+      { timeout: 10_000 }
+    );
+
+    await playerPage.reload({ waitUntil: 'networkidle' });
+    await waitForStoresReady(playerPage);
+    await waitForCharacterLoaded(playerPage, characterId);
+    await expect(sheetDialog(playerPage)).toBeHidden();
+
+    await playerPage
+      .getByRole('button', { name: 'Open character sheet' })
+      .click();
+    const reopened = sheetDialog(playerPage);
+    await expect(reopened).toBeVisible({ timeout: 10_000 });
+    await reopened.getByRole('tab', { name: /effects/i }).click();
+    const reopenedProne = reopened.getByRole('button', { name: 'Prone' });
+    await expect(reopenedProne).toHaveAttribute('aria-pressed', 'true');
+
+    // Leave no residual state behind.
+    await reopenedProne.click();
+    await expect(reopenedProne).toHaveAttribute('aria-pressed', 'false');
   });
 });

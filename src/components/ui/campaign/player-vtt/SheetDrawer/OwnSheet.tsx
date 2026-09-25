@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as Tabs from '@radix-ui/react-tabs';
-import { Star, Unlock } from 'lucide-react';
+import { Unlock } from 'lucide-react';
 
 import RestDialog from '@/components/ui/character/RestDialog';
 import type { ToastData } from '@/components/ui/feedback/Toast';
@@ -13,13 +13,18 @@ import { useCharacterStore } from '@/store/characterStore';
 import { SheetAbilities } from './SheetAbilities';
 import {
   SHEET_DICE_ROLLS_ENABLED,
-  SHEET_TAB_STORAGE_KEY,
+  type SheetSpellCastingProps,
   type SheetTabId,
 } from './SheetDrawer.types';
 import { SheetHeader } from './SheetHeader';
-import { SheetTabBar, type SheetTabDefinition } from './SheetTabBar';
+import { SheetTabBar } from './SheetTabBar';
 import { SheetVitals } from './SheetVitals';
+import { AbilitiesTab } from './tabs/AbilitiesTab';
+import { EffectsTab } from './tabs/EffectsTab';
+import { FeaturesTab } from './tabs/FeaturesTab';
 import { OverviewTab } from './tabs/OverviewTab';
+import { SpellsTab } from './tabs/SpellsTab';
+import { useSheetTabs } from './useSheetTabs';
 
 export interface OwnSheetProps {
   onClose: () => void;
@@ -31,21 +36,7 @@ export interface OwnSheetProps {
     isCrit: boolean
   ) => void;
   onRested: (type: 'short' | 'long') => void;
-}
-
-// PR 1 ships only the Overview tab; later PRs extend this list.
-const TABS: SheetTabDefinition[] = [
-  { id: 'overview', label: 'Overview', icon: Star },
-];
-
-function readStoredTab(): SheetTabId {
-  try {
-    const stored = window.localStorage.getItem(SHEET_TAB_STORAGE_KEY);
-    if (stored === 'overview') return stored;
-  } catch {
-    // localStorage unavailable (private mode, SSR) — fall back silently.
-  }
-  return 'overview';
+  spellCasting: SheetSpellCastingProps;
 }
 
 export function OwnSheet({
@@ -53,6 +44,7 @@ export function OwnSheet({
   addToast,
   showAttackRoll,
   onRested,
+  spellCasting,
 }: OwnSheetProps) {
   const name = useCharacterStore(s => s.character.name);
   const takeShortRest = useCharacterStore(s => s.takeShortRest);
@@ -60,17 +52,10 @@ export function OwnSheet({
 
   const [locked, setLocked] = useState(true);
   const [restType, setRestType] = useState<'short' | 'long' | null>(null);
-  const [activeTab, setActiveTab] = useState<SheetTabId>(readStoredTab);
+  const { tabs, activeTab, setActiveTab } = useSheetTabs();
 
   const roll = useSheetRoll({ diceReady: false, showAttackRoll });
-
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(SHEET_TAB_STORAGE_KEY, activeTab);
-    } catch {
-      // localStorage unavailable — the tab still works, just doesn't persist.
-    }
-  }, [activeTab]);
+  const rollOrUndefined = SHEET_DICE_ROLLS_ENABLED ? roll : undefined;
 
   return (
     <div className="flex h-full flex-col">
@@ -83,14 +68,8 @@ export function OwnSheet({
       />
 
       <div className="space-y-3 px-5 pb-4">
-        <SheetVitals
-          addToast={addToast}
-          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
-        />
-        <SheetAbilities
-          locked={locked}
-          roll={SHEET_DICE_ROLLS_ENABLED ? roll : undefined}
-        />
+        <SheetVitals addToast={addToast} roll={rollOrUndefined} />
+        <SheetAbilities locked={locked} roll={rollOrUndefined} />
       </div>
 
       <Tabs.Root
@@ -98,7 +77,7 @@ export function OwnSheet({
         onValueChange={v => setActiveTab(v as SheetTabId)}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <SheetTabBar tabs={TABS} activeTab={activeTab} />
+        <SheetTabBar tabs={tabs} activeTab={activeTab} />
 
         {!locked && (
           <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex items-center gap-2 border-b px-5 py-2 text-xs">
@@ -119,6 +98,31 @@ export function OwnSheet({
         >
           <OverviewTab addToast={addToast} />
         </Tabs.Content>
+        {tabs
+          .filter(tab => tab.id !== 'overview')
+          .map(tab => (
+            <Tabs.Content
+              key={tab.id}
+              value={tab.id}
+              className="flex-1 overflow-y-auto px-5 py-4"
+            >
+              {tab.id === 'abilities' && (
+                <AbilitiesTab locked={locked} roll={rollOrUndefined} />
+              )}
+              {tab.id === 'spells' && (
+                <SpellsTab
+                  locked={locked}
+                  addToast={addToast}
+                  spellCasting={spellCasting}
+                  roll={rollOrUndefined}
+                />
+              )}
+              {tab.id === 'features' && <FeaturesTab />}
+              {tab.id === 'effects' && (
+                <EffectsTab addToast={addToast} roll={rollOrUndefined} />
+              )}
+            </Tabs.Content>
+          ))}
       </Tabs.Root>
 
       <RestDialog
