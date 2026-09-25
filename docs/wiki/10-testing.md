@@ -42,7 +42,7 @@ its own npm script:
 | `test:auth:e2e` | Auth + auth wizard flows |
 | `test:reconnect:nightly` | Cross-tab/single-writer sync repeated 3x, plus a dedicated reconnect drill — nightly, not part of normal CI |
 | `test:checkpoint-matrix:nightly` | Storage checkpoint matrix — nightly |
-| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer ([relay](07-battlemap-fog-fieldnotes.md)-backed) — nightly only, not part of normal CI |
+| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer ([relay](07-battlemap-fog-fieldnotes.md)-backed) and the DM battle-map creature drawer — nightly only, not part of normal CI |
 | `test:rollback:drill` | `scripts/run-rollback-drill.mjs` — storage rollback verification |
 
 Nightly/drill suites are **not** expected to run on every PR — they exist for
