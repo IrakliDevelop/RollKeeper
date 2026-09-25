@@ -234,4 +234,43 @@ describe('usePlayerTokenDecorations', () => {
     );
     expect(result.current.get('e1')?.hp).toBeUndefined();
   });
+
+  it('player opted out of HP sharing: tier-colored state chip, not a broken/missing bar', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [
+          enemy({
+            entityId: 'p1',
+            type: 'player',
+            displayName: 'Fjord',
+            playerCharacterId: 'char-9',
+            hpMode: 'label',
+            hpState: 'Bloodied',
+            hpTier: 'low',
+          }),
+        ])
+      )
+    );
+    const d = result.current.get('p1');
+    expect(d?.hp).toEqual({ kind: 'label', text: 'Bloodied', tier: 'low' });
+    expect(result.current.get('char-9')).toBe(d);
+  });
+
+  it('player opted out and dead: no hp view (no state/tier once dead)', () => {
+    const { result } = renderHook(() =>
+      usePlayerTokenDecorations(
+        state('off', [
+          enemy({
+            entityId: 'p1',
+            type: 'player',
+            playerCharacterId: 'char-9',
+            hpMode: 'label',
+            isDead: true,
+          }),
+        ])
+      )
+    );
+    expect(result.current.get('p1')?.hp).toBeUndefined();
+    expect(result.current.get('p1')?.isDead).toBe(true);
+  });
 });

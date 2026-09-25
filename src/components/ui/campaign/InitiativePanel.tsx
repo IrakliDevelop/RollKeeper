@@ -202,11 +202,14 @@ export function InitiativePanel({
                   : entry.hpPercent !== undefined && hpMode === 'percent'
                     ? `${entry.hpPercent}%`
                     : (entry.hpState ?? null);
-              // Colour: dead = red; players use neutral (they have a bar);
-              // enemies use their coarse health tier.
+              // Colour: dead = red; a row with an exact HP bar (players who
+              // share, and DM-toggled enemies) uses neutral text since the
+              // bar itself carries the colour; a row with no exact HP (an
+              // opted-out player's label, or an enemy's label/percent) uses
+              // its coarse health tier instead.
               const hpTextColor = isDead
                 ? 'text-accent-red-text font-medium'
-                : isPlayer
+                : hasHp
                   ? 'text-faint'
                   : entry.hpTier
                     ? getHpTierTextColor(entry.hpTier)
