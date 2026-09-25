@@ -303,9 +303,11 @@ export function buildFavoriteRows(c: CharacterState): FavoriteRowView[] {
   );
   const spellsById = new Map((c.spells ?? []).map(spell => [spell.id, spell]));
   const featuresById = new Map(
-    buildFeatureGroups(c)
-      .flatMap(g => g.features)
-      .map(feature => [feature.id, feature])
+    buildFeatureGroups(c).flatMap(g =>
+      g.features.map(
+        feature => [feature.id, { feature, group: g.label }] as const
+      )
+    )
   );
 
   const rows: FavoriteRowView[] = [];
@@ -334,15 +336,15 @@ export function buildFavoriteRows(c: CharacterState): FavoriteRowView[] {
         castable: isSpellCastable(c, spell),
       });
     } else {
-      const feature = featuresById.get(favorite.id);
-      if (!feature) continue;
+      const match = featuresById.get(favorite.id);
+      if (!match) continue;
       rows.push({
         key: `feature:${favorite.id}`,
         kind: 'feature',
         id: favorite.id,
-        name: feature.name,
-        meta: feature.tag,
-        feature,
+        name: match.feature.name,
+        meta: match.group,
+        feature: match.feature,
       });
     }
   }

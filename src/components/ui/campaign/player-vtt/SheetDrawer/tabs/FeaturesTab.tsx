@@ -104,11 +104,15 @@ export function FeaturesTab() {
                         <Badge variant="neutral">{feature.tag}</Badge>
                       )}
                     </button>
-                    <FavoriteStar
-                      kind="feature"
-                      id={feature.id}
-                      name={feature.name}
-                    />
+                    {/* Legacy trackable traits aren't shown by the full sheet's
+                        QuickFeatures, so pinning one would create a phantom. */}
+                    {feature.kind !== 'trait' && (
+                      <FavoriteStar
+                        kind="feature"
+                        id={feature.id}
+                        name={feature.name}
+                      />
+                    )}
                   </div>
 
                   {feature.maxUses > 0 && (

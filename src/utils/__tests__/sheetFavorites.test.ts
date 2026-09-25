@@ -9,6 +9,17 @@ const make = (o: Partial<CharacterState>): CharacterState =>
   ({ ...base(), ...o }) as CharacterState;
 
 describe('resolveSheetFavorites', () => {
+  it('treats a non-array sheetFavorites as empty', () => {
+    const c = make({
+      sheetFavorites: {
+        bogus: true,
+      } as unknown as CharacterState['sheetFavorites'],
+      favoriteFeatureIds: ['f1'],
+      spellbook: { ...base().spellbook, favoriteSpells: [] },
+    });
+    expect(resolveSheetFavorites(c)).toEqual([{ kind: 'feature', id: 'f1' }]);
+  });
+
   it('derives from legacy flags when sheetFavorites is undefined', () => {
     const c = make({
       sheetFavorites: undefined,

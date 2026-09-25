@@ -316,6 +316,12 @@ function migrateCharacterData(character: unknown): CharacterState {
     if (!Array.isArray(result.favoriteFeatureIds)) {
       result.favoriteFeatureIds = [];
     }
+    if (
+      result.sheetFavorites !== undefined &&
+      !Array.isArray(result.sheetFavorites)
+    ) {
+      delete result.sheetFavorites;
+    }
     // Ensure defenses arrays exist
     if (!Array.isArray(result.damageImmunities)) {
       result.damageImmunities = [];

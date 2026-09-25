@@ -126,6 +126,14 @@ describe('FeaturesTab', () => {
     expect(getChar().favoriteFeatureIds).toContain('sw');
   });
 
+  it('does not offer a pin star for legacy tracked traits', () => {
+    render(<FeaturesTab />);
+    expect(
+      screen.getByRole('button', { name: /^(un)?pin second wind$/i })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /pin lucky/i })).toBeNull();
+  });
+
   it('shows an empty state', () => {
     cleanup();
     seed({ extendedFeatures: [], trackableTraits: [] });

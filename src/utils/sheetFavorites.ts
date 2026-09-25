@@ -29,7 +29,8 @@ export function resolveSheetFavorites(c: SheetFavoriteSource): SheetFavorite[] {
     result.push({ kind, id });
   };
 
-  for (const favorite of c.sheetFavorites ?? []) {
+  const pinned = Array.isArray(c.sheetFavorites) ? c.sheetFavorites : [];
+  for (const favorite of pinned) {
     if (favorite.kind === 'spell' && !legacySpells.has(favorite.id)) continue;
     if (favorite.kind === 'feature' && !legacyFeatures.has(favorite.id))
       continue;

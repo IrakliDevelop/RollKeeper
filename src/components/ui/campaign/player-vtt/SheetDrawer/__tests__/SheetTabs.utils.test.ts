@@ -439,6 +439,14 @@ describe('buildFavoriteRows', () => {
     }
   });
 
+  it('labels feature rows with their source group, not the uses tag', () => {
+    const [feature] = buildFavoriteRows(favoritesFixture());
+    expect(feature.meta).toBe('Class Features');
+    if (feature.kind === 'feature') {
+      expect(feature.meta).not.toBe(feature.feature.tag);
+    }
+  });
+
   it('is empty when nothing is pinned', () => {
     expect(buildFavoriteRows(fixture())).toEqual([]);
   });

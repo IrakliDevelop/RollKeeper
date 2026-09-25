@@ -105,3 +105,23 @@ describe('adjustItemQuantity', () => {
     expect(qty('p1')).toBe(0);
   });
 });
+
+describe('sheetFavorites migration guard', () => {
+  it('drops a non-array sheetFavorites on load so resolution falls back to legacy flags', () => {
+    seed({
+      sheetFavorites: 'corrupt' as unknown as CharacterState['sheetFavorites'],
+      favoriteFeatureIds: ['f1'],
+    });
+    expect(char().sheetFavorites).toBeUndefined();
+    store().setSheetFavorite('item', 'i1', true);
+    expect(char().sheetFavorites).toEqual([
+      { kind: 'feature', id: 'f1' },
+      { kind: 'item', id: 'i1' },
+    ]);
+  });
+
+  it('keeps a valid sheetFavorites array on load', () => {
+    seed({ sheetFavorites: [{ kind: 'item', id: 'i1' }] });
+    expect(char().sheetFavorites).toEqual([{ kind: 'item', id: 'i1' }]);
+  });
+});
