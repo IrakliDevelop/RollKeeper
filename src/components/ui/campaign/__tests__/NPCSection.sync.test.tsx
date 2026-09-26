@@ -137,4 +137,36 @@ describe('NPCSection cloud sync mount', () => {
       inventory: [{ id: 'key', name: 'Vault Key', quantity: 1 }],
     });
   });
+
+  it('persists the custom monster collapsed state across a remount', () => {
+    const props = {
+      campaignCode: 'empty-campaign',
+      kind: 'monster' as const,
+      showSpellSlotSettings: false,
+      showLibraryExtras: false,
+    };
+    const { unmount } = render(<NPCSection {...props} />);
+
+    fireEvent.click(
+      screen.getByRole('button', { name: /collapse custom monsters/i })
+    );
+
+    expect(
+      useDmStore.getState().getCampaign('empty-campaign')?.dmDashboardUi
+        ?.monsterSectionOpen
+    ).toBe(false);
+    expect(
+      screen.queryByText('No Custom Monsters yet')
+    ).not.toBeInTheDocument();
+
+    unmount();
+    render(<NPCSection {...props} />);
+
+    expect(
+      screen.getByRole('button', { name: /expand custom monsters/i })
+    ).toHaveAttribute('aria-expanded', 'false');
+    expect(
+      screen.queryByText('No Custom Monsters yet')
+    ).not.toBeInTheDocument();
+  });
 });

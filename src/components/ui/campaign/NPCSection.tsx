@@ -72,7 +72,6 @@ export function NPCSection({
   } = useNPCStore();
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
-  const [monsterSectionOpen, setMonsterSectionOpen] = useState(true);
   const [monsterCollapsedGroups, setMonsterCollapsedGroups] = useState<
     Set<string>
   >(new Set());
@@ -80,7 +79,7 @@ export function NPCSection({
   const singularLabel = isMonsterLibrary ? 'Custom Monster' : 'NPC';
   const pluralLabel = isMonsterLibrary ? 'Custom Monsters' : 'NPCs';
   const sectionOpen = isMonsterLibrary
-    ? monsterSectionOpen
+    ? (campaign?.dmDashboardUi?.monsterSectionOpen ?? true)
     : (campaign?.dmDashboardUi?.npcSectionOpen ?? true);
   const spellSlotDisplayMode: 'inline' | 'tracker' =
     campaign?.dmDashboardUi?.npcInlineSpellSlots === false &&
@@ -252,11 +251,10 @@ export function NPCSection({
   const hasAnyGroup = npcs.some(npc => !!npc.group);
 
   const handleSectionToggle = () => {
-    if (isMonsterLibrary) {
-      setMonsterSectionOpen(open => !open);
-      return;
-    }
-    setDmDashboardUi(campaignCode, { npcSectionOpen: !sectionOpen });
+    setDmDashboardUi(campaignCode, {
+      [isMonsterLibrary ? 'monsterSectionOpen' : 'npcSectionOpen']:
+        !sectionOpen,
+    });
   };
 
   return (
