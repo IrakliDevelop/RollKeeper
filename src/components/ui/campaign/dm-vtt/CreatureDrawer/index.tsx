@@ -44,10 +44,17 @@ const STUDIO_PANEL_SELECTOR = '[data-testid="dm-vtt-studio-panel"]';
 
 /**
  * Remembers the element focused when the drawer opens (layout effect: runs
- * before Radix moves focus inside) and, on close, if that element has since
- * unmounted — e.g. the Sheet pill, hidden while the drawer is open — moves
- * focus into the Studio panel instead of dropping it on <body>. When the
- * opener is still connected, `SideDrawer`'s default focus return applies.
+ * before Radix moves focus inside) and, on close, falls back to the Studio
+ * panel instead of dropping focus on <body> when that opener is unusable —
+ * missing, unmounted, or `document.body` itself. The last case covers the
+ * Sheet pill: it's hidden in the same render that opens the drawer (mirrors
+ * `sheetPillEntity` in `DmVttScreen`), so by the time this layout effect
+ * runs the pill is already gone and `document.activeElement` has already
+ * reverted to `<body>` — there's no real opener to remember.
+ *
+ * The fallback only fires when focus is actually stuck (still on `<body>`
+ * or trapped inside the drawer); if something else already holds focus,
+ * `SideDrawer`'s default restore applies.
  */
 function useStudioPanelFocusFallback(open: boolean) {
   const openerRef = useRef<Element | null>(null);
@@ -59,7 +66,17 @@ function useStudioPanelFocusFallback(open: boolean) {
   return (event: Event) => {
     const opener = openerRef.current;
     openerRef.current = null;
-    if (!opener || opener === document.body || opener.isConnected) return;
+    const openerUnusable =
+      !opener || opener === document.body || !opener.isConnected;
+    if (!openerUnusable) return;
+
+    const active = document.activeElement;
+    const focusStuck =
+      !active ||
+      active === document.body ||
+      (event.target instanceof Node && event.target.contains(active));
+    if (!focusStuck) return;
+
     const panel = document.querySelector<HTMLElement>(STUDIO_PANEL_SELECTOR);
     if (!panel) return;
     const target =

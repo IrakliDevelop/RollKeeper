@@ -227,6 +227,38 @@ describe('CreatureDrawer', () => {
     panel.remove();
   });
 
+  it('moves focus into the Studio panel when the pill unmounts in the same render that opens the drawer', async () => {
+    const panel = document.createElement('div');
+    panel.dataset.testid = 'dm-vtt-studio-panel';
+    const panelButton = document.createElement('button');
+    panel.appendChild(panelButton);
+    document.body.appendChild(panel);
+
+    // Mirrors DmVttScreen: `sheetPillEntity` hides the pill in the same
+    // render that opens the drawer, so the pill and the drawer's open state
+    // flip together, not in separate renders.
+    function Harness({ entity }: { entity: CreatureDrawerProps['entity'] }) {
+      return (
+        <>
+          {entity === null && <button>Sheet</button>}
+          <CreatureDrawer {...props({ entity })} />
+        </>
+      );
+    }
+
+    const { rerender } = render(<Harness entity={null} />);
+    screen.getByRole('button', { name: 'Sheet' }).focus();
+    expect(screen.getByRole('button', { name: 'Sheet' })).toHaveFocus();
+
+    rerender(<Harness entity={GOBLIN} />);
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeInTheDocument());
+    expect(screen.queryByRole('button', { name: 'Sheet' })).toBeNull();
+
+    rerender(<Harness entity={null} />);
+    await waitFor(() => expect(panelButton).toHaveFocus());
+    panel.remove();
+  });
+
   it('closes without throwing when neither the opener nor the Studio panel exist', async () => {
     const p = props({ entity: null });
     const opener = document.createElement('button');
