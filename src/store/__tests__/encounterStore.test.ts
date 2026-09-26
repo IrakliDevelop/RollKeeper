@@ -1,5 +1,9 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { useEncounterStore } from '@/store/encounterStore';
+import {
+  flushNpcLibrarySync,
+  resetNpcLibrarySync,
+} from '@/store/npcLibrarySyncQueue';
 import { useNPCStore } from '@/store/npcStore';
 import { createMockEncounterEntity } from '@/test/helpers';
 import { ensureStatBlockEntryIds } from '@/utils/statBlockAbilities';
@@ -25,6 +29,9 @@ function setupEncounterWithEntities(
   }
   return encId;
 }
+
+// Pending debounced library writes must not leak between tests.
+afterEach(resetNpcLibrarySync);
 
 describe('encounterStore', () => {
   beforeEach(resetStore);
@@ -2088,6 +2095,7 @@ describe('encounterStore', () => {
       useEncounterStore
         .getState()
         .updateEntity(encId, entityId, { monsterStatBlock: sb });
+      flushNpcLibrarySync();
       const ability = getEntityAbility(encId, entityId, 'entry-smite')!;
       expect(ability.usedUses).toBe(1); // preserved
       // The in-combat edit writes back to the library; the entity follows

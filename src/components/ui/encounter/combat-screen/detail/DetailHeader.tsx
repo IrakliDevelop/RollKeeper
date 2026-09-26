@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Eye, Pencil, X } from 'lucide-react';
+import { Eye, Link2, Pencil, X } from 'lucide-react';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
@@ -131,6 +131,18 @@ export function DetailHeader({
             {cr && (
               <span className="bg-surface-raised text-muted rounded-full px-2 py-0.5 text-[11px] font-medium">
                 CR {cr}
+              </span>
+            )}
+            {!isPlayer && npcSourceId && (
+              <span
+                title="Stat edits sync to the NPC library record"
+                className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
+              >
+                <Link2 size={11} />
+                Library
+                <span className="sr-only">
+                  : stat edits sync to the NPC library record
+                </span>
               </span>
             )}
           </div>
