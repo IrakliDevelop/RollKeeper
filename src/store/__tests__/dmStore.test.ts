@@ -303,15 +303,29 @@ describe('dmStore — setDmDashboardUi', () => {
     expect(found?.dmDashboardUi?.npcSectionOpen).toBe(false);
   });
 
-  it('sets npcCollapsedGroupNames', () => {
-    const campaign = createMockCampaignInfo({ code: 'AAA111' });
+  it('merges monsterSectionOpen without overwriting other fields', () => {
+    const campaign = createMockCampaignInfo({
+      code: 'AAA111',
+      dmDashboardUi: { playersSectionOpen: true },
+    });
     useDmStore.getState().addCampaign(campaign);
 
     useDmStore
       .getState()
-      .setDmDashboardUi('AAA111', {
-        npcCollapsedGroupNames: ['Bandits', 'Guards'],
-      });
+      .setDmDashboardUi('AAA111', { monsterSectionOpen: false });
+
+    const found = useDmStore.getState().getCampaign('AAA111');
+    expect(found?.dmDashboardUi?.playersSectionOpen).toBe(true);
+    expect(found?.dmDashboardUi?.monsterSectionOpen).toBe(false);
+  });
+
+  it('sets npcCollapsedGroupNames', () => {
+    const campaign = createMockCampaignInfo({ code: 'AAA111' });
+    useDmStore.getState().addCampaign(campaign);
+
+    useDmStore.getState().setDmDashboardUi('AAA111', {
+      npcCollapsedGroupNames: ['Bandits', 'Guards'],
+    });
 
     const found = useDmStore.getState().getCampaign('AAA111');
     expect(found?.dmDashboardUi?.npcCollapsedGroupNames).toEqual([

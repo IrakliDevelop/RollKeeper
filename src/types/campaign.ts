@@ -38,6 +38,7 @@ export interface CampaignInfo {
     /** House Rules card on the DM campaign page. Default collapsed. */
     houseRulesSectionOpen?: boolean;
     npcSectionOpen?: boolean;
+    monsterSectionOpen?: boolean;
     magicItemLibrarySectionOpen?: boolean;
     /** Group headers under NPC section (when NPCs use groups); names of collapsed groups. */
     npcCollapsedGroupNames?: string[];

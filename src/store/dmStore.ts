@@ -35,6 +35,7 @@ interface DmStoreState {
       playersSectionOpen: boolean;
       houseRulesSectionOpen: boolean;
       npcSectionOpen: boolean;
+      monsterSectionOpen: boolean;
       magicItemLibrarySectionOpen: boolean;
       npcCollapsedGroupNames: string[];
       npcInlineSpellSlots: boolean;
