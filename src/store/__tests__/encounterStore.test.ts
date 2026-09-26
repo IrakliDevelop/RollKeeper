@@ -2074,8 +2074,8 @@ describe('encounterStore', () => {
   describe('encounterStore — reconcile on stat-block edit', () => {
     beforeEach(resetStore);
 
-    it('text edit preserves usedUses; uses-edit on a linked entry is ignored (NPC config wins)', () => {
-      const { encId, entityId } = setupLinkedAbilityEntity();
+    it('text edit preserves usedUses; uses-edit on a linked entry syncs to the NPC and the entity follows it', () => {
+      const { npcId, encId, entityId } = setupLinkedAbilityEntity();
       useEncounterStore.getState().useAbility(encId, entityId, 'entry-smite');
       const entity = useEncounterStore
         .getState()
@@ -2090,7 +2090,14 @@ describe('encounterStore', () => {
         .updateEntity(encId, entityId, { monsterStatBlock: sb });
       const ability = getEntityAbility(encId, entityId, 'entry-smite')!;
       expect(ability.usedUses).toBe(1); // preserved
-      expect(ability.maxUses).toBe(3); // NPC's 3, not the entity-edited 9
+      // The in-combat edit writes back to the library; the entity follows
+      // the fresh NPC config.
+      const npcEntry = useNPCStore
+        .getState()
+        .getNPC(RES_CAMPAIGN, npcId)!
+        .monsterStatBlock!.actions.find(a => a.id === 'entry-smite')!;
+      expect(npcEntry.uses).toBe(9);
+      expect(ability.maxUses).toBe(9);
     });
 
     it('combat-added entry gets an id, source entity, and tracks entity-locally without touching the NPC', () => {

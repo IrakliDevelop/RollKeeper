@@ -9,7 +9,12 @@ import {
 import userEvent from '@testing-library/user-event';
 
 import { CreatureDrawer, type CreatureDrawerProps } from '..';
-import { GOBLIN, LAIR, LEGENDARY_MONSTER } from '../CreatureDrawer.fixtures';
+import {
+  FULL_CREATURE,
+  GOBLIN,
+  LAIR,
+  LEGENDARY_MONSTER,
+} from '../CreatureDrawer.fixtures';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 
 vi.mock('@/hooks/useOfficialConditions', () => ({
@@ -143,6 +148,17 @@ describe('CreatureDrawer', () => {
       screen.queryByText(/editing this combatant/i)
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Max HP')).not.toBeInTheDocument();
+  });
+
+  it('shows the library-sync banner copy for a library-linked NPC', async () => {
+    const user = userEvent.setup();
+    render(<CreatureDrawer {...props({ entity: FULL_CREATURE })} />);
+    await user.click(screen.getByRole('button', { name: /^play$/i }));
+    expect(
+      screen.getByText(
+        'Editing this combatant. Changes also sync back to the NPC library record.'
+      )
+    ).toBeInTheDocument();
   });
 
   it('resets editing and the tab when switching entities', async () => {

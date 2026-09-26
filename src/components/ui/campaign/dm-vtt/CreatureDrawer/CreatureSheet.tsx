@@ -111,7 +111,9 @@ export function CreatureSheet({
           <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex flex-wrap items-center gap-2 border-b px-5 py-2 text-xs">
             <LockOpen className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
-              Editing this combatant. Changes stay on this combatant.
+              {entity.npcSourceId
+                ? 'Editing this combatant. Changes also sync back to the NPC library record.'
+                : 'Editing this combatant. Changes stay on this combatant.'}
             </span>
             {openEditor && (
               <Button variant="outline" size="sm" onClick={openEditor}>
