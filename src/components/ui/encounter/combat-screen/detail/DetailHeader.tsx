@@ -136,11 +136,13 @@ export function DetailHeader({
             {!isPlayer && npcSourceId && (
               <span
                 title="Stat edits sync to the NPC library record"
-                aria-label="Stat edits sync to the NPC library record"
                 className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
               >
                 <Link2 size={11} />
                 Library
+                <span className="sr-only">
+                  : stat edits sync to the NPC library record
+                </span>
               </span>
             )}
           </div>

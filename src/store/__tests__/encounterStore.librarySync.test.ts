@@ -95,6 +95,10 @@ function getNpc(npcId: string) {
 describe('encounterStore — NPC library write-back', () => {
   beforeEach(resetStores);
   afterEach(resetNpcLibrarySync);
+  // Spies created with vi.spyOn below are restored manually on the happy
+  // path, but a failed assertion between spyOn and mockRestore would leak
+  // the spy into later tests. Belt-and-suspenders cleanup.
+  afterEach(() => vi.restoreAllMocks());
 
   it('updateEntity AC change syncs to the NPC, keeping its annotation', () => {
     const { npcId, encId, entityId } = setupLinkedEntity();
@@ -480,6 +484,23 @@ describe('encounterStore — NPC library write-back', () => {
         a => a.id === 'entry-tp'
       )!;
       expect(tp).toMatchObject({ maxUses: 2, usedUses: 2, source: 'npc' });
+    });
+
+    it('a direct library edit to an unrelated field during the debounce window survives the flush', () => {
+      const { npcId, encId, entityId } = setupLinkedEntity();
+      typeAc(encId, entityId, [1, 18]);
+      useNPCStore.getState().updateNPC(CAMPAIGN, npcId, {
+        monsterStatBlock: {
+          ...getNpc(npcId).monsterStatBlock!,
+          languages: 'Common, Infernal',
+        },
+      });
+
+      vi.advanceTimersByTime(NPC_LIBRARY_SYNC_DELAY_MS);
+
+      const fresh = getNpc(npcId);
+      expect(fresh.armorClass).toBe('18 (natural armor)');
+      expect(fresh.monsterStatBlock!.languages).toBe('Common, Infernal');
     });
 
     it('an entity removed before the flush does not throw', () => {

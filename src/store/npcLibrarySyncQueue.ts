@@ -32,11 +32,19 @@ function runPending(key: string): void {
   write.apply(write.before, write.after);
 }
 
+function flushIfHidden(): void {
+  if (document.visibilityState === 'hidden') flushNpcLibrarySync();
+}
+
 function registerUnloadListeners(): void {
   if (listenersRegistered || typeof window === 'undefined') return;
   listenersRegistered = true;
   window.addEventListener('pagehide', flushNpcLibrarySync);
   window.addEventListener('beforeunload', flushNpcLibrarySync);
+  // Tablets/mobile browsers can kill a backgrounded tab without ever firing
+  // pagehide/beforeunload — visibilitychange to 'hidden' is the one signal
+  // that reliably fires first.
+  document.addEventListener('visibilitychange', flushIfHidden);
 }
 
 /** Queue a write-back for one entity edit. Coalesces with pending edits of the same entity. */

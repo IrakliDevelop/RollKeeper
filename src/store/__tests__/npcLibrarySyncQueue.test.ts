@@ -92,4 +92,26 @@ describe('npcLibrarySyncQueue', () => {
     window.dispatchEvent(new Event('pagehide'));
     expect(apply).toHaveBeenCalledTimes(1);
   });
+
+  it('flushes pending writes when the tab is hidden (visibilitychange)', () => {
+    const apply = vi.fn();
+    queueNpcLibrarySync('enc', entity('a', 13), entity('a', 18), apply);
+    const visibilitySpy = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('hidden');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(apply).toHaveBeenCalledTimes(1);
+    visibilitySpy.mockRestore();
+  });
+
+  it('does not flush on visibilitychange when the tab becomes visible', () => {
+    const apply = vi.fn();
+    queueNpcLibrarySync('enc', entity('a', 13), entity('a', 18), apply);
+    const visibilitySpy = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('visible');
+    document.dispatchEvent(new Event('visibilitychange'));
+    expect(apply).not.toHaveBeenCalled();
+    visibilitySpy.mockRestore();
+  });
 });

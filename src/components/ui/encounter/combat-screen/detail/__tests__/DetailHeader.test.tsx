@@ -59,11 +59,10 @@ describe('DetailHeader library hint chip', () => {
     );
     const chip = screen.getByTitle('Stat edits sync to the NPC library record');
     expect(chip).toBeInTheDocument();
-    expect(chip).toHaveTextContent('Library');
-    expect(chip).toHaveAttribute(
-      'aria-label',
-      'Stat edits sync to the NPC library record'
+    expect(chip).toHaveTextContent(
+      'Library: stat edits sync to the NPC library record'
     );
+    expect(chip).not.toHaveAttribute('aria-label');
   });
 
   it('does not show the Library chip for a bestiary monster with no npcSourceId', () => {
