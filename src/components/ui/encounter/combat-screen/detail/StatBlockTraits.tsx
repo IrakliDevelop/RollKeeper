@@ -126,11 +126,11 @@ export function StatBlockTraits({
   onRestoreAbilityEntry,
 }: StatBlockTraitsProps) {
   const hasSections =
-    statBlock.traits.length > 0 ||
-    statBlock.actions.length > 0 ||
-    statBlock.bonusActions.length > 0 ||
-    statBlock.reactions.length > 0 ||
-    statBlock.lairActions.length > 0 ||
+    (statBlock.traits ?? []).length > 0 ||
+    (statBlock.actions ?? []).length > 0 ||
+    (statBlock.bonusActions ?? []).length > 0 ||
+    (statBlock.reactions ?? []).length > 0 ||
+    (statBlock.lairActions ?? []).length > 0 ||
     spellcasting != null;
 
   if (!hasSections) return null;

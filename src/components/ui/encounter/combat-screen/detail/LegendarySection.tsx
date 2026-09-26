@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { RotateCcw } from 'lucide-react';
+import { renderStatBlockEntryText } from '@/utils/statBlockText';
 import type { DetailSectionProps } from './DetailHeader';
 
 export function LegendarySection({ entity, actions }: DetailSectionProps) {
@@ -55,9 +56,12 @@ export function LegendarySection({ entity, actions }: DetailSectionProps) {
                 ({action.cost} action{action.cost !== 1 ? 's' : ''})
               </span>
               {action.description && (
-                <p className="text-muted line-clamp-1 text-xs">
-                  {action.description}
-                </p>
+                <p
+                  className="text-muted line-clamp-1 text-xs"
+                  dangerouslySetInnerHTML={{
+                    __html: renderStatBlockEntryText(action.description),
+                  }}
+                />
               )}
             </div>
             <button
