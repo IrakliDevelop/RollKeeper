@@ -72,12 +72,12 @@ export function NPCSection({
   } = useNPCStore();
   const { getCampaign, setDmDashboardUi } = useDmStore();
   const campaign = getCampaign(campaignCode);
-  const [monsterCollapsedGroups, setMonsterCollapsedGroups] = useState<
-    Set<string>
-  >(new Set());
   const isMonsterLibrary = kind === 'monster';
   const singularLabel = isMonsterLibrary ? 'Custom Monster' : 'NPC';
   const pluralLabel = isMonsterLibrary ? 'Custom Monsters' : 'NPCs';
+  const collapsedGroupNamesKey = isMonsterLibrary
+    ? 'monsterCollapsedGroupNames'
+    : 'npcCollapsedGroupNames';
   const sectionOpen = isMonsterLibrary
     ? (campaign?.dmDashboardUi?.monsterSectionOpen ?? true)
     : (campaign?.dmDashboardUi?.npcSectionOpen ?? true);
@@ -86,13 +86,10 @@ export function NPCSection({
     campaign?.dmDashboardUi?.npcSeparateSpellSlotTracker === true
       ? 'tracker'
       : 'inline';
-  const persistedCollapsedGroups = useMemo(() => {
-    const names = campaign?.dmDashboardUi?.npcCollapsedGroupNames;
+  const collapsedGroups = useMemo(() => {
+    const names = campaign?.dmDashboardUi?.[collapsedGroupNamesKey];
     return new Set(names ?? []);
-  }, [campaign?.dmDashboardUi?.npcCollapsedGroupNames]);
-  const collapsedGroups = isMonsterLibrary
-    ? monsterCollapsedGroups
-    : persistedCollapsedGroups;
+  }, [campaign?.dmDashboardUi, collapsedGroupNamesKey]);
   const allCreatures = getNPCsForCampaign(campaignCode);
   const npcs = useMemo(
     () => allCreatures.filter(npc => (npc.kind ?? 'npc') === kind),
@@ -174,22 +171,13 @@ export function NPCSection({
   };
 
   const handleGroupToggle = (groupName: string) => {
-    if (isMonsterLibrary) {
-      setMonsterCollapsedGroups(current => {
-        const next = new Set(current);
-        if (next.has(groupName)) next.delete(groupName);
-        else next.add(groupName);
-        return next;
-      });
-      return;
-    }
     const current =
-      getCampaign(campaignCode)?.dmDashboardUi?.npcCollapsedGroupNames ?? [];
+      getCampaign(campaignCode)?.dmDashboardUi?.[collapsedGroupNamesKey] ?? [];
     const next = new Set(current);
     if (next.has(groupName)) next.delete(groupName);
     else next.add(groupName);
     setDmDashboardUi(campaignCode, {
-      npcCollapsedGroupNames: Array.from(next),
+      [collapsedGroupNamesKey]: Array.from(next),
     });
   };
 

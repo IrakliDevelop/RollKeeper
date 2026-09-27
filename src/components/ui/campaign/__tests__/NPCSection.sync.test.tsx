@@ -138,6 +138,55 @@ describe('NPCSection cloud sync mount', () => {
     });
   });
 
+  it('persists a custom monster group collapse across a remount', () => {
+    useNPCStore.setState({
+      npcsByCampaign: {
+        'empty-campaign': [
+          {
+            id: 'monster-wolf',
+            campaignCode: 'empty-campaign',
+            name: 'Dire Wolf',
+            kind: 'monster',
+            group: 'Lair',
+            armorClass: '14',
+            maxHp: 37,
+            speed: '50 ft.',
+            inventory: [],
+            createdAt: '2026-09-12T00:00:00.000Z',
+            updatedAt: '2026-09-12T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+
+    const props = {
+      campaignCode: 'empty-campaign',
+      kind: 'monster' as const,
+      showSpellSlotSettings: false,
+      showLibraryExtras: false,
+    };
+    const { unmount } = render(<NPCSection {...props} />);
+
+    expect(screen.getByText('Dire Wolf')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /Lair/i }));
+
+    expect(
+      useDmStore.getState().getCampaign('empty-campaign')?.dmDashboardUi
+        ?.monsterCollapsedGroupNames
+    ).toEqual(['Lair']);
+    expect(screen.queryByText('Dire Wolf')).not.toBeInTheDocument();
+
+    unmount();
+    render(<NPCSection {...props} />);
+
+    expect(
+      useDmStore.getState().getCampaign('empty-campaign')?.dmDashboardUi
+        ?.monsterCollapsedGroupNames
+    ).toEqual(['Lair']);
+    expect(screen.queryByText('Dire Wolf')).not.toBeInTheDocument();
+    expect(screen.getByText('Lair')).toBeInTheDocument();
+  });
+
   it('persists the custom monster collapsed state across a remount', () => {
     const props = {
       campaignCode: 'empty-campaign',
