@@ -38,6 +38,7 @@ interface DmStoreState {
       monsterSectionOpen: boolean;
       magicItemLibrarySectionOpen: boolean;
       npcCollapsedGroupNames: string[];
+      monsterCollapsedGroupNames: string[];
       npcInlineSpellSlots: boolean;
       npcSeparateSpellSlotTracker: boolean;
     }>

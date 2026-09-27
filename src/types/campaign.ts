@@ -42,6 +42,8 @@ export interface CampaignInfo {
     magicItemLibrarySectionOpen?: boolean;
     /** Group headers under NPC section (when NPCs use groups); names of collapsed groups. */
     npcCollapsedGroupNames?: string[];
+    /** Group headers under Custom Monsters section; names of collapsed groups. */
+    monsterCollapsedGroupNames?: string[];
     /** Show slot pips inline inside each spell level header in NPC spell tab. */
     npcInlineSpellSlots?: boolean;
     /** Show the separate spell slot tracker block in NPC spell tab. */

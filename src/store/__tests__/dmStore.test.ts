@@ -334,6 +334,25 @@ describe('dmStore — setDmDashboardUi', () => {
     ]);
   });
 
+  it('sets monsterCollapsedGroupNames without overwriting NPC groups', () => {
+    const campaign = createMockCampaignInfo({
+      code: 'AAA111',
+      dmDashboardUi: { npcCollapsedGroupNames: ['Guards'] },
+    });
+    useDmStore.getState().addCampaign(campaign);
+
+    useDmStore.getState().setDmDashboardUi('AAA111', {
+      monsterCollapsedGroupNames: ['Lair', 'Undead'],
+    });
+
+    const found = useDmStore.getState().getCampaign('AAA111');
+    expect(found?.dmDashboardUi?.npcCollapsedGroupNames).toEqual(['Guards']);
+    expect(found?.dmDashboardUi?.monsterCollapsedGroupNames).toEqual([
+      'Lair',
+      'Undead',
+    ]);
+  });
+
   it('is a no-op for unknown campaign code', () => {
     const campaign = createMockCampaignInfo({ code: 'AAA111' });
     useDmStore.getState().addCampaign(campaign);
