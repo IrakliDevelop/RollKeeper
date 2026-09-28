@@ -56,7 +56,10 @@ export function useDmVttInitiative({
   const nextTurn = useEncounterStore(state => state.nextTurn);
   const prevTurn = useEncounterStore(state => state.prevTurn);
 
-  const { pushInitiative } = useDmInitiativeSync({ campaignCode, dmId });
+  const { pushInitiative, control, publicationError } = useDmInitiativeSync({
+    campaignCode,
+    dmId,
+  });
 
   const linked = useMemo(
     () => encounters.filter(e => linkedEncounterIds.includes(e.id)),
@@ -68,11 +71,20 @@ export function useDmVttInitiative({
     [linked]
   );
 
-  const followNote = useMemo(
-    () =>
-      encounter && started.length > 1 ? `Following: ${encounter.name}` : null,
-    [encounter, started]
-  );
+  const followNote = useMemo(() => {
+    const followed =
+      encounter && started.length > 1 ? `Following: ${encounter.name}` : null;
+    if (control.status === 'checking') return followed;
+    if (control.status === 'legacy')
+      return publicationError
+        ? `${followed ? `${followed} · ` : ''}Not broadcasting: ${publicationError}`
+        : followed;
+    const publication =
+      control.status === 'broadcasting'
+        ? 'Broadcasting initiative'
+        : `Not broadcasting${control.error ? `: ${control.error}` : ''}`;
+    return followed ? `${followed} · ${publication}` : publication;
+  }, [encounter, started, control.status, control.error, publicationError]);
 
   const activeEntity = useMemo(() => {
     if (!encounter || !encounter.isActive) return null;
@@ -83,7 +95,15 @@ export function useDmVttInitiative({
   // Only fires for campaign-linked encounters; safe when encounter is null.
   useEffect(() => {
     if (!encounter || !encounter.campaignCode) return;
-    pushInitiative(buildSharedInitiative(encounter, combatConfig));
+    if (
+      control.status !== 'legacy' &&
+      control.status !== 'controlling' &&
+      control.status !== 'broadcasting'
+    )
+      return;
+    void pushInitiative(buildSharedInitiative(encounter, combatConfig)).catch(
+      () => {}
+    );
   }, [
     encounter,
     encounter?.isActive,
@@ -92,6 +112,7 @@ export function useDmVttInitiative({
     encounter?.entities,
     combatConfig,
     pushInitiative,
+    control.status,
   ]);
 
   const handleNextTurn = useCallback(() => {

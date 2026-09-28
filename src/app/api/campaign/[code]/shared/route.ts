@@ -51,6 +51,7 @@ import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecu
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 import { campaignSettingsProjectionWriteAllowed } from '@/lib/supabase/campaignSettingsServer';
 import { calendarProjectionWriteAllowed } from '@/lib/supabase/calendarServer';
+import { isTableProtocolRequired } from '@/lib/tableServer/control';
 
 export async function GET(
   request: NextRequest,
@@ -104,6 +105,9 @@ export async function GET(
         typeof initiativeRaw === 'string'
           ? JSON.parse(initiativeRaw)
           : initiativeRaw;
+    }
+    if (initiative?.expiresAt && initiative.expiresAt <= Date.now()) {
+      initiative = null;
     }
 
     const battleMapRaw = await redis.get<string>(
@@ -249,6 +253,17 @@ export async function POST(
     }
 
     const { feature, data, dmId } = body;
+    if (
+      isTableProtocolRequired() &&
+      (feature === 'initiative' ||
+        feature === 'initiativeRequest' ||
+        feature === 'battlemap')
+    ) {
+      return NextResponse.json(
+        { error: 'Table v1 control is required for this feature' },
+        { status: 426 }
+      );
+    }
     const membership = await authorizeCampaignMembershipRoute(code, true);
     if (membership.mode === 'denied') {
       return NextResponse.json(

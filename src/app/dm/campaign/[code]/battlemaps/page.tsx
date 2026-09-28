@@ -36,6 +36,7 @@ export default function CampaignBattleMapsPage() {
   const [mapFile, setMapFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
+  const [deleteError, setDeleteError] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const battleMaps = hasHydrated ? getBattleMaps(code) : [];
@@ -231,6 +232,11 @@ export default function CampaignBattleMapsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        {deleteError && (
+          <p className="text-accent-red-text mb-4" role="alert">
+            {deleteError}
+          </p>
+        )}
         {battleMaps.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <Map className="text-muted mb-4 h-12 w-12" />
@@ -246,13 +252,30 @@ export default function CampaignBattleMapsPage() {
                 key={bm.id}
                 battleMap={bm}
                 campaignCode={code}
-                onDelete={id => {
-                  removeBattleMap(code, id);
-                  fetch(`/api/campaign/${code}/battlemaps/${id}`, {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ dmId }),
-                  }).catch(() => {});
+                onDelete={async id => {
+                  setDeleteError('');
+                  try {
+                    const response = await fetch(
+                      `/api/campaign/${code}/battlemaps/${id}`,
+                      {
+                        method: 'DELETE',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'x-rollkeeper-csrf': '1',
+                        },
+                        body: JSON.stringify({ dmId }),
+                      }
+                    );
+                    if (!response.ok)
+                      throw new Error(
+                        `Delete was rejected (${response.status})`
+                      );
+                    removeBattleMap(code, id);
+                  } catch (error) {
+                    setDeleteError(
+                      error instanceof Error ? error.message : 'Delete failed'
+                    );
+                  }
                 }}
               />
             ))}

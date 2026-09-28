@@ -6,6 +6,10 @@ import type {
   SharedInitiativeState,
 } from '@/types/sharedState';
 
+vi.mock('@/hooks/useTableControl', () => ({
+  useTableControl: () => ({ status: 'legacy', error: null }),
+}));
+
 const state: SharedInitiativeState = {
   encounterId: 'enc-1',
   isActive: true,
@@ -80,5 +84,16 @@ describe('useDmInitiativeSync', () => {
     );
     expect(body.feature).toBe('initiativeRequest');
     expect(body.data).toBeNull();
+  });
+
+  it('reports a rejected publication instead of treating HTTP failure as success', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({ ok: false, status: 426 })
+    );
+    const { result } = renderHook(() =>
+      useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
+    );
+    await expect(result.current.pushInitiative(state)).rejects.toThrow();
   });
 });

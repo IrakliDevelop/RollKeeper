@@ -328,6 +328,25 @@ describe('GET /api/campaign/[code]/shared', () => {
     const data = await res.json();
     expect(data.initiative).toBeNull();
   });
+
+  it('does not return an initiative after its v1 lease deadline', async () => {
+    seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+      encounterId: 'run-one',
+      isActive: true,
+      round: 1,
+      currentEntityId: null,
+      turnOrder: [],
+      enemyHpMode: 'off',
+      enemyConditionsMode: 'off',
+      updatedAt: 'synthetic',
+      expiresAt: Date.now() - 1,
+    });
+    const response = await GET(
+      new NextRequest('http://localhost/api/campaign/ABC123/shared'),
+      createRouteParams({ code: 'ABC123' })
+    );
+    expect((await response.json()).initiative).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -338,6 +357,29 @@ describe('POST /api/campaign/[code]/shared', () => {
   beforeEach(() => {
     resetRedis();
   });
+
+  it.each(['initiative', 'initiativeRequest', 'battlemap'])(
+    'rejects the reserved %s writer under the deployment protocol flag',
+    async feature => {
+      process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
+      try {
+        const request = createNextRequest('/api/campaign/ABC123/shared', {
+          method: 'POST',
+          body: { feature, data: {}, dmId: 'dm-1' },
+        });
+        const response = await POST(
+          request as NextRequest,
+          createRouteParams({ code: 'ABC123' })
+        );
+        expect(response.status).toBe(426);
+        expect(getRedisStore().has(campaignSharedKey('ABC123', feature))).toBe(
+          false
+        );
+      } finally {
+        delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
+      }
+    }
+  );
 
   it('returns 400 when feature is missing', async () => {
     const req = createNextRequest('/api/campaign/TEST/shared', {
@@ -922,31 +964,25 @@ describe('DELETE /api/campaign/[code]/shared', () => {
     }
   );
 
-  it(
-    'a batch ack of a 25-entry purchase never loses an entry, in one request',
-    async () => {
-      // Reproduces the exact shape of a full-size shop purchase batch: 25
-      // transfers, one shared queue.
-      const ids = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
-      seedRedis(
-        campaignTransfersKey('TEST', 'player-1'),
-        ids.map(id => makeTransfer(id))
-      );
+  it('a batch ack of a 25-entry purchase never loses an entry, in one request', async () => {
+    // Reproduces the exact shape of a full-size shop purchase batch: 25
+    // transfers, one shared queue.
+    const ids = Array.from({ length: 25 }, (_, i) => `wand-${i}`);
+    seedRedis(
+      campaignTransfersKey('TEST', 'player-1'),
+      ids.map(id => makeTransfer(id))
+    );
 
-      const batchReq = createNextRequest('/api/campaign/TEST/shared', {
-        method: 'DELETE',
-        body: { playerId: 'player-1', type: 'transfers', transferIds: ids },
-      });
-      await DELETE(
-        batchReq as NextRequest,
-        createRouteParams({ code: 'TEST' })
-      );
+    const batchReq = createNextRequest('/api/campaign/TEST/shared', {
+      method: 'DELETE',
+      body: { playerId: 'player-1', type: 'transfers', transferIds: ids },
+    });
+    await DELETE(batchReq as NextRequest, createRouteParams({ code: 'TEST' }));
 
-      expect(
-        getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))
-      ).toBe(false);
-    }
-  );
+    expect(getRedisStore().has(campaignTransfersKey('TEST', 'player-1'))).toBe(
+      false
+    );
+  });
 
   it(
     'Slice 3 final review, Important finding: N concurrent single-id acks ' +
@@ -1011,7 +1047,10 @@ describe('DELETE /api/campaign/[code]/shared', () => {
         method: 'POST',
         body: {
           feature: 'item_transfer',
-          data: { transfer: makeTransfer('transfer-gift-1'), playerId: 'player-1' },
+          data: {
+            transfer: makeTransfer('transfer-gift-1'),
+            playerId: 'player-1',
+          },
         },
       });
 

@@ -29,6 +29,7 @@ import type { EntityActions } from './combat-screen/types';
 import { buildEntityActions } from './combat-screen/buildEntityActions';
 import { AddCombatantDialog } from './combat-screen/AddCombatantDialog';
 import { CombatConfigDialog } from './CombatConfigDialog';
+import { TablePublicationControls } from './TablePublicationControls';
 import { PlayerDetailDialog } from '@/components/ui/campaign/PlayerDetailDialog';
 import { NPCDetailDialog } from '@/components/ui/campaign/NPCDetailDialog';
 import type { CampaignPlayerData } from '@/types/campaign';
@@ -177,7 +178,13 @@ export function EncounterView({
 
   const combatConfig = useEncounterStore(state => state.combatConfig);
 
-  const { pushInitiative, pushInitiativeRequest } = useDmInitiativeSync({
+  const {
+    pushInitiative,
+    pushInitiativeRequest,
+    control,
+    publicationError,
+    legacyBroadcasting,
+  } = useDmInitiativeSync({
     campaignCode,
     dmId,
   });
@@ -206,7 +213,15 @@ export function EncounterView({
   // Only fires for campaign-linked encounters; safe when encounter is undefined.
   useEffect(() => {
     if (!encounter || !encounter.campaignCode) return;
-    pushInitiative(buildSharedInitiative(encounter, combatConfig));
+    if (
+      control.status !== 'legacy' &&
+      control.status !== 'controlling' &&
+      control.status !== 'broadcasting'
+    )
+      return;
+    void pushInitiative(buildSharedInitiative(encounter, combatConfig)).catch(
+      () => {}
+    );
   }, [
     encounter,
     encounter?.isActive,
@@ -215,6 +230,7 @@ export function EncounterView({
     encounter?.entities,
     combatConfig,
     pushInitiative,
+    control.status,
   ]);
 
   const { players: campaignPlayers, refresh: refreshPlayers } = useCampaignSync(
@@ -375,13 +391,13 @@ export function EncounterView({
       requestId: req.requestId,
       requestedAt: req.requestedAt,
     });
-    void pushInitiativeRequest(req);
+    void pushInitiativeRequest(req).catch(() => {});
   }, [encounter, pushInitiativeRequest, setPendingInitiativeRequest]);
 
   const handleStartCombat = useCallback(() => {
     if (encounter?.pendingInitiativeRequest) {
       setPendingInitiativeRequest(encounterId, null);
-      void pushInitiativeRequest(null);
+      void pushInitiativeRequest(null).catch(() => {});
       void fetch(`/api/campaign/${campaignCode}/initiative-submission`, {
         method: 'DELETE',
       }).catch(() => {});
@@ -434,6 +450,12 @@ export function EncounterView({
 
   return (
     <div className="flex h-full flex-col">
+      <TablePublicationControls
+        control={control}
+        combatActive={encounter.isActive}
+        publicationError={publicationError}
+        legacyBroadcasting={legacyBroadcasting}
+      />
       <CombatScreen
         encounter={encounter}
         playerSyncMap={playerSyncMap}

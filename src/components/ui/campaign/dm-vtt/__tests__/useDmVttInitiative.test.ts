@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 import { useEncounterStore } from '@/store/encounterStore';
 import { createMockEncounter, createMockEncounterEntity } from '@/test/helpers';
@@ -19,7 +19,13 @@ describe('useDmVttInitiative', () => {
     resetStore();
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => Promise.resolve({ ok: true }))
+      vi.fn((url: string) =>
+        Promise.resolve(
+          url.endsWith('/capability')
+            ? { ok: true, json: async () => ({ required: false }) }
+            : { ok: true }
+        )
+      )
     );
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -265,9 +271,11 @@ describe('useDmVttInitiative', () => {
 
     expect(useEncounterStore.getState().encounters[0].currentTurn).toBe(1);
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/campaign/ABC/shared',
-      expect.objectContaining({ method: 'POST' })
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaign/ABC/shared',
+        expect.objectContaining({ method: 'POST' })
+      )
     );
     const lastCall = (fetch as FetchMock).mock.calls[
       (fetch as FetchMock).mock.calls.length - 1
@@ -346,10 +354,14 @@ describe('useDmVttInitiative', () => {
       })
     );
 
-    expect(fetch).not.toHaveBeenCalled();
+    expect(
+      vi
+        .mocked(fetch)
+        .mock.calls.some(call => call[0] === '/api/campaign/ABC/shared')
+    ).toBe(false);
   });
 
-  it('pushes on mount for an already-started campaign-linked encounter', () => {
+  it('pushes on mount for an already-started campaign-linked encounter', async () => {
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -369,9 +381,11 @@ describe('useDmVttInitiative', () => {
       })
     );
 
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/campaign/ABC/shared',
-      expect.objectContaining({ method: 'POST' })
+    await waitFor(() =>
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/campaign/ABC/shared',
+        expect.objectContaining({ method: 'POST' })
+      )
     );
   });
 });
