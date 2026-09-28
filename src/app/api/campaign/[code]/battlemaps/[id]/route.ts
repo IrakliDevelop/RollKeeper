@@ -17,6 +17,7 @@ import {
   isHybridGuestServerEnabled,
 } from '@/lib/guestSessionSecurity';
 import { rejectHybridGuestPrivilegeEscalation } from '@/lib/guestRouteResponses';
+import { isTableProtocolRequired } from '@/lib/tableServer/control';
 
 export async function GET(
   request: NextRequest,
@@ -125,6 +126,12 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ code: string; id: string }> }
 ) {
+  if (isTableProtocolRequired()) {
+    return NextResponse.json(
+      { error: 'Table v1 control is required before deleting battle maps' },
+      { status: 426 }
+    );
+  }
   const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
   if (guestDenied) return guestDenied;
   try {
