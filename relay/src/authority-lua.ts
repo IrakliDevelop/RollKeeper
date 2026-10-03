@@ -203,7 +203,8 @@ local function json_array(values)
   return cjson.encode(values)
 end
 local function state_json(elements, layers, fog)
-  local fogJson = fog == cjson.null and 'null' or cjson.encode(fog)
+  local fogJson = fog == cjson.null and 'null' or '{"meta":' .. cjson.encode(fog.meta)
+    .. ',"tiles":' .. json_array(fog.tiles) .. '}'
   return '{"elements":' .. json_array(elements) .. ',"layers":' .. json_array(layers)
     .. ',"extensions":{"fog":{"pluginName":"fog","version":1,"data":' .. fogJson .. '}}}'
 end

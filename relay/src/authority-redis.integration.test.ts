@@ -429,6 +429,89 @@ run('authority driver against real Redis', () => {
     await capture.release();
   });
 
+  it('stores SDK-valid before/after evidence for a zero-tile fog-meta commit', async () => {
+    const mutation = {
+      kind: 'fog-meta' as const,
+      record: {
+        version: 1,
+        editor: 'dm-a',
+        definition: {
+          version: 1,
+          base: 'covered' as const,
+          bounds: { x: 0, y: 0, w: 1024, h: 1024 },
+          cellSize: 8,
+          tileCells: 128 as const,
+          generation: 'fog-generation-evidence',
+        },
+      },
+    };
+    const driver = new RedisAuthorityDriver(client);
+    await expect(
+      driver.commit(
+        operationContext('empty-fog-evidence'),
+        requestFor('empty-fog-evidence', mutation, {
+          schema: 1,
+          kind: 'extension',
+          key: 'fog',
+          version: 1,
+          payload: prepareFogAuthorityIntent(mutation),
+        })
+      )
+    ).resolves.toMatchObject({ status: 'committed' });
+
+    const page = await driver.readAfter(
+      context() as AuthorityReadContext,
+      { generation: GENERATION, revision: '0' },
+      { entries: 1, bytes: 64 * 1024 },
+      {
+        deadlineAt: Date.now() + 5_000,
+        signal: new AbortController().signal,
+      }
+    );
+    expect(page.status).toBe('ok');
+    if (page.status !== 'ok' || !page.records[0])
+      throw new Error('expected fog-meta publication');
+    const evidence = await driver.readEvidence(
+      context() as AuthorityReadContext,
+      page.records[0],
+      {
+        deadlineAt: Date.now() + 5_000,
+        signal: new AbortController().signal,
+      }
+    );
+    expect(evidence.status).toBe('available');
+    if (evidence.status !== 'available')
+      throw new Error('expected fog-meta evidence');
+    expect(evidence.lease.before.extensions.fog.data).toBeNull();
+    const afterFog = evidence.lease.after.extensions.fog.data;
+    expect(Array.isArray(afterFog?.tiles)).toBe(true);
+    expect(afterFog?.tiles).toEqual([]);
+
+    for (const [index, state] of [
+      evidence.lease.before,
+      evidence.lease.after,
+    ].entries()) {
+      const prepared = await prepareAuthorityCheckpoint(
+        {
+          ...state,
+          cursor: {
+            generation: GENERATION,
+            streamId: `${index}`.repeat(32),
+            revision: index,
+          },
+          casToken: `evidence-${index}`,
+        },
+        {
+          requestId: `evidence-request-${index}`,
+          checkpointId: `evidence-checkpoint-${index}`,
+          requiredExtensions: [createFogAuthorityServerExtension().requirement],
+        }
+      );
+      prepared.dispose();
+    }
+    await evidence.lease.release();
+  });
+
   it('commits every core, layer, and fog mutation with exactly one publication envelope', async () => {
     const driver = new RedisAuthorityDriver(client);
     const shape = (id: string, x: number) => ({

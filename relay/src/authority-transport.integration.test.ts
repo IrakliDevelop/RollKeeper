@@ -463,6 +463,10 @@ run('two relay authority transport', () => {
       );
       expect(result).toMatchObject({ status: 'committed' });
     };
+    const liveEmptyFog = new FogManager();
+    const liveEmptyFogClient = connectFogAdapter(liveEmptyFog);
+    await eventually(() => liveEmptyFogClient.status() === 'live');
+
     await commitFog('transport-fog-meta', {
       kind: 'fog-meta',
       record: {
@@ -471,6 +475,23 @@ run('two relay authority transport', () => {
         definition: seededState.definition,
       },
     });
+    await eventually(
+      () =>
+        liveEmptyFogClient.status() === 'live' &&
+        liveEmptyFog.getState()?.tiles.length === 0
+    ).catch(async () => {
+      throw new Error(
+        JSON.stringify({
+          status: liveEmptyFogClient.status(),
+          fog: liveEmptyFog.getState(),
+          fogMeta: await redis.hGetAll(keys.fogMeta),
+          fogTiles: await redis.hGetAll(keys.fogTiles),
+          closeEvents,
+        })
+      );
+    });
+    expect(closeEvents.some(event => event.code === 1013)).toBe(false);
+    liveEmptyFogClient.client.stop();
 
     const emptyFog = new FogManager();
     const emptyFogClient = connectFogAdapter(emptyFog);
