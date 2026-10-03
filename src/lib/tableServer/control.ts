@@ -1,8 +1,26 @@
 import { createHash, randomUUID } from 'node:crypto';
 import type { Redis } from '@upstash/redis';
-import { getRawRedis, campaignSharedKey } from '@/lib/redis';
+import { getRawRedis } from '@/lib/redis';
 import { TABLE_CONTROL_SCRIPT } from './atomic';
 import type { TableCommand } from './validation';
+import {
+  tableCompatibilityKey,
+  tableControlKey,
+  tableLedgerKey,
+  tableLedgerOrderKey,
+  tableRegistryKey,
+} from './keys';
+
+export {
+  tableAuthorityChallengeKey,
+  tableCampaignTag,
+  tableCompatibilityKey,
+  tableControlKey,
+  tableLedgerKey,
+  tableLedgerOrderKey,
+  tableRegistryKey,
+} from './keys';
+export type { TableCompatibilityFeature } from './keys';
 
 export interface TablePrincipal {
   id: string;
@@ -26,19 +44,6 @@ export interface TableResult {
   current: TableDescriptor | null;
   historical?: boolean;
   committedRevision?: number;
-}
-
-export function tableControlKey(code: string): string {
-  return `campaign:${code}:table-control`;
-}
-export function tableRegistryKey(code: string): string {
-  return `campaign:${code}:table-scenes`;
-}
-export function tableLedgerKey(code: string): string {
-  return `campaign:${code}:table-operations`;
-}
-export function tableLedgerOrderKey(code: string): string {
-  return `campaign:${code}:table-operations-order`;
 }
 
 function canonical(value: unknown): string {
@@ -122,9 +127,9 @@ export class TableControlService {
           tableRegistryKey(code),
           tableLedgerKey(code),
           tableLedgerOrderKey(code),
-          campaignSharedKey(code, 'initiative'),
-          campaignSharedKey(code, 'battlemap'),
-          campaignSharedKey(code, 'initiativeRequest'),
+          tableCompatibilityKey(code, 'initiative'),
+          tableCompatibilityKey(code, 'battlemap'),
+          tableCompatibilityKey(code, 'initiativeRequest'),
         ],
         [
           JSON.stringify(command),

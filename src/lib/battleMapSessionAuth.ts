@@ -11,7 +11,12 @@ import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecu
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 
 export type BattleMapSessionResult =
-  | { authorized: true; role: BattleMapRole; userId: string }
+  | {
+      authorized: true;
+      role: BattleMapRole;
+      userId: string;
+      authorityPrincipal?: string;
+    }
   | { authorized: false; error: string; status: number };
 
 export async function authorizeBattleMapSession(
@@ -77,7 +82,15 @@ export async function authorizeBattleMapSession(
     ) {
       return { authorized: false, error: 'Not the campaign DM', status: 403 };
     }
-    return { authorized: true, role: 'dm', userId: dmId };
+    return {
+      authorized: true,
+      role: 'dm',
+      userId: dmId,
+      authorityPrincipal:
+        membership.mode === 'account'
+          ? `account:${membership.principal.accountId}`
+          : `legacy:${dmId}`,
+    };
   }
 
   if (role === 'player') {

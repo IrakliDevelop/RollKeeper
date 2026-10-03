@@ -1,17 +1,28 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { createClient } from 'redis';
-import { createSyncServer } from '@fieldnotes/sync-server';
+import { createSyncServer, readBearerToken } from '@fieldnotes/sync-server';
 import type {
   Authenticate,
+  AuthContext,
+  AuthorityRoomDefinition,
+  AuthorityState,
   HubBackend,
   HubFanout,
   ServerSyncPlugin,
   SyncHub,
 } from '@fieldnotes/sync-server';
-import { RedisHubFanout } from '@fieldnotes/sync-redis';
-import { createFogServerPlugin } from '@fieldnotes/vtt/server';
+import { RedisHubFanout, type RedisHashClient } from '@fieldnotes/sync-redis';
+import {
+  createFogAuthorityServerExtension,
+  createFogServerPlugin,
+} from '@fieldnotes/vtt/server';
 import { makePolicies } from './policies.js';
+import { TableAccessBatcher } from './authority-access.js';
+import { RedisAuthorityDriver } from './authority-driver.js';
+import { verifyBattleMapToken } from './token.js';
+import { tableAuthorityChallengeKey } from './authority-keys.js';
 import { BufferedRedisBackend } from './backend.js';
 import { EphemeralHubFanout } from './ephemeral-fanout.js';
 import { handlePokeRequest } from './poke.js';
@@ -24,6 +35,12 @@ export interface StartRelayOptions {
   backend?: HubBackend;
   /** Cross-instance ephemeral and durable-operation fan-out. */
   fanout?: HubFanout;
+  /** Required to enable Table v1 UUID authority rooms. */
+  authorityRedis?: RedisHashClient & {
+    get?(key: string): Promise<string | null>;
+  };
+  /** Test seam; production polls idle v1 sockets every two seconds. */
+  authorityPollMs?: number;
   /**
    * Hub presence throttle window in ms. Test-only seam: production
    * (`main()`) never sets it, so the sync-server default applies.
@@ -69,9 +86,10 @@ export function createBufferedElementLocalityPlugin(): ServerSyncPlugin {
 export async function startRelay(
   opts: StartRelayOptions
 ): Promise<RelayHandle> {
+  let authorityDriver: RedisAuthorityDriver | null = null;
   let pokeHandler:
-    | ((req: http.IncomingMessage, res: http.ServerResponse) => void)
-    | null = null;
+    ((req: http.IncomingMessage, res: http.ServerResponse) => void) | null =
+    null;
   const server = http.createServer((req, res) => {
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'text/plain' });
@@ -87,11 +105,185 @@ export async function startRelay(
       }
       return;
     }
+    if (
+      (req.url === '/authority-admin/checkpoint' ||
+        req.url === '/authority-admin/provision') &&
+      req.method === 'POST'
+    ) {
+      const supplied = req.headers['x-rollkeeper-relay-secret'];
+      const actual = Buffer.from(typeof supplied === 'string' ? supplied : '');
+      const expected = Buffer.from(opts.secret);
+      if (
+        actual.length !== expected.length ||
+        !timingSafeEqual(actual, expected) ||
+        !authorityDriver
+      ) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      let bytes = 0;
+      const chunks: Buffer[] = [];
+      req.on('data', chunk => {
+        bytes += Buffer.byteLength(chunk);
+        if (bytes > 21 * 1024 * 1024) req.destroy();
+        else chunks.push(Buffer.from(chunk));
+      });
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+              campaign: string;
+              sceneId: string;
+              room: string;
+              epoch: string;
+              writerFence: number;
+              principal: string;
+              roomGeneration: string;
+              expectedGeneration?: string | null;
+              expectedCasToken?: string | null;
+              generation?: string;
+              casToken?: string;
+              state?: AuthorityState;
+            };
+            if (req.url === '/authority-admin/checkpoint') {
+              const abort = new AbortController();
+              const capture = await authorityDriver!.checkpoint(
+                {
+                  room: body.room,
+                  actorId: body.principal,
+                  connectionId: `admin:${body.principal}`,
+                  userId: body.principal,
+                  role: 'dm',
+                  ownershipId: body.principal,
+                  definitionId: 'rollkeeper-scene-v1',
+                  authContext: {
+                    v: 1,
+                    campaign: body.campaign,
+                    resourceKind: 'scene',
+                    sceneId: body.sceneId,
+                    room: body.room,
+                    epoch: body.epoch,
+                    role: 'dm',
+                    writerFence: body.writerFence,
+                    principal: body.principal,
+                    roomGeneration: body.roomGeneration,
+                  },
+                  expiresAt: Date.now() + 5_000,
+                  deadlineAt: Date.now() + 5_000,
+                  signal: abort.signal,
+                },
+                { deadlineAt: Date.now() + 5_000, signal: abort.signal }
+              );
+              const result = {
+                generation: capture.position.generation,
+                revision: capture.position.revision,
+                casToken: capture.casToken,
+                state: capture.state,
+              };
+              await capture.release();
+              res.writeHead(200, { 'content-type': 'application/json' });
+              res.end(JSON.stringify(result));
+              return;
+            }
+            if (!body.state || !body.generation || !body.casToken)
+              throw new Error('invalid provision');
+            const result = await authorityDriver!.provision({
+              campaign: body.campaign,
+              sceneId: body.sceneId,
+              room: body.room,
+              epoch: body.epoch,
+              writerFence: body.writerFence,
+              principal: body.principal,
+              deadlineAt: Date.now() + 5_000,
+              generation: body.generation,
+              casToken: body.casToken,
+              expectedGeneration: body.expectedGeneration ?? null,
+              expectedCasToken: body.expectedCasToken ?? null,
+              state: body.state,
+            });
+            res.writeHead(result.status === 'provisioned' ? 200 : 409, {
+              'content-type': 'application/json',
+            });
+            res.end(JSON.stringify(result));
+          } catch {
+            if (!res.headersSent) res.writeHead(400);
+            res.end();
+          }
+        })();
+      });
+      return;
+    }
+    if (req.url === '/authority-proof' && req.method === 'POST') {
+      const supplied = req.headers['x-rollkeeper-relay-secret'];
+      const suppliedSecret = typeof supplied === 'string' ? supplied : '';
+      const expected = Buffer.from(opts.secret);
+      const actual = Buffer.from(suppliedSecret);
+      if (
+        expected.length !== actual.length ||
+        !timingSafeEqual(expected, actual) ||
+        !opts.authorityRedis?.get
+      ) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      let bytes = 0;
+      const chunks: Buffer[] = [];
+      req.on('data', chunk => {
+        bytes += Buffer.byteLength(chunk);
+        if (bytes > 4096) req.destroy();
+        else chunks.push(Buffer.from(chunk));
+      });
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as {
+              campaign?: unknown;
+              challengeId?: unknown;
+            };
+            if (
+              typeof body.campaign !== 'string' ||
+              !/^[A-Za-z0-9_-]{1,64}$/u.test(body.campaign) ||
+              typeof body.challengeId !== 'string' ||
+              !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+                body.challengeId
+              )
+            )
+              throw new Error('invalid challenge request');
+            const raw = await opts.authorityRedis!.get!(
+              tableAuthorityChallengeKey(body.campaign, body.challengeId)
+            );
+            const challenge = raw
+              ? (JSON.parse(raw) as { challengeId?: unknown; nonce?: unknown })
+              : null;
+            if (
+              !challenge ||
+              challenge.challengeId !== body.challengeId ||
+              typeof challenge.nonce !== 'string'
+            )
+              throw new Error('challenge unavailable');
+            const sha256 = createHash('sha256')
+              .update(challenge.nonce)
+              .digest('hex');
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ challengeId: body.challengeId, sha256 }));
+          } catch {
+            if (!res.headersSent) res.writeHead(404);
+            res.end();
+          }
+        })();
+      });
+      return;
+    }
     res.writeHead(404);
     res.end();
   });
 
-  const policies = makePolicies(opts.secret);
+  const policies = makePolicies(opts.secret, opts.authorityRedis !== undefined);
+  const access = opts.authorityRedis
+    ? new TableAccessBatcher(opts.authorityRedis)
+    : null;
   const plugins = [
     createFogServerPlugin({
       authorize: policies.authorizeFog,
@@ -121,10 +313,48 @@ export async function startRelay(
       }
     : policies.authenticate;
 
+  const authorityDefinition: AuthorityRoomDefinition = {
+    id: 'rollkeeper-scene-v1',
+    extensions: [createFogAuthorityServerExtension()],
+    project(context, state) {
+      if (context.role === 'dm') return state;
+      return {
+        ...state,
+        // The SDK strips ownerId after validating this is a true subset.
+        elements: state.elements.filter(element => element.audience !== 'dm'),
+      };
+    },
+    canReadOwnerId: context => context.role === 'dm',
+  };
+  authorityDriver = opts.authorityRedis
+    ? new RedisAuthorityDriver(opts.authorityRedis)
+    : null;
+
   const { hub, wss, close } = createSyncServer({
     server,
     ...policies,
     authenticate,
+    ...(access ? { framePolicy: { authorize: access.authorizeFrame } } : {}),
+    ...(authorityDriver
+      ? {
+          authority: {
+            driver: authorityDriver,
+            resolveRoom: room =>
+              /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/iu.test(
+                room
+              )
+                ? authorityDefinition
+                : null,
+            resolveIdentity: connection => ({
+              actorId: connection.userId ?? connection.id,
+              ownershipId:
+                typeof connection.authContext?.playerPrincipal === 'string'
+                  ? connection.authContext.playerPrincipal
+                  : (connection.userId ?? connection.id),
+            }),
+          },
+        }
+      : {}),
     plugins,
     ...(opts.backend ? { backend: opts.backend } : {}),
     ...(opts.fanout ? { fanout: opts.fanout } : {}),
@@ -132,6 +362,34 @@ export async function startRelay(
       ? { presenceThrottleMs: opts.presenceThrottleMs }
       : {}),
   });
+
+  if (access) {
+    wss.on('connection', (socket, request) => {
+      const token = readBearerToken(request);
+      const payload = token ? verifyBattleMapToken(token, opts.secret) : null;
+      if (!payload || !('v' in payload) || payload.v !== 1) return;
+      let active = true;
+      const interval = setInterval(() => {
+        void access
+          .authorizeClaim(
+            Object.freeze({ ...payload }) as unknown as AuthContext,
+            payload.exp
+          )
+          .then(allowed => {
+            if (active && !allowed) socket.close(4403, 'authority withdrawn');
+          });
+      }, opts.authorityPollMs ?? 2_000);
+      const expiry = setTimeout(
+        () => socket.close(4401, 'credential expired'),
+        Math.max(0, payload.exp - Date.now())
+      );
+      socket.once('close', () => {
+        active = false;
+        clearInterval(interval);
+        clearTimeout(expiry);
+      });
+    });
+  }
 
   if (opts.gateLog) {
     wss.on('connection', socket => {
@@ -227,6 +485,22 @@ async function main(): Promise<void> {
     secret,
     port,
     backend,
+    authorityRedis: redisClient
+      ? {
+          hGetAll: redisClient.hGetAll.bind(redisClient),
+          hGet: async (key, field) =>
+            (await redisClient!.hGet(key, field)) ?? null,
+          hSet: redisClient.hSet.bind(redisClient),
+          hDel: redisClient.hDel.bind(redisClient),
+          del: redisClient.del.bind(redisClient),
+          eval: redisClient.eval.bind(redisClient) as RedisHashClient['eval'],
+          scriptLoad: redisClient.scriptLoad.bind(redisClient),
+          evalSha: redisClient.evalSha.bind(redisClient) as NonNullable<
+            RedisHashClient['evalSha']
+          >,
+          get: async key => (await redisClient!.get(key)) ?? null,
+        }
+      : undefined,
     fanout: fanout ? new EphemeralHubFanout(fanout) : undefined,
     gateLog: process.env.RELAY_GATE_LOG === '1',
   });

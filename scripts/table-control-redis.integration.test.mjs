@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFile, execFileSync, spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import fs from 'node:fs';
 import test from 'node:test';
 import { promisify } from 'node:util';
@@ -8,15 +8,17 @@ import { promisify } from 'node:util';
 const execAsync = promisify(execFile);
 const CONTAINER = `rollkeeper-table-control-${randomUUID().slice(0, 8)}`;
 const CODE = 'SYNTH03A';
+const TAG = `{rk-table-v1:${createHash('sha256').update(CODE, 'utf8').digest('hex')}}`;
 const keys = [
-  `campaign:${CODE}:table-control`,
-  `campaign:${CODE}:table-scenes`,
-  `campaign:${CODE}:table-operations`,
-  `campaign:${CODE}:table-operations-order`,
-  `campaign:${CODE}:shared:initiative`,
-  `campaign:${CODE}:shared:battlemap`,
-  `campaign:${CODE}:shared:initiativeRequest`,
+  `campaign:${TAG}:table-control`,
+  `campaign:${TAG}:table-scenes`,
+  `campaign:${TAG}:table-operations`,
+  `campaign:${TAG}:table-operations-order`,
+  `campaign:${TAG}:shared:initiative`,
+  `campaign:${TAG}:shared:battlemap`,
+  `campaign:${TAG}:shared:initiativeRequest`,
 ];
+assert.ok(keys.every(key => key.includes(TAG)));
 const source = fs.readFileSync(
   new URL('../src/lib/tableServer/atomic.ts', import.meta.url),
   'utf8'

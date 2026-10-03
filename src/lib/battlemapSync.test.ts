@@ -124,6 +124,7 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   afterEach(() => {
+    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
     vi.unstubAllGlobals();
   });
 
@@ -184,6 +185,187 @@ describe('createManagedBattleMapConnection', () => {
       'request-snapshot',
     ]);
 
+    conn.stop();
+  });
+
+  it('keeps location rooms on the legacy client when the global Table v1 flag is on', async () => {
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+      authorityTransportFactory: () => {
+        throw new Error('location must not construct an authority transport');
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([
+      'wss://relay.example?room=CODE_location-1&token=test-token',
+    ]);
+    const posted = JSON.parse(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string
+    ) as Record<string, unknown>;
+    expect(posted).toMatchObject({ kind: 'location' });
+    expect(posted).not.toHaveProperty('sceneId');
+    conn.stop();
+  });
+
+  it('re-verifies a genuine location on credential refresh without manufacturing sceneId', async () => {
+    vi.useFakeTimers();
+    try {
+      process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+      const conn = createManagedBattleMapConnection({
+        relayUrl: 'wss://relay.example',
+        campaignCode: 'CODE',
+        battleMapId: 'location-1',
+        store: new ElementStore(),
+        clientId: 'dm-1',
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'location-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
+        transportFactory: () => fakeTransport,
+      });
+      await vi.advanceTimersByTimeAsync(0);
+      fakeTransport.emitClose(4401);
+      await vi.advanceTimersByTimeAsync(2_000);
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      for (const call of fetchMock.mock.calls) {
+        const posted = JSON.parse(
+          (call[1] as RequestInit).body as string
+        ) as Record<string, unknown>;
+        expect(posted).toMatchObject({ kind: 'location' });
+        expect(posted).not.toHaveProperty('sceneId');
+      }
+      conn.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('fails a legacy location adapter visibly when the server returns authority:1', async () => {
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'authority-token',
+        authority: 1,
+        room: '123e4567-e89b-42d3-a456-426614174000',
+        roomGeneration: '223e4567-e89b-42d3-a456-426614174000',
+      }),
+    });
+    const diagnostic = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      onStatus: status => statuses.push(status),
+      onDiagnostic: diagnostic,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([]);
+    expect(statuses).toContain('denied');
+    expect(diagnostic).toHaveBeenCalledWith(
+      expect.stringMatching(/authority.*location|location.*authority/i)
+    );
+    conn.stop();
+  });
+
+  it('opens no location socket and reports a diagnostic when token minting is rejected', async () => {
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    fetchMock.mockResolvedValue({ ok: false });
+    const diagnostic = vi.fn();
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'location-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'location-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      onStatus: status => statuses.push(status),
+      onDiagnostic: diagnostic,
+      transportFactory: url => {
+        transportUrls.push(url);
+        return fakeTransport;
+      },
+    });
+    await flush();
+
+    expect(transportUrls).toEqual([]);
+    expect(statuses).toContain('denied');
+    expect(diagnostic).toHaveBeenCalledWith(expect.stringMatching(/denied/i));
+    conn.stop();
+  });
+
+  it('uses an explicitly supplied sceneId for v1 even with a location hint', async () => {
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    fetchMock.mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        token: 'authority-token',
+        authority: 1,
+        room: '123e4567-e89b-42d3-a456-426614174000',
+        roomGeneration: '223e4567-e89b-42d3-a456-426614174000',
+      }),
+    });
+    const authorityTransportFactory = vi.fn(() => fakeTransport as never);
+    const conn = createManagedBattleMapConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-1',
+      store: new ElementStore(),
+      clientId: 'dm-1',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        sceneId: 'scene-real',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
+      authorityTransportFactory,
+    });
+    await flush();
+
+    const posted = JSON.parse(
+      (fetchMock.mock.calls[0]?.[1] as RequestInit).body as string
+    ) as Record<string, unknown>;
+    expect(posted.sceneId).toBe('scene-real');
+    expect(posted.kind).toBe('location');
+    expect(authorityTransportFactory).toHaveBeenCalled();
     conn.stop();
   });
 
@@ -901,12 +1083,10 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
-    const { attachRemotePings, attachPingInput } = await import(
-      '@/components/ui/campaign/location-map/pingSync'
-    );
-    const { attachRemoteLaserTrails } = await import(
-      '@/components/ui/campaign/location-map/laserSync'
-    );
+    const { attachRemotePings, attachPingInput } =
+      await import('@/components/ui/campaign/location-map/pingSync');
+    const { attachRemoteLaserTrails } =
+      await import('@/components/ui/campaign/location-map/laserSync');
 
     const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
     const vp = {
@@ -1079,18 +1259,14 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       shiftKey: false,
     });
 
-    const { attachRemotePings } = await import(
-      '@/components/ui/campaign/location-map/pingSync'
-    );
-    const { attachRemoteLaserTrails } = await import(
-      '@/components/ui/campaign/location-map/laserSync'
-    );
-    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
-      '@/components/ui/campaign/location-map/measureSync'
-    );
-    const { attachFocusBroadcast, attachFocusReceiver } = await import(
-      '@/components/ui/campaign/location-map/focusSync'
-    );
+    const { attachRemotePings } =
+      await import('@/components/ui/campaign/location-map/pingSync');
+    const { attachRemoteLaserTrails } =
+      await import('@/components/ui/campaign/location-map/laserSync');
+    const { attachMeasureBroadcast, attachRemoteMeasurements } =
+      await import('@/components/ui/campaign/location-map/measureSync');
+    const { attachFocusBroadcast, attachFocusReceiver } =
+      await import('@/components/ui/campaign/location-map/focusSync');
 
     // Ping/laser overlays share this host, mirroring the sibling test above
     // (their draw functions are exercised through a mock 2D context).
@@ -1404,18 +1580,14 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       shiftKey: false,
     });
 
-    const { attachRemotePings } = await import(
-      '@/components/ui/campaign/location-map/pingSync'
-    );
-    const { attachRemoteLaserTrails } = await import(
-      '@/components/ui/campaign/location-map/laserSync'
-    );
-    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
-      '@/components/ui/campaign/location-map/measureSync'
-    );
-    const { attachFocusBroadcast, attachFocusReceiver } = await import(
-      '@/components/ui/campaign/location-map/focusSync'
-    );
+    const { attachRemotePings } =
+      await import('@/components/ui/campaign/location-map/pingSync');
+    const { attachRemoteLaserTrails } =
+      await import('@/components/ui/campaign/location-map/laserSync');
+    const { attachMeasureBroadcast, attachRemoteMeasurements } =
+      await import('@/components/ui/campaign/location-map/measureSync');
+    const { attachFocusBroadcast, attachFocusReceiver } =
+      await import('@/components/ui/campaign/location-map/focusSync');
 
     const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
     const vp = {

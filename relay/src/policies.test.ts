@@ -34,11 +34,29 @@ const upsert = (id: string, extra: Record<string, unknown> = {}): SyncOp =>
   ({ kind: 'upsert', element: el(id, extra) }) as SyncOp;
 
 describe('authenticate', () => {
+  it('accepts the SDK-provided bearer token without a legacy query token', async () => {
+    const token = tokenFor('dm-1', 'dm');
+    expect(
+      await authenticate({ ...req(`/?room=${ROOM}`), token } as never)
+    ).toEqual({ userId: 'dm-1', role: 'dm' });
+  });
+
   it('accepts a valid token for the right room', async () => {
     const r = await authenticate(
       req(`/?room=${ROOM}&token=${tokenFor('dm-1', 'dm')}`)
     );
     expect(r).toEqual({ userId: 'dm-1', role: 'dm' });
+  });
+
+  it('prefers the SDK-provided token over a conflicting legacy query token', async () => {
+    const query = tokenFor('other', 'player');
+    const token = tokenFor('dm-1', 'dm');
+    expect(
+      await authenticate({
+        ...req(`/?room=${ROOM}&token=${query}`),
+        token,
+      } as never)
+    ).toEqual({ userId: 'dm-1', role: 'dm' });
   });
   it('rejects missing token', async () => {
     expect(await authenticate(req(`/?room=${ROOM}`))).toBeNull();
