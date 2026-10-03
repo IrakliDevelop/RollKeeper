@@ -507,6 +507,40 @@ describe('Table v1 authority token minting', () => {
     );
   });
 
+  it('accepts a verified location when raw Redis returns HGETALL as a flat array', async () => {
+    seedRedis(
+      `campaign:${CODE}:location:location-a`,
+      validLocation('location-a')
+    );
+    mockRedis.hgetall.mockResolvedValueOnce([
+      'scene-a',
+      JSON.stringify({
+        v: 1,
+        sceneId: 'scene-a',
+        workspaceInstanceId: 'workspace-a',
+        sourceMapId: 'map-a',
+        contentRevision: 1,
+        safeLabel: 'Scene A',
+        registeredAt: 1,
+        registryRevision: 1,
+        roomId: ROOM,
+        deleted: false,
+      }),
+    ] as never);
+
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+
+    expect(response.status).toBe(200);
+  });
+
   it('treats an explicit valid sceneId as v1 even with a location hint', async () => {
     const response = await POST(
       request({

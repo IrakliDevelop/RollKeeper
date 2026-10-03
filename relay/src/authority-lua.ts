@@ -479,7 +479,8 @@ local function json_array(items)
   if #items == 0 then return '[]' end
   return cjson.encode(items)
 end
-local fogJson = fog == cjson.null and 'null' or cjson.encode(fog)
+local fogJson = fog == cjson.null and 'null' or '{"meta":' .. cjson.encode(fog.meta)
+  .. ',"tiles":' .. json_array(fog.tiles) .. '}'
 local stateJson = '{"elements":' .. json_array(elements) .. ',"layers":' .. json_array(layers)
   .. ',"extensions":{"fog":{"pluginName":"fog","version":1,"data":' .. fogJson .. '}}}'
 if #stateJson > 20971520 then return {0, 'overloaded'} end

@@ -2,11 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
 import { createShape } from '@fieldnotes/core';
+import { prepareAuthorityCheckpoint } from '@fieldnotes/sync';
 import {
   assembleFogAuthorityRedisScriptV1,
   encodeFogAuthorityRedisIntentV1,
 } from '@fieldnotes/vtt/redis';
-import { prepareFogAuthorityIntent } from '@fieldnotes/vtt/server';
+import {
+  createFogAuthorityServerExtension,
+  prepareFogAuthorityIntent,
+} from '@fieldnotes/vtt/server';
 import type {
   AuthorityCommitContext,
   AuthorityCommitRequest,
@@ -374,6 +378,55 @@ run('authority driver against real Redis', () => {
     expect(await client.lLen(keys.history)).toBe(1);
     expect(await client.lLen(keys.outbox)).toBe(1);
     expect(await client.hLen(keys.evidence)).toBe(2);
+  });
+
+  it('returns SDK-valid checkpoint fog data when metadata exists with zero tiles', async () => {
+    await client.hSet(
+      keys.fogMeta,
+      'current',
+      JSON.stringify({
+        version: 1,
+        editor: 'dm-a',
+        definition: {
+          version: 1,
+          base: 'covered',
+          bounds: { x: 0, y: 0, w: 1024, h: 1024 },
+          cellSize: 8,
+          tileCells: 128,
+          generation: 'fog-generation-empty',
+        },
+      })
+    );
+    expect(await client.hLen(keys.fogTiles)).toBe(0);
+
+    const driver = new RedisAuthorityDriver(client);
+    const capture = await driver.checkpoint(context() as AuthorityReadContext, {
+      deadlineAt: Date.now() + 5_000,
+      signal: new AbortController().signal,
+    });
+    const fog = capture.state.extensions.fog.data;
+    expect(fog).not.toBeNull();
+    expect(Array.isArray(fog?.tiles)).toBe(true);
+    expect(fog?.tiles).toEqual([]);
+
+    const prepared = await prepareAuthorityCheckpoint(
+      {
+        ...capture.state,
+        cursor: {
+          generation: GENERATION,
+          streamId: 'b'.repeat(32),
+          revision: 0,
+        },
+        casToken: capture.casToken,
+      },
+      {
+        requestId: 'empty-fog-request',
+        checkpointId: 'empty-fog-checkpoint',
+        requiredExtensions: [createFogAuthorityServerExtension().requirement],
+      }
+    );
+    prepared.dispose();
+    await capture.release();
   });
 
   it('commits every core, layer, and fog mutation with exactly one publication envelope', async () => {

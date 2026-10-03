@@ -471,6 +471,26 @@ run('two relay authority transport', () => {
         definition: seededState.definition,
       },
     });
+
+    const emptyFog = new FogManager();
+    const emptyFogClient = connectFogAdapter(emptyFog);
+    await eventually(
+      () =>
+        emptyFogClient.status() === 'live' &&
+        emptyFog.getState()?.tiles.length === 0
+    ).catch(async () => {
+      throw new Error(
+        JSON.stringify({
+          status: emptyFogClient.status(),
+          fog: emptyFog.getState(),
+          fogMeta: await redis.hGetAll(keys.fogMeta),
+          fogTiles: await redis.hGetAll(keys.fogTiles),
+          closeEvents,
+        })
+      );
+    });
+    emptyFogClient.client.stop();
+
     await commitFog('transport-fog-tile', {
       kind: 'fog-patch',
       generation: seededState.definition.generation,

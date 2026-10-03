@@ -12,7 +12,7 @@ const encoder = new TextEncoder();
 
 type RedisGet = { get(key: string): Promise<unknown> };
 type RedisHashRead = {
-  hgetall(key: string): Promise<Record<string, unknown> | null>;
+  hgetall(key: string): Promise<unknown>;
 };
 
 export type LocationResolution =
@@ -22,6 +22,22 @@ const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const byteLength = (value: string): number => encoder.encode(value).byteLength;
+
+function normalizeHashEntries(value: unknown): Array<[string, unknown]> | null {
+  if (value === null || value === undefined) return [];
+  if (record(value)) return Object.entries(value);
+  if (!Array.isArray(value) || value.length % 2 !== 0) return null;
+
+  const entries: Array<[string, unknown]> = [];
+  const fields = new Set<string>();
+  for (let index = 0; index < value.length; index += 2) {
+    const field = value[index];
+    if (typeof field !== 'string' || fields.has(field)) return null;
+    fields.add(field);
+    entries.push([field, value[index + 1]]);
+  }
+  return entries;
+}
 
 export const isSafeResourceId = (value: unknown): value is string =>
   typeof value === 'string' && SAFE_ID.test(value);
@@ -150,13 +166,14 @@ export async function resolveVerifiedLocation(input: {
       return { status: 'corrupt' };
   }
 
-  let rawRegistry: Record<string, unknown> | null;
+  let rawRegistry: unknown;
   try {
     rawRegistry = await input.registryRedis.hgetall(input.registryKey);
   } catch {
     return { status: 'unavailable' };
   }
-  const entries = Object.entries(rawRegistry ?? {});
+  const entries = normalizeHashEntries(rawRegistry);
+  if (entries === null) return { status: 'corrupt' };
   if (entries.length > REGISTRY_FIELDS) return { status: 'corrupt' };
   for (const [field, raw] of entries) {
     const decoded = decodeOnce(raw, REGISTRY_ENTRY_BYTES);

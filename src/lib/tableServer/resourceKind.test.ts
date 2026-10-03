@@ -204,6 +204,57 @@ describe('server-owned location resource resolution', () => {
     expect(result).toEqual({ status: 'verified' });
   });
 
+  it('accepts the flat field/value HGETALL shape returned by raw Upstash Redis', async () => {
+    const raw = JSON.stringify(registry({ sourceMapId: 'other-map' }));
+    const result = await resolveVerifiedLocation({
+      redis: { get: async () => location() },
+      registryRedis: {
+        hgetall: async () => ['scene-a', raw] as never,
+      },
+      campaign: CODE,
+      battleMapId: ID,
+      registryKey: REGISTRY_KEY,
+    });
+    expect(result).toEqual({ status: 'verified' });
+  });
+
+  it('detects collisions in the flat field/value HGETALL shape', async () => {
+    const raw = JSON.stringify(registry({ sourceMapId: ID }));
+    const result = await resolveVerifiedLocation({
+      redis: { get: async () => location() },
+      registryRedis: {
+        hgetall: async () => ['scene-a', raw] as never,
+      },
+      campaign: CODE,
+      battleMapId: ID,
+      registryKey: REGISTRY_KEY,
+    });
+    expect(result).toEqual({ status: 'collision' });
+  });
+
+  it.each([
+    ['odd field/value count', ['scene-a']],
+    ['non-string field', [1, JSON.stringify(registry())]],
+    [
+      'duplicate field',
+      [
+        'scene-a',
+        JSON.stringify(registry()),
+        'scene-a',
+        JSON.stringify(registry()),
+      ],
+    ],
+  ])('rejects malformed flat HGETALL: %s', async (_label, rawRegistry) => {
+    const result = await resolveVerifiedLocation({
+      redis: { get: async () => location() },
+      registryRedis: { hgetall: async () => rawRegistry as never },
+      campaign: CODE,
+      battleMapId: ID,
+      registryKey: REGISTRY_KEY,
+    });
+    expect(result).toEqual({ status: 'corrupt' });
+  });
+
   it.each([
     ['unknown field', { ...registry(), extra: true }],
     ['field mismatch', registry({ sceneId: 'other' })],
