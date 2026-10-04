@@ -8,6 +8,7 @@ import {
 } from '@/lib/relayPoke';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
 import { MAX_LIVE_MAP_ROOMS } from '@/lib/liveMapRooms';
+import { tableCompatibilityKey } from '@/lib/tableServer/control';
 
 const CODE = 'CAMP1';
 const SECRET = 'test-secret';
@@ -111,6 +112,16 @@ describe('sendInitiativePoke', () => {
       { fetchFn }
     );
     expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('reads the tagged active-map projection when Table v1 is required', async () => {
+    vi.stubEnv('TABLE_PROTOCOL_V1_REQUIRED', 'true');
+    const fetchFn = vi.fn();
+    const redis = redisWith(null);
+    await sendInitiativePoke(CODE, redis, { fetchFn });
+    expect(redis.get).toHaveBeenCalledWith(
+      tableCompatibilityKey(CODE, 'battlemap')
+    );
   });
 
   it('does nothing when env vars are missing', async () => {

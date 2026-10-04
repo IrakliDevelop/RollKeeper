@@ -51,7 +51,20 @@ import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecu
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
 import { campaignSettingsProjectionWriteAllowed } from '@/lib/supabase/campaignSettingsServer';
 import { calendarProjectionWriteAllowed } from '@/lib/supabase/calendarServer';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
+import {
+  isTableProtocolRequired,
+  tableCompatibilityKey,
+  type TableCompatibilityFeature,
+} from '@/lib/tableServer/control';
+
+function reservedProjectionKey(
+  code: string,
+  feature: TableCompatibilityFeature
+): string {
+  return isTableProtocolRequired()
+    ? tableCompatibilityKey(code, feature)
+    : campaignSharedKey(code, feature);
+}
 
 export async function GET(
   request: NextRequest,
@@ -97,7 +110,7 @@ export async function GET(
       campaignSharedKey(code, 'calendar')
     );
     const initiativeRaw = await redis.get<string>(
-      campaignSharedKey(code, 'initiative')
+      reservedProjectionKey(code, 'initiative')
     );
     let initiative: SharedInitiativeState | null = null;
     if (initiativeRaw) {
@@ -111,7 +124,7 @@ export async function GET(
     }
 
     const battleMapRaw = await redis.get<string>(
-      campaignSharedKey(code, 'battlemap')
+      reservedProjectionKey(code, 'battlemap')
     );
     let battleMap: SharedBattleMapState | null = null;
     if (battleMapRaw) {
@@ -131,7 +144,7 @@ export async function GET(
     }
 
     const initiativeRequestRaw = await redis.get<string>(
-      campaignSharedKey(code, 'initiativeRequest')
+      reservedProjectionKey(code, 'initiativeRequest')
     );
     let initiativeRequest: InitiativeRollRequest | null = null;
     if (initiativeRequestRaw) {

@@ -1,8 +1,7 @@
-import { randomBytes, randomUUID, createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
-import { getRawRedis } from '@/lib/redis';
 import { authorizeTableDm } from '@/lib/tableServer/auth';
 import { isTableProtocolRequired } from '@/lib/tableServer/control';
+import { proveRelayAuthority } from '@/lib/tableServer/authorityProof';
 import { readBoundedJson } from '@/lib/tableServer/validation';
 
 export async function POST(
@@ -31,18 +30,11 @@ export async function POST(
   const auth = await authorizeTableDm(request, code, record?.dmId, true);
   if (!auth.ok)
     return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const challengeId = randomUUID();
-  const nonce = randomBytes(32).toString('hex');
-  // One bounded slot per campaign: repeated authenticated requests replace the
-  // prior challenge instead of allocating unlimited nonce keys.
-  await getRawRedis().set(
-    `campaign:${code}:table-authority-challenge`,
-    JSON.stringify({ challengeId, nonce }),
-    { ex: 30 }
-  );
-  return NextResponse.json({
-    challengeId,
-    sha256: createHash('sha256').update(nonce).digest('hex'),
-    expiresInSeconds: 30,
-  });
+  const verified = await proveRelayAuthority(code);
+  if (!verified)
+    return NextResponse.json(
+      { error: 'Relay authority proof failed' },
+      { status: 503 }
+    );
+  return NextResponse.json({ verified: true, expiresInSeconds: 30 });
 }

@@ -16,19 +16,34 @@ export const DM_AUDIENCE = 'dm';
  * Layer definitions are presentation-only (never element bytes), so
  * authorizeLayer guards edit ownership, not privacy.
  */
-export function makePolicies(secret: string): {
+export function makePolicies(
+  secret: string,
+  authorityAvailable = true
+): {
   authenticate: Authenticate;
   authorize: Authorize;
   authorizeFog: (context: FogAuthorizationContext) => boolean;
   authorizeLayer: AuthorizeLayer;
   canRead: CanRead;
 } {
-  const authenticate: Authenticate = ({ req, room }) => {
+  const authenticate: Authenticate = ({ req, room, token: suppliedToken }) => {
     const url = new URL(req.url ?? '', 'http://relay');
-    const token = url.searchParams.get('token');
+    // Released SDKs pass a bearer-subprotocol credential as `token`. Keep the
+    // query parameter only as an explicit compatibility path for legacy peers.
+    const token = suppliedToken ?? url.searchParams.get('token');
     if (!token) return null;
     const payload = verifyBattleMapToken(token, secret);
     if (!payload || payload.room !== room) return null;
+    if ('v' in payload) {
+      if (!authorityAvailable) return null;
+      const authContext = Object.freeze({ ...payload });
+      return {
+        userId: payload.userId,
+        role: payload.role,
+        authContext,
+        expiresAt: payload.exp,
+      };
+    }
     return { userId: payload.userId, role: payload.role };
   };
 

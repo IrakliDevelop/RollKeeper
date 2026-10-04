@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   mockRedis,
@@ -9,16 +9,31 @@ import {
 } from '@/test/mocks/redis';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
 
-const { authorizeCampaignMembershipRoute } = vi.hoisted(() => ({
-  authorizeCampaignMembershipRoute: vi.fn(),
-}));
+const { authorizeCampaignMembershipRoute, proveRelayAuthority } = vi.hoisted(
+  () => ({
+    authorizeCampaignMembershipRoute: vi.fn(),
+    proveRelayAuthority: vi.fn(),
+  })
+);
 vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
   authorizeCampaignMembershipRoute,
 }));
+vi.mock('@/lib/tableServer/authorityProof', () => ({ proveRelayAuthority }));
 
 import { POST } from './route';
 
 const CODE = 'A1B2C3D4E5F6';
+const ROOM = '123e4567-e89b-42d3-a456-426614174000';
+const EPOCH = '223e4567-e89b-42d3-a456-426614174000';
+const GENERATION = '323e4567-e89b-42d3-a456-426614174000';
+
+const validLocation = (id: string, extra: Record<string, unknown> = {}) => ({
+  id,
+  name: 'Location',
+  mapImageUrl: 'https://example.test/location.png',
+  updatedAt: '2026-10-03T00:00:00.000Z',
+  ...extra,
+});
 
 function request(body: Record<string, unknown>, secure = false) {
   return new NextRequest(
@@ -367,6 +382,409 @@ describe('fog protocol capability gate', () => {
       params
     );
     expect(response.status).toBe(426);
+  });
+});
+
+describe('Table v1 authority token minting', () => {
+  beforeEach(async () => {
+    resetRedis();
+    vi.clearAllMocks();
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
+    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    proveRelayAuthority.mockResolvedValue(true);
+    seedRedisSet(`campaign:${CODE}:players`, ['player-a']);
+    const tag = `{rk-table-v1:${await import('node:crypto').then(({ createHash }) => createHash('sha256').update(CODE).digest('hex'))}}`;
+    seedRedis(
+      `campaign:${tag}:table-control`,
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 4,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 60_000,
+        presentation: { sceneId: 'scene-a', revision: 1, blanked: false },
+        displayGeneration: 3,
+      })
+    );
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'scene-a',
+      JSON.stringify({
+        v: 1,
+        sceneId: 'scene-a',
+        workspaceInstanceId: 'workspace-a',
+        sourceMapId: 'map-a',
+        contentRevision: 1,
+        safeLabel: 'Scene A',
+        registeredAt: 1,
+        registryRevision: 1,
+        roomId: ROOM,
+        deleted: false,
+      })
+    );
+    seedRedis(
+      `campaign:${tag}:room:${ROOM}:meta`,
+      JSON.stringify({
+        v: 1,
+        generation: GENERATION,
+        revision: 0,
+        casToken: 'cas-a',
+      })
+    );
+  });
+
+  it('requires authority negotiation and mints immutable registry-room claims', async () => {
+    const upgrade = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId: 'player-a',
+        protocols: { fog: 1 },
+      }),
+      params
+    );
+    expect(upgrade.status).toBe(426);
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId: 'player-a',
+        protocols: { fog: 1, authority: 1 },
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      token: string;
+      authority: number;
+      room: string;
+    };
+    expect(body).toMatchObject({ authority: 1, room: ROOM });
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({
+      v: 1,
+      campaign: CODE,
+      sceneId: 'scene-a',
+      room: ROOM,
+      roomGeneration: GENERATION,
+      role: 'player',
+      playerPrincipal: 'player-a',
+    });
+  });
+
+  it('keeps location requests on the legacy room/token path while the flag is on', async () => {
+    seedRedis(
+      `campaign:${CODE}:location:location-a`,
+      validLocation('location-a')
+    );
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      token: string;
+      authority?: number;
+    };
+    expect(body.authority).toBeUndefined();
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({ room: `${CODE}_location-a` });
+    expect(proveRelayAuthority).not.toHaveBeenCalled();
+    expect(mockRedis.zadd).toHaveBeenCalledWith(
+      `campaign:${CODE}:live-locations`,
+      expect.objectContaining({ member: 'location:location-a' })
+    );
+  });
+
+  it('accepts a verified location when raw Redis returns HGETALL as a flat array', async () => {
+    seedRedis(
+      `campaign:${CODE}:location:location-a`,
+      validLocation('location-a')
+    );
+    mockRedis.hgetall.mockResolvedValueOnce([
+      'scene-a',
+      JSON.stringify({
+        v: 1,
+        sceneId: 'scene-a',
+        workspaceInstanceId: 'workspace-a',
+        sourceMapId: 'map-a',
+        contentRevision: 1,
+        safeLabel: 'Scene A',
+        registeredAt: 1,
+        registryRevision: 1,
+        roomId: ROOM,
+        deleted: false,
+      }),
+    ] as never);
+
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+
+    expect(response.status).toBe(200);
+  });
+
+  it('treats an explicit valid sceneId as v1 even with a location hint', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId: 'player-a',
+        kind: 'location',
+        protocols: { fog: 1, authority: 1 },
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as {
+      authority?: number;
+      token: string;
+    };
+    expect(body.authority).toBe(1);
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({ resourceKind: 'scene', sceneId: 'scene-a', room: ROOM });
+    expect(mockRedis.zadd).not.toHaveBeenCalled();
+  });
+
+  it('rejects an unverified no-scene location claim without proof or live-room mutation', async () => {
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(409);
+    expect(proveRelayAuthority).not.toHaveBeenCalled();
+    expect(mockRedis.zadd).not.toHaveBeenCalled();
+  });
+
+  it('uses the expired-detail metadata fallback only for truly absent detail', async () => {
+    seedRedis(`campaign:${CODE}:locations`, [
+      validLocation('fallback-a'),
+      validLocation('other-a'),
+    ]);
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'fallback-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(200);
+  });
+
+  it.each([null, 1, '', ' ', 'bad/id', 'x'.repeat(129)])(
+    'rejects malformed present sceneId %# without location fallback',
+    async sceneId => {
+      mockRedis.get.mockClear();
+      const response = await POST(
+        request({
+          role: 'player',
+          battleMapId: 'location-a',
+          sceneId,
+          playerId: 'player-a',
+          kind: 'location',
+          protocols: { fog: 1, authority: 1 },
+        }),
+        params
+      );
+      expect(response.status).toBe(400);
+      expect(mockRedis.get).not.toHaveBeenCalledWith(
+        `campaign:${CODE}:location:location-a`
+      );
+    }
+  );
+
+  it('rejects an unsafe location battleMapId before location key construction/read', async () => {
+    mockRedis.get.mockClear();
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'bad/location',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(400);
+    expect(mockRedis.get).not.toHaveBeenCalledWith(
+      `campaign:${CODE}:location:bad/location`
+    );
+  });
+
+  it('rejects an active source collision but ignores a tombstoned-only collision', async () => {
+    seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
+    const collision = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(collision.status).toBe(409);
+    const tag = `{rk-table-v1:${await import('node:crypto').then(({ createHash }) => createHash('sha256').update(CODE).digest('hex'))}}`;
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'scene-a',
+      JSON.stringify({
+        v: 1,
+        sceneId: 'scene-a',
+        workspaceInstanceId: 'workspace-a',
+        sourceMapId: 'map-a',
+        contentRevision: 1,
+        safeLabel: 'Scene A',
+        registeredAt: 1,
+        registryRevision: 1,
+        roomId: ROOM,
+        deleted: true,
+      })
+    );
+    const tombstone = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(tombstone.status).toBe(200);
+  });
+
+  it('performs no location or registry resolver reads for an unauthorized request', async () => {
+    mockRedis.get.mockClear();
+    mockRedis.hgetall.mockClear();
+    const response = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'not-a-member',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(response.status).toBe(403);
+    expect(mockRedis.get).not.toHaveBeenCalledWith(
+      `campaign:${CODE}:location:location-a`
+    );
+    expect(mockRedis.hgetall).not.toHaveBeenCalled();
+  });
+
+  it('distinguishes corrupt evidence from resolver read unavailability', async () => {
+    seedRedis(`campaign:${CODE}:location:corrupt-a`, 'null');
+    const corrupt = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'corrupt-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(corrupt.status).toBe(409);
+
+    mockRedis.get.mockRejectedValueOnce(new Error('redis unavailable'));
+    const unavailable = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(unavailable.status).toBe(503);
+  });
+
+  it('maps corrupt registry evidence to 409 and a failed registry read to 503', async () => {
+    seedRedis(
+      `campaign:${CODE}:location:location-a`,
+      validLocation('location-a')
+    );
+    const tag = `{rk-table-v1:${await import('node:crypto').then(({ createHash }) => createHash('sha256').update(CODE).digest('hex'))}}`;
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'scene-a',
+      JSON.stringify({ unexpected: true })
+    );
+    const corrupt = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(corrupt.status).toBe(409);
+
+    mockRedis.hgetall.mockRejectedValueOnce(new Error('registry unavailable'));
+    const unavailable = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(unavailable.status).toBe(503);
+  });
+
+  it('fails closed on source-map mismatch or same-authority proof failure', async () => {
+    const mismatch = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-b',
+        sceneId: 'scene-a',
+        playerId: 'player-a',
+        protocols: { fog: 1, authority: 1 },
+      }),
+      params
+    );
+    expect(mismatch.status).toBe(409);
+    proveRelayAuthority.mockResolvedValue(false);
+    const unavailable = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId: 'player-a',
+        protocols: { fog: 1, authority: 1 },
+      }),
+      params
+    );
+    expect(unavailable.status).toBe(503);
+  });
+
+  afterEach(() => {
+    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
   });
 });
 

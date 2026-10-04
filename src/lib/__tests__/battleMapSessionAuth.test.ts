@@ -68,6 +68,7 @@ describe('authorizeBattleMapSession', () => {
       authorized: true,
       role: 'dm',
       userId: 'dm-1',
+      authorityPrincipal: 'legacy:dm-1',
     });
   });
 

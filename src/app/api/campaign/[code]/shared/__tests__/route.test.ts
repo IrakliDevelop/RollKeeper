@@ -24,6 +24,7 @@ import type {
   ItemTransfer,
   SharedCustomCounter,
 } from '@/types/sharedState';
+import { tableCompatibilityKey } from '@/lib/tableServer/control';
 
 // Shared key helpers (mirrors the mock)
 const campaignSharedKey = (code: string, feature: string) =>
@@ -318,6 +319,35 @@ describe('GET /api/campaign/[code]/shared', () => {
     expect(data.initiative).not.toBeNull();
     expect(data.initiative.round).toBe(3);
     expect(data.initiative.currentEntityId).toBe('a');
+  });
+
+  it('reads only tagged reserved projections when Table v1 is required', async () => {
+    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    try {
+      seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+        encounterId: 'legacy-preview',
+        isActive: true,
+        round: 99,
+        currentEntityId: null,
+        turnOrder: [],
+        updatedAt: 'legacy',
+      });
+      seedRedis(tableCompatibilityKey('ABC123', 'initiative'), {
+        encounterId: 'v1',
+        isActive: true,
+        round: 4,
+        currentEntityId: null,
+        turnOrder: [],
+        updatedAt: 'v1',
+      });
+      const response = await GET(
+        new NextRequest('http://localhost/api/campaign/ABC123/shared'),
+        createRouteParams({ code: 'ABC123' })
+      );
+      expect((await response.json()).initiative.round).toBe(4);
+    } finally {
+      delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
+    }
   });
 
   it('returns null initiative when none is stored', async () => {
