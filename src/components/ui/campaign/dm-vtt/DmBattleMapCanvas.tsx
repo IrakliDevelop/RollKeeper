@@ -86,7 +86,17 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     fogControls,
   } = useDmBattleMapCanvas(props);
   const { toasts, addToast, dismissToast } = useToast();
-  const updateBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const updateLegacyBattleMap = useBattleMapStore(s => s.updateBattleMap);
+  const updateBattleMap = useCallback(
+    (updates: Parameters<typeof updateLegacyBattleMap>[2]) => {
+      if (props.tableSceneAdapter) {
+        props.tableSceneAdapter.updateBattleMap(updates);
+      } else {
+        updateLegacyBattleMap(campaignCode, battleMapId, updates);
+      }
+    },
+    [props.tableSceneAdapter, updateLegacyBattleMap, campaignCode, battleMapId]
+  );
   const { appearance: fogAppearance, fingerprint: fogFingerprint } =
     useAppliedFogAppearance(battleMap?.fogAppearance);
   const [fogPlugin] = useState(() =>
@@ -95,7 +105,8 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   useFogAppearanceProjection({
     enabled:
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
-      battleMap !== undefined,
+      battleMap !== undefined &&
+      !props.tableSceneAdapter,
     campaignCode,
     battleMapId,
     dmId: props.dmId,
@@ -123,15 +134,16 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
       if (viewport) {
         setViewportFogStyle(viewport, resolveFogRendererOptions(appearance));
       }
-      updateBattleMap(campaignCode, battleMapId, { fogAppearance: appearance });
+      updateBattleMap({ fogAppearance: appearance });
     },
-    [viewport, updateBattleMap, campaignCode, battleMapId]
+    [viewport, updateBattleMap]
   );
   const fogPresetControls = useFogPresetControls({
     campaignCode,
     viewport,
     applied: fogAppearance,
     onApply: handleFogAppearanceChange,
+    libraryWritable: !props.tableSceneAdapter,
   });
   // Session-scoped only — pure UI state, no connection dependency. Off by
   // default; the DM opts in each session before a focus request can move
@@ -189,6 +201,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                 name={battleMap?.name ?? 'battle-map'}
                 mapImageSize={battleMap?.mapImageSize}
                 getDmOnlyElements={() =>
+                  props.tableSceneAdapter?.getBattleMap()?.dmOnlyElements ??
                   useBattleMapStore
                     .getState()
                     .getBattleMap(campaignCode, battleMapId)?.dmOnlyElements ??
@@ -210,11 +223,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                     ...(battleMap?.cameraViews ?? []),
                     { id: crypto.randomUUID(), name, view },
                   ];
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
                 onGoToView={handleGoToCameraView}
                 onSend={handleSendCameraView}
@@ -222,21 +231,13 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                   const next = (battleMap?.cameraViews ?? []).map(v =>
                     v.id === id ? { ...v, name } : v
                   );
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
                 onDeleteView={id => {
                   const next = (battleMap?.cameraViews ?? []).filter(
                     v => v.id !== id
                   );
-                  useBattleMapStore
-                    .getState()
-                    .updateBattleMap(campaignCode, battleMapId, {
-                      cameraViews: next,
-                    });
+                  updateBattleMap({ cameraViews: next });
                 }}
               />
             }

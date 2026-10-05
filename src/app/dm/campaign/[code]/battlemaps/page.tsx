@@ -21,6 +21,7 @@ import { useBattleMapStore, generateBattleMapId } from '@/store/battleMapStore';
 import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { uploadAsset } from '@/utils/uploadAsset';
+import { TableScenePanel } from '@/components/ui/campaign/table/TableScenePanel';
 
 export default function CampaignBattleMapsPage() {
   const params = useParams();
@@ -232,6 +233,7 @@ export default function CampaignBattleMapsPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+        <TableScenePanel campaignCode={code} battleMaps={battleMaps} />
         {deleteError && (
           <p className="text-accent-red-text mb-4" role="alert">
             {deleteError}

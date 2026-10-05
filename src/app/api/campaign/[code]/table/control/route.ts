@@ -23,8 +23,12 @@ export async function GET(request: NextRequest, { params }: Context) {
   );
   if (!auth.ok)
     return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const current = await new TableControlService().read(code);
-  return NextResponse.json({ current });
+  const service = new TableControlService();
+  const [current, registry] = await Promise.all([
+    service.read(code),
+    service.registry(auth.principal),
+  ]);
+  return NextResponse.json({ current, registry });
 }
 
 export async function POST(request: NextRequest, { params }: Context) {
