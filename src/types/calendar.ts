@@ -70,6 +70,7 @@ export interface CalendarEvent {
   month: number; // 0-based month index
   day: number; // 0-based day of month
   createdAt: number; // timestamp for ordering
+  sortOrder?: number; // DM-arranged position within its day; absent = creation order
   color?: string; // hex '#rrggbb' dot marker color
   emoji?: string; // emoji marker; takes precedence over color
   visibility?: CalendarEventVisibility; // legacy absence is private

@@ -44,6 +44,7 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
   const addEvent = useCalendarStore(state => state.addEvent);
   const updateEvent = useCalendarStore(state => state.updateEvent);
   const deleteEvent = useCalendarStore(state => state.deleteEvent);
+  const moveEvent = useCalendarStore(state => state.moveEvent);
   const { date, moonPhases, dayPeriod } = useCalendar(campaignCode);
 
   // Sub-tab state
@@ -276,6 +277,9 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
                 onAddEvent={handleAddEvent}
                 onEditEvent={handleEditEvent}
                 onDeleteEvent={eventId => deleteEvent(campaignCode, eventId)}
+                onMoveEvent={(eventId, direction) =>
+                  moveEvent(campaignCode, eventId, direction)
+                }
               />
             </div>
             {config.moons.length > 0 && (
@@ -295,6 +299,9 @@ export function CalendarView({ campaignCode, onReset }: CalendarViewProps) {
                 updateEvent(campaignCode, eventId, updates)
               }
               onDeleteEvent={eventId => deleteEvent(campaignCode, eventId)}
+              onMoveEvent={(eventId, direction) =>
+                moveEvent(campaignCode, eventId, direction)
+              }
             />
           </CardContent>
         </Card>

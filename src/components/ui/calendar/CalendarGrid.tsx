@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Plus, Pencil, Trash2 } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { Button } from '@/components/ui/forms/button';
 import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
@@ -18,6 +18,10 @@ import {
   getAllMoonPhases,
   getTotalDaysForDate,
 } from '@/utils/calendarCalculations';
+import {
+  sortEventsWithinDay,
+  type EventMoveDirection,
+} from '@/utils/calendarEventOrder';
 
 export interface SelectedDay {
   year: number;
@@ -36,6 +40,7 @@ interface CalendarGridProps {
   onAddEvent?: () => void;
   onEditEvent?: (event: CalendarEvent) => void;
   onDeleteEvent?: (eventId: string) => void;
+  onMoveEvent?: (eventId: string, direction: EventMoveDirection) => void;
   showMoonPhases?: boolean;
 }
 
@@ -62,6 +67,7 @@ function DayPopover({
   onAddEvent,
   onEditEvent,
   onDeleteEvent,
+  onMoveEvent,
   onClose,
 }: {
   selectedDay: SelectedDay;
@@ -72,6 +78,7 @@ function DayPopover({
   onAddEvent: () => void;
   onEditEvent: (event: CalendarEvent) => void;
   onDeleteEvent: (eventId: string) => void;
+  onMoveEvent?: (eventId: string, direction: EventMoveDirection) => void;
   onClose: () => void;
 }) {
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -132,7 +139,7 @@ function DayPopover({
           <p className="text-muted px-3 py-2 text-xs">No events</p>
         ) : (
           <div className="p-1.5">
-            {events.map(event => (
+            {events.map((event, index) => (
               <div
                 key={event.id}
                 className="hover:bg-surface-secondary group flex items-center gap-1.5 rounded px-2 py-1.5 transition-colors duration-150"
@@ -151,7 +158,29 @@ function DayPopover({
                     {event.title}
                   </span>
                 </button>
-                <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                <div className="ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                  {onMoveEvent && events.length > 1 && (
+                    <>
+                      <button
+                        type="button"
+                        aria-label={`Move ${event.title} earlier`}
+                        disabled={index === 0}
+                        onClick={() => onMoveEvent(event.id, 'up')}
+                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                      >
+                        <ChevronUp size={10} />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Move ${event.title} later`}
+                        disabled={index === events.length - 1}
+                        onClick={() => onMoveEvent(event.id, 'down')}
+                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                      >
+                        <ChevronDown size={10} />
+                      </button>
+                    </>
+                  )}
                   <button
                     type="button"
                     onClick={() => onEditEvent(event)}
@@ -187,6 +216,7 @@ export function CalendarGrid({
   onAddEvent,
   onEditEvent,
   onDeleteEvent,
+  onMoveEvent,
   showMoonPhases = true,
 }: CalendarGridProps) {
   const grid = getMonthGrid(browseYear, browseMonth, config);
@@ -240,14 +270,14 @@ export function CalendarGrid({
     selectedDay &&
     selectedDay.year === browseYear &&
     selectedDay.month === browseMonth
-      ? events
-          .filter(
+      ? sortEventsWithinDay(
+          events.filter(
             e =>
               e.year === selectedDay.year &&
               e.month === selectedDay.month &&
               e.day === selectedDay.day
           )
-          .sort((a, b) => a.createdAt - b.createdAt)
+        )
       : [];
 
   const showPopover =
@@ -310,14 +340,14 @@ export function CalendarGrid({
                     config
                   );
                   const transitions = getPhaseTransitions(totalDays, config);
-                  const dayEvents = events
-                    .filter(
+                  const dayEvents = sortEventsWithinDay(
+                    events.filter(
                       e =>
                         e.year === browseYear &&
                         e.month === browseMonth &&
                         e.day === day
                     )
-                    .sort((a, b) => a.createdAt - b.createdAt);
+                  );
 
                   return (
                     <td
@@ -395,6 +425,7 @@ export function CalendarGrid({
           onAddEvent={onAddEvent}
           onEditEvent={onEditEvent}
           onDeleteEvent={onDeleteEvent}
+          onMoveEvent={onMoveEvent}
           onClose={() =>
             onDayClick?.(selectedDay.year, selectedDay.month, selectedDay.day)
           }
