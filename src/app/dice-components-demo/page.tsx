@@ -51,7 +51,8 @@ export default function DiceComponentsDemo() {
             customization
           </p>
           <DiceRoller
-            containerId="demo-dice-container"
+            containerId="main-dice-container"
+            showDiceSet
             onRollResult={handleRollResult}
             quickButtons={[
               {
@@ -218,6 +219,7 @@ export default function DiceComponentsDemo() {
           </p>
           <DiceRoller
             containerId="minimal-dice-container"
+            showDiceSet
             showHistory={false}
             showAutoClearControl={false}
             maxHistoryResults={5}
@@ -297,7 +299,7 @@ export default function DiceComponentsDemo() {
           </h2>
           <ul className="space-y-2 text-blue-700">
             <li>
-              • Each component needs a unique <code>containerId</code>
+              • Hooks that share a <code>containerId</code> share one dice tray
             </li>
             <li>
               • Components automatically handle dice initialization and cleanup

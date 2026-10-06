@@ -1,20 +1,81 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-// @ts-expect-error - DiceBox is not typed
-import DiceBox from '@3d-dice/dice-box';
-import { DiceRollResults, RollSummary } from '@/types/dice';
-import { calculateRollSummary, autoClearDice } from '@/utils/diceUtils';
+'use client';
 
-interface DiceBoxInstance {
-  clear?: () => void;
-  roll?: (notation: string) => Promise<DiceRollResults>;
-  init?: () => Promise<void>;
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { createRoll, evaluate, PollyrollSyntaxError } from 'pollyroll';
+import { createDiceTray } from 'pollyroll/render';
+import type { DiceTray, SkinRef } from 'pollyroll/render';
+import type { RollSummary } from '@/types/dice';
+import { toRollSummary } from '@/utils/pollyrollSummary';
+
+interface TrayEntry {
+  tray: DiceTray;
+  users: number;
+  skinKey: string;
+  dieScale: number;
+  rolling: boolean;
+  clearTimer: ReturnType<typeof setTimeout> | null;
+}
+
+const trays = new Map<string, TrayEntry>();
+
+function acquireTray(
+  containerId: string,
+  skin: SkinRef | undefined,
+  dieScale: number
+): DiceTray | null {
+  const existing = trays.get(containerId);
+  if (existing) {
+    existing.users += 1;
+    return existing.tray;
+  }
+  const element = document.getElementById(containerId);
+  if (!element) return null;
+  const tray = createDiceTray(element, { skin, dieScale });
+  trays.set(containerId, {
+    tray,
+    users: 1,
+    skinKey: JSON.stringify(skin ?? null),
+    dieScale,
+    rolling: false,
+    clearTimer: null,
+  });
+  return tray;
+}
+
+function releaseTray(containerId: string): void {
+  const entry = trays.get(containerId);
+  if (!entry) return;
+  entry.users -= 1;
+  if (entry.users > 0) return;
+  if (entry.clearTimer) clearTimeout(entry.clearTimer);
+  entry.tray.dispose();
+  trays.delete(containerId);
+}
+
+function applyAppearance(
+  containerId: string,
+  skin: SkinRef | undefined,
+  dieScale: number | undefined
+): void {
+  const entry = trays.get(containerId);
+  if (!entry) return;
+  if (skin !== undefined) {
+    const key = JSON.stringify(skin);
+    if (key !== entry.skinKey) {
+      entry.skinKey = key;
+      entry.tray.setSkin(skin);
+    }
+  }
+  if (dieScale !== undefined && dieScale !== entry.dieScale) {
+    entry.dieScale = dieScale;
+    entry.tray.setDieScale(dieScale);
+  }
 }
 
 export interface UseDiceRollerOptions {
   containerId: string;
-  theme?: string;
-  themeColor?: string;
-  scale?: number;
+  skin?: SkinRef;
+  dieScale?: number;
   autoClearDelay?: number;
   onRollComplete?: (summary: RollSummary) => void;
   onError?: (error: string) => void;
@@ -34,223 +95,170 @@ export interface UseDiceRollerReturn {
 
 export function useDiceRoller({
   containerId,
-  theme = 'diceOfRolling',
-  themeColor = '#feea03',
-  scale = 6,
+  skin,
+  dieScale,
   autoClearDelay: initialAutoClearDelay = 10000,
   onRollComplete,
   onError,
   onLog,
 }: UseDiceRollerOptions): UseDiceRollerReturn {
-  const [diceBox, setDiceBox] = useState<DiceBoxInstance | null>(null);
   const [isInitialized, setIsInitialized] = useState(false);
   const [isRolling, setIsRolling] = useState(false);
   const [rollHistory, setRollHistory] = useState<RollSummary[]>([]);
   const [autoClearDelay, setAutoClearDelay] = useState(initialAutoClearDelay);
-  const [isMounted, setIsMounted] = useState(false);
-
-  // Use ref to avoid recreating log function on every render
   const onLogRef = useRef(onLog);
   const onErrorRef = useRef(onError);
+  const onCompleteRef = useRef(onRollComplete);
+  const skinRef = useRef(skin);
+  const dieScaleRef = useRef(dieScale);
+  const delayRef = useRef(autoClearDelay);
+  const mountedRef = useRef(true);
 
-  // Update refs when props change
   useEffect(() => {
     onLogRef.current = onLog;
     onErrorRef.current = onError;
+    onCompleteRef.current = onRollComplete;
+    skinRef.current = skin;
+    dieScaleRef.current = dieScale;
+    delayRef.current = autoClearDelay;
   });
 
-  // Stable log function
   const log = useCallback((message: string) => {
     console.log(`[DiceRoller] ${message}`);
-    if (onLogRef.current) {
-      onLogRef.current(message);
-    }
+    onLogRef.current?.(message);
   }, []);
 
-  // Track mounting state
+  const reportError = useCallback(
+    (message: string) => {
+      log(message);
+      onErrorRef.current?.(message);
+    },
+    [log]
+  );
+
   useEffect(() => {
-    setIsMounted(true);
-    return () => setIsMounted(false);
-  }, []);
+    mountedRef.current = true;
+    let acquired = false;
+    let observer: MutationObserver | null = null;
 
-  // Initialize dice box
-  useEffect(() => {
-    if (!isInitialized && isMounted) {
-      const initializeDiceBox = () => {
-        // Check if DOM element exists
-        const containerElement = document.querySelector(`#${containerId}`);
-        if (!containerElement) {
-          log(
-            `Container element #${containerId} not found, waiting for DOM...`
-          );
-          return false;
-        }
+    const attach = () => {
+      if (acquired) return true;
+      const tray = acquireTray(
+        containerId,
+        skinRef.current,
+        dieScaleRef.current ?? 2
+      );
+      if (!tray) return false;
+      acquired = true;
+      if (mountedRef.current) setIsInitialized(true);
+      return true;
+    };
 
-        const rect = (containerElement as HTMLElement).getBoundingClientRect();
-        log(
-          `Container element #${containerId} found at ${Math.round(rect.left)},${Math.round(rect.top)} size ${Math.round(rect.width)}x${Math.round(rect.height)} - creating DiceBox...`
-        );
-
-        const selector = `#${containerId}`;
-        const box = new DiceBox(selector, {
-          assetPath: '/assets/',
-          scale,
-          theme,
-          themeColor,
-          offscreen: false,
-          throwForce: 5,
-          gravity: 1,
-          mass: 1,
-          spinForce: 6,
-        });
-
-        setDiceBox(box);
-        log('DiceBox instance created');
-
-        box
-          .init()
-          .then(() => {
-            log('DiceBox initialized successfully');
-            setIsInitialized(true);
-          })
-          .catch((error: unknown) => {
-            const errorMessage =
-              error instanceof Error ? error.message : String(error);
-            const message = `Failed to initialize DiceBox: ${errorMessage}`;
-            log(message);
-            if (onErrorRef.current) {
-              onErrorRef.current(message);
-            }
-          });
-
-        return true;
-      };
-
-      // Try to initialize immediately
-      if (!initializeDiceBox()) {
-        // If DOM not ready, wait a bit and try again (only once)
-        const timer = setTimeout(() => {
-          initializeDiceBox();
-        }, 100);
-
-        return () => clearTimeout(timer);
-      }
+    if (!attach()) {
+      observer = new MutationObserver(() => {
+        if (attach()) observer?.disconnect();
+      });
+      observer.observe(document.body, { childList: true, subtree: true });
     }
-  }, [containerId, scale, theme, themeColor, isInitialized, isMounted, log]);
 
-  // Roll dice function
+    return () => {
+      mountedRef.current = false;
+      observer?.disconnect();
+      if (acquired) releaseTray(containerId);
+      setIsInitialized(false);
+    };
+  }, [containerId]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    applyAppearance(containerId, skin, dieScale);
+  }, [containerId, skin, dieScale, isInitialized]);
+
   const roll = useCallback(
     async (notation: string): Promise<RollSummary | null> => {
-      if (!diceBox || !isInitialized) {
-        const message = 'DiceBox not ready yet';
-        log(message);
-        if (onErrorRef.current) {
-          onErrorRef.current(message);
-        }
+      const entry = trays.get(containerId);
+      if (!entry) {
+        reportError('Dice tray is not ready yet');
+        return null;
+      }
+      if (entry.rolling) {
+        reportError('Already rolling dice, please wait');
         return null;
       }
 
-      if (isRolling) {
-        const message = 'Already rolling dice, please wait';
-        log(message);
-        if (onErrorRef.current) {
-          onErrorRef.current(message);
-        }
-        return null;
+      entry.rolling = true;
+      if (mountedRef.current) setIsRolling(true);
+      if (entry.clearTimer) {
+        clearTimeout(entry.clearTimer);
+        entry.clearTimer = null;
       }
-
-      setIsRolling(true);
       log(`Rolling: ${notation}`);
 
       try {
-        if (!diceBox.roll) {
-          throw new Error('DiceBox roll method not available');
+        const event = createRoll(notation, {
+          skin: skinRef.current,
+        });
+        await entry.tray.playRoll(event);
+        const summary = toRollSummary(
+          event,
+          evaluate(event),
+          typeof skinRef.current === 'object'
+            ? skinRef.current.labelColor
+            : '#1a1a1a'
+        );
+        if (mountedRef.current) {
+          setRollHistory(prev => [...prev, summary]);
+          setIsRolling(false);
         }
-        const results: DiceRollResults = await diceBox.roll(notation);
-        log(`Roll completed: ${notation}`);
-
-        // Calculate summary
-        const summary = calculateRollSummary(results, notation);
-        setRollHistory(prev => [...prev, summary]);
-
         log(
           `Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`
         );
-
-        // Call completion callback
-        if (onRollComplete) {
-          onRollComplete(summary);
+        onCompleteRef.current?.(summary);
+        const delay = delayRef.current;
+        if (delay > 0 && trays.get(containerId) === entry) {
+          entry.clearTimer = setTimeout(() => {
+            try {
+              entry.tray.clear();
+            } catch (clearError) {
+              console.warn('Error during auto-clear dice:', clearError);
+            }
+            entry.clearTimer = null;
+          }, delay);
         }
-
-        // Auto-clear if enabled
-        if (autoClearDelay > 0) {
-          autoClearDice(diceBox, autoClearDelay, () => {
-            log(`Dice auto-cleared after ${autoClearDelay}ms`);
-          });
-        }
-
-        setIsRolling(false);
         return summary;
       } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        const message = `Error rolling dice: ${errorMessage}`;
-        log(message);
-        if (onErrorRef.current) {
-          onErrorRef.current(message);
-        }
-        setIsRolling(false);
+        const detail =
+          error instanceof PollyrollSyntaxError || error instanceof Error
+            ? error.message
+            : String(error);
+        reportError(`Error rolling dice: ${detail}`);
+        if (mountedRef.current) setIsRolling(false);
         return null;
+      } finally {
+        entry.rolling = false;
       }
     },
-    [diceBox, isInitialized, isRolling, autoClearDelay, onRollComplete, log]
+    [containerId, log, reportError]
   );
 
-  // Clear dice function
   const clearDice = useCallback(() => {
-    if (diceBox && typeof diceBox.clear === 'function' && isInitialized) {
-      log('Clearing dice from screen');
-      try {
-        diceBox.clear();
-        log('Dice cleared successfully');
-      } catch (error) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        const message = `Error clearing dice: ${errorMessage}`;
-        log(message);
-        if (onErrorRef.current) {
-          onErrorRef.current(message);
-        }
-      }
-    } else {
-      const message =
-        'Cannot clear dice - not initialized or clear method unavailable';
-      log(message);
-      if (onErrorRef.current) {
-        onErrorRef.current(message);
-      }
+    const entry = trays.get(containerId);
+    if (!entry) {
+      reportError('Cannot clear dice — tray is not ready');
+      return;
     }
-  }, [diceBox, isInitialized, log]);
+    if (entry.clearTimer) {
+      clearTimeout(entry.clearTimer);
+      entry.clearTimer = null;
+    }
+    entry.tray.clear();
+    log('Dice cleared');
+  }, [containerId, log, reportError]);
 
-  // Clear history function
   const clearHistory = useCallback(() => {
     setRollHistory([]);
     log('Roll history cleared');
   }, [log]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (diceBox && typeof diceBox.clear === 'function') {
-        try {
-          console.log('[DiceRoller] Cleaning up DiceBox on unmount');
-          diceBox.clear();
-        } catch (error) {
-          console.warn('Error during component unmount cleanup:', error);
-        }
-      }
-    };
-  }, [diceBox]);
 
   return {
     isInitialized,

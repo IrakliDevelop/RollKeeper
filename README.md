@@ -18,7 +18,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 **Actions & Combat**
 - Quick-cast spells with integrated damage and saving throw rolls
 - Attack rolls with advantage/disadvantage, critical hits, and fumble detection
-- 3D animated dice rolling (d4, d6, d8, d10, d12, d20) via `@3d-dice/dice-box`
+- 3D animated dice rolling (d4–d100) via Pollyroll, with a dice set saved on each character
 - Spell attack bonus and spell save DC auto-calculation
 - Reaction tracking (used/reset per turn)
 - Initiative calculation from Dexterity with manual overrides
@@ -189,7 +189,7 @@ A comprehensive web-based D&D 5e companion application for players and Dungeon M
 | **UI Components** | Radix UI (Dialog, Tabs, Checkbox, Radio, Select, Switch, Toast, Tooltip) |
 | **Rich Text** | TipTap 3 |
 | **Forms** | React Hook Form 7 + Zod 4 |
-| **Dice** | @3d-dice/dice-box |
+| **Dice** | pollyroll |
 | **Canvas/Maps** | Fieldnotes (`@fieldnotes/core`, `@fieldnotes/react`, `@fieldnotes/sync`) |
 | **Node Graphs** | React Flow |
 | **Icons** | Lucide React |
