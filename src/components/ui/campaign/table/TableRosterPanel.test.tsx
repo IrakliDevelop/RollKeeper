@@ -256,6 +256,124 @@ describe('TableRosterPanel', () => {
     expect(await screen.findByText(/Player-controlled/)).toBeInTheDocument();
   });
 
+  it('adds a campaign NPC copy through a read-only picker without library writes (review N1)', async () => {
+    const { useNPCStore } = await import('@/store/npcStore');
+    useNPCStore.setState({
+      npcsByCampaign: {
+        CAMP: [
+          {
+            id: 'npc-barkeep',
+            name: 'Barkeep Tomas',
+            kind: 'npc',
+            maxHp: 9,
+            armorClass: '11',
+          } as never,
+        ],
+      },
+    });
+    const createNPC = vi.spyOn(useNPCStore.getState(), 'createNPC');
+    const deleteNPC = vi.spyOn(useNPCStore.getState(), 'deleteNPC');
+    const before = JSON.stringify(useNPCStore.getState().npcsByCampaign);
+    const repository = await repositoryWith();
+    renderPanel(repository, fakeCanvas());
+    const dialog = await openAddDialog();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Campaign NPC' }));
+    expect(
+      within(dialog).queryByRole('button', { name: /create/i })
+    ).toBeNull();
+    expect(
+      within(dialog).queryByRole('button', { name: /delete/i })
+    ).toBeNull();
+    expect(within(dialog).queryByText(/hide name/i)).toBeNull();
+    fireEvent.click(
+      await within(dialog).findByRole('button', { name: /Barkeep Tomas/ })
+    );
+    await waitFor(() =>
+      expect(snapshot(repository).actors[0]).toMatchObject({
+        actorKind: 'dm-managed',
+        liveStats: { name: 'Barkeep Tomas', maxHp: 9, armorClass: 11 },
+        profile: {
+          category: 'npc',
+          sourceKind: 'campaign-npc',
+          sourceId: 'npc-barkeep',
+        },
+      })
+    );
+    expect(createNPC).not.toHaveBeenCalled();
+    expect(deleteNPC).not.toHaveBeenCalled();
+    expect(JSON.stringify(useNPCStore.getState().npcsByCampaign)).toBe(before);
+  });
+
+  it('implements keyboard-operable ARIA tabs in the add dialog (review N3)', async () => {
+    const repository = await repositoryWith();
+    renderPanel(repository, fakeCanvas());
+    const dialog = await openAddDialog();
+    const tabs = within(dialog).getAllByRole('tab');
+    expect(tabs.map(tab => tab.textContent)).toEqual([
+      'Party',
+      'Creature',
+      'Campaign NPC',
+      'Manual PC',
+    ]);
+    const panel = within(dialog).getByRole('tabpanel');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('aria-controls', panel.id);
+    expect(panel).toHaveAttribute('aria-labelledby', tabs[0]!.id);
+    expect(tabs.map(tab => tab.getAttribute('tabindex'))).toEqual([
+      '0',
+      '-1',
+      '-1',
+      '-1',
+    ]);
+    tabs[0]!.focus();
+    fireEvent.keyDown(tabs[0]!, { key: 'ArrowRight' });
+    expect(within(dialog).getAllByRole('tab')[1]).toHaveFocus();
+    expect(within(dialog).getAllByRole('tab')[1]).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    fireEvent.keyDown(document.activeElement!, { key: 'End' });
+    expect(within(dialog).getAllByRole('tab')[3]).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' });
+    expect(within(dialog).getAllByRole('tab')[0]).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowLeft' });
+    expect(within(dialog).getAllByRole('tab')[3]).toHaveFocus();
+    fireEvent.keyDown(document.activeElement!, { key: 'Home' });
+    expect(within(dialog).getAllByRole('tab')[0]).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+  });
+
+  it('restores a removed party member truthfully (review N2)', async () => {
+    const repository = await repositoryWith(
+      [
+        {
+          actorId: 'party-actor',
+          tokenIds: [],
+          sceneMemberId: 'member-a',
+          control: { kind: 'dm' },
+          removedAt: AT,
+        },
+      ],
+      key => [partyActor(key)]
+    );
+    renderPanel(repository, fakeCanvas());
+    const dialog = await openAddDialog();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Party' }));
+    fireEvent.click(
+      await within(dialog).findByRole('button', { name: /Aria/ })
+    );
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /Aria restored to the scene as player-controlled/i
+    );
+    expect(snapshot(repository).scenes[0]!.members[0]!.control).toEqual({
+      kind: 'player',
+      legacyPlayerId: 'legacy-a',
+      characterId: 'legacy-a',
+    });
+  });
+
   it('adds a manual PC from the design-system form', async () => {
     const repository = await repositoryWith();
     renderPanel(repository, fakeCanvas());

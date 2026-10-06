@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useId, useRef, useState, type KeyboardEvent } from 'react';
 
 import {
   Dialog,
@@ -11,7 +11,6 @@ import {
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
-import { NpcTab } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/NpcTab';
 import { PlayerTab } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/PlayerTab';
 import type { TableCampaignPlayer } from '@/lib/table/roster';
 import type {
@@ -22,8 +21,8 @@ import type { EncounterEntity } from '@/types/encounter';
 
 import { TableAddCreatureTab } from './TableAddCreatureTab';
 import { TableAddManualPcTab } from './TableAddManualPcTab';
+import { TableAddNpcTab } from './TableAddNpcTab';
 import { TableRosterNoticeLine } from './TableRosterNoticeLine';
-import { creatureFromEntity } from './tableRosterModel';
 import type { TableRosterNotice } from './useTableRosterActions';
 import type { TablePlayersSnapshot } from './useTablePlayersSnapshot';
 
@@ -39,8 +38,6 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'npc', label: 'Campaign NPC' },
   { id: 'manual', label: 'Manual PC' },
 ];
-
-const NO_NPCS: never[] = [];
 
 /** Add party / creature-or-NPC / manual PC to a scene (no encounter needed). */
 export function TableAddMemberDialog(props: {
@@ -59,6 +56,33 @@ export function TableAddMemberDialog(props: {
 }) {
   const [tab, setTab] = useState<Tab>('party');
   const players = props.players;
+  const baseId = useId();
+  const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const tabId = (id: Tab) => `${baseId}-tab-${id}`;
+  const panelId = `${baseId}-panel`;
+
+  // WAI-ARIA tabs: roving tabindex; arrows/Home/End move focus and select.
+  const handleTabKey = (event: KeyboardEvent, index: number) => {
+    const last = TABS.length - 1;
+    const next =
+      event.key === 'ArrowRight'
+        ? index === last
+          ? 0
+          : index + 1
+        : event.key === 'ArrowLeft'
+          ? index === 0
+            ? last
+            : index - 1
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    setTab(TABS[next]!.id);
+    tabRefs.current[next]?.focus();
+  };
 
   const handleParty = (entity: Omit<EncounterEntity, 'id'>) => {
     if (players.status !== 'ready') return;
@@ -83,11 +107,18 @@ export function TableAddMemberDialog(props: {
           aria-label="Participant type"
           className="flex flex-wrap gap-2"
         >
-          {TABS.map(entry => (
+          {TABS.map((entry, index) => (
             <Button
               key={entry.id}
+              ref={element => {
+                tabRefs.current[index] = element;
+              }}
+              id={tabId(entry.id)}
               role="tab"
               aria-selected={tab === entry.id}
+              aria-controls={panelId}
+              tabIndex={tab === entry.id ? 0 : -1}
+              onKeyDown={event => handleTabKey(event, index)}
               variant={tab === entry.id ? 'primary' : 'outline'}
               size="sm"
               onClick={() => setTab(entry.id)}
@@ -97,7 +128,12 @@ export function TableAddMemberDialog(props: {
           ))}
         </div>
         <TableRosterNoticeLine notice={props.notice} />
-        <DialogBody role="tabpanel" className="min-h-[12rem]">
+        <DialogBody
+          role="tabpanel"
+          id={panelId}
+          aria-labelledby={tabId(tab)}
+          className="min-h-[12rem]"
+        >
           {tab === 'party' &&
             (players.status === 'ready' ? (
               <PlayerTab
@@ -131,14 +167,10 @@ export function TableAddMemberDialog(props: {
             />
           )}
           {tab === 'npc' && (
-            <NpcTab
-              npcs={NO_NPCS}
+            <TableAddNpcTab
               campaignCode={props.campaignCode}
-              onAdd={entity =>
-                props.onAddParticipant(
-                  'roster.addCreatureInstance',
-                  creatureFromEntity(entity, 'campaign-npc')
-                )
+              onAdd={stats =>
+                props.onAddParticipant('roster.addCreatureInstance', stats)
               }
             />
           )}

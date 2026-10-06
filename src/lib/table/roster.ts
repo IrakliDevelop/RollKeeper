@@ -740,7 +740,11 @@ export function planRosterCommand(
         if (alreadyLinked) return { status: 'unchanged' };
         members[index] = withoutRemoval(
           linked,
-          linksAdopted || !linked.control ? control : undefined
+          // A restored or adopted member takes the current verified control
+          // for this player; a stale reassignment is never resurrected.
+          linksAdopted || !linked.control || linked.removedAt !== undefined
+            ? control
+            : undefined
         );
         return putScene(scene, members, command.at);
       }

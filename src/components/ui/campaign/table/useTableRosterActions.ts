@@ -197,7 +197,7 @@ export function useTableRosterActions(options: {
     notice,
     busy,
     clearNotice: () => setNotice(null),
-    addParty: (player: TableCampaignPlayer) =>
+    addParty: (player: TableCampaignPlayer, restoring = false) =>
       execute(
         {
           type: 'roster.addPartyMember',
@@ -210,7 +210,9 @@ export function useTableRosterActions(options: {
           at: at(),
         },
         {
-          success: `${player.name} added to the scene.`,
+          success: restoring
+            ? `${player.name} restored to the scene as player-controlled.`
+            : `${player.name} added to the scene.`,
           unchanged: `${player.name} is already in this scene.`,
         }
       ),

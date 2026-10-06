@@ -128,7 +128,18 @@ export function TableRosterPanel(props: {
         onRetryPlayers={state.players.refresh}
         notice={actions.notice}
         busy={actions.busy}
-        onAddParty={player => afterAdd(actions.addParty(player))}
+        onAddParty={player =>
+          afterAdd(
+            actions.addParty(
+              player,
+              roster?.entries.some(
+                entry =>
+                  entry.removed &&
+                  entry.identityLegacyPlayerId === player.playerId
+              ) ?? false
+            )
+          )
+        }
         onAddParticipant={(kind, stats) =>
           afterAdd(actions.addParticipant(kind, stats))
         }

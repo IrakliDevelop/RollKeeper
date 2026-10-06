@@ -760,6 +760,40 @@ describe('roster commands', () => {
     );
   });
 
+  it('restores a removed party member with the current verified control (review N2)', async () => {
+    const repository = await open();
+    await repository.mutateWorkspace(0, 'seed', {
+      scenes: { put: [scene(repository.workspaceIdentity)] },
+    });
+    await run(repository, party('tavern', 'legacy-a', 'a'));
+    await run(repository, {
+      type: 'roster.reassignControl',
+      sceneId: 'tavern',
+      sceneMemberId: 'party-member-a',
+      control: { kind: 'player', legacyPlayerId: 'legacy-b' },
+      at: AT,
+    });
+    await run(repository, {
+      type: 'roster.removeMember',
+      sceneId: 'tavern',
+      sceneMemberId: 'party-member-a',
+      at: AT,
+    });
+    await expect(
+      run(repository, party('tavern', 'legacy-a', 'again'))
+    ).resolves.toMatchObject({ status: 'committed' });
+    expect(sceneOf(repository).members[0]).toEqual({
+      actorId: 'party-actor-a',
+      tokenIds: [],
+      sceneMemberId: 'party-member-a',
+      control: {
+        kind: 'player',
+        legacyPlayerId: 'legacy-a',
+        characterId: 'legacy-a',
+      },
+    });
+  });
+
   it('enforces caps, CAS, replay and digest checks before any write', async () => {
     const repository = await open();
     const key = repository.workspaceIdentity;
