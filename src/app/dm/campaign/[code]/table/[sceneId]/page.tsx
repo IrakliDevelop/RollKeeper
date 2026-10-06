@@ -341,7 +341,7 @@ export default function TableScenePage() {
               Battle Maps
             </Button>
           </Link>
-          <div className="min-w-0 flex-1">
+          <div className="min-w-[min(100%,16rem)] flex-1">
             <p className="text-heading truncate text-sm font-semibold">
               {scene.name}
             </p>
