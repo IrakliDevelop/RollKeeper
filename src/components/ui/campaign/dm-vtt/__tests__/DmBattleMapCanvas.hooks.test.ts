@@ -293,6 +293,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
       sceneId: 'scene-1',
       sourceMapId: 'map-original',
       subscribe: vi.fn(() => () => {}),
+      resolveMovement: vi.fn(() => null),
       getBattleMap: vi.fn(() => ({
         id: 'scene-1',
         campaignCode: 'TEST01',
@@ -601,5 +602,35 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     callOrder.length = 0;
     unmount();
     expect(callOrder).not.toContain('connection.stop');
+  });
+});
+
+describe('Table movement resolution (PR02 item 10)', () => {
+  it('resolves Table tokens from scene members and never from linked encounters', async () => {
+    const { resolveSceneMovement } = await import('../DmBattleMapCanvas.hooks');
+    const adapter = {
+      resolveMovement: vi.fn(() => ({
+        name: 'Barkeep',
+        walkFeet: 25,
+        entityId: 'member-npc',
+      })),
+    };
+    const linked = vi.fn(() => ['encounter-should-not-be-read']);
+    expect(
+      resolveSceneMovement(
+        adapter as unknown as TableSceneAdapter,
+        { kind: 'combatant', key: 'member-npc' },
+        linked
+      )
+    ).toEqual({ name: 'Barkeep', walkFeet: 25, entityId: 'member-npc' });
+    expect(adapter.resolveMovement).toHaveBeenCalledWith({
+      kind: 'combatant',
+      key: 'member-npc',
+    });
+    expect(linked).not.toHaveBeenCalled();
+    expect(
+      resolveSceneMovement(undefined, { kind: 'combatant', key: 'x' }, linked)
+    ).toBeNull();
+    expect(linked).toHaveBeenCalledTimes(1);
   });
 });

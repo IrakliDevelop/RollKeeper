@@ -16,6 +16,8 @@ const mocks = vi.hoisted(() => ({
   save: vi.fn(),
   createAdapter: vi.fn(),
   workspace: vi.fn(),
+  canvasProps: vi.fn(),
+  rosterProps: vi.fn(),
   query: '',
 }));
 
@@ -54,8 +56,30 @@ vi.mock('@/store/dmStore', () => ({
     selector({ dmId: 'dm-1' }),
 }));
 vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', () => ({
-  DmBattleMapCanvas: (props: { sessionControls: ReactNode }) => (
-    <div data-testid="canvas">{props.sessionControls}</div>
+  DmBattleMapCanvas: (props: {
+    sessionControls: ReactNode;
+    children?: ReactNode;
+    onViewportReady?: unknown;
+    tokenConfigRef?: unknown;
+  }) => {
+    mocks.canvasProps(props);
+    return (
+      <div data-testid="canvas">
+        {props.sessionControls}
+        {props.children}
+      </div>
+    );
+  },
+}));
+vi.mock('@/components/ui/campaign/table/TableRosterPanel', () => ({
+  TableRosterPanel: (props: Record<string, unknown>) => {
+    mocks.rosterProps(props);
+    return <div data-testid="table-roster" />;
+  },
+}));
+vi.mock('@/components/ui/campaign/dm-vtt/TokenPlacementController', () => ({
+  TokenPlacementController: (props: { pending: unknown }) => (
+    <div data-testid="placement" data-pending={props.pending ? 'yes' : 'no'} />
   ),
 }));
 
@@ -205,6 +229,29 @@ describe('Table scene recovery UI', () => {
     expect(
       await screen.findByText(/Local draft restored to live authority/i)
     ).toBeVisible();
+  });
+
+  it('mounts the scene roster inside the canvas with the shared placement ref', async () => {
+    render(<TableScenePage />);
+    await screen.findByTestId('table-roster');
+    expect(screen.getByTestId('placement')).toHaveAttribute(
+      'data-pending',
+      'no'
+    );
+    const canvasProps = mocks.canvasProps.mock.calls.at(-1)![0] as {
+      onViewportReady?: unknown;
+      tokenConfigRef?: unknown;
+    };
+    expect(canvasProps.onViewportReady).toEqual(expect.any(Function));
+    expect(mocks.rosterProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        sceneId: 'scene-1',
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        canvas: null,
+        live: false,
+      })
+    );
   });
 
   it('preserves imported workspace selection in Battle Maps links', async () => {

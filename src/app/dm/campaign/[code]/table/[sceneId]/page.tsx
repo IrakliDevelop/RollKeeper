@@ -2,11 +2,19 @@
 
 import Link from 'next/link';
 import { useParams, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { Viewport } from '@fieldnotes/core';
 
 import { DmBattleMapCanvas } from '@/components/ui/campaign/dm-vtt/DmBattleMapCanvas';
 import type { DmTokenConfig } from '@/components/ui/campaign/dm-vtt/combatantToken';
+import { PlacementBanner } from '@/components/ui/campaign/dm-vtt/PlacementBanner';
+import {
+  TokenPlacementController,
+  type PendingTokenPlacement,
+} from '@/components/ui/campaign/dm-vtt/TokenPlacementController';
 import { Button } from '@/components/ui/forms/button';
+import { TableRosterPanel } from '@/components/ui/campaign/table/TableRosterPanel';
+import { createTableRosterCanvas } from '@/components/ui/campaign/table/tableRosterCanvas';
 import { useAuthenticatedTableWorkspace } from '@/components/ui/campaign/table/useAuthenticatedTableWorkspace';
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 import {
@@ -63,6 +71,23 @@ export default function TableScenePage() {
   const [authorityAttempt, setAuthorityAttempt] = useState(0);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [, refresh] = useState(0);
+  const [viewport, setViewport] = useState<Viewport | null>(null);
+  const [pendingPlacement, setPendingPlacement] =
+    useState<PendingTokenPlacement | null>(null);
+  const cancelPlacement = useCallback(() => setPendingPlacement(null), []);
+  // Roster canvas operations follow committed roster commands and travel the
+  // v1 room as ordinary DM edits (placement, control conversion, bands).
+  const rosterCanvas = useMemo(
+    () =>
+      viewport
+        ? createTableRosterCanvas({
+            viewport,
+            connection,
+            onArm: setPendingPlacement,
+          })
+        : null,
+    [viewport, connection]
+  );
 
   useEffect(() => {
     setAdapter(null);
@@ -306,6 +331,7 @@ export default function TableScenePage() {
       onConnectionReady={handleConnectionReady}
       onStatus={setRelayStatus}
       tokenConfigRef={tokenConfigRef}
+      onViewportReady={setViewport}
       tokenInfoToggle={{ mode: null, onCycle: () => {} }}
       onExportError={message => setSaveMessage(message)}
       sessionControls={
@@ -404,6 +430,26 @@ export default function TableScenePage() {
           </Button>
         </div>
       }
-    />
+    >
+      <TokenPlacementController
+        pending={pendingPlacement}
+        configRef={tokenConfigRef}
+        onCancel={cancelPlacement}
+      />
+      {pendingPlacement && (
+        <PlacementBanner
+          entityName={pendingPlacement.entityName}
+          onCancel={cancelPlacement}
+        />
+      )}
+      <TableRosterPanel
+        repository={repository}
+        sceneId={sceneId}
+        campaignCode={campaignCode}
+        dmId={dmId}
+        canvas={rosterCanvas}
+        live={relayStatus === 'live'}
+      />
+    </DmBattleMapCanvas>
   );
 }

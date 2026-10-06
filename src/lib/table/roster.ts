@@ -144,6 +144,8 @@ export type TableRosterControlStatus =
 export interface TableRosterEntry {
   sceneMemberId: string | null;
   actorId: string;
+  /** PR01-adopted encounter entity id (legacy combatant token key), if any. */
+  sourceEntityId: string | null;
   name: string;
   category: TableActorProfileV1['category'];
   avatarUrl: string | null;
@@ -375,6 +377,7 @@ export function deriveSceneRoster(options: {
     const entry: TableRosterEntry = {
       sceneMemberId: member.sceneMemberId ?? null,
       actorId: member.actorId,
+      sourceEntityId: adopted?.entityId ?? null,
       name: nameOf(actor, verifiedLegacyPlayerId, players),
       category: categoryOf(actor, adopted),
       avatarUrl: actor?.profile?.avatarUrl ?? null,

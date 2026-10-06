@@ -227,6 +227,19 @@ export interface DmBattleMapCanvasState {
 }
 
 /**
+ * Table scenes resolve movement from their scene members; only the legacy
+ * map route reads linked encounters (which a Table scene need not have).
+ */
+export function resolveSceneMovement(
+  tableSceneAdapter: TableSceneAdapter | undefined,
+  identity: MovableTokenIdentity,
+  linkedEncounterIds: () => string[]
+): ReturnType<typeof resolveDmMovement> {
+  if (tableSceneAdapter) return tableSceneAdapter.resolveMovement(identity);
+  return resolveDmMovement(identity, linkedEncounterIds());
+}
+
+/**
  * Init/persistence/connection wiring for `DmBattleMapCanvas` — mirrors
  * `DmLocationEditor.hooks.ts`'s battlemap-mode path (loadJSON guard, AutoSave
  * + save-on-local-ops with remote-origin filtering, `createManagedBattleMapConnection`
@@ -362,8 +375,8 @@ export function useDmBattleMapCanvas({
   );
   const resolveMovement = useCallback(
     (identity: MovableTokenIdentity) =>
-      resolveDmMovement(identity, linkedEncounterIdsLive()),
-    [linkedEncounterIdsLive]
+      resolveSceneMovement(tableSceneAdapter, identity, linkedEncounterIdsLive),
+    [tableSceneAdapter, linkedEncounterIdsLive]
   );
 
   const legacyHiddenElementCount = useBattleMapStore(
