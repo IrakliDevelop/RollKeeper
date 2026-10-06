@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { useDiceRoller } from '@/hooks/useDiceRoller';
+import type { RollSummary } from '@/types/dice';
 
 describe('useDiceRoller', () => {
   afterEach(() => {
@@ -17,10 +18,9 @@ describe('useDiceRoller', () => {
     );
     await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
-    let summary: Awaited<ReturnType<typeof result.current.roll>> = null;
-    await act(async () => {
-      summary = await result.current.roll('1d20');
-    });
+    const summary: RollSummary | null = await act(() =>
+      result.current.roll('1d20')
+    );
 
     expect(summary?.diceResults).toHaveLength(1);
     expect(summary?.diceResults[0]?.sides).toBe(20);
@@ -46,10 +46,7 @@ describe('useDiceRoller', () => {
     );
     await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
-    let summary: Awaited<ReturnType<typeof result.current.roll>> = null;
-    await act(async () => {
-      summary = await result.current.roll('1d200');
-    });
+    const summary = await act(() => result.current.roll('1d200'));
 
     expect(summary).toBeNull();
     expect(errors.some(message => message.includes('Error rolling dice'))).toBe(
