@@ -4,7 +4,7 @@ import { clampDieScale, parseDiceSet } from '@/utils/diceSet';
 
 describe('parseDiceSet', () => {
   it('accepts a bare preset skin and fills the default size', () => {
-    expect(parseDiceSet(classic)).toEqual({ skin: classic, dieScale: 2 });
+    expect(parseDiceSet(classic)).toEqual({ skin: classic, dieScale: 1 });
   });
 
   it('clamps die size and keeps a two-tone custom material', () => {

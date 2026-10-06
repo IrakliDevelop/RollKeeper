@@ -41,7 +41,7 @@ const PARAMS = [
 /** Pollyroll's classic preset: white plastic, black printed labels. */
 export const DEFAULT_DICE_SET: CharacterDiceSet = {
   skin: classic,
-  dieScale: 2,
+  dieScale: 1,
 };
 
 export function clampDieScale(value: number): number {
