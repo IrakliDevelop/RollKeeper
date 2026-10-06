@@ -229,35 +229,122 @@ local function changed_hash_values(key, changedField, changedValue, remove, clea
   return values
 end
 
+-- Player control policy (PR02). A stored element is control-bearing when it
+-- carries any of the token control fields; for such elements only the
+-- verified control identity (characterId == ownershipId on the player's own
+-- layer) grants movement, and the retained owner grants nothing. Absent and
+-- JSON null are equal; hidden means audience == 'dm' (shared with projection).
+local function absent(value) return value == nil or value == cjson.null end
+local function control_bearing(element)
+  return not absent(element.tokenKind) or not absent(element.characterId)
+    or not absent(element.sceneMemberId) or not absent(element.entityId)
+end
+local function deep_equal(left, right)
+  if absent(left) and absent(right) then return true end
+  if type(left) ~= type(right) then return false end
+  if type(left) ~= 'table' then return left == right end
+  for key, value in pairs(left) do
+    if not deep_equal(value, right[key]) then return false end
+  end
+  for key, value in pairs(right) do
+    if left[key] == nil and not absent(value) then return false end
+  end
+  return true
+end
+-- Every field except the allowlist must equal the stored record. The stored
+-- ownerId is server provenance and never travels in a player's element.
+local function equal_except(stored, incoming, allowed)
+  for key, value in pairs(stored) do
+    if key ~= 'ownerId' and not allowed[key] and not deep_equal(value, incoming[key]) then
+      return false
+    end
+  end
+  for key, value in pairs(incoming) do
+    if key ~= 'ownerId' and not allowed[key] and stored[key] == nil and not absent(value) then
+      return false
+    end
+  end
+  return true
+end
+local PLAYER_MOVE = {position=true}
+local PLAYER_BACKFILL = {position=true, characterId=true}
+
 local kind = app.kind
 local retainedOwner = nil
 local fogPlan = nil
 if kind == 'element-upsert' or kind == 'element-remove' then
   retainedOwner = redis.call('HGET', ownershipKey, app.elementId)
   local currentRaw = redis.call('HGET', elementsKey, app.elementId)
+  local current = nil
   if currentRaw then
-    local currentOk, current = pcall(cjson.decode, currentRaw)
-    if not currentOk or type(current) ~= 'table' then return reject('invalid') end
-    if app.role == 'player' and (retainedOwner ~= app.ownershipId or current.audience == 'dm') then
-      return reject('forbidden')
+    local currentOk, decoded = pcall(cjson.decode, currentRaw)
+    if not currentOk or type(decoded) ~= 'table' then return reject('invalid') end
+    current = decoded
+  end
+  if app.role == 'player' then
+    if not ascii(app.ownershipId) then return reject('invalid') end
+    local self = app.ownershipId
+    local ownLayer = 'player-' .. self
+    local incoming = app.element
+    if kind == 'element-upsert' then
+      if type(incoming) ~= 'table' then return reject('invalid') end
+      -- Players never write any audience value, so they cannot reveal or hide.
+      if not absent(incoming.audience) then return reject('forbidden') end
     end
-  elseif app.role == 'player' and kind == 'element-remove' then
-    return reject('forbidden')
-  elseif retainedOwner and app.role == 'player' and retainedOwner ~= app.ownershipId then
-    return reject('forbidden')
-  end
-  if kind == 'element-remove' and app.role == 'player' and retainedOwner ~= app.ownershipId then
-    return reject('forbidden')
-  end
-  if kind == 'element-upsert' and app.role == 'player' and app.element.audience == 'dm' then
-    return reject('forbidden')
+    if current then
+      if current.audience == 'dm' then return reject('forbidden') end
+      if control_bearing(current) then
+        local ownToken = current.tokenKind == 'player' and current.layerId == ownLayer
+        if kind == 'element-remove' then
+          if not (ownToken and current.characterId == self and retainedOwner == self
+            and absent(current.sceneMemberId) and absent(current.entityId)) then
+            return reject('forbidden')
+          end
+        else
+          local moves = ownToken and current.characterId == self
+            and equal_except(current, incoming, PLAYER_MOVE)
+          local backfills = ownToken and absent(current.characterId)
+            and retainedOwner == self and absent(current.sceneMemberId)
+            and absent(current.audience) and incoming.characterId == self
+            and equal_except(current, incoming, PLAYER_BACKFILL)
+          if not moves and not backfills then return reject('forbidden') end
+        end
+      else
+        if retainedOwner ~= self then return reject('forbidden') end
+        if kind == 'element-upsert' and control_bearing(incoming) then
+          return reject('forbidden')
+        end
+      end
+    else
+      if kind == 'element-remove' then return reject('forbidden') end
+      if retainedOwner and retainedOwner ~= self then return reject('forbidden') end
+      if not absent(incoming.sceneMemberId) or not absent(incoming.entityId) then
+        return reject('forbidden')
+      end
+      if not absent(incoming.tokenKind) and incoming.tokenKind ~= 'player' then
+        return reject('forbidden')
+      end
+      if incoming.tokenKind == 'player' or not absent(incoming.characterId) then
+        if (not absent(incoming.characterId) and incoming.characterId ~= self)
+          or incoming.layerId ~= ownLayer then return reject('forbidden') end
+      end
+    end
   end
 elseif kind == 'elements-clear' then
   if app.role ~= 'dm' or type(app.expectedState) ~= 'string' or app.expectedState == ''
     or app.expectedState ~= meta.casToken then return reject('conflict') end
 elseif kind == 'layer-write' then
   local layerId = app.record.id
-  if app.role == 'player' and layerId ~= 'player-' .. app.ownershipId then return reject('forbidden') end
+  if app.role == 'player' then
+    -- A player may publish only the canonical definition of its own band; a
+    -- hidden, locked, reordered, faded or tombstoned band could hide
+    -- DM-created party tokens from every other viewer.
+    local definition = app.record.definition
+    if layerId ~= 'player-' .. app.ownershipId or type(definition) ~= 'table'
+      or definition.id ~= layerId or definition.visible ~= true
+      or definition.locked ~= false or definition.opacity ~= 1
+      or definition.order ~= 500 then return reject('forbidden') end
+  end
   local currentRaw = redis.call('HGET', layersKey, layerId)
   if currentRaw then
     local currentOk, current = pcall(cjson.decode, currentRaw)

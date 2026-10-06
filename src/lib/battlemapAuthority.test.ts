@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authority = vi.hoisted(() => {
   let listener: (() => void) | null = null;
-  let state: { status: string; document: unknown } = {
+  let state: { status: string; document: unknown; operations?: unknown[] } = {
     status: 'connecting',
     document: null,
   };
@@ -19,6 +19,14 @@ const authority = vi.hoisted(() => {
     },
     install(document: unknown) {
       state = { status: 'live', document };
+      listener?.();
+    },
+    installState(next: {
+      status: string;
+      document: unknown;
+      operations: unknown[];
+    }) {
+      state = next;
       listener?.();
     },
     connection: {
@@ -201,5 +209,119 @@ describe('managed authority fog sequencing', () => {
       expect.stringMatching(/fog version.*safe integer/i)
     );
     connection.stop();
+  });
+});
+
+describe('rejected player edits', () => {
+  beforeEach(() => authority.reset());
+
+  const confirmed = {
+    id: 'party-a',
+    type: 'shape',
+    shape: 'ellipse',
+    position: { x: 10, y: 10 },
+    size: { w: 50, h: 50 },
+    zIndex: 0,
+    locked: false,
+    layerId: 'player-player-a',
+    strokeColor: '#000',
+    strokeWidth: 2,
+    fillColor: '#f00',
+    tokenKind: 'player',
+    characterId: 'player-a',
+    sceneMemberId: 'member-a',
+    ownerId: 'dm-a',
+  };
+  const documentWith = (elements: unknown[]) => ({
+    elements,
+    layers: [],
+    extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+  });
+  const rejected = (id: string, mutation: unknown) => ({
+    clientOperationId: id,
+    status: 'rejected',
+    proposal: { mutation },
+  });
+
+  function startPlayer(role: 'player' | 'dm' = 'player') {
+    const store = new ElementStore();
+    createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'map-a',
+      clientId: 'player-a',
+      store,
+      tokenRequest:
+        role === 'player'
+          ? { role, battleMapId: 'map-a', playerId: 'player-a' }
+          : { role, battleMapId: 'map-a', dmId: 'player-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+    });
+    return store;
+  }
+
+  it('restores a rejected resize from the confirmed document without resubmitting', () => {
+    const store = startPlayer();
+    const document = documentWith([confirmed]);
+    authority.installState({ status: 'live', document, operations: [] });
+    store.update('party-a', {
+      size: { w: 400, h: 400 },
+      rotation: 1,
+    } as never);
+    authority.submit.mockClear();
+    authority.installState({
+      status: 'live',
+      document,
+      operations: [
+        rejected('op-resize', {
+          kind: 'upsert',
+          element: { ...confirmed, size: { w: 400, h: 400 } },
+        }),
+      ],
+    });
+    const restored = store.getById('party-a') as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(restored.size).toEqual({ w: 50, h: 50 });
+    expect(restored.rotation).toBeUndefined();
+    expect(restored.ownerId).toBeUndefined();
+    expect(authority.submit).not.toHaveBeenCalled();
+  });
+
+  it('restores a rejected delete of a bound token', () => {
+    const store = startPlayer();
+    const document = documentWith([confirmed]);
+    authority.installState({ status: 'live', document, operations: [] });
+    store.remove('party-a');
+    authority.installState({
+      status: 'live',
+      document,
+      operations: [rejected('op-remove', { kind: 'remove', id: 'party-a' })],
+    });
+    expect(store.getById('party-a')).toMatchObject({
+      tokenKind: 'player',
+      sceneMemberId: 'member-a',
+    });
+  });
+
+  it('leaves DM edits untouched (the DM keeps its local draft)', () => {
+    const store = startPlayer('dm');
+    const document = documentWith([confirmed]);
+    authority.installState({ status: 'live', document, operations: [] });
+    store.update('party-a', { size: { w: 400, h: 400 } } as never);
+    authority.installState({
+      status: 'live',
+      document,
+      operations: [
+        rejected('op-dm', {
+          kind: 'upsert',
+          element: { ...confirmed, size: { w: 400, h: 400 } },
+        }),
+      ],
+    });
+    expect(
+      (store.getById('party-a') as unknown as { size: unknown }).size
+    ).toEqual({ w: 400, h: 400 });
   });
 });

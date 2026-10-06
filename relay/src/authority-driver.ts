@@ -42,7 +42,10 @@ import {
   ROLLKEEPER_CHECKPOINT_LUA_V1,
   ROLLKEEPER_PROVISION_LUA_V1,
 } from './authority-lua.js';
-import { validateAuthorityRequest } from './authority-validation.js';
+import {
+  playerIntentShapeAllowed,
+  validateAuthorityRequest,
+} from './authority-validation.js';
 
 const AUTHORITY_SCRIPT = assembleFogAuthorityRedisScriptV1(
   ROLLKEEPER_AUTHORITY_HOST_V1
@@ -332,6 +335,14 @@ export class RedisAuthorityDriver implements AuthorityDriver {
       return { status: 'rejected', reason: 'forbidden' };
     const intent = validateAuthorityRequest(context, request);
     if (!intent) return { status: 'rejected', reason: 'invalid' };
+    // Displays are read-only; the Lua role gate repeats this atomically.
+    if (auth.role === 'display')
+      return { status: 'rejected', reason: 'forbidden' };
+    if (
+      auth.role === 'player' &&
+      !playerIntentShapeAllowed(intent, context.ownershipId)
+    )
+      return { status: 'rejected', reason: 'forbidden' };
     const ref = roomRef(context, auth);
     this.remember(ref);
     const app: Record<string, unknown> = {

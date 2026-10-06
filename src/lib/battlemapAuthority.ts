@@ -194,9 +194,65 @@ export function createManagedBattleMapAuthorityConnection(
     );
   }
 
+  // Player/display edits the authority rejects (e.g. a forged resize of a
+  // movement-only token) are restored from the confirmed document; the
+  // optimistic local copy would otherwise linger until the next snapshot.
+  const restoredRejections = new Set<string>();
+  const restoreRejectedEdits = (
+    state: ReturnType<typeof connection.getState>
+  ): void => {
+    if (options.tokenRequest.role === 'dm' || !state.document) return;
+    const live = new Set<string>();
+    const ids = new Set<string>();
+    for (const operation of state.operations) {
+      live.add(operation.clientOperationId);
+      if (
+        operation.status !== 'rejected' ||
+        restoredRejections.has(operation.clientOperationId)
+      )
+        continue;
+      restoredRejections.add(operation.clientOperationId);
+      const mutation = operation.proposal.mutation;
+      if (mutation.kind === 'upsert') ids.add(mutation.element.id);
+      else if (mutation.kind === 'remove') ids.add(mutation.id);
+    }
+    for (const id of restoredRejections) {
+      if (!live.has(id)) restoredRejections.delete(id);
+    }
+    if (ids.size === 0) return;
+    applyingRemote = true;
+    try {
+      for (const id of ids) {
+        const confirmed = state.document.elements.find(item => item.id === id);
+        const local = options.store.getById(id);
+        if (!confirmed) {
+          if (local) options.store.remove(id, { origin: 'remote' });
+          continue;
+        }
+        const element = canvasElement(
+          confirmed as unknown as Record<string, unknown>
+        );
+        if (!local) {
+          options.store.add(element, { origin: 'remote' });
+          continue;
+        }
+        const patch: Record<string, unknown> = { ...element };
+        for (const key of Object.keys(local)) {
+          if (!Object.hasOwn(patch, key)) patch[key] = undefined;
+        }
+        options.store.update(id, patch as Partial<CanvasElement>, {
+          origin: 'remote',
+        });
+      }
+    } finally {
+      applyingRemote = false;
+    }
+  };
+
   const unsubscribeAuthority = connection.subscribe(() => {
     const state = connection.getState();
     options.onStatus?.(state.status);
+    restoreRejectedEdits(state);
     const document = state.document;
     if (!document || document === lastDocument) return;
     lastDocument = document;
@@ -217,7 +273,9 @@ export function createManagedBattleMapAuthorityConnection(
       }
       if (options.fog) {
         const data = document.extensions.fog?.data as
-          FogSnapshot | null | undefined;
+          | FogSnapshot
+          | null
+          | undefined;
         if (data) {
           const versions = [
             data.meta.version,
