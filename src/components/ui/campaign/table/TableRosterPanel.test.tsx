@@ -434,6 +434,8 @@ describe('TableRosterPanel', () => {
       ]);
     });
     renderPanel(repository, canvas);
+    // Party fields are stamped only once the players snapshot verifies Aria.
+    await screen.findByText(/Player-controlled/);
     fireEvent.click(await rowButton('Aria'));
     await waitFor(() => expect(canvas.armPlacement).toHaveBeenCalledTimes(1));
     const tokenId = snapshot(repository).scenes[0]!.members[0]!.tokenIds[0]!;
@@ -731,8 +733,9 @@ describe('TableRosterPanel', () => {
         reason: 'transaction-failed',
       }));
     renderPanel(repository, fakeCanvas());
-    expect(await screen.findByRole('status')).toHaveTextContent(
-      /could not be prepared/i
+    expect(await screen.findByText(/could not be prepared/i)).toHaveAttribute(
+      'role',
+      'status'
     );
     spy.mockImplementation(original);
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
