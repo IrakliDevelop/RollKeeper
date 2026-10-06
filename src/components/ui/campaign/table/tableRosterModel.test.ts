@@ -34,6 +34,7 @@ function entry(overrides: Partial<TableRosterEntry>): TableRosterEntry {
     },
     control: { kind: 'dm' },
     verifiedLegacyPlayerId: null,
+    identityLegacyPlayerId: null,
     boundTokenIds: [],
     aliasTokenIds: [],
     mismatchedTokenIds: [],

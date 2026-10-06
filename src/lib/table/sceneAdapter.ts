@@ -306,9 +306,7 @@ export function createTableSceneAdapter(options: {
           (identity.kind === 'combatant'
             ? item.sceneMemberId === identity.key ||
               item.sourceEntityId === identity.key
-            : (item.control.kind === 'player' &&
-                item.control.legacyPlayerId === identity.key) ||
-              item.verifiedLegacyPlayerId === identity.key)
+            : item.identityLegacyPlayerId === identity.key)
       );
       return entry
         ? {

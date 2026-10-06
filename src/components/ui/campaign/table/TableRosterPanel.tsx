@@ -115,7 +115,9 @@ export function TableRosterPanel(props: {
               {`${ambiguous} map token${ambiguous === 1 ? '' : 's'} match several members — open a member to bind.`}
             </p>
           )}
-          <TableRosterNoticeLine notice={actions.notice} />
+          <TableRosterNoticeLine
+            notice={state.ensureNotice ?? actions.notice}
+          />
         </div>
       )}
       <TableAddMemberDialog
@@ -139,6 +141,7 @@ export function TableRosterPanel(props: {
         }}
         players={state.players.snapshot}
         ambiguousTokenIds={roster?.ambiguousTokenIds ?? []}
+        unmatchedTokenIds={roster?.unmatchedTokenIds ?? []}
         liveIds={state.liveIds}
         notice={actions.notice}
         busy={actions.busy}

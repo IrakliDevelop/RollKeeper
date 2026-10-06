@@ -132,6 +132,8 @@ export function createManagedBattleMapAuthorityConnection(
         : undefined,
       transportFactory: options.transportFactory,
       resolveUrl: async () => {
+        // A stopped or superseded connection never mints again.
+        if (stopped || inner !== connection || retired === inner) return null;
         const result =
           pendingSeed ??
           (await options.mint(options.campaignCode, options.tokenRequest));
@@ -313,7 +315,7 @@ export function createManagedBattleMapAuthorityConnection(
   };
 
   const onAuthorityChange = (inner: ManagedAuthorityConnection): void => {
-    if (inner !== connection || retired === inner) return;
+    if (stopped || inner !== connection || retired === inner) return;
     const state = inner.getState();
     if (state.status === 'live') everLive = true;
     options.onStatus?.(state.status);
@@ -421,11 +423,20 @@ export function createManagedBattleMapAuthorityConnection(
         discardedOperationIds,
       });
     }
+    // Either callback may stop this connection (the pages rebuild their
+    // canvas on a scene change); never open a replacement after that.
+    if (stopped) return;
     options.onSceneResolved?.(next.sceneId);
+    if (stopped) return;
     const inner = open(seed);
     connection = inner;
     retired = null;
     unsubscribeAuthority = inner.subscribe(() => onAuthorityChange(inner));
+    if (stopped) {
+      unsubscribeAuthority();
+      inner.stop();
+      return;
+    }
     onAuthorityChange(inner);
   }
 

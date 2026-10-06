@@ -92,6 +92,8 @@ import {
   startFogAppearancePoll,
 } from '../fog/fogAppearancePoll';
 
+const viewports: Viewport[] = [];
+
 function stubCanvas(): void {
   const origCreate = document.createElement.bind(document);
   vi.spyOn(document, 'createElement').mockImplementation((tag: string) => {
@@ -153,6 +155,7 @@ function makeViewport(): Viewport {
   });
   document.body.appendChild(container);
   const vp = new Viewport(container);
+  viewports.push(vp);
   vp.toolManager.register(new SelectTool());
   vp.toolManager.register({
     name: 'path',
@@ -197,6 +200,7 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
 
   beforeEach(() => {
     connections.length = 0;
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -206,6 +210,7 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
 
   afterEach(() => {
     cleanup();
+    viewports.splice(0).forEach(viewport => viewport.destroy());
     vi.restoreAllMocks();
     vi.clearAllMocks();
     for (const [key, value] of [
@@ -318,6 +323,44 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     act(() => select.setSelection(['party-token']));
     expect(screen.queryByLabelText('Delete selected')).toBeNull();
     act(() => select.setSelection(['own-drawing']));
+    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
+  });
+
+  it('keeps delete for the own self-placed token in v1 (rule 12)', () => {
+    stubCanvas();
+    renderPlayer();
+    const vp = makeViewport();
+    fireReady(vp);
+    const self = {
+      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
+      id: 'self-token',
+      layerId: 'player-char-a',
+      tokenKind: 'player',
+      characterId: 'char-a',
+    };
+    act(() => vp.store.add(self));
+    const select = vp.toolManager.getTool<SelectTool>('select')!;
+    act(() => select.setSelection(['self-token']));
+    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
+  });
+
+  it('keeps the legacy delete behavior outside Table v1', () => {
+    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
+    stubCanvas();
+    renderPlayer();
+    const vp = makeViewport();
+    fireReady(vp);
+    const party = {
+      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
+      id: 'party-token',
+      layerId: 'player-char-a',
+      tokenKind: 'player',
+      characterId: 'char-a',
+      sceneMemberId: 'member-a',
+    };
+    act(() => vp.store.add(party));
+    const select = vp.toolManager.getTool<SelectTool>('select')!;
+    act(() => select.setSelection(['party-token']));
     expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
   });
 });

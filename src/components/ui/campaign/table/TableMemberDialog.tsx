@@ -36,6 +36,7 @@ export function TableMemberDialog(props: {
   onClose: () => void;
   players: TablePlayersSnapshot;
   ambiguousTokenIds: readonly string[];
+  unmatchedTokenIds: readonly string[];
   liveIds: ReadonlySet<string>;
   notice: TableRosterNotice | null;
   busy: boolean;
@@ -89,6 +90,7 @@ export function TableMemberDialog(props: {
                 entry={entry}
                 players={props.players}
                 ambiguousTokenIds={props.ambiguousTokenIds}
+                unmatchedTokenIds={props.unmatchedTokenIds}
                 liveIds={props.liveIds}
                 busy={props.busy}
                 actions={props.actions}

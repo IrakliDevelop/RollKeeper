@@ -1,21 +1,62 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, screen, cleanup, act } from '@testing-library/react';
 import { Viewport } from '@fieldnotes/core';
 
 import BattleMapDisplayPage from '../page';
 
 /**
- * PR02 R4 on the map-pinned TV display: with Table v1 required the display
- * keeps its map-keyed fog-appearance companion neutral unless the resolved
- * presented scene is this map, and rebuilds its canvas when the resolved
- * scene changes. Harness copied from page.presence.test.tsx.
+ * PR02 R4 review F1 on the map-pinned display: a real presentation switch
+ * through the real battlemapSync/battlemapAuthority stack (SDK managed
+ * connection faked). The page rebuilds, every old connection is stopped,
+ * nothing keeps minting and the cover clears once the new scene is live.
  */
+
+interface FakeInstance {
+  resolveUrl: () => Promise<unknown> | unknown;
+  state: { status: string; document: unknown; operations: unknown[] };
+  listeners: Set<() => void>;
+  stop: ReturnType<typeof vi.fn>;
+  publish(): void;
+}
+
+const fake = vi.hoisted(() => ({ instances: [] as FakeInstance[] }));
+
+vi.mock('@fieldnotes/sync', async importOriginal => ({
+  ...(await importOriginal<typeof import('@fieldnotes/sync')>()),
+  createManagedAuthorityConnection: (options: {
+    resolveUrl: () => unknown;
+  }) => {
+    const instance: FakeInstance = {
+      resolveUrl: options.resolveUrl,
+      state: { status: 'connecting', document: null, operations: [] },
+      listeners: new Set(),
+      stop: vi.fn(),
+      publish() {
+        for (const listener of [...this.listeners]) listener();
+      },
+    };
+    fake.instances.push(instance);
+    return {
+      getState: () => instance.state,
+      subscribe: (listener: () => void) => {
+        instance.listeners.add(listener);
+        return () => instance.listeners.delete(listener);
+      },
+      stop: instance.stop,
+      submit: vi.fn(() => ({ status: 'admitted', clientOperationId: 'x' })),
+      captureBarrier: vi.fn(),
+      waitForAcknowledgements: vi.fn(),
+      requestCheckpoint: vi.fn(),
+      releaseBarrier: vi.fn(),
+    };
+  },
+}));
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
-    useParams: () => ({ code: 'CAMP01', id: 'bm-1' }),
+    useParams: () => ({ code: 'CAMP01', id: 'map-m' }),
     useSearchParams: () => new URLSearchParams({ dk: 'key' }),
   };
 });
@@ -26,15 +67,6 @@ vi.mock('@fieldnotes/react', async importOriginal => {
 });
 
 import { FieldNotesCanvas } from '@fieldnotes/react';
-
-const stops: Array<ReturnType<typeof vi.fn>> = [];
-vi.mock('@/lib/battlemapSync', () => ({
-  createManagedBattleMapConnection: vi.fn(() => {
-    const stop = vi.fn();
-    stops.push(stop);
-    return { stop, sendPresence: vi.fn() };
-  }),
-}));
 
 vi.mock('@/components/ui/campaign/location-map/fog/fogAppearancePoll', () => ({
   applyFogAppearanceMetadata: vi.fn(),
@@ -71,11 +103,8 @@ vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
   })),
 }));
 
-import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
-import {
-  fetchAndApplyFogAppearance,
-  startFogAppearancePoll,
-} from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
+const ROOM_X = '423e4567-e89b-42d3-a456-426614174000';
+const ROOM_M = '523e4567-e89b-42d3-a456-426614174000';
 
 const viewports: Viewport[] = [];
 
@@ -155,23 +184,53 @@ function fireReady(vp: Viewport): void {
   act(() => onReady(vp));
 }
 
-function lastOptions() {
-  const call = vi.mocked(createManagedBattleMapConnection).mock.calls.at(-1);
-  if (!call) throw new Error('no connection');
-  return call[0];
+async function flush() {
+  for (let index = 0; index < 5; index += 1) await Promise.resolve();
 }
 
-describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
+const liveDocument = {
+  elements: [],
+  layers: [],
+  extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+};
+
+async function goLive(instance: FakeInstance) {
+  await act(async () => {
+    await instance.resolveUrl();
+    await flush();
+  });
+  await act(async () => {
+    instance.state = { status: 'live', document: liveDocument, operations: [] };
+    instance.publish();
+    await flush();
+  });
+}
+
+describe('BattleMapDisplayPage: real presentation switch (R4)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
     table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
+  let presented = { room: ROOM_X, sceneId: 'scene-x' };
+  let mints = 0;
 
   beforeEach(() => {
-    stops.length = 0;
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    fake.instances.length = 0;
+    mints = 0;
+    presented = { room: ROOM_X, sceneId: 'scene-x' };
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
+      if (String(input).includes('/battlemap-token')) {
+        mints += 1;
+        return new Response(
+          JSON.stringify({ token: 'token', authority: 1, ...presented }),
+          { status: 200 }
+        );
+      }
+      return new Response('{}', { status: 200 });
+    });
   });
 
   afterEach(() => {
@@ -188,35 +247,50 @@ describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('polls fog appearance only while the resolved scene is this map', async () => {
+  it('stops every old connection, stops minting and clears the cover on the new scene', async () => {
     stubCanvas();
     render(<BattleMapDisplayPage />);
     fireReady(makeViewport());
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-    const options = lastOptions();
     await act(async () => {
-      options.onSceneResolved?.('scene-x');
-      options.onPoke?.('fog-appearance');
+      await fake.instances[0]!.resolveUrl();
+      await flush();
     });
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-    expect(fetchAndApplyFogAppearance).not.toHaveBeenCalled();
-    await act(async () => options.onSceneResolved?.('bm-1'));
-    expect(startFogAppearancePoll).toHaveBeenCalledTimes(1);
-  });
+    await goLive(fake.instances[1]!);
+    expect(
+      screen.queryByTestId('battlemap-bootstrap-privacy-cover')
+    ).toBeNull();
 
-  it('rebuilds the display canvas when the resolved scene changes', async () => {
-    stubCanvas();
-    render(<BattleMapDisplayPage />);
+    presented = { room: ROOM_M, sceneId: 'map-m' };
+    await act(async () => {
+      await fake.instances[1]!.resolveUrl();
+      await flush();
+    });
+    const before = fake.instances.length;
     fireReady(makeViewport());
-    await act(async () =>
-      lastOptions().onSceneChange?.({
-        previousSceneId: 'bm-1',
-        sceneId: 'scene-x',
-        discardedOperationIds: [],
-      })
-    );
-    expect(stops[0]).toHaveBeenCalled();
-    fireReady(makeViewport());
-    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);
+    await act(async () => {
+      await fake.instances[before]!.resolveUrl();
+      await flush();
+    });
+    const current = fake.instances.at(-1)!;
+    await goLive(current);
+    expect(
+      screen.queryByTestId('battlemap-bootstrap-privacy-cover')
+    ).toBeNull();
+    for (const instance of fake.instances.slice(0, -1)) {
+      expect(instance.stop).toHaveBeenCalled();
+    }
+    const mintCount = mints;
+    await act(async () => {
+      for (const instance of fake.instances.slice(0, -1)) {
+        await expect(instance.resolveUrl()).resolves.toBeNull();
+        instance.state = { ...instance.state, status: 'offline' };
+        instance.publish();
+      }
+      await flush();
+    });
+    expect(mints).toBe(mintCount);
+    expect(
+      screen.queryByTestId('battlemap-bootstrap-privacy-cover')
+    ).toBeNull();
   });
 });

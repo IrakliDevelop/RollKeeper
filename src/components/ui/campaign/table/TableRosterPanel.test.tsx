@@ -11,7 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TableRepository } from '@/lib/table/repository';
-import { partyTokenFields } from '@/lib/table/roster';
+import { dmTokenFields, partyTokenFields } from '@/lib/table/roster';
 import type {
   JsonObject,
   TableActorRecordV1,
@@ -525,6 +525,103 @@ describe('TableRosterPanel', () => {
         'goblin-token',
         'self-token',
       ])
+    );
+  });
+
+  it('shows verification unavailable and stamps DM-only fields when the players snapshot fails', async () => {
+    vi.mocked(globalThis.fetch).mockImplementation(
+      async () => new Response('{}', { status: 503 })
+    );
+    const repository = await repositoryWith(
+      [
+        {
+          actorId: 'party-actor',
+          tokenIds: [],
+          sceneMemberId: 'member-a',
+          control: { kind: 'player', legacyPlayerId: 'legacy-a' },
+        },
+      ],
+      key => [partyActor(key)]
+    );
+    const canvas = fakeCanvas();
+    renderPanel(repository, canvas);
+    expect(
+      await screen.findByText(/Verification unavailable/)
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/Player-controlled/)).toBeNull();
+    fireEvent.click(await rowButton('Aria'));
+    await waitFor(() => expect(canvas.armPlacement).toHaveBeenCalledTimes(1));
+    expect(canvas.armPlacement.mock.calls[0]![0]).toMatchObject({
+      fields: dmTokenFields('member-a'),
+    });
+    expect(canvas.ensurePlayerBand).not.toHaveBeenCalled();
+  });
+
+  it('offers explicit binding of an unbound legacy token and surfaces a failed canvas step with a retry', async () => {
+    const repository = await repositoryWith(
+      [
+        {
+          actorId: 'goblin',
+          tokenIds: [],
+          sceneMemberId: 'm-g',
+          control: { kind: 'dm' },
+        },
+      ],
+      key => [creature(key, 'goblin')],
+      [
+        {
+          id: 'legacy-orc',
+          tokenKind: 'combatant',
+          entityId: 'orc',
+          ownerId: 'dm-a',
+        },
+      ]
+    );
+    const canvas = fakeCanvas([
+      { id: 'legacy-orc', tokenKind: 'combatant', entityId: 'orc' },
+    ]);
+    canvas.applyTokenPatch.mockReturnValueOnce(false);
+    renderPanel(repository, canvas);
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Details for Goblin' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    const bind = within(dialog).queryByRole('button', {
+      name: 'Bind legacy-orc',
+    });
+    if (!bind) return expect.fail('legacy token not offered for binding');
+    fireEvent.click(bind);
+    expect(await within(dialog).findByRole('status')).toHaveTextContent(
+      /not updated on the map/i
+    );
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(canvas.applyTokenPatch).toHaveBeenCalledTimes(2)
+    );
+  });
+
+  it('surfaces a failed member-id assignment with a retry', async () => {
+    const repository = await repositoryWith(
+      [{ actorId: 'pr01-goblin', tokenIds: [] }],
+      key => [creature(key, 'pr01-goblin')]
+    );
+    const original = repository.mutateWorkspace.bind(repository);
+    const spy = vi
+      .spyOn(repository, 'mutateWorkspace')
+      .mockImplementationOnce(async () => ({
+        status: 'failed',
+        reason: 'transaction-failed',
+      }));
+    renderPanel(repository, fakeCanvas());
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      /could not be prepared/i
+    );
+    spy.mockImplementation(original);
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    await waitFor(() =>
+      expect(snapshot(repository).scenes[0]!.members[0]!.sceneMemberId).toEqual(
+        expect.any(String)
+      )
     );
   });
 

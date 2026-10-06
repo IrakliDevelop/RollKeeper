@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useReducer, useRef } from 'react';
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 
 import type { TableRepository } from '@/lib/table/repository';
 import {
@@ -9,6 +9,7 @@ import {
   type TableSceneRoster,
 } from '@/lib/table/roster';
 
+import type { TableRosterNotice } from './useTableRosterActions';
 import { useTablePlayersSnapshot } from './useTablePlayersSnapshot';
 
 /** Live canvas operations the roster needs (provided by the Table route). */
@@ -99,6 +100,8 @@ export function useTableRosterState(options: {
   );
 
   const ensuring = useRef(false);
+  const [ensureAttempt, retryEnsure] = useReducer((n: number) => n + 1, 0);
+  const [ensureFailed, setEnsureFailed] = useState(false);
   const needsIds = roster?.needsSceneMemberIds === true;
   useEffect(() => {
     if (!needsIds || ensuring.current) return;
@@ -118,10 +121,38 @@ export function useTableRosterState(options: {
       expectedRevision: latest.snapshot.campaign?.revision ?? 0,
       operationId: crypto.randomUUID(),
       command: { type: 'roster.ensureSceneMemberIds', sceneId, assignments },
-    }).finally(() => {
-      ensuring.current = false;
-    });
-  }, [needsIds, repository, sceneId]);
+    })
+      .then(result =>
+        setEnsureFailed(
+          result.status !== 'committed' && result.status !== 'unchanged'
+        )
+      )
+      .catch(() => setEnsureFailed(true))
+      .finally(() => {
+        ensuring.current = false;
+      });
+  }, [needsIds, repository, sceneId, ensureAttempt]);
 
-  return { roster, liveIds, canvasElements, players, playerList };
+  // Members without a stable id cannot be placed or bound; say so visibly
+  // and let the DM retry the one persisted assignment command.
+  const pending =
+    roster?.entries.filter(entry => entry.sceneMemberId === null).length ?? 0;
+  const ensureNotice: TableRosterNotice | null =
+    pending === 0
+      ? null
+      : ensureFailed
+        ? {
+            tone: 'error',
+            message: `${pending} member${pending === 1 ? '' : 's'} could not be prepared for this scene. Nothing else changed.`,
+            retry: () => {
+              setEnsureFailed(false);
+              retryEnsure();
+            },
+          }
+        : {
+            tone: 'info',
+            message: `Preparing ${pending} member${pending === 1 ? '' : 's'} for this scene…`,
+          };
+
+  return { roster, liveIds, canvasElements, players, playerList, ensureNotice };
 }

@@ -69,6 +69,7 @@ function start(
   const onSceneResolved = vi.fn();
   const onSceneChange = vi.fn();
   const onDiagnostic = vi.fn();
+  const onStatus = vi.fn();
   const tokenRequest =
     role === 'player'
       ? { role, battleMapId: 'map-m', playerId: 'legacy-a' }
@@ -87,8 +88,10 @@ function start(
     onSceneResolved,
     onSceneChange,
     onDiagnostic,
+    onStatus,
   });
   return {
+    onStatus,
     store,
     fog,
     connection,
@@ -180,6 +183,44 @@ describe('resolved-scene connection scope (R4 client)', () => {
     expect(replacement.submit).not.toHaveBeenCalled();
     connection.stop();
     expect(replacement.stop).toHaveBeenCalled();
+  });
+
+  it('leaves no live replacement, mint or status after onSceneChange stops the connection', async () => {
+    let current: { room: string; sceneId: string } = {
+      room: ROOM_X,
+      sceneId: 'scene-x',
+    };
+    const mint = vi.fn(async () => ({
+      token: 'token',
+      authority: 1,
+      ...current,
+    }));
+    const { connection, onSceneChange, onStatus } = start(mint, 'display');
+    await fake.instances[0]!.options.resolveUrl();
+    await Promise.resolve();
+    const live = fake.instances[1]!;
+    await live.options.resolveUrl();
+    live.state = { status: 'live', document: emptyDocument(), operations: [] };
+    live.publish();
+    onSceneChange.mockImplementation(() => connection.stop());
+
+    current = { room: ROOM_M, sceneId: 'map-m' };
+    await live.options.resolveUrl();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(onSceneChange).toHaveBeenCalledTimes(1);
+    for (const instance of fake.instances) {
+      expect(instance.stop).toHaveBeenCalled();
+    }
+    const mints = mint.mock.calls.length;
+    const statusCalls = onStatus.mock.calls.length;
+    for (const instance of fake.instances) {
+      await expect(instance.options.resolveUrl()).resolves.toBeNull();
+      instance.state = { ...instance.state, status: 'offline' };
+      instance.publish();
+    }
+    expect(mint.mock.calls.length).toBe(mints);
+    expect(onStatus.mock.calls.length).toBe(statusCalls);
   });
 
   it('keeps the DM on its explicit scene scope', async () => {

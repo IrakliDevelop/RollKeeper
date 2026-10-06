@@ -18,6 +18,7 @@ export function TableMemberControls({
   entry,
   players,
   ambiguousTokenIds,
+  unmatchedTokenIds,
   liveIds,
   busy,
   actions,
@@ -25,15 +26,19 @@ export function TableMemberControls({
   entry: TableRosterEntry;
   players: TablePlayersSnapshot;
   ambiguousTokenIds: readonly string[];
+  /** Tokens with no exact identity or no DM provenance (C3): bind explicitly. */
+  unmatchedTokenIds: readonly string[];
   liveIds: ReadonlySet<string>;
   busy: boolean;
   actions: TableMemberActions;
 }) {
   const playerControlled = entry.control.kind === 'player';
   const mismatched = entry.mismatchedTokenIds.filter(id => liveIds.has(id));
-  const bindable = [...entry.aliasTokenIds, ...ambiguousTokenIds].filter(id =>
-    liveIds.has(id)
-  );
+  const bindable = [
+    ...entry.aliasTokenIds,
+    ...ambiguousTokenIds,
+    ...unmatchedTokenIds,
+  ].filter(id => liveIds.has(id));
 
   return (
     <div className="space-y-4">
@@ -113,7 +118,9 @@ export function TableMemberControls({
             <span className="text-muted min-w-0 flex-1 truncate text-xs">
               {ambiguousTokenIds.includes(tokenId)
                 ? 'Ambiguous legacy token'
-                : 'Unbound legacy alias'}
+                : unmatchedTokenIds.includes(tokenId)
+                  ? 'Unbound map token'
+                  : 'Unbound legacy alias'}
             </span>
             <Button
               variant="outline"

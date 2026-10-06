@@ -339,6 +339,25 @@ export function PlayerBattleMapCanvas({
   // under a new key; the notice tells the player unsent edits were dropped.
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const [sceneNotice, setSceneNotice] = useState<string | null>(null);
+  // Table v1 relay rule 12: players delete only their own self-placed token
+  // among control-bearing elements (never a bound or DM-placed one). Legacy
+  // rooms keep the existing delete behavior.
+  const playerMayDelete = useCallback(
+    (element: CanvasElement): boolean => {
+      if (!tableScoped || !isControlBearingElement(element)) return true;
+      const rec = element as unknown as Record<string, unknown>;
+      const absent = (key: string) =>
+        rec[key] === undefined || rec[key] === null;
+      return (
+        rec.tokenKind === PLAYER_TOKEN_KIND &&
+        rec.characterId === characterId &&
+        rec.layerId === playerLayerId(characterId) &&
+        absent('sceneMemberId') &&
+        absent('entityId')
+      );
+    },
+    [tableScoped, characterId]
+  );
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -679,12 +698,10 @@ export function PlayerBattleMapCanvas({
 
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
-    // Control-bearing tokens are movement-only for players (relay rules);
-    // only selections with something deletable offer the delete action.
     const deletableSelection = (): boolean =>
       (selectTool?.selectedIds ?? []).some(id => {
         const element = vp.store.getById(id);
-        return element !== undefined && !isControlBearingElement(element);
+        return element !== undefined && playerMayDelete(element);
       });
     if (selectTool) {
       selectTool.onSelectionChange(() => {
@@ -888,12 +905,12 @@ export function PlayerBattleMapCanvas({
     if (!selectTool) return;
     const ids = selectTool.selectedIds.filter(id => {
       const element = vp.store.getById(id);
-      return element !== undefined && !isControlBearingElement(element);
+      return element !== undefined && playerMayDelete(element);
     });
     if (ids.length === 0) return;
     vp.removeElements(ids);
     selectTool.setSelection([]);
-  }, [viewport]);
+  }, [viewport, playerMayDelete]);
 
   useEffect(
     () => () => {

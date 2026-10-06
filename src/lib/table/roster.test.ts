@@ -858,6 +858,34 @@ describe('roster commands', () => {
   });
 });
 
+describe('unavailable player verification (review F4)', () => {
+  it('never reports player control without a current players snapshot but keeps identity for aliases', async () => {
+    const repository = await open();
+    await repository.mutateWorkspace(0, 'seed', {
+      scenes: {
+        put: [
+          scene(
+            repository.workspaceIdentity,
+            'tavern',
+            [],
+            [{ id: 'self-token', tokenKind: 'player', characterId: 'legacy-a' }]
+          ),
+        ],
+      },
+    });
+    await run(repository, party('tavern', 'legacy-a', 'a'));
+    const roster = deriveSceneRoster({
+      snapshot: snapshot(repository),
+      sceneId: 'tavern',
+    });
+    expect(roster.entries[0]).toMatchObject({
+      control: { kind: 'unavailable', reason: 'verification-unavailable' },
+      identityLegacyPlayerId: 'legacy-a',
+      aliasTokenIds: ['self-token'],
+    });
+  });
+});
+
 describe('legacy token aliases', () => {
   async function aliasFixture(elements: JsonObject[]) {
     const repository = await open();

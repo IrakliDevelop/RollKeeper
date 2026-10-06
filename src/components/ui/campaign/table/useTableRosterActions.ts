@@ -146,7 +146,13 @@ export function useTableRosterActions(options: {
 
   const reassign = useCallback(
     async (entry: TableRosterEntry, control: TableMemberControlV1) => {
-      if (!entry.sceneMemberId) return;
+      if (!entry.sceneMemberId) {
+        setNotice({
+          tone: 'error',
+          message: `${entry.name} is still being prepared for this scene.`,
+        });
+        return;
+      }
       const result = await execute(
         {
           type: 'roster.reassignControl',
@@ -166,17 +172,25 @@ export function useTableRosterActions(options: {
       const live = entry.boundTokenIds.filter(id =>
         latest.current.liveIds.has(id)
       );
-      if (!applyControl(entry, control, live)) {
+      const patch = () => {
+        if (applyControl(entry, control, live)) return;
         setNotice({
           tone: 'error',
-          message: `Saved, but ${entry.name}’s token was not updated on the map. Use Repair token to retry.`,
+          message: `Saved, but ${entry.name}’s token was not updated on the map.`,
+          retry: patch,
         });
-      }
+      };
+      patch();
     },
     [applyControl, execute]
   );
 
   const at = () => new Date().toISOString();
+  const notPrepared = (entry: TableRosterEntry) =>
+    setNotice({
+      tone: 'error',
+      message: `${entry.name} is still being prepared for this scene.`,
+    });
   const sceneId = options.sceneId;
 
   return {
@@ -219,8 +233,9 @@ export function useTableRosterActions(options: {
         { success: `${entry.name}: stats saved.` }
       ),
     remove: (entry: TableRosterEntry) =>
-      entry.sceneMemberId
-        ? execute(
+      !entry.sceneMemberId
+        ? notPrepared(entry)
+        : execute(
             {
               type: 'roster.removeMember',
               sceneId,
@@ -228,10 +243,10 @@ export function useTableRosterActions(options: {
               at: at(),
             },
             { success: `${entry.name} removed from the scene.` }
-          )
-        : undefined,
+          ),
     bind: async (entry: TableRosterEntry, tokenId: string, bind: boolean) => {
-      if (!entry.sceneMemberId) return;
+      if (!entry.sceneMemberId) return notPrepared(entry);
+      const sceneMemberId = entry.sceneMemberId;
       const result = await execute(
         {
           type: bind ? 'roster.bindToken' : 'roster.unbindToken',
@@ -242,11 +257,27 @@ export function useTableRosterActions(options: {
         },
         { success: bind ? 'Token bound.' : 'Token unbound.' }
       );
-      if (bind && succeeded(result))
-        latest.current.canvas?.applyTokenPatch(tokenId, {
-          set: { sceneMemberId: entry.sceneMemberId },
-          unset: [],
-        });
+      if (!bind || !succeeded(result)) return;
+      // Stamp the binding key on the token (R2); a failed canvas step stays
+      // visibly retryable instead of silently diverging from the repository.
+      const stamp = () => {
+        const applied =
+          latest.current.canvas?.applyTokenPatch(tokenId, {
+            set: { sceneMemberId },
+            unset: [],
+          }) ?? false;
+        setNotice(
+          applied
+            ? { tone: 'success', message: 'Token bound.' }
+            : {
+                tone: 'error',
+                message:
+                  'Binding saved, but the token was not updated on the map.',
+                retry: stamp,
+              }
+        );
+      };
+      stamp();
     },
     reassign,
     repair: (entry: TableRosterEntry) => {
@@ -266,7 +297,7 @@ export function useTableRosterActions(options: {
     },
     place: async (entry: TableRosterEntry) => {
       const { canvas, live, liveIds } = latest.current;
-      if (!entry.sceneMemberId) return;
+      if (!entry.sceneMemberId) return notPrepared(entry);
       const present = [...entry.boundTokenIds, ...entry.aliasTokenIds].filter(
         id => liveIds.has(id)
       );

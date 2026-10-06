@@ -138,7 +138,11 @@ export type TableRosterControlStatus =
   | { kind: 'dm' }
   | {
       kind: 'unavailable';
-      reason: 'identity-unresolved' | 'control-unavailable';
+      reason:
+        | 'identity-unresolved'
+        | 'control-unavailable'
+        /** No current players snapshot: never claim player control. */
+        | 'verification-unavailable';
     };
 
 export interface TableRosterEntry {
@@ -160,6 +164,12 @@ export interface TableRosterEntry {
   control: TableRosterControlStatus;
   /** Verified identity of a party or adopted PC actor, if any. */
   verifiedLegacyPlayerId: string | null;
+  /**
+   * Persisted identity claim (explicit control, party reference or verified
+   * adopted PC) used only for exact alias matching and movement lookup —
+   * never as an authorization signal.
+   */
+  identityLegacyPlayerId: string | null;
   boundTokenIds: string[];
   aliasTokenIds: string[];
   /** Bound tokens whose control fields disagree with the member's control. */
@@ -238,7 +248,7 @@ function exactlyVerified(
   players: readonly TableCampaignPlayer[] | undefined,
   legacyPlayerId: string
 ): boolean {
-  if (!players) return true;
+  if (!players) return false;
   const verification = verifyPlayerIdentity(players, legacyPlayerId);
   return (
     verification.status === 'verified' &&
@@ -254,6 +264,14 @@ function memberControl(
   players: readonly TableCampaignPlayer[] | undefined
 ): TableRosterControlStatus {
   if (member.control?.kind === 'dm') return { kind: 'dm' };
+  if (
+    !players &&
+    (member.control?.kind === 'player' ||
+      actor?.actorKind === 'player-reference' ||
+      adoptedPc)
+  ) {
+    return { kind: 'unavailable', reason: 'verification-unavailable' };
+  }
   if (member.control?.kind === 'player') {
     return exactlyVerified(players, member.control.legacyPlayerId)
       ? { kind: 'player', legacyPlayerId: member.control.legacyPlayerId }
@@ -392,6 +410,12 @@ export function deriveSceneRoster(options: {
       liveStats: actor?.liveStats ?? null,
       control,
       verifiedLegacyPlayerId,
+      identityLegacyPlayerId:
+        member.control?.kind === 'player'
+          ? member.control.legacyPlayerId
+          : actor?.actorKind === 'player-reference'
+            ? referenceLegacyId(actor)
+            : verifiedLegacyPlayerId,
       boundTokenIds: [...member.tokenIds],
       aliasTokenIds: [],
       mismatchedTokenIds: [],
@@ -421,10 +445,7 @@ export function deriveSceneRoster(options: {
       typeof token.characterId === 'string'
     ) {
       candidates = active.filter(
-        item =>
-          (item.member.control?.kind === 'player' &&
-            item.member.control.legacyPlayerId === token.characterId) ||
-          item.entry.verifiedLegacyPlayerId === token.characterId
+        item => item.entry.identityLegacyPlayerId === token.characterId
       );
     } else if (
       token.tokenKind === COMBATANT_TOKEN_KIND &&
