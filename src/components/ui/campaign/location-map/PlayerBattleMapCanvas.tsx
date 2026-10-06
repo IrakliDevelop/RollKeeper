@@ -69,7 +69,12 @@ import { useCloseMarkerPanelOnRemove } from './useCloseMarkerPanelOnRemove';
 import { resolveMarkerPanelState } from './MarkerDetailPanel/MarkerDetailPanel.utils';
 import MarkerDetailPanel from './MarkerDetailPanel';
 import type { PublicMarkerDetail } from '@/types/battlemap';
-import { ensurePlayerLayer, playerLayerId } from './playerLayer';
+import {
+  canonicalPlayerBand,
+  ensurePlayerLayer,
+  playerLayerId,
+} from './playerLayer';
+import { isControlBearingElement } from './tokenIdentity';
 import {
   ensureCanonicalLayers,
   subscribePinCanonicalLayers,
@@ -162,6 +167,7 @@ interface PlayerBattleMapCanvasProps {
 }
 
 const EMPTY_PUBLIC_MARKERS: PublicMarkerDetail[] = [];
+const NEVER_ACTIVATABLE = () => false;
 const EMPTY_APPLIED_TRANSFER_IDS: string[] = [];
 
 const PLAYER_TOOLS: {
@@ -319,6 +325,20 @@ export function PlayerBattleMapCanvas({
   onOpenPartySheet,
 }: PlayerBattleMapCanvasProps) {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
+  // R4 (Table v1): this route opens the source map URL; the server resolves
+  // the presented scene. Map-keyed side channels (marker details, loot,
+  // shop, fog appearance) stay neutral unless that scene IS this map —
+  // PR04's HTTP privacy inventory owns re-enabling them for adopted scenes.
+  const tableScoped =
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
+  const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
+  const sideChannelsEnabled = !tableScoped || resolvedSceneId === battleMapId;
+  const sideChannelsRef = useRef(sideChannelsEnabled);
+  sideChannelsRef.current = sideChannelsEnabled;
+  // A resolved-scene change rebuilds the whole canvas (store, layers, fog)
+  // under a new key; the notice tells the player unsent edits were dropped.
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const [sceneNotice, setSceneNotice] = useState<string | null>(null);
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -394,6 +414,10 @@ export function PlayerBattleMapCanvas({
   onOpenPartySheetRef.current = onOpenPartySheet;
 
   const refreshMarkers = useCallback(async () => {
+    if (!sideChannelsEnabled) {
+      setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
+      return;
+    }
     try {
       const response = await fetch(
         `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
@@ -409,7 +433,9 @@ export function PlayerBattleMapCanvas({
       // can retry, and a marker poke will refresh connected clients later.
       console.warn('Failed to refresh marker details:', error);
     }
-  }, [battleMapId, campaignCode]);
+  }, [battleMapId, campaignCode, sideChannelsEnabled]);
+  const refreshMarkersRef = useRef(refreshMarkers);
+  refreshMarkersRef.current = refreshMarkers;
 
   useEffect(() => {
     setPublishedMarkers(suppliedMarkers);
@@ -535,7 +561,9 @@ export function PlayerBattleMapCanvas({
     gesture: 'single',
     markerDetails: publishedMarkers,
     onActivateMarker: handleMarkerActivate,
-    isExtraActivatable: isCombatantToken,
+    isExtraActivatable: sideChannelsEnabled
+      ? isCombatantToken
+      : NEVER_ACTIVATABLE,
     onActivateExtra: handleShopTokenActivate,
     sheetTokens,
   });
@@ -576,6 +604,8 @@ export function PlayerBattleMapCanvas({
 
   const handleClaimLoot = useCallback(
     async (entryId: string, quantity: number): Promise<number> => {
+      if (!sideChannelsRef.current)
+        throw new Error('Loot is not available in this scene.');
       if (markerPanelState.kind !== 'ready')
         throw new Error('This loot container is no longer available.');
       const response = await fetch(
@@ -649,16 +679,21 @@ export function PlayerBattleMapCanvas({
 
     // Selection state for the touch-friendly delete button.
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
+    // Control-bearing tokens are movement-only for players (relay rules);
+    // only selections with something deletable offer the delete action.
+    const deletableSelection = (): boolean =>
+      (selectTool?.selectedIds ?? []).some(id => {
+        const element = vp.store.getById(id);
+        return element !== undefined && !isControlBearingElement(element);
+      });
     if (selectTool) {
       selectTool.onSelectionChange(() => {
-        setHasSelection(selectTool.selectedIds.length > 0);
+        setHasSelection(deletableSelection());
       });
     }
     vp.toolManager.onChange(() => {
       const active = vp.toolManager.activeTool?.name === 'select';
-      setHasSelection(
-        active ? (selectTool?.selectedIds.length ?? 0) > 0 : false
-      );
+      setHasSelection(active ? deletableSelection() : false);
     });
 
     // Movement commit: connection-independent — moving a token needs no
@@ -728,9 +763,28 @@ export function PlayerBattleMapCanvas({
           meta.fogAppearanceUpdatedAt
         );
       },
+      onSceneResolved: sceneId => setResolvedSceneId(sceneId),
+      onSceneChange: change => {
+        const count = change.discardedOperationIds.length;
+        setSceneNotice(
+          `The presented scene changed${
+            count > 0
+              ? ` — ${count} unsent edit${count === 1 ? ' was' : 's were'} discarded`
+              : ''
+          }. The map was reloaded.`
+        );
+        setResolvedSceneId(null);
+        laserCleanupRef.current?.();
+        laserCleanupRef.current = null;
+        connectionRef.current?.stop();
+        connectionRef.current = null;
+        setViewport(null);
+        viewportRef.current = null;
+        setCanvasEpoch(epoch => epoch + 1);
+      },
       onPoke: feature => {
-        if (feature === 'markers') void refreshMarkers();
-        if (feature === 'fog-appearance') {
+        if (feature === 'markers') void refreshMarkersRef.current();
+        if (feature === 'fog-appearance' && sideChannelsRef.current) {
           fetchAndApplyFogAppearance(
             vp,
             `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
@@ -745,7 +799,7 @@ export function PlayerBattleMapCanvas({
     publishOwnedLayers(
       vp,
       'player',
-      def => connection.publishLayerUpsert(def),
+      def => connection.publishLayerUpsert(canonicalPlayerBand(def)),
       ownLayerId
     );
     // Render remote laser trails + map pings (DM pointer). Players do not
@@ -802,13 +856,6 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current = null;
           awareness.dispose();
         });
-
-        scope.push(
-          startFogAppearancePoll({
-            viewport: vp,
-            url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
-          })
-        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and
@@ -819,12 +866,30 @@ export function PlayerBattleMapCanvas({
     }
   };
 
+  // Fog appearance is a map-keyed companion: polled only while the resolved
+  // scene is this map (always, outside Table v1).
+  useEffect(() => {
+    if (
+      !viewport ||
+      !sideChannelsEnabled ||
+      !process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL
+    )
+      return;
+    return startFogAppearancePoll({
+      viewport,
+      url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
+    });
+  }, [viewport, sideChannelsEnabled, campaignCode, battleMapId, characterId]);
+
   const handleDeleteSelected = useCallback(() => {
     const vp = viewport;
     if (!vp) return;
     const selectTool = vp.toolManager.getTool<SelectTool>('select');
     if (!selectTool) return;
-    const ids = selectTool.selectedIds.filter(id => vp.store.getById(id));
+    const ids = selectTool.selectedIds.filter(id => {
+      const element = vp.store.getById(id);
+      return element !== undefined && !isControlBearingElement(element);
+    });
     if (ids.length === 0) return;
     vp.removeElements(ids);
     selectTool.setSelection([]);
@@ -843,6 +908,7 @@ export function PlayerBattleMapCanvas({
     <ViewportContext.Provider value={viewport}>
       <div className="bg-surface fixed inset-0">
         <FieldNotesCanvas
+          key={canvasEpoch}
           tools={tools}
           defaultTool="hand"
           onReady={handleReady}
@@ -854,6 +920,20 @@ export function PlayerBattleMapCanvas({
           snapToGrid
         />
         <BattleMapBootstrapPrivacyCover status={status} />
+        {sceneNotice && (
+          <div className="border-accent-amber-border bg-accent-amber-bg pointer-events-auto absolute top-16 left-1/2 z-[110] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 shadow-lg">
+            <p role="status" className="text-accent-amber-text text-sm">
+              {sceneNotice}
+            </p>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setSceneNotice(null)}
+            >
+              Dismiss
+            </Button>
+          </div>
+        )}
         {viewport && (
           <PlayerMapToolControls>
             <PlayerToolbar

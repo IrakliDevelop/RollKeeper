@@ -54,6 +54,17 @@ function DisplayCanvas() {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+  // R4 (Table v1): this pinned display opens the source map URL and shows
+  // the scene the server resolves. Its map-keyed fog-appearance companion
+  // stays neutral unless that scene is this map; a resolved-scene change
+  // rebuilds the canvas under a new key.
+  const tableScoped =
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
+  const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
+  const sideChannelsEnabled = !tableScoped || resolvedSceneId === id;
+  const sideChannelsRef = useRef(sideChannelsEnabled);
+  sideChannelsRef.current = sideChannelsEnabled;
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -109,8 +120,19 @@ function DisplayCanvas() {
           awarenessRef.current?.announce();
         }
       },
+      onSceneResolved: sceneId => setResolvedSceneId(sceneId),
+      onSceneChange: () => {
+        setResolvedSceneId(null);
+        laserCleanupRef.current?.();
+        laserCleanupRef.current = null;
+        connectionRef.current?.stop();
+        connectionRef.current = null;
+        viewportRef.current = null;
+        setViewport(null);
+        setCanvasEpoch(epoch => epoch + 1);
+      },
       onPoke: feature => {
-        if (feature === 'fog-appearance') {
+        if (feature === 'fog-appearance' && sideChannelsRef.current) {
           fetchAndApplyFogAppearance(
             vp,
             `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
@@ -154,13 +176,6 @@ function DisplayCanvas() {
           awarenessRef.current = null;
           awareness.dispose();
         });
-
-        scope.push(
-          startFogAppearancePoll({
-            viewport: vp,
-            url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
-          })
-        );
       });
     } catch (error) {
       // attachConnectionScope already disposed every helper it saw and
@@ -170,6 +185,14 @@ function DisplayCanvas() {
       throw error;
     }
   };
+
+  useEffect(() => {
+    if (!viewport || !relayUrl || !displayKey || !sideChannelsEnabled) return;
+    return startFogAppearancePoll({
+      viewport,
+      url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
+    });
+  }, [viewport, relayUrl, displayKey, sideChannelsEnabled, code, id]);
 
   useEffect(
     () => () => {
@@ -207,6 +230,7 @@ function DisplayCanvas() {
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000' }}>
       <FieldNotesCanvas
+        key={canvasEpoch}
         tools={toolsRef.current}
         defaultTool="hand"
         onReady={handleReady}

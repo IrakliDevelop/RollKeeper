@@ -401,6 +401,35 @@ describe('createManagedBattleMapConnection', () => {
     conn.stop();
   });
 
+  it('exposes only a string resolved sceneId from the mint response', async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        token: 't',
+        authority: 1,
+        room: 'room-x',
+        sceneId: 'scene-x',
+      }),
+    });
+    await expect(
+      mintBattleMapToken('CODE', {
+        role: 'player',
+        battleMapId: 'map-m',
+        playerId: 'legacy-a',
+      })
+    ).resolves.toMatchObject({ room: 'room-x', sceneId: 'scene-x' });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ token: 't', authority: 1, sceneId: 7 }),
+    });
+    const malformed = await mintBattleMapToken('CODE', {
+      role: 'player',
+      battleMapId: 'map-m',
+      playerId: 'legacy-a',
+    });
+    expect(malformed?.sceneId).toBeUndefined();
+  });
+
   it('keeps a projected custom appearance and strips any source preset id', async () => {
     const material = { v: 1, kind: 'solid', color: '#ff0000' };
     const fetchMock = vi.fn(async () => ({
@@ -1083,10 +1112,12 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
     );
     vi.stubGlobal('cancelAnimationFrame', vi.fn());
 
-    const { attachRemotePings, attachPingInput } =
-      await import('@/components/ui/campaign/location-map/pingSync');
-    const { attachRemoteLaserTrails } =
-      await import('@/components/ui/campaign/location-map/laserSync');
+    const { attachRemotePings, attachPingInput } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
 
     const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
     const vp = {
@@ -1259,14 +1290,18 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       shiftKey: false,
     });
 
-    const { attachRemotePings } =
-      await import('@/components/ui/campaign/location-map/pingSync');
-    const { attachRemoteLaserTrails } =
-      await import('@/components/ui/campaign/location-map/laserSync');
-    const { attachMeasureBroadcast, attachRemoteMeasurements } =
-      await import('@/components/ui/campaign/location-map/measureSync');
-    const { attachFocusBroadcast, attachFocusReceiver } =
-      await import('@/components/ui/campaign/location-map/focusSync');
+    const { attachRemotePings } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
+    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
+      '@/components/ui/campaign/location-map/measureSync'
+    );
+    const { attachFocusBroadcast, attachFocusReceiver } = await import(
+      '@/components/ui/campaign/location-map/focusSync'
+    );
 
     // Ping/laser overlays share this host, mirroring the sibling test above
     // (their draw functions are exercised through a mock 2D context).
@@ -1580,14 +1615,18 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       shiftKey: false,
     });
 
-    const { attachRemotePings } =
-      await import('@/components/ui/campaign/location-map/pingSync');
-    const { attachRemoteLaserTrails } =
-      await import('@/components/ui/campaign/location-map/laserSync');
-    const { attachMeasureBroadcast, attachRemoteMeasurements } =
-      await import('@/components/ui/campaign/location-map/measureSync');
-    const { attachFocusBroadcast, attachFocusReceiver } =
-      await import('@/components/ui/campaign/location-map/focusSync');
+    const { attachRemotePings } = await import(
+      '@/components/ui/campaign/location-map/pingSync'
+    );
+    const { attachRemoteLaserTrails } = await import(
+      '@/components/ui/campaign/location-map/laserSync'
+    );
+    const { attachMeasureBroadcast, attachRemoteMeasurements } = await import(
+      '@/components/ui/campaign/location-map/measureSync'
+    );
+    const { attachFocusBroadcast, attachFocusReceiver } = await import(
+      '@/components/ui/campaign/location-map/focusSync'
+    );
 
     const overlays: ((ctx: CanvasRenderingContext2D) => void)[] = [];
     const vp = {
