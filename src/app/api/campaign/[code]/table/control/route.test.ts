@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   membership: vi.fn(),
   dmAuthority: vi.fn(),
   eval: vi.fn(),
+  get: vi.fn(),
+  hgetall: vi.fn(),
   hybridGuest: vi.fn(() => false),
 }));
 vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
@@ -17,13 +19,17 @@ vi.mock('@/lib/guestSessionSecurity', () => ({
 }));
 vi.mock('@/lib/redis', () => ({
   getRedis: () => ({}),
-  getRawRedis: () => ({ eval: mocks.eval }),
+  getRawRedis: () => ({
+    eval: mocks.eval,
+    get: mocks.get,
+    hgetall: mocks.hgetall,
+  }),
   campaignSharedKey: (code: string, feature: string) =>
     `campaign:${code}:shared:${feature}`,
 }));
 vi.mock('@/lib/relayPoke', () => ({ sendInitiativePoke: vi.fn() }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 const params = { params: Promise.resolve({ code: 'SYNTH03A' }) };
 const initialize = { type: 'initialize', operationId: 'op-1' };
@@ -57,12 +63,44 @@ beforeEach(() => {
       JSON.stringify({ status: 'committed', reason: 'current', current: null })
     );
   mocks.hybridGuest.mockReturnValue(false);
+  mocks.get.mockReset().mockResolvedValue(null);
+  mocks.hgetall.mockReset().mockResolvedValue({});
 });
 afterEach(() => {
   delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
 });
 
 describe('Table control authorization and request boundary', () => {
+  it('returns the authenticated registry needed for idempotent scene registration', async () => {
+    mocks.hgetall.mockResolvedValue({
+      'scene-1': JSON.stringify({
+        v: 1,
+        sceneId: 'scene-1',
+        workspaceInstanceId: 'workspace-1',
+        sourceMapId: 'map-1',
+        registryRevision: 1,
+        deleted: false,
+      }),
+    });
+    const response = await GET(
+      new NextRequest(
+        'http://localhost/api/campaign/SYNTH03A/table/control?dmId=dm-one'
+      ),
+      params
+    );
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      current: null,
+      registry: [
+        {
+          sceneId: 'scene-1',
+          sourceMapId: 'map-1',
+          workspaceInstanceId: 'workspace-1',
+        },
+      ],
+    });
+  });
+
   it('rejects account players even if they claim a DM role', async () => {
     mocks.membership.mockResolvedValue({
       mode: 'account',

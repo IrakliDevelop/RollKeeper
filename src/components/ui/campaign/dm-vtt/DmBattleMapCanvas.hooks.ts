@@ -125,6 +125,7 @@ import type {
   MarkerDetail,
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
+import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -147,6 +148,11 @@ export interface DmBattleMapCanvasProps {
   onExportError: (message: string) => void;
   /** Double-click on a combatant token → open its creature drawer. Absent = tokens not activatable. */
   onOpenCombatant?: (entityId: string) => void;
+  /** Isolated Table scene state. When present no legacy map/source writer is used. */
+  tableSceneAdapter?: TableSceneAdapter;
+  onConnectionReady?: (
+    connection: import('@/lib/battlemapSync').BattleMapConnection | null
+  ) => void;
 }
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
@@ -237,6 +243,8 @@ export function useDmBattleMapCanvas({
   tokenConfigRef,
   onSelectionChange,
   onOpenCombatant,
+  tableSceneAdapter,
+  onConnectionReady,
 }: DmBattleMapCanvasProps): DmBattleMapCanvasState {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   useEffect(() => {
@@ -244,7 +252,9 @@ export function useDmBattleMapCanvas({
   }, [viewport]);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const autoSaveRef = useRef<AutoSave | null>(null);
-  const connectionRef = useRef<{ stop: () => void } | null>(null);
+  const connectionRef = useRef<
+    import('@/lib/battlemapSync').BattleMapConnection | null
+  >(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
@@ -310,11 +320,45 @@ export function useDmBattleMapCanvas({
     awarenessRef.current?.setShowPlayerCursors(enabled);
   }, []);
 
-  const linkedEncounterIdsLive = useCallback(
+  const [, notifyTableScene] = useState(0);
+  useEffect(
     () =>
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-        ?.linkedEncounterIds ?? [],
-    [campaignCode, battleMapId]
+      tableSceneAdapter?.subscribe(() => notifyTableScene(value => value + 1)),
+    [tableSceneAdapter]
+  );
+  const legacyBattleMap = useBattleMapStore(
+    state => state.battleMaps[campaignCode]?.[battleMapId]
+  );
+  const battleMap = tableSceneAdapter?.getBattleMap() ?? legacyBattleMap;
+  const readBattleMap = useCallback(
+    () =>
+      tableSceneAdapter?.getBattleMap() ??
+      useBattleMapStore.getState().getBattleMap(campaignCode, battleMapId),
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const updateBattleMap = useCallback(
+    (updates: Partial<BattleMap>) => {
+      if (tableSceneAdapter) tableSceneAdapter.updateBattleMap(updates);
+      else
+        useBattleMapStore
+          .getState()
+          .updateBattleMap(campaignCode, battleMapId, updates);
+    },
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const setDmOnly = useCallback(
+    (elementId: string, dmOnly: boolean) => {
+      if (tableSceneAdapter) tableSceneAdapter.setDmOnly(elementId, dmOnly);
+      else
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, battleMapId, elementId, dmOnly);
+    },
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const linkedEncounterIdsLive = useCallback(
+    () => readBattleMap()?.linkedEncounterIds ?? [],
+    [readBattleMap]
   );
   const resolveMovement = useCallback(
     (identity: MovableTokenIdentity) =>
@@ -322,24 +366,26 @@ export function useDmBattleMapCanvas({
     [linkedEncounterIdsLive]
   );
 
-  const hiddenElementCount = useBattleMapStore(
+  const legacyHiddenElementCount = useBattleMapStore(
     state =>
       Object.keys(
         state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements ?? {}
       ).length
   );
-  const selectedElementIsDmOnly = useBattleMapStore(state =>
+  const legacySelectedElementIsDmOnly = useBattleMapStore(state =>
     selectedElementId
       ? (state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements[
           selectedElementId
         ] ?? false)
       : false
   );
-  // Same store-object reference each render unless the record actually
-  // changes — safe as a selector return without a custom equality fn.
-  const battleMap = useBattleMapStore(
-    state => state.battleMaps[campaignCode]?.[battleMapId]
-  );
+  const hiddenElementCount = tableSceneAdapter
+    ? Object.keys(battleMap?.dmOnlyElements ?? {}).length
+    : legacyHiddenElementCount;
+  const selectedElementIsDmOnly = tableSceneAdapter
+    ? selectedElementId !== null &&
+      battleMap?.dmOnlyElements[selectedElementId] === true
+    : legacySelectedElementIsDmOnly;
   // ─── Portal target choices ────────────────────────────────────
   // Subscribe to the backing RECORD references (not `getBattleMaps()` /
   // `getLocations()` results — those produce fresh arrays and defeat Zustand's
@@ -407,8 +453,10 @@ export function useDmBattleMapCanvas({
     campaignCode,
     mapId: battleMapId,
     getViewport: getMarkerViewport,
+    productState: tableSceneAdapter?.markerProductState,
   });
   refreshMarkerClaimsRef.current = async () => {
+    if (tableSceneAdapter) return;
     const response = await fetch(
       `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
     );
@@ -594,7 +642,7 @@ export function useDmBattleMapCanvas({
   // Publish the explicit player projection separately, together with the
   // private server-only definitions needed for authoritative loot claims.
   useEffect(() => {
-    if (!viewport || !battleMap) return;
+    if (!viewport || !battleMap || tableSceneAdapter) return;
     const timeout = window.setTimeout(() => {
       const markers = buildPublicMarkerDetails({
         canvasState: viewport.exportJSON() || battleMap.canvasState,
@@ -621,6 +669,7 @@ export function useDmBattleMapCanvas({
     dmId,
     markerWrites.markers,
     viewport,
+    tableSceneAdapter,
   ]);
 
   const handleCloseMarkerPanel = useCallback(() => {
@@ -750,9 +799,7 @@ export function useDmBattleMapCanvas({
       const fogManager = getViewportFogManager(vp);
       installVttGridController(vp);
 
-      const battleMap = useBattleMapStore
-        .getState()
-        .getBattleMap(campaignCode, battleMapId);
+      const battleMap = readBattleMap();
       if (battleMap?.canvasState && battleMap.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(battleMap.canvasState);
@@ -773,12 +820,10 @@ export function useDmBattleMapCanvas({
       // if anything migrated, persist the result once.
       const migrated = migrateCanvasToContract(vp, 'dm');
       if (migrated) {
-        useBattleMapStore
-          .getState()
-          .updateBattleMap(campaignCode, battleMapId, {
-            canvasState: vp.exportJSON(),
-            updatedAt: new Date().toISOString(),
-          });
+        updateBattleMap({
+          canvasState: vp.exportJSON(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
       vp.toolManager.register(new FogTool(fogManager));
@@ -786,30 +831,30 @@ export function useDmBattleMapCanvas({
       // canvas mounts; persisted state never decides the authoring view.
       configureFogView(fogManager, 'dm', false);
 
-      const autoSave = new AutoSave(vp.store, vp.camera, {
-        key: `battlemap-canvas-${battleMapId}`,
-        debounceMs: 1500,
-        layerManager: vp.layerManager,
-        elementRegistry: vp.elementRegistry,
-        pluginStateManager: vp.plugins,
-        changeEmitters: [
-          { onChange: listener => fogManager.on('change', listener) },
-        ],
-      });
-      autoSave.start();
-      autoSaveRef.current = autoSave;
+      if (!tableSceneAdapter) {
+        const autoSave = new AutoSave(vp.store, vp.camera, {
+          key: `battlemap-canvas-${battleMapId}`,
+          debounceMs: 1500,
+          layerManager: vp.layerManager,
+          elementRegistry: vp.elementRegistry,
+          pluginStateManager: vp.plugins,
+          changeEmitters: [
+            { onChange: listener => fogManager.on('change', listener) },
+          ],
+        });
+        autoSave.start();
+        autoSaveRef.current = autoSave;
+      }
 
       // Remote-origin ops (relayed from another client) must not thrash
       // zustand/localStorage on every incoming drag frame (mirrors the
       // DmLocationEditor battlemap-mode save path).
       const saveOnLocalOps = (_data: unknown, meta?: { origin?: string }) => {
         if (meta?.origin !== undefined && meta.origin !== 'local') return;
-        useBattleMapStore
-          .getState()
-          .updateBattleMap(campaignCode, battleMapId, {
-            canvasState: vp.exportJSON(),
-            updatedAt: new Date().toISOString(),
-          });
+        updateBattleMap({
+          canvasState: vp.exportJSON(),
+          updatedAt: new Date().toISOString(),
+        });
       };
       vp.store.on('add', saveOnLocalOps);
       vp.store.on('remove', saveOnLocalOps);
@@ -819,19 +864,15 @@ export function useDmBattleMapCanvas({
       fogPersistenceCleanupRef.current = attachFogPersistence(
         fogManager,
         () => {
-          useBattleMapStore
-            .getState()
-            .updateBattleMap(campaignCode, battleMapId, {
-              canvasState: vp.exportJSON(),
-              updatedAt: new Date().toISOString(),
-            });
+          updateBattleMap({
+            canvasState: vp.exportJSON(),
+            updatedAt: new Date().toISOString(),
+          });
         }
       );
 
       // Reconcile fog bounds after loading canvas state
-      const mapImageSize = useBattleMapStore
-        .getState()
-        .getBattleMap(campaignCode, battleMapId)?.mapImageSize;
+      const mapImageSize = readBattleMap()?.mapImageSize;
       try {
         const fogBounds = resolveMapImageBounds(
           vp.store,
@@ -852,9 +893,7 @@ export function useDmBattleMapCanvas({
         ) {
           return;
         }
-        useBattleMapStore
-          .getState()
-          .setDmOnly(campaignCode, battleMapId, element.id, true);
+        setDmOnly(element.id, true);
       });
 
       // Markers are DM-only by DEFAULT, so unlike the hidden-placement
@@ -928,8 +967,10 @@ export function useDmBattleMapCanvas({
             viewport: vp,
             role: 'dm',
             resolveMovement,
-            logMovement: payload =>
-              logDmMovement(linkedEncounterIdsLive(), payload),
+            logMovement: payload => {
+              if (!tableSceneAdapter)
+                logDmMovement(linkedEncounterIdsLive(), payload);
+            },
           });
         });
       }
@@ -946,19 +987,24 @@ export function useDmBattleMapCanvas({
         laserCleanupRef.current = null;
         connectionRef.current?.stop();
         connectionRef.current = null;
+        onConnectionReady?.(null);
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
-          battleMapId,
+          battleMapId: tableSceneAdapter?.sourceMapId ?? battleMapId,
           store: vp.store,
           clientId: dmId,
-          tokenRequest: { role: 'dm', battleMapId, dmId },
-          seedLocal: true,
+          tokenRequest: {
+            role: 'dm',
+            battleMapId: tableSceneAdapter?.sourceMapId ?? battleMapId,
+            dmId,
+            ...(tableSceneAdapter
+              ? { sceneId: tableSceneAdapter.sceneId }
+              : {}),
+          },
+          seedLocal: !tableSceneAdapter,
           resolveAudience: el =>
-            useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-              ?.dmOnlyElements[el.id]
-              ? DM_AUDIENCE
-              : undefined,
+            readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct
           // calls; the pin subscription above re-pins bands on every change.
@@ -985,6 +1031,7 @@ export function useDmBattleMapCanvas({
           },
         });
         connectionRef.current = connection;
+        onConnectionReady?.(connection);
         // Teach peers and late joiners the custom layers persisted in this
         // canvas (created before layer sync, or on another device). Ledger
         // buffers until the first snapshot if the socket is still connecting.
@@ -1047,10 +1094,7 @@ export function useDmBattleMapCanvas({
                 connection,
                 {
                   role: 'dm',
-                  isDmOnlyElement: id =>
-                    !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
-                      battleMapId
-                    ]?.dmOnlyElements[id],
+                  isDmOnlyElement: id => !!readBattleMap()?.dmOnlyElements[id],
                   getElement: id => vp.store.getById(id) ?? null,
                 }
               );
@@ -1105,6 +1149,7 @@ export function useDmBattleMapCanvas({
           // stopped `connection`; drop the dead reference so unmount and the
           // next re-attach do not stop it twice, then surface the error.
           connectionRef.current = null;
+          onConnectionReady?.(null);
           throw error;
         }
       }
@@ -1120,6 +1165,11 @@ export function useDmBattleMapCanvas({
       onSelectionChange,
       resolveMovement,
       linkedEncounterIdsLive,
+      readBattleMap,
+      setDmOnly,
+      tableSceneAdapter,
+      updateBattleMap,
+      onConnectionReady,
     ]
   );
 
@@ -1138,6 +1188,7 @@ export function useDmBattleMapCanvas({
       // frame may schedule a stale Zustand write while the socket closes.
       fogPersistenceCleanupRef.current?.();
       connectionRef.current?.stop();
+      onConnectionReady?.(null);
       pinUnsubRef.current?.();
       // Disposed here for the same reason as every other store subscription;
       // its absence was an oversight (the location editor already did it).
@@ -1146,7 +1197,7 @@ export function useDmBattleMapCanvas({
       markerRemovalTrackUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
-  }, []);
+  }, [onConnectionReady]);
 
   const handleClearDrawings = useCallback(() => {
     if (!viewport) return;
@@ -1171,18 +1222,13 @@ export function useDmBattleMapCanvas({
 
   const handleRevealAll = useCallback(() => {
     if (!viewport) return;
-    const hiddenIds = Object.keys(
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-        ?.dmOnlyElements ?? {}
-    );
+    const hiddenIds = Object.keys(readBattleMap()?.dmOnlyElements ?? {});
     if (hiddenIds.length === 0) return;
-    useBattleMapStore
-      .getState()
-      .updateBattleMap(campaignCode, battleMapId, { dmOnlyElements: {} });
+    updateBattleMap({ dmOnlyElements: {} });
     for (const id of hiddenIds) {
       if (viewport.store.getById(id)) viewport.store.update(id, {});
     }
-  }, [viewport, campaignCode, battleMapId]);
+  }, [viewport, readBattleMap, updateBattleMap]);
 
   const handleGoToCameraView = useCallback((view: CameraView) => {
     localAnimatorRef.current?.animateTo(view);
@@ -1203,9 +1249,7 @@ export function useDmBattleMapCanvas({
     const outcome = applyMarkerAudienceToggle({
       element: viewport.store.getById(selectedElementId),
       selectedElementId,
-      readDmOnlyElements: () =>
-        useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-          ?.dmOnlyElements ?? {},
+      readDmOnlyElements: () => readBattleMap()?.dmOnlyElements ?? {},
       setMarkerAudienceForRef: markerWrites.setMarkerAudienceForRef,
     });
     if (outcome.handled) {
@@ -1214,13 +1258,23 @@ export function useDmBattleMapCanvas({
     }
 
     setMarkerAudienceNotice(null);
-    useBattleMapStore
-      .getState()
-      .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
+    if (tableSceneAdapter) tableSceneAdapter.toggleDmOnly(selectedElementId);
+    else
+      useBattleMapStore
+        .getState()
+        .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
     if (viewport.store.getById(selectedElementId)) {
       viewport.store.update(selectedElementId, {});
     }
-  }, [viewport, selectedElementId, campaignCode, battleMapId, markerWrites]);
+  }, [
+    viewport,
+    selectedElementId,
+    campaignCode,
+    battleMapId,
+    markerWrites,
+    readBattleMap,
+    tableSceneAdapter,
+  ]);
 
   return {
     viewport,

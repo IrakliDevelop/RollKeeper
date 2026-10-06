@@ -133,6 +133,7 @@ import { attachRemoteMeasurements } from '@/components/ui/campaign/location-map/
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
+import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 
 /** A minimal stand-in for the registered movement `PathTool` — truthy so
  * `getTool<PathTool>('path')` resolves and the hook's movement-commit and
@@ -272,6 +273,95 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     ).not.toThrow();
     expect(animatorAnimateTo).not.toHaveBeenCalled();
     expect(broadcastSend).not.toHaveBeenCalled();
+  });
+
+  it('routes adopted scene load/save/audience through Table and disables legacy seed/source writers', () => {
+    const vp = makeVp();
+    const listeners = new Map<
+      string,
+      Array<(data: unknown, meta?: { origin?: string }) => void>
+    >();
+    vi.mocked(vp.store.on).mockImplementation((event, listener) => {
+      const key = String(event);
+      listeners.set(key, [...(listeners.get(key) ?? []), listener as never]);
+      return vi.fn();
+    });
+    const updateBattleMap = vi.fn();
+    const setDmOnly = vi.fn();
+    const tableMarkers: never[] = [];
+    const tableSceneAdapter: TableSceneAdapter = {
+      sceneId: 'scene-1',
+      sourceMapId: 'map-original',
+      subscribe: vi.fn(() => () => {}),
+      getBattleMap: vi.fn(() => ({
+        id: 'scene-1',
+        campaignCode: 'TEST01',
+        name: 'Adopted',
+        mapImageUrl: '/map.webp',
+        mapImageSize: { w: 100, h: 100 },
+        canvasState: '{"elements":[]}',
+        dmOnlyElements: {},
+        gridEnabled: false,
+        linkedEncounterIds: [],
+        createdAt: '2026-10-05T00:00:00.000Z',
+        updatedAt: '2026-10-05T00:00:00.000Z',
+        markers: [],
+      })),
+      updateBattleMap,
+      setDmOnly,
+      toggleDmOnly: vi.fn(),
+      markerProductState: {
+        subscribe: vi.fn(() => () => {}),
+        getMarkers: () => tableMarkers,
+        setMarkers: vi.fn(),
+        getDmOnlyElements: () => ({}),
+        setDmOnly,
+        setDmOnlyBulk: vi.fn(),
+        isReadable: () => true,
+      },
+      getLocalEditGeneration: () => 0,
+      getPendingConflict: () => null,
+      refreshPendingConflict: vi.fn(async () => false),
+      retryPendingConflict: vi.fn(async () => 'none' as const),
+      discardPendingConflict: vi.fn(),
+      flush: vi.fn(async () => {}),
+      dispose: vi.fn(),
+    };
+    const legacy = useBattleMapStore.getState();
+    const updateLegacy = vi.spyOn(legacy, 'updateBattleMap');
+    const legacyAudience = vi.spyOn(legacy, 'setDmOnly');
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+
+    const { result } = renderHook(() =>
+      useDmBattleMapCanvas({
+        ...baseProps(),
+        battleMapId: 'scene-1',
+        tableSceneAdapter,
+      })
+    );
+    act(() => result.current.handleReady(vp));
+    act(() => {
+      listeners
+        .get('update')
+        ?.forEach(listener => listener({}, { origin: 'local' }));
+    });
+
+    expect(updateBattleMap).toHaveBeenCalledWith(
+      expect.objectContaining({ canvasState: '{}' })
+    );
+    expect(updateLegacy).not.toHaveBeenCalled();
+    expect(legacyAudience).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(createManagedBattleMapConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        seedLocal: false,
+        battleMapId: 'map-original',
+        tokenRequest: expect.objectContaining({
+          battleMapId: 'map-original',
+          sceneId: 'scene-1',
+        }),
+      })
+    );
   });
 
   it('handleGoToCameraView drives the local animator with NO relay URL configured (regression: moving your own camera needs no connection)', () => {
