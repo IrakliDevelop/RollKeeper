@@ -22,6 +22,7 @@ function entry(overrides: Partial<TableRosterEntry>): TableRosterEntry {
     tokenCells: 1,
     walkFeet: null,
     adoptedPc: false,
+    playerIdentity: false,
     statsEditable: true,
     liveStats: {
       name: 'Goblin',

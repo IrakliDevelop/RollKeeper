@@ -694,6 +694,32 @@ describe('roster commands', () => {
     ).toEqual({ kind: 'dm' });
   });
 
+  it('refuses player control for DM-managed creatures and manual PCs', async () => {
+    const repository = await open();
+    await repository.mutateWorkspace(0, 'seed', {
+      scenes: { put: [scene(repository.workspaceIdentity)] },
+    });
+    await run(repository, creature('tavern', 'npc'));
+    await run(
+      repository,
+      creature('tavern', 'manual', 'roster.addManualParticipant')
+    );
+    for (const sceneMemberId of [
+      'creature-member-npc',
+      'creature-member-manual',
+    ]) {
+      await expect(
+        run(repository, {
+          type: 'roster.reassignControl',
+          sceneId: 'tavern',
+          sceneMemberId,
+          control: { kind: 'player', legacyPlayerId: 'legacy-a' },
+          at: AT,
+        })
+      ).resolves.toMatchObject({ status: 'rejected', detail: 'dm-only' });
+    }
+  });
+
   it('tombstones membership only and restores the same member on re-add', async () => {
     const repository = await open();
     await repository.mutateWorkspace(0, 'seed', {

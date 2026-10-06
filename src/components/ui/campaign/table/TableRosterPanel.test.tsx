@@ -65,6 +65,24 @@ function scene(
   };
 }
 
+function partyActor(workspaceKey: string): TableActorRecordV1 {
+  return {
+    schemaVersion: 1,
+    workspaceKey,
+    actorId: 'party-actor',
+    actorKind: 'player-reference',
+    liveStats: null,
+    playerReference: { campaignId: 'CAMP', playerId: 'legacy-a' },
+    cachedPlayerData: { name: 'Aria' },
+    playerConditionOverlay: {
+      suppressedSourceConditionIds: [],
+      dmConditions: [],
+    },
+    createdAt: AT,
+    updatedAt: AT,
+  };
+}
+
 function creature(workspaceKey: string, actorId: string): TableActorRecordV1 {
   return {
     schemaVersion: 1,
@@ -310,6 +328,44 @@ describe('TableRosterPanel', () => {
     });
   });
 
+  it('re-places a member with its existing bound token id without a second binding', async () => {
+    const repository = await repositoryWith(
+      [{ actorId: 'goblin', tokenIds: ['goblin-token'], sceneMemberId: 'm-g' }],
+      key => [creature(key, 'goblin')]
+    );
+    const canvas = fakeCanvas();
+    renderPanel(repository, canvas);
+    const revision = snapshot(repository).campaign?.revision;
+    fireEvent.click(await rowButton('Goblin'));
+    await waitFor(() => expect(canvas.armPlacement).toHaveBeenCalledTimes(1));
+    expect(canvas.armPlacement.mock.calls[0]![0]).toMatchObject({
+      tokenId: 'goblin-token',
+      fields: {
+        tokenKind: 'combatant',
+        entityId: 'm-g',
+        sceneMemberId: 'm-g',
+      },
+    });
+    expect(snapshot(repository).campaign?.revision).toBe(revision);
+  });
+
+  it('disposes canvas and repository subscriptions and aborts the players read on unmount', async () => {
+    const repository = await repositoryWith();
+    const unsubscribe = vi.fn();
+    const canvas = fakeCanvas();
+    canvas.subscribe.mockReturnValue(unsubscribe);
+    const signals: AbortSignal[] = [];
+    vi.mocked(globalThis.fetch).mockImplementation(async (_input, init) => {
+      if (init?.signal) signals.push(init.signal);
+      return new Promise<Response>(() => {});
+    });
+    const { unmount } = renderPanel(repository, canvas);
+    await waitFor(() => expect(signals).toHaveLength(1));
+    unmount();
+    expect(unsubscribe).toHaveBeenCalled();
+    expect(signals[0]!.aborted).toBe(true);
+  });
+
   it('selects a placed member token instead of placing another', async () => {
     const repository = await repositoryWith(
       [{ actorId: 'goblin', tokenIds: ['goblin-token'], sceneMemberId: 'm-g' }],
@@ -351,8 +407,15 @@ describe('TableRosterPanel', () => {
 
   it('gives player control and returns it to the DM, patching bound tokens after each commit', async () => {
     const repository = await repositoryWith(
-      [{ actorId: 'goblin', tokenIds: ['goblin-token'], sceneMemberId: 'm-g' }],
-      key => [creature(key, 'goblin')]
+      [
+        {
+          actorId: 'party-actor',
+          tokenIds: ['goblin-token'],
+          sceneMemberId: 'm-g',
+          control: { kind: 'dm' },
+        },
+      ],
+      key => [partyActor(key)]
     );
     const token = {
       id: 'goblin-token',
@@ -364,7 +427,7 @@ describe('TableRosterPanel', () => {
     const canvas = fakeCanvas([token]);
     renderPanel(repository, canvas);
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Details for Goblin' })
+      await screen.findByRole('button', { name: 'Details for Aria' })
     );
     let dialog = await screen.findByRole('dialog');
     await within(dialog).findByRole('button', {
@@ -386,7 +449,7 @@ describe('TableRosterPanel', () => {
         unset: ['entityId'],
       })
     );
-    expect(canvas.ensurePlayerBand).toHaveBeenCalledWith('legacy-a', 'Goblin');
+    expect(canvas.ensurePlayerBand).toHaveBeenCalledWith('legacy-a', 'Aria');
     dialog = screen.getByRole('dialog');
     fireEvent.click(
       await within(dialog).findByRole('button', {
@@ -398,6 +461,24 @@ describe('TableRosterPanel', () => {
         kind: 'dm',
       })
     );
+  });
+
+  it('keeps DM-managed creatures and manual PCs DM-only (no player control offered)', async () => {
+    const repository = await repositoryWith(
+      [{ actorId: 'goblin', tokenIds: [], sceneMemberId: 'm-g' }],
+      key => [creature(key, 'goblin')]
+    );
+    renderPanel(repository, fakeCanvas());
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Details for Goblin' })
+    );
+    const dialog = await screen.findByRole('dialog');
+    expect(
+      await within(dialog).findByText(/DM-managed participant/)
+    ).toBeInTheDocument();
+    expect(
+      within(dialog).queryByRole('button', { name: /Give .* control/ })
+    ).toBeNull();
   });
 
   it('surfaces a control mismatch and aliases for explicit repair and binding', async () => {

@@ -55,8 +55,10 @@ export function TableMemberDialog(props: {
           <>
             <DialogHeader>
               <DialogTitle>{entry.name}</DialogTitle>
-              <DialogDescription className="flex flex-wrap items-center gap-2">
-                <span>{CATEGORY_LABEL[entry.category]}</span>
+              <DialogDescription>
+                {CATEGORY_LABEL[entry.category]}
+              </DialogDescription>
+              <div>
                 <Badge
                   variant={
                     entry.control.kind === 'unavailable' ? 'warning' : 'neutral'
@@ -65,7 +67,7 @@ export function TableMemberDialog(props: {
                 >
                   {controlLabel(entry)}
                 </Badge>
-              </DialogDescription>
+              </div>
             </DialogHeader>
             <TableRosterNoticeLine notice={props.notice} />
             <DialogBody className="space-y-4">

@@ -2670,6 +2670,115 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
       );
     });
 
+    it('converts an adopted combatant token with Give player control end to end (C6)', async () => {
+      const adopted = token('adopted-pc', {
+        tokenKind: 'combatant',
+        entityId: 'pc-entity',
+        layerId: 'layer-annotations',
+      });
+      await expectCommitted('adopted DM combatant token', () =>
+        asDm(op => upsertOf(op, adopted))
+      );
+      const before = await storedElement('adopted-pc');
+      await expectForbidden('player A before conversion', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...before, position: { x: 1, y: 1 } })
+        )
+      );
+      const converted = { ...before };
+      delete converted.entityId;
+      await expectCommitted('dm gives player A control', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...converted,
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            layerId: ownLayer(PLAYER_A),
+            sceneMemberId: 'member-adopted',
+          })
+        )
+      );
+      const playable = await storedElement('adopted-pc');
+      await expectCommitted('verified player A moves converted token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...playable, position: { x: 90, y: 80 } })
+        )
+      );
+      await expectForbidden('player B moves converted token', () =>
+        asPlayer(PLAYER_B, op =>
+          upsertOf(op, { ...playable, position: { x: 2, y: 2 } })
+        )
+      );
+      await expectForbidden('player A restores the prior combatant state', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, before))
+      );
+    });
+
+    it('keeps an original-map room and its adopted-scene room isolated', async () => {
+      const ADOPTED_ROOM = '923e4567-e89b-42d3-a456-426614174000';
+      const adoptedKeys = authorityRoomKeys(CAMPAIGN, ADOPTED_ROOM);
+      await client.del(Object.values(adoptedKeys));
+      await client.hSet(
+        tableRegistryKey(CAMPAIGN),
+        'scene-x',
+        JSON.stringify({
+          v: 1,
+          sceneId: 'scene-x',
+          roomId: ADOPTED_ROOM,
+          deleted: false,
+        })
+      );
+      await client.set(
+        adoptedKeys.meta,
+        JSON.stringify({
+          v: 1,
+          generation: GENERATION,
+          revision: 0,
+          casToken: 'cas-adopted',
+        })
+      );
+      const adoptedContext = (operationId: string) =>
+        context({
+          room: ADOPTED_ROOM,
+          clientOperationId: operationId,
+          operationDigest: operationDigest(operationId),
+          authContext: {
+            ...(context().authContext ?? {}),
+            sceneId: 'scene-x',
+            room: ADOPTED_ROOM,
+          },
+        });
+      await expectCommitted('original map room edit', () =>
+        asDm(op => upsertOf(op, token('shared-id', { fillColor: '#111111' })))
+      );
+      const driver = new RedisAuthorityDriver(client);
+      await expect(
+        driver.commit(
+          adoptedContext('adopted-edit'),
+          upsertOf('adopted-edit', token('shared-id', { fillColor: '#222222' }))
+        )
+      ).resolves.toMatchObject({ status: 'committed' });
+      expect(
+        JSON.parse((await client.hGet(keys.elements, 'shared-id'))!)
+      ).toMatchObject({ fillColor: '#111111' });
+      expect(
+        JSON.parse((await client.hGet(adoptedKeys.elements, 'shared-id'))!)
+      ).toMatchObject({ fillColor: '#222222' });
+      const crossRoom = context({
+        room: ADOPTED_ROOM,
+        clientOperationId: 'cross-room',
+        operationDigest: operationDigest('cross-room'),
+      });
+      await expect(
+        driver.commit(
+          crossRoom,
+          upsertOf('cross-room', token('shared-id', { fillColor: '#333333' }))
+        )
+      ).resolves.toEqual({ status: 'rejected', reason: 'forbidden' });
+      await client.del(Object.values(adoptedKeys));
+      await client.hDel(tableRegistryKey(CAMPAIGN), 'scene-x');
+    });
+
     it('accepts only the canonical own player-band layer from players', async () => {
       await expectCommitted('dm publishes player A band', () =>
         asDm(op => layerOf(op, canonicalLayer(PLAYER_A), 1, 'dm-a'))

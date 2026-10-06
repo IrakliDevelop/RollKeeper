@@ -85,7 +85,6 @@ export function RosterTray({
         <span className="text-heading flex items-center gap-1.5 text-sm font-semibold">
           <AppIcon name="party" className="h-4 w-4" /> Roster
         </span>
-        {headerActions}
         <Button
           variant="ghost"
           size="lg"
@@ -95,6 +94,11 @@ export function RosterTray({
           ▸
         </Button>
       </div>
+      {headerActions && (
+        <div className="border-divider flex shrink-0 flex-wrap gap-2 border-b px-2 py-2">
+          {headerActions}
+        </div>
+      )}
       <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
         {entities.length === 0 && emptyMessage ? (
           <p className="text-muted px-1 py-2 text-xs">{emptyMessage}</p>

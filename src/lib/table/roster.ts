@@ -153,6 +153,8 @@ export interface TableRosterEntry {
   walkFeet: number | null;
   /** PR01-adopted encounter PC: DM-managed copy, read-only stats (R8). */
   adoptedPc: boolean;
+  /** Party member or adopted PC: the only members a player may control. */
+  playerIdentity: boolean;
   statsEditable: boolean;
   liveStats: TableActorLiveStatsV1 | null;
   control: TableRosterControlStatus;
@@ -384,6 +386,8 @@ export function deriveSceneRoster(options: {
       tokenCells: actor?.profile?.tokenCells ?? 1,
       walkFeet: actor?.profile?.walkFeet ?? null,
       adoptedPc: adoptedPc !== null,
+      playerIdentity:
+        actor?.actorKind === 'player-reference' || adoptedPc !== null,
       statsEditable: actor?.actorKind === 'dm-managed' && adoptedPc === null,
       liveStats: actor?.liveStats ?? null,
       control,
@@ -805,6 +809,16 @@ export function planRosterCommand(
       const member = members[memberIndex];
       if (!member || member.removedAt !== undefined)
         return rejected('invalid-reference', 'member-missing');
+      const actor = snapshot.actors.find(
+        value => value.actorId === member.actorId
+      );
+      // Creatures and manual PCs have no player identity: DM-only (R8/R9).
+      if (
+        command.control.kind === 'player' &&
+        actor?.actorKind !== 'player-reference' &&
+        !(actor && adoptedPcIdentity(snapshot, actor, scene.sceneId))
+      )
+        return rejected('invalid-command', 'dm-only');
       const control =
         command.control.kind === 'dm'
           ? ({ kind: 'dm' } as const)

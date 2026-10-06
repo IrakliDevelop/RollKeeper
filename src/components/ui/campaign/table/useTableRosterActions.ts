@@ -34,6 +34,7 @@ const REJECTIONS: Record<string, string> = {
     'Player control is unavailable for that identity. It stays with the DM.',
   'read-only': 'This character’s stats are read-only here.',
   'member-missing': 'That member is no longer in this scene.',
+  'dm-only': 'This participant is DM-managed; players cannot control it.',
 };
 
 function failureMessage(result: TableRosterResult): string {

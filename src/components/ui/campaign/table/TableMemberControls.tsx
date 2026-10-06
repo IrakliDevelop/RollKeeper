@@ -48,6 +48,10 @@ export function TableMemberControls({
           >
             Return to DM control
           </Button>
+        ) : !entry.playerIdentity ? (
+          <p className="text-muted text-xs">
+            DM-managed participant — players cannot control it.
+          </p>
         ) : players.status === 'ready' ? (
           <div className="flex flex-wrap gap-2">
             {players.players.map(player => (

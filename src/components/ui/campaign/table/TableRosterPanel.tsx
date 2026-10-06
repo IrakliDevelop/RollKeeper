@@ -93,7 +93,12 @@ export function TableRosterPanel(props: {
         hasLinkedEncounter
         emptyMessage="Add party members, creatures or manual PCs to this scene."
         headerActions={
-          <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+          <Button
+            variant="outline"
+            size="sm"
+            fullWidth
+            onClick={() => setAdding(true)}
+          >
             Add to scene
           </Button>
         }
