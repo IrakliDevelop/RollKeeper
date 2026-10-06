@@ -9,6 +9,7 @@ import {
   sceneCheckpointToViewportState,
   validateSceneAuthorityCheckpoint,
 } from './checkpoint';
+import { canvasStateToAuthorityState } from './authorityLifecycle';
 import type { TableSceneRecordV1 } from './schema';
 
 const selection: TableWorkspaceSelection = {
@@ -290,5 +291,82 @@ describe('scene checkpoint persistence', () => {
       expectedGeneration: 'current',
       expectedCasToken: 'current-cas',
     });
+  });
+});
+
+describe('PR02 checkpoint provenance and roster durability', () => {
+  it('keeps ownerId and token control fields through checkpoint, reload and provisioning state', async () => {
+    const factory = new IDBFactory();
+    const repository = new TableRepository({ factory, selection });
+    repositories.push(repository);
+    await repository.start();
+    const base = scene(repository.workspaceIdentity);
+    base.members = [
+      {
+        actorId: 'party-actor',
+        tokenIds: ['party-token'],
+        sceneMemberId: 'member-1',
+        control: { kind: 'player', legacyPlayerId: 'legacy-a' },
+      },
+    ];
+    await repository.mutateWorkspace(0, 'seed', {
+      scenes: { put: [base] },
+      actors: {
+        put: [
+          {
+            schemaVersion: 1,
+            workspaceKey: repository.workspaceIdentity,
+            actorId: 'party-actor',
+            actorKind: 'player-reference',
+            liveStats: null,
+            playerReference: { campaignId: 'CAMP', playerId: 'legacy-a' },
+            cachedPlayerData: null,
+            playerConditionOverlay: {
+              suppressedSourceConditionIds: [],
+              dmConditions: [],
+            },
+            createdAt: '2026-10-05T00:00:00.000Z',
+            updatedAt: '2026-10-05T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+    const party = {
+      id: 'party-token',
+      type: 'shape',
+      tokenKind: 'player',
+      characterId: 'legacy-a',
+      layerId: 'player-legacy-a',
+      sceneMemberId: 'member-1',
+      ownerId: 'dm-a',
+    };
+    const withProvenance = { ...checkpoint, elements: [party] };
+    const result = await saveSceneCheckpoint({
+      repository,
+      connection: connection({
+        requestCheckpoint: vi.fn(async () => ({
+          status: 'complete' as const,
+          checkpoint: withProvenance,
+          barrier,
+        })) as unknown as NonNullable<BattleMapConnection['requestCheckpoint']>,
+      }),
+      sceneId: 'scene-1',
+      expectedRevision: 1,
+      operationId: 'checkpoint-provenance',
+    });
+    expect(result).toMatchObject({ status: 'committed' });
+
+    const reopened = new TableRepository({ factory, selection });
+    repositories.push(reopened);
+    const loaded = await reopened.start();
+    if (loaded.status !== 'ready') throw new Error('expected ready');
+    const stored = loaded.snapshot.scenes[0]!;
+    expect(stored.members[0]).toMatchObject({
+      sceneMemberId: 'member-1',
+      tokenIds: ['party-token'],
+    });
+    const viewport = sceneCheckpointToViewportState(stored.canvasCheckpoint!);
+    const authority = canvasStateToAuthorityState(viewport, 'dm-a');
+    expect(authority.elements).toEqual([party]);
   });
 });

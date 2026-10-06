@@ -8,6 +8,7 @@ import {
   serializedByteCount,
   validateActorRecord,
   validateRuntimeCommand,
+  validateSceneRecord,
   validateWorkspaceLimits,
   type TableActorRecordV1,
   type TableRuntimeCommandV1,
@@ -246,5 +247,156 @@ describe('table schema', () => {
     expect(Object.isFrozen(frozen.nested)).toBe(true);
     expect(Object.isFrozen(frozen.nested.values)).toBe(true);
     expect(() => frozen.nested.values.push(4)).toThrow();
+  });
+});
+
+describe('PR02 additive roster schema', () => {
+  const workspaceKey = actor().workspaceKey;
+  const scene = (members: unknown[]) => ({
+    schemaVersion: 1,
+    workspaceKey,
+    sceneId: 'scene-1',
+    originalMapId: null,
+    map: {
+      name: 'Tavern',
+      mapImageUrl: '/tavern.webp',
+      mapImageSize: { w: 10, h: 10 },
+      gridEnabled: false,
+      gridSettings: null,
+      markers: [],
+      dmOnlyElements: {},
+    },
+    canvasCheckpoint: null,
+    members,
+    arrivalPoint: null,
+    createdAt: '2026-10-05T00:00:00.000Z',
+    updatedAt: '2026-10-05T00:00:00.000Z',
+  });
+
+  it('keeps PR01 members and actors valid without any new field', () => {
+    expect(
+      validateSceneRecord(scene([{ actorId: 'a', tokenIds: [] }]))
+    ).toEqual({ ok: true });
+    expect(validateActorRecord(actor())).toEqual({ ok: true });
+  });
+
+  it('accepts the optional member identity, control and tombstone fields', () => {
+    expect(
+      validateSceneRecord(
+        scene([
+          {
+            actorId: 'a',
+            tokenIds: ['token-a'],
+            sceneMemberId: 'member-a',
+            control: {
+              kind: 'player',
+              legacyPlayerId: 'legacy-a',
+              characterId: 'character-a',
+            },
+          },
+          {
+            actorId: 'b',
+            tokenIds: [],
+            sceneMemberId: 'member-b',
+            control: { kind: 'dm' },
+            removedAt: '2026-10-06T00:00:00.000Z',
+          },
+          { actorId: 'c', tokenIds: [], sceneMemberId: 'member-c' },
+        ])
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it.each([
+    [
+      'duplicate sceneMemberId',
+      [
+        { actorId: 'a', tokenIds: [], sceneMemberId: 'm' },
+        { actorId: 'b', tokenIds: [], sceneMemberId: 'm' },
+      ],
+    ],
+    [
+      'duplicate actor in one scene',
+      [
+        { actorId: 'a', tokenIds: [] },
+        { actorId: 'a', tokenIds: [] },
+      ],
+    ],
+    [
+      'token bound to two members',
+      [
+        { actorId: 'a', tokenIds: ['t'] },
+        { actorId: 'b', tokenIds: ['t'] },
+      ],
+    ],
+    ['token repeated in one member', [{ actorId: 'a', tokenIds: ['t', 't'] }]],
+    [
+      'unknown control kind',
+      [{ actorId: 'a', tokenIds: [], control: { kind: 'owner' } }],
+    ],
+    [
+      'player control without legacy id',
+      [{ actorId: 'a', tokenIds: [], control: { kind: 'player' } }],
+    ],
+    [
+      'extra control key',
+      [
+        {
+          actorId: 'a',
+          tokenIds: [],
+          control: { kind: 'dm', legacyPlayerId: 'x' },
+        },
+      ],
+    ],
+    [
+      'invalid tombstone',
+      [{ actorId: 'a', tokenIds: [], removedAt: 'not-a-date' }],
+    ],
+    ['unknown member key', [{ actorId: 'a', tokenIds: [], owner: 'x' }]],
+  ])('rejects %s', (_label, members) => {
+    expect(validateSceneRecord(scene(members))).toMatchObject({ ok: false });
+  });
+
+  it('accepts a verified player mapping and a DM-managed profile on actors', () => {
+    const reference: TableActorRecordV1 = {
+      ...actor('party-a'),
+      actorKind: 'player-reference',
+      liveStats: null,
+      playerReference: {
+        campaignId: 'CAMP',
+        playerId: 'legacy-a',
+        legacyPlayerId: 'legacy-a',
+        characterId: 'character-a',
+      },
+      playerConditionOverlay: {
+        suppressedSourceConditionIds: [],
+        dmConditions: [],
+      },
+    };
+    expect(validateActorRecord(reference)).toEqual({ ok: true });
+    expect(
+      validateActorRecord({
+        ...actor('npc-a'),
+        profile: {
+          category: 'monster',
+          sourceKind: 'bestiary',
+          sourceId: 'goblin',
+          avatarUrl: '/api/bestiary/token/goblin',
+          tokenCells: 2,
+          walkFeet: 30,
+        },
+      })
+    ).toEqual({ ok: true });
+    for (const invalid of [
+      { ...actor(), profile: { category: 'dragon' } },
+      { ...actor(), profile: { category: 'npc', tokenCells: 0 } },
+      { ...actor(), profile: { category: 'npc', extra: true } },
+      {
+        ...reference,
+        playerReference: { ...reference.playerReference, extra: 'x' },
+      },
+    ]) {
+      expect(validateActorRecord(invalid)).toMatchObject({ ok: false });
+    }
   });
 });
