@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Weapon, WeaponCharge } from '@/types/character';
 import { RollSummary } from '@/types/dice';
+import { appendModifier, d20Notation } from '@/utils/sheetRoll';
 import {
   isWeaponProficient,
   getWeaponAttackString,
@@ -104,9 +105,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
     // Animate d20 attack roll and use actual result
     if (animateRoll) {
       try {
-        const rollResult = await animateRoll(
-          `1d20${attackBonus > 0 ? `+${attackBonus}` : attackBonus}`
-        );
+        const rollResult = await animateRoll(d20Notation(attackBonus));
         if (
           rollResult &&
           typeof rollResult === 'object' &&
@@ -164,10 +163,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         // Animate damage dice and use actual result
         if (animateRoll) {
           try {
-            const notationWithBonus =
-              weaponBonus !== 0
-                ? `${dice}${weaponBonus > 0 ? `+${weaponBonus}` : `${weaponBonus}`}`
-                : dice;
+            const notationWithBonus = appendModifier(dice, weaponBonus);
             const rollResult = await animateRoll(notationWithBonus);
             if (
               rollResult &&
@@ -218,10 +214,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         // Animate damage dice and use actual result
         if (animateRoll) {
           try {
-            const notationWithBonus =
-              damageBonus !== 0
-                ? `${dice}${damageBonus > 0 ? `+${damageBonus}` : `${damageBonus}`}`
-                : dice;
+            const notationWithBonus = appendModifier(dice, damageBonus);
             const rollResult = await animateRoll(notationWithBonus);
             if (
               rollResult &&

@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useDiceRoller, UseDiceRollerOptions } from '@/hooks/useDiceRoller';
 import { DiceResultDisplay } from './DiceResultDisplay';
+import { DiceSetEditor } from './DiceSetEditor';
 import { RollSummary } from '@/types/dice';
 import { AppIcon } from '@/components/ui/icons';
+import { DEFAULT_DICE_SET } from '@/utils/diceSet';
 
 export interface DiceRollerProps
   extends Omit<UseDiceRollerOptions, 'containerId'> {
@@ -20,6 +22,8 @@ export interface DiceRollerProps
   }>;
   className?: string;
   onRollResult?: (summary: RollSummary) => void;
+  /** Shows the dice-set editor and uses it for rolls from this tray. */
+  showDiceSet?: boolean;
 }
 
 export function DiceRoller({
@@ -42,10 +46,12 @@ export function DiceRoller({
   ],
   className = '',
   onRollResult,
+  showDiceSet = false,
   ...diceOptions
 }: DiceRollerProps) {
   const [customNotation, setCustomNotation] = useState('');
   const [logs, setLogs] = useState<string[]>([]);
+  const [diceSet, setDiceSet] = useState(DEFAULT_DICE_SET);
 
   const addLog = (message: string) => {
     setLogs(prev => [
@@ -75,6 +81,7 @@ export function DiceRoller({
     onError: addLog,
     onLog: addLog,
     ...diceOptions,
+    ...(showDiceSet ? { skin: diceSet.skin, dieScale: diceSet.dieScale } : {}),
   });
 
   const handleCustomRoll = () => {
@@ -103,6 +110,16 @@ export function DiceRoller({
           position: 'fixed',
         }}
       />
+      {showDiceSet && (
+        <DiceSetEditor
+          value={diceSet}
+          onChange={setDiceSet}
+          onPreview={() => {
+            void roll('1d20+1d8+1d6');
+          }}
+        />
+      )}
+
       <style jsx global>{`
         #${containerId} {
           position: fixed;

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { d20Notation, rollD20 } from '@/utils/sheetRoll';
+import { appendModifier, d20Notation, rollD20 } from '@/utils/sheetRoll';
 import type { RollSummary } from '@/types/dice';
 
 describe('d20Notation', () => {
@@ -8,6 +8,16 @@ describe('d20Notation', () => {
     expect(d20Notation(-1)).toBe('1d20-1');
     // Regression: the old inline code produced "1d200" for a +0 modifier.
     expect(d20Notation(0)).toBe('1d20');
+    expect(d20Notation(-0)).toBe('1d20');
+  });
+});
+
+describe('appendModifier', () => {
+  it('does not glue a zero modifier onto the die size', () => {
+    expect(appendModifier('1d20', 0)).toBe('1d20');
+    expect(appendModifier('1d8', 0)).toBe('1d8');
+    expect(appendModifier('2d6', 3)).toBe('2d6+3');
+    expect(appendModifier('1d10', -2)).toBe('1d10-2');
   });
 });
 

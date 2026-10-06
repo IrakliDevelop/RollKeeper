@@ -13,9 +13,14 @@ export interface D20RollDeps {
   random?: () => number;
 }
 
+/** Appends a modifier without gluing a 0 onto the die size (`1d20` + 0 → `1d200`). */
+export function appendModifier(notation: string, modifier: number): string {
+  if (!Number.isFinite(modifier) || modifier === 0) return notation;
+  return modifier > 0 ? `${notation}+${modifier}` : `${notation}${modifier}`;
+}
+
 export function d20Notation(modifier: number): string {
-  if (modifier === 0) return '1d20';
-  return modifier > 0 ? `1d20+${modifier}` : `1d20${modifier}`;
+  return appendModifier('1d20', modifier);
 }
 
 /** Rolls 1d20 + modifier with the 3D dice when available, else Math.random. */

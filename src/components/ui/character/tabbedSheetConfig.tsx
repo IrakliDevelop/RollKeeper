@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
+import { DEFAULT_DICE_SET, parseDiceSet } from '@/utils/diceSet';
 import { PlayerCalendarView } from '@/components/ui/calendar/PlayerCalendarView';
 import PlayerLocationView from '@/components/ui/campaign/location-map/PlayerLocationView';
 import ConditionsDiseasesManager from '@/components/ui/game/ConditionsDiseasesManager';
@@ -12,6 +13,7 @@ import DefensesAndSenses from '@/components/ui/game/DefensesAndSenses';
 import CharacterBackgroundEditor from '@/components/ui/character/CharacterBackgroundEditor';
 import FeaturesTraitsManager from '@/components/ui/game/FeaturesTraitsManager';
 import NotesManager from '@/components/ui/game/NotesManager';
+import { DiceSetEditor } from '@/components/ui/game/DiceSetEditor';
 import InventoryManager from '@/components/ui/game/InventoryManager';
 import CurrencyManager from '@/components/ui/game/CurrencyManager';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
@@ -796,6 +798,11 @@ const CHARACTER_SUB_TABS = [
     label: 'Features & Background',
     icon: <AppIcon name="character" className="h-4 w-4" />,
   },
+  {
+    id: 'dice',
+    label: 'Dice',
+    icon: <AppIcon name="dice" className="h-4 w-4" />,
+  },
 ] as const;
 
 type CharacterSubTab = (typeof CHARACTER_SUB_TABS)[number]['id'];
@@ -921,6 +928,20 @@ function CharacterTabContent({
             />
           </ErrorBoundary>
         </div>
+      )}
+
+      {activeSubTab === 'dice' && (
+        <DiceSetEditor
+          value={parseDiceSet(character.diceSet) ?? DEFAULT_DICE_SET}
+          onChange={diceSet => params.updateCharacter({ diceSet })}
+          onPreview={
+            params.animateRoll
+              ? () => {
+                  void params.animateRoll?.('1d20+1d8+1d6');
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );
