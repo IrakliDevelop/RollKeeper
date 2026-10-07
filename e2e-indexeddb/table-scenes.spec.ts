@@ -696,7 +696,11 @@ test('encounter-free scene roster persists party and manual PC members across re
   await page.getByRole('button', { name: 'Add to scene' }).click();
   await dialog.getByRole('tab', { name: 'Party' }).click();
   await dialog.getByRole('button', { name: /Aria/ }).click();
-  await expect(page.getByRole('status')).toContainText('already in this scene');
+  // The page now has several live regions (control, publication): target the
+  // roster notice itself.
+  await expect(
+    page.getByRole('status').filter({ hasText: 'already in this scene' })
+  ).toBeVisible();
   const after = await readMembers();
   expect(after.members).toEqual(before.members);
   expect(after.actors).toHaveLength(2);

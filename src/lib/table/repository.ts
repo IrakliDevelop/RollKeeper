@@ -544,6 +544,55 @@ function parseRawWorkspace(
   return immutableResult({ status: 'ready' as const, snapshot });
 }
 
+/**
+ * Operation retention shared by every write path: oldest committed revision
+ * first, ties broken by operation id, keeping at most `max` records.
+ */
+export function retainOperations(
+  operations: readonly TableOperationRecordV1[],
+  max: number = TABLE_LIMITS.maxOperations
+): { kept: TableOperationRecordV1[]; evicted: TableOperationRecordV1[] } {
+  const ordered = [...operations].sort((left, right) =>
+    left.committedRevision === right.committedRevision
+      ? left.operationId.localeCompare(right.operationId)
+      : left.committedRevision - right.committedRevision
+  );
+  const evicted = ordered.splice(0, Math.max(0, ordered.length - max));
+  return { kept: ordered, evicted };
+}
+
+/**
+ * Candidate-wide run pointer checks (D2, R2-8). They validate the state a
+ * mutation would commit; an inconsistent candidate is refused, never
+ * repaired. Adoption's legacy `isActive` with a null pointer stays valid:
+ * only `activeRunId ⇒ that run is active` is enforced.
+ */
+function runReferenceViolation(
+  campaign: TableCampaignRecordV1,
+  encounters: ReadonlyMap<string, TableEncounterRecordV1>,
+  tombstones: ReadonlyMap<string, TableTombstoneRecordV1>
+): string | null {
+  const live = (runId: string) =>
+    encounters.has(runId) && !tombstones.has(`encounter:${runId}`);
+  if (campaign.activeRunId !== null) {
+    if (!live(campaign.activeRunId)) return 'active-run-missing';
+    if (!encounters.get(campaign.activeRunId)!.isActive)
+      return 'active-run-inactive';
+  }
+  if (campaign.selectedRunId !== null && !live(campaign.selectedRunId))
+    return 'selected-run-missing';
+  for (const run of encounters.values()) {
+    if (
+      run.currentActorId !== null &&
+      !run.participants.some(
+        participant => participant.actorId === run.currentActorId
+      )
+    )
+      return 'current-actor-not-participant';
+  }
+  return null;
+}
+
 export class TableRepository {
   private selection: TableWorkspaceSelection;
   private workspaceKey: string;
@@ -882,14 +931,8 @@ export class TableRepository {
         result,
         createdAt: this.now(),
       };
-      const operations = (byStore.operations as TableOperationRecordV1[])
-        .concat(operation)
-        .sort(
-          (left, right) => left.committedRevision - right.committedRevision
-        );
-      const evicted = operations.splice(
-        0,
-        Math.max(0, operations.length - TABLE_LIMITS.maxOperations)
+      const { kept: operations, evicted } = retainOperations(
+        (byStore.operations as TableOperationRecordV1[]).concat(operation)
       );
       const candidate: TableWorkspaceSnapshotV1 = {
         workspaceKey,
@@ -915,13 +958,22 @@ export class TableRepository {
         candidate.scenes.every(item =>
           item.members.every(member => records.actors.has(member.actorId))
         );
-      if (!limits.ok || !referencesValid) {
+      const runViolation = runReferenceViolation(
+        campaign,
+        records.encounters,
+        records.tombstones
+      );
+      if (!limits.ok || !referencesValid || runViolation) {
         transaction.abort();
         await completed.catch(() => undefined);
         return immutableResult({
           status: 'rejected',
           reason: !limits.ok ? 'limit-exceeded' : 'invalid-reference',
-          ...(!limits.ok ? { detail: limits.reason } : {}),
+          ...(!limits.ok
+            ? { detail: limits.reason }
+            : runViolation
+              ? { detail: runViolation }
+              : {}),
         });
       }
 
@@ -1300,18 +1352,11 @@ export class TableRepository {
         result,
         createdAt: this.now(),
       };
-      const operations = storedOperations
-        .filter(value => belongsToWorkspace(value, workspaceKey))
-        .map(value => value as TableOperationRecordV1)
-        .concat(operation)
-        .sort((left, right) =>
-          left.committedRevision === right.committedRevision
-            ? left.operationId.localeCompare(right.operationId)
-            : left.committedRevision - right.committedRevision
-        );
-      const evicted = operations.splice(
-        0,
-        Math.max(0, operations.length - TABLE_LIMITS.maxOperations)
+      const { kept: operations, evicted } = retainOperations(
+        storedOperations
+          .filter(value => belongsToWorkspace(value, workspaceKey))
+          .map(value => value as TableOperationRecordV1)
+          .concat(operation)
       );
       const candidate: TableWorkspaceSnapshotV1 = {
         workspaceKey,

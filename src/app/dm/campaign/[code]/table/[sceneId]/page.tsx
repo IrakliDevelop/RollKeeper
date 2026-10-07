@@ -13,18 +13,16 @@ import {
   type PendingTokenPlacement,
 } from '@/components/ui/campaign/dm-vtt/TokenPlacementController';
 import { Button } from '@/components/ui/forms/button';
+import { TableAuthorityStatus } from '@/components/ui/campaign/table/TableAuthorityStatus';
+import { TableCombatPanel } from '@/components/ui/campaign/table/combat/TableCombatPanel';
 import { TableRosterPanel } from '@/components/ui/campaign/table/TableRosterPanel';
 import { createTableRosterCanvas } from '@/components/ui/campaign/table/tableRosterCanvas';
 import { useAuthenticatedTableWorkspace } from '@/components/ui/campaign/table/useAuthenticatedTableWorkspace';
+import { useTableSceneAuthority } from '@/components/ui/campaign/table/useTableSceneAuthority';
 import type { BattleMapConnection } from '@/lib/battlemapSync';
-import {
-  prepareTableSceneAuthority,
-  getTableAuthoritySessionId,
-} from '@/lib/table/authorityLifecycle';
 import {
   restoreAuthorityFork,
   saveSceneCheckpoint,
-  sceneCheckpointToViewportState,
 } from '@/lib/table/checkpoint';
 import {
   createTableSceneAdapter,
@@ -39,6 +37,7 @@ export default function TableScenePage() {
   const campaignCode = params.code as string;
   const sceneId = params.sceneId as string;
   const selectedWorkspaceId = searchParams.get('tableWorkspace');
+  const requestedRunId = searchParams.get('run');
   const battleMapsHref = `/dm/campaign/${campaignCode}/battlemaps${selectedWorkspaceId ? `?tableWorkspace=${encodeURIComponent(selectedWorkspaceId)}` : ''}`;
   const dmId = useDmStore(state => state.dmId);
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
@@ -65,10 +64,6 @@ export default function TableScenePage() {
   );
   const [relayStatus, setRelayStatus] = useState('connecting');
   const [saveMessage, setSaveMessage] = useState('Local scene loading…');
-  const [authorityStatus, setAuthorityStatus] = useState<
-    'idle' | 'initializing' | 'ready' | 'failed' | 'offline'
-  >('idle');
-  const [authorityAttempt, setAuthorityAttempt] = useState(0);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [, refresh] = useState(0);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -92,13 +87,7 @@ export default function TableScenePage() {
   useEffect(() => {
     setAdapter(null);
     setConnection(null);
-    if (!repository) {
-      setAuthorityStatus('idle');
-      return;
-    }
-    // Gate canvas mounting until registration/private authority init has
-    // completed; otherwise its token request can race private preparation.
-    setAuthorityStatus('initializing');
+    if (!repository) return;
     const activeAdapter = createTableSceneAdapter({
       repository,
       sceneId,
@@ -127,61 +116,46 @@ export default function TableScenePage() {
         )
       : undefined;
 
-  useEffect(() => {
-    if (!repository || !adapter) return;
-    const current = repository.getCurrent();
-    if (current?.status !== 'ready') return;
-    const authorityScene = current.snapshot.scenes.find(
-      value => value.sceneId === sceneId
+  // Live control (D8/R2-3): the first outcome gates canvas mounting (its
+  // token request must not race private preparation, C3-7); afterwards the
+  // canvas and combat stay mounted regardless of control.
+  const authority = useTableSceneAuthority({
+    repository,
+    adapter,
+    campaignCode,
+    dmId,
+    sceneId,
+  });
+  // After an explicit acquire the canvas reconnects through a fresh mount
+  // (re-mints its token) when it is not live.
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const relayLive = relayStatus === 'live';
+  // F5: "Public initiative cleared" shows after an explicit acquire until
+  // the panel reports a publication outcome for THAT acquire.
+  const [publication, setPublication] = useState<{
+    epoch: number;
+    kind: string;
+  } | null>(null);
+  const explicitRef = useRef(authority.explicitAcquired);
+  explicitRef.current = authority.explicitAcquired;
+  const handlePublicationStatus = useCallback(
+    (status: { kind: string }) =>
+      setPublication({ epoch: explicitRef.current, kind: status.kind }),
+    []
+  );
+  const clearedNotice =
+    authority.explicitAcquired > 0 &&
+    !(
+      publication?.epoch === authority.explicitAcquired &&
+      (publication.kind === 'broadcasting' ||
+        publication.kind === 'saved-locally')
     );
-    if (!authorityScene) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    setAuthorityStatus('initializing');
-    setSaveMessage('Registering scene and preparing private authority…');
-    const canvasState = authorityScene.canvasCheckpoint
-      ? sceneCheckpointToViewportState(authorityScene.canvasCheckpoint)
-      : {};
-    void prepareTableSceneAuthority({
-      campaignCode,
-      dmId,
-      sceneId,
-      sourceMapId: authorityScene.originalMapId ?? sceneId,
-      workspaceInstanceId:
-        repository.workspaceSelection.workspace.localWorkspaceId,
-      contentRevision: current.snapshot.campaign?.revision ?? 0,
-      safeLabel: authorityScene.map.name,
-      canvasState,
-      holderSessionId: getTableAuthoritySessionId(),
-    }).then(session => {
-      if (cancelled) return;
-      if (session.status === 'failed') {
-        setAuthorityStatus('failed');
-        setSaveMessage(
-          `Private authority preparation failed (${session.reason}). No checkpoint was changed and public presentation is unchanged.`
-        );
-        return;
-      }
-      setAuthorityStatus('ready');
-      setSaveMessage(
-        'Private authority ready. Public presentation is unchanged; local drafts remain separate.'
-      );
-      timer = setInterval(() => {
-        void session.renew().then(ok => {
-          if (!ok && !cancelled) {
-            setAuthorityStatus('failed');
-            setSaveMessage(
-              'Live control was lost. The local draft remains saved on this device.'
-            );
-          }
-        });
-      }, 20_000);
-    });
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [adapter, authorityAttempt, campaignCode, dmId, repository, sceneId]);
+  const lastExplicit = useRef(0);
+  useEffect(() => {
+    if (authority.explicitAcquired === lastExplicit.current) return;
+    lastExplicit.current = authority.explicitAcquired;
+    if (!relayLive) setCanvasEpoch(value => value + 1);
+  }, [authority.explicitAcquired, relayLive]);
 
   const handleConnectionReady = useCallback(
     (next: BattleMapConnection | null) => setConnection(next),
@@ -293,163 +267,173 @@ export default function TableScenePage() {
     );
   }
 
-  if (authorityStatus === 'initializing') {
+  if (!authority.firstOutcome) {
     return (
       <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-        <p className="text-heading text-lg font-semibold">{saveMessage}</p>
-      </main>
-    );
-  }
-
-  if (authorityStatus === 'failed') {
-    return (
-      <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-        <p className="text-accent-red-text max-w-xl text-center" role="alert">
-          {saveMessage}
+        <p className="text-heading text-lg font-semibold">
+          Registering scene and preparing private authority…
         </p>
-        <div className="flex gap-2">
-          <Button
-            variant="primary"
-            onClick={() => setAuthorityAttempt(value => value + 1)}
-          >
-            Retry private setup
-          </Button>
-          <Button variant="ghost" onClick={() => setAuthorityStatus('offline')}>
-            Work offline
-          </Button>
-        </div>
       </main>
     );
   }
 
   return (
-    <DmBattleMapCanvas
-      campaignCode={campaignCode}
-      battleMapId={sceneId}
-      dmId={dmId}
-      tableSceneAdapter={adapter}
-      onConnectionReady={handleConnectionReady}
-      onStatus={setRelayStatus}
-      tokenConfigRef={tokenConfigRef}
-      onViewportReady={setViewport}
-      tokenInfoToggle={{ mode: null, onCycle: () => {} }}
-      onExportError={message => setSaveMessage(message)}
-      sessionControls={
-        <div className="border-divider bg-surface-secondary pointer-events-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-lg border p-3 shadow-lg">
-          <Link href={battleMapsHref}>
-            <Button variant="ghost" size="sm">
-              Battle Maps
-            </Button>
-          </Link>
-          <div className="min-w-[min(100%,16rem)] flex-1">
-            <p className="text-heading truncate text-sm font-semibold">
-              {scene.name}
-            </p>
-            <p className="text-muted text-xs">
-              Relay: {relayStatus} · local operations:{' '}
-              {storedScene?.localDraft ? 'pending' : 'none'}
-            </p>
-            <p className="text-muted text-xs">
-              Local draft: {storedScene?.localDraft ? 'saved' : 'none'} ·
-              authoritative checkpoint:{' '}
-              {storedScene?.canvasCheckpoint
-                ? storedScene.canvasCheckpoint.generation.startsWith(
-                    'adoption:'
-                  )
-                  ? 'not yet committed (local adoption snapshot available)'
-                  : 'committed locally'
-                : 'none'}
-            </p>
-            <p className="text-muted text-xs">{saveMessage}</p>
-          </div>
-          {pendingConflict && (
-            <div
-              className="border-accent-orange-text w-full rounded border p-2"
-              role="alert"
-            >
-              <p className="text-accent-orange-text text-xs">
-                A local edit conflicted with a newer scene and was not replayed.
-                Pending fields: {pendingConflict.fields.join(', ')}. Review the
-                winner, then retry deliberately or discard this edit.
+    <>
+      <DmBattleMapCanvas
+        key={`canvas-${canvasEpoch}`}
+        campaignCode={campaignCode}
+        battleMapId={sceneId}
+        dmId={dmId}
+        tableSceneAdapter={adapter}
+        onConnectionReady={handleConnectionReady}
+        onStatus={setRelayStatus}
+        tokenConfigRef={tokenConfigRef}
+        onViewportReady={setViewport}
+        tokenInfoToggle={{ mode: null, onCycle: () => {} }}
+        onExportError={message => setSaveMessage(message)}
+        sessionControls={
+          <div className="border-divider bg-surface-secondary pointer-events-auto flex max-w-2xl flex-wrap items-center gap-3 rounded-lg border p-3 shadow-lg">
+            <Link href={battleMapsHref}>
+              <Button variant="ghost" size="sm">
+                Battle Maps
+              </Button>
+            </Link>
+            <div className="min-w-[min(100%,16rem)] flex-1">
+              <p className="text-heading truncate text-sm font-semibold">
+                {scene.name}
               </p>
-              <div className="mt-2 flex flex-wrap gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void reconcilePendingEdit('refresh')}
-                >
-                  Refresh winner
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void reconcilePendingEdit('retry')}
-                >
-                  Retry pending edit
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => void reconcilePendingEdit('discard')}
-                >
-                  Discard pending edit
-                </Button>
-              </div>
+              <p className="text-muted text-xs">
+                Relay: {relayStatus} · local operations:{' '}
+                {storedScene?.localDraft ? 'pending' : 'none'}
+              </p>
+              <p className="text-muted text-xs">
+                Local draft: {storedScene?.localDraft ? 'saved' : 'none'} ·
+                authoritative checkpoint:{' '}
+                {storedScene?.canvasCheckpoint
+                  ? storedScene.canvasCheckpoint.generation.startsWith(
+                      'adoption:'
+                    )
+                    ? 'not yet committed (local adoption snapshot available)'
+                    : 'committed locally'
+                  : 'none'}
+              </p>
+              <p className="text-muted text-xs">{saveMessage}</p>
             </div>
-          )}
-          {storedScene?.localDraft && (
+            <TableAuthorityStatus
+              state={authority.state}
+              waitSeconds={authority.waitSeconds}
+              clearedNotice={clearedNotice}
+              onAcquire={authority.acquire}
+              onWorkOffline={authority.workOffline}
+            />
+            {pendingConflict && (
+              <div
+                className="border-accent-orange-text w-full rounded border p-2"
+                role="alert"
+              >
+                <p className="text-accent-orange-text text-xs">
+                  A local edit conflicted with a newer scene and was not
+                  replayed. Pending fields: {pendingConflict.fields.join(', ')}.
+                  Review the winner, then retry deliberately or discard this
+                  edit.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void reconcilePendingEdit('refresh')}
+                  >
+                    Refresh winner
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void reconcilePendingEdit('retry')}
+                  >
+                    Retry pending edit
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => void reconcilePendingEdit('discard')}
+                  >
+                    Discard pending edit
+                  </Button>
+                </div>
+              </div>
+            )}
+            {storedScene?.localDraft && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={recoveryBusy}
+                onClick={() =>
+                  void restore(storedScene.localDraft ?? null, 'Local draft')
+                }
+              >
+                Reapply local draft
+              </Button>
+            )}
+            {storedScene?.canvasCheckpoint && (
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={recoveryBusy}
+                onClick={() =>
+                  void restore(storedScene.canvasCheckpoint, 'Saved checkpoint')
+                }
+              >
+                Restore saved checkpoint
+              </Button>
+            )}
             <Button
-              variant="ghost"
+              variant="primary"
               size="sm"
-              disabled={recoveryBusy}
-              onClick={() =>
-                void restore(storedScene.localDraft ?? null, 'Local draft')
-              }
+              onClick={() => void saveCheckpoint()}
             >
-              Reapply local draft
+              Save checkpoint
             </Button>
-          )}
-          {storedScene?.canvasCheckpoint && (
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={recoveryBusy}
-              onClick={() =>
-                void restore(storedScene.canvasCheckpoint, 'Saved checkpoint')
-              }
-            >
-              Restore saved checkpoint
-            </Button>
-          )}
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={() => void saveCheckpoint()}
-          >
-            Save checkpoint
-          </Button>
-        </div>
-      }
-    >
-      <TokenPlacementController
-        pending={pendingPlacement}
-        configRef={tokenConfigRef}
-        onCancel={cancelPlacement}
-      />
-      {pendingPlacement && (
-        <PlacementBanner
-          entityName={pendingPlacement.entityName}
+          </div>
+        }
+      >
+        <TokenPlacementController
+          pending={pendingPlacement}
+          configRef={tokenConfigRef}
           onCancel={cancelPlacement}
         />
-      )}
-      <TableRosterPanel
+        {pendingPlacement && (
+          <PlacementBanner
+            entityName={pendingPlacement.entityName}
+            onCancel={cancelPlacement}
+          />
+        )}
+        <TableRosterPanel
+          repository={repository}
+          sceneId={sceneId}
+          campaignCode={campaignCode}
+          dmId={dmId}
+          canvas={rosterCanvas}
+          live={relayStatus === 'live'}
+        />
+      </DmBattleMapCanvas>
+      {/* Outside the keyed canvas: an explicit acquire remounts the canvas
+        only, so open dialogs and the command queue survive (F6). */}
+      <TableCombatPanel
         repository={repository}
         sceneId={sceneId}
         campaignCode={campaignCode}
         dmId={dmId}
-        canvas={rosterCanvas}
-        live={relayStatus === 'live'}
+        controlSession={authority.session}
+        controlEpoch={authority.controlEpoch}
+        liveUnavailable={
+          (authority.state.phase === 'failed' ||
+            authority.state.phase === 'lost') &&
+          authority.state.reason === 'live-unavailable'
+        }
+        requestedRunId={requestedRunId}
+        tableWorkspaceId={selectedWorkspaceId}
+        onPublicationStatus={handlePublicationStatus}
       />
-    </DmBattleMapCanvas>
+    </>
   );
 }

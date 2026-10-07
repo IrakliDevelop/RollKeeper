@@ -4,9 +4,17 @@ import React from 'react';
 import { Brain, ClockAlert } from 'lucide-react';
 import type { DetailSectionProps } from './DetailHeader';
 
-export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
+export function ConcentrationReaction({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   if (entity.type === 'lair') return null;
   const isPlayer = entity.type === 'player';
+  // Scene runs: concentration is display-only; reaction per capability.
+  const readOnlyConcentration = capabilities ? true : isPlayer;
+  const readOnlyReaction = capabilities ? !capabilities.reaction : isPlayer;
+  const syncedNote = capabilities ? null : '(synced)';
 
   return (
     <>
@@ -14,7 +22,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
       <div className="flex items-center gap-2">
         <Brain size={13} className="text-accent-purple-text shrink-0" />
         <span className="text-body text-xs">Concentration:</span>
-        {isPlayer ? (
+        {readOnlyConcentration ? (
           <span className="text-body text-xs">
             {entity.concentrationSpell ? (
               <span className="text-accent-purple-text font-medium">
@@ -23,7 +31,9 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
             ) : (
               <span className="text-faint">None</span>
             )}
-            <span className="text-faint ml-1">(synced)</span>
+            {syncedNote && (
+              <span className="text-faint ml-1">{syncedNote}</span>
+            )}
           </span>
         ) : (
           <>
@@ -52,7 +62,7 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
       <div className="flex items-center gap-2">
         <ClockAlert size={13} className="text-muted shrink-0" />
         <span className="text-body text-xs">Reaction:</span>
-        {isPlayer ? (
+        {readOnlyReaction ? (
           <span className="text-body text-xs">
             {entity.hasUsedReaction ? (
               <span className="text-accent-red-text font-medium">Used</span>
@@ -61,7 +71,9 @@ export function ConcentrationReaction({ entity, actions }: DetailSectionProps) {
                 Available
               </span>
             )}
-            <span className="text-faint ml-1">(synced)</span>
+            {(syncedNote || isPlayer) && (
+              <span className="text-faint ml-1">(synced)</span>
+            )}
           </span>
         ) : (
           <button

@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { CampaignPlayer } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity';
 import type { TableCampaignPlayer } from '@/lib/table/roster';
@@ -15,6 +15,12 @@ export type TablePlayersSnapshot =
       players: TableCampaignPlayer[];
       /** Display rows for the reused PlayerTab (id = playerId). */
       campaignPlayers: CampaignPlayer[];
+      /** Server-authorized rows incl. character data (read-only live merge). */
+      data: CampaignPlayerData[];
+      /** The latest refresh failed; `data` is the last successful snapshot. */
+      stale: boolean;
+      /** Time (ms) of the last successful refresh. */
+      fetchedAt: number;
     };
 
 /**
@@ -22,7 +28,15 @@ export type TablePlayersSnapshot =
  * Identity comes only from here; names are display data, never a key.
  * Read-only: no encounter or campaign store is touched.
  */
-export function useTablePlayersSnapshot(campaignCode: string): {
+export function useTablePlayersSnapshot(
+  campaignCode: string,
+  options: {
+    /** Poll interval while a scene run is active (C3-6); null = no polling. */
+    pollMs?: number | null;
+    /** Changing value triggers a refresh (e.g. each turn change). */
+    refreshKey?: unknown;
+  } = {}
+): {
   snapshot: TablePlayersSnapshot;
   refresh: () => void;
 } {
@@ -30,9 +44,15 @@ export function useTablePlayersSnapshot(campaignCode: string): {
     status: 'loading',
   });
   const [attempt, setAttempt] = useState(0);
+  const inFlight = useRef<AbortController | null>(null);
+  const pollMs = options.pollMs ?? null;
+  const refreshKey = options.refreshKey;
 
   useEffect(() => {
+    // Single in-flight request: a newer refresh supersedes the previous one.
+    inFlight.current?.abort();
     const controller = new AbortController();
+    inFlight.current = controller;
     void (async () => {
       try {
         const response = await fetch(
@@ -68,13 +88,28 @@ export function useTablePlayersSnapshot(campaignCode: string): {
             dexterity: row.characterData?.abilities?.dexterity ?? 10,
             avatarUrl: row.characterData?.avatar,
           })),
+          data: rows,
+          stale: false,
+          fetchedAt: Date.now(),
         });
       } catch {
-        if (!controller.signal.aborted) setSnapshot({ status: 'unavailable' });
+        if (controller.signal.aborted) return;
+        // F1: a failed poll keeps the last ready data and only marks it stale.
+        setSnapshot(previous =>
+          previous.status === 'ready'
+            ? { ...previous, stale: true }
+            : { status: 'unavailable' }
+        );
       }
     })();
     return () => controller.abort();
-  }, [campaignCode, attempt]);
+  }, [campaignCode, attempt, refreshKey]);
+
+  useEffect(() => {
+    if (pollMs === null) return;
+    const timer = setInterval(() => setAttempt(value => value + 1), pollMs);
+    return () => clearInterval(timer);
+  }, [pollMs]);
 
   const refresh = useCallback(() => setAttempt(value => value + 1), []);
   return { snapshot, refresh };
