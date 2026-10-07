@@ -38,25 +38,39 @@ export async function findSceneRunsForEncounter(options: {
   campaignCode: string;
   encounterId: string;
 }): Promise<TableSceneRunLink[]> {
+  const all = await findSceneRunsForCampaign(options);
+  return all.get(options.encounterId) ?? [];
+}
+
+/**
+ * Every adopted scene run of the campaign keyed by source encounter id, in
+ * ONE read (F7) — the encounter library shares this per list.
+ */
+export async function findSceneRunsForCampaign(options: {
+  factory?: IDBFactory | null;
+  account: TableWorkspaceSelection['account'];
+  campaignCode: string;
+}): Promise<Map<string, TableSceneRunLink[]>> {
+  const empty = new Map<string, TableSceneRunLink[]>();
   const factory =
     options.factory === null
       ? null
       : (options.factory ??
         (typeof indexedDB === 'undefined' ? null : indexedDB));
-  if (!factory || typeof factory.databases !== 'function') return [];
+  if (!factory || typeof factory.databases !== 'function') return empty;
   let names: Array<string | undefined>;
   try {
     names = (await factory.databases()).map(database => database.name);
   } catch {
-    return [];
+    return empty;
   }
-  if (!names.includes(TABLE_DATABASE_NAME)) return [];
+  if (!names.includes(TABLE_DATABASE_NAME)) return empty;
 
   let database: IDBDatabase;
   try {
     database = await openTableDatabase({ factory });
   } catch {
-    return [];
+    return empty;
   }
   try {
     const transaction = database.transaction(
@@ -85,28 +99,34 @@ export async function findSceneRunsForEncounter(options: {
         .filter(value => value?.kind === 'encounter')
         .map(value => `${String(value.workspaceKey)}|${String(value.id)}`)
     );
-    return workspaces.flatMap(campaign =>
-      (encounters as unknown[])
+    const result = new Map<string, TableSceneRunLink[]>();
+    for (const campaign of workspaces) {
+      const runs = (encounters as unknown[])
         .filter(value => validateEncounterRecord(value).ok)
         .map(value => value as TableEncounterRecordV1)
         .filter(
           run =>
             run.workspaceKey === campaign.workspaceKey &&
-            run.sourceEncounterId === options.encounterId &&
+            run.sourceEncounterId !== null &&
             !deleted.has(`${run.workspaceKey}|${run.runId}`)
         )
-        .sort((left, right) => left.runId.localeCompare(right.runId))
-        .map(run => ({
+        .sort((left, right) => left.runId.localeCompare(right.runId));
+      for (const run of runs) {
+        const list = result.get(run.sourceEncounterId!) ?? [];
+        list.push({
           runId: run.runId,
           sceneId: run.sceneId,
           label: run.label ?? null,
           localWorkspaceId: campaign.localWorkspaceId,
           defaultWorkspace:
             campaign.sourceCampaignCode === options.campaignCode,
-        }))
-    );
+        });
+        result.set(run.sourceEncounterId!, list);
+      }
+    }
+    return result;
   } catch {
-    return [];
+    return empty;
   } finally {
     database.close();
   }

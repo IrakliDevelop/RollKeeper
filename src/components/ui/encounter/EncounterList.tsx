@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
 import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
+import { SceneRunLinksProvider } from '@/components/ui/campaign/table/combat/useSceneRunLinks';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
@@ -116,23 +117,27 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {sorted.map(encounter => (
-            <EncounterCard
-              key={encounter.id}
-              encounter={encounter}
-              campaignCode={campaignCode}
-              linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
-              onDelete={() => {
-                if (
-                  confirm(`Delete "${encounter.name}"? This cannot be undone.`)
-                ) {
-                  deleteEncounter(encounter.id);
-                }
-              }}
-            />
-          ))}
-        </div>
+        <SceneRunLinksProvider campaignCode={campaignCode}>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {sorted.map(encounter => (
+              <EncounterCard
+                key={encounter.id}
+                encounter={encounter}
+                campaignCode={campaignCode}
+                linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
+                onDelete={() => {
+                  if (
+                    confirm(
+                      `Delete "${encounter.name}"? This cannot be undone.`
+                    )
+                  ) {
+                    deleteEncounter(encounter.id);
+                  }
+                }}
+              />
+            ))}
+          </div>
+        </SceneRunLinksProvider>
       )}
     </div>
   );

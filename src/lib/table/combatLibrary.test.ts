@@ -9,7 +9,10 @@ import {
   repositories,
   revisionOf,
 } from './combat.fixture';
-import { findSceneRunsForEncounter } from './combatLibrary';
+import {
+  findSceneRunsForCampaign,
+  findSceneRunsForEncounter,
+} from './combatLibrary';
 import { TableRepository } from './repository';
 
 afterEach(() =>
@@ -150,5 +153,17 @@ describe('library "Open scene run" lookup (D10, R2-9)', () => {
         encounterId: 'enc-1',
       })
     ).resolves.toEqual([]);
+  });
+
+  it('maps every encounter of the campaign in one read and never creates the database (F7)', async () => {
+    const factory = new IDBFactory();
+    await expect(
+      findSceneRunsForCampaign({
+        factory,
+        account: fixtureSelection.account,
+        campaignCode: 'CAMP',
+      })
+    ).resolves.toEqual(new Map());
+    expect(await names(factory)).toEqual([]);
   });
 });

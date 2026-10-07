@@ -1,3 +1,4 @@
+import type React from 'react';
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -6,6 +7,8 @@ import { useEncounterStore } from '@/store/encounterStore';
 const links = vi.hoisted(() => ({ value: [] as unknown[] }));
 vi.mock('@/components/ui/campaign/table/combat/useSceneRunLinks', () => ({
   useSceneRunLinks: () => links.value,
+  SceneRunLinksProvider: ({ children }: { children: React.ReactNode }) =>
+    children,
 }));
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
