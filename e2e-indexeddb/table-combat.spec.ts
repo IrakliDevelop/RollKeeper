@@ -258,6 +258,21 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   });
   expect(exported.events[0]).toMatchObject({ type: 'combat_start' });
 
+  // 390px: the combat panel and its dialogs cause no horizontal overflow.
+  await page.keyboard.press('Escape');
+  await page.setViewportSize({ width: 390, height: 844 });
+  const noHorizontalOverflow = () =>
+    page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth
+    );
+  expect(await noHorizontalOverflow()).toBe(true);
+  await page.getByRole('button', { name: 'Choose participants' }).click();
+  await expect(dialog).toBeVisible();
+  expect(await noHorizontalOverflow()).toBe(true);
+  await page.keyboard.press('Escape');
+
   // Original map and legacy stores were never written by scene combat.
   expect(
     await page.evaluate(() => ({
