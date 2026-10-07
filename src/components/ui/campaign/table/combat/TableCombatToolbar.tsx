@@ -76,7 +76,7 @@ export function TableCombatToolbar(props: {
           Saved on this device
         </Badge>
         <p
-          className="text-muted min-w-0 flex-1 text-xs"
+          className="text-muted order-first w-full min-w-0 text-xs"
           role="status"
           aria-live="polite"
           data-testid="table-publication-status"

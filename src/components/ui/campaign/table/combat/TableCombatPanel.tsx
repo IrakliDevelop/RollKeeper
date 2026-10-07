@@ -148,6 +148,9 @@ export function TableCombatPanel(props: {
         }
         detailCapabilities={entity => capabilityByEntity.get(entity.id)}
         hpUnknownEntityIds={panel.hpUnknownEntityIds}
+        // Fits a 390px viewport; header, toolbar and setup scroll as one.
+        widthClassName="w-[min(390px,calc(100vw-1rem))]"
+        scrollToolbar
       />
       {running && model && (
         <TurnControl

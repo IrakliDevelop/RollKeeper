@@ -178,6 +178,14 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   await expect(
     page.getByText(/Started locally · not broadcasting|Not broadcasting/)
   ).toBeVisible();
+  // A2: at desktop width the status line takes the toolbar width instead of
+  // wrapping word-by-word beside the buttons.
+  const status = page.getByTestId('table-publication-status');
+  const statusBox = (await status.boundingBox())!;
+  const panelBox = (await page
+    .getByTestId('dm-vtt-studio-panel')
+    .boundingBox())!;
+  expect(statusBox.width).toBeGreaterThan(panelBox.width * 0.75);
 
   // Reload mid-fight: run, turn and pending intent come back from IndexedDB.
   await page.reload();
@@ -272,6 +280,28 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   await expect(dialog).toBeVisible();
   expect(await noHorizontalOverflow()).toBe(true);
   await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  // A1: with the (tall, wrapped) live-control status header showing, the
+  // panel's tabs, collapse control, an initiative input and Start combat are
+  // inside the 390x844 viewport without scrolling any inner region.
+  await expect(
+    page.getByText(/Private authority preparation failed/)
+  ).toBeVisible();
+  const panel = page.getByTestId('dm-vtt-studio-panel');
+  for (const control of [
+    panel.getByRole('button', { name: 'Initiative' }),
+    panel.getByRole('button', { name: 'Selected' }),
+    panel.getByRole('button', { name: 'Collapse combat panel' }),
+    panel.getByLabel('Initiative for Cora'),
+    panel.getByRole('button', { name: 'Start combat' }),
+  ]) {
+    const box = (await control.boundingBox())!;
+    expect(box.x).toBeGreaterThanOrEqual(0);
+    expect(box.y).toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width).toBeLessThanOrEqual(390);
+    expect(box.y + box.height).toBeLessThanOrEqual(844);
+    await control.click({ trial: true });
+  }
 
   // Original map and legacy stores were never written by scene combat.
   expect(

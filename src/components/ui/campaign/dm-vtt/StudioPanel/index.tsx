@@ -51,6 +51,10 @@ export interface StudioPanelProps {
   ) => CombatantDetailCapabilities | undefined;
   /** Initiative rows whose live HP is not loaded yet ("HP —"). */
   hpUnknownEntityIds?: ReadonlySet<string>;
+  /** Panel width classes (default `w-[min(390px,40vw)]`). */
+  widthClassName?: string;
+  /** Scroll the toolbar together with the tab content (narrow viewports). */
+  scrollToolbar?: boolean;
 }
 
 const TABS: {
@@ -85,6 +89,8 @@ export function StudioPanel({
   inactiveContent,
   detailCapabilities,
   hpUnknownEntityIds,
+  widthClassName = 'w-[min(390px,40vw)]',
+  scrollToolbar = false,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -108,7 +114,7 @@ export function StudioPanel({
 
   return (
     <div
-      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
+      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex ${widthClassName} flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
         activeTab === 'initiative'
           ? 'max-h-[70vh]'
           : 'max-h-[calc(100vh-var(--dm-vtt-panel-top,8rem)-0.75rem)]'
@@ -159,8 +165,9 @@ export function StudioPanel({
           {followNote}
         </p>
       )}
-      {toolbar}
+      {!scrollToolbar && toolbar}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {scrollToolbar && toolbar}
         {activeTab === 'initiative' ? (
           <InitiativeTab
             encounter={encounter}

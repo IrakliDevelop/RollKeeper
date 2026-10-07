@@ -132,4 +132,23 @@ describe('StudioPanel optional Table props (D10)', () => {
     expect(screen.getByText(/HP —/)).toBeVisible();
     expect(screen.queryByText('0/0')).toBeNull();
   });
+
+  it('accepts a Table width and scrolls the toolbar with the content (A1)', () => {
+    render(
+      <StudioPanel
+        {...base}
+        encounter={encounter}
+        activeTab="initiative"
+        toolbar={<p>Scene run toolbar</p>}
+        widthClassName="w-[min(390px,calc(100vw-1rem))]"
+        scrollToolbar
+      />
+    );
+    const panel = screen.getByTestId('dm-vtt-studio-panel');
+    expect(panel.className).toContain('w-[min(390px,calc(100vw-1rem))]');
+    expect(panel.className).not.toContain('w-[min(390px,40vw)]');
+    expect(
+      screen.getByText('Scene run toolbar').closest('.overflow-y-auto')
+    ).not.toBeNull();
+  });
 });
