@@ -26,6 +26,24 @@ export function DetailVitals({
 
   if (entity.type === 'lair') return null;
 
+  if (capabilities?.hpUnknown) {
+    return (
+      <div className="bg-surface-secondary border-divider space-y-3 rounded-xl border p-4">
+        <div className="flex items-baseline gap-2">
+          <span className="font-display text-muted text-3xl font-bold">—</span>
+          <span className="text-accent-amber-text text-xs font-medium">
+            Waiting for player data
+          </span>
+        </div>
+        <ConcentrationReaction
+          entity={entity}
+          actions={actions}
+          capabilities={capabilities}
+        />
+      </div>
+    );
+  }
+
   const isPlayer = entity.type === 'player';
   const isNonPlayerNonSummon = !isPlayer && !entity.summonId;
   // Legacy: players are synced read-only. Scene runs: per-capability.

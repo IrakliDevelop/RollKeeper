@@ -41,6 +41,8 @@ export interface PublisherSession {
 export type PublicationPayload =
   | { status: 'ok'; initiative: SharedInitiativeState }
   | { status: 'invalid-identity' }
+  /** A player participant has no live data yet: hold, send nothing. */
+  | { status: 'waiting-player-data' }
   | { status: 'not-running' };
 
 export interface PublicationAck {
@@ -63,6 +65,8 @@ export type PublicationStatus =
   /** An end intent not yet published: "Remote initiative may be stale". */
   | { kind: 'stale'; reason: string | null }
   | { kind: 'blocked'; reason: 'invalid-identity' | 'too-large' }
+  /** Publication held until required player data loads (no request sent). */
+  | { kind: 'waiting'; reason: 'player-data' }
   | { kind: 'publishing' };
 
 export interface CombatPublisher {
@@ -125,6 +129,18 @@ export function createCombatPublisher(options: {
   let disposed = false;
   let failure: string | null = null;
   let blocked: 'invalid-identity' | 'too-large' | null = null;
+  /** A publish is wanted but required player data has not loaded (F1). */
+  let awaitingData = false;
+  /**
+   * Canonical payload last sent per run generation (F6): an automatic
+   * publish of an unchanged payload is skipped; an explicit one always sends.
+   */
+  const lastSent = new Map<string, string>();
+  const canonical = (initiative: SharedInitiativeState) => {
+    const { updatedAt: _ignored, ...rest } = initiative;
+    void _ignored;
+    return JSON.stringify(rest);
+  };
   let current: PublicationStatus = { kind: 'saved-locally' };
   /** End intents already cleared remotely whose local ack may still lag. */
   const clearedEnds = new Set<string>();
@@ -161,6 +177,8 @@ export function createCombatPublisher(options: {
         : { kind: 'saved-locally' };
     }
     if (blocked) return { kind: 'blocked', reason: blocked };
+    if (awaitingData && state.active)
+      return { kind: 'waiting', reason: 'player-data' };
     if (state.active) {
       if (broadcasting && !held)
         return { kind: 'broadcasting', runId: state.active.runId };
@@ -178,6 +196,7 @@ export function createCombatPublisher(options: {
 
   const holdNow = (state: PublicationRunState) => {
     held = true;
+    awaitingData = false;
     holdKey = intentKey(state);
     if (timer) clearTimeout(timer);
     timer = null;
@@ -212,7 +231,10 @@ export function createCombatPublisher(options: {
     emit({ kind: 'stale', reason: outcome.reason });
   };
 
-  const sendPublish = async (state: PublicationRunState): Promise<void> => {
+  const sendPublish = async (
+    state: PublicationRunState,
+    explicit: boolean
+  ): Promise<void> => {
     const session = options.getSession();
     const active = state.active;
     if (!active) return;
@@ -229,7 +251,24 @@ export function createCombatPublisher(options: {
       emit({ kind: 'blocked', reason: 'invalid-identity' });
       return;
     }
+    if (payload.status === 'waiting-player-data') {
+      awaitingData = true;
+      emit({ kind: 'waiting', reason: 'player-data' });
+      return;
+    }
     if (payload.status !== 'ok') return;
+    awaitingData = false;
+    const generationKey = `${active.runId}:${active.combatGeneration}`;
+    const body = canonical(payload.initiative);
+    if (
+      !explicit &&
+      broadcasting &&
+      !pendingPublish(state) &&
+      lastSent.get(generationKey) === body
+    ) {
+      emit({ kind: 'broadcasting', runId: active.runId });
+      return;
+    }
     emit({ kind: 'publishing' });
     lastPublishAt = now();
     const outcome = await session.publishInitiative(
@@ -239,6 +278,7 @@ export function createCombatPublisher(options: {
     if (outcome.status === 'committed') {
       broadcasting = true;
       held = false;
+      lastSent.set(generationKey, body);
       failure = null;
       blocked = null;
       const publication = active.publication;
@@ -277,7 +317,7 @@ export function createCombatPublisher(options: {
       held = false;
       blocked = null;
     }
-    if (state.active) return sendPublish(state);
+    if (state.active) return sendPublish(state, explicit);
     if (state.pendingEnds.length > 0) return sendEnd(state);
     if (broadcasting) broadcasting = false;
     emit(describe(state));
@@ -337,12 +377,12 @@ export function createCombatPublisher(options: {
       }
       return;
     }
-    if (!broadcasting && !pendingPublish(state)) {
+    if (!broadcasting && !pendingPublish(state) && !awaitingData) {
       emit(describe(state));
       return;
     }
     const wait = lastPublishAt + MIN_PUBLISH_INTERVAL_MS - now();
-    if (pendingPublish(state) || wait <= 0) {
+    if (pendingPublish(state) || awaitingData || wait <= 0) {
       if (timer) clearTimeout(timer);
       timer = null;
       void drain(false);
@@ -375,6 +415,8 @@ export function createCombatPublisher(options: {
       broadcasting = false;
       failure = null;
       blocked = null;
+      // A (re)acquire wiped the public initiative: nothing counts as sent.
+      lastSent.clear();
       holdNow(state);
       emit(describe(state));
     },

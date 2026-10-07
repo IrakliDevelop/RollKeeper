@@ -17,6 +17,10 @@ export type TablePlayersSnapshot =
       campaignPlayers: CampaignPlayer[];
       /** Server-authorized rows incl. character data (read-only live merge). */
       data: CampaignPlayerData[];
+      /** The latest refresh failed; `data` is the last successful snapshot. */
+      stale: boolean;
+      /** Time (ms) of the last successful refresh. */
+      fetchedAt: number;
     };
 
 /**
@@ -85,9 +89,17 @@ export function useTablePlayersSnapshot(
             avatarUrl: row.characterData?.avatar,
           })),
           data: rows,
+          stale: false,
+          fetchedAt: Date.now(),
         });
       } catch {
-        if (!controller.signal.aborted) setSnapshot({ status: 'unavailable' });
+        if (controller.signal.aborted) return;
+        // F1: a failed poll keeps the last ready data and only marks it stale.
+        setSnapshot(previous =>
+          previous.status === 'ready'
+            ? { ...previous, stale: true }
+            : { status: 'unavailable' }
+        );
       }
     })();
     return () => controller.abort();

@@ -270,4 +270,38 @@ describe('Table EntityActions adapter (R2-4, R2-5, C3-1, C3-2, C3-3)', () => {
       readOnlyNote: expect.stringMatching(/Read-only adopted PC/),
     });
   });
+
+  it('strips undefined optional fields so the command validates (F9)', async () => {
+    const view = await model();
+    const dispatch = vi.fn();
+    const actions = createTableEntityActions({
+      model: view,
+      dispatch,
+      notify: vi.fn(),
+    });
+    actions.onAddCondition('m-goblin', {
+      name: 'Prone',
+      source: 'dm',
+      description: undefined,
+      rounds: undefined,
+    });
+    const draft = dispatch.mock.calls[0]![0] as {
+      change: { condition: Record<string, unknown> };
+    };
+    expect(Object.keys(draft.change.condition).sort()).toEqual([
+      'name',
+      'source',
+    ]);
+    const repository = repositories.at(-1)!;
+    const result = await runCombatCommand(repository, {
+      expectedRevision: revisionOf(repository),
+      operationId: 'f9-condition',
+      command: {
+        ...(draft as unknown as Record<string, unknown>),
+        runId: 'run-a',
+        at: AT,
+      } as TableCombatCommandV1,
+    });
+    expect(result.status).toBe('committed');
+  });
 });

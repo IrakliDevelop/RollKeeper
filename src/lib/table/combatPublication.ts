@@ -25,6 +25,9 @@ export function buildScenePublication(
     model.participants.some(view => !view.validIdentity)
   )
     return { status: 'invalid-identity' };
+  // Never publish 0 HP / dead derived from missing player data (F1).
+  if (model.participants.some(view => view.missingPlayerData))
+    return { status: 'waiting-player-data' };
   // `name` stays local: buildSharedInitiative never publishes it, but the
   // encounter label is replaced anyway so nothing private is carried along.
   const initiative = buildSharedInitiative(

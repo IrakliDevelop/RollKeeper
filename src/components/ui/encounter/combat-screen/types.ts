@@ -68,4 +68,6 @@ export interface CombatantDetailCapabilities {
   creatureConditions: CreatureCondition[];
   /** Visible explanation for read-only rows (e.g. adopted PCs). */
   readOnlyNote?: string;
+  /** Live HP is not loaded yet: show it as unknown, never as 0/0. */
+  hpUnknown?: boolean;
 }

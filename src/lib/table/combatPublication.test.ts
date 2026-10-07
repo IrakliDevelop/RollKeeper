@@ -216,4 +216,47 @@ describe('scene initiative publication payload (D8, R2-1)', () => {
       pendingEnds: [{ runId: 'run-a', combatGeneration: 1 }],
     });
   });
+
+  it('holds publication while a player participant has no live data (F1)', async () => {
+    const repository = await openFixture();
+    await fight(repository, ['goblin', 'aria', ADOPTED_PC]);
+    const missing = buildCombatReadModel({
+      snapshot: readySnapshot(repository),
+      runId: 'run-a',
+    })!;
+    expect(
+      missing.participants.find(view => view.actorId === 'aria')
+    ).toMatchObject({ missingPlayerData: true });
+    // Unverified adopted PC shows its adoption stats: not waiting.
+    expect(
+      missing.participants.find(view => view.actorId === ADOPTED_PC)
+    ).toMatchObject({ missingPlayerData: false });
+    expect(buildScenePublication(missing, DEFAULT_COMBAT_CONFIG)).toEqual({
+      status: 'waiting-player-data',
+    });
+    const ready = buildCombatReadModel({
+      snapshot: readySnapshot(repository),
+      runId: 'run-a',
+      players: [
+        createMockPlayerData({
+          playerId: 'legacy-aria',
+          characterId: 'char-aria',
+          characterData: createMockCharacterState({
+            hitPoints: {
+              current: 12,
+              max: 20,
+              temporary: 0,
+              calculationMode: 'auto',
+            },
+          } as never),
+        }),
+      ],
+    })!;
+    const built = buildScenePublication(ready, DEFAULT_COMBAT_CONFIG);
+    if (built.status !== 'ok') throw new Error(built.status);
+    const aria = built.initiative.turnOrder.find(
+      entry => entry.entityId === 'm-aria'
+    );
+    expect(aria).toMatchObject({ currentHp: 12, maxHp: 20, isDead: false });
+  });
 });

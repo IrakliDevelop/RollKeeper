@@ -76,4 +76,30 @@ describe('Table players snapshot refresh (C3-6)', () => {
     await act(async () => vi.advanceTimersByTimeAsync(60_000));
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+
+  it('keeps the last ready data across a failed poll and marks it stale (F1)', async () => {
+    const fetchMock = vi.mocked(fetch);
+    const { result } = renderHook(() =>
+      useTablePlayersSnapshot('CAMP', { pollMs: 10_000 })
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.snapshot).toMatchObject({
+      status: 'ready',
+      stale: false,
+    });
+    fetchMock.mockImplementationOnce(async () =>
+      Response.json({ error: 'down' }, { status: 503 })
+    );
+    await act(async () => vi.advanceTimersByTimeAsync(10_000));
+    expect(result.current.snapshot).toMatchObject({
+      status: 'ready',
+      stale: true,
+      data: [expect.objectContaining({ playerId: 'legacy-aria' })],
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(10_000));
+    expect(result.current.snapshot).toMatchObject({
+      status: 'ready',
+      stale: false,
+    });
+  });
 });

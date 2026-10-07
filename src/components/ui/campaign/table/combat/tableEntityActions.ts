@@ -51,6 +51,7 @@ export function tableDetailCapabilities(
     reaction: !view.playerControlled,
     hidden: true,
     creatureConditions: [],
+    ...(view.missingPlayerData ? { hpUnknown: true } : {}),
     ...(notes.length > 0 ? { readOnlyNote: notes.join(' · ') } : {}),
   };
 }
@@ -125,7 +126,9 @@ export function createTableEntityActions(options: {
     onAddCondition: (entityId, condition) =>
       stat(entityId, {
         kind: 'addCondition',
-        condition: structuredClone(condition) as unknown as JsonObject,
+        // F9: optional fields may be `undefined`; JSON drops them so the
+        // command stays canonical JSON and validates.
+        condition: JSON.parse(JSON.stringify(condition)) as JsonObject,
       }),
     onRemoveCondition: (entityId, conditionId) => {
       const target = view(entityId);

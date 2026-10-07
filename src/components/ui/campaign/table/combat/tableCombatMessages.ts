@@ -63,6 +63,8 @@ export function publicationLabel(
         : `Not broadcasting (${status.reason})`;
     case 'stale':
       return 'Remote initiative may be stale';
+    case 'waiting':
+      return 'Waiting for player data';
     case 'blocked':
       return status.reason === 'too-large'
         ? 'Initiative too large to broadcast'

@@ -155,4 +155,23 @@ describe('CombatantDetail capabilities (R2-4, C3-3)', () => {
     ).toBeVisible();
     expect(selector).not.toHaveBeenCalled();
   });
+
+  it('shows HP as unknown instead of 0/0 while player data is missing (F1)', () => {
+    render(
+      <CombatantDetail
+        entity={{
+          ...creature,
+          type: 'player',
+          currentHp: 0,
+          maxHp: 0,
+          tempHp: 0,
+          armorClass: 0,
+        }}
+        actions={actions()}
+        capabilities={{ ...readOnly, hpUnknown: true }}
+      />
+    );
+    expect(screen.getByText('Waiting for player data')).toBeVisible();
+    expect(screen.queryByText('0')).toBeNull();
+  });
 });

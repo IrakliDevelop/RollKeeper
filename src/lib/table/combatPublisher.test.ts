@@ -112,6 +112,11 @@ describe('Table combat publisher (D8, R2-5, R2-7, C3-8, C3-9)', () => {
     h.state.active!.publication!.acknowledged = true;
     h.acknowledge.mockClear();
     vi.mocked(h.session.publishInitiative).mockClear();
+    // A real change (next round); identical payloads are skipped (F6).
+    h.buildPayload.mockImplementation((runId: string) => ({
+      status: 'ok' as const,
+      initiative: payload(runId, 2),
+    }));
     h.publisher.changed();
     h.publisher.changed();
     h.publisher.changed();
@@ -266,5 +271,73 @@ describe('Table combat publisher (D8, R2-5, R2-7, C3-8, C3-9)', () => {
       kind: 'blocked',
       reason: 'invalid-identity',
     });
+  });
+
+  it('waits visibly for player data without a request, then publishes when it arrives (F1)', async () => {
+    const h = harness();
+    let waiting = true;
+    h.buildPayload.mockImplementation((runId: string) =>
+      waiting
+        ? ({ status: 'waiting-player-data' } as never)
+        : { status: 'ok' as const, initiative: payload(runId) }
+    );
+    h.publisher.hold();
+    startLocally(h.state);
+    h.publisher.changed();
+    await flush();
+    expect(h.session.publishInitiative).not.toHaveBeenCalled();
+    expect(h.lastStatus()).toEqual({ kind: 'waiting', reason: 'player-data' });
+    waiting = false;
+    h.publisher.changed();
+    await flush();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+    expect(h.lastStatus()).toEqual({ kind: 'broadcasting', runId: 'run-a' });
+  });
+
+  it('keeps an explicit publish waiting for player data and sends it once data arrives (F1)', async () => {
+    const h = harness();
+    let waiting = true;
+    h.buildPayload.mockImplementation((runId: string) =>
+      waiting
+        ? ({ status: 'waiting-player-data' } as never)
+        : { status: 'ok' as const, initiative: payload(runId) }
+    );
+    startLocally(h.state);
+    h.state.active!.publication!.acknowledged = true;
+    h.publisher.hold();
+    await h.publisher.publishCurrentState();
+    expect(h.session.publishInitiative).not.toHaveBeenCalled();
+    expect(h.lastStatus()).toEqual({ kind: 'waiting', reason: 'player-data' });
+    waiting = false;
+    h.publisher.changed();
+    await flush();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips automatic publishes whose canonical payload is unchanged, but an explicit publish always sends (F6)', async () => {
+    const h = harness();
+    h.publisher.hold();
+    startLocally(h.state);
+    h.publisher.changed();
+    await flush();
+    h.state.active!.publication!.acknowledged = true;
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+    // Players poll: new data identity, identical payload (updatedAt aside).
+    await vi.advanceTimersByTimeAsync(5_000);
+    h.publisher.changed();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+    // A real change publishes.
+    h.buildPayload.mockImplementation((runId: string) => ({
+      status: 'ok' as const,
+      initiative: payload(runId, 2),
+    }));
+    h.publisher.changed();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(2);
+    // After a reacquire the identical state must be sent again explicitly.
+    h.publisher.hold();
+    await h.publisher.publishCurrentState();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(3);
   });
 });

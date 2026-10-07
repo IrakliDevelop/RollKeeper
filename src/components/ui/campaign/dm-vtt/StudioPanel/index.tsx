@@ -49,6 +49,8 @@ export interface StudioPanelProps {
   detailCapabilities?: (
     entity: EncounterEntity
   ) => CombatantDetailCapabilities | undefined;
+  /** Initiative rows whose live HP is not loaded yet ("HP —"). */
+  hpUnknownEntityIds?: ReadonlySet<string>;
 }
 
 const TABS: {
@@ -82,6 +84,7 @@ export function StudioPanel({
   emptyContent,
   inactiveContent,
   detailCapabilities,
+  hpUnknownEntityIds,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -166,6 +169,7 @@ export function StudioPanel({
             encounterHref={encounterHref}
             emptyContent={emptyContent}
             inactiveContent={inactiveContent}
+            hpUnknownEntityIds={hpUnknownEntityIds}
           />
         ) : selectedEntity ? (
           <>

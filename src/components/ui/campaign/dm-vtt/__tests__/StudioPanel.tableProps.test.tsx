@@ -115,4 +115,21 @@ describe('StudioPanel optional Table props (D10)', () => {
     };
     expect(props.round).toBe(1);
   });
+
+  it('renders rows without real HP for entities waiting on player data (F1)', () => {
+    render(
+      <StudioPanel
+        {...base}
+        encounter={{
+          ...encounter,
+          isActive: true,
+          entities: [{ ...encounter.entities[0]!, currentHp: 0, maxHp: 0 }],
+        }}
+        activeTab="initiative"
+        hpUnknownEntityIds={new Set(['m-goblin'])}
+      />
+    );
+    expect(screen.getByText(/HP —/)).toBeVisible();
+    expect(screen.queryByText('0/0')).toBeNull();
+  });
 });

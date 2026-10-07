@@ -36,6 +36,12 @@ export interface TableCombatParticipantView {
   hidden: boolean;
   /** Player's current condition names (overlay commands prune against them). */
   playerConditionNames: string[] | undefined;
+  /**
+   * Published HP/conditions need the player's live sheet (player reference
+   * or verified adopted PC) and none is loaded: publication must wait and
+   * the DM view must not present 0/0 as real HP (F1).
+   */
+  missingPlayerData: boolean;
   /** Suppressed names the player no longer has (C3-5 prune candidates). */
   staleSuppressions: string[];
   validIdentity: boolean;
@@ -174,6 +180,10 @@ export function buildCombatReadModel(options: {
         removedFromScene: entry?.removed ?? true,
         hidden: participant.hidden === true,
         playerConditionNames: currentNames,
+        missingPlayerData:
+          (kind === 'player-reference' ||
+            (kind === 'adopted-pc' && verified !== null)) &&
+          !playerData?.characterData,
         staleSuppressions,
         validIdentity:
           entry?.sceneMemberId !== null &&
