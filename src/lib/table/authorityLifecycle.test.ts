@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { prepareTableSceneAuthority } from './authorityLifecycle';
+import {
+  createTableControlSession,
+  prepareTableSceneAuthority,
+} from './authorityLifecycle';
 
 const descriptor = (revision: number, writerFence: number) => ({
   epoch: '10000000-0000-4000-8000-000000000001',
@@ -155,7 +158,287 @@ describe('Table scene authority lifecycle', () => {
         holderSessionId: 'table-session-1',
         fetcher,
       })
-    ).resolves.toEqual({ status: 'failed', reason: 'controller-active' });
+    ).resolves.toEqual({
+      status: 'failed',
+      reason: 'controller-active',
+      leaseUntil: active.leaseUntil,
+      holderSessionId: 'other-session',
+    });
     expect(commands).toEqual(['acquire']);
+  });
+});
+
+/**
+ * In-memory model of the PR03A Lua control contract (atomic.ts): exact
+ * epoch/revision/fence checks, lease ownership, and a revision bump on every
+ * commit, renewals included.
+ */
+function controlServer(options: { now?: () => number } = {}) {
+  const now = options.now ?? (() => Date.now());
+  const state = {
+    epoch: '10000000-0000-4000-8000-000000000001',
+    revision: 0,
+    writerFence: 0,
+    leaseUntil: 0,
+    holderSessionId: null as string | null,
+    presentation: {
+      sceneId: null as string | null,
+      revision: 0,
+      blanked: false,
+    },
+    publicRunId: null as string | null,
+  };
+  const commands: Array<Record<string, unknown>> = [];
+  const descriptor = () => structuredClone(state);
+  const reply = (status: string, reason: string, code: number) =>
+    Response.json({ status, reason, current: descriptor() }, { status: code });
+  const execute = (command: Record<string, unknown>): Response => {
+    commands.push(command);
+    if (command.expectedEpoch !== state.epoch)
+      return reply('conflict', 'stale-epoch', 409);
+    if (command.expectedRevision !== state.revision)
+      return reply('conflict', 'stale-control', 409);
+    if (command.expectedFence !== state.writerFence)
+      return reply('conflict', 'stale-fence', 409);
+    const leaseActive = state.leaseUntil > now();
+    const owns =
+      leaseActive && state.holderSessionId === command.holderSessionId;
+    switch (command.type) {
+      case 'acquire':
+        if (leaseActive) return reply('conflict', 'controller-active', 409);
+        state.writerFence += 1;
+        state.holderSessionId = String(command.holderSessionId);
+        state.leaseUntil = now() + 30_000;
+        state.publicRunId = null;
+        break;
+      case 'takeover':
+        state.writerFence += 1;
+        state.holderSessionId = String(command.holderSessionId);
+        state.leaseUntil = now() + 30_000;
+        state.publicRunId = null;
+        break;
+      case 'renew':
+        if (!owns) return reply('conflict', 'lease-lost', 409);
+        state.leaseUntil = now() + 30_000;
+        break;
+      case 'publishInitiative':
+        if (!owns) return reply('conflict', 'lease-lost', 409);
+        state.publicRunId = String(command.runId);
+        break;
+      case 'endInitiative':
+        if (!owns) return reply('conflict', 'lease-lost', 409);
+        state.publicRunId = null;
+        break;
+      default:
+        if (!owns) return reply('conflict', 'lease-lost', 409);
+    }
+    state.revision += 1;
+    return reply('committed', 'current', 200);
+  };
+  const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+    const url = String(input);
+    if (!init?.method)
+      return Response.json({ current: descriptor(), registry: [] });
+    if (url.endsWith('/table/control')) {
+      const body = JSON.parse(String(init.body)) as {
+        command: Record<string, unknown>;
+      };
+      return execute(body.command);
+    }
+    if (url.endsWith('/authority/initialize-if-empty'))
+      return Response.json({ status: 'provisioned' });
+    throw new Error(`Unexpected URL ${url}`);
+  });
+  /** A commit made by another request (e.g. a second client) of this holder. */
+  const interleave = (holderSessionId: string) =>
+    execute({
+      type: 'publishInitiative',
+      expectedEpoch: state.epoch,
+      expectedRevision: state.revision,
+      expectedFence: state.writerFence,
+      holderSessionId,
+      runId: 'run-other',
+    });
+  return { state, commands, fetcher, execute, interleave };
+}
+
+const prepareOptions = (fetcher: typeof fetch) => ({
+  campaignCode: 'CAMP',
+  dmId: 'dm-1',
+  sceneId: 'scene-1',
+  sourceMapId: 'map-original',
+  workspaceInstanceId: 'workspace-1',
+  contentRevision: 1,
+  safeLabel: 'Crypt',
+  canvasState: {},
+  holderSessionId: 'table-session-1',
+  fetcher,
+});
+
+const initiative = (runId: string) => ({
+  encounterId: runId,
+  isActive: true,
+  round: 1,
+  currentEntityId: null,
+  turnOrder: [],
+  enemyHpMode: 'off' as const,
+  enemyConditionsMode: 'off' as const,
+  updatedAt: 'synthetic',
+});
+
+describe('Table control session (D8)', () => {
+  it('renews after an interleaved commit by retrying once with the fresh revision', async () => {
+    const server = controlServer();
+    server.state.revision = 4;
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    server.interleave('table-session-1');
+    await expect(prepared.renew()).resolves.toBe(true);
+    const renewals = server.commands.filter(
+      command => command.type === 'renew'
+    );
+    expect(renewals).toHaveLength(2);
+    expect(renewals[1]!.operationId).not.toBe(renewals[0]!.operationId);
+    expect(
+      server.commands.some(
+        command => command.type === 'acquire' && command !== server.commands[0]
+      )
+    ).toBe(false);
+  });
+
+  it('builds every command from the latest descriptor (publish then renew)', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    const session = prepared.session;
+    await expect(
+      session.publishInitiative('run-a', initiative('run-a'))
+    ).resolves.toMatchObject({ status: 'committed' });
+    await expect(session.renew()).resolves.toMatchObject({
+      status: 'committed',
+    });
+    expect(
+      server.commands.filter(command => command.type === 'renew')
+    ).toHaveLength(1);
+    expect(session.current().revision).toBe(server.state.revision);
+  });
+
+  it('marks takeover and lease loss as lost and never acquires or takes over', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    const session = prepared.session;
+    // Another session explicitly takes over.
+    server.execute({
+      type: 'takeover',
+      expectedEpoch: server.state.epoch,
+      expectedRevision: server.state.revision,
+      expectedFence: server.state.writerFence,
+      holderSessionId: 'other-session',
+    });
+    const outcome = await session.publishInitiative(
+      'run-a',
+      initiative('run-a')
+    );
+    expect(outcome).toMatchObject({ status: 'lost' });
+    expect(session.isLost()).toBe(true);
+    const sent = server.commands.length;
+    await expect(session.endInitiative()).resolves.toMatchObject({
+      status: 'lost',
+    });
+    await expect(session.renew()).resolves.toMatchObject({ status: 'lost' });
+    expect(server.commands).toHaveLength(sent);
+    expect(
+      server.commands.filter(command =>
+        ['acquire', 'takeover'].includes(String(command.type))
+      )
+    ).toHaveLength(2); // the initial acquire and the other session's takeover
+    expect(server.state.holderSessionId).toBe('other-session');
+  });
+
+  it('treats lease-lost from an expired lease as lost', async () => {
+    let clock = 1_000_000;
+    const server = controlServer({ now: () => clock });
+    const session = createTableControlSession({
+      campaignCode: 'CAMP',
+      dmId: 'dm-1',
+      holderSessionId: 'table-session-1',
+      initial: { ...server.state },
+      fetcher: server.fetcher,
+      now: () => clock,
+    });
+    server.execute({
+      type: 'acquire',
+      expectedEpoch: server.state.epoch,
+      expectedRevision: server.state.revision,
+      expectedFence: server.state.writerFence,
+      holderSessionId: 'table-session-1',
+    });
+    clock += 60_000;
+    const outcome = await session.renew();
+    expect(outcome).toMatchObject({ status: 'lost' });
+  });
+
+  it('refuses an oversized publication without sending a request', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    const before = server.commands.length;
+    const huge = {
+      ...initiative('run-a'),
+      turnOrder: Array.from({ length: 200 }, (_, index) => ({
+        entityId: `entity-${index}`,
+        displayName: 'x'.repeat(150),
+        type: 'npc' as const,
+      })),
+    };
+    await expect(
+      prepared.session.publishInitiative('run-a', huge)
+    ).resolves.toEqual({ status: 'failed', reason: 'too-large' });
+    expect(server.commands).toHaveLength(before);
+    expect(prepared.session.isLost()).toBe(false);
+  });
+
+  it('serializes commands and bounds the queue at 8 pending', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const release: Array<() => void> = [];
+    server.fetcher.mockImplementation(async (_input, init) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise<void>(resolve => release.push(resolve));
+      inFlight -= 1;
+      const body = JSON.parse(String(init?.body)) as {
+        command: Record<string, unknown>;
+      };
+      return server.execute(body.command);
+    });
+    const results = Array.from({ length: 9 }, () =>
+      prepared.session.publishInitiative('run-a', initiative('run-a'))
+    );
+    await expect(results[8]).resolves.toEqual({
+      status: 'failed',
+      reason: 'queue-overflow',
+    });
+    while (release.length > 0 || inFlight > 0) {
+      release.shift()?.();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
+    const settled = await Promise.all(results.slice(0, 8));
+    expect(settled.every(result => result.status === 'committed')).toBe(true);
+    expect(maxInFlight).toBe(1);
   });
 });
