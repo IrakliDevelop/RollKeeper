@@ -3,13 +3,15 @@
 import React, { useState } from 'react';
 import { Eye, Link2, Pencil, X } from 'lucide-react';
 import type { EncounterEntity } from '@/types/encounter';
-import type { EntityActions } from '../types';
+import type { CombatantDetailCapabilities, EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
 import { HeaderStatLine } from './HeaderStatLine';
 
 export interface DetailSectionProps {
   entity: EncounterEntity;
   actions: EntityActions;
+  /** Table scene runs (see CombatantDetailCapabilities); legacy when omitted. */
+  capabilities?: CombatantDetailCapabilities;
 }
 
 const BADGE_STYLES: Record<
@@ -42,6 +44,7 @@ export function DetailHeader({
   entity,
   actions,
   onOpenSheet,
+  capabilities,
 }: DetailSectionProps & { onOpenSheet?: () => void }) {
   const [isEditingName, setIsEditingName] = useState(false);
   const [nameInput, setNameInput] = useState('');
@@ -107,7 +110,7 @@ export function DetailHeader({
               <h2 className="font-display text-heading min-w-0 truncate text-2xl leading-tight font-bold">
                 {entity.name}
               </h2>
-              {!isPlayer && (
+              {!isPlayer && !capabilities && (
                 <button
                   onClick={() => {
                     setNameInput(entity.name);
@@ -133,7 +136,7 @@ export function DetailHeader({
                 CR {cr}
               </span>
             )}
-            {!isPlayer && npcSourceId && (
+            {!isPlayer && npcSourceId && !capabilities && (
               <span
                 title="Stat edits sync to the NPC library record"
                 className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium"
@@ -147,38 +150,46 @@ export function DetailHeader({
             )}
           </div>
           {meta && <p className="text-muted mt-0.5 text-xs">{meta}</p>}
-          <HeaderStatLine entity={entity} actions={actions} />
+          {!capabilities && (
+            <HeaderStatLine entity={entity} actions={actions} />
+          )}
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
-          {isPlayer && onOpenSheet && (
+        {!capabilities && (
+          <div className="flex shrink-0 items-center gap-1.5">
+            {isPlayer && onOpenSheet && (
+              <button
+                onClick={onOpenSheet}
+                className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border-strong rounded-lg border px-3 py-1.5 text-xs font-semibold"
+              >
+                Full character sheet
+              </button>
+            )}
+            {npcSourceId && onViewNPC && (
+              <button
+                onClick={() => onViewNPC(npcSourceId, entity.id)}
+                className="text-muted hover:text-accent-amber-text rounded p-1 transition-colors"
+                title="View NPC details"
+              >
+                <Eye size={15} />
+              </button>
+            )}
             <button
-              onClick={onOpenSheet}
-              className="bg-accent-blue-bg text-accent-blue-text border-accent-blue-border-strong rounded-lg border px-3 py-1.5 text-xs font-semibold"
+              onClick={handleRemove}
+              className="text-accent-red-text hover:bg-accent-red-bg rounded p-1 transition-colors"
+              title="Remove from combat"
             >
-              Full character sheet
+              <X size={15} />
             </button>
-          )}
-          {npcSourceId && onViewNPC && (
-            <button
-              onClick={() => onViewNPC(npcSourceId, entity.id)}
-              className="text-muted hover:text-accent-amber-text rounded p-1 transition-colors"
-              title="View NPC details"
-            >
-              <Eye size={15} />
-            </button>
-          )}
-          <button
-            onClick={handleRemove}
-            className="text-accent-red-text hover:bg-accent-red-bg rounded p-1 transition-colors"
-            title="Remove from combat"
-          >
-            <X size={15} />
-          </button>
-        </div>
+          </div>
+        )}
       </div>
 
-      <HeaderControls entity={entity} actions={actions} />
+      <HeaderControls
+        entity={entity}
+        actions={actions}
+        capabilities={capabilities}
+      />
     </div>
   );
 }

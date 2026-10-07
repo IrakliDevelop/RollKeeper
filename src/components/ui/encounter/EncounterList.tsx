@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
+import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
@@ -233,6 +234,12 @@ function EncounterCard({
           <Button variant="ghost" size="sm" onClick={onDelete} title="Delete">
             <Trash2 size={14} />
           </Button>
+        </div>
+        <div className="mt-2 empty:hidden">
+          <OpenSceneRunLink
+            campaignCode={campaignCode}
+            encounterId={encounter.id}
+          />
         </div>
       </div>
     </div>

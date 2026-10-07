@@ -13,18 +13,16 @@ import {
   type PendingTokenPlacement,
 } from '@/components/ui/campaign/dm-vtt/TokenPlacementController';
 import { Button } from '@/components/ui/forms/button';
+import { TableAuthorityStatus } from '@/components/ui/campaign/table/TableAuthorityStatus';
+import { TableCombatPanel } from '@/components/ui/campaign/table/combat/TableCombatPanel';
 import { TableRosterPanel } from '@/components/ui/campaign/table/TableRosterPanel';
 import { createTableRosterCanvas } from '@/components/ui/campaign/table/tableRosterCanvas';
 import { useAuthenticatedTableWorkspace } from '@/components/ui/campaign/table/useAuthenticatedTableWorkspace';
+import { useTableSceneAuthority } from '@/components/ui/campaign/table/useTableSceneAuthority';
 import type { BattleMapConnection } from '@/lib/battlemapSync';
-import {
-  prepareTableSceneAuthority,
-  getTableAuthoritySessionId,
-} from '@/lib/table/authorityLifecycle';
 import {
   restoreAuthorityFork,
   saveSceneCheckpoint,
-  sceneCheckpointToViewportState,
 } from '@/lib/table/checkpoint';
 import {
   createTableSceneAdapter,
@@ -39,6 +37,7 @@ export default function TableScenePage() {
   const campaignCode = params.code as string;
   const sceneId = params.sceneId as string;
   const selectedWorkspaceId = searchParams.get('tableWorkspace');
+  const requestedRunId = searchParams.get('run');
   const battleMapsHref = `/dm/campaign/${campaignCode}/battlemaps${selectedWorkspaceId ? `?tableWorkspace=${encodeURIComponent(selectedWorkspaceId)}` : ''}`;
   const dmId = useDmStore(state => state.dmId);
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
@@ -65,10 +64,6 @@ export default function TableScenePage() {
   );
   const [relayStatus, setRelayStatus] = useState('connecting');
   const [saveMessage, setSaveMessage] = useState('Local scene loading…');
-  const [authorityStatus, setAuthorityStatus] = useState<
-    'idle' | 'initializing' | 'ready' | 'failed' | 'offline'
-  >('idle');
-  const [authorityAttempt, setAuthorityAttempt] = useState(0);
   const [recoveryBusy, setRecoveryBusy] = useState(false);
   const [, refresh] = useState(0);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -92,13 +87,7 @@ export default function TableScenePage() {
   useEffect(() => {
     setAdapter(null);
     setConnection(null);
-    if (!repository) {
-      setAuthorityStatus('idle');
-      return;
-    }
-    // Gate canvas mounting until registration/private authority init has
-    // completed; otherwise its token request can race private preparation.
-    setAuthorityStatus('initializing');
+    if (!repository) return;
     const activeAdapter = createTableSceneAdapter({
       repository,
       sceneId,
@@ -127,61 +116,26 @@ export default function TableScenePage() {
         )
       : undefined;
 
+  // Live control (D8/R2-3): the first outcome gates canvas mounting (its
+  // token request must not race private preparation, C3-7); afterwards the
+  // canvas and combat stay mounted regardless of control.
+  const authority = useTableSceneAuthority({
+    repository,
+    adapter,
+    campaignCode,
+    dmId,
+    sceneId,
+  });
+  // After an explicit acquire the canvas reconnects through a fresh mount
+  // (re-mints its token) when it is not live.
+  const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const relayLive = relayStatus === 'live';
+  const lastExplicit = useRef(0);
   useEffect(() => {
-    if (!repository || !adapter) return;
-    const current = repository.getCurrent();
-    if (current?.status !== 'ready') return;
-    const authorityScene = current.snapshot.scenes.find(
-      value => value.sceneId === sceneId
-    );
-    if (!authorityScene) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setInterval> | null = null;
-    setAuthorityStatus('initializing');
-    setSaveMessage('Registering scene and preparing private authority…');
-    const canvasState = authorityScene.canvasCheckpoint
-      ? sceneCheckpointToViewportState(authorityScene.canvasCheckpoint)
-      : {};
-    void prepareTableSceneAuthority({
-      campaignCode,
-      dmId,
-      sceneId,
-      sourceMapId: authorityScene.originalMapId ?? sceneId,
-      workspaceInstanceId:
-        repository.workspaceSelection.workspace.localWorkspaceId,
-      contentRevision: current.snapshot.campaign?.revision ?? 0,
-      safeLabel: authorityScene.map.name,
-      canvasState,
-      holderSessionId: getTableAuthoritySessionId(),
-    }).then(session => {
-      if (cancelled) return;
-      if (session.status === 'failed') {
-        setAuthorityStatus('failed');
-        setSaveMessage(
-          `Private authority preparation failed (${session.reason}). No checkpoint was changed and public presentation is unchanged.`
-        );
-        return;
-      }
-      setAuthorityStatus('ready');
-      setSaveMessage(
-        'Private authority ready. Public presentation is unchanged; local drafts remain separate.'
-      );
-      timer = setInterval(() => {
-        void session.renew().then(ok => {
-          if (!ok && !cancelled) {
-            setAuthorityStatus('failed');
-            setSaveMessage(
-              'Live control was lost. The local draft remains saved on this device.'
-            );
-          }
-        });
-      }, 20_000);
-    });
-    return () => {
-      cancelled = true;
-      if (timer) clearInterval(timer);
-    };
-  }, [adapter, authorityAttempt, campaignCode, dmId, repository, sceneId]);
+    if (authority.explicitAcquired === lastExplicit.current) return;
+    lastExplicit.current = authority.explicitAcquired;
+    if (!relayLive) setCanvasEpoch(value => value + 1);
+  }, [authority.explicitAcquired, relayLive]);
 
   const handleConnectionReady = useCallback(
     (next: BattleMapConnection | null) => setConnection(next),
@@ -293,37 +247,19 @@ export default function TableScenePage() {
     );
   }
 
-  if (authorityStatus === 'initializing') {
+  if (!authority.firstOutcome) {
     return (
       <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-        <p className="text-heading text-lg font-semibold">{saveMessage}</p>
-      </main>
-    );
-  }
-
-  if (authorityStatus === 'failed') {
-    return (
-      <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
-        <p className="text-accent-red-text max-w-xl text-center" role="alert">
-          {saveMessage}
+        <p className="text-heading text-lg font-semibold">
+          Registering scene and preparing private authority…
         </p>
-        <div className="flex gap-2">
-          <Button
-            variant="primary"
-            onClick={() => setAuthorityAttempt(value => value + 1)}
-          >
-            Retry private setup
-          </Button>
-          <Button variant="ghost" onClick={() => setAuthorityStatus('offline')}>
-            Work offline
-          </Button>
-        </div>
       </main>
     );
   }
 
   return (
     <DmBattleMapCanvas
+      key={`canvas-${canvasEpoch}`}
       campaignCode={campaignCode}
       battleMapId={sceneId}
       dmId={dmId}
@@ -362,6 +298,13 @@ export default function TableScenePage() {
             </p>
             <p className="text-muted text-xs">{saveMessage}</p>
           </div>
+          <TableAuthorityStatus
+            state={authority.state}
+            waitSeconds={authority.waitSeconds}
+            clearedNotice={authority.explicitAcquired > 0}
+            onAcquire={authority.acquire}
+            onWorkOffline={authority.workOffline}
+          />
           {pendingConflict && (
             <div
               className="border-accent-orange-text w-full rounded border p-2"
@@ -449,6 +392,20 @@ export default function TableScenePage() {
         dmId={dmId}
         canvas={rosterCanvas}
         live={relayStatus === 'live'}
+      />
+      <TableCombatPanel
+        repository={repository}
+        sceneId={sceneId}
+        campaignCode={campaignCode}
+        dmId={dmId}
+        controlSession={authority.session}
+        controlEpoch={authority.controlEpoch}
+        liveUnavailable={
+          (authority.state.phase === 'failed' ||
+            authority.state.phase === 'lost') &&
+          authority.state.reason === 'live-unavailable'
+        }
+        requestedRunId={requestedRunId}
       />
     </DmBattleMapCanvas>
   );

@@ -74,6 +74,22 @@ export function pushLinkedMapLive(
 }
 
 /**
+ * Start-combat auto-share (D9). Under Table protocol v1 the legacy shared
+ * battlemap write can only be rejected (426) and would be an implicit share,
+ * so it is skipped; legacy mode keeps `pushLinkedMapLive` unchanged.
+ */
+export function pushLinkedMapLiveOnStart(
+  battleMaps: BattleMap[],
+  encounterId: string,
+  pushActive: (battleMapId: string | null, name?: string) => Promise<void>,
+  tableProtocolRequired = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED ===
+    'true'
+): void {
+  if (tableProtocolRequired) return;
+  pushLinkedMapLive(battleMaps, encounterId, pushActive);
+}
+
+/**
  * Start-combat combat-log wiring, extracted for unit testability (same
  * pattern as `handleEncounterPoke`/`pushLinkedMapLive`). `startArchive`
  * admits and activates a new archive for this encounter; a null return
@@ -404,7 +420,11 @@ export function EncounterView({
     }
     startCombat(encounterId);
     startCombatLogArchiveForCombat(encounterId, campaignCode, startArchive);
-    pushLinkedMapLive(getBattleMaps(campaignCode), encounterId, pushActive);
+    pushLinkedMapLiveOnStart(
+      getBattleMaps(campaignCode),
+      encounterId,
+      pushActive
+    );
   }, [
     encounter?.pendingInitiativeRequest,
     encounterId,

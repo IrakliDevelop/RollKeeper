@@ -16,7 +16,11 @@ import {
   spendHitDie,
 } from './hitDie';
 
-export function DetailVitals({ entity, actions }: DetailSectionProps) {
+export function DetailVitals({
+  entity,
+  actions,
+  capabilities,
+}: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
   const [maxInput, setMaxInput] = useState('');
 
@@ -24,6 +28,11 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
   const isPlayer = entity.type === 'player';
   const isNonPlayerNonSummon = !isPlayer && !entity.summonId;
+  // Legacy: players are synced read-only. Scene runs: per-capability.
+  const readOnlyMax = capabilities ? !capabilities.maxHp : isPlayer;
+  const readOnlyTemp = capabilities ? !capabilities.tempHp : isPlayer;
+  const readOnlyAc = capabilities ? !capabilities.armorClass : isPlayer;
+  const showDamage = capabilities ? capabilities.hp : isNonPlayerNonSummon;
 
   const commitMaxHp = (raw: string) => {
     const val = parseInt(raw, 10);
@@ -44,7 +53,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
             {entity.currentHp}
           </span>
           <span className="text-muted text-sm font-medium">/</span>
-          {isPlayer ? (
+          {readOnlyMax ? (
             <span className="text-muted text-sm tabular-nums">
               {entity.maxHp}
             </span>
@@ -76,9 +85,9 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
 
           {/* Temp HP pill */}
           {entity.tempHp > 0 &&
-            (isPlayer ? (
+            (readOnlyTemp ? (
               <span className="text-faint ml-1 text-xs">
-                (+{entity.tempHp} temp, synced)
+                (+{entity.tempHp} temp{capabilities ? '' : ', synced'})
               </span>
             ) : (
               <span className="bg-accent-blue-bg text-accent-blue-text ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium">
@@ -97,13 +106,26 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         {/* AC */}
         <div className="flex items-center gap-1.5">
           <Shield size={14} className="text-muted shrink-0" />
-          {isPlayer ? (
+          {readOnlyAc ? (
             <div className="text-right">
               <span className="text-heading font-bold tabular-nums">
                 {entity.armorClass}
               </span>
-              <p className="text-faint text-[10px]">synced</p>
+              <p className="text-faint text-[10px]">
+                {capabilities ? 'read-only' : 'synced'}
+              </p>
             </div>
+          ) : capabilities ? (
+            <NumberField
+              value={entity.armorClass}
+              onChange={v =>
+                actions.onUpdate(entity.id, { armorClass: v ?? 0 })
+              }
+              min={0}
+              className="bg-surface-raised text-heading w-12 rounded px-1 py-0.5 text-center text-sm font-bold shadow-sm"
+              aria-label="Armor class"
+              title="Armor class"
+            />
           ) : (
             <div className="flex items-center gap-1">
               <NumberField
@@ -154,7 +176,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
       />
 
       {/* Damage/heal/temp controls */}
-      {isNonPlayerNonSummon && (
+      {showDamage && (
         <DamageControls
           entityId={entity.id}
           onDamage={actions.onDamage}
@@ -163,15 +185,19 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
         />
       )}
 
-      <ConcentrationReaction entity={entity} actions={actions} />
+      <ConcentrationReaction
+        entity={entity}
+        actions={actions}
+        capabilities={capabilities}
+      />
 
       {/* Death saves (players read-only, NPCs interactive) */}
-      {showDeathSaves(entity) && (
+      {showDeathSaves(entity) && (!capabilities || isPlayer) && (
         <DeathSaves entity={entity} actions={actions} />
       )}
 
       {/* Spend hit die */}
-      {canSpendHitDie(entity) && (
+      {!capabilities && canSpendHitDie(entity) && (
         <button
           onClick={() => spendHitDie(entity, actions)}
           className="text-accent-purple-text bg-accent-purple-bg hover:bg-accent-purple-bg-strong flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors"
