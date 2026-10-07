@@ -932,12 +932,15 @@ run('two relay authority transport', () => {
       tableControlKey(CAMPAIGN),
       JSON.stringify(control(99_999_999_999_999))
     );
-    // Relay poll (50 ms here) + the 1 s control-read bound.
+    // S4: closed within the next relay poll (50 ms here) + the 1 s
+    // control-read bound; 150 ms covers this harness (the Redis SET round
+    // trip and the 20 ms `eventually` tick). Typically 20–90 ms.
+    const bound = 50 + 1_000 + 150;
     await eventually(
       () => closeEvents.some(event => event.code === 4403),
-      1_050
+      bound
     );
-    expect(Date.now() - rotatedAt).toBeLessThan(1_050);
+    expect(Date.now() - rotatedAt).toBeLessThanOrEqual(bound);
     console.log(
       'DEBUG',
       JSON.stringify(closeEvents),
