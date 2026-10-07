@@ -650,7 +650,15 @@ export class TableRepository {
   async mutateWorkspace(
     expectedRevision: number,
     operationId: string,
-    mutation: TableWorkspaceMutation
+    mutation: TableWorkspaceMutation,
+    options: {
+      /**
+       * Typed commands digest their intent rather than the planned records,
+       * so a retry with the same operation id replays instead of comparing
+       * freshly timestamped/planned records (see `roster.ts`).
+       */
+      digestSource?: unknown;
+    } = {}
   ): Promise<TableCommitResult> {
     const workspaceKey = this.workspaceKey;
     const generation = this.generation;
@@ -697,7 +705,7 @@ export class TableRepository {
     try {
       database = await this.database();
       digest = await commandDigest(
-        mutation as unknown as TableRuntimeCommandV1
+        (options.digestSource ?? mutation) as unknown as TableRuntimeCommandV1
       );
     } catch (error) {
       return immutableResult({

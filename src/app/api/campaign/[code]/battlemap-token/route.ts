@@ -16,6 +16,7 @@ import {
   tableRegistryKey,
 } from '@/lib/tableServer/control';
 import { tableAuthorityRoomKeys } from '@/lib/tableServer/keys';
+import { resolvePresentedTableScene } from '@/lib/tableServer/presentation';
 import {
   isSafeResourceId,
   resolveVerifiedLocation,
@@ -170,6 +171,80 @@ export async function POST(
       resolvedLegacyKind = 'location';
     }
 
+    if (tableV1 && session.role !== 'dm') {
+      // R4: map-pinned player/display surfaces open the source map URL and
+      // reach only the current, unblanked presentation adopted from it.
+      // Every availability miss is one uniform answer (no registry probing).
+      let rawRedis: ReturnType<typeof getRawRedis>;
+      try {
+        rawRedis = getRawRedis();
+      } catch {
+        return NextResponse.json(
+          { error: 'Live authority is unavailable' },
+          { status: 503 }
+        );
+      }
+      const resolution = await resolvePresentedTableScene({
+        rawRedis,
+        campaign: code,
+        battleMapId,
+        requestedSceneId: body.sceneId,
+        role: session.role,
+      });
+      if (resolution.status === 'error') {
+        return NextResponse.json(
+          { error: 'Live authority is unavailable' },
+          { status: 503 }
+        );
+      }
+      if (resolution.status !== 'resolved') {
+        return NextResponse.json(
+          { error: 'Scene is unavailable' },
+          { status: 403 }
+        );
+      }
+      if (!(await proveRelayAuthority(code))) {
+        return NextResponse.json(
+          { error: 'Live authority is unavailable' },
+          { status: 503 }
+        );
+      }
+      const common = {
+        v: 1 as const,
+        userId: session.userId,
+        room: resolution.room,
+        exp: Date.now() + TOKEN_TTL_MS,
+        campaign: code,
+        resourceKind: 'scene' as const,
+        sceneId: resolution.sceneId,
+        epoch: resolution.epoch,
+        roomGeneration: resolution.roomGeneration,
+      };
+      const token = signBattleMapToken(
+        session.role === 'player'
+          ? {
+              ...common,
+              role: 'player' as const,
+              playerPrincipal: session.userId,
+            }
+          : {
+              ...common,
+              role: 'display' as const,
+              displayGeneration: resolution.displayGeneration as number,
+            },
+        secret
+      );
+      return NextResponse.json({
+        token,
+        authority: 1,
+        room: resolution.room,
+        roomGeneration: resolution.roomGeneration,
+        sceneId: resolution.sceneId,
+        fogAppearance: 'solid',
+        fogAppearanceUpdatedAt: null,
+      });
+    }
+
     if (tableV1) {
       if (!body.sceneId) {
         return NextResponse.json(
@@ -288,6 +363,7 @@ export async function POST(
         authority: 1,
         room,
         roomGeneration: meta.generation,
+        sceneId: body.sceneId,
         fogAppearance: 'solid',
         fogAppearanceUpdatedAt: null,
       });

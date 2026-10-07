@@ -486,3 +486,47 @@ describe('restampCombatantTokens', () => {
     expect(el.id).toBe('tok-1');
   });
 });
+
+describe('stampCombatantToken with Table member fields (PR02)', () => {
+  it('uses the pre-allocated token id and replaces the combatant identity keys for a party token', () => {
+    const { ctx, added } = fakeCtx();
+    stampCombatantToken(
+      {
+        entityId: 'member-a',
+        name: 'Aria',
+        color: '#12855C',
+        tokenId: 'bound-token-a',
+        fields: {
+          tokenKind: 'player',
+          characterId: 'legacy-a',
+          layerId: 'player-legacy-a',
+          sceneMemberId: 'member-a',
+        },
+      },
+      { x: 100, y: 100 },
+      ctx
+    );
+    const el = added[0] as unknown as Record<string, unknown>;
+    expect(el).toMatchObject({
+      id: 'bound-token-a',
+      tokenKind: 'player',
+      characterId: 'legacy-a',
+      layerId: 'player-legacy-a',
+      sceneMemberId: 'member-a',
+    });
+    expect(el).not.toHaveProperty('entityId');
+  });
+
+  it('keeps legacy stamping unchanged without Table fields', () => {
+    const { ctx, added } = fakeCtx();
+    stampCombatantToken(
+      { entityId: 'e1', name: 'Goblin', color: '#C0392B' },
+      { x: 0, y: 0 },
+      ctx
+    );
+    const el = added[0] as unknown as Record<string, unknown>;
+    expect(el.id).not.toBe('e1');
+    expect(el).not.toHaveProperty('sceneMemberId');
+    expect(el).toMatchObject({ entityId: 'e1', tokenKind: 'combatant' });
+  });
+});

@@ -195,3 +195,50 @@ export function validateAuthorityRequest(
   }
   return null;
 }
+
+/** Canonical player-band definition, mirrored by the Lua layer rule. */
+export const PLAYER_BAND_ORDER = 500;
+
+export function isCanonicalPlayerLayerRecord(
+  value: unknown,
+  ownershipId: string
+): boolean {
+  const layer = record(value);
+  const definition = record(layer?.definition);
+  const id = `player-${ownershipId}`;
+  return (
+    layer?.id === id &&
+    definition !== null &&
+    definition.id === id &&
+    definition.visible === true &&
+    definition.locked === false &&
+    definition.opacity === 1 &&
+    definition.order === PLAYER_BAND_ORDER
+  );
+}
+
+/**
+ * Stateless half of the v1 player policy, applied before Redis. It can only
+ * narrow: the atomic Lua host repeats every rule against current state.
+ * Players never write an audience or a non-player token kind, and only
+ * publish the canonical definition of their own band (no tombstones).
+ */
+export function playerIntentShapeAllowed(
+  intent: AuthorityIntent,
+  ownershipId: string
+): boolean {
+  const value = intent as unknown as Record<string, unknown>;
+  if (value.kind === 'element-upsert') {
+    const element = record(value.element);
+    if (!element) return false;
+    const absent = (field: unknown) => field === undefined || field === null;
+    return (
+      absent(element.audience) &&
+      (absent(element.tokenKind) || element.tokenKind === 'player')
+    );
+  }
+  if (value.kind === 'layer-write') {
+    return isCanonicalPlayerLayerRecord(value.record, ownershipId);
+  }
+  return true;
+}

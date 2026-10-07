@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { Redis } from '@upstash/redis';
 import { getRawRedis } from '@/lib/redis';
 import { TABLE_CONTROL_SCRIPT } from './atomic';
+import { normalizeHashEntries } from './resourceKind';
 import type { TableCommand } from './validation';
 import {
   tableCompatibilityKey,
@@ -103,8 +104,10 @@ export class TableControlService {
     const entries = await this.redis.hgetall(
       tableRegistryKey(principal.campaignCode)
     );
-    return Object.values(entries ?? {})
-      .map(value => decode<Record<string, unknown>>(value as string)!)
+    const normalized = normalizeHashEntries(entries);
+    if (!normalized) throw new Error('Invalid Table scene registry');
+    return normalized
+      .map(([, value]) => decode<Record<string, unknown>>(value as string)!)
       .filter(Boolean);
   }
 

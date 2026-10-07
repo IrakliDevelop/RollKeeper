@@ -768,7 +768,8 @@ describe('Table v1 authority token minting', () => {
       }),
       params
     );
-    expect(mismatch.status).toBe(409);
+    // R4: player/display availability denials are uniform 403s.
+    expect(mismatch.status).toBe(403);
     proveRelayAuthority.mockResolvedValue(false);
     const unavailable = await POST(
       request({
@@ -836,5 +837,307 @@ describe('fog appearance token metadata', () => {
     const body = await response.json();
     expect(body.fogAppearance).toEqual({ v: 2, kind: 'custom', material });
     expect(JSON.stringify(body.fogAppearance)).not.toContain('fp_1');
+  });
+});
+
+describe('R4 presented Table scene resolution for map-pinned audiences', () => {
+  const ROOM_X = '423e4567-e89b-42d3-a456-426614174000';
+  const ROOM_M = '523e4567-e89b-42d3-a456-426614174000';
+  const ROOM_N = '623e4567-e89b-42d3-a456-426614174000';
+  let tag = '';
+
+  const registry = (sceneId: string, sourceMapId: string, roomId: string) =>
+    JSON.stringify({
+      v: 1,
+      sceneId,
+      workspaceInstanceId: 'workspace-a',
+      sourceMapId,
+      contentRevision: 1,
+      safeLabel: `Scene ${sceneId}`,
+      registeredAt: 1,
+      registryRevision: 1,
+      roomId,
+      deleted: false,
+    });
+
+  async function present(
+    sceneId: string | null,
+    extra: Record<string, unknown> = {}
+  ) {
+    seedRedis(
+      `campaign:${tag}:table-control`,
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 4,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 60_000,
+        presentation: { sceneId, revision: 2, blanked: false },
+        displayGeneration: 3,
+        ...extra,
+      })
+    );
+  }
+
+  beforeEach(async () => {
+    resetRedis();
+    vi.clearAllMocks();
+    delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
+    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
+    authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
+    proveRelayAuthority.mockResolvedValue(true);
+    seedRedisSet(`campaign:${CODE}:players`, ['player-a']);
+    seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
+    const { createHash } = await import('node:crypto');
+    tag = `{rk-table-v1:${createHash('sha256').update(CODE).digest('hex')}}`;
+    await present('scene-x');
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'scene-x',
+      registry('scene-x', 'map-m', ROOM_X)
+    );
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'map-m',
+      registry('map-m', 'map-m', ROOM_M)
+    );
+    await mockRedis.hset(
+      `campaign:${tag}:table-scenes`,
+      'scene-n',
+      registry('scene-n', 'map-n', ROOM_N)
+    );
+    for (const room of [ROOM_X, ROOM_M, ROOM_N]) {
+      seedRedis(
+        `campaign:${tag}:room:${room}:meta`,
+        JSON.stringify({
+          v: 1,
+          generation: GENERATION,
+          revision: 0,
+          casToken: 'cas-a',
+        })
+      );
+    }
+  });
+
+  afterEach(() => {
+    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
+  });
+
+  const player = (body: Record<string, unknown> = {}) =>
+    request({
+      role: 'player',
+      battleMapId: 'map-m',
+      sceneId: 'map-m',
+      playerId: 'player-a',
+      protocols: { fog: 1, authority: 1 },
+      ...body,
+    });
+  const display = (body: Record<string, unknown> = {}) =>
+    request({
+      role: 'display',
+      battleMapId: 'map-m',
+      sceneId: 'map-m',
+      displayKey: 'display-a',
+      protocols: { fog: 1, authority: 1 },
+      ...body,
+    });
+
+  async function expectUnavailable(response: Response) {
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Scene is unavailable',
+    });
+  }
+
+  it('resolves the presented adopted scene for a source-map URL (sceneId equal or absent)', async () => {
+    for (const body of [{}, { sceneId: undefined }]) {
+      const response = await POST(player(body), params);
+      expect(response.status).toBe(200);
+      const result = (await response.json()) as {
+        token: string;
+        room: string;
+        sceneId: string;
+      };
+      expect(result).toMatchObject({ room: ROOM_X, sceneId: 'scene-x' });
+      expect(Object.keys(result).sort()).toEqual([
+        'authority',
+        'fogAppearance',
+        'fogAppearanceUpdatedAt',
+        'room',
+        'roomGeneration',
+        'sceneId',
+        'token',
+      ]);
+      expect(
+        verifyBattleMapToken(result.token, 'synthetic-relay-secret')
+      ).toMatchObject({
+        sceneId: 'scene-x',
+        room: ROOM_X,
+        role: 'player',
+        playerPrincipal: 'player-a',
+      });
+    }
+    const shown = await POST(display(), params);
+    expect(shown.status).toBe(200);
+    await expect(shown.json()).resolves.toMatchObject({
+      room: ROOM_X,
+      sceneId: 'scene-x',
+    });
+  });
+
+  it('keeps the original map room when the original map itself is presented', async () => {
+    await present('map-m');
+    const response = await POST(player(), params);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      room: ROOM_M,
+      sceneId: 'map-m',
+    });
+  });
+
+  it.each([
+    ['unpresented', null, {}],
+    ['blanked', 'scene-x', { blanked: true }],
+    ['switched to another source map', 'scene-n', {}],
+  ])(
+    'denies %s with the uniform status',
+    async (_label, sceneId, presentation) => {
+      seedRedis(
+        `campaign:${tag}:table-control`,
+        JSON.stringify({
+          v: 1,
+          epoch: EPOCH,
+          writerFence: 4,
+          holderPrincipal: 'legacy:dm-a',
+          leaseUntil: Date.now() + 60_000,
+          presentation: {
+            sceneId,
+            revision: 2,
+            blanked: false,
+            ...presentation,
+          },
+          displayGeneration: 3,
+        })
+      );
+      await expectUnavailable(await POST(player(), params));
+      await expectUnavailable(await POST(display(), params));
+      expect(proveRelayAuthority).not.toHaveBeenCalled();
+    }
+  );
+
+  it('denies another source map, a mismatched explicit scene and an uninitialized room uniformly', async () => {
+    await expectUnavailable(
+      await POST(player({ battleMapId: 'map-n', sceneId: 'map-n' }), params)
+    );
+    await expectUnavailable(
+      await POST(player({ battleMapId: 'map-n', sceneId: 'scene-x' }), params)
+    );
+    await expectUnavailable(
+      await POST(player({ sceneId: 'scene-missing' }), params)
+    );
+    await mockRedis.del(`campaign:${tag}:room:${ROOM_X}:meta`);
+    await expectUnavailable(await POST(player(), params));
+    await expectUnavailable(await POST(display(), params));
+  });
+
+  it('verifies an explicit presented sceneId exactly as before', async () => {
+    const response = await POST(player({ sceneId: 'scene-x' }), params);
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({
+      sceneId: 'scene-x',
+      room: ROOM_X,
+    });
+  });
+
+  it('denies a display without display authority or with an invalid key', async () => {
+    seedRedis(
+      `campaign:${tag}:table-control`,
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 4,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 60_000,
+        presentation: { sceneId: 'scene-x', revision: 2, blanked: false },
+      })
+    );
+    await expectUnavailable(await POST(display(), params));
+    const invalid = await POST(display({ displayKey: 'wrong' }), params);
+    expect(invalid.status).toBe(403);
+  });
+
+  it('denies a wrong campaign without disclosing registration', async () => {
+    const otherParams = { params: Promise.resolve({ code: 'Z9Y8X7W6V5U4' }) };
+    seedRedisSet('campaign:Z9Y8X7W6V5U4:players', ['player-a']);
+    const response = await POST(player(), otherParams);
+    expect(response.status).toBe(403);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Scene is unavailable',
+    });
+  });
+
+  it('keeps 503 for a genuine authority outage', async () => {
+    proveRelayAuthority.mockResolvedValue(false);
+    expect((await POST(player(), params)).status).toBe(503);
+    proveRelayAuthority.mockResolvedValue(true);
+    mockRedis.get.mockRejectedValueOnce(new Error('redis down'));
+    expect((await POST(player(), params)).status).toBe(503);
+  });
+
+  it('never intercepts DM requests or the no-scene location path', async () => {
+    const dm = await POST(
+      request(
+        {
+          role: 'dm',
+          battleMapId: 'map-m',
+          sceneId: 'map-m',
+          dmId: 'dm-a',
+          protocols: { fog: 1, authority: 1 },
+        },
+        true
+      ),
+      params
+    );
+    expect(dm.status).toBe(200);
+    await expect(dm.json()).resolves.toMatchObject({
+      room: ROOM_M,
+      sceneId: 'map-m',
+    });
+    const dmMismatch = await POST(
+      request(
+        {
+          role: 'dm',
+          battleMapId: 'map-n',
+          sceneId: 'scene-x',
+          dmId: 'dm-a',
+          protocols: { fog: 1, authority: 1 },
+        },
+        true
+      ),
+      params
+    );
+    expect(dmMismatch.status).toBe(409);
+
+    seedRedis(
+      `campaign:${CODE}:location:location-a`,
+      validLocation('location-a')
+    );
+    const location = await POST(
+      request({
+        role: 'player',
+        battleMapId: 'location-a',
+        playerId: 'player-a',
+        kind: 'location',
+      }),
+      params
+    );
+    expect(location.status).toBe(200);
+    const body = (await location.json()) as { token: string; room?: string };
+    expect(body.room).toBeUndefined();
+    expect(
+      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
+    ).toMatchObject({ room: `${CODE}_location-a` });
   });
 });

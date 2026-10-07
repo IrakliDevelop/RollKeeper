@@ -536,3 +536,175 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
   });
   await context.close();
 });
+
+test('encounter-free scene roster persists party and manual PC members across reload without legacy writes', async ({
+  browser,
+}) => {
+  const context = await browser.newContext();
+  await context.addInitScript(
+    ({ campaign, map }) => {
+      localStorage.setItem(
+        'rollkeeper-dm-data',
+        JSON.stringify({
+          state: { dmId: 'dm-roster', campaigns: [campaign] },
+          version: 1,
+        })
+      );
+      localStorage.setItem(
+        'rollkeeper-battlemap-data',
+        JSON.stringify({
+          state: { battleMaps: { [campaign.code]: { [map.id]: map } } },
+          version: 0,
+        })
+      );
+    },
+    { campaign: CAMPAIGN, map: MAP }
+  );
+  const page = await context.newPage();
+  await page.route('**/api/campaign/E2ETABLE/players', route =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        campaign: { code: CAMPAIGN.code, name: CAMPAIGN.name },
+        players: [
+          {
+            playerId: 'legacy-aria',
+            playerName: 'Sam',
+            characterId: 'legacy-aria',
+            characterName: 'Aria',
+            characterData: {
+              class: { name: 'Rogue' },
+              level: 3,
+              armorClass: 14,
+              hitPoints: { current: 20, max: 20 },
+              abilities: { dexterity: 16 },
+            },
+            lastSynced: '2026-10-06T00:00:00.000Z',
+          },
+        ],
+      }),
+    })
+  );
+  await page.route('**/api/campaign/E2ETABLE/table/**', route =>
+    route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: '{"error":"offline"}',
+    })
+  );
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
+  await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
+  const legacyBefore = await page.evaluate(() => ({
+    map: localStorage.getItem('rollkeeper-battlemap-data'),
+    encounters: localStorage.getItem('rollkeeper-encounter-data'),
+  }));
+  const sceneId = await page.evaluate(async () => {
+    const database = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open('rollkeeper-table', 1);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const scenes = await new Promise<Array<{ sceneId: string }>>(
+      (resolve, reject) => {
+        const request = database
+          .transaction('scenes')
+          .objectStore('scenes')
+          .getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      }
+    );
+    database.close();
+    return scenes[0]!.sceneId;
+  });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table/${sceneId}`);
+  await page.getByRole('button', { name: 'Work offline' }).click();
+
+  await page.getByRole('button', { name: 'Add to scene' }).click();
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('tab', { name: 'Party' }).click();
+  await dialog.getByRole('button', { name: /Aria/ }).click();
+  await expect(page.getByText(/Player-controlled · Not on map/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add to scene' }).click();
+  await dialog.getByRole('tab', { name: 'Manual PC' }).click();
+  await dialog.getByLabel('Name').fill('Nyx');
+  await dialog.getByLabel('Max HP').fill('12');
+  await dialog.getByLabel('Armor class').fill('13');
+  await dialog.getByRole('button', { name: 'Add PC' }).click();
+  await expect(page.getByText(/DM-controlled · Not on map/)).toBeVisible();
+
+  await page.getByRole('button', { name: 'Details for Nyx' }).click();
+  await dialog.getByLabel('Current HP').fill('5');
+  await dialog.getByRole('button', { name: 'Save stats' }).click();
+  await expect(dialog.getByRole('status')).toContainText('stats saved');
+  await page.keyboard.press('Escape');
+
+  const readMembers = () =>
+    page.evaluate(async id => {
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        const request = indexedDB.open('rollkeeper-table', 1);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+      const transaction = database.transaction(['scenes', 'actors']);
+      const read = (store: string) =>
+        new Promise<Array<Record<string, unknown>>>((resolve, reject) => {
+          const request = transaction.objectStore(store).getAll();
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      const [scenes, actors] = await Promise.all([
+        read('scenes'),
+        read('actors'),
+      ]);
+      database.close();
+      const scene = scenes.find(item => item.sceneId === id) as {
+        members: Array<Record<string, unknown>>;
+      };
+      return { members: scene.members, actors };
+    }, sceneId);
+  const before = await readMembers();
+  expect(before.members).toHaveLength(2);
+  expect(before.members).toEqual([
+    expect.objectContaining({
+      sceneMemberId: expect.any(String),
+      control: expect.objectContaining({ legacyPlayerId: 'legacy-aria' }),
+    }),
+    expect.objectContaining({ sceneMemberId: expect.any(String) }),
+  ]);
+  expect(before.actors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        actorKind: 'player-reference',
+        playerReference: expect.objectContaining({
+          legacyPlayerId: 'legacy-aria',
+        }),
+      }),
+      expect.objectContaining({
+        actorKind: 'dm-managed',
+        liveStats: expect.objectContaining({ name: 'Nyx', currentHp: 5 }),
+      }),
+    ])
+  );
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Work offline' }).click();
+  await expect(page.getByText(/Player-controlled · Not on map/)).toBeVisible();
+  await page.getByRole('button', { name: 'Add to scene' }).click();
+  await dialog.getByRole('tab', { name: 'Party' }).click();
+  await dialog.getByRole('button', { name: /Aria/ }).click();
+  await expect(page.getByRole('status')).toContainText('already in this scene');
+  const after = await readMembers();
+  expect(after.members).toEqual(before.members);
+  expect(after.actors).toHaveLength(2);
+  expect(
+    await page.evaluate(() => ({
+      map: localStorage.getItem('rollkeeper-battlemap-data'),
+      encounters: localStorage.getItem('rollkeeper-encounter-data'),
+    }))
+  ).toEqual(legacyBefore);
+  await context.close();
+});

@@ -1,6 +1,8 @@
 import type { BattleMap, MarkerDetail } from '@/types/battlemap';
 
 import type { MarkerProductStateAdapter } from '@/components/ui/campaign/location-map/useMarkerWrites';
+import type { MovementResolution } from '@/components/ui/campaign/location-map/movementTool';
+import type { MovableTokenIdentity } from '@/components/ui/campaign/location-map/tokenIdentity';
 import { sceneCheckpointToViewportState } from './checkpoint';
 import {
   resolveTableWorkspaceSelection,
@@ -8,7 +10,10 @@ import {
   type TableRepositoryOptions,
   type TableWorkspaceSelection,
 } from './repository';
+import { deriveSceneRoster } from './roster';
 import type { JsonObject, TableSceneRecordV1 } from './schema';
+
+const DEFAULT_WALK_FEET = 30;
 
 function parseCanvasState(value: string): JsonObject {
   const parsed = JSON.parse(value) as unknown;
@@ -63,6 +68,12 @@ export interface TableSceneAdapter {
   toggleDmOnly(elementId: string): void;
   markerProductState: MarkerProductStateAdapter;
   getLocalEditGeneration(): number;
+  /**
+   * Table movement resolution comes from scene members (never linked
+   * encounters): member id or adopted entity id for DM-managed tokens,
+   * the verified player id for party tokens.
+   */
+  resolveMovement(identity: MovableTokenIdentity): MovementResolution | null;
   getPendingConflict(): {
     operationId: string;
     fields: string[];
@@ -282,6 +293,29 @@ export function createTableSceneAdapter(options: {
       setDmOnly(elementId, !scene?.map.dmOnlyElements[elementId]),
     markerProductState,
     getLocalEditGeneration: () => localEditGeneration,
+    resolveMovement: identity => {
+      const current = options.repository.getCurrent();
+      if (current?.status !== 'ready') return null;
+      const roster = deriveSceneRoster({
+        snapshot: current.snapshot,
+        sceneId: options.sceneId,
+      });
+      const entry = roster.entries.find(
+        item =>
+          !item.removed &&
+          (identity.kind === 'combatant'
+            ? item.sceneMemberId === identity.key ||
+              item.sourceEntityId === identity.key
+            : item.identityLegacyPlayerId === identity.key)
+      );
+      return entry
+        ? {
+            name: entry.name,
+            walkFeet: entry.walkFeet ?? DEFAULT_WALK_FEET,
+            entityId: identity.key,
+          }
+        : null;
+    },
     getPendingConflict: pendingView,
     refreshPendingConflict: async () => {
       const attempt = queue.then(async () => {

@@ -1,4 +1,4 @@
-import type { Viewport } from '@fieldnotes/core';
+import type { Layer, Viewport } from '@fieldnotes/core';
 import { PLAYER_BAND_ORDER } from './layerContract';
 
 /** Deterministic layer id for a player's own canvas elements. */
@@ -31,4 +31,19 @@ export function ensurePlayerLayer(vp: Viewport, characterId: string): string {
   }
   vp.layerManager.setActiveLayer(id);
   return id;
+}
+
+/**
+ * The only player-band definition a Table v1 relay accepts from a player:
+ * visible, unlocked, opaque, at the canonical band order. A player can never
+ * publish a definition that hides DM-created party tokens on its band.
+ */
+export function canonicalPlayerBand(layer: Layer): Layer {
+  return {
+    ...layer,
+    visible: true,
+    locked: false,
+    opacity: 1,
+    order: PLAYER_BAND_ORDER,
+  };
 }

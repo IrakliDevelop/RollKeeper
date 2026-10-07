@@ -46,3 +46,15 @@ export function movableTokenIdentity(
   }
   return null;
 }
+
+/**
+ * Control-bearing elements carry token control fields. In Table v1 rooms the
+ * relay grants players only movement on these (never delete or reshape), so
+ * player surfaces offer no delete action for them.
+ */
+export function isControlBearingElement(el: CanvasElement): boolean {
+  const rec = el as unknown as Record<string, unknown>;
+  return ['tokenKind', 'characterId', 'sceneMemberId', 'entityId'].some(
+    key => rec[key] !== undefined && rec[key] !== null
+  );
+}

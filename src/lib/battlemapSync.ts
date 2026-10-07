@@ -24,7 +24,8 @@ import { createManagedBattleMapAuthorityConnection } from '@/lib/battlemapAuthor
 export type { RemoteLayerUpdate };
 
 export type BattleMapConnectionStatus =
-  ManagedSyncStatus | AuthorityClientStatus;
+  | ManagedSyncStatus
+  | AuthorityClientStatus;
 
 const PRINTABLE_ASCII = /^[\x20-\x7e]+$/;
 
@@ -50,6 +51,8 @@ export interface BattleMapTokenResult {
   authority?: 1;
   room?: string;
   roomGeneration?: string;
+  /** Server-resolved Table scene (R4); map-pinned audiences scope to it. */
+  sceneId?: string;
   fogAppearance?: import('@/types/battlemap').ProjectedFogAppearance;
   fogAppearanceUpdatedAt?: string | null;
 }
@@ -79,6 +82,7 @@ export async function mintBattleMapToken(
       authority?: unknown;
       room?: unknown;
       roomGeneration?: unknown;
+      sceneId?: unknown;
       fogAppearance?: unknown;
       fogAppearanceUpdatedAt?: unknown;
     };
@@ -91,6 +95,7 @@ export async function mintBattleMapToken(
         typeof data.roomGeneration === 'string'
           ? data.roomGeneration
           : undefined,
+      sceneId: typeof data.sceneId === 'string' ? data.sceneId : undefined,
       fogAppearance: parseProjectedFogAppearance(data.fogAppearance),
       fogAppearanceUpdatedAt: normalizeFogAppearanceProjectionTimestamp(
         data.fogAppearanceUpdatedAt
@@ -174,6 +179,15 @@ export interface ManagedConnectionOptions {
   }) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */
   transportFactory?: (url: string) => BattleMapTransport;
+  /**
+   * Table v1 only (R4): the scene the server resolved for a map-pinned
+   * player/display surface, and a later change of that resolution. On a
+   * change the connection is rebuilt and pending edits are discarded.
+   */
+  onSceneResolved?: (sceneId: string) => void;
+  onSceneChange?: (
+    change: import('@/lib/battlemapAuthority').BattleMapSceneChange
+  ) => void;
   authorityTransportFactory?: import('@fieldnotes/sync').ManagedAuthorityOptions['transportFactory'];
 }
 

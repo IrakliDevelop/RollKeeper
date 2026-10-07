@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
-import { createShape } from '@fieldnotes/core';
+import { createImage, createShape } from '@fieldnotes/core';
 import { prepareAuthorityCheckpoint } from '@fieldnotes/sync';
 import {
   assembleFogAuthorityRedisScriptV1,
@@ -2018,5 +2018,810 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
     expect(await client.lLen(keys.outbox)).toBe(0);
     expect(await client.hLen(keys.outboxClaims)).toBe(0);
     expect(await client.hLen(keys.playerRate)).toBe(0);
+  });
+
+  describe('PR02 control-bearing token policy', () => {
+    const PLAYER_A = 'player-a';
+    const PLAYER_B = 'player-b';
+    const ownLayer = (player: string) => `player-${player}`;
+    const canonicalLayer = (player: string) => ({
+      id: ownLayer(player),
+      name: 'My elements',
+      visible: true,
+      locked: false,
+      order: 500,
+      opacity: 1,
+    });
+
+    function token(
+      id: string,
+      fields: Record<string, unknown> = {}
+    ): Record<string, unknown> {
+      return {
+        ...createShape({
+          position: { x: 10, y: 20 },
+          size: { w: 50, h: 50 },
+          shape: 'ellipse',
+          fillColor: '#ff0000',
+          layerId: ownLayer(PLAYER_A),
+        }),
+        id,
+        ...fields,
+      };
+    }
+
+    function upsertOf(
+      operationId: string,
+      element: Record<string, unknown>
+    ): AuthorityCommitRequest {
+      return requestFor(
+        operationId,
+        { kind: 'upsert', element },
+        { schema: 1, kind: 'element-upsert', element }
+      );
+    }
+
+    function removeOf(operationId: string, id: string): AuthorityCommitRequest {
+      return requestFor(
+        operationId,
+        { kind: 'remove', id },
+        { schema: 1, kind: 'element-remove', id }
+      );
+    }
+
+    function layerOf(
+      operationId: string,
+      layer: Record<string, unknown>,
+      version: number,
+      editor: string
+    ): AuthorityCommitRequest {
+      return requestFor(
+        operationId,
+        { kind: 'layer-upsert', layer, version, editor },
+        {
+          schema: 1,
+          kind: 'layer-write',
+          record: { id: layer.id, version, editor, definition: layer },
+        }
+      );
+    }
+
+    function layerRemoveOf(
+      operationId: string,
+      id: string,
+      version: number,
+      editor: string
+    ): AuthorityCommitRequest {
+      return requestFor(
+        operationId,
+        { kind: 'layer-remove', id, version, editor },
+        { schema: 1, kind: 'layer-write', record: { id, version, editor } }
+      );
+    }
+
+    let sequence = 0;
+    const nextId = (label: string) => `${label}-${(sequence += 1)}`;
+
+    async function asDm(
+      request: (operationId: string) => AuthorityCommitRequest
+    ) {
+      const operationId = nextId('dm');
+      return new RedisAuthorityDriver(client).commit(
+        operationContext(operationId),
+        request(operationId)
+      );
+    }
+
+    async function asPlayer(
+      player: string,
+      request: (operationId: string) => AuthorityCommitRequest
+    ) {
+      await client.del(keys.playerRate);
+      const operationId = nextId(player);
+      return new RedisAuthorityDriver(client).commit(
+        playerContext(operationId, player),
+        request(operationId)
+      );
+    }
+
+    async function asDisplay(
+      request: (operationId: string) => AuthorityCommitRequest
+    ) {
+      const operationId = nextId('display');
+      return new RedisAuthorityDriver(client).commit(
+        context({
+          actorId: 'display-a',
+          userId: 'display-a',
+          role: 'display',
+          ownershipId: 'display-a',
+          clientOperationId: operationId,
+          operationDigest: operationDigest(operationId),
+          authContext: {
+            ...(context().authContext ?? {}),
+            role: 'display',
+            displayGeneration: 2,
+          },
+        }),
+        request(operationId)
+      );
+    }
+
+    async function storedElement(id: string): Promise<Record<string, unknown>> {
+      const raw = await client.hGet(keys.elements, id);
+      if (!raw) throw new Error(`missing element ${id}`);
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      delete parsed.ownerId;
+      return parsed;
+    }
+
+    // DUMP bytes of a large hashtable-encoded hash change with incremental
+    // rehashing on plain reads, so compare logical, order-independent state.
+    async function logicalSnapshot(): Promise<readonly string[]> {
+      return Promise.all(
+        declaredKeys.map(async key => {
+          const type = await client.type(key);
+          let content: unknown = null;
+          if (type === 'hash') {
+            const all = await client.hGetAll(key);
+            content = Object.keys(all)
+              .sort()
+              .map(field => [field, all[field]]);
+          } else if (type === 'list') {
+            content = await client.lRange(key, 0, -1);
+          } else if (type === 'string') {
+            content = await client.get(key);
+          }
+          return `${key}\0${type}\0${await client.pTTL(key)}\0${JSON.stringify(content)}`;
+        })
+      );
+    }
+
+    async function expectForbidden(
+      label: string,
+      attempt: () => Promise<unknown>
+    ): Promise<void> {
+      await client.del(keys.playerRate);
+      const before = await logicalSnapshot();
+      await expect(attempt(), label).resolves.toEqual({
+        status: 'rejected',
+        reason: 'forbidden',
+      });
+      expect(await logicalSnapshot(), label).toEqual(before);
+    }
+
+    async function expectCommitted(
+      label: string,
+      attempt: () => Promise<unknown>
+    ): Promise<void> {
+      await expect(attempt(), label).resolves.toMatchObject({
+        status: 'committed',
+      });
+    }
+
+    async function dmPlacesPartyToken(id = 'party-a'): Promise<void> {
+      await expectCommitted('dm places party token', () =>
+        asDm(op =>
+          upsertOf(
+            op,
+            token(id, {
+              tokenKind: 'player',
+              characterId: PLAYER_A,
+              sceneMemberId: 'member-a',
+            })
+          )
+        )
+      );
+      expect(await client.hGet(keys.ownership, id)).toBe('dm-a');
+    }
+
+    it('rejects every forged initial player-token creation and keeps state unchanged', async () => {
+      await client.hSet(keys.ownership, 'foreign-element', PLAYER_B);
+      const forged: Array<[string, Record<string, unknown>]> = [
+        [
+          'claim player B',
+          token('forged-claim-b', {
+            tokenKind: 'player',
+            characterId: PLAYER_B,
+            layerId: ownLayer(PLAYER_B),
+          }),
+        ],
+        [
+          'claim player B on own layer',
+          token('forged-claim-b-own-layer', {
+            tokenKind: 'player',
+            characterId: PLAYER_B,
+          }),
+        ],
+        [
+          'characterId B without kind',
+          token('forged-character-b', { characterId: PLAYER_B }),
+        ],
+        [
+          'sceneMemberId',
+          token('forged-member', {
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            sceneMemberId: 'member-a',
+          }),
+        ],
+        ['entityId', token('forged-entity', { entityId: 'npc-entity' })],
+        [
+          'combatant kind',
+          token('forged-combatant', {
+            tokenKind: 'combatant',
+            entityId: 'npc-entity',
+            layerId: 'layer-annotations',
+          }),
+        ],
+        [
+          'combatant kind without entity',
+          token('forged-combatant-bare', { tokenKind: 'combatant' }),
+        ],
+        ['dm audience', token('forged-audience', { audience: 'dm' })],
+        [
+          'non-dm audience',
+          token('forged-audience-public', { audience: 'public' }),
+        ],
+        [
+          'foreign layer',
+          token('forged-layer', {
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            layerId: ownLayer(PLAYER_B),
+          }),
+        ],
+        [
+          'reused foreign element id',
+          token('foreign-element', {
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+          }),
+        ],
+      ];
+      for (const [label, element] of forged) {
+        await expectForbidden(label, () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, element))
+        );
+      }
+      await expectCommitted('own self-placed token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(
+            op,
+            token('own-token', { tokenKind: 'player', characterId: PLAYER_A })
+          )
+        )
+      );
+      await expectCommitted('ordinary drawing', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, token('own-drawing')))
+      );
+    });
+
+    it('lets the verified player move a DM-created party token and rejects every forged immutable field', async () => {
+      await dmPlacesPartyToken();
+      const base = await storedElement('party-a');
+      await expectCommitted('verified move', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...base, position: { x: 400, y: 300 } })
+        )
+      );
+      expect(await storedElement('party-a')).toMatchObject({
+        position: { x: 400, y: 300 },
+        tokenKind: 'player',
+        characterId: PLAYER_A,
+        sceneMemberId: 'member-a',
+      });
+      expect(await client.hGet(keys.ownership, 'party-a')).toBe('dm-a');
+      const moved = await storedElement('party-a');
+      const forgedUpdates: Array<[string, Record<string, unknown>]> = [
+        ['tokenKind', { ...moved, tokenKind: 'combatant' }],
+        ['characterId', { ...moved, characterId: PLAYER_B }],
+        ['layerId', { ...moved, layerId: ownLayer(PLAYER_B) }],
+        ['sceneMemberId', { ...moved, sceneMemberId: 'member-b' }],
+        ['entityId', { ...moved, entityId: 'npc-entity' }],
+        ['audience', { ...moved, audience: 'dm' }],
+        ['type', { ...moved, type: 'image', src: 'https://x.test/a.png' }],
+        ['size', { ...moved, size: { w: 500, h: 500 } }],
+        ['fill', { ...moved, fillColor: '#00ff00' }],
+        ['rotation', { ...moved, rotation: 1 }],
+        ['zIndex', { ...moved, zIndex: 9_999 }],
+        ['locked', { ...moved, locked: true }],
+      ];
+      const withoutMember = { ...moved };
+      delete withoutMember.sceneMemberId;
+      forgedUpdates.push(['sceneMemberId removed', withoutMember]);
+      for (const [label, element] of forgedUpdates) {
+        await expectForbidden(`forged ${label}`, () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, element))
+        );
+      }
+      await expectForbidden('player B move', () =>
+        asPlayer(PLAYER_B, op =>
+          upsertOf(op, { ...moved, position: { x: 1, y: 1 } })
+        )
+      );
+      await expectForbidden('player A removes bound token', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'party-a'))
+      );
+      await expectForbidden('display move', () =>
+        asDisplay(op => upsertOf(op, { ...moved, position: { x: 2, y: 2 } }))
+      );
+      await expectForbidden('display remove', () =>
+        asDisplay(op => removeOf(op, 'party-a'))
+      );
+    });
+
+    it('protects a DM-created image token src and size', async () => {
+      await expectCommitted('dm image token', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...createImage({
+              position: { x: 0, y: 0 },
+              size: { w: 70, h: 70 },
+              src: 'https://assets.test/a.png',
+              layerId: ownLayer(PLAYER_A),
+            }),
+            id: 'party-image',
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            sceneMemberId: 'member-image',
+          })
+        )
+      );
+      const image = await storedElement('party-image');
+      await expectForbidden('src swap', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...image, src: 'https://evil.test/b.png' })
+        )
+      );
+      await expectCommitted('image move', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...image, position: { x: 5, y: 6 } })
+        )
+      );
+    });
+
+    it('never lets a player reveal or touch a hidden token', async () => {
+      await expectCommitted('dm hidden party token', () =>
+        asDm(op =>
+          upsertOf(
+            op,
+            token('hidden-a', {
+              tokenKind: 'player',
+              characterId: PLAYER_A,
+              sceneMemberId: 'member-hidden',
+              audience: 'dm',
+            })
+          )
+        )
+      );
+      const hidden = await storedElement('hidden-a');
+      const revealed = { ...hidden };
+      delete revealed.audience;
+      for (const [label, element] of [
+        ['reveal', revealed],
+        ['move hidden', { ...hidden, position: { x: 9, y: 9 } }],
+      ] as const) {
+        await expectForbidden(label, () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, element))
+        );
+      }
+      await expectForbidden('remove hidden', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'hidden-a'))
+      );
+      await expectCommitted('own drawing', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, token('drawing-hidden')))
+      );
+      const drawing = await storedElement('drawing-hidden');
+      await expectCommitted('dm hides player drawing', () =>
+        asDm(op => upsertOf(op, { ...drawing, audience: 'dm' }))
+      );
+      await expectForbidden('reveal own hidden drawing', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, drawing))
+      );
+    });
+
+    it('revokes the old player after DM reassignment A to B, including remove and recreate', async () => {
+      await expectCommitted('player A self-placed token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(
+            op,
+            token('self-a', { tokenKind: 'player', characterId: PLAYER_A })
+          )
+        )
+      );
+      expect(await client.hGet(keys.ownership, 'self-a')).toBe(PLAYER_A);
+      const original = await storedElement('self-a');
+      await expectCommitted('dm reassigns to B', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...original,
+            characterId: PLAYER_B,
+            layerId: ownLayer(PLAYER_B),
+            sceneMemberId: 'member-b',
+          })
+        )
+      );
+      const reassigned = await storedElement('self-a');
+      await expectForbidden('A moves after reassignment', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...reassigned, position: { x: 1, y: 1 } })
+        )
+      );
+      await expectForbidden('A removes after reassignment', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'self-a'))
+      );
+      await expectForbidden('A recreates claim over existing token', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, original))
+      );
+      await expectCommitted('B moves', () =>
+        asPlayer(PLAYER_B, op =>
+          upsertOf(op, { ...reassigned, position: { x: 77, y: 66 } })
+        )
+      );
+
+      await dmPlacesPartyToken('party-reassign');
+      const party = await storedElement('party-reassign');
+      await expectCommitted('dm reassigns party token to B', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...party,
+            characterId: PLAYER_B,
+            layerId: ownLayer(PLAYER_B),
+          })
+        )
+      );
+      await expectCommitted('dm removes reassigned token', () =>
+        asDm(op => removeOf(op, 'party-reassign'))
+      );
+      await expectForbidden('A recreates removed DM token id', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(
+            op,
+            token('party-reassign', {
+              tokenKind: 'player',
+              characterId: PLAYER_A,
+            })
+          )
+        )
+      );
+    });
+
+    it('revokes all player rights after Return to DM control', async () => {
+      await dmPlacesPartyToken('party-return');
+      const party = await storedElement('party-return');
+      const returned = { ...party };
+      delete returned.characterId;
+      await expectCommitted('dm returns control', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...returned,
+            tokenKind: 'combatant',
+            entityId: 'member-a',
+            layerId: 'layer-annotations',
+          })
+        )
+      );
+      const combatant = await storedElement('party-return');
+      await expectForbidden('A moves returned token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...combatant, position: { x: 3, y: 3 } })
+        )
+      );
+      await expectForbidden('A removes returned token', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'party-return'))
+      );
+      await expectForbidden('A recreates the original claim', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, party))
+      );
+    });
+
+    it('allows only the narrow legacy characterId self-backfill', async () => {
+      const legacy = (id: string) =>
+        token(id, { tokenKind: 'player', layerId: ownLayer(PLAYER_A) });
+      await expectCommitted('legacy own token', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, legacy('legacy-a')))
+      );
+      const stored = await storedElement('legacy-a');
+      for (const [label, element] of [
+        ['backfill foreign id', { ...stored, characterId: PLAYER_B }],
+        [
+          'backfill with resize',
+          { ...stored, characterId: PLAYER_A, size: { w: 99, h: 99 } },
+        ],
+        [
+          'backfill with member',
+          { ...stored, characterId: PLAYER_A, sceneMemberId: 'member-x' },
+        ],
+        [
+          'backfill with audience',
+          { ...stored, characterId: PLAYER_A, audience: 'dm' },
+        ],
+      ] as const) {
+        await expectForbidden(label, () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, element))
+        );
+      }
+      await expectCommitted('exact backfill with move', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, {
+            ...stored,
+            characterId: PLAYER_A,
+            position: { x: 33, y: 44 },
+          })
+        )
+      );
+
+      await expectCommitted('dm legacy-shaped token', () =>
+        asDm(op => upsertOf(op, legacy('legacy-dm')))
+      );
+      const dmOwned = await storedElement('legacy-dm');
+      await expectForbidden('backfill DM-owned token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...dmOwned, characterId: PLAYER_A })
+        )
+      );
+      await expectCommitted('legacy token on foreign layer', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...legacy('legacy-foreign'),
+            layerId: ownLayer(PLAYER_B),
+          })
+        )
+      );
+      await client.hSet(keys.ownership, 'legacy-foreign', PLAYER_A);
+      const foreign = await storedElement('legacy-foreign');
+      await expectForbidden('backfill on foreign layer', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...foreign, characterId: PLAYER_A })
+        )
+      );
+      await expectCommitted('dm stamps member on legacy token', () =>
+        asDm(op =>
+          upsertOf(op, { ...legacy('legacy-member'), sceneMemberId: 'm-1' })
+        )
+      );
+      await client.hSet(keys.ownership, 'legacy-member', PLAYER_A);
+      const member = await storedElement('legacy-member');
+      await expectForbidden('backfill bound legacy token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...member, characterId: PLAYER_A })
+        )
+      );
+      await expectCommitted('dm hides legacy token', () =>
+        asDm(op => upsertOf(op, { ...legacy('legacy-hidden'), audience: 'dm' }))
+      );
+      await client.hSet(keys.ownership, 'legacy-hidden', PLAYER_A);
+      const hiddenLegacy = await storedElement('legacy-hidden');
+      const unhidden = { ...hiddenLegacy, characterId: PLAYER_A };
+      delete unhidden.audience;
+      await expectForbidden('backfill hidden legacy token', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, unhidden))
+      );
+    });
+
+    it('makes self-placed tokens movement-only while keeping self removal', async () => {
+      await expectCommitted('self token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(
+            op,
+            token('self-only', { tokenKind: 'player', characterId: PLAYER_A })
+          )
+        )
+      );
+      const self = await storedElement('self-only');
+      await expectForbidden('resize own token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...self, size: { w: 200, h: 200 } })
+        )
+      );
+      await expectForbidden('rotate own token', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, { ...self, rotation: 0.5 }))
+      );
+      await expectCommitted('move own token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...self, position: { x: 5, y: 5 } })
+        )
+      );
+      await expectForbidden('B removes A token', () =>
+        asPlayer(PLAYER_B, op => removeOf(op, 'self-only'))
+      );
+      await expectCommitted('A removes own self-placed token', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'self-only'))
+      );
+      await expectCommitted('A recreates own token', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, self))
+      );
+    });
+
+    it('keeps ordinary drawing ownership and forbids adding control fields', async () => {
+      await expectCommitted('A drawing', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, token('drawing-a')))
+      );
+      const drawing = await storedElement('drawing-a');
+      await expectCommitted('A edits own drawing freely', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, {
+            ...drawing,
+            size: { w: 300, h: 300 },
+            fillColor: '#123456',
+          })
+        )
+      );
+      await expectForbidden('B edits A drawing', () =>
+        asPlayer(PLAYER_B, op => upsertOf(op, drawing))
+      );
+      await expectForbidden('B removes A drawing', () =>
+        asPlayer(PLAYER_B, op => removeOf(op, 'drawing-a'))
+      );
+      const current = await storedElement('drawing-a');
+      for (const [label, fields] of [
+        ['tokenKind', { tokenKind: 'player', characterId: PLAYER_A }],
+        ['characterId', { characterId: PLAYER_A }],
+        ['sceneMemberId', { sceneMemberId: 'member-a' }],
+        ['entityId', { entityId: 'npc' }],
+        ['audience', { audience: 'dm' }],
+      ] as const) {
+        await expectForbidden(`add ${label} to drawing`, () =>
+          asPlayer(PLAYER_A, op => upsertOf(op, { ...current, ...fields }))
+        );
+      }
+      await expectCommitted('A removes own drawing', () =>
+        asPlayer(PLAYER_A, op => removeOf(op, 'drawing-a'))
+      );
+    });
+
+    it('converts an adopted combatant token with Give player control end to end (C6)', async () => {
+      const adopted = token('adopted-pc', {
+        tokenKind: 'combatant',
+        entityId: 'pc-entity',
+        layerId: 'layer-annotations',
+      });
+      await expectCommitted('adopted DM combatant token', () =>
+        asDm(op => upsertOf(op, adopted))
+      );
+      const before = await storedElement('adopted-pc');
+      await expectForbidden('player A before conversion', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...before, position: { x: 1, y: 1 } })
+        )
+      );
+      const converted = { ...before };
+      delete converted.entityId;
+      await expectCommitted('dm gives player A control', () =>
+        asDm(op =>
+          upsertOf(op, {
+            ...converted,
+            tokenKind: 'player',
+            characterId: PLAYER_A,
+            layerId: ownLayer(PLAYER_A),
+            sceneMemberId: 'member-adopted',
+          })
+        )
+      );
+      const playable = await storedElement('adopted-pc');
+      await expectCommitted('verified player A moves converted token', () =>
+        asPlayer(PLAYER_A, op =>
+          upsertOf(op, { ...playable, position: { x: 90, y: 80 } })
+        )
+      );
+      await expectForbidden('player B moves converted token', () =>
+        asPlayer(PLAYER_B, op =>
+          upsertOf(op, { ...playable, position: { x: 2, y: 2 } })
+        )
+      );
+      await expectForbidden('player A restores the prior combatant state', () =>
+        asPlayer(PLAYER_A, op => upsertOf(op, before))
+      );
+    });
+
+    it('keeps an original-map room and its adopted-scene room isolated', async () => {
+      const ADOPTED_ROOM = '923e4567-e89b-42d3-a456-426614174000';
+      const adoptedKeys = authorityRoomKeys(CAMPAIGN, ADOPTED_ROOM);
+      await client.del(Object.values(adoptedKeys));
+      await client.hSet(
+        tableRegistryKey(CAMPAIGN),
+        'scene-x',
+        JSON.stringify({
+          v: 1,
+          sceneId: 'scene-x',
+          roomId: ADOPTED_ROOM,
+          deleted: false,
+        })
+      );
+      await client.set(
+        adoptedKeys.meta,
+        JSON.stringify({
+          v: 1,
+          generation: GENERATION,
+          revision: 0,
+          casToken: 'cas-adopted',
+        })
+      );
+      const adoptedContext = (operationId: string) =>
+        context({
+          room: ADOPTED_ROOM,
+          clientOperationId: operationId,
+          operationDigest: operationDigest(operationId),
+          authContext: {
+            ...(context().authContext ?? {}),
+            sceneId: 'scene-x',
+            room: ADOPTED_ROOM,
+          },
+        });
+      await expectCommitted('original map room edit', () =>
+        asDm(op => upsertOf(op, token('shared-id', { fillColor: '#111111' })))
+      );
+      const driver = new RedisAuthorityDriver(client);
+      await expect(
+        driver.commit(
+          adoptedContext('adopted-edit'),
+          upsertOf('adopted-edit', token('shared-id', { fillColor: '#222222' }))
+        )
+      ).resolves.toMatchObject({ status: 'committed' });
+      expect(
+        JSON.parse((await client.hGet(keys.elements, 'shared-id'))!)
+      ).toMatchObject({ fillColor: '#111111' });
+      expect(
+        JSON.parse((await client.hGet(adoptedKeys.elements, 'shared-id'))!)
+      ).toMatchObject({ fillColor: '#222222' });
+      const crossRoom = context({
+        room: ADOPTED_ROOM,
+        clientOperationId: 'cross-room',
+        operationDigest: operationDigest('cross-room'),
+      });
+      await expect(
+        driver.commit(
+          crossRoom,
+          upsertOf('cross-room', token('shared-id', { fillColor: '#333333' }))
+        )
+      ).resolves.toEqual({ status: 'rejected', reason: 'forbidden' });
+      await client.del(Object.values(adoptedKeys));
+      await client.hDel(tableRegistryKey(CAMPAIGN), 'scene-x');
+    });
+
+    it('accepts only the canonical own player-band layer from players', async () => {
+      await expectCommitted('dm publishes player A band', () =>
+        asDm(op => layerOf(op, canonicalLayer(PLAYER_A), 1, 'dm-a'))
+      );
+      await expectCommitted('player canonical own layer', () =>
+        asPlayer(PLAYER_A, op =>
+          layerOf(op, canonicalLayer(PLAYER_A), 2, PLAYER_A)
+        )
+      );
+      for (const [label, layer] of [
+        ['hidden', { ...canonicalLayer(PLAYER_A), visible: false }],
+        ['locked', { ...canonicalLayer(PLAYER_A), locked: true }],
+        ['reordered', { ...canonicalLayer(PLAYER_A), order: 900 }],
+        ['below map', { ...canonicalLayer(PLAYER_A), order: -1 }],
+        ['transparent', { ...canonicalLayer(PLAYER_A), opacity: 0 }],
+        ['foreign', canonicalLayer(PLAYER_B)],
+      ] as const) {
+        await expectForbidden(`player layer ${label}`, () =>
+          asPlayer(PLAYER_A, op => layerOf(op, layer, 10, PLAYER_A))
+        );
+      }
+      await expectForbidden('player tombstones own layer', () =>
+        asPlayer(PLAYER_A, op =>
+          layerRemoveOf(op, ownLayer(PLAYER_A), 11, PLAYER_A)
+        )
+      );
+      await expectForbidden('display layer write', () =>
+        asDisplay(op => layerOf(op, canonicalLayer(PLAYER_A), 12, 'display'))
+      );
+      const band = JSON.parse(
+        (await client.hGet(keys.layers, ownLayer(PLAYER_A)))!
+      ) as { definition: Record<string, unknown> };
+      expect(band.definition).toEqual(canonicalLayer(PLAYER_A));
+      await expectCommitted('dm may still write any layer', () =>
+        asDm(op =>
+          layerOf(
+            op,
+            { ...canonicalLayer(PLAYER_A), visible: false },
+            20,
+            'dm-a'
+          )
+        )
+      );
+    });
   });
 });

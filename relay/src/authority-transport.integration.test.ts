@@ -633,4 +633,220 @@ run('two relay authority transport', () => {
     });
     expect(closeEvents.some(event => event.code === 4403)).toBe(true);
   }, 15_000);
+
+  it('lets only the verified player move a DM-created party token through real managed clients', async () => {
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 2, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const claims = {
+      v: 1 as const,
+      room: ROOM,
+      exp: Date.now() + 60_000,
+      campaign: CAMPAIGN,
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-a',
+      epoch: EPOCH,
+      roomGeneration: GENERATION,
+    };
+    const dmToken = signBattleMapToken(
+      { ...claims, userId: 'dm-a', role: 'dm', writerFence: 1 },
+      SECRET
+    );
+    const playerToken = (player: string) =>
+      signBattleMapToken(
+        { ...claims, userId: player, role: 'player', playerPrincipal: player },
+        SECRET
+      );
+    const displayToken = signBattleMapToken(
+      {
+        ...claims,
+        userId: `display-${CAMPAIGN}`,
+        role: 'display',
+        displayGeneration: 1,
+      },
+      SECRET
+    );
+    const raw = (relay: RelayHandle, clientId: string, credential: string) => {
+      const client = createManagedAuthorityConnection({
+        scopeId: `${CAMPAIGN}:scene-a:${clientId}`,
+        clientId,
+        extensions: [createFogAuthorityClientExtension()],
+        resolveUrl: () => ({
+          url: `ws://127.0.0.1:${relay.address().port}?room=${ROOM}`,
+          protocols: bearerSubprotocols(credential),
+        }),
+        transportFactory: transport,
+      });
+      clients.push(client);
+      return client;
+    };
+    const player = (relay: RelayHandle, playerId: string) => {
+      const store = new ElementStore();
+      let status = 'connecting';
+      const client = createManagedBattleMapAuthorityConnection({
+        relayUrl: `ws://127.0.0.1:${relay.address().port}`,
+        campaignCode: CAMPAIGN,
+        battleMapId: 'scene-a',
+        store,
+        clientId: playerId,
+        tokenRequest: {
+          role: 'player',
+          battleMapId: 'map-a',
+          sceneId: 'scene-a',
+          playerId,
+        },
+        fog: { manager: new FogManager() },
+        mint: async () => ({
+          token: playerToken(playerId),
+          authority: 1,
+          room: ROOM,
+        }),
+        transportFactory: transport,
+        onStatus: next => {
+          status = next;
+        },
+      });
+      clients.push(client);
+      return { store, client, status: () => status };
+    };
+
+    const dm = raw(first, 'dm-a', dmToken);
+    const playerA = player(second, 'player-a');
+    const playerB = player(first, 'player-b');
+    const display = raw(second, `display-${CAMPAIGN}`, displayToken);
+    await eventually(
+      () =>
+        dm.getState().status === 'live' &&
+        playerA.status() === 'live' &&
+        playerB.status() === 'live' &&
+        display.getState().status === 'live'
+    ).catch(() => {
+      throw new Error(
+        JSON.stringify({
+          dm: dm.getState().status,
+          a: playerA.status(),
+          b: playerB.status(),
+          display: display.getState().status,
+          closeEvents,
+        })
+      );
+    });
+
+    const band = {
+      id: 'player-player-a',
+      name: 'Aria',
+      visible: true,
+      locked: false,
+      order: 500,
+      opacity: 1,
+    };
+    const partyToken = {
+      ...createShape({
+        position: { x: 10, y: 10 },
+        size: { w: 50, h: 50 },
+        shape: 'ellipse',
+        fillColor: '#ff0000',
+        layerId: band.id,
+      }),
+      id: 'party-token-a',
+      tokenKind: 'player',
+      characterId: 'player-a',
+      sceneMemberId: 'member-a',
+    };
+    expect(
+      dm.submit({
+        kind: 'layer-upsert',
+        layer: band,
+        version: 100,
+        editor: 'dm-a',
+      })
+    ).toMatchObject({ status: 'admitted' });
+    expect(dm.submit({ kind: 'upsert', element: partyToken })).toMatchObject({
+      status: 'admitted',
+    });
+    const dmElement = () =>
+      dm.getState().document?.elements.find(item => item.id === partyToken.id);
+    await eventually(
+      () =>
+        playerA.store.getById(partyToken.id) !== undefined &&
+        playerB.store.getById(partyToken.id) !== undefined &&
+        display
+          .getState()
+          .document?.elements.some(item => item.id === partyToken.id) === true
+    );
+    expect(
+      display.getState().document?.layers.find(record => record.id === band.id)
+        ?.definition
+    ).toMatchObject({ visible: true });
+
+    playerA.store.update(partyToken.id, { position: { x: 300, y: 200 } });
+    await eventually(
+      () =>
+        (dmElement() as { position?: { x: number } } | undefined)?.position
+          ?.x === 300
+    );
+
+    playerA.store.update(partyToken.id, { size: { w: 400, h: 400 } });
+    await eventually(
+      () =>
+        (
+          playerA.store.getById(partyToken.id) as
+            | { size?: { w: number } }
+            | undefined
+        )?.size?.w === 50
+    ).catch(() => {
+      throw new Error(
+        `rejected resize was not restored: ${JSON.stringify(
+          playerA.store.getById(partyToken.id)
+        )}`
+      );
+    });
+    expect((dmElement() as { size: { w: number } }).size.w).toBe(50);
+
+    playerB.store.update(partyToken.id, { position: { x: 900, y: 900 } });
+    await eventually(
+      () =>
+        (
+          playerB.store.getById(partyToken.id) as
+            | { position?: { x: number } }
+            | undefined
+        )?.position?.x === 300
+    );
+    expect((dmElement() as { position: { x: number } }).position.x).toBe(300);
+
+    const displayMove = display.submit({
+      kind: 'upsert',
+      element: { ...partyToken, position: { x: 700, y: 700 } },
+    });
+    if (displayMove.status === 'admitted') {
+      await eventually(
+        () =>
+          display
+            .getState()
+            .operations.find(
+              item => item.clientOperationId === displayMove.clientOperationId
+            )?.status === 'rejected'
+      );
+    }
+    expect((dmElement() as { position: { x: number } }).position.x).toBe(300);
+
+    const hide = playerA.client;
+    hide.publishLayerUpsert({ ...band, visible: false });
+    await new Promise(resolve => setTimeout(resolve, 300));
+    expect(
+      dm.getState().document?.layers.find(record => record.id === band.id)
+        ?.definition
+    ).toMatchObject({ visible: true });
+    expect(closeEvents.some(event => event.code === 1013)).toBe(false);
+  }, 20_000);
 });

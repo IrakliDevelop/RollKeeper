@@ -16,14 +16,22 @@ type RedisHashRead = {
 };
 
 export type LocationResolution =
-  { status: 'verified' } | { status: 'corrupt' | 'collision' | 'unavailable' };
+  | { status: 'verified' }
+  | { status: 'corrupt' | 'collision' | 'unavailable' };
 
 const record = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === 'object' && !Array.isArray(value);
 
 const byteLength = (value: string): number => encoder.encode(value).byteLength;
 
-function normalizeHashEntries(value: unknown): Array<[string, unknown]> | null {
+/**
+ * HGETALL arrives as an object from the deserializing client but as the raw
+ * REST flat array `[field, value, ...]` from `getRawRedis()`. Null means a
+ * malformed shape (odd length, non-string or duplicate field).
+ */
+export function normalizeHashEntries(
+  value: unknown
+): Array<[string, unknown]> | null {
   if (value === null || value === undefined) return [];
   if (record(value)) return Object.entries(value);
   if (!Array.isArray(value) || value.length % 2 !== 0) return null;

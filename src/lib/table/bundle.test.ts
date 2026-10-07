@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { exportTableBundle, importTableBundle } from './bundle';
 import { TableRepository, type TableWorkspaceSelection } from './repository';
-import type { TableSceneRecordV1 } from './schema';
+import { canonicalJson, type TableSceneRecordV1 } from './schema';
 
 async function sha256(raw: string): Promise<string> {
   const bytes = new TextEncoder().encode(raw);
@@ -328,5 +328,192 @@ describe('Table bundles', () => {
     repositories.push(target);
     const loaded = await target.start();
     expect(loaded.status === 'ready' && loaded.snapshot.campaign).toBeNull();
+  });
+});
+
+describe('PR02 additive fields through bundles (R3)', () => {
+  async function roundTrip(
+    seed: (source: TableRepository) => Promise<unknown>
+  ) {
+    const factory = new IDBFactory();
+    const source = new TableRepository({ factory, selection: sourceSelection });
+    repositories.push(source);
+    await source.start();
+    await seed(source);
+    const raw = await exportTableBundle(source);
+    const imported = await importTableBundle({
+      factory,
+      account: sourceSelection.account,
+      activeWorkspaceKey: source.workspaceIdentity,
+      targetCampaignCode: 'CAMP-A',
+      raw,
+      newWorkspaceId: () => 'pr02-import',
+      now: () => '2026-10-06T00:00:00.000Z',
+    });
+    expect(imported).toMatchObject({ status: 'imported' });
+    const target = new TableRepository({
+      factory,
+      selection: {
+        account: sourceSelection.account,
+        workspace: {
+          localWorkspaceId: 'pr02-import',
+          sourceCampaignCode: null,
+          routeCampaignCode: 'CAMP-A',
+        },
+      },
+    });
+    repositories.push(target);
+    const loaded = await target.start();
+    if (loaded.status !== 'ready') throw new Error('expected ready');
+    const sourceState = source.getCurrent();
+    if (sourceState?.status !== 'ready') throw new Error('expected ready');
+    return { source: sourceState.snapshot, target: loaded.snapshot };
+  }
+
+  const strip = <T extends { workspaceKey: string }>(value: T) => {
+    const copy = structuredClone(value) as Partial<T>;
+    delete copy.workspaceKey;
+    return canonicalJson(copy);
+  };
+
+  it('round-trips PR01 records without new fields byte-identically (canonical bytes)', async () => {
+    const { source, target } = await roundTrip(async repository => {
+      const base = scene(repository.workspaceIdentity);
+      base.members = [{ actorId: 'actor-1', tokenIds: [] }];
+      await repository.mutateWorkspace(0, 'seed', {
+        scenes: { put: [base] },
+        actors: {
+          put: [
+            {
+              schemaVersion: 1,
+              workspaceKey: repository.workspaceIdentity,
+              actorId: 'actor-1',
+              actorKind: 'dm-managed',
+              liveStats: {
+                name: 'Guard',
+                currentHp: 1,
+                maxHp: 1,
+                tempHp: 0,
+                armorClass: 10,
+                conditions: [],
+              },
+              playerReference: null,
+              cachedPlayerData: null,
+              playerConditionOverlay: null,
+              createdAt: '2026-10-05T00:00:00.000Z',
+              updatedAt: '2026-10-05T00:00:00.000Z',
+            },
+          ],
+        },
+      });
+    });
+    expect(target.scenes.map(strip)).toEqual(source.scenes.map(strip));
+    expect(target.actors.map(strip)).toEqual(source.actors.map(strip));
+    expect(target.scenes[0]!.members[0]).toEqual({
+      actorId: 'actor-1',
+      tokenIds: [],
+    });
+  });
+
+  it('keeps every PR02 field unstripped through export and import', async () => {
+    const { target } = await roundTrip(async repository => {
+      const base = scene(repository.workspaceIdentity);
+      base.members = [
+        {
+          actorId: 'party-1',
+          tokenIds: ['token-1'],
+          sceneMemberId: 'member-1',
+          control: {
+            kind: 'player',
+            legacyPlayerId: 'legacy-a',
+            characterId: 'character-a',
+          },
+        },
+        {
+          actorId: 'npc-1',
+          tokenIds: [],
+          sceneMemberId: 'member-2',
+          control: { kind: 'dm' },
+          removedAt: '2026-10-06T00:00:00.000Z',
+        },
+      ];
+      await repository.mutateWorkspace(0, 'seed', {
+        scenes: { put: [base] },
+        actors: {
+          put: [
+            {
+              schemaVersion: 1,
+              workspaceKey: repository.workspaceIdentity,
+              actorId: 'party-1',
+              actorKind: 'player-reference',
+              liveStats: null,
+              playerReference: {
+                campaignId: 'CAMP',
+                playerId: 'legacy-a',
+                legacyPlayerId: 'legacy-a',
+                characterId: 'character-a',
+              },
+              cachedPlayerData: { name: 'Aria' },
+              playerConditionOverlay: {
+                suppressedSourceConditionIds: [],
+                dmConditions: [],
+              },
+              createdAt: '2026-10-05T00:00:00.000Z',
+              updatedAt: '2026-10-05T00:00:00.000Z',
+            },
+            {
+              schemaVersion: 1,
+              workspaceKey: repository.workspaceIdentity,
+              actorId: 'npc-1',
+              actorKind: 'dm-managed',
+              liveStats: {
+                name: 'Barkeep',
+                currentHp: 4,
+                maxHp: 4,
+                tempHp: 0,
+                armorClass: 10,
+                conditions: [],
+              },
+              playerReference: null,
+              cachedPlayerData: null,
+              playerConditionOverlay: null,
+              profile: { category: 'npc', sourceKind: 'manual' },
+              createdAt: '2026-10-05T00:00:00.000Z',
+              updatedAt: '2026-10-05T00:00:00.000Z',
+            },
+          ],
+        },
+      });
+    });
+    expect(target.scenes[0]!.members).toEqual([
+      {
+        actorId: 'party-1',
+        tokenIds: ['token-1'],
+        sceneMemberId: 'member-1',
+        control: {
+          kind: 'player',
+          legacyPlayerId: 'legacy-a',
+          characterId: 'character-a',
+        },
+      },
+      {
+        actorId: 'npc-1',
+        tokenIds: [],
+        sceneMemberId: 'member-2',
+        control: { kind: 'dm' },
+        removedAt: '2026-10-06T00:00:00.000Z',
+      },
+    ]);
+    expect(
+      target.actors.find(value => value.actorId === 'party-1')!.playerReference
+    ).toEqual({
+      campaignId: 'CAMP',
+      playerId: 'legacy-a',
+      legacyPlayerId: 'legacy-a',
+      characterId: 'character-a',
+    });
+    expect(
+      target.actors.find(value => value.actorId === 'npc-1')!.profile
+    ).toEqual({ category: 'npc', sourceKind: 'manual' });
   });
 });

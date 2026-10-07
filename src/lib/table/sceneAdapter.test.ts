@@ -203,3 +203,79 @@ describe('Table scene canvas adapter', () => {
     stale.dispose();
   });
 });
+
+describe('Table movement resolution from scene members (item 10)', () => {
+  it('resolves member tokens from the roster instead of linked encounters', async () => {
+    const factory = new IDBFactory();
+    const repository = new TableRepository({ factory, selection });
+    repositories.push(repository);
+    await repository.start();
+    const base = scene(repository.workspaceIdentity);
+    base.members = [
+      { actorId: 'npc-actor', tokenIds: [], sceneMemberId: 'member-npc' },
+      {
+        actorId: 'party-actor',
+        tokenIds: [],
+        sceneMemberId: 'member-party',
+        control: { kind: 'player', legacyPlayerId: 'legacy-a' },
+      },
+    ];
+    await repository.mutateWorkspace(0, 'seed', {
+      scenes: { put: [base] },
+      actors: {
+        put: [
+          {
+            schemaVersion: 1,
+            workspaceKey: repository.workspaceIdentity,
+            actorId: 'npc-actor',
+            actorKind: 'dm-managed',
+            liveStats: {
+              name: 'Barkeep',
+              currentHp: 5,
+              maxHp: 5,
+              tempHp: 0,
+              armorClass: 10,
+              conditions: [],
+            },
+            playerReference: null,
+            cachedPlayerData: null,
+            playerConditionOverlay: null,
+            profile: { category: 'npc', walkFeet: 25 },
+            createdAt: '2026-10-05T00:00:00.000Z',
+            updatedAt: '2026-10-05T00:00:00.000Z',
+          },
+          {
+            schemaVersion: 1,
+            workspaceKey: repository.workspaceIdentity,
+            actorId: 'party-actor',
+            actorKind: 'player-reference',
+            liveStats: null,
+            playerReference: { campaignId: 'CAMP', playerId: 'legacy-a' },
+            cachedPlayerData: { name: 'Aria' },
+            playerConditionOverlay: {
+              suppressedSourceConditionIds: [],
+              dmConditions: [],
+            },
+            createdAt: '2026-10-05T00:00:00.000Z',
+            updatedAt: '2026-10-05T00:00:00.000Z',
+          },
+        ],
+      },
+    });
+    const adapter = createTableSceneAdapter({
+      repository,
+      sceneId: 'scene-1',
+      campaignCode: 'CAMP',
+    });
+    expect(
+      adapter.resolveMovement({ kind: 'combatant', key: 'member-npc' })
+    ).toEqual({ name: 'Barkeep', walkFeet: 25, entityId: 'member-npc' });
+    expect(
+      adapter.resolveMovement({ kind: 'player', key: 'legacy-a' })
+    ).toEqual({ name: 'Aria', walkFeet: 30, entityId: 'legacy-a' });
+    expect(
+      adapter.resolveMovement({ kind: 'combatant', key: 'unknown' })
+    ).toBeNull();
+    adapter.dispose();
+  });
+});

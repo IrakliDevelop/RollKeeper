@@ -2,6 +2,8 @@ import type { CanvasElement, ElementStore, Layer } from '@fieldnotes/core';
 import {
   bearerSubprotocols,
   createManagedAuthorityConnection,
+  type AuthorityClientState,
+  type ManagedAuthorityConnection,
   type AuthorityBarrier,
   type AuthorityBarrierResult,
   type AuthorityClientCheckpointResult,
@@ -44,6 +46,23 @@ interface AuthorityOptions {
     url: string;
     protocols?: readonly string[];
   }) => AuthorityClientTransport;
+  /** R4: the scene the server resolved for this map-pinned audience. */
+  onSceneResolved?: (sceneId: string) => void;
+  /** R4: the resolved scene changed under a live/pending connection. */
+  onSceneChange?: (change: BattleMapSceneChange) => void;
+}
+
+export interface BattleMapSceneChange {
+  previousSceneId: string;
+  sceneId: string;
+  /** Pending local operations dropped with the old room (never replayed). */
+  discardedOperationIds: string[];
+}
+
+interface SceneBinding {
+  sceneId: string;
+  /** Null until the first mint resolves the room. */
+  room: string | null;
 }
 
 function canvasElement(element: Record<string, unknown>): CanvasElement {
@@ -81,28 +100,76 @@ export function createManagedBattleMapAuthorityConnection(
     return fogSequence;
   };
 
-  const connection = createManagedAuthorityConnection({
-    scopeId: `${options.campaignCode}:scene:${options.battleMapId}`,
-    clientId: options.clientId,
-    extensions: options.fog ? [createFogAuthorityClientExtension()] : undefined,
-    transportFactory: options.transportFactory,
-    resolveUrl: async () => {
-      const result = await options.mint(
-        options.campaignCode,
-        options.tokenRequest
-      );
-      if (stopped || !result?.authority || !result.room) return null;
-      options.onTokenMetadata?.({
-        fogAppearance: result.fogAppearance,
-        fogAppearanceUpdatedAt: result.fogAppearanceUpdatedAt,
-      });
-      return {
-        url: `${options.relayUrl}?room=${encodeURIComponent(result.room)}`,
-        protocols: bearerSubprotocols(result.token),
-      };
-    },
-  });
+  // R4: player/display surfaces open the source-map URL and are admitted
+  // only to the scene the server resolves from the current presentation.
+  // The SDK scope (and every local operation) is keyed by that resolved
+  // scene and room; a different resolution tears the connection down and
+  // never replays its pending work into the new room.
+  const resolvesPresentation =
+    options.tokenRequest.role !== 'dm' &&
+    (options.tokenRequest.sceneId === undefined ||
+      options.tokenRequest.sceneId === options.battleMapId);
+  let binding: SceneBinding = {
+    sceneId: options.tokenRequest.sceneId ?? options.battleMapId,
+    room: null,
+  };
+  let everLive = false;
+  let retired: ManagedAuthorityConnection | null = null;
+  const scopeFor = (current: SceneBinding): string =>
+    current.room === null
+      ? `${options.campaignCode}:scene:${options.battleMapId}`
+      : `${options.campaignCode}:scene:${current.sceneId}:room:${current.room}`;
 
+  const open = (
+    seed: BattleMapTokenResult | null
+  ): ManagedAuthorityConnection => {
+    let pendingSeed = seed;
+    const inner: ManagedAuthorityConnection = createManagedAuthorityConnection({
+      scopeId: scopeFor(binding),
+      clientId: options.clientId,
+      extensions: options.fog
+        ? [createFogAuthorityClientExtension()]
+        : undefined,
+      transportFactory: options.transportFactory,
+      resolveUrl: async () => {
+        // A stopped or superseded connection never mints again.
+        if (stopped || inner !== connection || retired === inner) return null;
+        const result =
+          pendingSeed ??
+          (await options.mint(options.campaignCode, options.tokenRequest));
+        pendingSeed = null;
+        if (
+          stopped ||
+          inner !== connection ||
+          !result?.authority ||
+          !result.room
+        )
+          return null;
+        if (resolvesPresentation) {
+          const next = {
+            sceneId: result.sceneId ?? binding.sceneId,
+            room: result.room,
+          };
+          if (next.room !== binding.room || next.sceneId !== binding.sceneId) {
+            retired = inner;
+            queueMicrotask(() => rebind(next, result));
+            return null;
+          }
+        }
+        options.onTokenMetadata?.({
+          fogAppearance: result.fogAppearance,
+          fogAppearanceUpdatedAt: result.fogAppearanceUpdatedAt,
+        });
+        return {
+          url: `${options.relayUrl}?room=${encodeURIComponent(result.room)}`,
+          protocols: bearerSubprotocols(result.token),
+        };
+      },
+    });
+    return inner;
+  };
+
+  let connection = open(null);
   const submitElement = (element: CanvasElement): void => {
     const audience = options.resolveAudience?.(element);
     connection.submit({
@@ -194,9 +261,65 @@ export function createManagedBattleMapAuthorityConnection(
     );
   }
 
-  const unsubscribeAuthority = connection.subscribe(() => {
-    const state = connection.getState();
+  // Player/display edits the authority rejects (e.g. a forged resize of a
+  // movement-only token) are restored from the confirmed document; the
+  // optimistic local copy would otherwise linger until the next snapshot.
+  const restoredRejections = new Set<string>();
+  const restoreRejectedEdits = (state: AuthorityClientState): void => {
+    if (options.tokenRequest.role === 'dm' || !state.document) return;
+    const live = new Set<string>();
+    const ids = new Set<string>();
+    for (const operation of state.operations) {
+      live.add(operation.clientOperationId);
+      if (
+        operation.status !== 'rejected' ||
+        restoredRejections.has(operation.clientOperationId)
+      )
+        continue;
+      restoredRejections.add(operation.clientOperationId);
+      const mutation = operation.proposal.mutation;
+      if (mutation.kind === 'upsert') ids.add(mutation.element.id);
+      else if (mutation.kind === 'remove') ids.add(mutation.id);
+    }
+    for (const id of restoredRejections) {
+      if (!live.has(id)) restoredRejections.delete(id);
+    }
+    if (ids.size === 0) return;
+    applyingRemote = true;
+    try {
+      for (const id of ids) {
+        const confirmed = state.document.elements.find(item => item.id === id);
+        const local = options.store.getById(id);
+        if (!confirmed) {
+          if (local) options.store.remove(id, { origin: 'remote' });
+          continue;
+        }
+        const element = canvasElement(
+          confirmed as unknown as Record<string, unknown>
+        );
+        if (!local) {
+          options.store.add(element, { origin: 'remote' });
+          continue;
+        }
+        const patch: Record<string, unknown> = { ...element };
+        for (const key of Object.keys(local)) {
+          if (!Object.hasOwn(patch, key)) patch[key] = undefined;
+        }
+        options.store.update(id, patch as Partial<CanvasElement>, {
+          origin: 'remote',
+        });
+      }
+    } finally {
+      applyingRemote = false;
+    }
+  };
+
+  const onAuthorityChange = (inner: ManagedAuthorityConnection): void => {
+    if (stopped || inner !== connection || retired === inner) return;
+    const state = inner.getState();
+    if (state.status === 'live') everLive = true;
     options.onStatus?.(state.status);
+    restoreRejectedEdits(state);
     const document = state.document;
     if (!document || document === lastDocument) return;
     lastDocument = document;
@@ -217,7 +340,9 @@ export function createManagedBattleMapAuthorityConnection(
       }
       if (options.fog) {
         const data = document.extensions.fog?.data as
-          FogSnapshot | null | undefined;
+          | FogSnapshot
+          | null
+          | undefined;
         if (data) {
           const versions = [
             data.meta.version,
@@ -257,7 +382,63 @@ export function createManagedBattleMapAuthorityConnection(
     } finally {
       applyingRemote = false;
     }
-  });
+  };
+  let unsubscribeAuthority = connection.subscribe(() =>
+    onAuthorityChange(connection)
+  );
+
+  function rebind(next: SceneBinding, seed: BattleMapTokenResult): void {
+    if (stopped) return;
+    const previous = binding;
+    const discardedOperationIds = connection
+      .getState()
+      .operations.filter(
+        operation =>
+          operation.status === 'draft' ||
+          operation.status === 'pending' ||
+          operation.status === 'uncertain'
+      )
+      .map(operation => operation.clientOperationId);
+    const visible = everLive || discardedOperationIds.length > 0;
+    unsubscribeAuthority();
+    connection.stop();
+    binding = next;
+    everLive = false;
+    lastDocument = null;
+    restoredRejections.clear();
+    if (visible) {
+      applyingRemote = true;
+      try {
+        options.store.loadSnapshot([], { origin: 'remote' });
+        options.fog?.manager.loadState(null, { origin: 'remote' });
+      } finally {
+        applyingRemote = false;
+      }
+      options.onDiagnostic?.(
+        'The presented scene changed. Unsent map edits were discarded.'
+      );
+      options.onSceneChange?.({
+        previousSceneId: previous.sceneId,
+        sceneId: next.sceneId,
+        discardedOperationIds,
+      });
+    }
+    // Either callback may stop this connection (the pages rebuild their
+    // canvas on a scene change); never open a replacement after that.
+    if (stopped) return;
+    options.onSceneResolved?.(next.sceneId);
+    if (stopped) return;
+    const inner = open(seed);
+    connection = inner;
+    retired = null;
+    unsubscribeAuthority = inner.subscribe(() => onAuthorityChange(inner));
+    if (stopped) {
+      unsubscribeAuthority();
+      inner.stop();
+      return;
+    }
+    onAuthorityChange(inner);
+  }
 
   const presenceHandlers = new Set<(from: string, data: unknown) => void>();
   const leaveHandlers = new Set<(from: string) => void>();

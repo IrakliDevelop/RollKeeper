@@ -60,6 +60,25 @@ export interface TableCanvasCheckpointV1 {
   state: JsonObject;
 }
 
+/**
+ * Explicit control assignment for a scene member (PR02). Absent means the
+ * control is derived from the actor (player reference vs DM-managed).
+ */
+export type TableMemberControlV1 =
+  | { kind: 'player'; legacyPlayerId: string; characterId?: string }
+  | { kind: 'dm' };
+
+export interface TableSceneMemberV1 {
+  actorId: string;
+  /** Explicit DM token bindings; legacy aliases are derived, never stored. */
+  tokenIds: string[];
+  /** Stable local binding key, allocated once and never reused (R2). Not an auth principal. */
+  sceneMemberId?: string;
+  control?: TableMemberControlV1;
+  /** Membership tombstone; the actor and its other scenes are untouched. */
+  removedAt?: string;
+}
+
 export interface TableSceneRecordV1 {
   schemaVersion: 1;
   workspaceKey: string;
@@ -78,7 +97,7 @@ export interface TableSceneRecordV1 {
   };
   canvasCheckpoint: TableCanvasCheckpointV1 | null;
   localDraft?: TableCanvasCheckpointV1 | null;
-  members: Array<{ actorId: string; tokenIds: string[] }>;
+  members: TableSceneMemberV1[];
   arrivalPoint: { x: number; y: number } | null;
   createdAt: string;
   updatedAt: string;
@@ -96,6 +115,20 @@ export interface TableActorLiveStatsV1 {
 export interface TablePlayerReferenceV1 {
   campaignId: string;
   playerId: string;
+  /** Server-authorized campaign player identity used as the relay principal. */
+  legacyPlayerId?: string;
+  /** Verified character mapping when it differs from the legacy player id. */
+  characterId?: string;
+}
+
+/** Display/source metadata for DM-managed actors created in Table (PR02). */
+export interface TableActorProfileV1 {
+  category: 'pc' | 'npc' | 'monster';
+  sourceKind?: 'bestiary' | 'campaign-npc' | 'manual';
+  sourceId?: string;
+  avatarUrl?: string;
+  tokenCells?: number;
+  walkFeet?: number;
 }
 
 export interface TablePlayerConditionOverlayV1 {
@@ -112,6 +145,7 @@ export interface TableActorRecordV1 {
   playerReference: TablePlayerReferenceV1 | null;
   cachedPlayerData: JsonObject | null;
   playerConditionOverlay: TablePlayerConditionOverlayV1 | null;
+  profile?: TableActorProfileV1;
   createdAt: string;
   updatedAt: string;
 }
@@ -491,14 +525,8 @@ export function validateSceneRecord(value: unknown): TableValidation {
     (value.map.fogAppearance !== undefined &&
       !isJsonValue(value.map.fogAppearance)) ||
     !Array.isArray(value.members) ||
-    !value.members.every(
-      member =>
-        isRecord(member) &&
-        hasExactKeys(member, ['actorId', 'tokenIds']) &&
-        isStableId(member.actorId) &&
-        Array.isArray(member.tokenIds) &&
-        member.tokenIds.every(isStableId)
-    ) ||
+    !value.members.every(validateSceneMember) ||
+    !sceneMembersAreUnique(value.members as TableSceneMemberV1[]) ||
     (value.arrivalPoint !== null &&
       (!isRecord(value.arrivalPoint) ||
         !hasExactKeys(value.arrivalPoint, ['x', 'y']) ||
@@ -553,24 +581,95 @@ export function validateSceneRecord(value: unknown): TableValidation {
   return { ok: true };
 }
 
+function validateMemberControl(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  if (value.kind === 'dm') return hasExactKeys(value, ['kind']);
+  return (
+    value.kind === 'player' &&
+    hasExactKeys(value, ['kind', 'legacyPlayerId'], ['characterId']) &&
+    isStableId(value.legacyPlayerId) &&
+    (value.characterId === undefined || isStableId(value.characterId))
+  );
+}
+
+function validateSceneMember(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    hasExactKeys(
+      value,
+      ['actorId', 'tokenIds'],
+      ['sceneMemberId', 'control', 'removedAt']
+    ) &&
+    isStableId(value.actorId) &&
+    Array.isArray(value.tokenIds) &&
+    value.tokenIds.every(isStableId) &&
+    (value.sceneMemberId === undefined || isStableId(value.sceneMemberId)) &&
+    (value.control === undefined || validateMemberControl(value.control)) &&
+    (value.removedAt === undefined || isTimestamp(value.removedAt))
+  );
+}
+
+/** One member per actor, unique binding keys, and one owner per token id. */
+function sceneMembersAreUnique(members: TableSceneMemberV1[]): boolean {
+  const memberIds = members.flatMap(member =>
+    member.sceneMemberId === undefined ? [] : [member.sceneMemberId]
+  );
+  return (
+    unique(members.map(member => member.actorId)) &&
+    unique(memberIds) &&
+    unique(members.flatMap(member => member.tokenIds))
+  );
+}
+
+function validateActorProfile(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    hasExactKeys(
+      value,
+      ['category'],
+      ['sourceKind', 'sourceId', 'avatarUrl', 'tokenCells', 'walkFeet']
+    ) &&
+    ['pc', 'npc', 'monster'].includes(String(value.category)) &&
+    (value.sourceKind === undefined ||
+      ['bestiary', 'campaign-npc', 'manual'].includes(
+        String(value.sourceKind)
+      )) &&
+    (value.sourceId === undefined || isStableId(value.sourceId)) &&
+    (value.avatarUrl === undefined ||
+      (isMapImageReference(value.avatarUrl) &&
+        encoder.encode(value.avatarUrl).byteLength <= 2_048)) &&
+    (value.tokenCells === undefined ||
+      (Number.isSafeInteger(value.tokenCells) &&
+        Number(value.tokenCells) >= 1 &&
+        Number(value.tokenCells) <= 4)) &&
+    (value.walkFeet === undefined ||
+      (isFiniteNumber(value.walkFeet) && value.walkFeet >= 0))
+  );
+}
+
 export function validateActorRecord(value: unknown): TableValidation {
   if (!isRecord(value)) return { ok: false, reason: 'invalid-record' };
   if (value.schemaVersion !== 1) {
     return { ok: false, reason: 'unsupported-schema' };
   }
   if (
-    !hasExactKeys(value, [
-      'schemaVersion',
-      'workspaceKey',
-      'actorId',
-      'actorKind',
-      'liveStats',
-      'playerReference',
-      'cachedPlayerData',
-      'playerConditionOverlay',
-      'createdAt',
-      'updatedAt',
-    ]) ||
+    !hasExactKeys(
+      value,
+      [
+        'schemaVersion',
+        'workspaceKey',
+        'actorId',
+        'actorKind',
+        'liveStats',
+        'playerReference',
+        'cachedPlayerData',
+        'playerConditionOverlay',
+        'createdAt',
+        'updatedAt',
+      ],
+      ['profile']
+    ) ||
+    (value.profile !== undefined && !validateActorProfile(value.profile)) ||
     !isWorkspaceKey(value.workspaceKey) ||
     !isStableId(value.actorId) ||
     !['dm-managed', 'player-reference'].includes(String(value.actorKind)) ||
@@ -602,9 +701,17 @@ export function validateActorRecord(value: unknown): TableValidation {
   const playerReferenceValid =
     value.playerReference === null ||
     (isRecord(value.playerReference) &&
-      hasExactKeys(value.playerReference, ['campaignId', 'playerId']) &&
+      hasExactKeys(
+        value.playerReference,
+        ['campaignId', 'playerId'],
+        ['legacyPlayerId', 'characterId']
+      ) &&
       isStableId(value.playerReference.campaignId) &&
-      isStableId(value.playerReference.playerId));
+      isStableId(value.playerReference.playerId) &&
+      (value.playerReference.legacyPlayerId === undefined ||
+        isStableId(value.playerReference.legacyPlayerId)) &&
+      (value.playerReference.characterId === undefined ||
+        isStableId(value.playerReference.characterId)));
   const playerConditionOverlayValid =
     value.playerConditionOverlay === null ||
     (isRecord(value.playerConditionOverlay) &&
