@@ -1293,3 +1293,436 @@ test('PR04 session: lost Show response, Retry, duplicate judged by presentation'
     'scene-tavern'
   );
 });
+
+/** A disposable Redis + serverless-redis-http pair; returns cli and REST. */
+async function startRestRedis(t, label) {
+  const suffix = randomUUID().slice(0, 8);
+  const network = `rollkeeper-table-${label}-${suffix}`;
+  const redisName = `rollkeeper-table-${label}-redis-${suffix}`;
+  const srhName = `rollkeeper-table-${label}-srh-${suffix}`;
+  execFileSync('docker', ['network', 'create', network], { stdio: 'ignore' });
+  const cli = await startRedis(t, redisName, ['--network', network]);
+  const srh = spawn(
+    'docker',
+    [
+      'run',
+      '--rm',
+      '--name',
+      srhName,
+      '--network',
+      network,
+      '-p',
+      '127.0.0.1::80',
+      '-e',
+      'SRH_MODE=env',
+      '-e',
+      'SRH_TOKEN=synthetic_rest_token',
+      '-e',
+      `SRH_CONNECTION_STRING=redis://${redisName}:6379`,
+      'hiett/serverless-redis-http:latest',
+    ],
+    { stdio: 'ignore' }
+  );
+  t.after(() => {
+    for (const container of [srhName, redisName]) {
+      try {
+        execFileSync('docker', ['stop', container], { stdio: 'ignore' });
+      } catch {}
+    }
+    srh.kill('SIGTERM');
+    try {
+      execFileSync('docker', ['network', 'rm', network], { stdio: 'ignore' });
+    } catch {}
+  });
+  let url = null;
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline && !url) {
+    try {
+      const port = execFileSync('docker', ['port', srhName, '80/tcp'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      })
+        .trim()
+        .split('\n')[0]
+        .split(':')
+        .at(-1);
+      const probe = await fetch(`http://127.0.0.1:${port}/`, {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer synthetic_rest_token',
+          'content-type': 'application/json',
+        },
+        body: '["PING"]',
+      });
+      if (probe.ok && (await probe.json()).result === 'PONG')
+        url = `http://127.0.0.1:${port}`;
+    } catch {}
+    if (!url) await new Promise(resolve => setTimeout(resolve, 250));
+  }
+  assert.ok(url, 'serverless-redis-http did not become ready');
+  const { Redis } = await import('@upstash/redis');
+  const rawRedis = new Redis({
+    url,
+    token: 'synthetic_rest_token',
+    automaticDeserialization: false,
+  });
+  return { cli, rawRedis };
+}
+
+/**
+ * PR05 S4 display capability against real Redis through the real REST client
+ * (`@upstash/redis` → serverless-redis-http): lease-free rotation that keeps
+ * the fenced command revision and TTL (M2/R4-F1), compare-if-unbound nonce
+ * binding with control-PTTL expiry (E4/R4-F5), the exact ACK tuple (E7), DM
+ * status computed with Redis TIME (E13), and generation precision through
+ * later command commits plus the relay access Lua (M1/R4-F8).
+ */
+test('PR05 display capability: rotation, binding, ACK tuple, status and precision', async t => {
+  const { cli, rawRedis } = await startRestRedis(t, 'display');
+  const { TableControlService } = await import(
+    '../src/lib/tableServer/control.ts'
+  );
+  const display = await import('../src/lib/tableServer/displayCapability.ts');
+  const { DISPLAY_ROTATE_SCRIPT } = await import(
+    '../src/lib/tableServer/displayScripts.ts'
+  );
+  const tableKeys = await import('../src/lib/tableServer/keys.ts');
+  const controlKey = tableKeys.tableControlKey(CODE);
+  const sessionKey = tableKeys.tableDisplaySessionKey(CODE);
+  const ackKey = tableKeys.tableDisplayAckKey(CODE);
+  assert.equal(controlKey, keys[0]);
+  for (const key of [sessionKey, ackKey]) assert.ok(key.includes(TAG));
+  const service = new TableControlService(rawRedis);
+  const principal = {
+    id: 'account:synthetic-owner',
+    campaignCode: CODE,
+    role: 'owner',
+  };
+  const ok = async command => {
+    const result = await service.execute(principal, command);
+    assert.equal(result.status, 'committed', JSON.stringify(result));
+    return result.current;
+  };
+  const stored = () => JSON.parse(cli('GET', controlKey));
+  const nonce = () => randomUUID().replace(/-/gu, '').slice(0, 22);
+  const nonceA = nonce();
+  const nonceB = nonce();
+
+  assert.deepEqual(await display.rotateDisplayCapability(rawRedis, CODE), {
+    status: 'not-initialized',
+  });
+  let current = await ok({ type: 'initialize', operationId: randomUUID() });
+  assert.equal(stored().displayGeneration, 0);
+  assert.equal(stored().displayCapabilityHash, null);
+  const base = () => ({
+    operationId: randomUUID(),
+    expectedEpoch: current.epoch,
+    expectedRevision: current.revision,
+    expectedFence: current.writerFence,
+    holderSessionId: 'mapless-holder',
+  });
+  current = await ok({ ...base(), type: 'acquire' });
+  for (const [sceneId, sourceMapId, safeLabel] of [
+    ['scene-tavern', 'map-tavern', 'Tavern'],
+    ['scene-forest', 'map-forest', 'Private Forest'],
+  ]) {
+    current = await ok({
+      ...base(),
+      type: 'registerScene',
+      sceneId,
+      workspaceInstanceId: 'workspace-a',
+      sourceMapId,
+      contentRevision: 1,
+      safeLabel,
+      expectedRegistryRevision: 0,
+    });
+  }
+  current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
+  current = await ok({
+    ...base(),
+    type: 'publishInitiative',
+    runId: 'run-one',
+    initiative: initiative(),
+  });
+
+  // M2 / R4-F1: rotation keeps the fenced command state and the TTL.
+  cli('SET', sessionKey, '{"displayGeneration":0,"nonceHash":"x"}');
+  cli('SET', ackKey, '{"v":1}');
+  const before = stored();
+  const pttlBefore = Number(cli('PTTL', controlKey));
+  const preRotation = current;
+  const first = await display.rotateDisplayCapability(rawRedis, CODE);
+  assert.equal(first.status, 'rotated');
+  assert.match(first.capability, /^[A-Za-z0-9_-]{43}$/u);
+  assert.ok(Number.isSafeInteger(first.displayGeneration));
+  assert.ok(first.displayGeneration >= 1 && first.displayGeneration < 1e14);
+  const rotated = stored();
+  assert.equal(
+    rotated.displayCapabilityHash,
+    createHash('sha256').update(first.capability, 'utf8').digest('hex')
+  );
+  assert.equal(rotated.displayGeneration, first.displayGeneration);
+  for (const field of [
+    'revision',
+    'writerFence',
+    'leaseUntil',
+    'holderSessionId',
+    'holderPrincipal',
+    'epoch',
+    'publicRunId',
+  ])
+    assert.deepEqual(rotated[field], before[field], field);
+  assert.deepEqual(rotated.presentation, before.presentation);
+  const pttlAfter = Number(cli('PTTL', controlKey));
+  assert.ok(pttlAfter > 0 && pttlAfter <= pttlBefore, 'TTL is not extended');
+  assert.equal(cli('EXISTS', sessionKey), '0');
+  assert.equal(cli('EXISTS', ackKey), '0');
+  assert.ok(!cli('KEYS', '*').includes(first.capability));
+  // The mapless holder renews and publishes with its pre-rotation revision.
+  current = await ok({
+    operationId: randomUUID(),
+    type: 'renew',
+    expectedEpoch: preRotation.epoch,
+    expectedRevision: preRotation.revision,
+    expectedFence: preRotation.writerFence,
+    holderSessionId: 'mapless-holder',
+  });
+  current = await ok({
+    ...base(),
+    type: 'publishInitiative',
+    runId: 'run-one',
+    initiative: { ...initiative(), round: 2 },
+  });
+  assert.equal(stored().displayGeneration, first.displayGeneration);
+
+  // E4: first nonce wins, a second nonce is denied, the same nonce reloads.
+  const verify = (capability, sessionNonce, bind) =>
+    display.verifyDisplayCapability({
+      rawRedis,
+      code: CODE,
+      capability,
+      nonce: sessionNonce,
+      bind,
+    });
+  const ackOf = (extra = {}) => ({
+    displayGeneration: first.displayGeneration,
+    epoch: current.epoch,
+    presentationRevision: stored().presentation.revision,
+    sceneId: 'scene-tavern',
+    blanked: false,
+    phase: 'loaded',
+    ...extra,
+  });
+  const sendAck = (ack, sessionNonce = nonceA, capability = first.capability) =>
+    display.recordDisplayAck({
+      rawRedis,
+      code: CODE,
+      capability,
+      nonce: sessionNonce,
+      ack,
+    });
+  assert.deepEqual(await sendAck(ackOf()), { status: 'stale' });
+  assert.equal((await verify(first.capability, nonceA, false)).status, 'stale');
+  const bound = await verify(first.capability, nonceA, true);
+  assert.equal(bound.status, 'ok');
+  assert.equal(bound.displayGeneration, first.displayGeneration);
+  const sessionTtl = Number(cli('PTTL', sessionKey));
+  const controlTtl = Number(cli('PTTL', controlKey));
+  assert.ok(
+    Math.abs(controlTtl - sessionTtl) < 2_000,
+    'binding follows control'
+  );
+  assert.deepEqual(await verify(first.capability, nonceB, true), {
+    status: 'denied',
+    httpStatus: 403,
+    error: 'Display link is in use on another screen',
+  });
+  assert.equal((await verify(first.capability, nonceA, true)).status, 'ok');
+  assert.equal((await verify(first.capability, nonceA, false)).status, 'ok');
+
+  // E7: the exact tuple is stored with Redis TIME and EX 30.
+  const timeBefore = Number(cli('TIME').split('\n')[0]) * 1000;
+  const recorded = await sendAck(ackOf());
+  assert.equal(recorded.status, 'recorded');
+  assert.ok(recorded.receivedAt >= timeBefore - 1_000);
+  const record = JSON.parse(cli('GET', ackKey));
+  assert.deepEqual(record, {
+    v: 1,
+    displayGeneration: first.displayGeneration,
+    epoch: current.epoch,
+    presentationRevision: stored().presentation.revision,
+    sceneId: 'scene-tavern',
+    blanked: false,
+    phase: 'loaded',
+    receivedAt: recorded.receivedAt,
+  });
+  const ackTtl = Number(cli('TTL', ackKey));
+  assert.ok(ackTtl > 25 && ackTtl <= 30);
+  assert.equal(
+    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
+    'loaded'
+  );
+
+  cli('DEL', ackKey);
+  for (const [label, ack, sessionNonce] of [
+    ['stale revision', ackOf({ presentationRevision: 0 })],
+    ['wrong epoch', ackOf({ epoch: randomUUID() })],
+    ['wrong generation', ackOf({ displayGeneration: 1 })],
+    ['other scene', ackOf({ sceneId: 'scene-forest' })],
+    ['blank while visible', ackOf({ sceneId: null, phase: 'blank' })],
+    ['claims blanked', ackOf({ blanked: true })],
+    ['wrong nonce', ackOf(), nonceB],
+  ]) {
+    const result = await sendAck(ack, sessionNonce);
+    assert.notEqual(result.status, 'recorded', label);
+    assert.equal(cli('EXISTS', ackKey), '0', label);
+  }
+  current = await ok({ ...base(), type: 'blank' });
+  assert.equal(
+    (await sendAck(ackOf({ sceneId: null }))).status,
+    'stale',
+    'loaded while blanked'
+  );
+  assert.equal(
+    (await sendAck(ackOf({ sceneId: null, blanked: true, phase: 'blank' })))
+      .status,
+    'recorded'
+  );
+  const blankStatus = (await display.readDisplayStatus(rawRedis, CODE)).display;
+  assert.equal(blankStatus.state, 'blank');
+  assert.equal(blankStatus.sceneId, null);
+  assert.ok(blankStatus.ageMs >= 0 && blankStatus.ageMs < 15_000);
+
+  // E13 with Redis TIME: updating (tuple differs), stale (>= 15 s), none.
+  current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
+  assert.equal(
+    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
+    'updating'
+  );
+  const nowMs = Number(cli('TIME').split('\n')[0]) * 1000;
+  cli(
+    'SET',
+    ackKey,
+    JSON.stringify({
+      ...JSON.parse(cli('GET', ackKey)),
+      receivedAt: nowMs - 16_000,
+    }),
+    'EX',
+    '30'
+  );
+  const staleStatus = (await display.readDisplayStatus(rawRedis, CODE)).display;
+  assert.equal(staleStatus.state, 'stale');
+  assert.ok(staleStatus.ageMs >= 15_000);
+  cli('DEL', ackKey);
+  assert.deepEqual((await display.readDisplayStatus(rawRedis, CODE)).display, {
+    state: 'none',
+    sceneId: null,
+    ageMs: null,
+  });
+  current = await ok({ ...base(), type: 'unpresent' });
+  assert.equal(
+    (await sendAck(ackOf({ sceneId: null, phase: 'blank' }))).status,
+    'recorded'
+  );
+  assert.equal(
+    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
+    'waiting'
+  );
+  current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
+
+  // R4-F5: an expired binding answers stale; the descriptor re-binds; a
+  // different nonce after expiry must win the descriptor bind first.
+  cli('DEL', sessionKey);
+  assert.equal((await sendAck(ackOf())).status, 'stale');
+  assert.equal((await verify(first.capability, nonceA, true)).status, 'ok');
+  assert.equal((await sendAck(ackOf())).status, 'recorded');
+  cli('DEL', sessionKey);
+  assert.equal((await sendAck(ackOf(), nonceB)).status, 'stale');
+  assert.equal((await verify(first.capability, nonceB, true)).status, 'ok');
+  assert.equal(
+    (await verify(first.capability, nonceA, true)).error,
+    'Display link is in use on another screen'
+  );
+
+  // Rotation denies the old capability for descriptor, ACK and bind.
+  const second = await display.rotateDisplayCapability(rawRedis, CODE);
+  assert.equal(second.status, 'rotated');
+  assert.notEqual(second.displayGeneration, first.displayGeneration);
+  assert.equal(cli('EXISTS', sessionKey), '0');
+  assert.equal(cli('EXISTS', ackKey), '0');
+  for (const bind of [true, false])
+    assert.equal(
+      (await verify(first.capability, nonceB, bind)).error,
+      'Display link expired'
+    );
+  assert.equal(
+    (
+      await sendAck(
+        ackOf({ displayGeneration: first.displayGeneration }),
+        nonceB,
+        first.capability
+      )
+    ).error,
+    'Display link expired'
+  );
+  assert.equal(cli('EXISTS', sessionKey), '0');
+
+  // R4-F8: a near-maximum generation survives later command commits and the
+  // relay access Lua compares it exactly.
+  const MAX = 99999999999999;
+  const maxHash = createHash('sha256')
+    .update('precision', 'utf8')
+    .digest('hex');
+  assert.equal(
+    JSON.parse(
+      await rawRedis.eval(
+        DISPLAY_ROTATE_SCRIPT,
+        [controlKey, sessionKey, ackKey],
+        [maxHash, String(MAX)]
+      )
+    ).displayGeneration,
+    MAX
+  );
+  current = await ok({ ...base(), type: 'renew' });
+  current = await ok({ ...base(), type: 'blank' });
+  current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
+  assert.match(
+    cli('GET', controlKey),
+    /"displayGeneration":99999999999999[,}]/u
+  );
+  assert.equal(stored().displayGeneration, MAX);
+  const relaySource = fs.readFileSync(
+    new URL('../relay/src/authority-access.ts', import.meta.url),
+    'utf8'
+  );
+  const accessLua = relaySource.match(
+    /const ACCESS_LUA = String\.raw`([\s\S]*?)`;/u
+  )?.[1];
+  assert.ok(accessLua, 'relay ACCESS_LUA is readable');
+  const roomId = JSON.parse(
+    cli('HGET', tableKeys.tableRegistryKey(CODE), 'scene-tavern')
+  ).roomId;
+  const meta = tableKeys.tableAuthorityRoomKeys(CODE, roomId).meta;
+  const roomGeneration = randomUUID();
+  cli('SET', meta, JSON.stringify({ v: 1, generation: roomGeneration }));
+  const access = async generation =>
+    rawRedis.eval(
+      accessLua,
+      [controlKey, tableKeys.tableRegistryKey(CODE), meta],
+      [
+        JSON.stringify([
+          {
+            epoch: current.epoch,
+            sceneId: 'scene-tavern',
+            room: roomId,
+            roomGeneration,
+            role: 'display',
+            displayGeneration: generation,
+          },
+        ]),
+      ]
+    );
+  assert.deepEqual(await access(MAX), [1]);
+  assert.deepEqual(await access(MAX - 1), [0]);
+  assert.deepEqual(await access(second.displayGeneration), [0]);
+});

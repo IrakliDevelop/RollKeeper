@@ -40,6 +40,10 @@ export interface BattleMapTokenRequest {
   dmId?: string;
   playerId?: string;
   displayKey?: string;
+  /** PR05 E5 (Table v1): the campaign display capability (body only). */
+  displayCapability?: string;
+  /** PR05 E4: the display tab's bound session nonce (body only). */
+  displaySession?: string;
   protocols?: { fog?: 1; authority?: 1 };
   /** Routing hint for the established location versus scene adapter. It
    * grants nothing; the server independently resolves resource identity. */

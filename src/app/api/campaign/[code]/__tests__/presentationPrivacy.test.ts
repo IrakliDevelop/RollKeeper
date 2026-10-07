@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CODE,
-  DISPLAY_KEY,
+  DISPLAY_CAPABILITY,
+  DISPLAY_NONCE,
   DM_ID,
   PLAYER_ID,
   ROOM_TAVERN,
   clientRequest,
   createTableFakeRedis,
+  issueDisplay,
   params,
   registryEntry,
   type RouteHandler,
@@ -15,6 +17,7 @@ import {
   setPresentation,
   setRegistryEntry,
 } from './tableFakeRedis';
+import { installDisplayEval } from './tableDisplayFake';
 
 const fake = vi.hoisted(() => ({ current: null as unknown }));
 vi.mock('@/lib/redis', async importOriginal => {
@@ -53,6 +56,7 @@ import {
   battleMapListUrl,
   fogAppearanceReadUrl,
   markerDetailsUrl,
+  sideChannelReadInit,
   type SideChannelCredential,
 } from '@/components/ui/campaign/table/sideChannelRequests';
 import {
@@ -61,9 +65,12 @@ import {
 } from '@/lib/battlemapSync';
 
 const player: SideChannelCredential = { role: 'player', playerId: PLAYER_ID };
+// PR05: under Table v1 the display credential is the capability + bound
+// session nonce, sent in headers (never the query).
 const display: SideChannelCredential = {
   role: 'display',
-  displayKey: DISPLAY_KEY,
+  capability: DISPLAY_CAPABILITY,
+  nonce: DISPLAY_NONCE,
 };
 const dm: SideChannelCredential = { role: 'dm', dmId: DM_ID };
 const AUDIENCES = [player, display];
@@ -71,8 +78,13 @@ const FOREST_IDS = ['scene-forest', 'map-forest'];
 
 let store: ReturnType<typeof createTableFakeRedis>;
 
-async function read(route: RouteHandler, url: string, id?: string) {
-  const response = await route(clientRequest(url), params(id));
+async function read(
+  route: RouteHandler,
+  url: string,
+  id?: string,
+  init: RequestInit = {}
+) {
+  const response = await route(clientRequest(url, init), params(id));
   return {
     status: response.status,
     type: response.headers.get('content-type'),
@@ -110,17 +122,29 @@ async function mint(request: BattleMapTokenRequest) {
 }
 
 const sideReads = (credential: SideChannelCredential, id: string) => [
-  read(detailGET, battleMapDetailUrl(CODE, id, credential), id),
-  read(markersGET, markerDetailsUrl(CODE, id, credential), id),
+  read(
+    detailGET,
+    battleMapDetailUrl(CODE, id, credential),
+    id,
+    sideChannelReadInit(credential)
+  ),
+  read(
+    markersGET,
+    markerDetailsUrl(CODE, id, credential),
+    id,
+    sideChannelReadInit(credential)
+  ),
   read(
     battleMapFogGET,
     fogAppearanceReadUrl('battlemap', CODE, id, credential),
-    id
+    id,
+    sideChannelReadInit(credential)
   ),
   read(
     locationFogGET,
     fogAppearanceReadUrl('location', CODE, id, credential),
-    id
+    id,
+    sideChannelReadInit(credential)
   ),
 ];
 
@@ -128,8 +152,10 @@ const NOT_FOUND = JSON.stringify({ error: 'Not found' });
 
 beforeEach(() => {
   store = createTableFakeRedis();
+  installDisplayEval(store);
   fake.current = store;
   seedTavernAndForest(store);
+  issueDisplay(store);
   process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
 });
@@ -141,7 +167,12 @@ afterEach(() => {
 describe('PR04 privacy: Private Forest never reaches the audience while Tavern is shown', () => {
   it('list GET returns only the shown scene safe metadata to player and display', async () => {
     for (const credential of AUDIENCES) {
-      const response = await read(listGET, battleMapListUrl(CODE, credential));
+      const response = await read(
+        listGET,
+        battleMapListUrl(CODE, credential),
+        undefined,
+        sideChannelReadInit(credential)
+      );
       expect(response.status).toBe(200);
       expect(JSON.parse(response.text)).toEqual({
         battlemaps: [
@@ -178,7 +209,8 @@ describe('PR04 privacy: Private Forest never reaches the audience while Tavern i
       {
         role: 'display',
         battleMapId: 'map-forest',
-        displayKey: DISPLAY_KEY,
+        displayCapability: DISPLAY_CAPABILITY,
+        displaySession: DISPLAY_NONCE,
       },
     ] as BattleMapTokenRequest[]) {
       const minted = await mint(request);
@@ -237,7 +269,14 @@ describe('PR04 privacy: Private Forest never reaches the audience while Tavern i
         expect(response.text).toBe(NOT_FOUND);
       expect(
         JSON.parse(
-          (await read(listGET, battleMapListUrl(CODE, credential))).text
+          (
+            await read(
+              listGET,
+              battleMapListUrl(CODE, credential),
+              undefined,
+              sideChannelReadInit(credential)
+            )
+          ).text
         )
       ).toEqual({ battlemaps: [] });
     }
@@ -308,13 +347,16 @@ describe('PR04 privacy: request flags and spoofed identities grant nothing', () 
         id
       );
       expect(stranger.status).toBe(403);
+      const rotatedAway: SideChannelCredential = {
+        role: 'display',
+        capability: 'R'.repeat(43),
+        nonce: DISPLAY_NONCE,
+      };
       const staleKey = await read(
         battleMapFogGET,
-        fogAppearanceReadUrl('battlemap', CODE, id, {
-          role: 'display',
-          displayKey: 'rotated-away',
-        }),
-        id
+        fogAppearanceReadUrl('battlemap', CODE, id, rotatedAway),
+        id,
+        sideChannelReadInit(rotatedAway)
       );
       expect(staleKey.status).toBe(403);
     }

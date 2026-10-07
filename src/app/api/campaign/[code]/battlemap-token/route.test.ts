@@ -8,6 +8,7 @@ import {
   seedRedisSet,
 } from '@/test/mocks/redis';
 import { verifyBattleMapToken } from '@/lib/battlemapToken';
+import { DISPLAY_VERIFY_SCRIPT } from '@/lib/tableServer/displayScripts';
 
 const { authorizeCampaignMembershipRoute, proveRelayAuthority } = vi.hoisted(
   () => ({
@@ -841,6 +842,14 @@ describe('fog appearance token metadata', () => {
 });
 
 describe('R4 presented Table scene resolution for map-pinned audiences', () => {
+  // PR05: under Table v1 the display credential is the capability + bound
+  // session nonce (full binding semantics: displayCredential/displayRoutes
+  // tests and the real-Redis script test). Here the verify script answers
+  // with the stored control, as it does for a bound session.
+  const CAPABILITY = 'Cap5Synthetic_display-capability_0123456789';
+  const NONCE = 'Nonce5Synthetic_012345';
+  let displayHash = '';
+  const baseEval = mockRedis.eval.getMockImplementation()!;
   const ROOM_X = '423e4567-e89b-42d3-a456-426614174000';
   const ROOM_M = '523e4567-e89b-42d3-a456-426614174000';
   const ROOM_N = '623e4567-e89b-42d3-a456-426614174000';
@@ -874,6 +883,7 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
         leaseUntil: Date.now() + 60_000,
         presentation: { sceneId, revision: 2, blanked: false },
         displayGeneration: 3,
+        displayCapabilityHash: displayHash,
         ...extra,
       })
     );
@@ -882,6 +892,20 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
   beforeEach(async () => {
     resetRedis();
     vi.clearAllMocks();
+    const crypto = await import('node:crypto');
+    displayHash = crypto
+      .createHash('sha256')
+      .update(CAPABILITY, 'utf8')
+      .digest('hex');
+    mockRedis.eval.mockImplementation(async (script, keys, args) =>
+      script === DISPLAY_VERIFY_SCRIPT
+        ? JSON.stringify({
+            status: 'ok',
+            control: await mockRedis.get(keys[0]!),
+            entry: null,
+          })
+        : baseEval(script, keys, args)
+    );
     delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
     process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
@@ -923,6 +947,7 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
 
   afterEach(() => {
     delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
+    mockRedis.eval.mockImplementation(baseEval);
   });
 
   const player = (body: Record<string, unknown> = {}) =>
@@ -935,14 +960,18 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
       ...body,
     });
   const display = (body: Record<string, unknown> = {}) =>
-    request({
-      role: 'display',
-      battleMapId: 'map-m',
-      sceneId: 'map-m',
-      displayKey: 'display-a',
-      protocols: { fog: 1, authority: 1 },
-      ...body,
-    });
+    request(
+      {
+        role: 'display',
+        battleMapId: 'map-m',
+        sceneId: 'map-m',
+        displayCapability: CAPABILITY,
+        displaySession: NONCE,
+        protocols: { fog: 1, authority: 1 },
+        ...body,
+      },
+      true
+    );
 
   async function expectUnavailable(response: Response) {
     expect(response.status).toBe(403);
@@ -1019,6 +1048,7 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
             ...presentation,
           },
           displayGeneration: 3,
+          displayCapabilityHash: displayHash,
         })
       );
       await expectUnavailable(await POST(player(), params));
@@ -1052,6 +1082,13 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
   });
 
   it('denies a display without display authority or with an invalid key', async () => {
+    const expired = async (response: Response) => {
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Display link expired',
+      });
+    };
+    // PR05: no capability issued (no generation/hash) is an expired link.
     seedRedis(
       `campaign:${tag}:table-control`,
       JSON.stringify({
@@ -1063,9 +1100,22 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
         presentation: { sceneId: 'scene-x', revision: 2, blanked: false },
       })
     );
-    await expectUnavailable(await POST(display(), params));
-    const invalid = await POST(display({ displayKey: 'wrong' }), params);
-    expect(invalid.status).toBe(403);
+    await expired(await POST(display(), params));
+    await present('scene-x');
+    await expired(
+      await POST(display({ displayCapability: 'W'.repeat(43) }), params)
+    );
+    // The pre-PR05 plaintext key is not a v1 credential.
+    await expired(
+      await POST(
+        display({
+          displayCapability: undefined,
+          displaySession: undefined,
+          displayKey: 'display-a',
+        }),
+        params
+      )
+    );
   });
 
   it('denies a wrong campaign without disclosing registration', async () => {

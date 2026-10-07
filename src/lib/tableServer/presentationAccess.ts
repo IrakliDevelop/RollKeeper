@@ -2,7 +2,12 @@ import { NextResponse, type NextRequest } from 'next/server';
 
 import { authorizeBattleMapSession } from '@/lib/battleMapSessionAuth';
 import { getRawRedis, getRedis } from '@/lib/redis';
+import {
+  DISPLAY_CAPABILITY_HEADER,
+  DISPLAY_SESSION_HEADER,
+} from '@/components/ui/campaign/table/sideChannelRequests';
 import { authorizeTableDm } from './auth';
+import { isTableProtocolRequired } from './control';
 import { resolveTableResource, type TableResource } from './presentation';
 
 /**
@@ -34,6 +39,9 @@ export interface TableAccessCredential {
   dmId?: string | null;
   playerId?: string | null;
   displayKey?: string | null;
+  /** PR05 E5 (v1): from headers, never the query. */
+  displayCapability?: string | null;
+  displaySession?: string | null;
 }
 
 export type TableAudienceRole = 'dm' | 'player' | 'display';
@@ -48,16 +56,25 @@ export type TableResourceAccess =
   | { status: 'location' }
   | { status: 'denied'; response: NextResponse };
 
-/** Q4 wire shape: `role=player&playerId=` | `role=display&displayKey=` | `role=dm&dmId=`. */
+/**
+ * Q4 wire shape: `role=player&playerId=` | `role=dm&dmId=` | `role=display`
+ * with the PR05 capability + session headers under Table v1 (a query
+ * `displayKey` is ignored there) or `displayKey=` with Table v1 off.
+ */
 export function credentialFromQuery(
   request: NextRequest
 ): TableAccessCredential {
   const search = request.nextUrl.searchParams;
+  const v1 = isTableProtocolRequired();
   return {
     role: search.get('role'),
     dmId: search.get('dmId'),
     playerId: search.get('playerId'),
-    displayKey: search.get('displayKey'),
+    displayKey: v1 ? null : search.get('displayKey'),
+    displayCapability: v1
+      ? request.headers.get(DISPLAY_CAPABILITY_HEADER)
+      : null,
+    displaySession: v1 ? request.headers.get(DISPLAY_SESSION_HEADER) : null,
   };
 }
 
@@ -113,12 +130,28 @@ export async function verifyTableCredential(
         role: credential.role,
         playerId: credential.playerId ?? undefined,
         displayKey: credential.displayKey ?? undefined,
+        displayCapability: credential.displayCapability ?? undefined,
+        displaySession: credential.displaySession ?? undefined,
       },
       { mutation }
     );
-    return session.authorized && session.role === credential.role
-      ? { ok: true, role: credential.role }
-      : denied(session.authorized ? 'Invalid credential' : session.error);
+    if (session.authorized && session.role === credential.role)
+      return { ok: true, role: credential.role };
+    // PR05 E4: an unbound display session is 409 `stale` (re-poll), and a
+    // failed authority read 503 — never a credential 403.
+    if (
+      credential.role === 'display' &&
+      !session.authorized &&
+      (session.status === 409 || session.status === 503)
+    )
+      return {
+        ok: false,
+        response: NextResponse.json(
+          { error: session.error },
+          { status: session.status }
+        ),
+      };
+    return denied(session.authorized ? 'Invalid credential' : session.error);
   }
   return denied('Valid table credentials are required');
 }
