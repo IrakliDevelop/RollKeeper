@@ -1881,10 +1881,9 @@ export function useDmLocationEditor(
     [fogControls, getVp]
   );
 
-  const handleOpenTvDisplay = useCallback(
-    () => openTvDisplay(campaignCode, location.id, dmId),
-    [campaignCode, dmId, location.id]
-  );
+  const handleOpenTvDisplay = useCallback(async () => {
+    await openTvDisplay(campaignCode, location.id, dmId);
+  }, [campaignCode, dmId, location.id]);
 
   const handleFitToMap = useCallback(() => {
     const vp = getVp();
