@@ -32,10 +32,10 @@ export function TableNewRunDialog(props: {
         props.onOpenChange(open);
       }}
     >
-      <DialogContent size="sm" aria-describedby="table-new-run-description">
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>New scene run</DialogTitle>
-          <DialogDescription id="table-new-run-description">
+          <DialogDescription>
             A run is a prepared fight in this scene, saved on this device.
           </DialogDescription>
         </DialogHeader>

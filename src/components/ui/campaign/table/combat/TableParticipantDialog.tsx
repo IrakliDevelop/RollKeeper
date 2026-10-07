@@ -52,13 +52,10 @@ export function TableParticipantDialog(props: {
         props.onOpenChange(open);
       }}
     >
-      <DialogContent
-        size="sm"
-        aria-describedby="table-participants-description"
-      >
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Choose participants</DialogTitle>
-          <DialogDescription id="table-participants-description">
+          <DialogDescription>
             Checked members roll initiative. Everyone else stays in the scene as
             a bystander.
           </DialogDescription>

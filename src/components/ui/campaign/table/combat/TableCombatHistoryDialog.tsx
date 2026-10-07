@@ -66,10 +66,10 @@ export function TableCombatHistoryDialog(props: {
         props.onOpenChange(open);
       }}
     >
-      <DialogContent size="md" aria-describedby="table-history-description">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Combat history</DialogTitle>
-          <DialogDescription id="table-history-description">
+          <DialogDescription>
             Scene fights saved on this device, independent of the encounter
             library.
           </DialogDescription>
