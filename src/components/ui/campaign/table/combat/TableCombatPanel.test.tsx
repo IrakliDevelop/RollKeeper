@@ -218,7 +218,9 @@ describe('Table combat panel (D10)', () => {
       useNPCStore,
       useBattleMapStore,
     ];
-    const spies = stores.map(store => vi.spyOn(store, 'setState'));
+    // Zustand's internal `set` bypasses a setState spy: assert state identity
+    // (any legacy write replaces it) and persisted storage instead.
+    const states = stores.map(store => store.getState());
     const storage = vi.spyOn(Storage.prototype, 'setItem');
     try {
       const repository = await openFixture();
@@ -235,10 +237,11 @@ describe('Table combat panel (D10)', () => {
       await waitFor(() =>
         expect(readySnapshot(repository).campaign?.activeRunId).toBeNull()
       );
-      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
+      stores.forEach((store, index) =>
+        expect(store.getState()).toBe(states[index])
+      );
       expect(storage).not.toHaveBeenCalled();
     } finally {
-      spies.forEach(spy => spy.mockRestore());
       storage.mockRestore();
     }
   });
@@ -337,7 +340,7 @@ describe('Table combat panel (D10)', () => {
     await setInitiative('Goblin', '12');
     await setInitiative('Aria', '15');
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(await screen.findByText('Broadcasting initiative')).toBeVisible();
+    expect(await screen.findByText(/Broadcasting initiative/)).toBeVisible();
     await waitFor(() =>
       expect(
         readySnapshot(repository).encounters.find(
@@ -427,5 +430,98 @@ describe('Table combat panel (D10)', () => {
     expect(
       screen.getByRole('switch', { name: 'Hide Goblin from players' })
     ).toBeVisible();
+  });
+
+  it('surfaces an active run in another scene with a link and names the published run (F2)', async () => {
+    const repository = await openFixture();
+    const key = repository.workspaceIdentity;
+    const base = readySnapshot(repository).scenes[0]!;
+    const seeded = await repository.mutateWorkspace(
+      revisionOf(repository),
+      'second-scene',
+      {
+        scenes: {
+          put: [
+            {
+              ...structuredClone(base),
+              workspaceKey: key,
+              sceneId: 'scene-2',
+              originalMapId: 'map-2',
+              map: { ...structuredClone(base.map), name: 'Far Ridge' },
+              canvasCheckpoint: null,
+              members: [
+                { actorId: 'orc', tokenIds: [], sceneMemberId: 'm2-orc' },
+              ],
+            },
+          ],
+        },
+      }
+    );
+    expect(seeded.status).toBe('committed');
+    const commands = [
+      {
+        type: 'combat.createRun',
+        sceneId: 'scene-2',
+        runId: 'far-run',
+        label: 'Far fight',
+      },
+      { type: 'combat.setParticipants', runId: 'far-run', actorIds: ['orc'] },
+      {
+        type: 'combat.setInitiative',
+        runId: 'far-run',
+        actorId: 'orc',
+        value: 9,
+      },
+      { type: 'combat.start', runId: 'far-run' },
+    ];
+    for (const [index, command] of commands.entries()) {
+      const result = await runCombatCommand(repository, {
+        expectedRevision: revisionOf(repository),
+        operationId: `far-${index}`,
+        command: { ...command, at: AT } as never,
+      });
+      expect(result.status).toBe('committed');
+    }
+    renderPanel(repository, { tableWorkspaceId: 'fork-1' });
+    await createRun('Near fight');
+    expect(
+      await screen.findByText(
+        /Another run is active: Far fight \(scene Far Ridge\)/
+      )
+    ).toBeVisible();
+    expect(
+      screen.getByRole('link', { name: 'Go to active run' })
+    ).toHaveAttribute(
+      'href',
+      '/dm/campaign/CAMP/table/scene-2?tableWorkspace=fork-1&run=far-run'
+    );
+    await chooseParticipants(['Goblin']);
+    await setInitiative('Goblin', '3');
+    expect(screen.getByRole('button', { name: 'Start combat' })).toBeDisabled();
+    expect(
+      screen.getByText(/Far fight \(scene Far Ridge\)/, {
+        selector: '[data-testid="table-publication-status"]',
+      })
+    ).toBeVisible();
+  });
+
+  it('waits for player data instead of publishing 0 HP and shows HP as unknown (F1)', async () => {
+    vi.mocked(fetch).mockImplementation(async () =>
+      Response.json({ error: 'down' }, { status: 503 })
+    );
+    const repository = await openFixture();
+    const session = fakeSession();
+    renderPanel(repository, { controlSession: session, controlEpoch: 1 });
+    await createRun('Bridge ambush');
+    await chooseParticipants(['Goblin', 'Aria']);
+    await setInitiative('Goblin', '12');
+    await setInitiative('Aria', '15');
+    fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
+    expect(
+      await screen.findByText(/^Waiting for player data · Bridge ambush$/)
+    ).toBeVisible();
+    expect(session.publishInitiative).not.toHaveBeenCalled();
+    expect(screen.getAllByText(/HP —/).length).toBeGreaterThan(0);
+    expect(screen.queryByText('0/0')).toBeNull();
   });
 });

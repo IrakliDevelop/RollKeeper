@@ -30,6 +30,8 @@ export function TableCombatToolbar(props: {
   running: boolean;
   loggingPaused: boolean;
   publicationLabel: string;
+  /** The run publication targets (campaign.activeRunId), possibly elsewhere. */
+  publishedRun: { label: string; sameScene: boolean; sceneName: string } | null;
   canPublish: boolean;
   saving: boolean;
   notice: TableCombatNotice | null;
@@ -73,8 +75,15 @@ export function TableCombatToolbar(props: {
           className="text-muted min-w-0 flex-1 text-xs"
           role="status"
           aria-live="polite"
+          data-testid="table-publication-status"
         >
-          {props.publicationLabel}
+          {props.publishedRun
+            ? `${props.publicationLabel} · ${props.publishedRun.label}${
+                props.publishedRun.sameScene
+                  ? ''
+                  : ` (scene ${props.publishedRun.sceneName})`
+              }`
+            : props.publicationLabel}
         </p>
         {props.canPublish && (
           <Button variant="outline" size="sm" onClick={props.onPublish}>

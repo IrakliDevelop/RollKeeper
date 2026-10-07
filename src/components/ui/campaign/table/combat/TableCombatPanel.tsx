@@ -1,10 +1,11 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { StudioPanel } from '@/components/ui/campaign/dm-vtt/StudioPanel';
 import { TurnControl } from '@/components/ui/campaign/dm-vtt/TurnControl';
 import type { TableControlSession } from '@/lib/table/authorityLifecycle';
+import type { PublicationStatus } from '@/lib/table/combatPublisher';
 import type { TableRepository } from '@/lib/table/repository';
 
 import { TableCombatHistoryDialog } from './TableCombatHistoryDialog';
@@ -35,6 +36,10 @@ export function TableCombatPanel(props: {
   controlEpoch: number;
   liveUnavailable: boolean;
   requestedRunId: string | null;
+  /** Imported-workspace route selection (kept in cross-scene links). */
+  tableWorkspaceId?: string | null;
+  /** Reports publication status (the page clears its acquire banner). */
+  onPublicationStatus?: (status: PublicationStatus) => void;
 }) {
   const combat = useTableCombat(props);
   const publication = useTableCombatPublication({
@@ -45,7 +50,16 @@ export function TableCombatPanel(props: {
     playerData: combat.playerData,
     background: combat.background,
   });
-  const panel = useTableCombatPanelActions({ combat, sceneId: props.sceneId });
+  const panel = useTableCombatPanelActions({
+    combat,
+    sceneId: props.sceneId,
+    campaignCode: props.campaignCode,
+    tableWorkspaceId: props.tableWorkspaceId ?? null,
+  });
+  const { onPublicationStatus } = props;
+  useEffect(() => {
+    onPublicationStatus?.(publication.status);
+  }, [publication.status, onPublicationStatus]);
   const [collapsed, setCollapsed] = useState(false);
   const [tab, setTab] = useState<'initiative' | 'selected'>('initiative');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
@@ -94,6 +108,7 @@ export function TableCombatPanel(props: {
               publication.status,
               props.liveUnavailable
             )}
+            publishedRun={panel.activeSummary}
             canPublish={canPublish}
             saving={combat.saving}
             notice={combat.notice}
@@ -127,6 +142,7 @@ export function TableCombatPanel(props: {
           ) : undefined
         }
         detailCapabilities={entity => capabilityByEntity.get(entity.id)}
+        hpUnknownEntityIds={panel.hpUnknownEntityIds}
       />
       {running && model && (
         <TurnControl

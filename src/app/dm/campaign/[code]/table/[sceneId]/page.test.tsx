@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   rosterProps: vi.fn(),
   combatProps: vi.fn(),
   canvasMounts: 0,
+  combatMounts: 0,
   query: '',
 }));
 
@@ -81,12 +82,18 @@ vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', async () => {
     },
   };
 });
-vi.mock('@/components/ui/campaign/table/combat/TableCombatPanel', () => ({
-  TableCombatPanel: (props: Record<string, unknown>) => {
-    mocks.combatProps(props);
-    return <div data-testid="table-combat" />;
-  },
-}));
+vi.mock('@/components/ui/campaign/table/combat/TableCombatPanel', async () => {
+  const { useEffect } = await import('react');
+  return {
+    TableCombatPanel: (props: Record<string, unknown>) => {
+      mocks.combatProps(props);
+      useEffect(() => {
+        mocks.combatMounts += 1;
+      }, []);
+      return <div data-testid="table-combat" />;
+    },
+  };
+});
 vi.mock('@/components/ui/campaign/table/TableRosterPanel', () => ({
   TableRosterPanel: (props: Record<string, unknown>) => {
     mocks.rosterProps(props);
@@ -228,6 +235,7 @@ describe('Table scene recovery UI', () => {
       dispose: vi.fn(),
     });
     mocks.canvasMounts = 0;
+    mocks.combatMounts = 0;
     mocks.activate.mockResolvedValue(preparedSession());
     mocks.restore.mockResolvedValue({ status: 'conflict' });
   });
@@ -515,6 +523,47 @@ describe('Table scene recovery UI', () => {
     await screen.findByTestId('table-combat');
     expect(mocks.combatProps).toHaveBeenLastCalledWith(
       expect.objectContaining({ requestedRunId: 'run-7', sceneId: 'scene-1' })
+    );
+  });
+
+  it('keeps the combat panel mounted across the canvas remount after an explicit acquire (F6)', async () => {
+    mocks.activate.mockResolvedValueOnce({
+      status: 'failed',
+      reason: 'network',
+    });
+    render(<TableScenePage />);
+    await screen.findByTestId('canvas');
+    const canvasBefore = mocks.canvasMounts;
+    expect(mocks.combatMounts).toBe(1);
+    fireEvent.click(
+      screen.getByRole('button', { name: /Acquire live control/i })
+    );
+    await waitFor(() =>
+      expect(mocks.canvasMounts).toBeGreaterThan(canvasBefore)
+    );
+    expect(mocks.combatMounts).toBe(1);
+  });
+
+  it('clears the "Public initiative cleared" banner once the panel reports a publish (F5)', async () => {
+    mocks.activate.mockResolvedValueOnce({
+      status: 'failed',
+      reason: 'network',
+    });
+    render(<TableScenePage />);
+    await screen.findByTestId('canvas');
+    fireEvent.click(
+      screen.getByRole('button', { name: /Acquire live control/i })
+    );
+    // The canvas (holding the banner) remounts after the acquire.
+    await waitFor(() =>
+      expect(screen.getByText(/Public initiative cleared/i)).toBeVisible()
+    );
+    const props = mocks.combatProps.mock.calls.at(-1)![0] as {
+      onPublicationStatus: (status: { kind: string; runId?: string }) => void;
+    };
+    act(() => props.onPublicationStatus({ kind: 'broadcasting', runId: 'r' }));
+    await waitFor(() =>
+      expect(screen.queryByText(/Public initiative cleared/i)).toBeNull()
     );
   });
 });

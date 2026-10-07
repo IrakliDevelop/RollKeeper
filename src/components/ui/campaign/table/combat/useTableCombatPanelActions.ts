@@ -28,6 +28,9 @@ function record(value: unknown): Record<string, unknown> | null {
 export function useTableCombatPanelActions(options: {
   combat: Combat;
   sceneId: string;
+  campaignCode: string;
+  /** Imported-workspace route selection, kept in cross-scene links. */
+  tableWorkspaceId: string | null;
 }) {
   const { combat, sceneId } = options;
   const { snapshot, model, selectedRun, execute, setNotice } = combat;
@@ -89,11 +92,27 @@ export function useTableCombatPanelActions(options: {
     .map(entry => ({ actorId: entry.actorId, name: entry.name }));
 
   const activeRunId = combat.campaign?.activeRunId ?? null;
-  const activeRun = combat.runs.find(run => run.runId === activeRunId);
+  // F2: the campaign pointer is workspace-wide; the active run may live in
+  // another scene of this workspace.
+  const activeRun = snapshot?.encounters.find(run => run.runId === activeRunId);
+  const activeScene = activeRun
+    ? snapshot?.scenes.find(value => value.sceneId === activeRun.sceneId)
+    : undefined;
+  const activeQuery = new URLSearchParams();
+  if (options.tableWorkspaceId)
+    activeQuery.set('tableWorkspace', options.tableWorkspaceId);
+  if (activeRun) activeQuery.set('run', activeRun.runId);
+  const activeSummary = activeRun
+    ? {
+        runId: activeRun.runId,
+        label: activeRun.label ?? 'Imported run',
+        sameScene: activeRun.sceneId === sceneId,
+        sceneName: activeScene?.map.name ?? 'another scene',
+        href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/table/${encodeURIComponent(activeRun.sceneId)}?${activeQuery.toString()}`,
+      }
+    : null;
   const activeElsewhere =
-    activeRun && activeRun.runId !== runId
-      ? { runId: activeRun.runId, label: activeRun.label ?? 'Imported run' }
-      : null;
+    activeSummary && activeSummary.runId !== runId ? activeSummary : null;
   const log = selectedRun
     ? snapshot?.logs.find(
         value =>
@@ -170,6 +189,12 @@ export function useTableCombatPanelActions(options: {
     participantOptions,
     bystanders,
     activeElsewhere,
+    activeSummary,
+    hpUnknownEntityIds: new Set(
+      (model?.participants ?? [])
+        .filter(view => view.missingPlayerData)
+        .map(view => view.entityId)
+    ),
     loggingPaused: log?.loggingPaused === true,
     missingPrompt,
     newRunOpen,

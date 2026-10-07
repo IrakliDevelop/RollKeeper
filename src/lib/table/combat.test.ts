@@ -1153,8 +1153,9 @@ describe('no legacy writers (D6)', () => {
       useNPCStore,
       useBattleMapStore,
     ];
+    // Zustand's internal `set` bypasses a setState spy: state identity and
+    // persisted storage are the discriminating assertions.
     const snapshots = stores.map(store => store.getState());
-    const spies = stores.map(store => vi.spyOn(store, 'setState'));
     const storage = vi.spyOn(Storage.prototype, 'setItem');
     try {
       const repository = await openFixture();
@@ -1192,13 +1193,11 @@ describe('no legacy writers (D6)', () => {
         runId: 'run-a',
         at: AT,
       });
-      for (const spy of spies) expect(spy).not.toHaveBeenCalled();
       expect(storage).not.toHaveBeenCalled();
       stores.forEach((store, index) =>
         expect(store.getState()).toBe(snapshots[index])
       );
     } finally {
-      spies.forEach(spy => spy.mockRestore());
       storage.mockRestore();
     }
   });

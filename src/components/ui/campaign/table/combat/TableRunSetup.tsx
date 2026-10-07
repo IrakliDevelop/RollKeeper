@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+
 import { Button } from '@/components/ui/forms/button';
 import type { TableCombatReadModel } from '@/lib/table/combatReadModel';
 
@@ -12,7 +14,13 @@ import { TableParticipantRow } from './TableParticipantRow';
 export function TableRunSetup(props: {
   model: TableCombatReadModel;
   bystanders: Array<{ actorId: string; name: string }>;
-  activeElsewhere: { runId: string; label: string } | null;
+  activeElsewhere: {
+    runId: string;
+    label: string;
+    sameScene: boolean;
+    sceneName: string;
+    href: string;
+  } | null;
   missingPrompt: string[] | null;
   busy: boolean;
   onChooseParticipants: () => void;
@@ -53,11 +61,24 @@ export function TableRunSetup(props: {
       {props.activeElsewhere && (
         <div className="border-accent-amber-border rounded-lg border p-2">
           <p className="text-accent-amber-text text-xs">
-            Another run is active: {props.activeElsewhere.label}
+            {`Another run is active: ${props.activeElsewhere.label}${
+              props.activeElsewhere.sameScene
+                ? ''
+                : ` (scene ${props.activeElsewhere.sceneName})`
+            }`}
           </p>
-          <Button variant="link" size="sm" onClick={props.onGoToActive}>
-            Go to active run
-          </Button>
+          {props.activeElsewhere.sameScene ? (
+            <Button variant="link" size="sm" onClick={props.onGoToActive}>
+              Go to active run
+            </Button>
+          ) : (
+            <Link
+              className="text-accent-blue-text text-xs font-medium underline"
+              href={props.activeElsewhere.href}
+            >
+              Go to active run
+            </Link>
+          )}
         </div>
       )}
       {participants.length === 0 ? (
