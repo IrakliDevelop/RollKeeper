@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { StrictMode } from 'react';
 import {
   act,
   cleanup,
@@ -609,6 +609,24 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
     expect(cover()).toBe(DISPLAY_EXPIRED);
     expect(connections[0]!.stop).toHaveBeenCalledTimes(1);
     expect(window.sessionStorage.getItem(displayStorageKey(CODE))).toBeNull();
+  });
+});
+
+describe('TableDisplayShell under StrictMode (acceptance A1)', () => {
+  it('binds the remounted canvas and uncovers the presented scene', async () => {
+    setDescriptor(scene('tavern', 2));
+    render(
+      <StrictMode>
+        <TableDisplayShell code={CODE} deps={deps} />
+      </StrictMode>
+    );
+    await flush();
+    await advance(0);
+    expect(canvas.viewports.length).toBeGreaterThanOrEqual(2);
+    await goLive();
+    expect(cover()).toBeNull();
+    for (const connection of connections.slice(0, -1))
+      expect(connection.stop).toHaveBeenCalledTimes(1);
   });
 });
 

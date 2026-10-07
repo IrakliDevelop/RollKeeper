@@ -148,6 +148,24 @@ export function parseDisplayDescriptor(
   return value as DisplayDescriptor;
 }
 
+/** A CameraView core `applyCameraView` accepts (finite, positive size). */
+export function isUsableView(view: unknown): view is CameraView {
+  if (!view || typeof view !== 'object') return false;
+  const { x, y, w, h } = view as Record<string, unknown>;
+  return (
+    typeof x === 'number' &&
+    typeof y === 'number' &&
+    typeof w === 'number' &&
+    typeof h === 'number' &&
+    Number.isFinite(x) &&
+    Number.isFinite(y) &&
+    Number.isFinite(w) &&
+    Number.isFinite(h) &&
+    w > 0 &&
+    h > 0
+  );
+}
+
 function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     if (signal.aborted) {
@@ -227,18 +245,57 @@ export class TableDisplayController {
   fitMap(): void {
     const attach = this.attach;
     if (!attach?.viewport || !attach.uncovered) return;
-    this.options.deps.fitView(attach.viewport);
-    this.views.set(
-      attach.scene.sceneId,
-      this.options.deps.captureView(attach.viewport)
-    );
+    try {
+      this.options.deps.fitView(attach.viewport);
+    } catch {
+      return;
+    }
+    this.rememberView(attach.scene.sceneId, attach.viewport);
+  }
+
+  /**
+   * Acceptance A1: remembers the current view only when it is usable
+   * (core `applyCameraView` throws on a non-positive view, which a 0×0 or
+   * destroyed canvas reports).
+   */
+  private rememberView(sceneId: string, viewport: Viewport): void {
+    try {
+      const view = this.options.deps.captureView(viewport);
+      if (isUsableView(view)) this.views.set(sceneId, view);
+    } catch {
+      // A destroyed viewport keeps the previously remembered view.
+    }
   }
 
   /** `FieldNotesCanvas` `onReady` for the canvas keyed `key`. */
   onViewportReady(key: number, viewport: Viewport): void {
     const attach = this.attach;
-    if (this.stopped || !attach || attach.gen !== key || attach.viewport)
-      return;
+    if (this.stopped || !attach || attach.gen !== key) return;
+    if (attach.viewport === viewport) return;
+    if (attach.viewport) {
+      // Acceptance A1: the canvas remounted under the same key (React
+      // StrictMode replays FieldNotesCanvas's mount effect: the first
+      // viewport is destroyed). Release everything bound to the old
+      // viewport and bind this attach to the live one.
+      for (const dispose of attach.disposers.splice(0)) {
+        try {
+          dispose();
+        } catch {
+          // Keep releasing the rest.
+        }
+      }
+      attach.connection?.stop();
+      attach.connection = null;
+      attach.status = 'connecting';
+      attach.fogApplied = false;
+      attach.fogDefinition = null;
+      attach.stage = 'idle';
+      attach.cameraApplied = false;
+      attach.uncovered = false;
+      attach.metadata = null;
+      this.stopHeartbeat();
+      this.emit({ cover: DISPLAY_WAITING, showing: false });
+    }
     const { deps, code, credential } = this.options;
     attach.viewport = viewport;
     const fog = attach.fogPlugin.manager;
@@ -486,16 +543,8 @@ export class TableDisplayController {
     if (!attach) return;
     this.attach = null;
     this.emit({ cover: DISPLAY_WAITING, showing: false });
-    if (attach.uncovered && attach.viewport) {
-      try {
-        this.views.set(
-          attach.scene.sceneId,
-          this.options.deps.captureView(attach.viewport)
-        );
-      } catch {
-        // A destroyed viewport keeps the previously remembered view.
-      }
-    }
+    if (attach.uncovered && attach.viewport)
+      this.rememberView(attach.scene.sceneId, attach.viewport);
     for (const dispose of attach.disposers.splice(0)) {
       try {
         dispose();
@@ -586,14 +635,22 @@ export class TableDisplayController {
       return;
     if (!attach.cameraApplied) {
       attach.cameraApplied = true;
-      const remembered = this.views.get(attach.scene.sceneId);
-      if (remembered) this.options.deps.applyView(attach.viewport, remembered);
-      else {
-        this.options.deps.fitView(attach.viewport);
-        this.views.set(
-          attach.scene.sceneId,
-          this.options.deps.captureView(attach.viewport)
-        );
+      const sceneId = attach.scene.sceneId;
+      try {
+        const remembered = this.views.get(sceneId);
+        if (remembered && isUsableView(remembered))
+          this.options.deps.applyView(attach.viewport, remembered);
+        else {
+          this.views.delete(sceneId);
+          this.options.deps.fitView(attach.viewport);
+          this.rememberView(sceneId, attach.viewport);
+        }
+      } catch {
+        // Acceptance A1: a camera failure never uncovers and never sticks:
+        // forget the view, stay covered and retry this attach (E9).
+        this.views.delete(sceneId);
+        this.failAttach(gen);
+        return;
       }
     }
     attach.stage = 'awaitFrame';
