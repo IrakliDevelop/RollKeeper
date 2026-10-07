@@ -187,7 +187,7 @@ export interface TableSceneRoster {
   needsSceneMemberIds: boolean;
 }
 
-interface AdoptedIdentity {
+export interface AdoptedIdentity {
   encounterId: string;
   entityId: string;
   entity: Record<string, unknown> | null;
@@ -229,7 +229,17 @@ function adoptedIdentity(
   return null;
 }
 
-function adoptedPcIdentity(
+/** PR01-adopted encounter identity of an actor, with its retained source entity. */
+export function adoptedActorIdentity(
+  snapshot: TableWorkspaceSnapshotV1,
+  actorId: string,
+  sceneId?: string
+): AdoptedIdentity | null {
+  return adoptedIdentity(snapshot, actorId, sceneId);
+}
+
+/** R8: a PR01-adopted encounter PC (DM-managed copy with read-only stats). */
+export function adoptedPcIdentity(
   snapshot: TableWorkspaceSnapshotV1,
   actor: TableActorRecordV1,
   sceneId?: string
@@ -237,6 +247,21 @@ function adoptedPcIdentity(
   if (actor.actorKind !== 'dm-managed') return null;
   const adopted = adoptedIdentity(snapshot, actor.actorId, sceneId);
   return adopted?.entity?.type === 'player' ? adopted : null;
+}
+
+/**
+ * The one stat-writer predicate (R8, R2-2): an editable actor is DM-managed
+ * and not an adopted PC. Shared by `roster.updateActorStats` and combat.
+ */
+export function isEditableActor(
+  snapshot: TableWorkspaceSnapshotV1,
+  actor: TableActorRecordV1
+): boolean {
+  return (
+    actor.actorKind === 'dm-managed' &&
+    actor.liveStats !== null &&
+    adoptedPcIdentity(snapshot, actor) === null
+  );
 }
 
 function referenceLegacyId(actor: TableActorRecordV1): string | null {
@@ -644,10 +669,7 @@ export function planRosterCommand(
       value => value.actorId === command.actorId
     );
     if (!actor) return rejected('invalid-reference', 'actor-missing');
-    if (
-      actor.actorKind !== 'dm-managed' ||
-      adoptedPcIdentity(snapshot, actor) !== null
-    ) {
+    if (!isEditableActor(snapshot, actor)) {
       return rejected('invalid-command', 'read-only');
     }
     if (canonicalJson(actor.liveStats) === canonicalJson(command.liveStats))

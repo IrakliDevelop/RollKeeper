@@ -160,6 +160,15 @@ export interface TableEncounterParticipantV1 {
   actorId: string;
   initiative: number | null;
   turnResources: TableTurnResourcesV1;
+  /** PR03: masked in the player-facing initiative (absent ≡ visible). */
+  hidden?: true;
+}
+
+/** PR03: pending remote publication intent for one combat generation. */
+export interface TableRunPublicationV1 {
+  intent: 'publish' | 'end';
+  combatGeneration: number;
+  acknowledged: boolean;
 }
 
 export interface TableEncounterRecordV1 {
@@ -175,6 +184,14 @@ export interface TableEncounterRecordV1 {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  /** PR03: DM-facing run label (1–200 Unicode characters). */
+  label?: string;
+  /**
+   * PR03: integer combat generation (absent ≡ 0). `runGeneration` keeps its
+   * PR01 meaning (immutable run instance id); each start increments this.
+   */
+  combatGeneration?: number;
+  publication?: TableRunPublicationV1;
 }
 
 export interface TableLogRecordV1 {
@@ -185,6 +202,11 @@ export interface TableLogRecordV1 {
   events: JsonObject[];
   startedAt: string;
   endedAt: string | null;
+  /** PR03 scene-run archive metadata (`archiveId = ${runId}:${generation}`). */
+  sceneId?: string;
+  combatGeneration?: number;
+  /** PR03: an append would exceed the archive cap; combat continued. */
+  loggingPaused?: true;
 }
 
 export interface TableOperationRecordV1 {
@@ -757,20 +779,29 @@ export function validateEncounterRecord(value: unknown): TableValidation {
     return { ok: false, reason: 'unsupported-schema' };
   }
   if (
-    !hasExactKeys(value, [
-      'schemaVersion',
-      'workspaceKey',
-      'runId',
-      'sceneId',
-      'sourceEncounterId',
-      'runGeneration',
-      'participants',
-      'round',
-      'currentActorId',
-      'isActive',
-      'createdAt',
-      'updatedAt',
-    ]) ||
+    !hasExactKeys(
+      value,
+      [
+        'schemaVersion',
+        'workspaceKey',
+        'runId',
+        'sceneId',
+        'sourceEncounterId',
+        'runGeneration',
+        'participants',
+        'round',
+        'currentActorId',
+        'isActive',
+        'createdAt',
+        'updatedAt',
+      ],
+      ['label', 'combatGeneration', 'publication']
+    ) ||
+    (value.label !== undefined && !isRunLabel(value.label)) ||
+    (value.combatGeneration !== undefined &&
+      !isSafeNonNegativeInteger(value.combatGeneration)) ||
+    (value.publication !== undefined &&
+      !validRunPublication(value.publication)) ||
     !isWorkspaceKey(value.workspaceKey) ||
     !isStableId(value.runId) ||
     !isStableId(value.sceneId) ||
@@ -796,10 +827,32 @@ export function validateEncounterRecord(value: unknown): TableValidation {
   return { ok: true };
 }
 
+/** Run labels are 1–200 Unicode characters (code points). */
+export function isRunLabel(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const length = [...value].length;
+  return length >= 1 && length <= 200;
+}
+
+function validRunPublication(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    hasExactKeys(value, ['intent', 'combatGeneration', 'acknowledged']) &&
+    (value.intent === 'publish' || value.intent === 'end') &&
+    isSafeNonNegativeInteger(value.combatGeneration) &&
+    typeof value.acknowledged === 'boolean'
+  );
+}
+
 function validateParticipant(value: unknown): boolean {
   if (
     !isRecord(value) ||
-    !hasExactKeys(value, ['actorId', 'initiative', 'turnResources']) ||
+    !hasExactKeys(
+      value,
+      ['actorId', 'initiative', 'turnResources'],
+      ['hidden']
+    ) ||
+    (value.hidden !== undefined && value.hidden !== true) ||
     !isStableId(value.actorId) ||
     (value.initiative !== null && !isFiniteNumber(value.initiative)) ||
     !isRecord(value.turnResources) ||
@@ -827,15 +880,23 @@ export function validateLogRecord(value: unknown): TableValidation {
     return { ok: false, reason: 'unsupported-schema' };
   }
   if (
-    !hasExactKeys(value, [
-      'schemaVersion',
-      'workspaceKey',
-      'archiveId',
-      'runId',
-      'events',
-      'startedAt',
-      'endedAt',
-    ]) ||
+    !hasExactKeys(
+      value,
+      [
+        'schemaVersion',
+        'workspaceKey',
+        'archiveId',
+        'runId',
+        'events',
+        'startedAt',
+        'endedAt',
+      ],
+      ['sceneId', 'combatGeneration', 'loggingPaused']
+    ) ||
+    (value.sceneId !== undefined && !isStableId(value.sceneId)) ||
+    (value.combatGeneration !== undefined &&
+      !isSafeNonNegativeInteger(value.combatGeneration)) ||
+    (value.loggingPaused !== undefined && value.loggingPaused !== true) ||
     !isWorkspaceKey(value.workspaceKey) ||
     !isStableId(value.archiveId) ||
     !isStableId(value.runId) ||
