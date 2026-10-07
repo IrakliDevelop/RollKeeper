@@ -57,9 +57,19 @@ export interface BattleMapTokenResult {
   fogAppearanceUpdatedAt?: string | null;
 }
 
+/** A non-ok token response: HTTP status and the server's error string. */
+export interface BattleMapTokenDenial {
+  status: number;
+  error: string | null;
+}
+
 export async function mintBattleMapToken(
   campaignCode: string,
-  req: BattleMapTokenRequest
+  req: BattleMapTokenRequest,
+  options: {
+    /** PR04 C4-1: observes a denial (null is still returned). */
+    onDenied?: (denial: BattleMapTokenDenial) => void;
+  } = {}
 ): Promise<BattleMapTokenResult | null> {
   try {
     const sceneId =
@@ -76,7 +86,18 @@ export async function mintBattleMapToken(
         protocols: { fog: 1, authority: 1 },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (options.onDenied) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: unknown;
+        } | null;
+        options.onDenied({
+          status: res.status,
+          error: typeof body?.error === 'string' ? body.error : null,
+        });
+      }
+      return null;
+    }
     const data = (await res.json()) as {
       token?: string;
       authority?: unknown;
@@ -170,6 +191,12 @@ export interface ManagedConnectionOptions {
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Receives pre-transport configuration failures for operator UI/logging. */
   onDiagnostic?: (message: string) => void;
+  /**
+   * PR04 C4-1/P10: a token mint denial (status + server error body), so a
+   * surface can tell "Scene is unavailable" from a credential denial. The
+   * connection's existing retry/backoff is unchanged.
+   */
+  onTokenDenied?: (denial: BattleMapTokenDenial) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
   /** Called with session metadata from each token mint (initial + refreshes). */
@@ -288,7 +315,10 @@ export function createManagedBattleMapConnection(
         sceneId: opts.tokenRequest.sceneId ?? opts.battleMapId,
         protocols: { fog: 1, authority: 1 },
       },
-      mint: mintBattleMapToken,
+      mint: (campaignCode, request) =>
+        mintBattleMapToken(campaignCode, request, {
+          onDenied: opts.onTokenDenied,
+        }),
       transportFactory: opts.authorityTransportFactory,
     });
   }
@@ -308,7 +338,8 @@ export function createManagedBattleMapConnection(
     resolveUrl: async () => {
       const result = await mintBattleMapToken(
         opts.campaignCode,
-        opts.tokenRequest
+        opts.tokenRequest,
+        { onDenied: opts.onTokenDenied }
       );
       if (stopped) return null;
       if (!result) {

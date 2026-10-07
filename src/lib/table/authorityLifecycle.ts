@@ -35,12 +35,85 @@ type LifecycleResult =
       holderSessionId?: string | null;
     };
 
+/** A presentation command exactly as sent (P3.4 Retry re-sends it as is). */
+export type PresentationCommand = Readonly<{
+  type: 'show' | 'blank' | 'unpresent' | 'deletePresented';
+  operationId: string;
+  expectedEpoch: string;
+  expectedRevision: number;
+  expectedFence: number;
+  holderSessionId: string;
+  sceneId?: string;
+  expectedSceneId?: string;
+}>;
+
 export type TableControlOutcome =
-  | { status: 'committed' }
+  | {
+      status: 'committed';
+      /** Presentation commands: a ledger duplicate (judge it per Q1). */
+      duplicate?: boolean;
+      /** Presentation commands: the fresh committed descriptor. */
+      current?: TableDescriptor;
+    }
   /** Lease/fence/epoch/holder loss: Not broadcasting until explicit reacquire. */
   | { status: 'lost'; reason: string }
   /** Transport/service failure, oversize or queue overflow; nothing changed here. */
-  | { status: 'failed'; reason: string };
+  | {
+      status: 'failed';
+      reason: string;
+      /** Presentation commands: the command to Retry identically. */
+      command?: PresentationCommand;
+      /**
+       * HTTP status of a non-conflict reply. 400 is returned only before the
+       * control EVAL (definite non-commit); 503/5xx may follow a commit.
+       */
+      httpStatus?: number;
+    }
+  /**
+   * Presentation-domain refusal that is NOT ownership loss (scene deleted or
+   * unregistered, nothing presented, presentation changed, reused id).
+   * Controls refresh from `current`; the session stays usable.
+   */
+  | { status: 'rejected'; reason: string; current: TableDescriptor | null }
+  /** A Retry met a different digest for its id: re-read control, then Q1. */
+  | { status: 'unconfirmed'; reason: 'operation-id-reused' };
+
+/** Refusals of presentation commands that leave live control intact. */
+const PRESENTATION_REJECTIONS = new Set([
+  'scene-unregistered',
+  'scene-deleted',
+  'no-presented-scene',
+  'presentation-changed',
+  'operation-id-reused',
+]);
+
+export type PresentationIntent =
+  | { type: 'show'; sceneId: string }
+  | { type: 'blank' }
+  | { type: 'unpresent' }
+  | { type: 'deletePresented'; expectedSceneId: string };
+
+/**
+ * Q1: a committed presentation result — including a ledger duplicate,
+ * historical or not — is "published" only if the CURRENT descriptor shows
+ * the command's intended effect; otherwise the audience has since changed.
+ * The `historical` flag alone never decides.
+ */
+export function judgePresentationOutcome(
+  intent: PresentationIntent,
+  current: TableDescriptor
+): 'published' | 'changed' {
+  const { sceneId, blanked } = current.presentation;
+  const matches =
+    intent.type === 'show'
+      ? sceneId === intent.sceneId && !blanked
+      : intent.type === 'blank'
+        ? blanked
+        : intent.type === 'unpresent'
+          ? sceneId === null
+          : sceneId !== intent.expectedSceneId;
+  return matches ? 'published' : 'changed';
+}
 
 export interface TableControlSession {
   readonly holderSessionId: string;
@@ -48,6 +121,16 @@ export interface TableControlSession {
   isLost(): boolean;
   lostReason(): string | null;
   renew(): Promise<TableControlOutcome>;
+  /** PR04 P3: explicit presentation commands; one caller intent each. */
+  show(sceneId: string, operationId: string): Promise<TableControlOutcome>;
+  blank(operationId: string): Promise<TableControlOutcome>;
+  unpresent(operationId: string): Promise<TableControlOutcome>;
+  deletePresented(
+    expectedSceneId: string,
+    operationId: string
+  ): Promise<TableControlOutcome>;
+  /** P3.4 Retry: re-sends a failed presentation command byte-identically. */
+  resend(command: PresentationCommand): Promise<TableControlOutcome>;
   publishInitiative(
     runId: string,
     initiative: SharedInitiativeState
@@ -191,7 +274,12 @@ export function createTableControlSession(options: {
   const post = async (
     command: Record<string, unknown>
   ): Promise<
-    | { kind: 'response'; ok: boolean; body: Record<string, unknown> | null }
+    | {
+        kind: 'response';
+        ok: boolean;
+        httpStatus: number;
+        body: Record<string, unknown> | null;
+      }
     | { kind: 'too-large' }
     | { kind: 'network' }
   > => {
@@ -216,7 +304,12 @@ export function createTableControlSession(options: {
       } catch {
         parsed = null;
       }
-      return { kind: 'response', ok: response.ok, body: parsed };
+      return {
+        kind: 'response',
+        ok: response.ok,
+        httpStatus: response.status,
+        body: parsed,
+      };
     } catch {
       return { kind: 'network' };
     } finally {
@@ -231,8 +324,10 @@ export function createTableControlSession(options: {
     }
   };
 
+  type ControlType = 'renew' | 'publishInitiative' | 'endInitiative';
+
   const run = async (
-    type: 'renew' | 'publishInitiative' | 'endInitiative',
+    type: ControlType,
     extra: Record<string, unknown>
   ): Promise<TableControlOutcome> => {
     for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -281,17 +376,96 @@ export function createTableControlSession(options: {
     return { status: 'lost', reason: 'stale-control' };
   };
 
-  const enqueue = (
-    type: 'renew' | 'publishInitiative' | 'endInitiative',
-    extra: Record<string, unknown> = {}
+  /**
+   * Presentation commands (PR04 P3): same queue, latest-descriptor build and
+   * one same-holder stale-control retry as `run`, but the caller's
+   * operationId is kept across that retry (an uncommitted op has no ledger
+   * entry), presentation refusals are `rejected` (control intact), and a
+   * network failure returns the exact command for an identical Retry.
+   */
+  const runPresentation = async (
+    build: () => PresentationCommand,
+    resent: PresentationCommand | null
+  ): Promise<TableControlOutcome> => {
+    let command = resent ?? build();
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (lost !== null) return { status: 'lost', reason: lost };
+      const result = await post(command as Record<string, unknown>);
+      if (result.kind === 'too-large')
+        return { status: 'failed', reason: 'too-large' };
+      if (result.kind === 'network')
+        return { status: 'failed', reason: 'network', command };
+      const returned = descriptor(result.body?.current);
+      const reason =
+        typeof result.body?.reason === 'string' ? result.body.reason : null;
+      if (result.ok && result.body?.status === 'committed' && returned) {
+        current = returned;
+        notify();
+        return {
+          status: 'committed',
+          duplicate: reason === 'duplicate',
+          current: structuredClone(returned),
+        };
+      }
+      if (
+        result.body?.status === 'conflict' ||
+        result.body?.status === 'denied'
+      ) {
+        if (reason === 'operation-id-reused' && resent !== null) {
+          if (returned) {
+            current = returned;
+            notify();
+          }
+          return { status: 'unconfirmed', reason: 'operation-id-reused' };
+        }
+        if (reason !== null && PRESENTATION_REJECTIONS.has(reason)) {
+          if (returned) current = returned;
+          notify();
+          return {
+            status: 'rejected',
+            reason,
+            current: returned ? structuredClone(returned) : null,
+          };
+        }
+        if (
+          attempt === 0 &&
+          reason === 'stale-control' &&
+          sameController(current, returned, holderSessionId)
+        ) {
+          current = returned;
+          command = {
+            ...command,
+            expectedEpoch: current.epoch,
+            expectedRevision: current.revision,
+            expectedFence: current.writerFence,
+          };
+          continue;
+        }
+        if (returned) current = returned;
+        markLost(reason ?? 'conflict');
+        return { status: 'lost', reason: lost ?? 'conflict' };
+      }
+      return {
+        status: 'failed',
+        reason: reason ?? 'unavailable',
+        command,
+        httpStatus: result.httpStatus,
+      };
+    }
+    markLost('stale-control');
+    return { status: 'lost', reason: 'stale-control' };
+  };
+
+  const schedule = (
+    task: () => Promise<TableControlOutcome>
   ): Promise<TableControlOutcome> => {
     if (lost !== null) return Promise.resolve({ status: 'lost', reason: lost });
     if (pending >= MAX_PENDING_CONTROL)
       return Promise.resolve({ status: 'failed', reason: 'queue-overflow' });
     pending += 1;
-    const task = queue.then(() => run(type, extra));
-    queue = task.catch(() => undefined);
-    return task
+    const queued = queue.then(task);
+    queue = queued.catch(() => undefined);
+    return queued
       .catch(
         (): TableControlOutcome => ({ status: 'failed', reason: 'network' })
       )
@@ -300,12 +474,43 @@ export function createTableControlSession(options: {
       });
   };
 
+  const enqueue = (
+    type: ControlType,
+    extra: Record<string, unknown> = {}
+  ): Promise<TableControlOutcome> => schedule(() => run(type, extra));
+
+  const present = (
+    type: PresentationCommand['type'],
+    operationIdValue: string,
+    extra: { sceneId?: string; expectedSceneId?: string } = {}
+  ): Promise<TableControlOutcome> =>
+    schedule(() =>
+      runPresentation(
+        () => ({
+          type,
+          operationId: operationIdValue,
+          expectedEpoch: current.epoch,
+          expectedRevision: current.revision,
+          expectedFence: current.writerFence,
+          holderSessionId,
+          ...extra,
+        }),
+        null
+      )
+    );
+
   return {
     holderSessionId,
     current: () => structuredClone(current),
     isLost: () => lost !== null,
     lostReason: () => lost,
     renew: () => enqueue('renew'),
+    show: (sceneId, id) => present('show', id, { sceneId }),
+    blank: id => present('blank', id),
+    unpresent: id => present('unpresent', id),
+    deletePresented: (expectedSceneId, id) =>
+      present('deletePresented', id, { expectedSceneId }),
+    resend: command => schedule(() => runPresentation(() => command, command)),
     publishInitiative: (runId, initiative) =>
       enqueue('publishInitiative', { runId, initiative }),
     endInitiative: () => enqueue('endInitiative'),
@@ -465,4 +670,18 @@ export async function prepareTableSceneAuthority(options: {
   } catch {
     return { status: 'failed', reason: 'network' };
   }
+}
+
+/**
+ * Whether a presentation command that did not commit may still have been
+ * applied (lost response, 503/5xx after a commit). A definite pre-EVAL 400
+ * and never-sent failures (too large, queue overflow) cannot have committed.
+ */
+export function presentationMayHaveCommitted(
+  outcome: TableControlOutcome
+): boolean {
+  if (outcome.status === 'unconfirmed') return true;
+  if (outcome.status !== 'failed') return false;
+  if (outcome.httpStatus === 400) return false;
+  return outcome.command !== undefined || outcome.reason === 'network';
 }

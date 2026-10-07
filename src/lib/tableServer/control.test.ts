@@ -49,3 +49,21 @@ describe('TableControlService.registry', () => {
     await expect(service(['scene-a']).registry(principal)).rejects.toThrow();
   });
 });
+
+describe('TableControlService.execute (PR04 projection timestamp)', () => {
+  it('supplies the projection updatedAt as an ISO-8601 ARGV', async () => {
+    const calls: unknown[][] = [];
+    const svc = new TableControlService({
+      eval: async (...args: unknown[]) => {
+        calls.push(args);
+        return JSON.stringify({ status: 'committed', reason: 'current' });
+      },
+      get: async () => null,
+      hgetall: async () => null,
+    } as never);
+    await svc.execute(principal, { type: 'initialize', operationId: 'op-1' });
+    const argv = calls[0][2] as string[];
+    expect(argv).toHaveLength(6);
+    expect(argv[5]).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u);
+  });
+});

@@ -222,7 +222,7 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('keeps map-keyed side channels neutral until the resolved scene is this map', async () => {
+  it('PR04: addresses side channels by the RESOLVED scene id once resolved', async () => {
     stubCanvas();
     renderPlayer();
     fireReady(makeViewport());
@@ -232,20 +232,23 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
 
     await act(async () => {
       options.onSceneResolved?.('scene-x');
-      options.onPoke?.('markers');
-      options.onPoke?.('fog-appearance');
     });
-    expect(fetchedUrls().some(url => url.includes('/markers'))).toBe(false);
-    expect(fetchAndApplyFogAppearance).not.toHaveBeenCalled();
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-
-    await act(async () => options.onSceneResolved?.('bm-1'));
-    expect(
-      fetchedUrls().some(url =>
-        url.endsWith('/api/campaign/CAMP01/battlemaps/bm-1/markers')
-      )
-    ).toBe(true);
-    expect(startFogAppearancePoll).toHaveBeenCalledTimes(1);
+    expect(fetchedUrls()).toContain(
+      '/api/campaign/CAMP01/battlemaps/scene-x/markers?role=player&playerId=char-a'
+    );
+    expect(fetchedUrls().some(url => url.includes('/bm-1/markers'))).toBe(
+      false
+    );
+    expect(startFogAppearancePoll).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=player&playerId=char-a',
+      })
+    );
+    await act(async () => options.onPoke?.('fog-appearance'));
+    expect(fetchAndApplyFogAppearance).toHaveBeenCalledWith(
+      expect.anything(),
+      '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=player&playerId=char-a'
+    );
   });
 
   it('rebuilds the canvas with a visible notice when the presented scene changes', async () => {

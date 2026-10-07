@@ -22,6 +22,17 @@ import { useHydration } from '@/hooks/useHydration';
 import { useDmStore } from '@/store/dmStore';
 import { uploadAsset } from '@/utils/uploadAsset';
 import { TableScenePanel } from '@/components/ui/campaign/table/TableScenePanel';
+import { battleMapDeleteRequest } from '@/components/ui/campaign/table/sideChannelRequests';
+
+/** PR04 P9: a Table v1 delete refusal in words (never a bare status). */
+function tableDeleteRefusal(status: number): string {
+  if (status === 404) return 'Not deleted — this map is used by a Table scene.';
+  if (status === 403)
+    return 'Not deleted — only the campaign DM can delete battle maps.';
+  if (status === 503)
+    return 'Not deleted — live storage is unavailable. Try again shortly.';
+  return 'Not deleted — the battle map could not be removed. Try again.';
+}
 
 export default function CampaignBattleMapsPage() {
   const params = useParams();
@@ -256,28 +267,30 @@ export default function CampaignBattleMapsPage() {
                 campaignCode={code}
                 onDelete={async id => {
                   setDeleteError('');
+                  const tableV1 =
+                    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED ===
+                    'true';
+                  const request = battleMapDeleteRequest(code, id, dmId);
+                  let status = 0;
+                  let networkMessage = 'Delete failed';
                   try {
-                    const response = await fetch(
-                      `/api/campaign/${code}/battlemaps/${id}`,
-                      {
-                        method: 'DELETE',
-                        headers: {
-                          'Content-Type': 'application/json',
-                          'x-rollkeeper-csrf': '1',
-                        },
-                        body: JSON.stringify({ dmId }),
-                      }
-                    );
-                    if (!response.ok)
-                      throw new Error(
-                        `Delete was rejected (${response.status})`
-                      );
-                    removeBattleMap(code, id);
+                    const response = await fetch(request.url, request.init);
+                    status = response.ok ? 200 : response.status;
                   } catch (error) {
-                    setDeleteError(
-                      error instanceof Error ? error.message : 'Delete failed'
-                    );
+                    if (error instanceof Error && error.message)
+                      networkMessage = error.message;
                   }
+                  if (status === 200) {
+                    removeBattleMap(code, id);
+                    return;
+                  }
+                  setDeleteError(
+                    tableV1
+                      ? tableDeleteRefusal(status)
+                      : status === 0
+                        ? networkMessage
+                        : `Delete was rejected (${status})`
+                  );
                 }}
               />
             ))}

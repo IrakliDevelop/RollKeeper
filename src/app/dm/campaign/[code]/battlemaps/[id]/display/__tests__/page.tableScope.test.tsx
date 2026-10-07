@@ -188,20 +188,23 @@ describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('polls fog appearance only while the resolved scene is this map', async () => {
+  it('PR04: polls fog appearance for the RESOLVED scene id once resolved', async () => {
     stubCanvas();
     render(<BattleMapDisplayPage />);
     fireReady(makeViewport());
     expect(startFogAppearancePoll).not.toHaveBeenCalled();
     const options = lastOptions();
-    await act(async () => {
-      options.onSceneResolved?.('scene-x');
-      options.onPoke?.('fog-appearance');
-    });
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-    expect(fetchAndApplyFogAppearance).not.toHaveBeenCalled();
-    await act(async () => options.onSceneResolved?.('bm-1'));
-    expect(startFogAppearancePoll).toHaveBeenCalledTimes(1);
+    await act(async () => options.onSceneResolved?.('scene-x'));
+    await act(async () => options.onPoke?.('fog-appearance'));
+    const url =
+      '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=display&displayKey=key';
+    expect(startFogAppearancePoll).toHaveBeenCalledWith(
+      expect.objectContaining({ url })
+    );
+    expect(fetchAndApplyFogAppearance).toHaveBeenCalledWith(
+      expect.anything(),
+      url
+    );
   });
 
   it('rebuilds the display canvas when the resolved scene changes', async () => {

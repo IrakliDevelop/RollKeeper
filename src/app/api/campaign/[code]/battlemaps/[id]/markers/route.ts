@@ -30,6 +30,13 @@ import {
   requireGuestPlayerBinding,
 } from '@/lib/guestRouteResponses';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
+import { isTableProtocolRequired } from '@/lib/tableServer/control';
+import {
+  authorizeTableAudienceWrite,
+  authorizeTableResourceAccess,
+  authorizeTableSceneWrite,
+  credentialFromQuery,
+} from '@/lib/tableServer/presentationAccess';
 
 const markerDetailsKey = (code: string, mapId: string) =>
   campaignSharedKey(code, `battlemap-markers:${mapId}`);
@@ -40,6 +47,17 @@ export async function GET(
 ) {
   const { code, id } = await params;
   try {
+    // PR04 P5: scene ids are readable by the audience only while presented;
+    // a verified location keeps its existing authorization below.
+    const access = isTableProtocolRequired()
+      ? await authorizeTableResourceAccess({
+          request,
+          code,
+          id,
+          credential: credentialFromQuery(request),
+        })
+      : null;
+    if (access?.status === 'denied') return access.response;
     const guest = await authorizeHybridGuestRoute(request, code, 'shared:read');
     if (guest.mode === 'denied') return guestDeniedResponse(guest);
     const redis = getRedis();
@@ -85,7 +103,16 @@ export async function PUT(
       );
 
     const redis = getRedis();
-    if ((await verifyDmAuthority(redis, code, body.dmId)) !== 'ok')
+    // PR04 C4-2: a scene id needs campaign DM mutation authority and a
+    // registered, non-deleted scene; other ids keep the existing check.
+    const sceneWrite = isTableProtocolRequired()
+      ? await authorizeTableSceneWrite({ request, code, id, dmId: body.dmId })
+      : ({ status: 'legacy' } as const);
+    if (sceneWrite.status === 'denied') return sceneWrite.response;
+    if (
+      sceneWrite.status === 'legacy' &&
+      (await verifyDmAuthority(redis, code, body.dmId)) !== 'ok'
+    )
       return NextResponse.json(
         { error: 'dmId is not authorized for this campaign' },
         { status: 403 }
@@ -173,6 +200,12 @@ export async function POST(
         { error: 'Player is not a member of this campaign' },
         { status: 403 }
       );
+    // PR04 P6: under Table v1 only the presented, unblanked scene accepts a
+    // claim; the ledger logic below is unchanged.
+    if (isTableProtocolRequired()) {
+      const audience = await authorizeTableAudienceWrite({ code, id });
+      if (audience.status === 'denied') return audience.response;
+    }
 
     const requestId = body.requestId as string;
     const result = await claimMarkerLoot(

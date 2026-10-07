@@ -35,6 +35,7 @@ import DmLocationGridPopover from './DmLocationGridPopover';
 import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
+import { TABLE_V1_SHARE_DISABLED_REASON } from './useShareWithPlayers';
 
 const BASE_TOOL_DEFS = [
   { name: 'hand', icon: Hand, label: 'Pan' },
@@ -130,6 +131,8 @@ export default function DmLocationToolbar({
   fogControls,
   liveSyncConfigured = false,
 }: DmLocationToolbarProps) {
+  const tableV1Share =
+    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const toolDefs =
@@ -401,7 +404,27 @@ export default function DmLocationToolbar({
                       : 'Sync off'}
             </span>
           )}
-          {mode === 'battlemap' && (
+          {mode === 'battlemap' && tableV1Share && (
+            // PR04 P9: Table v1 owns the join banner (Show on a Table scene);
+            // this legacy toggle never claims "Live for players".
+            <span className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                disabled
+                aria-describedby="share-with-players-table-v1"
+                className="flex items-center gap-1.5 px-3 py-1 text-xs"
+              >
+                Share with players
+              </Button>
+              <span
+                id="share-with-players-table-v1"
+                className="text-muted max-w-56 text-xs"
+              >
+                {TABLE_V1_SHARE_DISABLED_REASON}
+              </span>
+            </span>
+          )}
+          {mode === 'battlemap' && !tableV1Share && (
             <Button
               variant={sharedWithPlayers ? 'success' : 'outline'}
               onClick={onToggleShareWithPlayers}

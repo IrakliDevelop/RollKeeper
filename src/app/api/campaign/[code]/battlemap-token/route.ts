@@ -36,6 +36,32 @@ function decodeRecord(value: unknown): Record<string, unknown> | null {
   }
 }
 
+/** Fog-appearance projection of a map/scene id; solid on absence or error. */
+async function readFogAppearance(
+  redis: ReturnType<typeof getRedis>,
+  code: string,
+  id: string
+): Promise<{
+  fogAppearance: ProjectedFogAppearance;
+  updatedAt: string | null;
+}> {
+  try {
+    const projection = parseBattleMapFogAppearanceProjection(
+      await redis.get<BattleMapFogAppearanceProjection>(
+        campaignFogAppearanceKey(code, id)
+      )
+    );
+    if (projection)
+      return {
+        fogAppearance: projection.appearance,
+        updatedAt: projection.updatedAt,
+      };
+  } catch {
+    // Default to solid on read failure.
+  }
+  return { fogAppearance: 'solid', updatedAt: null };
+}
+
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
@@ -234,14 +260,17 @@ export async function POST(
             },
         secret
       );
+      // PR04 P6: the companion fog appearance is the RESOLVED scene's
+      // projection (scene-keyed side channel), never the source map's.
+      const fog = await readFogAppearance(redis, code, resolution.sceneId);
       return NextResponse.json({
         token,
         authority: 1,
         room: resolution.room,
         roomGeneration: resolution.roomGeneration,
         sceneId: resolution.sceneId,
-        fogAppearance: 'solid',
-        fogAppearanceUpdatedAt: null,
+        fogAppearance: fog.fogAppearance,
+        fogAppearanceUpdatedAt: fog.updatedAt,
       });
     }
 
@@ -391,25 +420,11 @@ export async function POST(
       secret
     );
 
-    let fogAppearance: ProjectedFogAppearance = 'solid';
-    let fogAppearanceUpdatedAt: string | null = null;
-    try {
-      const raw = await redis.get<BattleMapFogAppearanceProjection>(
-        campaignFogAppearanceKey(code, battleMapId)
-      );
-      const projection = parseBattleMapFogAppearanceProjection(raw);
-      if (projection) {
-        fogAppearance = projection.appearance;
-        fogAppearanceUpdatedAt = projection.updatedAt;
-      }
-    } catch {
-      // Default to solid on read failure.
-    }
-
+    const fog = await readFogAppearance(redis, code, battleMapId);
     return NextResponse.json({
       token,
-      fogAppearance,
-      fogAppearanceUpdatedAt,
+      fogAppearance: fog.fogAppearance,
+      fogAppearanceUpdatedAt: fog.updatedAt,
     });
   } catch (error) {
     console.error('Error minting battle map token:', error);

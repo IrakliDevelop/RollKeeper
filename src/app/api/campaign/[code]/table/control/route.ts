@@ -23,12 +23,19 @@ export async function GET(request: NextRequest, { params }: Context) {
   );
   if (!auth.ok)
     return NextResponse.json({ error: auth.error }, { status: auth.status });
-  const service = new TableControlService();
-  const [current, registry] = await Promise.all([
-    service.read(code),
-    service.registry(auth.principal),
-  ]);
-  return NextResponse.json({ current, registry });
+  try {
+    const service = new TableControlService();
+    const [current, registry] = await Promise.all([
+      service.read(code),
+      service.registry(auth.principal),
+    ]);
+    return NextResponse.json({ current, registry });
+  } catch {
+    return NextResponse.json(
+      { error: 'Table control is unavailable' },
+      { status: 503 }
+    );
+  }
 }
 
 export async function POST(request: NextRequest, { params }: Context) {

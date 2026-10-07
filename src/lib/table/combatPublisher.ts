@@ -134,8 +134,8 @@ export function createCombatPublisher(options: {
   /**
    * Run generation + canonical payload last sent (F6): an automatic publish
    * of the same public state is skipped. Explicit publishes and pending
-   * start intents (ack still owed) always send; a (re)acquire needs one of
-   * those to publish at all, so no cache reset is required on hold.
+   * start intents (ack still owed) always send; `hold()` (every reacquire)
+   * resets it, because the server cleared what was sent before (R03-1).
    */
   let lastSentKey: string | null = null;
   const canonical = (initiative: SharedInitiativeState) => {
@@ -409,6 +409,9 @@ export function createCombatPublisher(options: {
     hold: () => {
       const state = read();
       broadcasting = false;
+      // R03-1: a (re)acquire wiped the public initiative, so nothing sent
+      // before it may dedupe a later (even non-explicit) publish.
+      lastSentKey = null;
       failure = null;
       blocked = null;
       holdNow(state);

@@ -26,6 +26,7 @@ import {
   fetchAndApplyFogAppearance,
   startFogAppearancePoll,
 } from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
+import { fogAppearanceReadUrl } from '@/components/ui/campaign/table/sideChannelRequests';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 import {
   createRollKeeperFogPlugin,
@@ -55,16 +56,30 @@ function DisplayCanvas() {
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
   // R4 (Table v1): this pinned display opens the source map URL and shows
-  // the scene the server resolves. Its map-keyed fog-appearance companion
-  // stays neutral unless that scene is this map; a resolved-scene change
-  // rebuilds the canvas under a new key.
+  // the scene the server resolves; a resolved-scene change rebuilds the
+  // canvas under a new key. PR04 P7: its fog-appearance companion is keyed
+  // by the RESOLVED scene id (never the source map id) once resolved.
   const tableScoped =
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
-  const sideChannelsEnabled = !tableScoped || resolvedSceneId === id;
-  const sideChannelsRef = useRef(sideChannelsEnabled);
-  sideChannelsRef.current = sideChannelsEnabled;
+  const sideChannelId = tableScoped ? resolvedSceneId : id;
+  const sideChannelIdRef = useRef(sideChannelId);
+  sideChannelIdRef.current = sideChannelId;
+  // P10: the token route's 403 body decides the cover wording.
+  const [tokenDenial, setTokenDenial] = useState<
+    'scene-unavailable' | 'credential' | null
+  >(null);
   const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const tokenDenialRef = useRef(tokenDenial);
+  tokenDenialRef.current = tokenDenial;
+  // A2: a relay 4403 on any presentation change settles the SDK on terminal
+  // `denied`; under Table v1 the display rebuilds with bounded backoff so the
+  // fresh mint rebinds, goes live or shows the neutral cover.
+  const [withdrawn, setWithdrawn] = useState(false);
+  const reconnectRef = useRef<{
+    delay: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ delay: 1_000, timer: null });
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -106,7 +121,16 @@ function DisplayCanvas() {
           onApplied: () => vp.requestRender(),
         }),
       },
+      onTokenDenied: denial =>
+        setTokenDenial(
+          denial.status === 403 && denial.error === 'Scene is unavailable'
+            ? 'scene-unavailable'
+            : denial.status === 403 || denial.status === 400
+              ? 'credential'
+              : null
+        ),
       onTokenMetadata: meta => {
+        setTokenDenial(null);
         applyFogAppearanceMetadata(
           vp,
           meta.fogAppearance,
@@ -115,6 +139,32 @@ function DisplayCanvas() {
       },
       onStatus: s => {
         setStatus(s);
+        const reconnect = reconnectRef.current;
+        if (s === 'live') {
+          reconnect.delay = 1_000;
+          setWithdrawn(false);
+        }
+        if (
+          s === 'denied' &&
+          tableScoped &&
+          tokenDenialRef.current !== 'credential' &&
+          reconnect.timer === null
+        ) {
+          setWithdrawn(true);
+          const delay = reconnect.delay;
+          reconnect.delay = Math.min(delay * 2, 15_000);
+          reconnect.timer = setTimeout(() => {
+            reconnect.timer = null;
+            setResolvedSceneId(null);
+            laserCleanupRef.current?.();
+            laserCleanupRef.current = null;
+            connectionRef.current?.stop();
+            connectionRef.current = null;
+            viewportRef.current = null;
+            setViewport(null);
+            setCanvasEpoch(epoch => epoch + 1);
+          }, delay);
+        }
         if (s === 'live') {
           requestAnimationFrame(() => vp.fitToContent(60));
           awarenessRef.current?.announce();
@@ -132,10 +182,14 @@ function DisplayCanvas() {
         setCanvasEpoch(epoch => epoch + 1);
       },
       onPoke: feature => {
-        if (feature === 'fog-appearance' && sideChannelsRef.current) {
+        const target = sideChannelIdRef.current;
+        if (feature === 'fog-appearance' && target !== null) {
           fetchAndApplyFogAppearance(
             vp,
-            `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`
+            fogAppearanceReadUrl('battlemap', code, target, {
+              role: 'display',
+              displayKey,
+            })
           );
         }
       },
@@ -187,17 +241,21 @@ function DisplayCanvas() {
   };
 
   useEffect(() => {
-    if (!viewport || !relayUrl || !displayKey || !sideChannelsEnabled) return;
+    if (!viewport || !relayUrl || !displayKey || sideChannelId === null) return;
     return startFogAppearancePoll({
       viewport,
-      url: `/api/campaign/${code}/battlemaps/${id}/fog-appearance?role=display&displayKey=${encodeURIComponent(displayKey)}`,
+      url: fogAppearanceReadUrl('battlemap', code, sideChannelId, {
+        role: 'display',
+        displayKey,
+      }),
     });
-  }, [viewport, relayUrl, displayKey, sideChannelsEnabled, code, id]);
+  }, [viewport, relayUrl, displayKey, sideChannelId, code]);
 
   useEffect(
     () => () => {
       laserCleanupRef.current?.();
       connectionRef.current?.stop();
+      if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
     },
     []
   );
@@ -221,11 +279,16 @@ function DisplayCanvas() {
     ? 'Live display is not configured'
     : !displayKey
       ? 'Open this display from the battle map editor ("Open TV Display")'
-      : status === 'denied'
+      : status !== 'live' && tokenDenial === 'credential'
         ? 'Display link expired — reopen it from the battle map editor'
-        : status !== 'live'
-          ? 'Connecting to the table…'
-          : null;
+        : status !== 'live' &&
+            (tokenDenial === 'scene-unavailable' || withdrawn)
+          ? 'Nothing is being shown on this map right now'
+          : status === 'denied'
+            ? 'Display link expired — reopen it from the battle map editor'
+            : status !== 'live'
+              ? 'Connecting to the table…'
+              : null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000' }}>

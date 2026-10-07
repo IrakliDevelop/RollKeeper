@@ -126,6 +126,10 @@ import type {
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import {
+  markerDetailsUrl,
+  markerPublishRequest,
+} from '@/components/ui/campaign/table/sideChannelRequests';
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -201,6 +205,8 @@ export interface DmBattleMapCanvasState {
   selectedElementIsMarker: boolean;
   /** Explanation for a refused audience transition, or null. */
   markerAudienceNotice: string | null;
+  /** Table only: the last marker publication was refused (C4-2). */
+  markerShareNotice?: string | null;
   markerPanelOpen: boolean;
   markerPanelState: MarkerPanelState;
   markerPanelIsDmOnly: boolean;
@@ -431,7 +437,9 @@ export function useDmBattleMapCanvas({
   // is already established. Read the latest value via a ref instead.
   const onPokeRef = useRef(onPoke);
   onPokeRef.current = onPoke;
-  const refreshMarkerClaimsRef = useRef<() => Promise<void>>(async () => {});
+  const refreshMarkerClaimsRef = useRef<
+    (signal?: AbortSignal) => Promise<void>
+  >(async () => {});
 
   // ─── Markers ──────────────────────────────────────────────────
   // Deliberately connection-independent: nothing below reads the relay URL or
@@ -447,6 +455,10 @@ export function useDmBattleMapCanvas({
   const [markerAudienceNotice, setMarkerAudienceNotice] = useState<
     string | null
   >(null);
+  /** C4-2: a refused Table marker publication is visible, never silent. */
+  const [markerShareNotice, setMarkerShareNotice] = useState<string | null>(
+    null
+  );
 
   // Read at placement time by `DmMarkerTool`, not captured at construction:
   // the canvas keeps the first registered tool instance, so a constructor
@@ -468,12 +480,16 @@ export function useDmBattleMapCanvas({
     getViewport: getMarkerViewport,
     productState: tableSceneAdapter?.markerProductState,
   });
-  refreshMarkerClaimsRef.current = async () => {
-    if (tableSceneAdapter) return;
+  // PR04 P7: Table scenes refresh claims too; the side-channel id is the
+  // scene id (battleMapId on the Table page). Q4 credential always sent
+  // (ignored with Table v1 off). Write-back goes through `markerWrites`,
+  // i.e. the Table scene repository when `tableSceneAdapter` is set.
+  refreshMarkerClaimsRef.current = async (signal?: AbortSignal) => {
     const response = await fetch(
-      `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+      markerDetailsUrl(campaignCode, battleMapId, { role: 'dm', dmId }),
+      signal ? { signal } : undefined
     );
-    if (!response.ok) return;
+    if (!response.ok || signal?.aborted) return;
     const data = (await response.json()) as {
       markers?: import('@/types/battlemap').PublicMarkerDetail[];
     };
@@ -651,11 +667,12 @@ export function useDmBattleMapCanvas({
     battleMapId,
   ]);
 
+  const lastPublishedKeyRef = useRef<string | null>(null);
   // The relay transports canvas elements, not product-state marker details.
   // Publish the explicit player projection separately, together with the
   // private server-only definitions needed for authoritative loot claims.
   useEffect(() => {
-    if (!viewport || !battleMap || tableSceneAdapter) return;
+    if (!viewport || !battleMap) return;
     const timeout = window.setTimeout(() => {
       const markers = buildPublicMarkerDetails({
         canvasState: viewport.exportJSON() || battleMap.canvasState,
@@ -663,16 +680,30 @@ export function useDmBattleMapCanvas({
         dmOnlyElements: battleMap.dmOnlyElements,
       });
       const loot = buildMarkerLootLedger(markerWrites.markers, markers);
-      void fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dmId, markers, loot }),
-        }
-      ).catch(error => {
-        console.warn('Failed to publish marker details:', error);
+      // A5: publish only when the public projection or the loot ledger
+      // actually changed (the Table adapter hands out a fresh battleMap
+      // object on every render). A refused publish retries on the next
+      // real change, as the notice says.
+      const publishKey = JSON.stringify({ markers, loot });
+      if (publishKey === lastPublishedKeyRef.current) return;
+      lastPublishedKeyRef.current = publishKey;
+      const request = markerPublishRequest(campaignCode, battleMapId, {
+        dmId,
+        markers,
+        loot,
       });
+      void fetch(request.url, request.init)
+        .then(response => {
+          if (!tableSceneAdapter) return;
+          setMarkerShareNotice(
+            response.ok ? null : 'Markers not shared with players'
+          );
+        })
+        .catch(error => {
+          console.warn('Failed to publish marker details:', error);
+          if (tableSceneAdapter)
+            setMarkerShareNotice('Markers not shared with players');
+        });
     }, 200);
     return () => window.clearTimeout(timeout);
   }, [
@@ -684,6 +715,46 @@ export function useDmBattleMapCanvas({
     viewport,
     tableSceneAdapter,
   ]);
+
+  // PR04 Q2(a): Table scenes get no relay poke from the markers route (it
+  // pokes the legacy room), so while a loot marker exists poll claims every
+  // 10 s: one request in flight, aborted on unmount/scene change, and
+  // refreshed immediately when the tab becomes visible again.
+  const hasLootMarker = markerWrites.markers.some(
+    marker => !marker.deletedAt && (marker.loot?.length ?? 0) > 0
+  );
+  useEffect(() => {
+    if (!tableSceneAdapter || !hasLootMarker) return;
+    let inFlight: AbortController | null = null;
+    let disposed = false;
+    // A6: keep polling while the tab is hidden — a DM often has the Table
+    // tab in the background while players claim; the browser already
+    // throttles background timers. A hung read is aborted after 5 s.
+    const tick = () => {
+      if (disposed || inFlight) return;
+      const abort = new AbortController();
+      inFlight = abort;
+      const timeout = window.setTimeout(() => abort.abort(), 5_000);
+      void refreshMarkerClaimsRef
+        .current(abort.signal)
+        .catch(() => undefined)
+        .finally(() => {
+          window.clearTimeout(timeout);
+          if (inFlight === abort) inFlight = null;
+        });
+    };
+    const timer = window.setInterval(tick, 10_000);
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      inFlight?.abort();
+    };
+  }, [tableSceneAdapter, hasLootMarker, battleMapId]);
 
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
@@ -1321,6 +1392,7 @@ export function useDmBattleMapCanvas({
       selectedElementId !== null &&
       markerRefForElement(viewport?.store.getById(selectedElementId)) !== null,
     markerAudienceNotice,
+    markerShareNotice,
     markerPanelOpen: activeMarkerElementId !== null,
     markerPanelState,
     markerPanelIsDmOnly,

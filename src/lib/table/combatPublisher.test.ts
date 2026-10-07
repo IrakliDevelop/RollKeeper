@@ -376,4 +376,33 @@ describe('Table combat publisher (D8, R2-5, R2-7, C3-8, C3-9)', () => {
       { runId: 'run-a', combatGeneration: 3, intent: 'publish' },
     ]);
   });
+
+  it('R03-1: a reacquire hold clears the dedupe key so a resumed identical publish is sent', async () => {
+    const h = harness();
+    h.publisher.hold();
+    startLocally(h.state);
+    h.publisher.changed();
+    await flush();
+    h.state.active!.publication!.acknowledged = true;
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+    // Reacquire: the server wiped the public initiative.
+    h.publisher.hold();
+    // Explicit publish while player data is (re)loading → waiting.
+    let waiting = true;
+    h.buildPayload.mockImplementation((runId: string) =>
+      waiting
+        ? ({ status: 'waiting-player-data' } as never)
+        : { status: 'ok' as const, initiative: payload(runId) }
+    );
+    await h.publisher.publishCurrentState();
+    expect(h.lastStatus()).toEqual({ kind: 'waiting', reason: 'player-data' });
+    // Data arrives with an identical payload: the resumed non-explicit
+    // publish must still reach the server, not be deduped as broadcasting.
+    waiting = false;
+    await vi.advanceTimersByTimeAsync(2_000);
+    h.publisher.changed();
+    await flush();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(2);
+    expect(h.lastStatus()).toEqual({ kind: 'broadcasting', runId: 'run-a' });
+  });
 });

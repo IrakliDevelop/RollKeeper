@@ -40,6 +40,8 @@ export function TableCombatPanel(props: {
   tableWorkspaceId?: string | null;
   /** Reports publication status (the page clears its acquire banner). */
   onPublicationStatus?: (status: PublicationStatus) => void;
+  /** Server-acknowledged audience presentation (combined Show + Start). */
+  presentation?: { sceneId: string | null; blanked: boolean } | null;
 }) {
   const combat = useTableCombat(props);
   const publication = useTableCombatPublication({
@@ -55,6 +57,7 @@ export function TableCombatPanel(props: {
     sceneId: props.sceneId,
     campaignCode: props.campaignCode,
     tableWorkspaceId: props.tableWorkspaceId ?? null,
+    controlSession: props.controlSession,
   });
   const { onPublicationStatus } = props;
   useEffect(() => {
@@ -74,6 +77,16 @@ export function TableCombatPanel(props: {
     !props.controlSession.isLost() &&
     ['cleared', 'not-broadcasting', 'stale', 'blocked'].includes(
       publication.status.kind
+    );
+  // P8: holder only, while this route scene is not the shown unblanked one.
+  const offerShowAndStart =
+    !props.liveUnavailable &&
+    props.controlSession !== null &&
+    !props.controlSession.isLost() &&
+    props.presentation != null &&
+    !(
+      props.presentation.sceneId === props.sceneId &&
+      !props.presentation.blanked
     );
   const activeName =
     model && model.encounter.currentTurn >= 0
@@ -141,6 +154,9 @@ export function TableCombatPanel(props: {
               onInitiative={panel.setInitiative}
               onHidden={panel.setHidden}
               onStart={panel.start}
+              onShowAndStart={
+                offerShowAndStart ? panel.showAndStart : undefined
+              }
               onResetImported={panel.end}
               onGoToActive={panel.goToActive}
             />

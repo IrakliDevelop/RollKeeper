@@ -27,6 +27,8 @@ export function TableRunSetup(props: {
   onInitiative: (actorId: string, value: number | null) => void;
   onHidden: (actorId: string, hidden: boolean) => void;
   onStart: () => void;
+  /** P8: offered only to the holder while this scene is not shown. */
+  onShowAndStart?: () => void;
   onResetImported: () => void;
   onGoToActive: () => void;
 }) {
@@ -127,6 +129,20 @@ export function TableRunSetup(props: {
         >
           Start combat
         </Button>
+        {props.onShowAndStart && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={
+              props.busy ||
+              props.activeElsewhere !== null ||
+              participants.length === 0
+            }
+            onClick={props.onShowAndStart}
+          >
+            Show scene and start combat
+          </Button>
+        )}
       </div>
     </div>
   );

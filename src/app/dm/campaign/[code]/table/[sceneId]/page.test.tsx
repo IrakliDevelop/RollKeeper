@@ -116,8 +116,13 @@ function preparedSession(
   const session = {
     holderSessionId: 'table-session-1',
     current: () => ({
+      epoch: '10000000-0000-4000-8000-000000000001',
+      revision: 1,
+      writerFence: 1,
       leaseUntil: Date.now() + 30_000,
       holderSessionId: 'table-session-1',
+      presentation: { sceneId: null, revision: 0, blanked: false },
+      publicRunId: null,
     }),
     isLost: () => false,
     lostReason: () => null,
@@ -279,6 +284,23 @@ describe('Table scene recovery UI', () => {
     expect(
       await screen.findByText(/Local draft restored to live authority/i)
     ).toBeVisible();
+  });
+
+  it('PR04: shows audience presentation beside the authority status and feeds combat the descriptor', async () => {
+    render(<TableScenePage />);
+    await screen.findByTestId('canvas');
+    expect(
+      await screen.findByRole('status', { name: 'Audience status' })
+    ).toHaveTextContent('Audience: nothing shown');
+    expect(screen.getByText('Preparing: Crypt (private)')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Show this scene' })
+    ).toBeEnabled();
+    expect(mocks.combatProps).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        presentation: { sceneId: null, revision: 0, blanked: false },
+      })
+    );
   });
 
   it('mounts the scene roster inside the canvas with the shared placement ref', async () => {

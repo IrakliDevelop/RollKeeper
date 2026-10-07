@@ -18,6 +18,9 @@ import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
  * response in flight across a toggle can flip the state back for one
  * cycle; the next poll self-corrects.
  */
+export const TABLE_V1_SHARE_DISABLED_REASON =
+  'Join-banner sharing is managed by Table scenes while Table v1 is enabled';
+
 export function useShareWithPlayers(
   campaignCode: string,
   dmId: string,
@@ -26,17 +29,24 @@ export function useShareWithPlayers(
 ): {
   sharedWithPlayers: boolean;
   handleToggleShareWithPlayers: () => void;
+  /** PR04 P9: set when this toggle cannot change the join banner. */
+  shareDisabledReason: string | null;
 } {
+  // PR04 P9: under Table v1 the server owns the join-banner pointer; this
+  // legacy toggle never flips optimistically to "Live for players".
+  const tableV1 = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
+  const active = enabled && !tableV1;
   const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
   const [sharedWithPlayers, setSharedWithPlayers] = useState(false);
-  const activeBattleMapId = useActiveBattleMapId(enabled ? campaignCode : null);
+  const activeBattleMapId = useActiveBattleMapId(active ? campaignCode : null);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!active) return;
     setSharedWithPlayers(activeBattleMapId === location.id);
-  }, [enabled, activeBattleMapId, location.id]);
+  }, [active, activeBattleMapId, location.id]);
 
   const handleToggleShareWithPlayers = useCallback(() => {
+    if (tableV1) return;
     setSharedWithPlayers(prev => {
       const next = !prev;
       void pushActive(
@@ -45,7 +55,11 @@ export function useShareWithPlayers(
       );
       return next;
     });
-  }, [pushActive, location.id, location.name]);
+  }, [tableV1, pushActive, location.id, location.name]);
 
-  return { sharedWithPlayers, handleToggleShareWithPlayers };
+  return {
+    sharedWithPlayers: tableV1 ? false : sharedWithPlayers,
+    handleToggleShareWithPlayers,
+    shareDisabledReason: tableV1 ? TABLE_V1_SHARE_DISABLED_REASON : null,
+  };
 }

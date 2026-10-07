@@ -47,6 +47,9 @@ export function BattleMapPickerDialog({
   const dmId = useDmStore(s => s.dmId);
   const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
   const [newName, setNewName] = useState('');
+  // PR04 P9: under Table v1 opening/linking a map never claims to make it
+  // live; the audience follows Show on a Table scene.
+  const tableV1 = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
 
   const battleMaps = getBattleMaps(campaignCode);
   const current = findLinkedBattleMap(battleMaps, encounterId);
@@ -61,7 +64,7 @@ export function BattleMapPickerDialog({
     if (plan.unlinkFrom)
       unlinkEncounter(campaignCode, plan.unlinkFrom, encounterId);
     if (plan.linkTo) linkEncounter(campaignCode, plan.linkTo, encounterId);
-    if (pushLive) {
+    if (pushLive && !tableV1) {
       const name = battleMaps.find(m => m.id === mapId)?.name;
       void pushActive(mapId, name);
     }
@@ -108,6 +111,11 @@ export function BattleMapPickerDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
+          {tableV1 && (
+            <p className="text-muted text-sm" role="note">
+              Show maps to players from their Table scene
+            </p>
+          )}
           {battleMaps.length === 0 ? (
             <p className="text-muted text-sm">
               No battle maps in this campaign yet — create one below.
