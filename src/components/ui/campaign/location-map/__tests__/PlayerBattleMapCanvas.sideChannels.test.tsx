@@ -300,4 +300,44 @@ describe('PlayerBattleMapCanvas: scene-keyed side channels (PR04)', () => {
     });
     expect(count()).toBe(first + 1);
   });
+
+  it('F3: marker requests carry an AbortController, aborted on supersede, scene change and unmount', async () => {
+    const signals: AbortSignal[] = [];
+    vi.mocked(globalThis.fetch).mockImplementation(
+      (_input, init) =>
+        new Promise((_resolve, reject) => {
+          const signal = init?.signal;
+          if (signal) {
+            signals.push(signal);
+            signal.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            );
+          }
+        })
+    );
+    stubCanvas();
+    const { unmount } = renderPlayer();
+    fireReady(makeViewport());
+    await act(async () => lastOptions().onSceneResolved?.('scene-x'));
+    await vi.waitFor(() => expect(signals.length).toBeGreaterThanOrEqual(1));
+    const first = signals.at(-1)!;
+    await act(async () => lastOptions().onPoke?.('markers'));
+    expect(first.aborted).toBe(true);
+    const second = signals.at(-1)!;
+    expect(second).not.toBe(first);
+    await act(async () =>
+      lastOptions().onSceneChange?.({
+        previousSceneId: 'scene-x',
+        sceneId: 'scene-y',
+        discardedOperationIds: [],
+      })
+    );
+    expect(second.aborted).toBe(true);
+    fireReady(makeViewport());
+    await act(async () => lastOptions().onSceneResolved?.('scene-y'));
+    await vi.waitFor(() => expect(signals.at(-1)).not.toBe(second));
+    const third = signals.at(-1)!;
+    unmount();
+    expect(third.aborted).toBe(true);
+  });
 });

@@ -1239,14 +1239,57 @@ test('PR04 session: lost Show response, Retry, duplicate judged by presentation'
   assert.equal(JSON.parse(cli('GET', keys[0])).presentation.blanked, false);
   assert.equal(session.isLost(), false);
 
+  // 2b) F1: Lua commits but the response is a 503 (lost REST reply):
+  // "not confirmed", and the identical Retry is a ledger duplicate.
+  let fail503 = true;
+  const fetch503 = async (url, init) => {
+    const response = await fetcher(url, init);
+    if (!fail503) return response;
+    fail503 = false;
+    return Response.json(
+      { status: 'unavailable', reason: 'redis-unavailable', current: null },
+      { status: 503 }
+    );
+  };
+  const session503 = createTableControlSession({
+    campaignCode: CODE,
+    dmId: 'dm-1',
+    holderSessionId: 'table-page',
+    initial: session.current(),
+    fetcher: fetch503,
+  });
+  const unconfirmed = await session503.show('scene-tavern', 'show-503');
+  assert.equal(unconfirmed.status, 'failed');
+  assert.ok(
+    unconfirmed.command,
+    '503 keeps the command for an identical Retry'
+  );
+  assert.equal(
+    JSON.parse(cli('GET', keys[0])).presentation.sceneId,
+    'scene-tavern'
+  );
+  const confirmed = await session503.resend(unconfirmed.command);
+  assert.equal(confirmed.status, 'committed');
+  assert.equal(confirmed.duplicate, true);
+  assert.equal(
+    judgePresentationOutcome(
+      { type: 'show', sceneId: 'scene-tavern' },
+      confirmed.current
+    ),
+    'published'
+  );
+  assert.equal(ledgerCount('show-503'), 1);
+  // Restore the original session's view for the fenced-delete step.
+  assert.equal((await session.renew()).status, 'committed');
+
   // 3) A fenced deletePresented against a stale expectation is rejected,
   // not lost, and leaves the presented scene in place.
-  const stale = await session.deletePresented('scene-tavern', 'delete-1');
+  const stale = await session.deletePresented('scene-forest', 'delete-1');
   assert.equal(stale.status, 'rejected');
   assert.equal(stale.reason, 'presentation-changed');
   assert.equal(session.isLost(), false);
   assert.equal(
     JSON.parse(cli('GET', keys[0])).presentation.sceneId,
-    'scene-forest'
+    'scene-tavern'
   );
 });

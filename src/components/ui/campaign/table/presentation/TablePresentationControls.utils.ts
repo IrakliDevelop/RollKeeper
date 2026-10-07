@@ -136,12 +136,19 @@ export function failureMessage(
     case 'unconfirmed':
       return { tone: 'info', text: 'Not confirmed — status refreshed' };
     case 'failed':
-      return outcome.reason === 'network'
-        ? {
-            tone: 'error',
-            text: 'Not confirmed — Retry',
-            retry: { label: 'Retry', command: outcome.command },
-          }
-        : { tone: 'error', text: 'Not changed — live control is unavailable' };
+      // F1: a sent command may have committed (lost response, 503 after a
+      // Lua commit): never "Not changed"; offer the identical Retry, whose
+      // ledger duplicate is judged per Q1. Only a never-sent command (too
+      // large, queue overflow) is reported as not changed.
+      if (outcome.command || outcome.reason === 'network')
+        return {
+          tone: 'error',
+          text: 'Not confirmed — Retry',
+          retry: { label: 'Retry', command: outcome.command },
+        };
+      return {
+        tone: 'error',
+        text: 'Not changed — live control is unavailable',
+      };
   }
 }

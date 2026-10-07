@@ -20,6 +20,7 @@ import {
 } from './TablePresentationControls.utils';
 
 const POLL_MS = 10_000;
+const READ_TIMEOUT_MS = 5_000;
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -88,6 +89,8 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
     if (inFlight.current) return null;
     const abort = new AbortController();
     inFlight.current = abort;
+    // F3: a hung read must not block later polls (single flight).
+    const timeout = setTimeout(() => abort.abort(), READ_TIMEOUT_MS);
     try {
       const response = await fetch(
         `/api/campaign/${encodeURIComponent(campaignCode)}/table/control?dmId=${encodeURIComponent(dmId)}`,
@@ -103,6 +106,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
     } catch {
       return null;
     } finally {
+      clearTimeout(timeout);
       if (inFlight.current === abort) inFlight.current = null;
     }
   }, [campaignCode, dmId]);

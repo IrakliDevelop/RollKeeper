@@ -278,6 +278,66 @@ describe('Table presentation controls (PR04 P4)', () => {
     expect(session.show).toHaveBeenCalledTimes(1);
   });
 
+  it('F1: a 503 after a possible commit is "Not confirmed" with the identical Retry', async () => {
+    const command = {
+      type: 'show',
+      operationId: 'show-503',
+      expectedEpoch: 'epoch-a',
+      expectedRevision: 4,
+      expectedFence: 2,
+      holderSessionId: HOLDER,
+      sceneId: 'scene-forest',
+    } satisfies PresentationCommand;
+    const session = fakeSession({
+      show: async () => ({
+        status: 'failed',
+        reason: 'redis-unavailable',
+        command,
+      }),
+      resend: async () => ({
+        status: 'committed',
+        duplicate: true,
+        current: descriptor('scene-forest'),
+      }),
+    });
+    renderControls({ session });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Show this scene' })
+    );
+    expect(await screen.findByText('Not confirmed — Retry')).toBeVisible();
+    expect(screen.queryByText(/Not changed/)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(await screen.findByText('Published (confirmed)')).toBeVisible();
+    expect(session.resend).toHaveBeenCalledWith(command);
+  });
+
+  it('F3: a hung status read is aborted after 5 s so later polls still run', async () => {
+    vi.useFakeTimers();
+    const signals: AbortSignal[] = [];
+    fetchFn.mockImplementation(
+      (_url: string, init?: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          signals.push(init!.signal!);
+          init!.signal!.addEventListener('abort', () =>
+            reject(new DOMException('aborted', 'AbortError'))
+          );
+        })
+    );
+    renderControls({ session: null, current: null });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    expect(signals).toHaveLength(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(signals[0]!.aborted).toBe(true);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+    expect(signals).toHaveLength(2);
+  });
+
   it('judges a duplicate whose audience has since changed truthfully (Q1)', async () => {
     const session = fakeSession({
       show: async () => ({

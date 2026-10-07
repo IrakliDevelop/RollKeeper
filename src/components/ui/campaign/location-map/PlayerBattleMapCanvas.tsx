@@ -440,18 +440,27 @@ export function PlayerBattleMapCanvas({
   const onOpenPartySheetRef = useRef(onOpenPartySheet);
   onOpenPartySheetRef.current = onOpenPartySheet;
 
+  // F3: one marker request at a time; a newer refresh, a scene change or
+  // unmount aborts the previous one.
+  const markersAbortRef = useRef<AbortController | null>(null);
   const refreshMarkers = useCallback(async () => {
+    markersAbortRef.current?.abort();
+    markersAbortRef.current = null;
     if (sideChannelId === null) {
       setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
       return;
     }
+    const abort = new AbortController();
+    markersAbortRef.current = abort;
     try {
       const response = await fetch(
         markerDetailsUrl(campaignCode, sideChannelId, {
           role: 'player',
           playerId: characterId,
-        })
+        }),
+        { signal: abort.signal }
       );
+      if (abort.signal.aborted) return;
       // A late answer for a previous scene never lands on the new one.
       if (sideChannelIdRef.current !== sideChannelId) return;
       if (!response.ok) {
@@ -466,6 +475,7 @@ export function PlayerBattleMapCanvas({
       if (sideChannelIdRef.current !== sideChannelId) return;
       setPublishedMarkers(data.markers ?? []);
     } catch (error) {
+      if (abort.signal.aborted) return;
       // Marker details are a best-effort companion to the live canvas relay.
       // Keep the last projection when the endpoint is unavailable; activation
       // can retry, and a marker poke will refresh connected clients later.
@@ -481,14 +491,11 @@ export function PlayerBattleMapCanvas({
   // visibility, disposed on unmount or scene change.
   useEffect(() => {
     if (!tableScoped || sideChannelId === null) return;
-    let inFlight = false;
     let disposed = false;
     const tick = () => {
-      if (disposed || inFlight || document.hidden) return;
-      inFlight = true;
-      void refreshMarkersRef.current().finally(() => {
-        inFlight = false;
-      });
+      if (disposed || document.hidden) return;
+      // A newer refresh aborts a still-pending one (single in flight).
+      void refreshMarkersRef.current();
     };
     const timer = window.setInterval(tick, 10_000);
     const onVisibility = () => {
@@ -499,6 +506,7 @@ export function PlayerBattleMapCanvas({
       disposed = true;
       window.clearInterval(timer);
       document.removeEventListener('visibilitychange', onVisibility);
+      markersAbortRef.current?.abort();
     };
   }, [tableScoped, sideChannelId]);
 
@@ -967,6 +975,7 @@ export function PlayerBattleMapCanvas({
       laserCleanupRef.current?.();
       movementCommitUnsubRef.current?.();
       connectionRef.current?.stop();
+      markersAbortRef.current?.abort();
     },
     []
   );

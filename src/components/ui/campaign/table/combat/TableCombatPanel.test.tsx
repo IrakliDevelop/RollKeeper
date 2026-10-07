@@ -28,6 +28,21 @@ import { useEncounterStore } from '@/store/encounterStore';
 import { useNPCStore } from '@/store/npcStore';
 
 const download = vi.hoisted(() => ({ calls: [] as unknown[][] }));
+// F2: inject a planner-only start rejection at the combined action's plan
+// gate (runCombatCommand keeps using the real internal planner).
+const planner = vi.hoisted(() => ({ reject: null as string | null }));
+vi.mock('@/lib/table/combat', async importOriginal => {
+  const actual = await importOriginal<typeof import('@/lib/table/combat')>();
+  return {
+    ...actual,
+    planCombatCommand: (
+      ...args: Parameters<typeof actual.planCombatCommand>
+    ) =>
+      planner.reject
+        ? { status: 'rejected', reason: planner.reject }
+        : actual.planCombatCommand(...args),
+  };
+});
 vi.mock('./combatHistoryDownload', () => ({
   downloadCombatHistory: (...args: unknown[]) => download.calls.push(args),
 }));
@@ -632,6 +647,27 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
       /Missing initiative: Aria/
     );
     expect(session.show).not.toHaveBeenCalled();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
+  it('planner-only rejection (not caught by the panel pre-check): Show is never sent', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    const before = revisionOf(repository);
+    planner.reject = 'archive-capacity';
+    try {
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Show scene and start combat' })
+      );
+      expect(await screen.findByText(/Combat history is full/)).toBeVisible();
+    } finally {
+      planner.reject = null;
+    }
+    expect(session.show).not.toHaveBeenCalled();
+    expect(session.blank).not.toHaveBeenCalled();
+    expect(revisionOf(repository)).toBe(before);
     expect(runOf(repository).isActive).toBe(false);
   });
 
