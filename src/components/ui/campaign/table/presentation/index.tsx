@@ -74,14 +74,21 @@ export function TablePresentationControls(
         aria-live="polite"
         className="min-w-0 text-xs"
       >
-        <p className="text-heading font-medium break-words">{lines.audience}</p>
+        {/* The display line shares the audience row when it fits (390 px). */}
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
+          <p className="text-heading min-w-0 font-medium break-words">
+            {lines.audience}
+          </p>
+          {displayLine && (
+            <p
+              className={`${DISPLAY_TONE[displayLine.tone]} min-w-0 break-words`}
+            >
+              {displayLine.text}
+            </p>
+          )}
+        </div>
         {lines.preparation && (
           <p className="text-muted break-words">{lines.preparation}</p>
-        )}
-        {displayLine && (
-          <p className={`${DISPLAY_TONE[displayLine.tone]} break-words`}>
-            {displayLine.text}
-          </p>
         )}
       </div>
       <div className="flex flex-wrap gap-2">
