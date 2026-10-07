@@ -132,10 +132,12 @@ export function createCombatPublisher(options: {
   /** A publish is wanted but required player data has not loaded (F1). */
   let awaitingData = false;
   /**
-   * Canonical payload last sent per run generation (F6): an automatic
-   * publish of an unchanged payload is skipped; an explicit one always sends.
+   * Run generation + canonical payload last sent (F6): an automatic publish
+   * of the same public state is skipped. Explicit publishes and pending
+   * start intents (ack still owed) always send; a (re)acquire needs one of
+   * those to publish at all, so no cache reset is required on hold.
    */
-  const lastSent = new Map<string, string>();
+  let lastSentKey: string | null = null;
   const canonical = (initiative: SharedInitiativeState) => {
     const { updatedAt: _ignored, ...rest } = initiative;
     void _ignored;
@@ -258,14 +260,8 @@ export function createCombatPublisher(options: {
     }
     if (payload.status !== 'ok') return;
     awaitingData = false;
-    const generationKey = `${active.runId}:${active.combatGeneration}`;
-    const body = canonical(payload.initiative);
-    if (
-      !explicit &&
-      broadcasting &&
-      !pendingPublish(state) &&
-      lastSent.get(generationKey) === body
-    ) {
+    const sentKey = `${active.runId}:${active.combatGeneration}:${canonical(payload.initiative)}`;
+    if (!explicit && !pendingPublish(state) && lastSentKey === sentKey) {
       emit({ kind: 'broadcasting', runId: active.runId });
       return;
     }
@@ -278,7 +274,7 @@ export function createCombatPublisher(options: {
     if (outcome.status === 'committed') {
       broadcasting = true;
       held = false;
-      lastSent.set(generationKey, body);
+      lastSentKey = sentKey;
       failure = null;
       blocked = null;
       const publication = active.publication;
@@ -415,8 +411,6 @@ export function createCombatPublisher(options: {
       broadcasting = false;
       failure = null;
       blocked = null;
-      // A (re)acquire wiped the public initiative: nothing counts as sent.
-      lastSent.clear();
       holdNow(state);
       emit(describe(state));
     },

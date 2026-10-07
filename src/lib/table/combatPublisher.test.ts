@@ -340,4 +340,40 @@ describe('Table combat publisher (D8, R2-5, R2-7, C3-8, C3-9)', () => {
     await h.publisher.publishCurrentState();
     expect(h.session.publishInitiative).toHaveBeenCalledTimes(3);
   });
+
+  it('pins the dedupe guards: explicit, generation, and pending ack retry (N4)', async () => {
+    const h = harness();
+    h.publisher.hold();
+    startLocally(h.state);
+    h.publisher.changed();
+    await flush();
+    h.state.active!.publication!.acknowledged = true;
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(1);
+    // Explicit publish while broadcasting with an identical payload sends.
+    await h.publisher.publishCurrentState();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(2);
+    // Same run, next generation, identical payload, intent already acked:
+    // still a different public state (generation) → sends.
+    startLocally(h.state, 'run-a', 2);
+    h.state.active!.publication!.acknowledged = true;
+    await vi.advanceTimersByTimeAsync(2_000);
+    h.publisher.changed();
+    await vi.advanceTimersByTimeAsync(2_000);
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(3);
+    // Pending intent whose ack failed: identical payload is re-sent and
+    // re-acknowledged rather than silently skipped.
+    startLocally(h.state, 'run-a', 3);
+    h.acknowledge.mockResolvedValueOnce(false);
+    await vi.advanceTimersByTimeAsync(2_000);
+    h.publisher.changed();
+    await flush();
+    const sends = vi.mocked(h.session.publishInitiative).mock.calls.length;
+    await vi.advanceTimersByTimeAsync(2_000);
+    h.publisher.changed();
+    await flush();
+    expect(h.session.publishInitiative).toHaveBeenCalledTimes(sends + 1);
+    expect(h.acknowledge).toHaveBeenLastCalledWith([
+      { runId: 'run-a', combatGeneration: 3, intent: 'publish' },
+    ]);
+  });
 });
