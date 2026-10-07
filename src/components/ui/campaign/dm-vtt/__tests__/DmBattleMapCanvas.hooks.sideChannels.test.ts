@@ -20,6 +20,14 @@ import {
 } from '@/components/ui/campaign/table/sideChannelRequests';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { MARKER_TOOL_NAME } from '@/components/ui/campaign/location-map/DmMarkerTool';
+import {
+  openFixture,
+  readySnapshot,
+  repositories,
+} from '@/lib/table/combat.fixture';
+import { createTableSceneAdapter } from '@/lib/table/sceneAdapter';
+import type { PointerState, Tool, ToolContext } from '@fieldnotes/core';
 import type { MarkerDetail } from '@/types/battlemap';
 
 vi.mock('@/lib/battlemapSync', () => ({
@@ -318,5 +326,70 @@ describe('Table DM side channels (PR04 P7, Q2a, C4-2)', () => {
     expect(
       fetchFn.mock.calls.filter(([url]) => String(url).includes('/markers?'))
     ).toEqual([]);
+  });
+});
+
+describe('Marker tool on a Table scene (PR04 A4)', () => {
+  afterEach(() => {
+    repositories.splice(0).forEach(repository => repository.dispose());
+  });
+
+  it('places a marker through the scene adapter and persists it, with no battleMapStore write', async () => {
+    vi.useRealTimers();
+    const repository = await openFixture();
+    const adapter = createTableSceneAdapter({
+      repository,
+      sceneId: 'scene-1',
+      campaignCode: CODE,
+    });
+    const legacyStore = useBattleMapStore.getState();
+    const { result } = renderHook(() =>
+      useDmBattleMapCanvas({
+        ...props(adapter),
+        battleMapId: 'scene-1',
+      })
+    );
+    const vp = stubViewport();
+    act(() => result.current.handleReady(vp));
+    const tool = (result.current.tools as Tool[]).find(
+      candidate => candidate.name === MARKER_TOOL_NAME
+    );
+    expect(
+      tool,
+      'the marker tool is registered on the Table canvas'
+    ).toBeDefined();
+    const ctx = {
+      camera: vp.camera,
+      store: vp.store,
+      requestRender: () => {},
+      gridSize: 40,
+      gridType: 'square',
+      activeLayerId: ANNOTATIONS_LAYER_ID,
+    } as unknown as ToolContext;
+    const pointer = {
+      x: 100,
+      y: 120,
+      pressure: 0.5,
+      pointerType: 'mouse',
+      shiftKey: false,
+    } as PointerState;
+    act(() => {
+      tool!.onPointerDown(pointer, ctx);
+      tool!.onPointerUp(pointer, ctx);
+    });
+    const pins = vp.store
+      .getAll()
+      .filter(
+        element => element.type === 'html' && element.id !== CHEST_PIN.id
+      );
+    expect(pins).toHaveLength(1);
+    await adapter.flush();
+    const scene = readySnapshot(repository).scenes.find(
+      value => value.sceneId === 'scene-1'
+    )!;
+    expect(scene.map.markers).toHaveLength(1);
+    expect(scene.map.dmOnlyElements[pins[0]!.id]).toBe(true);
+    expect(useBattleMapStore.getState()).toBe(legacyStore);
+    adapter.dispose();
   });
 });
