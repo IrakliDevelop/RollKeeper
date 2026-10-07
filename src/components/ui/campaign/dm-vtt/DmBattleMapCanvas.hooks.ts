@@ -667,6 +667,7 @@ export function useDmBattleMapCanvas({
     battleMapId,
   ]);
 
+  const lastPublishedKeyRef = useRef<string | null>(null);
   // The relay transports canvas elements, not product-state marker details.
   // Publish the explicit player projection separately, together with the
   // private server-only definitions needed for authoritative loot claims.
@@ -679,6 +680,13 @@ export function useDmBattleMapCanvas({
         dmOnlyElements: battleMap.dmOnlyElements,
       });
       const loot = buildMarkerLootLedger(markerWrites.markers, markers);
+      // A5: publish only when the public projection or the loot ledger
+      // actually changed (the Table adapter hands out a fresh battleMap
+      // object on every render). A refused publish retries on the next
+      // real change, as the notice says.
+      const publishKey = JSON.stringify({ markers, loot });
+      if (publishKey === lastPublishedKeyRef.current) return;
+      lastPublishedKeyRef.current = publishKey;
       const request = markerPublishRequest(campaignCode, battleMapId, {
         dmId,
         markers,
@@ -710,8 +718,8 @@ export function useDmBattleMapCanvas({
 
   // PR04 Q2(a): Table scenes get no relay poke from the markers route (it
   // pokes the legacy room), so while a loot marker exists poll claims every
-  // 10 s: one request in flight, aborted on unmount/scene change, paused
-  // while the tab is hidden and refreshed when it becomes visible again.
+  // 10 s: one request in flight, aborted on unmount/scene change, and
+  // refreshed immediately when the tab becomes visible again.
   const hasLootMarker = markerWrites.markers.some(
     marker => !marker.deletedAt && (marker.loot?.length ?? 0) > 0
   );
@@ -719,14 +727,19 @@ export function useDmBattleMapCanvas({
     if (!tableSceneAdapter || !hasLootMarker) return;
     let inFlight: AbortController | null = null;
     let disposed = false;
+    // A6: keep polling while the tab is hidden — a DM often has the Table
+    // tab in the background while players claim; the browser already
+    // throttles background timers. A hung read is aborted after 5 s.
     const tick = () => {
-      if (disposed || inFlight || document.hidden) return;
+      if (disposed || inFlight) return;
       const abort = new AbortController();
       inFlight = abort;
+      const timeout = window.setTimeout(() => abort.abort(), 5_000);
       void refreshMarkerClaimsRef
         .current(abort.signal)
         .catch(() => undefined)
         .finally(() => {
+          window.clearTimeout(timeout);
           if (inFlight === abort) inFlight = null;
         });
     };

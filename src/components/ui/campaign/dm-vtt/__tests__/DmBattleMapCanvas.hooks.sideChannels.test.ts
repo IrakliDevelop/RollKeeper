@@ -291,7 +291,7 @@ describe('Table DM side channels (PR04 P7, Q2a, C4-2)', () => {
     expect(
       storage.mock.calls.filter(([key]) => String(key).includes('battlemap'))
     ).toEqual([]);
-    // Paused while hidden, refreshed on visibility.
+    // A6: hidden tabs keep polling (browser-throttled); visibility refreshes.
     Object.defineProperty(document, 'hidden', {
       configurable: true,
       value: true,
@@ -299,7 +299,7 @@ describe('Table DM side channels (PR04 P7, Q2a, C4-2)', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(20_000);
     });
-    expect(callsTo(claimUrl).length).toBe(1);
+    expect(callsTo(claimUrl).length).toBe(3);
     Object.defineProperty(document, 'hidden', {
       configurable: true,
       value: false,
@@ -308,12 +308,12 @@ describe('Table DM side channels (PR04 P7, Q2a, C4-2)', () => {
       document.dispatchEvent(new Event('visibilitychange'));
       await vi.advanceTimersByTimeAsync(0);
     });
-    expect(callsTo(claimUrl).length).toBe(2);
+    expect(callsTo(claimUrl).length).toBe(4);
     unmount();
     await act(async () => {
       await vi.advanceTimersByTimeAsync(30_000);
     });
-    expect(callsTo(claimUrl).length).toBe(2);
+    expect(callsTo(claimUrl).length).toBe(4);
   });
 
   it('does not poll a scene without loot markers, and never polls legacy maps', async () => {
@@ -391,5 +391,86 @@ describe('Marker tool on a Table scene (PR04 A4)', () => {
     expect(scene.map.dmOnlyElements[pins[0]!.id]).toBe(true);
     expect(useBattleMapStore.getState()).toBe(legacyStore);
     adapter.dispose();
+  });
+});
+
+describe('Table side-channel acceptance repairs (PR04 A5, A6)', () => {
+  const claimUrl = markerDetailsUrl(CODE, SCENE, { role: 'dm', dmId: 'dm-1' });
+  const claimedResponse = () =>
+    Response.json({
+      markers: [
+        {
+          id: 'marker-chest',
+          title: 'Chest',
+          body: '',
+          loot: [
+            {
+              id: 'entry-potion',
+              name: 'Potion',
+              itemKind: 'inventory',
+              quantity: 3,
+              remainingQuantity: 1,
+            },
+          ],
+        },
+      ],
+    });
+  afterEach(() => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: false,
+    });
+  });
+
+  it('A6: a background (hidden) DM tab still polls claims and writes them back to the scene', async () => {
+    Object.defineProperty(document, 'hidden', {
+      configurable: true,
+      value: true,
+    });
+    const { adapter, current } = tableAdapter([lootMarker()]);
+    fetchFn.mockImplementation(async (input: RequestInfo | URL) =>
+      String(input) === claimUrl
+        ? claimedResponse()
+        : Response.json({ success: true })
+    );
+    const { result } = renderHook(() => useDmBattleMapCanvas(props(adapter)));
+    act(() => result.current.handleReady(stubViewport()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(callsTo(claimUrl).length).toBe(1);
+    expect(current()[0]!.loot![0]!.claimedQuantity).toBe(2);
+  });
+
+  it('A5: unchanged markers publish once across many re-renders; a real change publishes once more', async () => {
+    const { adapter, setMarkers, current } = tableAdapter([lootMarker()]);
+    const { result, rerender } = renderHook(() =>
+      useDmBattleMapCanvas(props(adapter))
+    );
+    act(() => result.current.handleReady(stubViewport()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    const puts = () =>
+      fetchFn.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'PUT'
+      ).length;
+    expect(puts()).toBe(1);
+    for (let index = 0; index < 8; index += 1) {
+      rerender();
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(250);
+      });
+    }
+    expect(puts()).toBe(1);
+    act(() => setMarkers([{ ...current()[0]!, title: 'Locked chest' }]));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(puts()).toBe(2);
+    const body = JSON.parse(
+      String((fetchFn.mock.calls.at(-1)![1] as RequestInit).body)
+    );
+    expect(JSON.stringify(body.markers)).toContain('Locked chest');
   });
 });
