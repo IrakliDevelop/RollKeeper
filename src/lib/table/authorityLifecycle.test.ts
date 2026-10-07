@@ -441,4 +441,45 @@ describe('Table control session (D8)', () => {
     expect(settled.every(result => result.status === 'committed')).toBe(true);
     expect(maxInFlight).toBe(1);
   });
+
+  it('marks a stale-control with a foreign holder (same epoch and fence) lost without retrying (F4)', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    // Same fence, different holder (forged descriptor: only the guard differs).
+    server.state.revision += 1;
+    server.state.holderSessionId = 'other-session';
+    const before = server.commands.length;
+    const outcome = await prepared.session.publishInitiative(
+      'run-a',
+      initiative('run-a')
+    );
+    expect(outcome).toMatchObject({ status: 'lost', reason: 'stale-control' });
+    expect(server.commands.length - before).toBe(1);
+  });
+
+  it('treats the client lease clock as advisory: retries once and lets the server decide (F4)', async () => {
+    let clientNow = Date.now();
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    const session = createTableControlSession({
+      campaignCode: 'CAMP',
+      dmId: 'dm-1',
+      holderSessionId: 'table-session-1',
+      initial: prepared.session.current(),
+      fetcher: server.fetcher,
+      // A client clock far ahead of Redis time: the lease looks expired here.
+      now: () => clientNow + 10 * 60_000,
+    });
+    clientNow += 0;
+    server.interleave('table-session-1');
+    await expect(session.renew()).resolves.toMatchObject({
+      status: 'committed',
+    });
+  });
 });

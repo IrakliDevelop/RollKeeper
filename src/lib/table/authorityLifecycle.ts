@@ -137,18 +137,23 @@ export function canvasStateToAuthorityState(
   };
 }
 
+/**
+ * Retry-once guard for `stale-control`: the returned descriptor still names
+ * our epoch, fence and holder. Lease expiry is Redis time, so the client
+ * clock is deliberately NOT consulted (skew could wrongly skip or allow the
+ * retry); the single retry is fully fenced by the server, which answers
+ * `lease-lost` if the lease really expired (F4).
+ */
 function sameController(
   ours: TableDescriptor,
   theirs: TableDescriptor | null,
-  holderSessionId: string,
-  now: number
+  holderSessionId: string
 ): theirs is TableDescriptor {
   return (
     theirs !== null &&
     theirs.epoch === ours.epoch &&
     theirs.writerFence === ours.writerFence &&
-    theirs.holderSessionId === holderSessionId &&
-    theirs.leaseUntil > now
+    theirs.holderSessionId === holderSessionId
   );
 }
 
@@ -167,10 +172,13 @@ export function createTableControlSession(options: {
   holderSessionId: string;
   initial: TableDescriptor;
   fetcher?: typeof fetch;
+  /**
+   * Client clock (tests). Advisory only: lease decisions are made by the
+   * server with Redis time, never by this clock.
+   */
   now?: () => number;
 }): TableControlSession {
   const fetcher = options.fetcher ?? fetch;
-  const now = options.now ?? (() => Date.now());
   const url = `/api/campaign/${encodeURIComponent(options.campaignCode)}/table/control`;
   const holderSessionId = options.holderSessionId;
   let current = structuredClone(options.initial);
@@ -258,7 +266,7 @@ export function createTableControlSession(options: {
         if (
           attempt === 0 &&
           reason === 'stale-control' &&
-          sameController(current, returned, holderSessionId, now())
+          sameController(current, returned, holderSessionId)
         ) {
           current = returned;
           continue;
