@@ -164,6 +164,20 @@ export function bootstrapMapPinnedDisplay(
     : { status: 'missing' };
 }
 
+/**
+ * Re-scrubs a credential-bearing URL once the Next.js router has installed
+ * its history patch (the next commit after bootstrap): the first scrub runs
+ * during hydration, before the router knows about it, and a later router
+ * history sync would otherwise restore the canonical URL with the secret.
+ */
+export function scrubDisplayUrl(
+  env: DisplayEnvironment = browserDisplayEnvironment()
+): void {
+  const { hash, search, pathname } = env.location;
+  if (hash.length > 1 || new URLSearchParams(search).has('dk'))
+    env.history.replaceState(null, '', pathname);
+}
+
 /** E8.4: drop the stored credential after a credential denial. */
 export function clearDisplayCredential(
   code: string,

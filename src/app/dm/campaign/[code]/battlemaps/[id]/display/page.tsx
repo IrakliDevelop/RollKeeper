@@ -27,7 +27,10 @@ import {
   startFogAppearancePoll,
 } from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { fogAppearanceReadUrl } from '@/components/ui/campaign/table/sideChannelRequests';
-import { bootstrapMapPinnedDisplay } from '@/components/ui/campaign/table/display/displayCredentialStore';
+import {
+  bootstrapMapPinnedDisplay,
+  scrubDisplayUrl,
+} from '@/components/ui/campaign/table/display/displayCredentialStore';
 import { TableDisplayShell } from '@/components/ui/campaign/table/display/TableDisplayShell';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 import {
@@ -55,6 +58,11 @@ function DisplayCanvas({ code, id }: { code: string; id: string }) {
     }
     setDisplayKey(bootRef.current);
   }, [code]);
+  // After the router's history patch exists (the next commit), so a later
+  // router history sync cannot restore `?dk=` (see scrubDisplayUrl).
+  useEffect(() => {
+    if (displayKey !== null) scrubDisplayUrl();
+  }, [displayKey]);
 
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const connectionRef = useRef<{ stop: () => void } | null>(null);

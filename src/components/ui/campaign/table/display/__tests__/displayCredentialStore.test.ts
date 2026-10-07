@@ -7,6 +7,7 @@ import {
   displayStorageKey,
   generateDisplayNonce,
   legacyDisplayStorageKey,
+  scrubDisplayUrl,
   type DisplayEnvironment,
 } from '../displayCredentialStore';
 import {
@@ -242,5 +243,21 @@ describe('map-pinned display bootstrap (E8, C5-4)', () => {
     expect(
       bootstrapMapPinnedDisplay('CAMP1', false, environment(path, storage))
     ).toEqual({ status: 'legacy', displayKey: 'legacy-uuid-key' });
+  });
+});
+
+describe('scrubDisplayUrl (post-hydration re-scrub)', () => {
+  it('removes a restored fragment or ?dk and leaves clean URLs alone', () => {
+    for (const url of [
+      `/table-display/C#k=${CAPABILITY}`,
+      '/x/display?dk=key',
+    ]) {
+      const env = environment(url);
+      scrubDisplayUrl(env);
+      expect(env.current()).toBe(new URL(url, 'http://h').pathname);
+    }
+    const clean = environment('/table-display/C');
+    scrubDisplayUrl(clean);
+    expect(clean.replaceState).not.toHaveBeenCalled();
   });
 });

@@ -11,6 +11,7 @@ import {
   bootstrapCampaignDisplay,
   bootstrapMapPinnedDisplay,
   clearDisplayCredential,
+  scrubDisplayUrl,
   type DisplayBootstrap,
 } from './displayCredentialStore';
 import {
@@ -95,6 +96,11 @@ export function TableDisplayShell({
   const controllerRef = useRef<TableDisplayController | null>(null);
   const resolvedDeps = useMemo(() => deps ?? defaultTableDisplayDeps(), [deps]);
   const credential = boot?.status === 'ready' ? boot.credential : null;
+
+  // Runs (in order) before the controller below starts its first request.
+  useEffect(() => {
+    if (boot) scrubDisplayUrl();
+  }, [boot]);
 
   useEffect(() => {
     if (!credential) return;
