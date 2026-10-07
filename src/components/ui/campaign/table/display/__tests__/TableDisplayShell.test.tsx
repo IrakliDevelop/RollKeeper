@@ -276,6 +276,29 @@ describe('TableDisplayShell bootstrap (E8)', () => {
     });
   });
 
+  it('re-scrubs after a router history sync restores the fragment, before the first request (review 01 C19)', async () => {
+    window.sessionStorage.clear();
+    const url = `/table-display/${CODE}#k=${CAPABILITY}`;
+    window.history.replaceState(null, '', url);
+    const original = window.history.replaceState.bind(window.history);
+    let calls = 0;
+    vi.spyOn(window.history, 'replaceState').mockImplementation(
+      (data, unused, next) => {
+        original(data, unused, next);
+        // The first (hydration-time) scrub is undone by a router sync.
+        if ((calls += 1) === 1) original(null, '', url);
+      }
+    );
+    let hashAtFirstFetch: string | null = null;
+    fetchMock.mockImplementationOnce(async () => {
+      hashAtFirstFetch = window.location.hash;
+      return json(waiting(1));
+    });
+    await mount();
+    expect(window.location.hash).toBe('');
+    expect(hashAtFirstFetch).toBe('');
+  });
+
   it('reuses the stored nonce on reload and asks for Open display without any credential', async () => {
     await mount();
     expect(JSON.parse(String(descriptorCalls()[0]![1]!.body)).nonce).toBe(
@@ -439,6 +462,22 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
     expect(tavernViewport.hooks.size).toBe(0);
   });
 
+  it('a late status from a superseded attach never touches the current one (review 01 C11)', async () => {
+    setDescriptor(scene('tavern', 2));
+    await mount();
+    const tavern = connections[0]!;
+    setDescriptor(scene('forest', 3));
+    await advance(2_000);
+    await goLive();
+    expect(cover()).toBeNull();
+    await act(async () => tavern.options.onStatus?.('offline'));
+    await act(async () => tavern.options.onStatus?.('denied'));
+    await advance(20_000);
+    expect(cover()).toBeNull();
+    expect(connections).toHaveLength(2);
+    expect(connections[1]!.stop).not.toHaveBeenCalled();
+  });
+
   it('requires live, a later tick, fog applied and a rendered frame before uncovering and ACKing', async () => {
     setDescriptor(scene('tavern', 2));
     await mount();
@@ -493,15 +532,22 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
       sceneId: 'tavern',
       presentationRevision: 3,
     });
+    // A revision change re-ACKs inside the poll that delivered it; a 409
+    // must re-poll at once (same instant), not on the next 2 s tick.
     ackReply = () => json({ error: 'stale' }, 409);
-    await advance(5_000);
+    setDescriptor({ ...scene('tavern', 4) });
+    await advance(2_000);
     await flush();
     const stale = fetchLog.findIndex(entry => entry.status === 409);
     expect(stale).toBeGreaterThanOrEqual(0);
+    const delivering = fetchLog
+      .slice(0, stale)
+      .filter(entry => entry.url.endsWith('/table/display/descriptor'))
+      .at(-1)!;
     const repoll = fetchLog
       .slice(stale + 1)
       .find(entry => entry.url.endsWith('/table/display/descriptor'));
-    expect(repoll?.at).toBe(fetchLog[stale]!.at);
+    expect(repoll?.at).toBe(delivering.at);
   });
 
   it('covers on any non-live status and uncovers only after readiness again', async () => {
@@ -563,6 +609,21 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
     expect(cover()).toBe(DISPLAY_EXPIRED);
     expect(connections[0]!.stop).toHaveBeenCalledTimes(1);
     expect(window.sessionStorage.getItem(displayStorageKey(CODE))).toBeNull();
+  });
+});
+
+describe('TableDisplayShell without a relay (review 01 F5)', () => {
+  it('keeps the not-configured cover and never starts attach or retry cycles', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    setDescriptor(scene('tavern', 2));
+    await mount();
+    expect(cover()).toBe('Live display is not configured');
+    for (let index = 0; index < 4; index += 1) {
+      await advance(15_000);
+      expect(cover()).toBe('Live display is not configured');
+    }
+    expect(connections).toHaveLength(0);
+    expect(canvas.mounts).toBe(0);
   });
 });
 

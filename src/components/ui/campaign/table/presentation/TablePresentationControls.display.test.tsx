@@ -204,6 +204,34 @@ describe('display status wording (E13)', () => {
   });
 });
 
+describe('display status read timeout (review 01 F1)', () => {
+  it('a read aborted by its own 5 s timeout shows unavailable, never the old green line', async () => {
+    displayReply = () =>
+      Response.json({ state: 'loaded', sceneId: 'scene-tavern', ageMs: 1_000 });
+    render(controls({}).element);
+    await settle();
+    const loaded = screen.getByText('Table reports displaying Tavern');
+    expect(loaded.className).toContain('emerald');
+    fetchFn.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (!String(url).includes('/table/display/status'))
+        return Response.json({
+          current: descriptor('scene-tavern'),
+          registry: REGISTRY,
+        });
+      return new Promise<Response>((_resolve, reject) =>
+        init?.signal?.addEventListener('abort', () =>
+          reject(new DOMException('aborted', 'AbortError'))
+        )
+      );
+    });
+    await settle(5_000);
+    await settle(5_000);
+    const line = screen.getByText('Display status unavailable');
+    expect(line.className).not.toContain('emerald');
+    expect(screen.queryByText('Table reports displaying Tavern')).toBeNull();
+  });
+});
+
 describe('display status poll lifecycle (E13)', () => {
   it('polls every 5 s with one request in flight and a 5 s abort, holder and non-holder', async () => {
     for (const holder of [true, false]) {

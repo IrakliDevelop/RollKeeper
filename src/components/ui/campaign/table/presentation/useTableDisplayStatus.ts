@@ -58,10 +58,12 @@ export function useTableDisplayStatus(campaignCode: string, dmId: string) {
           signal: abort.signal,
         });
         const parsed = response.ok ? parse(await response.json()) : null;
-        if (mounted.current && !abort.signal.aborted)
-          setStatus(parsed ?? 'error');
+        if (mounted.current) setStatus(parsed ?? 'error');
       } catch {
-        if (mounted.current && !abort.signal.aborted) setStatus('error');
+        // Review 01 F1: only an unmount abort is silent (mounted is false
+        // then). A read aborted by its own 5 s timeout is a read error, so
+        // an old green line can never stay on screen.
+        if (mounted.current) setStatus('error');
       } finally {
         clearTimeout(timeout);
         if (inFlight.current === abort) inFlight.current = null;

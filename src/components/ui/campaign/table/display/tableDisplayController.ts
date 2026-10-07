@@ -440,6 +440,15 @@ export class TableDisplayController {
       }
       return;
     }
+    // Review 01 F5: without a relay there is nothing to attach or retry.
+    if (!this.options.relayUrl) {
+      this.emit({
+        cover: DISPLAY_NOT_CONFIGURED,
+        canvas: null,
+        showing: false,
+      });
+      return;
+    }
     const gen = ++this.attachGen;
     const fogPlugin = this.options.deps.createFogPlugin();
     this.attach = {

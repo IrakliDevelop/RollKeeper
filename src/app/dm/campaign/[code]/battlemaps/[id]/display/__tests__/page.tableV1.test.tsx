@@ -228,6 +228,16 @@ describe('map-pinned display under Table v1 (E8 outcome matrix)', () => {
     expect(connections).toHaveLength(0);
   });
 
+  it("sends no blank ACK while another map's scene is shown (review 01 C16)", async () => {
+    current = presented('scene-x', 'map-x', 2);
+    render(<BattleMapDisplayPage />);
+    await advance(12_000);
+    expect(calls.some(call => call.includes('/table/display/ack'))).toBe(false);
+    current = nothing(3);
+    await advance(2_000);
+    expect(calls.some(call => call.includes('/table/display/ack'))).toBe(true);
+  });
+
   it("shows this map's presented scene, then covers and tears down when it switches away (C5-6)", async () => {
     current = presented('scene-m', 'map-m', 2);
     render(<BattleMapDisplayPage />);

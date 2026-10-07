@@ -222,6 +222,28 @@ describe('PR05 token mint with the display capability (E5, R4-F2, C5-5)', () => 
     expect(withGuestCookie.status).toBe(200);
   });
 
+  it('denies a display location claim under v1 with the neutral body (review 01 F4)', async () => {
+    store.strings.set(
+      `campaign:${CODE}:location:loc-1`,
+      JSON.stringify({
+        id: 'loc-1',
+        name: 'Market',
+        mapImageUrl: 'https://cdn.test/market.png',
+        updatedAt: '2026-10-07T00:00:00.000Z',
+      })
+    );
+    const minted = await mint({
+      role: 'display',
+      battleMapId: 'loc-1',
+      kind: 'location',
+      displayCapability: DISPLAY_CAPABILITY,
+      displaySession: DISPLAY_NONCE,
+    });
+    expect(minted.status).toBe(403);
+    expect(minted.body).toEqual({ error: 'Scene is unavailable' });
+    expect(minted.result).toBeNull();
+  });
+
   it('flag off keeps the legacy plaintext display key path unchanged', async () => {
     delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
     const minted = await mint({
@@ -272,6 +294,19 @@ describe('PR05 side-channel GETs carry the display credential in headers', () =>
     );
     expect(queryKey.status).toBe(403);
     const init = sideChannelReadInit(display);
+    const { 'x-rollkeeper-csrf': _csrf, ...withoutCsrf } =
+      init.headers as Record<string, string>;
+    void _csrf;
+    const noCsrf = await read(
+      detailGET,
+      battleMapDetailUrl(CODE, 'scene-tavern', display),
+      { headers: withoutCsrf },
+      'scene-tavern'
+    );
+    expect(noCsrf.status).toBe(403);
+    expect(JSON.parse(noCsrf.text)).toEqual({
+      error: 'Request origin or CSRF validation failed',
+    });
     for (const extra of [
       { origin: 'https://evil.test' },
       { 'sec-fetch-site': 'cross-site' },

@@ -115,6 +115,15 @@ export async function POST(
     // resolution. A present valid scene ID always selects scene authority.
     const locationClaim =
       tableRequired && !sceneIdPresent && body.kind === 'location';
+    // Review 01 F4 (S4): the display capability is scoped to the current
+    // scene; it never mints a location room. Neutral body, so the display
+    // keeps its credential (not a credential denial).
+    if (locationClaim && body.role === 'display') {
+      return NextResponse.json(
+        { error: 'Scene is unavailable' },
+        { status: 403 }
+      );
+    }
     const tableV1 = tableRequired && !locationClaim;
     let legacyRoom: string | null = null;
     if (!tableV1) {

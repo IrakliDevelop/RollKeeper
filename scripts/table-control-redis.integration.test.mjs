@@ -1383,9 +1383,8 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     '../src/lib/tableServer/control.ts'
   );
   const display = await import('../src/lib/tableServer/displayCapability.ts');
-  const { DISPLAY_ROTATE_SCRIPT } = await import(
-    '../src/lib/tableServer/displayScripts.ts'
-  );
+  const { DISPLAY_ROTATE_SCRIPT, DISPLAY_VERIFY_SCRIPT, DISPLAY_ACK_SCRIPT } =
+    await import('../src/lib/tableServer/displayScripts.ts');
   const tableKeys = await import('../src/lib/tableServer/keys.ts');
   const controlKey = tableKeys.tableControlKey(CODE);
   const sessionKey = tableKeys.tableDisplaySessionKey(CODE);
@@ -1543,6 +1542,15 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
   });
   assert.equal((await verify(first.capability, nonceA, true)).status, 'ok');
   assert.equal((await verify(first.capability, nonceA, false)).status, 'ok');
+  // Review 01 L6: every verified use re-sets the binding to the control PTTL.
+  cli('PEXPIRE', sessionKey, '5000');
+  assert.equal((await verify(first.capability, nonceA, false)).status, 'ok');
+  assert.ok(
+    Math.abs(
+      Number(cli('PTTL', controlKey)) - Number(cli('PTTL', sessionKey))
+    ) < 2_000,
+    'verified use refreshes the binding expiry to the control PTTL'
+  );
 
   // E7: the exact tuple is stored with Redis TIME and EX 30.
   const timeBefore = Number(cli('TIME').split('\n')[0]) * 1000;
@@ -1624,6 +1632,12 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     ageMs: null,
   });
   current = await ok({ ...base(), type: 'unpresent' });
+  // Review 01 L9: loaded with a null scene while nothing is shown is stale.
+  assert.equal(
+    (await sendAck(ackOf({ sceneId: null, blanked: false, phase: 'loaded' })))
+      .status,
+    'stale'
+  );
   assert.equal(
     (await sendAck(ackOf({ sceneId: null, phase: 'blank' }))).status,
     'recorded'
@@ -1648,6 +1662,35 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     'Display link is in use on another screen'
   );
 
+  // Review 01 L14: a deleted presented entry projects to no scene in the
+  // ACK and status scripts (the DM did not unpresent it yet).
+  assert.equal(
+    (await verify(first.capability, nonceA, true)).error,
+    'Display link is in use on another screen'
+  );
+  cli('DEL', sessionKey);
+  assert.equal((await verify(first.capability, nonceA, true)).status, 'ok');
+  const registryKey = tableKeys.tableRegistryKey(CODE);
+  const liveEntry = cli('HGET', registryKey, 'scene-tavern');
+  cli(
+    'HSET',
+    registryKey,
+    'scene-tavern',
+    JSON.stringify({ ...JSON.parse(liveEntry), deleted: true })
+  );
+  assert.equal(stored().presentation.sceneId, 'scene-tavern');
+  cli('DEL', ackKey);
+  assert.equal((await sendAck(ackOf())).status, 'stale');
+  assert.equal(
+    (await sendAck(ackOf({ sceneId: null, phase: 'blank' }))).status,
+    'recorded'
+  );
+  assert.equal(
+    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
+    'waiting'
+  );
+  cli('HSET', registryKey, 'scene-tavern', liveEntry);
+
   // Rotation denies the old capability for descriptor, ACK and bind.
   const second = await display.rotateDisplayCapability(rawRedis, CODE);
   assert.equal(second.status, 'rotated');
@@ -1670,6 +1713,38 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     'Display link expired'
   );
   assert.equal(cli('EXISTS', sessionKey), '0');
+  // Review 01 L13: the scripts re-check the hash atomically even when the
+  // TS pre-check is bypassed (a rotation between pre-check and script).
+  const oldHash = createHash('sha256')
+    .update(first.capability, 'utf8')
+    .digest('hex');
+  const nonceHashB = createHash('sha256').update(nonceB, 'utf8').digest('hex');
+  assert.equal(
+    JSON.parse(
+      await rawRedis.eval(
+        DISPLAY_VERIFY_SCRIPT,
+        [controlKey, sessionKey, registryKey],
+        [oldHash, nonceHashB, '1']
+      )
+    ).status,
+    'expired'
+  );
+  assert.equal(cli('EXISTS', sessionKey), '0');
+  assert.equal(
+    JSON.parse(
+      await rawRedis.eval(
+        DISPLAY_ACK_SCRIPT,
+        [controlKey, sessionKey, ackKey, registryKey],
+        [
+          oldHash,
+          nonceHashB,
+          JSON.stringify(ackOf({ displayGeneration: first.displayGeneration })),
+        ]
+      )
+    ).status,
+    'expired'
+  );
+  assert.equal(cli('EXISTS', ackKey), '0');
 
   // R4-F8: a near-maximum generation survives later command commits and the
   // relay access Lua compares it exactly.

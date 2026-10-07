@@ -941,18 +941,8 @@ run('two relay authority transport', () => {
       bound
     );
     expect(Date.now() - rotatedAt).toBeLessThanOrEqual(bound);
-    console.log(
-      'DEBUG',
-      JSON.stringify(closeEvents),
-      display.getState().status,
-      dm.getState().status
-    );
-    await new Promise(resolve => setTimeout(resolve, 500));
-    console.log(
-      'DEBUG2',
-      JSON.stringify(closeEvents),
-      display.getState().status
-    );
+    await eventually(() => display.getState().status === 'denied', 1_000);
+    expect(dm.getState().status).toBe('live');
 
     const hidden = {
       ...createShape({ position: { x: 9, y: 9 }, size: { w: 10, h: 10 } }),
