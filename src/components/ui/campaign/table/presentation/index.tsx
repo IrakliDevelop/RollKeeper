@@ -1,27 +1,38 @@
 'use client';
 
+import { useEffect } from 'react';
+
 import { Button } from '@/components/ui/forms/button';
 
+import { OpenDisplayButton } from '../display/OpenDisplayButton';
 import { useTablePresentation } from './TablePresentationControls.hooks';
 import type { TablePresentationControlsProps } from './TablePresentationControls.types';
 import {
+  displayStatusLine,
   LIVE_CONTROL_REQUIRED,
   presentationActions,
   presentationStatusLines,
   revealLabel,
 } from './TablePresentationControls.utils';
+import { useTableDisplayStatus } from './useTableDisplayStatus';
 
 const MESSAGE_TONE = {
   success: 'text-accent-emerald-text',
   info: 'text-accent-amber-text',
   error: 'text-accent-red-text',
 } as const;
+const DISPLAY_TONE = {
+  success: 'text-accent-emerald-text',
+  muted: 'text-muted',
+  warning: 'text-accent-amber-text',
+} as const;
 
 /**
  * Explicit audience presentation for the Table page (PR04 P4): what players
  * see (server-acknowledged) apart from what this route privately prepares,
  * and holder-only Show / Blank / Reveal / Stop showing. Published is shown
- * only after a server commit; rendering ACK wording arrives with PR05.
+ * only after a server commit; the table display line (PR05 E13) is the
+ * server-computed device report, and "Open display" is offered to any DM.
  */
 export function TablePresentationControls(
   props: TablePresentationControlsProps
@@ -36,6 +47,22 @@ export function TablePresentationControls(
   });
   const actions = presentationActions(descriptor, props.sceneId);
   const disabled = !holder || pending;
+  // PR05 E13: the display line comes only from the server-computed display
+  // status, re-read at once after each committed presentation command.
+  const display = useTableDisplayStatus(props.campaignCode, props.dmId);
+  const { refresh } = display;
+  const { committedCount } = presentation;
+  useEffect(() => {
+    if (committedCount > 0) refresh();
+  }, [committedCount, refresh]);
+  const displayLine = display.status
+    ? displayStatusLine({
+        status: display.status,
+        sceneId: props.sceneId,
+        sceneName: props.sceneName,
+        labels,
+      })
+    : null;
   return (
     <section
       aria-label="Audience presentation"
@@ -51,8 +78,18 @@ export function TablePresentationControls(
         {lines.preparation && (
           <p className="text-muted break-words">{lines.preparation}</p>
         )}
+        {displayLine && (
+          <p className={`${DISPLAY_TONE[displayLine.tone]} break-words`}>
+            {displayLine.text}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap gap-2">
+        <OpenDisplayButton
+          code={props.campaignCode}
+          dmId={props.dmId}
+          onLaunched={refresh}
+        />
         {actions.includes('show') && (
           <Button
             variant="primary"

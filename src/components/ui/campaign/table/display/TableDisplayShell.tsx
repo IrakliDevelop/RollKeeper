@@ -9,6 +9,7 @@ import { useMarkerRegistration } from '@/components/ui/campaign/location-map/use
 
 import {
   bootstrapCampaignDisplay,
+  bootstrapMapPinnedDisplay,
   clearDisplayCredential,
   type DisplayBootstrap,
 } from './displayCredentialStore';
@@ -66,18 +67,28 @@ const INITIAL_VIEW: TableDisplayView = {
 export function TableDisplayShell({
   code,
   deps,
+  mapId,
 }: {
   code: string;
   deps?: TableDisplayDeps;
+  /** Map-pinned display (old `…/battlemaps/<id>/display?dk=` URLs). */
+  mapId?: string;
 }) {
   const bootRef = useRef<DisplayBootstrap | null>(null);
   const [boot, setBoot] = useState<DisplayBootstrap | null>(null);
   useEffect(() => {
-    // Refs survive StrictMode's effect replay: a consumed fragment (and a
-    // memory-only credential) is never bootstrapped twice.
-    bootRef.current ??= bootstrapCampaignDisplay(code);
+    // Refs survive StrictMode's effect replay: a consumed fragment/query
+    // (and a memory-only credential) is never bootstrapped twice.
+    if (!bootRef.current) {
+      const result =
+        mapId === undefined
+          ? bootstrapCampaignDisplay(code)
+          : bootstrapMapPinnedDisplay(code, true);
+      bootRef.current =
+        result.status === 'legacy' ? { status: 'missing' } : result;
+    }
     setBoot(bootRef.current);
-  }, [code]);
+  }, [code, mapId]);
 
   const [view, setView] = useState<TableDisplayView>(INITIAL_VIEW);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -94,6 +105,7 @@ export function TableDisplayShell({
       deps: resolvedDeps,
       onView: setView,
       onCredentialDenied: () => clearDisplayCredential(code),
+      mapPinned: mapId === undefined ? undefined : { mapId },
     });
     controllerRef.current = controller;
     controller.start();
@@ -102,7 +114,7 @@ export function TableDisplayShell({
       if (controllerRef.current === controller) controllerRef.current = null;
       setView(INITIAL_VIEW);
     };
-  }, [code, credential, resolvedDeps]);
+  }, [code, credential, resolvedDeps, mapId]);
 
   // Markers paint on the TV; it never opens a marker panel (gesture null).
   useMarkerRegistration({ viewport, gesture: null });

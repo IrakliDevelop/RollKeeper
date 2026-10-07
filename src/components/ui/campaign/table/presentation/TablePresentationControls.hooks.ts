@@ -74,6 +74,8 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
   const [labels, setLabels] = useState<PresentationLabels>({});
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<PresentationMessage | null>(null);
+  /** PR05 E13: bumps on every committed presentation command. */
+  const [committedCount, setCommittedCount] = useState(0);
   const lastIntent = useRef<PresentationIntent | null>(null);
   /** Control revision the current success message was judged against. */
   const judgedRevision = useRef(-1);
@@ -161,6 +163,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
   const settle = useCallback(
     async (intent: PresentationIntent, outcome: TableControlOutcome) => {
       if (outcome.status === 'committed') {
+        setCommittedCount(count => count + 1);
         judgedRevision.current = (
           outcome.current ?? session!.current()
         ).revision;
@@ -248,6 +251,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
     labels,
     pending,
     message,
+    committedCount,
     show: () => intend({ type: 'show', sceneId }),
     reveal: () => {
       if (presentedId) intend({ type: 'show', sceneId: presentedId });

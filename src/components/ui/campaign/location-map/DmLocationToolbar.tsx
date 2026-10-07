@@ -35,6 +35,7 @@ import DmLocationGridPopover from './DmLocationGridPopover';
 import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
+import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
 import { TABLE_V1_SHARE_DISABLED_REASON } from './useShareWithPlayers';
 
 const BASE_TOOL_DEFS = [
@@ -131,6 +132,7 @@ export default function DmLocationToolbar({
   fogControls,
   liveSyncConfigured = false,
 }: DmLocationToolbarProps) {
+  const displayLauncher = useDisplayLauncher();
   const tableV1Share =
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [activeTool, setTool] = useActiveTool();
@@ -365,12 +367,20 @@ export default function DmLocationToolbar({
           {mode === 'battlemap' && onOpenTvDisplay && (
             <Button
               variant="outline"
-              onClick={onOpenTvDisplay}
+              onClick={() => displayLauncher.launch(onOpenTvDisplay)}
               className="flex items-center gap-1.5 px-3 py-1 text-xs"
             >
               <ExternalLink size={13} />
               Open TV Display
             </Button>
+          )}
+          {mode === 'battlemap' && displayLauncher.message && (
+            <span
+              role="status"
+              className="text-accent-amber-text max-w-[16rem] text-xs break-words"
+            >
+              {displayLauncher.message}
+            </span>
           )}
           {mode === 'battlemap' && exportControl}
           {mode === 'battlemap' && viewsControl}

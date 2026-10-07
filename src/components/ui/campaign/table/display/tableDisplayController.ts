@@ -23,6 +23,7 @@ import {
   DISPLAY_EXPIRED,
   DISPLAY_IN_USE,
   DISPLAY_NOT_CONFIGURED,
+  DISPLAY_NOTHING_SHOWN,
   DISPLAY_WAITING,
 } from './displayMessages';
 
@@ -67,6 +68,12 @@ export interface TableDisplayControllerOptions {
   onView: (view: TableDisplayView) => void;
   onCredentialDenied: (denial: DisplayCredentialDenial) => void;
   fetcher?: typeof fetch;
+  /**
+   * Map-pinned display (E8): only a presented scene adopted from this map
+   * is shown; anything else is the "nothing shown on this map" cover, and
+   * no ACK claims a scene this page does not show.
+   */
+  mapPinned?: { mapId: string };
 }
 
 const POLL_MS = 2_000;
@@ -82,6 +89,10 @@ const CREDENTIAL_ERRORS: Record<string, DisplayCredentialDenial> = {
 interface Target {
   key: string;
   descriptor: DisplayDescriptor;
+  /** The scene this page shows (map-pinned: only this map's scene). */
+  scene: DisplayDescriptor['scene'];
+  /** Nothing visible anywhere: a blank ACK is truthful. */
+  audienceEmpty: boolean;
 }
 
 interface Attach {
@@ -377,25 +388,34 @@ export class TableDisplayController {
       descriptor.presentation.revision < previous.presentation.revision
     )
       return;
+    const mapId = this.options.mapPinned?.mapId;
+    const scene =
+      descriptor.scene &&
+      (mapId === undefined || descriptor.scene.sourceMapId === mapId)
+        ? descriptor.scene
+        : null;
+    const audienceEmpty = descriptor.scene === null;
     const key = [
       descriptor.displayGeneration,
       descriptor.epoch,
-      descriptor.presentation.sceneId ?? '',
-      descriptor.scene?.sourceMapId ?? '',
+      scene?.sceneId ?? '',
+      scene?.sourceMapId ?? '',
       descriptor.presentation.blanked ? 'blank' : 'open',
+      audienceEmpty ? 'empty' : 'elsewhere',
     ].join('|');
     const sameTarget = this.target?.key === key;
     const revisionChanged =
       previous?.presentation.revision !== descriptor.presentation.revision;
-    this.target = { key, descriptor };
+    this.target = { key, descriptor, scene, audienceEmpty };
     if (!sameTarget) {
       this.retryDelay = 1_000;
       this.clearRetry();
       this.retarget();
     } else if (revisionChanged) {
       // Same visible target: keep the attach, re-ACK the new tuple.
-      if (!this.attach) this.sendAck('blank');
-      else if (this.attach.stage === 'shown' && this.attach.status === 'live')
+      if (!this.attach) {
+        if (audienceEmpty) this.sendAck('blank');
+      } else if (this.attach.stage === 'shown' && this.attach.status === 'live')
         this.sendAck('loaded');
     }
   }
@@ -405,13 +425,19 @@ export class TableDisplayController {
   private retarget(): void {
     this.stopHeartbeat();
     this.teardownAttach();
-    const descriptor = this.target?.descriptor;
-    if (!descriptor) return;
-    const scene = descriptor.scene;
+    const target = this.target;
+    if (!target) return;
+    const scene = target.scene;
     if (!scene) {
-      this.emit({ cover: DISPLAY_WAITING, canvas: null, showing: false });
-      this.sendAck('blank');
-      this.startHeartbeat('blank');
+      this.emit({
+        cover: this.options.mapPinned ? DISPLAY_NOTHING_SHOWN : DISPLAY_WAITING,
+        canvas: null,
+        showing: false,
+      });
+      if (target.audienceEmpty) {
+        this.sendAck('blank');
+        this.startHeartbeat('blank');
+      }
       return;
     }
     const gen = ++this.attachGen;
@@ -482,8 +508,7 @@ export class TableDisplayController {
     this.clearRetry();
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
-      if (!this.stopped && !this.denied && this.target?.descriptor.scene)
-        this.retarget();
+      if (!this.stopped && !this.denied && this.target?.scene) this.retarget();
     }, delay);
   }
 

@@ -34,6 +34,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
+import type { OpenTableDisplayResult } from '@/lib/openTableDisplay';
 import { uploadAsset } from '@/utils/uploadAsset';
 import { useShareWithPlayers } from './useShareWithPlayers';
 import {
@@ -239,7 +240,7 @@ export interface DmLocationEditorState {
   handleMapImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
-  handleOpenTvDisplay: () => Promise<void>;
+  handleOpenTvDisplay: () => Promise<OpenTableDisplayResult | void>;
   handleFitToMap: () => void;
 
   // Arrange maps (battlemap mode only)
@@ -1881,9 +1882,12 @@ export function useDmLocationEditor(
     [fogControls, getVp]
   );
 
-  const handleOpenTvDisplay = useCallback(async () => {
-    await openTvDisplay(campaignCode, location.id, dmId);
-  }, [campaignCode, dmId, location.id]);
+  // PR05 E12: under Table v1 this opens the campaign display; the toolbar
+  // shows a failure message from the returned result.
+  const handleOpenTvDisplay = useCallback(
+    () => openTvDisplay(campaignCode, location.id, dmId),
+    [campaignCode, dmId, location.id]
+  );
 
   const handleFitToMap = useCallback(() => {
     const vp = getVp();

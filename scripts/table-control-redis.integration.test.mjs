@@ -1450,6 +1450,7 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
   cli('SET', ackKey, '{"v":1}');
   const before = stored();
   const pttlBefore = Number(cli('PTTL', controlKey));
+  const joinBannerBefore = cli('GET', keys[5]);
   const preRotation = current;
   const first = await display.rotateDisplayCapability(rawRedis, CODE);
   assert.equal(first.status, 'rotated');
@@ -1478,6 +1479,9 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
   assert.equal(cli('EXISTS', sessionKey), '0');
   assert.equal(cli('EXISTS', ackKey), '0');
   assert.ok(!cli('KEYS', '*').includes(first.capability));
+  // PR04 P1: the join-banner projection is untouched by rotation.
+  assert.equal(cli('GET', keys[5]), joinBannerBefore);
+  assert.equal(JSON.parse(joinBannerBefore).activeBattleMapId, 'map-tavern');
   // The mapless holder renews and publishes with its pre-rotation revision.
   current = await ok({
     operationId: randomUUID(),

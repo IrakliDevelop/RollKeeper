@@ -21,14 +21,17 @@ import BattleMapDisplayPage from '../page';
  * against these mocks rather than the network.
  */
 
-let mockSearchParams = new URLSearchParams({ dk: 'key' });
+// PR05 C5-4: the page consumes `?dk=` from the location itself (then
+// scrubs it); it never reads the credential through useSearchParams.
+const DISPLAY_PATH = '/dm/campaign/CAMP01/battlemaps/bm-1/display';
+const setQuery = (query: string) =>
+  window.history.replaceState(null, '', `${DISPLAY_PATH}${query}`);
 
 vi.mock('next/navigation', async importOriginal => {
   const actual = await importOriginal<typeof import('next/navigation')>();
   return {
     ...actual,
     useParams: () => ({ code: 'CAMP01', id: 'bm-1' }),
-    useSearchParams: () => mockSearchParams,
   };
 });
 
@@ -197,7 +200,9 @@ describe('BattleMapDisplayPage: shared presence', () => {
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    mockSearchParams = new URLSearchParams({ dk: 'key' });
+    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
+    window.sessionStorage.clear();
+    setQuery('?dk=key');
     callOrder.length = 0;
   });
 
@@ -333,7 +338,7 @@ describe('BattleMapDisplayPage: shared presence', () => {
 
   it('with no dk query param, nothing attaches', () => {
     stubCanvas();
-    mockSearchParams = new URLSearchParams();
+    setQuery('');
     const vp = makeViewport();
 
     render(<BattleMapDisplayPage />);
@@ -343,5 +348,123 @@ describe('BattleMapDisplayPage: shared presence', () => {
     expect(attachAwarenessSync).not.toHaveBeenCalled();
 
     vp.destroy();
+  });
+  it('PR05 flag off: scrubs ?dk before any request and keeps it for reload under the legacy entry', () => {
+    stubCanvas();
+    vi.mocked(createManagedBattleMapConnection).mockImplementationOnce(
+      options => {
+        expect(window.location.search).toBe('');
+        expect(options.tokenRequest).toMatchObject({
+          role: 'display',
+          displayKey: 'key',
+        });
+        return { stop: vi.fn(), sendPresence: vi.fn() } as never;
+      }
+    );
+    const vp = makeViewport();
+    const { unmount } = render(<BattleMapDisplayPage />);
+    expect(window.location.href).not.toContain('dk=');
+    fireReady(vp);
+    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(1);
+    expect(
+      window.sessionStorage.getItem('rollkeeper:legacy-display-key:CAMP01')
+    ).toBe('key');
+    expect(
+      window.sessionStorage.getItem('rollkeeper:table-display:CAMP01')
+    ).toBeNull();
+    unmount();
+    // Same-tab reload: the scrubbed URL still has the key from storage.
+    const vp2 = makeViewport();
+    render(<BattleMapDisplayPage />);
+    fireReady(vp2);
+    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);
+    vp.destroy();
+    vp2.destroy();
+  });
+
+  it('PR05 E11 flag off: fits only on the first live of a canvas and cancels a pending fit on unmount', () => {
+    stubCanvas();
+    // The viewport's own render loop also uses rAF; track only fit frames.
+    const frames: FrameRequestCallback[] = [];
+    let nextFrame = 100;
+    const fitFrameIds: number[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      nextFrame += 1;
+      if (callback.name !== 'loop') {
+        frames.push(callback);
+        fitFrameIds.push(nextFrame);
+      }
+      return nextFrame;
+    });
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    const vp = makeViewport();
+    const fit = vi.spyOn(vp, 'fitToContent');
+    const { unmount } = render(<BattleMapDisplayPage />);
+    fireReady(vp);
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    act(() => onStatus('offline'));
+    act(() => onStatus('live'));
+    act(() => onStatus('live'));
+    expect(frames).toHaveLength(1);
+    frames[0]!(0);
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(awarenessHandle.announce).toHaveBeenCalledTimes(3);
+    // A second canvas (re-attach) may fit once again; unmount cancels it.
+    const vp2 = makeViewport();
+    fireReady(vp2);
+    const onStatus2 = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[1]![0].onStatus!;
+    act(() => onStatus2('live'));
+    expect(frames).toHaveLength(2);
+    unmount();
+    expect(cancel).toHaveBeenCalledWith(fitFrameIds[1]);
+    vp.destroy();
+    vp2.destroy();
+  });
+
+  it('PR05 R4-F4 flag off: keeps the DM focus receiver (explicit Views → Display send)', async () => {
+    stubCanvas();
+    const { attachFocusReceiver } = await import(
+      '@/components/ui/campaign/location-map/focusSync'
+    );
+    const vp = makeViewport();
+    render(<BattleMapDisplayPage />);
+    fireReady(vp);
+    expect(attachFocusReceiver).toHaveBeenCalledTimes(1);
+    vp.destroy();
+  });
+
+  it('PR05 R3-1 flag off: a denied status never rebuilds the canvas and leaves no timer', () => {
+    vi.useFakeTimers({
+      toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
+    });
+    // The viewport render loop must not run against the stubbed context.
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
+    try {
+      stubCanvas();
+      const vp = makeViewport();
+      const { unmount, getByTestId } = render(<BattleMapDisplayPage />);
+      fireReady(vp);
+      const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+        .calls[0]![0].onStatus!;
+      act(() => onStatus('denied'));
+      const renders = vi.mocked(FieldNotesCanvas).mock.calls.length;
+      act(() => {
+        vi.advanceTimersByTime(60_000);
+      });
+      // No timer-driven re-render or remount of the canvas.
+      expect(vi.mocked(FieldNotesCanvas).mock.calls).toHaveLength(renders);
+      expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(1);
+      expect(getByTestId('battlemap-bootstrap-privacy-cover').textContent).toBe(
+        'Display link expired — reopen it from the battle map editor'
+      );
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+      vp.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -343,8 +343,10 @@ describe('Table presentation controls (PR04 P4)', () => {
     vi.useFakeTimers();
     const signals: AbortSignal[] = [];
     fetchFn.mockImplementation(
-      (_url: string, init?: RequestInit) =>
+      (url: string, init?: RequestInit) =>
         new Promise((_resolve, reject) => {
+          // PR05: the display status poll has its own lifecycle test.
+          if (!String(url).includes('/table/control')) return;
           signals.push(init!.signal!);
           init!.signal!.addEventListener('abort', () =>
             reject(new DOMException('aborted', 'AbortError'))

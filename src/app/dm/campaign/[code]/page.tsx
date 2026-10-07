@@ -59,6 +59,7 @@ import {
 import type { ItemTransfer } from '@/types/sharedState';
 import type { InventoryItem, MagicItem } from '@/types/character';
 import type { NPCInventoryItem } from '@/types/encounter';
+import { CampaignDisplayLauncher } from '@/components/ui/campaign/table/display/OpenDisplayButton';
 
 function npcItemToInventoryItem(npcItem: NPCInventoryItem): InventoryItem {
   return {
@@ -420,7 +421,7 @@ export default function CampaignViewPage() {
       {/* Sync Status Bar */}
       <div className="border-divider border-b">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-2 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <div className="h-2 w-2 animate-pulse rounded-full bg-green-500" />
             <span className="text-muted text-sm">
               Auto-refreshing every 10s
@@ -430,6 +431,8 @@ export default function CampaignViewPage() {
                 </span>
               )}
             </span>
+            {/* PR05 E12: the persistent table display (Table v1 only). */}
+            <CampaignDisplayLauncher code={code} dmId={dmId} />
           </div>
           <Button
             variant="ghost"

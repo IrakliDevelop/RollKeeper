@@ -392,6 +392,8 @@ export function PlayerBattleMapCanvas({
   >(null);
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
+  // PR05 E11: the one pending first-live fit of the current canvas.
+  const fitFrameRef = useRef<number | null>(null);
   // `viewport` is state, so a plain closure over it would be null inside a
   // tool built on the first render (mirrors DmBattleMapCanvas.hooks.ts).
   const viewportRef = useRef<Viewport | null>(null);
@@ -805,6 +807,11 @@ export function PlayerBattleMapCanvas({
     laserCleanupRef.current = null;
     connectionRef.current?.stop();
     connectionRef.current = null;
+    if (fitFrameRef.current !== null) cancelAnimationFrame(fitFrameRef.current);
+    fitFrameRef.current = null;
+    // PR05 E11: fit on the first `live` of this canvas only — never again
+    // on later authority notifications (every DM edit) or reconnects.
+    let fitted = false;
     const ownLayerId = playerLayerId(characterId);
     const connection = createManagedBattleMapConnection({
       relayUrl,
@@ -859,7 +866,13 @@ export function PlayerBattleMapCanvas({
           }, delay);
         }
         if (s === 'live') {
-          requestAnimationFrame(() => vp.fitToContent(60));
+          if (!fitted) {
+            fitted = true;
+            fitFrameRef.current = requestAnimationFrame(() => {
+              fitFrameRef.current = null;
+              vp.fitToContent(60);
+            });
+          }
           // Managed sendPresence drops while not live, so the attach-time
           // frame may be lost; announce on every live transition (first
           // connect AND reconnect) — the heartbeat self-heals otherwise.
@@ -1040,6 +1053,8 @@ export function PlayerBattleMapCanvas({
       movementCommitUnsubRef.current?.();
       connectionRef.current?.stop();
       markersAbortRef.current?.abort();
+      if (fitFrameRef.current !== null)
+        cancelAnimationFrame(fitFrameRef.current);
       if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
     },
     []

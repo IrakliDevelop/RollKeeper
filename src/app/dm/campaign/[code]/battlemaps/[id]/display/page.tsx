@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useParams, useSearchParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import { Suspense } from 'react';
 import { FieldNotesCanvas } from '@fieldnotes/react';
 import { HandTool, type Viewport } from '@fieldnotes/core';
@@ -27,24 +27,42 @@ import {
   startFogAppearancePoll,
 } from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 import { fogAppearanceReadUrl } from '@/components/ui/campaign/table/sideChannelRequests';
+import { bootstrapMapPinnedDisplay } from '@/components/ui/campaign/table/display/displayCredentialStore';
+import { TableDisplayShell } from '@/components/ui/campaign/table/display/TableDisplayShell';
 import { DISPLAY_FOCUS_OPTIONS } from './focusOptions';
 import {
   createRollKeeperFogPlugin,
   installVttGridController,
 } from '@/lib/fieldnotesVtt';
 
-function DisplayCanvas() {
-  const params = useParams();
-  const search = useSearchParams();
-  const code = params.code as string;
-  const id = params.id as string;
-  const displayKey = search.get('dk') ?? '';
+/**
+ * Legacy (Table v1 off) map-pinned TV display. The `?dk=` key is consumed
+ * from the location into this tab's session storage and scrubbed from the
+ * URL before any request (PR05 E8); authorization is unchanged. The
+ * explicit DM "Views → Display" send (focus receiver) is kept (R4-F4).
+ */
+function DisplayCanvas({ code, id }: { code: string; id: string }) {
+  // The credential comes only from the consumed location/storage (never
+  // from useSearchParams after the scrub, C5-4).
+  // `FieldNotesCanvas` calls `onReady` once on mount, so the canvas mounts
+  // only after the key is consumed.
+  const [displayKey, setDisplayKey] = useState<string | null>(null);
+  const bootRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (bootRef.current === null) {
+      const boot = bootstrapMapPinnedDisplay(code, false);
+      bootRef.current = boot.status === 'legacy' ? boot.displayKey : '';
+    }
+    setDisplayKey(bootRef.current);
+  }, [code]);
 
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
   const connectionRef = useRef<{ stop: () => void } | null>(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const awarenessRef = useRef<AwarenessSyncHandle | null>(null);
   const viewportRef = useRef<Viewport | null>(null);
+  // E11: one pending first-live fit per canvas; cancelled on teardown.
+  const fitFrameRef = useRef<number | null>(null);
   // `useMarkerRegistration` is keyed on the viewport VALUE (not a ref), so it
   // needs its own state slot even though nothing else on this page reads
   // viewport-dependent chrome. Keep `viewportRef` too — other code here
@@ -55,31 +73,8 @@ function DisplayCanvas() {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
 
   const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-  // R4 (Table v1): this pinned display opens the source map URL and shows
-  // the scene the server resolves; a resolved-scene change rebuilds the
-  // canvas under a new key. PR04 P7: its fog-appearance companion is keyed
-  // by the RESOLVED scene id (never the source map id) once resolved.
-  const tableScoped =
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
-  const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
-  const sideChannelId = tableScoped ? resolvedSceneId : id;
-  const sideChannelIdRef = useRef(sideChannelId);
-  sideChannelIdRef.current = sideChannelId;
   // P10: the token route's 403 body decides the cover wording.
-  const [tokenDenial, setTokenDenial] = useState<
-    'scene-unavailable' | 'credential' | null
-  >(null);
-  const [canvasEpoch, setCanvasEpoch] = useState(0);
-  const tokenDenialRef = useRef(tokenDenial);
-  tokenDenialRef.current = tokenDenial;
-  // A2: a relay 4403 on any presentation change settles the SDK on terminal
-  // `denied`; under Table v1 the display rebuilds with bounded backoff so the
-  // fresh mint rebinds, goes live or shows the neutral cover.
-  const [withdrawn, setWithdrawn] = useState(false);
-  const reconnectRef = useRef<{
-    delay: number;
-    timer: ReturnType<typeof setTimeout> | null;
-  }>({ delay: 1_000, timer: null });
+  const [tokenDenied, setTokenDenied] = useState(false);
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -89,6 +84,11 @@ function DisplayCanvas() {
   // — the TV display is deliberately non-interactive, so nothing here ever
   // opens a panel.
   useMarkerRegistration({ viewport, gesture: null });
+
+  const cancelFit = () => {
+    if (fitFrameRef.current !== null) cancelAnimationFrame(fitFrameRef.current);
+    fitFrameRef.current = null;
+  };
 
   const handleReady = (vp: Viewport) => {
     viewportRef.current = vp;
@@ -108,6 +108,11 @@ function DisplayCanvas() {
     laserCleanupRef.current = null;
     connectionRef.current?.stop();
     connectionRef.current = null;
+    cancelFit();
+    // E11: fit only on the first `live` of this canvas — never on later
+    // authority notifications or reconnects (the camera stays where the
+    // TV, or an explicit DM "Views → Display" send, put it).
+    let fitted = false;
     const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode: code,
@@ -122,15 +127,9 @@ function DisplayCanvas() {
         }),
       },
       onTokenDenied: denial =>
-        setTokenDenial(
-          denial.status === 403 && denial.error === 'Scene is unavailable'
-            ? 'scene-unavailable'
-            : denial.status === 403 || denial.status === 400
-              ? 'credential'
-              : null
-        ),
+        setTokenDenied(denial.status === 403 || denial.status === 400),
       onTokenMetadata: meta => {
-        setTokenDenial(null);
+        setTokenDenied(false);
         applyFogAppearanceMetadata(
           vp,
           meta.fogAppearance,
@@ -139,54 +138,22 @@ function DisplayCanvas() {
       },
       onStatus: s => {
         setStatus(s);
-        const reconnect = reconnectRef.current;
         if (s === 'live') {
-          reconnect.delay = 1_000;
-          setWithdrawn(false);
-        }
-        if (
-          s === 'denied' &&
-          tableScoped &&
-          tokenDenialRef.current !== 'credential' &&
-          reconnect.timer === null
-        ) {
-          setWithdrawn(true);
-          const delay = reconnect.delay;
-          reconnect.delay = Math.min(delay * 2, 15_000);
-          reconnect.timer = setTimeout(() => {
-            reconnect.timer = null;
-            setResolvedSceneId(null);
-            laserCleanupRef.current?.();
-            laserCleanupRef.current = null;
-            connectionRef.current?.stop();
-            connectionRef.current = null;
-            viewportRef.current = null;
-            setViewport(null);
-            setCanvasEpoch(epoch => epoch + 1);
-          }, delay);
-        }
-        if (s === 'live') {
-          requestAnimationFrame(() => vp.fitToContent(60));
+          if (!fitted) {
+            fitted = true;
+            fitFrameRef.current = requestAnimationFrame(() => {
+              fitFrameRef.current = null;
+              vp.fitToContent(60);
+            });
+          }
           awarenessRef.current?.announce();
         }
       },
-      onSceneResolved: sceneId => setResolvedSceneId(sceneId),
-      onSceneChange: () => {
-        setResolvedSceneId(null);
-        laserCleanupRef.current?.();
-        laserCleanupRef.current = null;
-        connectionRef.current?.stop();
-        connectionRef.current = null;
-        viewportRef.current = null;
-        setViewport(null);
-        setCanvasEpoch(epoch => epoch + 1);
-      },
       onPoke: feature => {
-        const target = sideChannelIdRef.current;
-        if (feature === 'fog-appearance' && target !== null) {
+        if (feature === 'fog-appearance') {
           fetchAndApplyFogAppearance(
             vp,
-            fogAppearanceReadUrl('battlemap', code, target, {
+            fogAppearanceReadUrl('battlemap', code, id, {
               role: 'display',
               displayKey,
             })
@@ -241,21 +208,25 @@ function DisplayCanvas() {
   };
 
   useEffect(() => {
-    if (!viewport || !relayUrl || !displayKey || sideChannelId === null) return;
+    if (!viewport || !relayUrl || !displayKey) return;
     return startFogAppearancePoll({
       viewport,
-      url: fogAppearanceReadUrl('battlemap', code, sideChannelId, {
+      url: fogAppearanceReadUrl('battlemap', code, id, {
         role: 'display',
         displayKey,
       }),
     });
-  }, [viewport, relayUrl, displayKey, sideChannelId, code]);
+  }, [viewport, relayUrl, displayKey, id, code]);
 
   useEffect(
     () => () => {
       laserCleanupRef.current?.();
+      laserCleanupRef.current = null;
       connectionRef.current?.stop();
-      if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
+      connectionRef.current = null;
+      if (fitFrameRef.current !== null)
+        cancelAnimationFrame(fitFrameRef.current);
+      fitFrameRef.current = null;
     },
     []
   );
@@ -277,33 +248,31 @@ function DisplayCanvas() {
 
   const overlayMessage = !relayUrl
     ? 'Live display is not configured'
-    : !displayKey
-      ? 'Open this display from the battle map editor ("Open TV Display")'
-      : status !== 'live' && tokenDenial === 'credential'
-        ? 'Display link expired — reopen it from the battle map editor'
-        : status !== 'live' &&
-            (tokenDenial === 'scene-unavailable' || withdrawn)
-          ? 'Nothing is being shown on this map right now'
-          : status === 'denied'
-            ? 'Display link expired — reopen it from the battle map editor'
-            : status !== 'live'
-              ? 'Connecting to the table…'
-              : null;
+    : displayKey === null
+      ? 'Connecting to the table…'
+      : !displayKey
+        ? 'Open this display from the battle map editor ("Open TV Display")'
+        : status === 'denied' || (status !== 'live' && tokenDenied)
+          ? 'Display link expired — reopen it from the battle map editor'
+          : status !== 'live'
+            ? 'Connecting to the table…'
+            : null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000' }}>
-      <FieldNotesCanvas
-        key={canvasEpoch}
-        tools={toolsRef.current}
-        defaultTool="hand"
-        onReady={handleReady}
-        options={{
-          background: { pattern: 'none' },
-          plugins: [fogPlugin],
-          requiredCapabilities: ['vtt:fog'],
-        }}
-        style={{ width: '100%', height: '100%' }}
-      />
+      {displayKey !== null && (
+        <FieldNotesCanvas
+          tools={toolsRef.current}
+          defaultTool="hand"
+          onReady={handleReady}
+          options={{
+            background: { pattern: 'none' },
+            plugins: [fogPlugin],
+            requiredCapabilities: ['vtt:fog'],
+          }}
+          style={{ width: '100%', height: '100%' }}
+        />
+      )}
       {overlayMessage && (
         <div
           data-testid="battlemap-bootstrap-privacy-cover"
@@ -328,10 +297,26 @@ function DisplayCanvas() {
   );
 }
 
+/**
+ * Map-pinned display. Under Table v1 (PR05 E8, R4-F3) an old map-pinned URL
+ * is the campaign display restricted to this map: `?dk=` is consumed and
+ * scrubbed before any request, the descriptor binds the session nonce
+ * before any mint, and only a presented scene adopted from this map is
+ * shown; anything else is the neutral "Nothing is being shown on this map
+ * right now" cover. No legacy access grant exists.
+ */
 export default function BattleMapDisplayPage() {
+  const params = useParams();
+  const code = params.code as string;
+  const id = params.id as string;
+  const tableV1 = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   return (
     <Suspense fallback={null}>
-      <DisplayCanvas />
+      {tableV1 ? (
+        <TableDisplayShell code={code} mapId={id} />
+      ) : (
+        <DisplayCanvas code={code} id={id} />
+      )}
     </Suspense>
   );
 }

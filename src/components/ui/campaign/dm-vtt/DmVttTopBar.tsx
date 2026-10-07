@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { ArrowLeft, Monitor } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
@@ -52,6 +53,8 @@ export function DmVttTopBar({
   mode,
   onModeChange,
 }: DmVttTopBarProps) {
+  // PR05 E12: under Table v1 this opens the persistent campaign display.
+  const display = useDisplayLauncher();
   return (
     <div className="scrollbar-thin flex min-h-[52px] min-w-0 items-center justify-start gap-2 overflow-x-auto overscroll-x-contain px-2 py-1 sm:gap-3 sm:px-3">
       <Link
@@ -81,12 +84,22 @@ export function DmVttTopBar({
         variant="ghost"
         size="lg"
         leftIcon={<Monitor size={16} />}
-        onClick={() => openTvDisplay(campaignCode, battleMapId, dmId)}
+        onClick={() =>
+          display.launch(() => openTvDisplay(campaignCode, battleMapId, dmId))
+        }
         className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
         aria-label="Open display"
       >
         <span className="hidden lg:inline">Open Display</span>
       </Button>
+      {display.message && (
+        <span
+          role="status"
+          className="text-accent-amber-text max-w-[16rem] shrink-0 text-xs break-words"
+        >
+          {display.message}
+        </span>
+      )}
       <span
         className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
           status === 'live'
