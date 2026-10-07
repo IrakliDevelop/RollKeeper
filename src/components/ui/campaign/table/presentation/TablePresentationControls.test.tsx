@@ -1,3 +1,4 @@
+import { StrictMode } from 'react';
 import {
   act,
   cleanup,
@@ -466,5 +467,137 @@ describe('Table presentation controls (PR04 P4)', () => {
     await screen.findByText('Audience: Tavern · Published');
     for (const method of ['show', 'blank', 'unpresent', 'resend'] as const)
       expect(session[method]).not.toHaveBeenCalled();
+  });
+
+  const holderProps = (
+    session: ReturnType<typeof fakeSession> | null,
+    current: TableDescriptor | null
+  ) => ({
+    campaignCode: 'CAMP',
+    dmId: 'dm-1',
+    sceneId: 'scene-forest',
+    sceneName: 'Private Forest',
+    authorityState: (session
+      ? { phase: 'ready', session: session as unknown as TableControlSession }
+      : {
+          phase: 'lost',
+          reason: 'lease-lost',
+          leaseUntil: null,
+          foreignHolder: true,
+        }) as TableAuthorityState,
+    session: session as unknown as TableControlSession | null,
+    descriptor: current,
+  });
+
+  it('A1: an aborted first label read (StrictMode remount) does not block the next one', async () => {
+    let calls = 0;
+    fetchFn.mockImplementation(
+      (_url: string, init?: RequestInit) =>
+        new Promise((resolve, reject) => {
+          calls += 1;
+          if (calls === 1) {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            );
+            return;
+          }
+          resolve(
+            Response.json({
+              current: descriptor('scene-tavern'),
+              registry: REGISTRY,
+            })
+          );
+        })
+    );
+    render(
+      <StrictMode>
+        <TablePresentationControls
+          {...holderProps(fakeSession(), descriptor('scene-tavern'))}
+        />
+      </StrictMode>
+    );
+    expect(
+      await screen.findByText('Audience: Tavern · Published')
+    ).toBeVisible();
+  });
+
+  it('A1: a failed label read is retried on the next descriptor change', async () => {
+    let calls = 0;
+    fetchFn.mockImplementation(async () => {
+      calls += 1;
+      return calls === 1
+        ? Response.json({ error: 'down' }, { status: 503 })
+        : Response.json({
+            current: descriptor('scene-tavern'),
+            registry: REGISTRY,
+          });
+    });
+    const session = fakeSession();
+    const { rerender } = render(
+      <TablePresentationControls
+        {...holderProps(session, descriptor('scene-tavern'))}
+      />
+    );
+    expect(
+      await screen.findByText('Audience: another scene · Published')
+    ).toBeVisible();
+    rerender(
+      <TablePresentationControls
+        {...holderProps(session, {
+          ...descriptor('scene-tavern'),
+          revision: 5,
+        })}
+      />
+    );
+    expect(
+      await screen.findByText('Audience: Tavern · Published')
+    ).toBeVisible();
+  });
+
+  it('A3: the previous success notice clears when the audience changes or control is lost', async () => {
+    const session = fakeSession();
+    const { rerender } = render(
+      <TablePresentationControls
+        {...holderProps(session, descriptor('scene-tavern'))}
+      />
+    );
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Show this scene' })
+    );
+    expect(await screen.findByText('Published')).toBeVisible();
+    // Same state the message described: it stays.
+    rerender(
+      <TablePresentationControls
+        {...holderProps(session, {
+          ...descriptor('scene-forest'),
+          revision: 9,
+        })}
+      />
+    );
+    expect(screen.getByText('Published')).toBeVisible();
+    // Audience changed elsewhere: the notice no longer describes it.
+    rerender(
+      <TablePresentationControls
+        {...holderProps(session, { ...descriptor(null), revision: 10 })}
+      />
+    );
+    expect(screen.queryByText('Published')).toBeNull();
+    session.show.mockResolvedValueOnce({
+      status: 'committed',
+      duplicate: false,
+      current: { ...descriptor('scene-forest'), revision: 11 },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Show this scene' }));
+    expect(await screen.findByText('Published')).toBeVisible();
+    // Control lost: no stale success beside "Live control is required…".
+    rerender(
+      <TablePresentationControls
+        {...holderProps(null, descriptor('scene-forest'))}
+      />
+    );
+    expect(
+      screen.getByText('Live control is required to change what players see')
+    ).toBeVisible();
+    expect(screen.queryByText('Published')).toBeNull();
   });
 });

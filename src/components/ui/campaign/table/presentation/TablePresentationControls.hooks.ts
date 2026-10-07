@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type {
-  PresentationCommand,
+import {
+  judgePresentationOutcome,
+  type PresentationCommand,
   PresentationIntent,
   TableControlOutcome,
   TableDescriptor,
@@ -74,13 +75,18 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<PresentationMessage | null>(null);
   const lastIntent = useRef<PresentationIntent | null>(null);
+  /** Control revision the current success message was judged against. */
+  const judgedRevision = useRef(-1);
   const inFlight = useRef<AbortController | null>(null);
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
     return () => {
       mounted.current = false;
+      // A1: an aborted read must not block the next one (StrictMode
+      // remount, page transitions).
       inFlight.current?.abort();
+      inFlight.current = null;
     };
   }, []);
 
@@ -122,18 +128,42 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
   const descriptor = holder ? props.descriptor : (polled ?? props.descriptor);
   const presentedId = descriptor?.presentation.sceneId ?? null;
 
-  // Holder: fetch registry labels when another scene becomes presented.
+  // Holder: fetch the registry label of another presented scene, and keep
+  // retrying on each descriptor change (every renew, ~10 s) until it is
+  // known — a single aborted or failed read never leaves "another scene".
+  const labelKnown = presentedId !== null && labels[presentedId] !== undefined;
+  const revision = descriptor?.revision ?? null;
   useEffect(() => {
     if (!holder || presentedId === null || presentedId === sceneId) return;
-    if (labels[presentedId]) return;
+    if (labelKnown) return;
     void readControl();
-    // `labels` deliberately omitted: one read per presented scene change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [holder, presentedId, sceneId, readControl]);
+  }, [holder, presentedId, sceneId, labelKnown, revision, readControl]);
+
+  // A3: the action message describes one moment. Drop it when control is
+  // lost, and drop a success message once the audience no longer matches
+  // the intent it reported.
+  useEffect(() => {
+    if (!holder) {
+      setMessage(null);
+      return;
+    }
+    const intent = lastIntent.current;
+    if (
+      message?.tone === 'success' &&
+      intent &&
+      descriptor &&
+      descriptor.revision > judgedRevision.current &&
+      judgePresentationOutcome(intent, descriptor) !== 'published'
+    )
+      setMessage(null);
+  }, [holder, descriptor, message]);
 
   const settle = useCallback(
     async (intent: PresentationIntent, outcome: TableControlOutcome) => {
       if (outcome.status === 'committed') {
+        judgedRevision.current = (
+          outcome.current ?? session!.current()
+        ).revision;
         setMessage(
           committedMessage(
             intent,
@@ -149,6 +179,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
         // Q6: re-read control, then judge the request by the fresh state.
         const current = await readControl();
         if (!mounted.current) return;
+        if (current) judgedRevision.current = current.revision;
         const judged = current
           ? committedMessage(intent, current, true)
           : { tone: 'info' as const, text: 'audience status unknown' };
