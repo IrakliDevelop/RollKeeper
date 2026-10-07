@@ -14,6 +14,8 @@ export interface InitiativeRowProps {
   isActive: boolean;
   isSelected: boolean;
   onSelect: (entityId: string) => void;
+  /** Live HP not available (Table scene runs): never show 0/0 as real. */
+  hpUnknown?: boolean;
 }
 
 /**
@@ -27,6 +29,7 @@ export function InitiativeRow({
   isActive,
   isSelected,
   onSelect,
+  hpUnknown = false,
 }: InitiativeRowProps) {
   const stripeColor = dispositionColor(entity);
 
@@ -71,15 +74,23 @@ export function InitiativeRow({
               </Badge>
             )}
           </span>
-          <HPBar
-            current={entity.currentHp}
-            max={entity.maxHp}
-            temp={entity.tempHp}
-            size="sm"
-          />
+          {hpUnknown ? (
+            <span className="text-faint text-[10px]">
+              HP — · no player data
+            </span>
+          ) : (
+            <HPBar
+              current={entity.currentHp}
+              max={entity.maxHp}
+              temp={entity.tempHp}
+              size="sm"
+            />
+          )}
         </span>
         <span className="text-faint shrink-0 text-[10px] font-semibold">
-          AC {effectiveAc(entity.armorClass, entity.tempAc)}
+          {hpUnknown
+            ? 'AC —'
+            : `AC ${effectiveAc(entity.armorClass, entity.tempAc)}`}
         </span>
       </button>
     </li>

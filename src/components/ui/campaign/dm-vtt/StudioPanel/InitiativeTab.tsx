@@ -18,7 +18,7 @@ export interface InitiativeTabProps {
   emptyContent?: ReactNode;
   /** Replaces the "Start combat from the encounter page." block. */
   inactiveContent?: ReactNode;
-  /** Rows whose live HP is not loaded: shown as "HP —", never 0/0. */
+  /** Rows whose live HP is unavailable: shown as "HP —", never 0/0. */
   hpUnknownEntityIds?: ReadonlySet<string>;
 }
 
@@ -67,43 +67,16 @@ export function InitiativeTab({
 
   return (
     <ul className="space-y-1 px-2 py-2">
-      {sorted.map((entity, index) =>
-        hpUnknownEntityIds?.has(entity.id) ? (
-          <li key={entity.id}>
-            <button
-              type="button"
-              onClick={() => onSelectEntity(entity.id)}
-              className={`flex min-h-[44px] w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left ${
-                index === encounter.currentTurn
-                  ? 'bg-accent-amber-bg border-accent-amber-border'
-                  : entity.id === selectedEntityId
-                    ? 'border-accent-blue-border'
-                    : 'border-divider hover:bg-surface-secondary'
-              }`}
-            >
-              <span className="text-heading w-6 shrink-0 text-center text-sm font-bold tabular-nums">
-                {entity.initiative ?? '—'}
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="text-body block truncate text-xs font-medium">
-                  {entity.name}
-                </span>
-                <span className="text-faint text-[10px]">
-                  HP — · waiting for player data
-                </span>
-              </span>
-            </button>
-          </li>
-        ) : (
-          <InitiativeRow
-            key={entity.id}
-            entity={entity}
-            isActive={index === encounter.currentTurn}
-            isSelected={entity.id === selectedEntityId}
-            onSelect={onSelectEntity}
-          />
-        )
-      )}
+      {sorted.map((entity, index) => (
+        <InitiativeRow
+          key={entity.id}
+          entity={entity}
+          isActive={index === encounter.currentTurn}
+          isSelected={entity.id === selectedEntityId}
+          onSelect={onSelectEntity}
+          hpUnknown={hpUnknownEntityIds?.has(entity.id)}
+        />
+      ))}
     </ul>
   );
 }
