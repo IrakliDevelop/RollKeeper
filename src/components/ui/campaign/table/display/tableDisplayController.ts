@@ -587,6 +587,10 @@ export class TableDisplayController {
     // its heartbeat; it uncovers only after readiness is re-established.
     attach.stage = 'idle';
     if (attach.uncovered) {
+      // Acceptance A2 (E11): remember an explicit local pan/zoom before
+      // the view can be lost to a withdrawal and re-attach.
+      if (attach.viewport)
+        this.rememberView(attach.scene.sceneId, attach.viewport);
       attach.uncovered = false;
       this.stopHeartbeat();
       this.emit({ cover: DISPLAY_WAITING, showing: false });
@@ -620,6 +624,25 @@ export class TableDisplayController {
       if (!this.stopped) run();
     }, 0);
     this.deferred.add(timer);
+  }
+
+  /**
+   * Requests the confirming frame from outside the render loop and keeps
+   * asking (1 s) until it arrives or the attach moves on; a hidden tab
+   * renders nothing and therefore never ACKs (truthful).
+   */
+  private requestConfirmingFrame(gen: number): void {
+    this.defer(() => {
+      const attach = this.attach;
+      if (!attach || attach.gen !== gen || attach.stage !== 'awaitSecondFrame')
+        return;
+      attach.viewport?.requestRender();
+      const timer = setTimeout(() => {
+        this.deferred.delete(timer);
+        if (!this.stopped) this.requestConfirmingFrame(gen);
+      }, 1_000);
+      this.deferred.add(timer);
+    });
   }
 
   private checkReadiness(gen: number): void {
@@ -673,7 +696,9 @@ export class TableDisplayController {
       this.readinessTimer = null;
       this.retryDelay = 1_000;
       this.emit({ cover: null, showing: true });
-      attach.viewport?.requestRender();
+      // Acceptance A3: this runs inside the frame's render(); the core
+      // render loop clears a request made there, so ask after it returns.
+      this.requestConfirmingFrame(gen);
     } else if (attach.stage === 'awaitSecondFrame') {
       attach.stage = 'shown';
       this.sendAck('loaded');
