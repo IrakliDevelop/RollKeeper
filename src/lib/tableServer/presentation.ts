@@ -1,5 +1,9 @@
-import { tableControlKey, tableRegistryKey } from './control';
-import { tableAuthorityRoomKeys } from './keys';
+import {
+  tableAuthorityRoomKeys,
+  tableControlKey,
+  tableRegistryKey,
+} from './keys';
+import { normalizeHashEntries, resolveVerifiedLocation } from './resourceKind';
 
 type RawRedisRead = {
   get(key: string): Promise<unknown>;
@@ -112,6 +116,154 @@ export async function resolvePresentedTableScene(options: {
       roomGeneration: meta.generation,
       epoch: control.epoch,
       displayGeneration,
+    };
+  } catch {
+    return { status: 'error' };
+  }
+}
+
+type RawRegistryRead = RawRedisRead & {
+  hgetall(key: string): Promise<unknown>;
+};
+
+/**
+ * Server-side resource kind of an id addressed by an HTTP side channel
+ * (PR04 P5.2), resolved in a fixed order that no caller input can change:
+ * a registry scene id, a non-deleted registry source map, a verified
+ * location, otherwise an unregistered map. Read failures are `error`.
+ */
+export type TableResource =
+  | {
+      kind: 'scene';
+      sceneId: string;
+      sourceMapId: string | null;
+      safeLabel: string;
+      deleted: boolean;
+      /** Control v1 presents this scene, unblanked, and it is not deleted. */
+      audienceVisible: boolean;
+    }
+  | { kind: 'source-map' | 'location' | 'unregistered' }
+  | { kind: 'error' };
+
+function presentationOf(control: Record<string, unknown> | null) {
+  const presentation = decodeRecord(control?.presentation);
+  if (control?.v !== 1 || !presentation) return null;
+  return {
+    sceneId:
+      typeof presentation.sceneId === 'string' ? presentation.sceneId : null,
+    blanked: presentation.blanked === true,
+  };
+}
+
+export async function resolveTableResource(options: {
+  rawRedis: RawRegistryRead;
+  /** Location detail/list reader (deserializing or raw). */
+  locationRedis?: { get(key: string): Promise<unknown> };
+  campaign: string;
+  id: string;
+}): Promise<TableResource> {
+  let registryKey: string;
+  let controlKey: string;
+  try {
+    registryKey = tableRegistryKey(options.campaign);
+    controlKey = tableControlKey(options.campaign);
+  } catch {
+    return { kind: 'error' };
+  }
+  try {
+    // One HGET first; the source-map scan runs only on a miss.
+    const entry = decodeRecord(
+      await options.rawRedis.hget(registryKey, options.id)
+    );
+    if (entry?.v === 1 && entry.sceneId === options.id) {
+      const presentation = presentationOf(
+        decodeRecord(await options.rawRedis.get(controlKey))
+      );
+      const deleted = entry.deleted === true;
+      return {
+        kind: 'scene',
+        sceneId: options.id,
+        sourceMapId:
+          typeof entry.sourceMapId === 'string' ? entry.sourceMapId : null,
+        safeLabel: typeof entry.safeLabel === 'string' ? entry.safeLabel : '',
+        deleted,
+        audienceVisible:
+          !deleted &&
+          presentation !== null &&
+          presentation.sceneId === options.id &&
+          !presentation.blanked,
+      };
+    }
+    const entries = normalizeHashEntries(
+      await options.rawRedis.hgetall(registryKey)
+    );
+    if (entries === null) return { kind: 'error' };
+    for (const [, raw] of entries) {
+      const candidate = decodeRecord(raw);
+      if (
+        candidate?.v === 1 &&
+        candidate.deleted !== true &&
+        candidate.sourceMapId === options.id
+      )
+        return { kind: 'source-map' };
+    }
+  } catch {
+    return { kind: 'error' };
+  }
+  const location = await resolveVerifiedLocation({
+    redis: options.locationRedis ?? options.rawRedis,
+    registryRedis: options.rawRedis,
+    campaign: options.campaign,
+    battleMapId: options.id,
+    registryKey,
+  });
+  if (location.status === 'unavailable') return { kind: 'error' };
+  return location.status === 'verified'
+    ? { kind: 'location' }
+    : { kind: 'unregistered' };
+}
+
+/** The presented, unblanked, registered scene (list GET projection). */
+export async function readPresentedTableScene(options: {
+  rawRedis: RawRedisRead;
+  campaign: string;
+}): Promise<
+  | {
+      status: 'presented';
+      sceneId: string;
+      sourceMapId: string | null;
+      safeLabel: string;
+    }
+  | { status: 'none' }
+  | { status: 'error' }
+> {
+  try {
+    const presentation = presentationOf(
+      decodeRecord(
+        await options.rawRedis.get(tableControlKey(options.campaign))
+      )
+    );
+    if (!presentation?.sceneId || presentation.blanked)
+      return { status: 'none' };
+    const entry = decodeRecord(
+      await options.rawRedis.hget(
+        tableRegistryKey(options.campaign),
+        presentation.sceneId
+      )
+    );
+    if (
+      entry?.v !== 1 ||
+      entry.sceneId !== presentation.sceneId ||
+      entry.deleted === true ||
+      typeof entry.safeLabel !== 'string'
+    )
+      return { status: 'none' };
+    return {
+      status: 'presented',
+      sceneId: presentation.sceneId,
+      sourceMapId:
+        typeof entry.sourceMapId === 'string' ? entry.sourceMapId : null,
+      safeLabel: entry.safeLabel,
     };
   } catch {
     return { status: 'error' };

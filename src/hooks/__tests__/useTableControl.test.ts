@@ -2,6 +2,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useTableControl } from '../useTableControl';
 import type { TableDescriptor } from '@/lib/tableServer/control';
+import { parseTableCommand } from '@/lib/tableServer/validation';
 
 const epoch = '19a12345-1234-4123-8123-123456789abc';
 function response(value: unknown, status = 200): Response {
@@ -330,5 +331,47 @@ describe('useTableControl', () => {
     });
     expect(result.current.status).toBe('error');
     expect(publicationCalls).toBe(1);
+  });
+
+  it('PR04: every lease and end command it sends passes exact-key validation', async () => {
+    let current: TableDescriptor | null = null;
+    const sent: Array<Record<string, unknown>> = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((url: string, init?: RequestInit) => {
+        if (url.endsWith('/capability'))
+          return Promise.resolve(response({ required: true }));
+        if (init?.method !== 'POST')
+          return Promise.resolve(response({ current }));
+        const command = JSON.parse(String(init.body)).command;
+        sent.push(command);
+        current = {
+          epoch,
+          revision: (current?.revision ?? -1) + 1,
+          writerFence: 1,
+          leaseUntil: Date.now() + 30_000,
+          holderSessionId: command.holderSessionId ?? null,
+          presentation: { sceneId: null, revision: 0, blanked: false },
+          publicRunId: null,
+        };
+        return Promise.resolve(
+          response({ status: 'committed', reason: 'current', current })
+        );
+      })
+    );
+    const { result } = renderHook(() => useTableControl('SYNTHA', 'dm-one'));
+    await waitFor(() => expect(result.current.status).toBe('waiting'));
+    await act(async () => result.current.initialize());
+    await act(async () => result.current.acquire());
+    await act(async () => result.current.takeover());
+    await act(async () => result.current.publish('endInitiative'));
+    expect(sent.map(command => command.type)).toEqual([
+      'initialize',
+      'acquire',
+      'takeover',
+      'endInitiative',
+    ]);
+    for (const command of sent.slice(1))
+      expect(parseTableCommand(command), String(command.type)).not.toBeNull();
   });
 });

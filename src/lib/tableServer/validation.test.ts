@@ -128,6 +128,58 @@ describe('Table command validation', () => {
     ).toBeNull();
   });
 
+  it('PR04: base-only and show commands are exact-key validated', () => {
+    for (const type of [
+      'acquire',
+      'renew',
+      'takeover',
+      'blank',
+      'unpresent',
+      'endInitiative',
+    ]) {
+      expect(parseTableCommand({ ...base, type })).not.toBeNull();
+      expect(parseTableCommand({ ...base, type, sceneId: 'x' })).toBeNull();
+      expect(parseTableCommand({ ...base, type, role: 'owner' })).toBeNull();
+    }
+    expect(
+      parseTableCommand({ ...base, type: 'show', sceneId: 'scene-1' })
+    ).not.toBeNull();
+    expect(
+      parseTableCommand({
+        ...base,
+        type: 'show',
+        sceneId: 'scene-1',
+        blanked: true,
+      })
+    ).toBeNull();
+  });
+
+  it('PR04: deletePresented requires exactly one expected scene id', () => {
+    expect(parseTableCommand({ ...base, type: 'deletePresented' })).toBeNull();
+    expect(
+      parseTableCommand({
+        ...base,
+        type: 'deletePresented',
+        expectedSceneId: 'bad id!',
+      })
+    ).toBeNull();
+    expect(
+      parseTableCommand({
+        ...base,
+        type: 'deletePresented',
+        expectedSceneId: 'scene-1',
+      })
+    ).not.toBeNull();
+    expect(
+      parseTableCommand({
+        ...base,
+        type: 'deletePresented',
+        expectedSceneId: 'scene-1',
+        sceneId: 'scene-2',
+      })
+    ).toBeNull();
+  });
+
   it('bounds streamed JSON before parse', async () => {
     const request = new Request('http://localhost', {
       method: 'POST',

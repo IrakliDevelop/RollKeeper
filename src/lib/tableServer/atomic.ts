@@ -3,6 +3,12 @@ export const TABLE_CONTROL_SCRIPT = `
 local controlKey, registryKey, ledgerKey, orderKey, initiativeKey, battlemapKey, requestKey = unpack(KEYS)
 local cmd = cjson.decode(ARGV[1])
 local digest, principal, epoch, roomId = ARGV[2], ARGV[3], ARGV[4], ARGV[5]
+-- Server-supplied ISO-8601 time for the compatibility projection (Redis Lua
+-- has no os.date); lease and expiry arithmetic keep using Redis TIME.
+local isoNow = ARGV[6]
+if type(isoNow) ~= 'string' or string.len(isoNow) == 0 or string.len(isoNow) > 64 then
+  return cjson.encode({status='unavailable', reason='invalid-arguments'})
+end
 local time = redis.call('TIME')
 local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
 local ttl = 86400
@@ -67,7 +73,7 @@ if cmd.type == 'initialize' then
       displayCapabilityHash=cjson.null}
   redis.call('DEL', initiativeKey, requestKey)
   redis.call('SET', battlemapKey, cjson.encode({activeBattleMapId=cjson.null,
-    updatedAt=now}), 'EX', ttl)
+    updatedAt=isoNow}), 'EX', ttl)
   return record()
 end
 if cmd.expectedEpoch ~= state.epoch or cmd.expectedRevision ~= state.revision then
@@ -152,6 +158,10 @@ else
     local sceneId = cmd.sceneId
     if cmd.type == 'deletePresented' then sceneId = state.presentation.sceneId end
     if sceneId == cjson.null then return reply('conflict','no-presented-scene') end
+    -- Fenced deletion: never clear a scene another command presented since.
+    if cmd.type == 'deletePresented' and sceneId ~= cmd.expectedSceneId then
+      return reply('conflict','presentation-changed')
+    end
     local rawEntry = redis.call('HGET', registryKey, sceneId)
     if not rawEntry then return reply('conflict','scene-unregistered') end
     local entry = cjson.decode(rawEntry)
@@ -200,8 +210,22 @@ else
   end
 end
 state.revision = state.revision + 1
--- PR04 read guards are not installed. Never project a scene/source map ID publicly.
-redis.call('SET', battlemapKey, cjson.encode({activeBattleMapId=cjson.null,
-  updatedAt=now}), 'EX', ttl)
+-- PR04 P1: the legacy join-banner pointer is derived from the committed
+-- presentation in this same transaction: the presented, unblanked,
+-- registered, non-deleted scene's source map id and safe label, else null.
+local projected = {activeBattleMapId=cjson.null, updatedAt=isoNow}
+local shown = state.presentation.sceneId
+if type(shown) == 'string' and state.presentation.blanked == false then
+  local rawShown = redis.call('HGET', registryKey, shown)
+  if rawShown then
+    local ok, entry = pcall(cjson.decode, rawShown)
+    if ok and type(entry) == 'table' and entry.v == 1 and entry.deleted == false and
+      type(entry.sourceMapId) == 'string' and string.len(entry.sourceMapId) > 0 then
+      projected.activeBattleMapId = entry.sourceMapId
+      if type(entry.safeLabel) == 'string' then projected.name = entry.safeLabel end
+    end
+  end
+end
+redis.call('SET', battlemapKey, cjson.encode(projected), 'EX', ttl)
 return record()
 `;

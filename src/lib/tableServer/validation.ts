@@ -37,7 +37,9 @@ export type TableCommand =
       expectedRegistryRevision: number;
     })
   | (BaseCommand & { type: 'show'; sceneId: string })
-  | (BaseCommand & { type: 'blank' | 'unpresent' | 'deletePresented' })
+  | (BaseCommand & { type: 'blank' | 'unpresent' })
+  /** Fenced: conflicts `presentation-changed` unless this scene is presented. */
+  | (BaseCommand & { type: 'deletePresented'; expectedSceneId: string })
   | (BaseCommand & {
       type: 'publishInitiative';
       initiative: SharedInitiativeState;
@@ -64,6 +66,23 @@ const onlyKeys = (value: Record<string, unknown>, keys: readonly string[]) =>
   Object.keys(value).every(key => keys.includes(key));
 const finiteNumber = (value: unknown) =>
   typeof value === 'number' && Number.isFinite(value);
+
+const BASE_KEYS = [
+  'type',
+  'operationId',
+  'expectedEpoch',
+  'expectedRevision',
+  'expectedFence',
+  'holderSessionId',
+] as const;
+const BASE_ONLY_TYPES: readonly string[] = [
+  'acquire',
+  'renew',
+  'takeover',
+  'blank',
+  'unpresent',
+  'endInitiative',
+];
 
 const INITIATIVE_KEYS = [
   'encounterId',
@@ -258,21 +277,21 @@ export function parseTableCommand(value: unknown): TableCommand | null {
   ) {
     return null;
   }
-  if (
-    [
-      'acquire',
-      'renew',
-      'takeover',
-      'blank',
-      'unpresent',
-      'deletePresented',
-      'endInitiative',
-    ].includes(String(value.type))
-  ) {
-    return value as TableCommand;
+  // PR04 P2/Q5: base-only commands, show and deletePresented are exact-key
+  // validated, so no extra field reaches the digest or the Lua script.
+  if (BASE_ONLY_TYPES.includes(String(value.type))) {
+    return onlyKeys(value, BASE_KEYS) ? (value as TableCommand) : null;
   }
   if (value.type === 'show') {
-    return isId(value.sceneId) ? (value as unknown as TableCommand) : null;
+    return isId(value.sceneId) && onlyKeys(value, [...BASE_KEYS, 'sceneId'])
+      ? (value as unknown as TableCommand)
+      : null;
+  }
+  if (value.type === 'deletePresented') {
+    return isId(value.expectedSceneId) &&
+      onlyKeys(value, [...BASE_KEYS, 'expectedSceneId'])
+      ? (value as unknown as TableCommand)
+      : null;
   }
   if (value.type === 'tombstoneScene') {
     return isId(value.sceneId) && isRevision(value.expectedRegistryRevision)

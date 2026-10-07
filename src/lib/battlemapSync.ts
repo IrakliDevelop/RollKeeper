@@ -57,9 +57,19 @@ export interface BattleMapTokenResult {
   fogAppearanceUpdatedAt?: string | null;
 }
 
+/** A non-ok token response: HTTP status and the server's error string. */
+export interface BattleMapTokenDenial {
+  status: number;
+  error: string | null;
+}
+
 export async function mintBattleMapToken(
   campaignCode: string,
-  req: BattleMapTokenRequest
+  req: BattleMapTokenRequest,
+  options: {
+    /** PR04 C4-1: observes a denial (null is still returned). */
+    onDenied?: (denial: BattleMapTokenDenial) => void;
+  } = {}
 ): Promise<BattleMapTokenResult | null> {
   try {
     const sceneId =
@@ -76,7 +86,18 @@ export async function mintBattleMapToken(
         protocols: { fog: 1, authority: 1 },
       }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (options.onDenied) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: unknown;
+        } | null;
+        options.onDenied({
+          status: res.status,
+          error: typeof body?.error === 'string' ? body.error : null,
+        });
+      }
+      return null;
+    }
     const data = (await res.json()) as {
       token?: string;
       authority?: unknown;

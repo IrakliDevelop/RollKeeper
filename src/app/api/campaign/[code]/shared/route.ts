@@ -56,6 +56,7 @@ import {
   tableCompatibilityKey,
   type TableCompatibilityFeature,
 } from '@/lib/tableServer/control';
+import { TABLE_V1_SHARED_FEATURES } from '@/lib/tableServer/presentationAccess';
 
 function reservedProjectionKey(
   code: string,
@@ -275,6 +276,17 @@ export async function POST(
       return NextResponse.json(
         { error: 'Table v1 control is required for this feature' },
         { status: 426 }
+      );
+    }
+    // PR04 P6: under Table v1 the default branch no longer stores arbitrary
+    // feature keys (e.g. `battlemap-markers:<id>`, bypassing sanitization).
+    if (
+      isTableProtocolRequired() &&
+      !TABLE_V1_SHARED_FEATURES.has(String(feature))
+    ) {
+      return NextResponse.json(
+        { error: 'Unknown shared feature' },
+        { status: 400 }
       );
     }
     const membership = await authorizeCampaignMembershipRoute(code, true);

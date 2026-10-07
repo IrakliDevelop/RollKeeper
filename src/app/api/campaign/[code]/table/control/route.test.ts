@@ -182,4 +182,35 @@ describe('Table control authorization and request boundary', () => {
     expect((await POST(request(), params)).status).toBe(503);
     expect(mocks.eval).not.toHaveBeenCalled();
   });
+
+  it('PR04: GET answers 503 JSON when control or registry reads fail', async () => {
+    const url =
+      'http://localhost/api/campaign/SYNTH03A/table/control?dmId=dm-one';
+    mocks.get.mockResolvedValue('{not json');
+    let response = await GET(new NextRequest(url), params);
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      error: 'Table control is unavailable',
+    });
+    mocks.get.mockResolvedValue(null);
+    mocks.hgetall.mockRejectedValue(new Error('redis down'));
+    response = await GET(new NextRequest(url), params);
+    expect(response.status).toBe(503);
+  });
+
+  it('PR04: rejects extra keys on base-only presentation commands', async () => {
+    const command = {
+      type: 'blank',
+      operationId: 'op-2',
+      expectedEpoch: '19a12345-1234-4123-8123-123456789abc',
+      expectedRevision: 1,
+      expectedFence: 1,
+      holderSessionId: 'session-1',
+      sceneId: 'smuggled',
+    };
+    expect(
+      (await POST(request({}, { dmId: 'dm-one', command }), params)).status
+    ).toBe(400);
+    expect(mocks.eval).not.toHaveBeenCalled();
+  });
 });

@@ -69,12 +69,13 @@ export function isTableProtocolRequired(): boolean {
 }
 
 export class TableControlService {
-  constructor(
-    private readonly redis: Pick<
-      Redis,
-      'eval' | 'get' | 'hgetall'
-    > = getRawRedis()
-  ) {}
+  // An explicit field (not a parameter property) keeps this file runnable
+  // under Node type stripping for the real-REST integration test.
+  private readonly redis: Pick<Redis, 'eval' | 'get' | 'hgetall'>;
+
+  constructor(redis?: Pick<Redis, 'eval' | 'get' | 'hgetall'>) {
+    this.redis = redis ?? getRawRedis();
+  }
 
   async read(code: string): Promise<TableDescriptor | null> {
     const state = decode<Record<string, unknown>>(
@@ -140,6 +141,7 @@ export class TableControlService {
           principal.id,
           randomUUID(),
           randomUUID(),
+          new Date().toISOString(),
         ]
       );
       return (
