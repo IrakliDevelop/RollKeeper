@@ -2,8 +2,18 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   createTableControlSession,
+  judgePresentationOutcome,
   prepareTableSceneAuthority,
 } from './authorityLifecycle';
+
+const BASE_KEYS = [
+  'type',
+  'operationId',
+  'expectedEpoch',
+  'expectedRevision',
+  'expectedFence',
+  'holderSessionId',
+];
 
 const descriptor = (revision: number, writerFence: number) => ({
   epoch: '10000000-0000-4000-8000-000000000001',
@@ -481,5 +491,240 @@ describe('Table control session (D8)', () => {
     await expect(session.renew()).resolves.toMatchObject({
       status: 'committed',
     });
+  });
+});
+
+describe('Table control session presentation commands (PR04 P3)', () => {
+  const EPOCH = '10000000-0000-4000-8000-000000000001';
+  const at = (
+    revision: number,
+    presentation: { sceneId: string | null; blanked: boolean } = {
+      sceneId: null,
+      blanked: false,
+    },
+    holderSessionId = 'table-session-1'
+  ) => ({
+    epoch: EPOCH,
+    revision,
+    writerFence: 3,
+    leaseUntil: Date.now() + 30_000,
+    holderSessionId,
+    presentation: { ...presentation, revision: revision },
+    publicRunId: null,
+  });
+  type Reply = (command: Record<string, unknown>) => Response;
+  function scripted(replies: Reply[]) {
+    const sent: Array<Record<string, unknown>> = [];
+    const bodies: string[] = [];
+    const fetcher = vi.fn<typeof fetch>(async (_input, init) => {
+      bodies.push(String(init?.body));
+      const body = JSON.parse(String(init?.body)) as {
+        command: Record<string, unknown>;
+      };
+      sent.push(body.command);
+      const reply = replies.shift();
+      if (!reply) throw new Error('unexpected request');
+      return reply(body.command);
+    });
+    const session = createTableControlSession({
+      campaignCode: 'CAMP',
+      dmId: 'dm-1',
+      holderSessionId: 'table-session-1',
+      initial: at(5),
+      fetcher,
+    });
+    return { session, sent, bodies, fetcher };
+  }
+  const commit =
+    (presentation?: { sceneId: string | null; blanked: boolean }) =>
+    (command: Record<string, unknown>) =>
+      Response.json({
+        status: 'committed',
+        reason: 'current',
+        current: at(Number(command.expectedRevision) + 1, presentation),
+      });
+  const conflict =
+    (
+      reason: string,
+      current: ReturnType<typeof at> | null = at(9),
+      status = 'conflict'
+    ) =>
+    () =>
+      Response.json({ status, reason, current }, { status: 409 });
+  const networkDown = () => {
+    throw new TypeError('network down');
+  };
+
+  it('builds show from the latest descriptor and keeps the caller operation id', async () => {
+    const { session, sent } = scripted([
+      commit(),
+      commit({ sceneId: 'scene-tavern', blanked: false }),
+    ]);
+    await session.renew();
+    const outcome = await session.show('scene-tavern', 'show-op-1');
+    expect(sent[1]).toEqual({
+      type: 'show',
+      operationId: 'show-op-1',
+      expectedEpoch: EPOCH,
+      expectedRevision: 6,
+      expectedFence: 3,
+      holderSessionId: 'table-session-1',
+      sceneId: 'scene-tavern',
+    });
+    expect(outcome).toMatchObject({
+      status: 'committed',
+      duplicate: false,
+      current: { presentation: { sceneId: 'scene-tavern', blanked: false } },
+    });
+  });
+
+  it('sends blank, unpresent and fenced deletePresented with exact shapes', async () => {
+    const { session, sent } = scripted([commit(), commit(), commit()]);
+    await session.blank('blank-op');
+    await session.unpresent('unpresent-op');
+    await session.deletePresented('scene-tavern', 'delete-op');
+    expect(sent.map(command => Object.keys(command).sort())).toEqual([
+      [...BASE_KEYS].sort(),
+      [...BASE_KEYS].sort(),
+      [...BASE_KEYS, 'expectedSceneId'].sort(),
+    ]);
+    expect(sent[2]).toMatchObject({
+      type: 'deletePresented',
+      operationId: 'delete-op',
+      expectedSceneId: 'scene-tavern',
+    });
+  });
+
+  it('retries a same-holder stale-control once with the same operation id and rebuilt expectations', async () => {
+    const { session, sent } = scripted([
+      conflict('stale-control', at(8)),
+      commit({ sceneId: 'scene-tavern', blanked: false }),
+    ]);
+    const outcome = await session.show('scene-tavern', 'show-op');
+    expect(outcome.status).toBe('committed');
+    expect(sent.map(command => command.operationId)).toEqual([
+      'show-op',
+      'show-op',
+    ]);
+    expect(sent.map(command => command.expectedRevision)).toEqual([5, 8]);
+    expect(session.isLost()).toBe(false);
+  });
+
+  it('classifies presentation refusals as rejected without losing control', async () => {
+    for (const reason of [
+      'scene-deleted',
+      'scene-unregistered',
+      'no-presented-scene',
+      'presentation-changed',
+    ]) {
+      const { session } = scripted([
+        conflict(reason, at(9, { sceneId: 'scene-forest', blanked: false })),
+      ]);
+      const listener = vi.fn();
+      session.subscribe(listener);
+      const outcome = await session.show('scene-tavern', `op-${reason}`);
+      expect(outcome).toMatchObject({
+        status: 'rejected',
+        reason,
+        current: { presentation: { sceneId: 'scene-forest' } },
+      });
+      expect(session.isLost()).toBe(false);
+      expect(session.current().revision).toBe(9);
+      expect(listener).toHaveBeenCalled();
+    }
+  });
+
+  it('keeps ownership loss as lost', async () => {
+    for (const reason of ['lease-lost', 'stale-fence', 'stale-epoch']) {
+      const { session } = scripted([conflict(reason)]);
+      await expect(session.blank('op')).resolves.toMatchObject({
+        status: 'lost',
+        reason,
+      });
+      expect(session.isLost()).toBe(true);
+    }
+  });
+
+  it('returns the sent command on network failure and resends it byte-identically', async () => {
+    const { session, bodies } = scripted([
+      networkDown,
+      (command: Record<string, unknown>) =>
+        Response.json({
+          status: 'committed',
+          reason: 'duplicate',
+          historical: true,
+          current: at(Number(command.expectedRevision) + 2, {
+            sceneId: 'scene-tavern',
+            blanked: false,
+          }),
+        }),
+    ]);
+    const first = await session.show('scene-tavern', 'show-op');
+    expect(first).toMatchObject({ status: 'failed', reason: 'network' });
+    if (first.status !== 'failed' || !first.command)
+      throw new Error('no command to retry');
+    const retried = await session.resend(first.command);
+    expect(bodies[1]).toBe(bodies[0]);
+    expect(retried).toMatchObject({ status: 'committed', duplicate: true });
+  });
+
+  it('reports operation-id-reused as unconfirmed on a resend but rejected for a fresh intent', async () => {
+    const fresh = scripted([conflict('operation-id-reused')]);
+    await expect(fresh.session.show('scene-a', 'op')).resolves.toMatchObject({
+      status: 'rejected',
+      reason: 'operation-id-reused',
+    });
+    const resent = scripted([networkDown, conflict('operation-id-reused')]);
+    const failed = await resent.session.show('scene-a', 'op');
+    if (failed.status !== 'failed' || !failed.command) throw new Error('x');
+    await expect(resent.session.resend(failed.command)).resolves.toMatchObject({
+      status: 'unconfirmed',
+      reason: 'operation-id-reused',
+    });
+    expect(resent.session.isLost()).toBe(false);
+  });
+});
+
+describe('judgePresentationOutcome (PR04 Q1)', () => {
+  const current = (sceneId: string | null, blanked = false) => ({
+    epoch: 'e',
+    revision: 9,
+    writerFence: 1,
+    leaseUntil: 0,
+    holderSessionId: 'h',
+    presentation: { sceneId, revision: 4, blanked },
+    publicRunId: null,
+  });
+  it('judges a duplicate by the current presentation, never by historical alone', () => {
+    expect(
+      judgePresentationOutcome({ type: 'show', sceneId: 'x' }, current('x'))
+    ).toBe('published');
+    expect(
+      judgePresentationOutcome({ type: 'show', sceneId: 'x' }, current('y'))
+    ).toBe('changed');
+    expect(
+      judgePresentationOutcome(
+        { type: 'show', sceneId: 'x' },
+        current('x', true)
+      )
+    ).toBe('changed');
+    expect(
+      judgePresentationOutcome({ type: 'blank' }, current('x', true))
+    ).toBe('published');
+    expect(judgePresentationOutcome({ type: 'unpresent' }, current(null))).toBe(
+      'published'
+    );
+    expect(
+      judgePresentationOutcome(
+        { type: 'deletePresented', expectedSceneId: 'x' },
+        current('y')
+      )
+    ).toBe('published');
+    expect(
+      judgePresentationOutcome(
+        { type: 'deletePresented', expectedSceneId: 'x' },
+        current('x')
+      )
+    ).toBe('changed');
   });
 });

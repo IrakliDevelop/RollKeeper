@@ -350,4 +350,32 @@ describe('DmLocationToolbar marker chrome', () => {
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
   });
+
+  it('PR04 Table v1: "Share with players" is disabled with the Table-managed reason', () => {
+    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
+    try {
+      const onToggle = vi.fn();
+      render(
+        <DmLocationToolbar
+          {...baseProps}
+          sharedWithPlayers
+          onToggleShareWithPlayers={onToggle}
+        />
+      );
+      const share = screen.getByRole('button', { name: 'Share with players' });
+      expect(share).toBeDisabled();
+      expect(
+        screen.getByText(
+          'Join-banner sharing is managed by Table scenes while Table v1 is enabled'
+        )
+      ).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: 'Live for players' })
+      ).not.toBeInTheDocument();
+      fireEvent.click(share);
+      expect(onToggle).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

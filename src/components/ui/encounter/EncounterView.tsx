@@ -67,7 +67,7 @@ export function handleEncounterPoke(
 export function pushLinkedMapLive(
   battleMaps: BattleMap[],
   encounterId: string,
-  pushActive: (battleMapId: string | null, name?: string) => Promise<void>
+  pushActive: (battleMapId: string | null, name?: string) => Promise<unknown>
 ): void {
   const linked = findLinkedBattleMap(battleMaps, encounterId);
   if (linked) void pushActive(linked.id, linked.name);
@@ -81,7 +81,7 @@ export function pushLinkedMapLive(
 export function pushLinkedMapLiveOnStart(
   battleMaps: BattleMap[],
   encounterId: string,
-  pushActive: (battleMapId: string | null, name?: string) => Promise<void>,
+  pushActive: (battleMapId: string | null, name?: string) => Promise<unknown>,
   tableProtocolRequired = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED ===
     'true'
 ): void {

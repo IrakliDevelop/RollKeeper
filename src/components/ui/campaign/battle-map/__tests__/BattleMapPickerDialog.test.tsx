@@ -166,4 +166,22 @@ describe('BattleMapPickerDialog', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('PR04 Table v1: opening a map never claims to make it live', () => {
+    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
+    try {
+      seed([map('m1', ['e1']), map('m2')]);
+      renderDialog();
+      expect(
+        screen.getByText('Show maps to players from their Table scene')
+      ).toBeInTheDocument();
+      fireEvent.click(screen.getByRole('button', { name: /switch & open/i }));
+      expect(pushActiveMock).not.toHaveBeenCalled();
+      expect(pushMock).toHaveBeenCalledWith(
+        '/dm/campaign/ABC123/battlemaps/m2'
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

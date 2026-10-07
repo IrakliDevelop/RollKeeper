@@ -6,6 +6,7 @@ import {
   getTableAuthoritySessionId,
   prepareTableSceneAuthority,
   type TableControlSession,
+  type TableDescriptor,
 } from '@/lib/table/authorityLifecycle';
 import { sceneCheckpointToViewportState } from '@/lib/table/checkpoint';
 import type { TableRepository } from '@/lib/table/repository';
@@ -46,6 +47,8 @@ export function useTableSceneAuthority(options: {
   /** Increments on every successful (re)acquire: publication must hold. */
   const [controlEpoch, setControlEpoch] = useState(0);
   const [explicitAcquired, setExplicitAcquired] = useState(0);
+  /** Latest descriptor of the page session (presentation status, P4). */
+  const [descriptor, setDescriptor] = useState<TableDescriptor | null>(null);
 
   useEffect(() => {
     if (!repository || !adapter) {
@@ -60,6 +63,7 @@ export function useTableSceneAuthority(options: {
     if (!scene) return;
     let cancelled = false;
     let timer: ReturnType<typeof setInterval> | null = null;
+    let unsubscribe: (() => void) | null = null;
     setState({ phase: 'initializing' });
     void prepareTableSceneAuthority({
       campaignCode,
@@ -88,28 +92,41 @@ export function useTableSceneAuthority(options: {
       }
       const session = result.session;
       setState({ phase: 'ready', session });
+      setDescriptor(session.current());
       setControlEpoch(value => value + 1);
       if (attempt > 0) setExplicitAcquired(value => value + 1);
+      // P3.5: a lost result or descriptor change from ANY command (renew,
+      // publish, show, …) updates the banner and status immediately.
+      const markLost = (reason: string) => {
+        if (timer) clearInterval(timer);
+        timer = null;
+        const current = session.current();
+        const foreign =
+          current.holderSessionId !== session.holderSessionId &&
+          current.leaseUntil > Date.now();
+        setState({
+          phase: 'lost',
+          reason,
+          leaseUntil: foreign ? current.leaseUntil : null,
+          foreignHolder: foreign,
+        });
+      };
+      unsubscribe = session.subscribe(() => {
+        if (cancelled) return;
+        setDescriptor(session.current());
+        if (session.isLost()) markLost(session.lostReason() ?? 'conflict');
+      });
       timer = setInterval(() => {
         void session.renew().then(outcome => {
           if (cancelled || outcome.status !== 'lost') return;
-          if (timer) clearInterval(timer);
-          const descriptor = session.current();
-          const foreign =
-            descriptor.holderSessionId !== session.holderSessionId &&
-            descriptor.leaseUntil > Date.now();
-          setState({
-            phase: 'lost',
-            reason: outcome.reason,
-            leaseUntil: foreign ? descriptor.leaseUntil : null,
-            foreignHolder: foreign,
-          });
+          markLost(outcome.reason);
         });
       }, RENEW_MS);
     });
     return () => {
       cancelled = true;
       if (timer) clearInterval(timer);
+      unsubscribe?.();
     };
     // `attempt` is the explicit re-acquire trigger.
   }, [adapter, attempt, campaignCode, dmId, repository, sceneId]);
@@ -138,6 +155,7 @@ export function useTableSceneAuthority(options: {
     controlEpoch,
     explicitAcquired,
     session: state.phase === 'ready' ? state.session : null,
+    descriptor,
     waitSeconds: waiting ? Math.ceil((leaseUntil! - now) / 1_000) : 0,
     acquire,
     workOffline: () => setState({ phase: 'offline' }),

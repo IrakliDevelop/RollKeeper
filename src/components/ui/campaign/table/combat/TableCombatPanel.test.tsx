@@ -74,6 +74,11 @@ function fakeSession(): TableControlSession {
     renew: vi.fn(async () => ({ status: 'committed' as const })),
     publishInitiative: vi.fn(async () => ({ status: 'committed' as const })),
     endInitiative: vi.fn(async () => ({ status: 'committed' as const })),
+    show: vi.fn(async () => ({ status: 'committed' as const })),
+    blank: vi.fn(async () => ({ status: 'committed' as const })),
+    unpresent: vi.fn(async () => ({ status: 'committed' as const })),
+    deletePresented: vi.fn(async () => ({ status: 'committed' as const })),
+    resend: vi.fn(async () => ({ status: 'committed' as const })),
     subscribe: () => () => {},
   };
 }

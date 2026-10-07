@@ -86,4 +86,26 @@ describe('useShareWithPlayers', () => {
     rerender();
     expect(result.current.sharedWithPlayers).toBe(true);
   });
+
+  it('PR04 Table v1: no optimistic "live" flip and no request', async () => {
+    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
+    try {
+      vi.mocked(useActiveBattleMapId).mockReturnValue('map-a');
+      const fetchFn = mockFetchResponse(200, {});
+      const { result } = renderHook(() =>
+        useShareWithPlayers('CODE', 'dm-1', LOCATION, true)
+      );
+      expect(result.current.sharedWithPlayers).toBe(false);
+      expect(result.current.shareDisabledReason).toBe(
+        'Join-banner sharing is managed by Table scenes while Table v1 is enabled'
+      );
+      await act(async () => {
+        result.current.handleToggleShareWithPlayers();
+      });
+      expect(result.current.sharedWithPlayers).toBe(false);
+      expect(fetchFn).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });

@@ -1112,3 +1112,141 @@ test('PR04 real REST: registry() and resource resolution through @upstash/redis'
   const projected = JSON.parse(cli('GET', keys[5]));
   assert.equal(projected.activeBattleMapId, null);
 });
+
+/**
+ * PR04 Q1/P3.4 against real Redis and the real page control session: a Show
+ * whose response is lost commits exactly once; the user's Retry re-sends the
+ * identical command and the ledger duplicate is judged by the CURRENT
+ * presentation (Published after an interleaved renew; "changed" after an
+ * interleaved different Show), never by the `historical` flag alone.
+ */
+test('PR04 session: lost Show response, Retry, duplicate judged by presentation', async t => {
+  const name = `rollkeeper-table-retry-${randomUUID().slice(0, 8)}`;
+  const cli = await startRedis(t, name);
+  const { parseTableCommand } = await import(
+    '../src/lib/tableServer/validation.ts'
+  );
+  const { createTableControlSession, judgePresentationOutcome } = await import(
+    '../src/lib/table/authorityLifecycle.ts'
+  );
+  const PRINCIPAL = 'account:synthetic-owner';
+  const lua = command =>
+    JSON.parse(
+      cli(
+        'EVAL',
+        script,
+        String(keys.length),
+        ...keys,
+        JSON.stringify(command),
+        createHash('sha256')
+          .update(JSON.stringify({ principal: PRINCIPAL, command }))
+          .digest('hex'),
+        PRINCIPAL,
+        randomUUID(),
+        randomUUID(),
+        new Date().toISOString()
+      )
+    );
+  let dropNextResponse = false;
+  const fetcher = async (_url, init) => {
+    const command = parseTableCommand(JSON.parse(String(init.body)).command);
+    if (!command) return Response.json({ error: 'invalid' }, { status: 400 });
+    const result = lua(command);
+    if (dropNextResponse) {
+      dropNextResponse = false;
+      throw new TypeError('response lost after commit');
+    }
+    const status =
+      result.status === 'committed'
+        ? 200
+        : result.status === 'conflict'
+          ? 409
+          : result.status === 'denied'
+            ? 403
+            : 503;
+    return Response.json(result, { status });
+  };
+  let current = lua({ type: 'initialize', operationId: randomUUID() }).current;
+  const base = () => ({
+    operationId: randomUUID(),
+    expectedEpoch: current.epoch,
+    expectedRevision: current.revision,
+    expectedFence: current.writerFence,
+    holderSessionId: 'table-page',
+  });
+  current = lua({ ...base(), type: 'acquire' }).current;
+  for (const sceneId of ['scene-tavern', 'scene-forest'])
+    current = lua({
+      ...base(),
+      type: 'registerScene',
+      sceneId,
+      workspaceInstanceId: 'workspace-a',
+      sourceMapId: `map-${sceneId}`,
+      contentRevision: 1,
+      safeLabel: sceneId,
+      expectedRegistryRevision: 0,
+    }).current;
+  const session = createTableControlSession({
+    campaignCode: CODE,
+    dmId: 'dm-1',
+    holderSessionId: 'table-page',
+    initial: current,
+    fetcher,
+  });
+  const ledgerCount = operationId =>
+    cli('LRANGE', keys[3], '0', '-1')
+      .split('\n')
+      .filter(value => value === operationId).length;
+
+  // 1) Lost response → interleaved renew commit → Retry ⇒ Published.
+  dropNextResponse = true;
+  const first = await session.show('scene-tavern', 'show-tavern-1');
+  assert.equal(first.status, 'failed');
+  assert.equal(first.reason, 'network');
+  assert.equal(
+    JSON.parse(cli('GET', keys[0])).presentation.sceneId,
+    'scene-tavern'
+  );
+  assert.equal((await session.renew()).status, 'committed');
+  const retried = await session.resend(first.command);
+  assert.equal(retried.status, 'committed');
+  assert.equal(retried.duplicate, true);
+  assert.equal(
+    judgePresentationOutcome(
+      { type: 'show', sceneId: 'scene-tavern' },
+      retried.current
+    ),
+    'published'
+  );
+  assert.equal(ledgerCount('show-tavern-1'), 1);
+
+  // 2) Lost response → interleaved different Show → Retry ⇒ changed.
+  dropNextResponse = true;
+  const blank = await session.blank('blank-1');
+  assert.equal(blank.status, 'failed');
+  assert.equal(
+    (await session.show('scene-forest', 'show-forest-1')).status,
+    'committed'
+  );
+  const blankRetry = await session.resend(blank.command);
+  assert.equal(blankRetry.status, 'committed');
+  assert.equal(blankRetry.duplicate, true);
+  assert.equal(
+    judgePresentationOutcome({ type: 'blank' }, blankRetry.current),
+    'changed'
+  );
+  assert.equal(ledgerCount('blank-1'), 1);
+  assert.equal(JSON.parse(cli('GET', keys[0])).presentation.blanked, false);
+  assert.equal(session.isLost(), false);
+
+  // 3) A fenced deletePresented against a stale expectation is rejected,
+  // not lost, and leaves the presented scene in place.
+  const stale = await session.deletePresented('scene-tavern', 'delete-1');
+  assert.equal(stale.status, 'rejected');
+  assert.equal(stale.reason, 'presentation-changed');
+  assert.equal(session.isLost(), false);
+  assert.equal(
+    JSON.parse(cli('GET', keys[0])).presentation.sceneId,
+    'scene-forest'
+  );
+});
