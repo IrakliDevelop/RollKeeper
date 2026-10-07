@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import {
   judgePresentationOutcome,
+  presentationMayHaveCommitted,
   type TableControlSession,
 } from '@/lib/table/authorityLifecycle';
 import { combatArchiveId, type TableCombatCommandV1 } from '@/lib/table/combat';
@@ -182,7 +183,7 @@ export function useTableCombatPanelActions(options: {
   };
   /** P8 step (3): Show through the page session, judged per Q1. */
   const showScene = async (): Promise<
-    { ok: true } | { ok: false; reason: string }
+    { ok: true } | { ok: false; reason: string; uncertain?: boolean }
   > => {
     const session = options.controlSession;
     if (!session || session.isLost())
@@ -201,15 +202,18 @@ export function useTableCombatPanelActions(options: {
       case 'lost':
         return { ok: false, reason: 'live control was lost' };
       case 'unconfirmed':
-        return { ok: false, reason: 'the request was not confirmed' };
       case 'failed':
-        return {
-          ok: false,
-          reason:
-            outcome.reason === 'network'
-              ? 'the request was not confirmed'
-              : 'live control is unavailable',
-        };
+        // N1: a sent Show whose outcome is uncertain may have committed —
+        // never claim "not shown"; combat still does not start.
+        return presentationMayHaveCommitted(outcome)
+          ? { ok: false, reason: 'not-confirmed', uncertain: true }
+          : {
+              ok: false,
+              reason:
+                outcome.status === 'failed' && outcome.httpStatus === 400
+                  ? 'the request was rejected'
+                  : 'live control is unavailable',
+            };
     }
   };
   const showAndStart = async () => {

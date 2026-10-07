@@ -1,5 +1,6 @@
 import {
   judgePresentationOutcome,
+  presentationMayHaveCommitted,
   type PresentationIntent,
   type TableControlOutcome,
   type TableDescriptor,
@@ -140,7 +141,10 @@ export function failureMessage(
       // Lua commit): never "Not changed"; offer the identical Retry, whose
       // ledger duplicate is judged per Q1. Only a never-sent command (too
       // large, queue overflow) is reported as not changed.
-      if (outcome.command || outcome.reason === 'network')
+      // Concern 2: a definite pre-EVAL 400 cannot have committed.
+      if (outcome.httpStatus === 400)
+        return { tone: 'error', text: 'Not changed — request rejected' };
+      if (presentationMayHaveCommitted(outcome))
         return {
           tone: 'error',
           text: 'Not confirmed — Retry',

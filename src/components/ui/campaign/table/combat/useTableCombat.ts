@@ -187,7 +187,9 @@ export function useTableCombat(options: {
   const showAndStart = useCallback(
     (
       runId: string,
-      show: () => Promise<{ ok: true } | { ok: false; reason: string }>
+      show: () => Promise<
+        { ok: true } | { ok: false; reason: string; uncertain?: boolean }
+      >
     ): Promise<TableCombatResult | null> => {
       if (busy.current) {
         setNotice({ tone: 'info', message: 'Saving…' });
@@ -232,7 +234,9 @@ export function useTableCombat(options: {
           if (!shown.ok) {
             setNotice({
               tone: 'error',
-              message: `Scene not shown — combat did not start: ${shown.reason}`,
+              message: shown.uncertain
+                ? 'Show not confirmed — combat did not start; check the audience status'
+                : `Scene not shown — combat did not start: ${shown.reason}`,
             });
             return null;
           }

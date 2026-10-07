@@ -724,6 +724,62 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
     expect(runOf(repository).isActive).toBe(false);
   });
 
+  it.each([
+    ['network', undefined],
+    ['redis-unavailable', 503],
+  ] as const)(
+    'Show sent but not confirmed (%s): combat does not start and it never claims "not shown"',
+    async (reason, httpStatus) => {
+      const repository = await openFixture();
+      const session = fakeSession();
+      vi.mocked(session.show).mockResolvedValue({
+        status: 'failed',
+        reason,
+        ...(httpStatus ? { httpStatus } : {}),
+        command: {
+          type: 'show',
+          operationId: 'show-x',
+          expectedEpoch: '10000000-0000-4000-8000-000000000001',
+          expectedRevision: 3,
+          expectedFence: 1,
+          holderSessionId: 'table-session-1',
+          sceneId: 'scene-1',
+        },
+      });
+      await prepare(repository, session);
+      await setInitiative('Aria', '15');
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Show scene and start combat' })
+      );
+      expect(
+        await screen.findByText(
+          'Show not confirmed — combat did not start; check the audience status'
+        )
+      ).toBeVisible();
+      expect(screen.queryByText(/Scene not shown/)).toBeNull();
+      expect(runOf(repository).isActive).toBe(false);
+    }
+  );
+
+  it('a definite 400 Show refusal still says "Scene not shown"', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    vi.mocked(session.show).mockResolvedValue({
+      status: 'failed',
+      reason: 'unavailable',
+      httpStatus: 400,
+    });
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(
+      await screen.findByText(/Scene not shown — combat did not start: /)
+    ).toBeVisible();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
   it('Start conflicts after Show: the scene stays shown and the message says so', async () => {
     const factory = new IDBFactory();
     const repository = await openFixture({ factory });

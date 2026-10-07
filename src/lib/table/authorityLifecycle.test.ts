@@ -668,6 +668,27 @@ describe('Table control session presentation commands (PR04 P3)', () => {
     expect(retried).toMatchObject({ status: 'committed', duplicate: true });
   });
 
+  it('carries the HTTP status of a non-conflict failure (400 is pre-EVAL, 503 is uncertain)', async () => {
+    const { session } = scripted([
+      () => Response.json({ error: 'Invalid table command' }, { status: 400 }),
+      () =>
+        Response.json(
+          { status: 'unavailable', reason: 'redis-unavailable', current: null },
+          { status: 503 }
+        ),
+    ]);
+    await expect(session.blank('op-400')).resolves.toMatchObject({
+      status: 'failed',
+      httpStatus: 400,
+    });
+    await expect(session.blank('op-503')).resolves.toMatchObject({
+      status: 'failed',
+      reason: 'redis-unavailable',
+      httpStatus: 503,
+      command: expect.objectContaining({ operationId: 'op-503' }),
+    });
+  });
+
   it('reports operation-id-reused as unconfirmed on a resend but rejected for a fresh intent', async () => {
     const fresh = scripted([conflict('operation-id-reused')]);
     await expect(fresh.session.show('scene-a', 'op')).resolves.toMatchObject({

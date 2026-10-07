@@ -63,6 +63,11 @@ export type TableControlOutcome =
       reason: string;
       /** Presentation commands: the command to Retry identically. */
       command?: PresentationCommand;
+      /**
+       * HTTP status of a non-conflict reply. 400 is returned only before the
+       * control EVAL (definite non-commit); 503/5xx may follow a commit.
+       */
+      httpStatus?: number;
     }
   /**
    * Presentation-domain refusal that is NOT ownership loss (scene deleted or
@@ -269,7 +274,12 @@ export function createTableControlSession(options: {
   const post = async (
     command: Record<string, unknown>
   ): Promise<
-    | { kind: 'response'; ok: boolean; body: Record<string, unknown> | null }
+    | {
+        kind: 'response';
+        ok: boolean;
+        httpStatus: number;
+        body: Record<string, unknown> | null;
+      }
     | { kind: 'too-large' }
     | { kind: 'network' }
   > => {
@@ -294,7 +304,12 @@ export function createTableControlSession(options: {
       } catch {
         parsed = null;
       }
-      return { kind: 'response', ok: response.ok, body: parsed };
+      return {
+        kind: 'response',
+        ok: response.ok,
+        httpStatus: response.status,
+        body: parsed,
+      };
     } catch {
       return { kind: 'network' };
     } finally {
@@ -430,7 +445,12 @@ export function createTableControlSession(options: {
         markLost(reason ?? 'conflict');
         return { status: 'lost', reason: lost ?? 'conflict' };
       }
-      return { status: 'failed', reason: reason ?? 'unavailable', command };
+      return {
+        status: 'failed',
+        reason: reason ?? 'unavailable',
+        command,
+        httpStatus: result.httpStatus,
+      };
     }
     markLost('stale-control');
     return { status: 'lost', reason: 'stale-control' };
@@ -650,4 +670,18 @@ export async function prepareTableSceneAuthority(options: {
   } catch {
     return { status: 'failed', reason: 'network' };
   }
+}
+
+/**
+ * Whether a presentation command that did not commit may still have been
+ * applied (lost response, 503/5xx after a commit). A definite pre-EVAL 400
+ * and never-sent failures (too large, queue overflow) cannot have committed.
+ */
+export function presentationMayHaveCommitted(
+  outcome: TableControlOutcome
+): boolean {
+  if (outcome.status === 'unconfirmed') return true;
+  if (outcome.status !== 'failed') return false;
+  if (outcome.httpStatus === 400) return false;
+  return outcome.command !== undefined || outcome.reason === 'network';
 }

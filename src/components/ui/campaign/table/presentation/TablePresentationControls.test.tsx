@@ -311,6 +311,33 @@ describe('Table presentation controls (PR04 P4)', () => {
     expect(session.resend).toHaveBeenCalledWith(command);
   });
 
+  it('Concern 2: a definite HTTP 400 is "Not changed — request rejected" with no futile Retry', async () => {
+    const session = fakeSession({
+      blank: async () => ({
+        status: 'failed',
+        reason: 'unavailable',
+        httpStatus: 400,
+        command: {
+          type: 'blank',
+          operationId: 'blank-400',
+          expectedEpoch: 'epoch-a',
+          expectedRevision: 4,
+          expectedFence: 2,
+          holderSessionId: HOLDER,
+        },
+      }),
+    });
+    renderControls({ session });
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Blank audience' })
+    );
+    expect(
+      await screen.findByText('Not changed — request rejected')
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+    expect(screen.queryByText(/Not confirmed/)).toBeNull();
+  });
+
   it('F3: a hung status read is aborted after 5 s so later polls still run', async () => {
     vi.useFakeTimers();
     const signals: AbortSignal[] = [];
