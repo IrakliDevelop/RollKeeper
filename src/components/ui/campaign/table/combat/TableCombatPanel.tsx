@@ -109,6 +109,11 @@ export function TableCombatPanel(props: {
               props.liveUnavailable
             )}
             publishedRun={panel.activeSummary}
+            playersStale={
+              combat.players.snapshot.status === 'ready' &&
+              combat.players.snapshot.stale
+            }
+            playerNotices={panel.playerNotices}
             canPublish={canPublish}
             saving={combat.saving}
             notice={combat.notice}

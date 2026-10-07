@@ -51,7 +51,9 @@ export function tableDetailCapabilities(
     reaction: !view.playerControlled,
     hidden: true,
     creatureConditions: [],
-    ...(view.missingPlayerData ? { hpUnknown: true } : {}),
+    ...(view.missingPlayerData || view.playerDataUnavailable
+      ? { hpUnknown: true }
+      : {}),
     ...(notes.length > 0 ? { readOnlyNote: notes.join(' · ') } : {}),
   };
 }

@@ -524,4 +524,39 @@ describe('Table combat panel (D10)', () => {
     expect(screen.getAllByText(/HP —/).length).toBeGreaterThan(0);
     expect(screen.queryByText('0/0')).toBeNull();
   });
+
+  it('broadcasts without HP for a loaded-but-unavailable player and names them to the DM (N1)', async () => {
+    vi.mocked(fetch).mockImplementation(async () =>
+      Response.json({
+        players: [
+          {
+            playerId: 'legacy-bran',
+            playerName: 'Ann',
+            characterId: 'char-bran',
+            characterName: 'Bran',
+            characterData: { hitPoints: { current: 5, max: 9 } },
+            lastSynced: AT,
+          },
+        ],
+      })
+    );
+    const repository = await openFixture();
+    const session = fakeSession();
+    renderPanel(repository, { controlSession: session, controlEpoch: 1 });
+    await createRun('Bridge ambush');
+    await chooseParticipants(['Goblin', 'Aria']);
+    await setInitiative('Goblin', '12');
+    await setInitiative('Aria', '15');
+    fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
+    await waitFor(() => expect(session.publishInitiative).toHaveBeenCalled());
+    const [, initiative] = vi.mocked(session.publishInitiative).mock.calls[0]!;
+    const aria = initiative.turnOrder.find(
+      entry => entry.displayName === 'Aria'
+    )!;
+    expect(aria).not.toHaveProperty('currentHp');
+    expect(aria).not.toHaveProperty('isDead');
+    expect(
+      screen.getByText('Aria: player data unavailable — HP not broadcast')
+    ).toBeVisible();
+  });
 });

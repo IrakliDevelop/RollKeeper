@@ -35,6 +35,10 @@ export function TableCombatToolbar(props: {
   canPublish: boolean;
   saving: boolean;
   notice: TableCombatNotice | null;
+  /** The players snapshot's last refresh failed (N2). */
+  playersStale: boolean;
+  /** Participants broadcast without HP (N1), one line each. */
+  playerNotices: string[];
   onSelect: (runId: string) => void;
   onNewRun: () => void;
   onHistory: () => void;
@@ -107,6 +111,16 @@ export function TableCombatToolbar(props: {
           </Link>
         </p>
       )}
+      {props.playersStale && (
+        <p className="text-accent-amber-text text-xs">
+          Player data may be out of date
+        </p>
+      )}
+      {props.playerNotices.map(message => (
+        <p key={message} className="text-accent-amber-text text-xs">
+          {message}
+        </p>
+      ))}
       {props.loggingPaused && (
         <p className="text-accent-amber-text text-xs">
           Combat log paused (archive full)

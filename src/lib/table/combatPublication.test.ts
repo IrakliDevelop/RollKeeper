@@ -259,4 +259,81 @@ describe('scene initiative publication payload (D8, R2-1)', () => {
     );
     expect(aria).toMatchObject({ currentHp: 12, maxHp: 20, isDead: false });
   });
+
+  it('publishes a loaded-but-unavailable player without HP fields and passes the real validator (N1)', async () => {
+    const repository = await openFixture();
+    await fight(repository, ['goblin', 'aria']);
+    const validate = (initiative: unknown) =>
+      parseTableCommand({
+        type: 'publishInitiative',
+        operationId: 'op-n1',
+        expectedEpoch: '10000000-0000-4000-8000-000000000001',
+        expectedRevision: 1,
+        expectedFence: 1,
+        holderSessionId: 'table-session',
+        runId: 'run-a',
+        initiative,
+      });
+    // (b1) snapshot loaded, aria's player left the campaign (identity unresolved).
+    const unresolved = buildCombatReadModel({
+      snapshot: readySnapshot(repository),
+      runId: 'run-a',
+      players: [bran()],
+    })!;
+    // (b2) snapshot loaded, aria present without synced character data.
+    const noSheet = buildCombatReadModel({
+      snapshot: readySnapshot(repository),
+      runId: 'run-a',
+      players: [
+        createMockPlayerData({
+          playerId: 'legacy-aria',
+          characterId: 'char-aria',
+          characterData: null as never,
+        }),
+      ],
+    })!;
+    for (const model of [unresolved, noSheet]) {
+      expect(
+        model.participants.find(view => view.actorId === 'aria')
+      ).toMatchObject({
+        missingPlayerData: false,
+        playerDataUnavailable: true,
+      });
+      const built = buildScenePublication(model, DEFAULT_COMBAT_CONFIG);
+      if (built.status !== 'ok') throw new Error(built.status);
+      const aria = built.initiative.turnOrder.find(
+        entry => entry.entityId === 'm-aria'
+      )!;
+      expect(aria.type).toBe('player');
+      for (const field of [
+        'currentHp',
+        'maxHp',
+        'hpPercent',
+        'hpState',
+        'hpTier',
+        'isDead',
+        'hpMode',
+      ])
+        expect(aria).not.toHaveProperty(field);
+      expect(
+        validate(JSON.parse(JSON.stringify(built.initiative)))
+      ).not.toBeNull();
+    }
+    const unresolvedEntry = (
+      buildScenePublication(unresolved, DEFAULT_COMBAT_CONFIG) as unknown as {
+        initiative: { turnOrder: Array<Record<string, unknown>> };
+      }
+    ).initiative.turnOrder.find(entry => entry.entityId === 'm-aria')!;
+    expect(unresolvedEntry).not.toHaveProperty('playerCharacterId');
+    // (a) never loaded: still held.
+    expect(
+      buildScenePublication(
+        buildCombatReadModel({
+          snapshot: readySnapshot(repository),
+          runId: 'run-a',
+        })!,
+        DEFAULT_COMBAT_CONFIG
+      )
+    ).toEqual({ status: 'waiting-player-data' });
+  });
 });

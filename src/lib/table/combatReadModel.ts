@@ -42,6 +42,11 @@ export interface TableCombatParticipantView {
    * the DM view must not present 0/0 as real HP (F1).
    */
   missingPlayerData: boolean;
+  /**
+   * The players snapshot loaded but this participant has no character data
+   * or no resolved identity: its entry is broadcast without HP (N1).
+   */
+  playerDataUnavailable: boolean;
   /** Suppressed names the player no longer has (C3-5 prune candidates). */
   staleSuppressions: string[];
   validIdentity: boolean;
@@ -129,6 +134,9 @@ export function buildCombatReadModel(options: {
         ? players?.find(player => player.playerId === verified)
         : undefined;
       const stats = actor?.liveStats;
+      const needsLiveData =
+        kind === 'player-reference' ||
+        (kind === 'adopted-pc' && verified !== null);
       const overlay = actor?.playerConditionOverlay;
       const currentNames = activeConditionNames(playerData);
       const suppressed = overlay?.suppressedSourceConditionIds ?? [];
@@ -180,10 +188,9 @@ export function buildCombatReadModel(options: {
         removedFromScene: entry?.removed ?? true,
         hidden: participant.hidden === true,
         playerConditionNames: currentNames,
-        missingPlayerData:
-          (kind === 'player-reference' ||
-            (kind === 'adopted-pc' && verified !== null)) &&
-          !playerData?.characterData,
+        missingPlayerData: needsLiveData && players === undefined,
+        playerDataUnavailable:
+          needsLiveData && players !== undefined && !playerData?.characterData,
         staleSuppressions,
         validIdentity:
           entry?.sceneMemberId !== null &&

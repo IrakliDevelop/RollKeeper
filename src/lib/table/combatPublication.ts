@@ -8,6 +8,16 @@ import type {
 import { PUBLIC_ID, type TableCombatReadModel } from './combatReadModel';
 import type { TableWorkspaceSnapshotV1 } from './schema';
 
+const HP_FIELDS = [
+  'currentHp',
+  'maxHp',
+  'hpPercent',
+  'hpState',
+  'hpTier',
+  'isDead',
+  'hpMode',
+] as const;
+
 /**
  * Player-facing initiative for a scene run: the existing
  * `buildSharedInitiative` masking over the read model, whose entity ids are
@@ -34,6 +44,19 @@ export function buildScenePublication(
     { ...model.encounter, name: '' },
     config
   );
+  // N1: loaded snapshot without this player's data → broadcast the entry
+  // with NO HP fields (never 0 HP / dead derived from missing data).
+  const unavailable = new Set(
+    model.participants
+      .filter(view => view.playerDataUnavailable)
+      .map(view => view.entityId)
+  );
+  for (const entry of initiative.turnOrder) {
+    // Unverified players carry no identity key at all (not `undefined`).
+    if (entry.playerCharacterId === undefined) delete entry.playerCharacterId;
+    if (!unavailable.has(entry.entityId)) continue;
+    for (const field of HP_FIELDS) delete entry[field];
+  }
   return { status: 'ok', initiative };
 }
 

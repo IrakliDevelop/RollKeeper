@@ -192,9 +192,15 @@ export function useTableCombatPanelActions(options: {
     activeSummary,
     hpUnknownEntityIds: new Set(
       (model?.participants ?? [])
-        .filter(view => view.missingPlayerData)
+        .filter(view => view.missingPlayerData || view.playerDataUnavailable)
         .map(view => view.entityId)
     ),
+    playerNotices: (model?.participants ?? [])
+      .filter(view => view.playerDataUnavailable)
+      .map(
+        view =>
+          `${view.entity.name}: player data unavailable — HP not broadcast`
+      ),
     loggingPaused: log?.loggingPaused === true,
     missingPrompt,
     newRunOpen,
