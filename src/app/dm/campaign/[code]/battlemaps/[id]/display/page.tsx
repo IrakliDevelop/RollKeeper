@@ -70,6 +70,16 @@ function DisplayCanvas() {
     'scene-unavailable' | 'credential' | null
   >(null);
   const [canvasEpoch, setCanvasEpoch] = useState(0);
+  const tokenDenialRef = useRef(tokenDenial);
+  tokenDenialRef.current = tokenDenial;
+  // A2: a relay 4403 on any presentation change settles the SDK on terminal
+  // `denied`; under Table v1 the display rebuilds with bounded backoff so the
+  // fresh mint rebinds, goes live or shows the neutral cover.
+  const [withdrawn, setWithdrawn] = useState(false);
+  const reconnectRef = useRef<{
+    delay: number;
+    timer: ReturnType<typeof setTimeout> | null;
+  }>({ delay: 1_000, timer: null });
 
   // OUTSIDE the `if (relayUrl)` guard below, and NOT part of
   // `laserCleanupRef`/`connectionRef` or any other connection-scoped
@@ -129,6 +139,32 @@ function DisplayCanvas() {
       },
       onStatus: s => {
         setStatus(s);
+        const reconnect = reconnectRef.current;
+        if (s === 'live') {
+          reconnect.delay = 1_000;
+          setWithdrawn(false);
+        }
+        if (
+          s === 'denied' &&
+          tableScoped &&
+          tokenDenialRef.current !== 'credential' &&
+          reconnect.timer === null
+        ) {
+          setWithdrawn(true);
+          const delay = reconnect.delay;
+          reconnect.delay = Math.min(delay * 2, 15_000);
+          reconnect.timer = setTimeout(() => {
+            reconnect.timer = null;
+            setResolvedSceneId(null);
+            laserCleanupRef.current?.();
+            laserCleanupRef.current = null;
+            connectionRef.current?.stop();
+            connectionRef.current = null;
+            viewportRef.current = null;
+            setViewport(null);
+            setCanvasEpoch(epoch => epoch + 1);
+          }, delay);
+        }
         if (s === 'live') {
           requestAnimationFrame(() => vp.fitToContent(60));
           awarenessRef.current?.announce();
@@ -219,6 +255,7 @@ function DisplayCanvas() {
     () => () => {
       laserCleanupRef.current?.();
       connectionRef.current?.stop();
+      if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
     },
     []
   );
@@ -242,14 +279,16 @@ function DisplayCanvas() {
     ? 'Live display is not configured'
     : !displayKey
       ? 'Open this display from the battle map editor ("Open TV Display")'
-      : status === 'denied' ||
-          (status !== 'live' && tokenDenial === 'credential')
+      : status !== 'live' && tokenDenial === 'credential'
         ? 'Display link expired — reopen it from the battle map editor'
-        : status !== 'live' && tokenDenial === 'scene-unavailable'
+        : status !== 'live' &&
+            (tokenDenial === 'scene-unavailable' || withdrawn)
           ? 'Nothing is being shown on this map right now'
-          : status !== 'live'
-            ? 'Connecting to the table…'
-            : null;
+          : status === 'denied'
+            ? 'Display link expired — reopen it from the battle map editor'
+            : status !== 'live'
+              ? 'Connecting to the table…'
+              : null;
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: '#000' }}>

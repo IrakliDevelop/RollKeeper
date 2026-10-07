@@ -341,8 +341,24 @@ export function PlayerBattleMapCanvas({
   const sideChannelsEnabled = sideChannelId !== null;
   const sideChannelIdRef = useRef(sideChannelId);
   sideChannelIdRef.current = sideChannelId;
-  // P10: "Scene is unavailable" (token 403 body) → neutral cover.
-  const [sceneUnavailable, setSceneUnavailable] = useState(false);
+  // P10: the token 403 body decides the cover — "Scene is unavailable" is
+  // neutral; any other credential denial is "Access denied".
+  const [tokenDenial, setTokenDenial] = useState<
+    'scene-unavailable' | 'credential' | null
+  >(null);
+  const tokenDenialRef = useRef(tokenDenial);
+  tokenDenialRef.current = tokenDenial;
+  // A2: the relay closes an audience socket with 4403 on any presentation
+  // change and the SDK settles on terminal `denied` (no re-mint). Under
+  // Table v1 the surface rebuilds its connection with bounded backoff so the
+  // fresh mint rebinds, goes live or shows the neutral cover.
+  const [withdrawn, setWithdrawn] = useState(false);
+  const reconnectRef = useRef<{
+    delay: number;
+    timer: ReturnType<typeof setTimeout> | null;
+    identityInvalid: boolean;
+    lastResolved: string | null;
+  }>({ delay: 1_000, timer: null, identityInvalid: false, lastResolved: null });
   // A resolved-scene change rebuilds the whole canvas (store, layers, fog)
   // under a new key; the notice tells the player unsent edits were dropped.
   const [canvasEpoch, setCanvasEpoch] = useState(0);
@@ -808,9 +824,40 @@ export function PlayerBattleMapCanvas({
           onApplied: () => vp.requestRender(),
         }),
       },
+      onDiagnostic: message => {
+        if (message.startsWith('Live map identity is invalid'))
+          reconnectRef.current.identityInvalid = true;
+      },
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
+        const reconnect = reconnectRef.current;
+        if (s === 'live') {
+          reconnect.delay = 1_000;
+          setWithdrawn(false);
+        }
+        if (
+          s === 'denied' &&
+          tableScoped &&
+          tokenDenialRef.current !== 'credential' &&
+          !reconnect.identityInvalid &&
+          reconnect.timer === null
+        ) {
+          setWithdrawn(true);
+          const delay = reconnect.delay;
+          reconnect.delay = Math.min(delay * 2, 15_000);
+          reconnect.timer = setTimeout(() => {
+            reconnect.timer = null;
+            setResolvedSceneId(null);
+            laserCleanupRef.current?.();
+            laserCleanupRef.current = null;
+            connectionRef.current?.stop();
+            connectionRef.current = null;
+            setViewport(null);
+            viewportRef.current = null;
+            setCanvasEpoch(epoch => epoch + 1);
+          }, delay);
+        }
         if (s === 'live') {
           requestAnimationFrame(() => vp.fitToContent(60));
           // Managed sendPresence drops while not live, so the attach-time
@@ -820,18 +867,35 @@ export function PlayerBattleMapCanvas({
         }
       },
       onTokenDenied: denial =>
-        setSceneUnavailable(
+        setTokenDenial(
           denial.status === 403 && denial.error === 'Scene is unavailable'
+            ? 'scene-unavailable'
+            : denial.status === 403 || denial.status === 400
+              ? 'credential'
+              : null
         ),
       onTokenMetadata: meta => {
-        setSceneUnavailable(false);
+        setTokenDenial(null);
         applyFogAppearanceMetadata(
           vp,
           meta.fogAppearance,
           meta.fogAppearanceUpdatedAt
         );
       },
-      onSceneResolved: sceneId => setResolvedSceneId(sceneId),
+      onSceneResolved: sceneId => {
+        // A rebuild after a withdrawal resolves afresh: name a scene change.
+        const reconnect = reconnectRef.current;
+        if (
+          reconnect.lastResolved !== null &&
+          reconnect.lastResolved !== sceneId
+        )
+          setSceneNotice(
+            notice =>
+              notice ?? 'The presented scene changed. The map was reloaded.'
+          );
+        reconnect.lastResolved = sceneId;
+        setResolvedSceneId(sceneId);
+      },
       onSceneChange: change => {
         const count = change.discardedOperationIds.length;
         setSceneNotice(
@@ -976,6 +1040,7 @@ export function PlayerBattleMapCanvas({
       movementCommitUnsubRef.current?.();
       connectionRef.current?.stop();
       markersAbortRef.current?.abort();
+      if (reconnectRef.current.timer) clearTimeout(reconnectRef.current.timer);
     },
     []
   );
@@ -998,9 +1063,11 @@ export function PlayerBattleMapCanvas({
         <BattleMapBootstrapPrivacyCover
           status={status}
           message={
-            sceneUnavailable && status !== 'denied'
-              ? "The DM isn't showing this map right now"
-              : undefined
+            tokenDenial === 'credential'
+              ? 'Access denied'
+              : tokenDenial === 'scene-unavailable' || withdrawn
+                ? "The DM isn't showing this map right now"
+                : undefined
           }
         />
         {sceneNotice && (
