@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/forms/button';
 import { TableAuthorityStatus } from '@/components/ui/campaign/table/TableAuthorityStatus';
 import { TableCombatPanel } from '@/components/ui/campaign/table/combat/TableCombatPanel';
+import { TablePresentationControls } from '@/components/ui/campaign/table/presentation';
 import { TableRosterPanel } from '@/components/ui/campaign/table/TableRosterPanel';
 import { createTableRosterCanvas } from '@/components/ui/campaign/table/tableRosterCanvas';
 import { useAuthenticatedTableWorkspace } from '@/components/ui/campaign/table/useAuthenticatedTableWorkspace';
@@ -326,6 +327,15 @@ export default function TableScenePage() {
               onAcquire={authority.acquire}
               onWorkOffline={authority.workOffline}
             />
+            <TablePresentationControls
+              campaignCode={campaignCode}
+              dmId={dmId}
+              sceneId={sceneId}
+              sceneName={scene.name}
+              authorityState={authority.state}
+              session={authority.session}
+              descriptor={authority.descriptor}
+            />
             {pendingConflict && (
               <div
                 className="border-accent-orange-text w-full rounded border p-2"
@@ -433,6 +443,7 @@ export default function TableScenePage() {
         requestedRunId={requestedRunId}
         tableWorkspaceId={selectedWorkspaceId}
         onPublicationStatus={handlePublicationStatus}
+        presentation={authority.descriptor?.presentation ?? null}
       />
     </>
   );

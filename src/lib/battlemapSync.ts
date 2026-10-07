@@ -191,6 +191,12 @@ export interface ManagedConnectionOptions {
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Receives pre-transport configuration failures for operator UI/logging. */
   onDiagnostic?: (message: string) => void;
+  /**
+   * PR04 C4-1/P10: a token mint denial (status + server error body), so a
+   * surface can tell "Scene is unavailable" from a credential denial. The
+   * connection's existing retry/backoff is unchanged.
+   */
+  onTokenDenied?: (denial: BattleMapTokenDenial) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
   /** Called with session metadata from each token mint (initial + refreshes). */
@@ -309,7 +315,10 @@ export function createManagedBattleMapConnection(
         sceneId: opts.tokenRequest.sceneId ?? opts.battleMapId,
         protocols: { fog: 1, authority: 1 },
       },
-      mint: mintBattleMapToken,
+      mint: (campaignCode, request) =>
+        mintBattleMapToken(campaignCode, request, {
+          onDenied: opts.onTokenDenied,
+        }),
       transportFactory: opts.authorityTransportFactory,
     });
   }
@@ -329,7 +338,8 @@ export function createManagedBattleMapConnection(
     resolveUrl: async () => {
       const result = await mintBattleMapToken(
         opts.campaignCode,
-        opts.tokenRequest
+        opts.tokenRequest,
+        { onDenied: opts.onTokenDenied }
       );
       if (stopped) return null;
       if (!result) {

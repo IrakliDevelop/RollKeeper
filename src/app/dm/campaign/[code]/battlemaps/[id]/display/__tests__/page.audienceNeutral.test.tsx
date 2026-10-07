@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
+import { render, cleanup, act, screen } from '@testing-library/react';
 import { Viewport } from '@fieldnotes/core';
 
 import BattleMapDisplayPage from '../page';
 
 /**
- * PR02 R4 on the map-pinned TV display: with Table v1 required the display
- * keeps its map-keyed fog-appearance companion neutral unless the resolved
- * presented scene is this map, and rebuilds its canvas when the resolved
- * scene changes. Harness copied from page.presence.test.tsx.
+ * PR04 P10 / C4-1 through the REAL createManagedBattleMapConnection path (no
+ * battlemapSync mock): the token route's 403 body decides the cover. An
+ * unpresented/blanked/deleted scene ("Scene is unavailable") shows a neutral
+ * cover; an invalid display key keeps the expired-link message.
  */
 
 vi.mock('next/navigation', async importOriginal => {
@@ -26,15 +26,6 @@ vi.mock('@fieldnotes/react', async importOriginal => {
 });
 
 import { FieldNotesCanvas } from '@fieldnotes/react';
-
-const stops: Array<ReturnType<typeof vi.fn>> = [];
-vi.mock('@/lib/battlemapSync', () => ({
-  createManagedBattleMapConnection: vi.fn(() => {
-    const stop = vi.fn();
-    stops.push(stop);
-    return { stop, sendPresence: vi.fn() };
-  }),
-}));
 
 vi.mock('@/components/ui/campaign/location-map/fog/fogAppearancePoll', () => ({
   applyFogAppearanceMetadata: vi.fn(),
@@ -70,12 +61,6 @@ vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
     dispose: vi.fn(),
   })),
 }));
-
-import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
-import {
-  fetchAndApplyFogAppearance,
-  startFogAppearancePoll,
-} from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
 
 const viewports: Viewport[] = [];
 
@@ -155,25 +140,21 @@ function fireReady(vp: Viewport): void {
   act(() => onReady(vp));
 }
 
-function lastOptions() {
-  const call = vi.mocked(createManagedBattleMapConnection).mock.calls.at(-1);
-  if (!call) throw new Error('no connection');
-  return call[0];
-}
+const tokenCalls = () =>
+  vi
+    .mocked(globalThis.fetch)
+    .mock.calls.filter(([url]) => String(url).includes('/battlemap-token'));
 
-describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
+describe('BattleMapDisplayPage: audience neutrality (PR04 P10)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
     table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
-
   beforeEach(() => {
-    stops.length = 0;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
   });
-
   afterEach(() => {
     cleanup();
     viewports.splice(0).forEach(viewport => viewport.destroy());
@@ -188,38 +169,28 @@ describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('PR04: polls fog appearance for the RESOLVED scene id once resolved', async () => {
-    stubCanvas();
-    render(<BattleMapDisplayPage />);
-    fireReady(makeViewport());
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-    const options = lastOptions();
-    await act(async () => options.onSceneResolved?.('scene-x'));
-    await act(async () => options.onPoke?.('fog-appearance'));
-    const url =
-      '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=display&displayKey=key';
-    expect(startFogAppearancePoll).toHaveBeenCalledWith(
-      expect.objectContaining({ url })
-    );
-    expect(fetchAndApplyFogAppearance).toHaveBeenCalledWith(
-      expect.anything(),
-      url
-    );
-  });
-
-  it('rebuilds the display canvas when the resolved scene changes', async () => {
-    stubCanvas();
-    render(<BattleMapDisplayPage />);
-    fireReady(makeViewport());
-    await act(async () =>
-      lastOptions().onSceneChange?.({
-        previousSceneId: 'bm-1',
-        sceneId: 'scene-x',
-        discardedOperationIds: [],
+  it.each([
+    ['Scene is unavailable', 'Nothing is being shown on this map right now'],
+    [
+      'Invalid display key',
+      'Display link expired — reopen it from the battle map editor',
+    ],
+  ])('a token 403 "%s" shows "%s"', async (error, message) => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ error }), {
+        status: 403,
+        headers: { 'content-type': 'application/json' },
       })
     );
-    expect(stops[0]).toHaveBeenCalled();
+    stubCanvas();
+    render(<BattleMapDisplayPage />);
     fireReady(makeViewport());
-    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => expect(tokenCalls().length).toBeGreaterThan(0));
+    expect(
+      await screen.findByText(message, undefined, { timeout: 3_000 })
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId('battlemap-bootstrap-privacy-cover')
+    ).toHaveTextContent(message);
   });
 });

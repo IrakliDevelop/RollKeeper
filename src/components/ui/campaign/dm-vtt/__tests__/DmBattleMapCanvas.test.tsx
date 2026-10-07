@@ -382,3 +382,64 @@ describe('DmBattleMapCanvas wiring', () => {
     );
   });
 });
+
+describe('DmBattleMapCanvas: Table scene side channels (PR04 P7)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(mockHookState, defaultMarkerHookFields(), {
+      battleMap: baseBattleMap,
+      markerShareNotice: null,
+    });
+    vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', 'wss://relay.test');
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  const adapter = {
+    sceneId: 'scene-1',
+    sourceMapId: 'map-original',
+    getBattleMap: () => ({ ...baseBattleMap, id: 'scene-1' }),
+    updateBattleMap: vi.fn(),
+    subscribe: () => () => {},
+  } as never;
+
+  it('projects fog appearance for the Table scene id (no longer suppressed)', async () => {
+    const fetchFn = vi.fn<typeof fetch>(async () =>
+      Response.json({ fogAppearance: 'solid', updatedAt: null })
+    );
+    vi.stubGlobal('fetch', fetchFn);
+    render(
+      <DmBattleMapCanvas
+        campaignCode={CAMPAIGN_CODE}
+        battleMapId="scene-1"
+        dmId="dm-1"
+        tableSceneAdapter={adapter}
+        tokenConfigRef={{ current: null }}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        onExportError={vi.fn()}
+      />
+    );
+    await vi.waitFor(() =>
+      expect(
+        fetchFn.mock.calls.some(
+          ([url, init]) =>
+            String(url) ===
+              '/api/campaign/TEST01/battlemaps/scene-1/fog-appearance' &&
+            (init as RequestInit | undefined)?.method === 'PUT'
+        )
+      ).toBe(true)
+    );
+  });
+
+  it('shows a visible notice when marker sharing was refused', async () => {
+    (mockHookState as Record<string, unknown>).markerShareNotice =
+      'Markers not shared with players';
+    renderCanvas();
+    expect(
+      await screen.findByText('Markers not shared with players')
+    ).toBeInTheDocument();
+  });
+});

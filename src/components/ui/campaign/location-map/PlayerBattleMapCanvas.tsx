@@ -57,6 +57,11 @@ import {
   getAppliedFogAppearance,
   startFogAppearancePoll,
 } from './fog/fogAppearancePoll';
+import {
+  fogAppearanceReadUrl,
+  lootClaimRequest,
+  markerDetailsUrl,
+} from '@/components/ui/campaign/table/sideChannelRequests';
 import DmLocationToolOptions from './DmLocationToolOptions';
 import { useMarkerRegistration } from './useMarkerRegistration';
 import {
@@ -326,15 +331,18 @@ export function PlayerBattleMapCanvas({
 }: PlayerBattleMapCanvasProps) {
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
   // R4 (Table v1): this route opens the source map URL; the server resolves
-  // the presented scene. Map-keyed side channels (marker details, loot,
-  // shop, fog appearance) stay neutral unless that scene IS this map —
-  // PR04's HTTP privacy inventory owns re-enabling them for adopted scenes.
+  // the presented scene. PR04 P7: side channels (marker details, loot, shop,
+  // fog appearance) are addressed by the RESOLVED scene id — never the
+  // source map id — and stay neutral until the token resolves one.
   const tableScoped =
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
-  const sideChannelsEnabled = !tableScoped || resolvedSceneId === battleMapId;
-  const sideChannelsRef = useRef(sideChannelsEnabled);
-  sideChannelsRef.current = sideChannelsEnabled;
+  const sideChannelId = tableScoped ? resolvedSceneId : battleMapId;
+  const sideChannelsEnabled = sideChannelId !== null;
+  const sideChannelIdRef = useRef(sideChannelId);
+  sideChannelIdRef.current = sideChannelId;
+  // P10: "Scene is unavailable" (token 403 body) → neutral cover.
+  const [sceneUnavailable, setSceneUnavailable] = useState(false);
   // A resolved-scene change rebuilds the whole canvas (store, layers, fog)
   // under a new key; the notice tells the player unsent edits were dropped.
   const [canvasEpoch, setCanvasEpoch] = useState(0);
@@ -433,18 +441,29 @@ export function PlayerBattleMapCanvas({
   onOpenPartySheetRef.current = onOpenPartySheet;
 
   const refreshMarkers = useCallback(async () => {
-    if (!sideChannelsEnabled) {
+    if (sideChannelId === null) {
       setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
       return;
     }
     try {
       const response = await fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+        markerDetailsUrl(campaignCode, sideChannelId, {
+          role: 'player',
+          playerId: characterId,
+        })
       );
-      if (!response.ok) return;
+      // A late answer for a previous scene never lands on the new one.
+      if (sideChannelIdRef.current !== sideChannelId) return;
+      if (!response.ok) {
+        // Table v1: 404 (not presented/blanked/deleted) is a neutral empty
+        // state — never the previous scene's details.
+        if (tableScoped) setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
+        return;
+      }
       const data = (await response.json()) as {
         markers?: PublicMarkerDetail[];
       };
+      if (sideChannelIdRef.current !== sideChannelId) return;
       setPublishedMarkers(data.markers ?? []);
     } catch (error) {
       // Marker details are a best-effort companion to the live canvas relay.
@@ -452,9 +471,36 @@ export function PlayerBattleMapCanvas({
       // can retry, and a marker poke will refresh connected clients later.
       console.warn('Failed to refresh marker details:', error);
     }
-  }, [battleMapId, campaignCode, sideChannelsEnabled]);
+  }, [campaignCode, characterId, sideChannelId, tableScoped]);
   const refreshMarkersRef = useRef(refreshMarkers);
   refreshMarkersRef.current = refreshMarkers;
+
+  // PR04 Q2(b): scene-keyed markers get no relay poke (the markers route
+  // pokes the legacy room), so refresh every 10 s while a Table scene is
+  // resolved: one request in flight, paused while hidden, refreshed on
+  // visibility, disposed on unmount or scene change.
+  useEffect(() => {
+    if (!tableScoped || sideChannelId === null) return;
+    let inFlight = false;
+    let disposed = false;
+    const tick = () => {
+      if (disposed || inFlight || document.hidden) return;
+      inFlight = true;
+      void refreshMarkersRef.current().finally(() => {
+        inFlight = false;
+      });
+    };
+    const timer = window.setInterval(tick, 10_000);
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [tableScoped, sideChannelId]);
 
   useEffect(() => {
     setPublishedMarkers(suppliedMarkers);
@@ -623,27 +669,19 @@ export function PlayerBattleMapCanvas({
 
   const handleClaimLoot = useCallback(
     async (entryId: string, quantity: number): Promise<number> => {
-      if (!sideChannelsRef.current)
+      const target = sideChannelIdRef.current;
+      if (target === null)
         throw new Error('Loot is not available in this scene.');
       if (markerPanelState.kind !== 'ready')
         throw new Error('This loot container is no longer available.');
-      const response = await fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-rollkeeper-csrf': '1',
-          },
-          body: JSON.stringify({
-            playerId: characterId,
-            markerId: markerPanelState.detail.id,
-            entryId,
-            quantity,
-            requestId: crypto.randomUUID(),
-          }),
-        }
-      );
+      const request = lootClaimRequest(campaignCode, target, {
+        playerId: characterId,
+        markerId: markerPanelState.detail.id,
+        entryId,
+        quantity,
+        requestId: crypto.randomUUID(),
+      });
+      const response = await fetch(request.url, request.init);
       const data = (await response.json().catch(() => ({}))) as {
         error?: string;
         markers?: PublicMarkerDetail[];
@@ -661,7 +699,7 @@ export function PlayerBattleMapCanvas({
       setPublishedMarkers(data.markers ?? []);
       return data.claim?.grantedQuantity ?? quantity;
     },
-    [battleMapId, campaignCode, characterId, markerPanelState]
+    [campaignCode, characterId, markerPanelState]
   );
 
   // `activeMarkerElement` above is a bare render-time `getById` with no store
@@ -773,7 +811,12 @@ export function PlayerBattleMapCanvas({
           awarenessRef.current?.announce();
         }
       },
+      onTokenDenied: denial =>
+        setSceneUnavailable(
+          denial.status === 403 && denial.error === 'Scene is unavailable'
+        ),
       onTokenMetadata: meta => {
+        setSceneUnavailable(false);
         applyFogAppearanceMetadata(
           vp,
           meta.fogAppearance,
@@ -801,10 +844,14 @@ export function PlayerBattleMapCanvas({
       },
       onPoke: feature => {
         if (feature === 'markers') void refreshMarkersRef.current();
-        if (feature === 'fog-appearance' && sideChannelsRef.current) {
+        const target = sideChannelIdRef.current;
+        if (feature === 'fog-appearance' && target !== null) {
           fetchAndApplyFogAppearance(
             vp,
-            `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`
+            fogAppearanceReadUrl('battlemap', campaignCode, target, {
+              role: 'player',
+              playerId: characterId,
+            })
           );
         }
         onPokeRef.current?.(feature);
@@ -883,20 +930,23 @@ export function PlayerBattleMapCanvas({
     }
   };
 
-  // Fog appearance is a map-keyed companion: polled only while the resolved
-  // scene is this map (always, outside Table v1).
+  // Fog appearance companion, keyed by the side-channel id (the resolved
+  // scene under Table v1; this map outside it).
   useEffect(() => {
     if (
       !viewport ||
-      !sideChannelsEnabled ||
+      sideChannelId === null ||
       !process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL
     )
       return;
     return startFogAppearancePoll({
       viewport,
-      url: `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/fog-appearance?role=player&playerId=${encodeURIComponent(characterId)}`,
+      url: fogAppearanceReadUrl('battlemap', campaignCode, sideChannelId, {
+        role: 'player',
+        playerId: characterId,
+      }),
     });
-  }, [viewport, sideChannelsEnabled, campaignCode, battleMapId, characterId]);
+  }, [viewport, sideChannelId, campaignCode, characterId]);
 
   const handleDeleteSelected = useCallback(() => {
     const vp = viewport;
@@ -936,7 +986,14 @@ export function PlayerBattleMapCanvas({
           }}
           snapToGrid
         />
-        <BattleMapBootstrapPrivacyCover status={status} />
+        <BattleMapBootstrapPrivacyCover
+          status={status}
+          message={
+            sceneUnavailable && status !== 'denied'
+              ? "The DM isn't showing this map right now"
+              : undefined
+          }
+        />
         {sceneNotice && (
           <div className="border-accent-amber-border bg-accent-amber-bg pointer-events-auto absolute top-16 left-1/2 z-[110] flex max-w-[calc(100%-2rem)] -translate-x-1/2 items-center gap-2 rounded-lg border px-3 py-2 shadow-lg">
             <p role="status" className="text-accent-amber-text text-sm">

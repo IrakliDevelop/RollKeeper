@@ -10,6 +10,7 @@ import {
 } from 'react';
 
 import {
+  planCombatCommand,
   runCombatCommand,
   type TableCombatCommandV1,
   type TableCombatResult,
@@ -173,6 +174,97 @@ export function useTableCombat(options: {
     [repository, run, options.campaignCode]
   );
 
+  /**
+   * PR04 P8 / S2 combined Show + Start, inside the same busy/serialized
+   * guard (Q10: no other combat command, background included, runs from this
+   * tab meanwhile). (1) plan `combat.start` against the current snapshot and
+   * capture its revision R — a refusal sends nothing; (2) re-read the
+   * repository right before Show — a changed revision aborts, nothing sent;
+   * (3) Show — not published → combat does not start; (4) commit start at R
+   * with a fresh operation id — a refusal leaves the scene shown (no rollback
+   * of a revealed scene). Both halves are reported in one result.
+   */
+  const showAndStart = useCallback(
+    (
+      runId: string,
+      show: () => Promise<{ ok: true } | { ok: false; reason: string }>
+    ): Promise<TableCombatResult | null> => {
+      if (busy.current) {
+        setNotice({ tone: 'info', message: 'Saving…' });
+        return Promise.resolve(null);
+      }
+      busy.current = true;
+      setSaving(true);
+      const task = queue.current.then(async () => {
+        try {
+          const latest = repository.getCurrent();
+          if (latest?.status !== 'ready') {
+            setNotice({
+              tone: 'error',
+              message: 'Table storage is unavailable. Nothing was sent.',
+            });
+            return null;
+          }
+          const revision = latest.snapshot.campaign?.revision ?? 0;
+          const operationId = crypto.randomUUID();
+          const command: TableCombatCommandV1 = {
+            type: 'combat.start',
+            runId,
+            at: new Date().toISOString(),
+          };
+          const plan = planCombatCommand(latest.snapshot, command, operationId);
+          if (plan.status === 'rejected') {
+            setNotice({ tone: 'error', message: combatFailureMessage(plan) });
+            return plan;
+          }
+          const reread = await repository.reload();
+          if (
+            reread.status !== 'ready' ||
+            (reread.snapshot.campaign?.revision ?? 0) !== revision
+          ) {
+            setNotice({
+              tone: 'error',
+              message: 'Scene changed locally — review and retry',
+            });
+            return null;
+          }
+          const shown = await show();
+          if (!shown.ok) {
+            setNotice({
+              tone: 'error',
+              message: `Scene not shown — combat did not start: ${shown.reason}`,
+            });
+            return null;
+          }
+          const result = await runCombatCommand(repository, {
+            expectedRevision: revision,
+            operationId,
+            command,
+          });
+          if (result.status === 'committed') {
+            setNotice({
+              tone: 'success',
+              message: 'Scene shown and combat started',
+            });
+          } else {
+            if (result.status === 'conflict') await repository.reload();
+            setNotice({
+              tone: 'error',
+              message: `Scene is now shown; combat did not start: ${combatFailureMessage(result)}`,
+            });
+          }
+          return result;
+        } finally {
+          busy.current = false;
+          setSaving(false);
+        }
+      });
+      queue.current = task.catch(() => undefined);
+      return task;
+    },
+    [repository]
+  );
+
   /** Background commands (acks, prunes, URL selection): queued, not refused. */
   const background = useCallback(
     (intent: TableCombatIntent): Promise<TableCombatResult> => {
@@ -242,5 +334,6 @@ export function useTableCombat(options: {
     setNotice,
     execute,
     background,
+    showAndStart,
   };
 }

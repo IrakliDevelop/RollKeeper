@@ -1,48 +1,41 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, cleanup, act } from '@testing-library/react';
-import { Viewport } from '@fieldnotes/core';
+import { render, screen, cleanup, act } from '@testing-library/react';
+import { SelectTool, Viewport } from '@fieldnotes/core';
 
-import BattleMapDisplayPage from '../page';
+import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
 
 /**
- * PR02 R4 on the map-pinned TV display: with Table v1 required the display
- * keeps its map-keyed fog-appearance companion neutral unless the resolved
- * presented scene is this map, and rebuilds its canvas when the resolved
- * scene changes. Harness copied from page.presence.test.tsx.
+ * PR04 P10 / C4-1 on the player surface through the REAL
+ * createManagedBattleMapConnection path: a token 403 "Scene is unavailable"
+ * (unpresented, blanked, deleted or another scene) shows a neutral cover.
  */
-
-vi.mock('next/navigation', async importOriginal => {
-  const actual = await importOriginal<typeof import('next/navigation')>();
-  return {
-    ...actual,
-    useParams: () => ({ code: 'CAMP01', id: 'bm-1' }),
-    useSearchParams: () => new URLSearchParams({ dk: 'key' }),
-  };
-});
 
 vi.mock('@fieldnotes/react', async importOriginal => {
   const actual = await importOriginal<typeof import('@fieldnotes/react')>();
-  return { ...actual, FieldNotesCanvas: vi.fn(() => null) };
+  return {
+    ...actual,
+    FieldNotesCanvas: vi.fn(() => null),
+    useActiveTool: () => ['select', vi.fn()] as const,
+  };
 });
 
 import { FieldNotesCanvas } from '@fieldnotes/react';
 
-const stops: Array<ReturnType<typeof vi.fn>> = [];
-vi.mock('@/lib/battlemapSync', () => ({
-  createManagedBattleMapConnection: vi.fn(() => {
-    const stop = vi.fn();
-    stops.push(stop);
-    return { stop, sendPresence: vi.fn() };
-  }),
+vi.mock('../BattleMapMinimap', () => ({ BattleMapMinimap: () => null }));
+vi.mock('../BattleMapExportControl', () => ({
+  BattleMapExportControl: () => null,
 }));
 
-vi.mock('@/components/ui/campaign/location-map/fog/fogAppearancePoll', () => ({
+vi.mock('../fog/fogAppearancePoll', () => ({
   applyFogAppearanceMetadata: vi.fn(),
   fetchAndApplyFogAppearance: vi.fn(),
+  getAppliedFogAppearance: vi.fn(() => 'solid'),
   startFogAppearancePoll: vi.fn(() => () => {}),
 }));
+
 vi.mock('@/components/ui/campaign/location-map/laserSync', () => ({
-  attachRemoteLaserTrails: vi.fn(() => vi.fn()),
+  attachRemoteLaserTrails: vi.fn(() => () => {}),
 }));
 vi.mock('@/components/ui/campaign/location-map/pingSync', () => ({
   attachRemotePings: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
@@ -54,10 +47,8 @@ vi.mock('@/components/ui/campaign/location-map/focusSync', () => ({
   attachFocusReceiver: vi.fn(() => ({ dispose: vi.fn() })),
 }));
 vi.mock('@/components/ui/campaign/location-map/pathSync', () => ({
+  attachPathBroadcast: vi.fn(() => ({ setSharing: vi.fn(), dispose: vi.fn() })),
   attachRemotePaths: vi.fn(() => ({ dispose: vi.fn(), overlay: {} })),
-}));
-vi.mock('@/components/ui/campaign/location-map/layerSync', () => ({
-  makeApplyRemoteLayer: vi.fn(() => vi.fn()),
 }));
 vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
   attachAwarenessSync: vi.fn(() => ({
@@ -71,12 +62,6 @@ vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
   })),
 }));
 
-import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
-import {
-  fetchAndApplyFogAppearance,
-  startFogAppearancePoll,
-} from '@/components/ui/campaign/location-map/fog/fogAppearancePoll';
-
 const viewports: Viewport[] = [];
 
 function stubCanvas(): void {
@@ -86,6 +71,7 @@ function stubCanvas(): void {
     if (tag === 'canvas') {
       const canvas = el as HTMLCanvasElement;
       vi.spyOn(canvas, 'getContext').mockReturnValue({
+        canvas,
         save: vi.fn(),
         restore: vi.fn(),
         scale: vi.fn(),
@@ -139,41 +125,51 @@ function makeViewport(): Viewport {
   });
   document.body.appendChild(container);
   const vp = new Viewport(container);
-  // Destroyed in afterEach so no render frame outlives the canvas stub.
   viewports.push(vp);
+  vp.toolManager.register(new SelectTool());
+  vp.toolManager.register({
+    name: 'path',
+    onCommit: vi.fn(() => vi.fn()),
+  } as unknown as Parameters<typeof vp.toolManager.register>[0]);
   return vp;
 }
 
-/** Pulls the `onReady` callback the (mocked) `FieldNotesCanvas` most
- * recently received, and invokes it with a real `Viewport` inside `act`. */
 function fireReady(vp: Viewport): void {
-  const lastCall = vi.mocked(FieldNotesCanvas).mock.calls.at(-1);
-  const onReady = lastCall?.[0]?.onReady;
-  if (!onReady) {
-    throw new Error('FieldNotesCanvas was not rendered with an onReady prop');
-  }
+  const onReady = vi.mocked(FieldNotesCanvas).mock.calls.at(-1)?.[0]?.onReady;
+  if (!onReady) throw new Error('FieldNotesCanvas has no onReady');
   act(() => onReady(vp));
 }
 
-function lastOptions() {
-  const call = vi.mocked(createManagedBattleMapConnection).mock.calls.at(-1);
-  if (!call) throw new Error('no connection');
-  return call[0];
+function fetchedUrls(): string[] {
+  return vi.mocked(globalThis.fetch).mock.calls.map(([input]) => String(input));
 }
 
-describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
+function renderPlayer() {
+  return render(
+    <PlayerBattleMapCanvas
+      campaignCode="CAMP01"
+      battleMapId="bm-1"
+      characterId="char-a"
+      onExportError={() => {}}
+    />
+  );
+}
+
+describe('PlayerBattleMapCanvas: audience neutrality (PR04 P10)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
     table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
-
   beforeEach(() => {
-    stops.length = 0;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
+      String(input).includes('/battlemap-token')
+        ? Response.json({ error: 'Scene is unavailable' }, { status: 403 })
+        : Response.json({ error: 'Not found' }, { status: 404 })
+    );
   });
-
   afterEach(() => {
     cleanup();
     viewports.splice(0).forEach(viewport => viewport.destroy());
@@ -188,38 +184,21 @@ describe('BattleMapDisplayPage: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('PR04: polls fog appearance for the RESOLVED scene id once resolved', async () => {
+  it('a token 403 "Scene is unavailable" shows the neutral cover, not an access error', async () => {
     stubCanvas();
-    render(<BattleMapDisplayPage />);
+    renderPlayer();
     fireReady(makeViewport());
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-    const options = lastOptions();
-    await act(async () => options.onSceneResolved?.('scene-x'));
-    await act(async () => options.onPoke?.('fog-appearance'));
-    const url =
-      '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=display&displayKey=key';
-    expect(startFogAppearancePoll).toHaveBeenCalledWith(
-      expect.objectContaining({ url })
+    await vi.waitFor(() =>
+      expect(fetchedUrls().some(url => url.includes('/battlemap-token'))).toBe(
+        true
+      )
     );
-    expect(fetchAndApplyFogAppearance).toHaveBeenCalledWith(
-      expect.anything(),
-      url
+    const cover = await screen.findByTestId(
+      'battlemap-bootstrap-privacy-cover'
     );
-  });
-
-  it('rebuilds the display canvas when the resolved scene changes', async () => {
-    stubCanvas();
-    render(<BattleMapDisplayPage />);
-    fireReady(makeViewport());
-    await act(async () =>
-      lastOptions().onSceneChange?.({
-        previousSceneId: 'bm-1',
-        sceneId: 'scene-x',
-        discardedOperationIds: [],
-      })
+    await vi.waitFor(() =>
+      expect(cover).toHaveTextContent("The DM isn't showing this map right now")
     );
-    expect(stops[0]).toHaveBeenCalled();
-    fireReady(makeViewport());
-    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);
+    expect(fetchedUrls().some(url => url.includes('/markers'))).toBe(false);
   });
 });

@@ -565,3 +565,202 @@ describe('Table combat panel (D10)', () => {
     ).toBeVisible();
   });
 });
+
+describe('Combined Show + Start (PR04 P8, S2)', () => {
+  const shown = (sceneId: string | null, blanked = false) => ({
+    epoch: '10000000-0000-4000-8000-000000000001',
+    revision: 3,
+    writerFence: 1,
+    leaseUntil: Date.now() + 30_000,
+    holderSessionId: 'table-session-1',
+    presentation: { sceneId, revision: 2, blanked },
+    publicRunId: null,
+  });
+  const NOT_SHOWN = { sceneId: 'scene-other', blanked: false };
+
+  async function prepare(
+    repository: TableRepository,
+    session: TableControlSession | null,
+    presentation: {
+      sceneId: string | null;
+      blanked: boolean;
+    } | null = NOT_SHOWN
+  ) {
+    renderPanel(repository, {
+      controlSession: session,
+      controlEpoch: 1,
+      presentation,
+    });
+    await createRun('Bridge ambush');
+    await chooseParticipants(['Goblin', 'Aria']);
+    await setInitiative('Goblin', '12');
+  }
+  const runOf = (repository: TableRepository) =>
+    readySnapshot(repository).encounters.find(
+      value => value.label === 'Bridge ambush'
+    )!;
+
+  it('is offered next to Start only to the holder while this scene is not shown', async () => {
+    const repository = await openFixture();
+    await prepare(repository, fakeSession());
+    expect(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    ).toBeVisible();
+    cleanup();
+    await prepare(await openFixture(), fakeSession(), {
+      sceneId: 'scene-1',
+      blanked: false,
+    });
+    expect(
+      screen.queryByRole('button', { name: 'Show scene and start combat' })
+    ).toBeNull();
+    cleanup();
+    await prepare(await openFixture(), null);
+    expect(
+      screen.queryByRole('button', { name: 'Show scene and start combat' })
+    ).toBeNull();
+  });
+
+  it('plan rejection: nothing is sent and nothing starts', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    await prepare(repository, session);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      /Missing initiative: Aria/
+    );
+    expect(session.show).not.toHaveBeenCalled();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
+  it('local revision recheck: a change before Show aborts with nothing sent', async () => {
+    const factory = new IDBFactory();
+    const repository = await openFixture({ factory });
+    const session = fakeSession();
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    const other = await openFixture({ factory, seed: false });
+    const reload = repository.reload.bind(repository);
+    vi.spyOn(repository, 'reload').mockImplementationOnce(async () => {
+      await runCombatCommand(other, {
+        expectedRevision: revisionOf(other),
+        operationId: 'other-tab-edit',
+        command: {
+          type: 'combat.setHidden',
+          runId: runOf(other).runId,
+          actorId: 'goblin',
+          hidden: true,
+          at: AT,
+        },
+      });
+      return reload();
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(
+      await screen.findByText('Scene changed locally — review and retry')
+    ).toBeVisible();
+    expect(session.show).not.toHaveBeenCalled();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
+  it('Show not committed: combat does not start and the reason is explained', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    vi.mocked(session.show).mockResolvedValue({
+      status: 'rejected',
+      reason: 'scene-deleted',
+      current: shown('scene-other'),
+    });
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(
+      await screen.findByText(
+        /Scene not shown — combat did not start: this scene was deleted/
+      )
+    ).toBeVisible();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
+  it('Start conflicts after Show: the scene stays shown and the message says so', async () => {
+    const factory = new IDBFactory();
+    const repository = await openFixture({ factory });
+    const session = fakeSession();
+    const other = await openFixture({ factory, seed: false });
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    vi.mocked(session.show).mockImplementation(async () => {
+      await other.reload();
+      await runCombatCommand(other, {
+        expectedRevision: revisionOf(other),
+        operationId: 'other-tab-during-show',
+        command: {
+          type: 'combat.setHidden',
+          runId: runOf(other).runId,
+          actorId: 'goblin',
+          hidden: true,
+          at: AT,
+        },
+      });
+      return {
+        status: 'committed',
+        duplicate: false,
+        current: shown('scene-1'),
+      };
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(
+      await screen.findByText(/Scene is now shown; combat did not start: /)
+    ).toBeVisible();
+    expect(session.show).toHaveBeenCalledWith('scene-1', expect.any(String));
+    expect(session.unpresent).not.toHaveBeenCalled();
+    expect(session.blank).not.toHaveBeenCalled();
+    await repository.reload();
+    expect(runOf(repository).isActive).toBe(false);
+  });
+
+  it('both halves commit; a failed remote publish stays explicitly local-only', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    vi.mocked(session.show).mockResolvedValue({
+      status: 'committed',
+      duplicate: false,
+      current: shown('scene-1'),
+    });
+    vi.mocked(session.publishInitiative).mockResolvedValue({
+      status: 'failed',
+      reason: 'network',
+    });
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Show scene and start combat' })
+    );
+    expect(
+      await screen.findByText('Scene shown and combat started')
+    ).toBeVisible();
+    expect(await screen.findByText(/ROUND 1 · NOW/)).toBeVisible();
+    expect(
+      await screen.findByText(/Started locally · not broadcasting/)
+    ).toBeVisible();
+    expect(runOf(repository).isActive).toBe(true);
+  });
+
+  it('"Start combat" alone never shows the scene (D9)', async () => {
+    const repository = await openFixture();
+    const session = fakeSession();
+    await prepare(repository, session);
+    await setInitiative('Aria', '15');
+    fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
+    expect(await screen.findByText(/ROUND 1 · NOW/)).toBeVisible();
+    expect(session.show).not.toHaveBeenCalled();
+  });
+});

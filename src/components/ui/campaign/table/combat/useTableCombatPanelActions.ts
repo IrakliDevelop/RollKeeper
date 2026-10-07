@@ -2,8 +2,14 @@
 
 import { useMemo, useState } from 'react';
 
+import {
+  judgePresentationOutcome,
+  type TableControlSession,
+} from '@/lib/table/authorityLifecycle';
 import { combatArchiveId, type TableCombatCommandV1 } from '@/lib/table/combat';
 import { deriveSceneRoster } from '@/lib/table/roster';
+
+import { presentationReasonWords } from '../presentation/TablePresentationControls.utils';
 
 import type { TableParticipantOption } from './TableParticipantDialog';
 import {
@@ -31,6 +37,8 @@ export function useTableCombatPanelActions(options: {
   campaignCode: string;
   /** Imported-workspace route selection, kept in cross-scene links. */
   tableWorkspaceId: string | null;
+  /** The page control session (combined Show + Start, P8). */
+  controlSession?: TableControlSession | null;
 }) {
   const { combat, sceneId } = options;
   const { snapshot, model, selectedRun, execute, setNotice } = combat;
@@ -172,6 +180,52 @@ export function useTableCombatPanelActions(options: {
     if (result?.status === 'rejected' && result.reason === 'missing-initiative')
       setMissing({ runId, actorIds: result.actorIds ?? [] });
   };
+  /** P8 step (3): Show through the page session, judged per Q1. */
+  const showScene = async (): Promise<
+    { ok: true } | { ok: false; reason: string }
+  > => {
+    const session = options.controlSession;
+    if (!session || session.isLost())
+      return { ok: false, reason: 'live control is required' };
+    const outcome = await session.show(sceneId, `show-${crypto.randomUUID()}`);
+    switch (outcome.status) {
+      case 'committed':
+        return judgePresentationOutcome(
+          { type: 'show', sceneId },
+          outcome.current ?? session.current()
+        ) === 'published'
+          ? { ok: true }
+          : { ok: false, reason: 'the audience changed in the meantime' };
+      case 'rejected':
+        return { ok: false, reason: presentationReasonWords(outcome.reason) };
+      case 'lost':
+        return { ok: false, reason: 'live control was lost' };
+      case 'unconfirmed':
+        return { ok: false, reason: 'the request was not confirmed' };
+      case 'failed':
+        return {
+          ok: false,
+          reason:
+            outcome.reason === 'network'
+              ? 'the request was not confirmed'
+              : 'live control is unavailable',
+        };
+    }
+  };
+  const showAndStart = async () => {
+    if (!model || !runId) return;
+    const lacking = model.run.participants
+      .filter(participant => participant.initiative === null)
+      .map(participant => participant.actorId);
+    if (lacking.length > 0) {
+      setMissing({ runId, actorIds: lacking });
+      return;
+    }
+    setMissing(null);
+    const result = await combat.showAndStart(runId, showScene);
+    if (result?.status === 'rejected' && result.reason === 'missing-initiative')
+      setMissing({ runId, actorIds: result.actorIds ?? [] });
+  };
   // Only participants still lacking a value stay in the prompt.
   const missingPrompt =
     missing && missing.runId === runId && model
@@ -274,6 +328,7 @@ export function useTableCombatPanelActions(options: {
         at: now(),
       }))(),
     start: () => void start(),
+    showAndStart: () => void showAndStart(),
     end: () =>
       void withRun(target => ({
         type: 'combat.end',

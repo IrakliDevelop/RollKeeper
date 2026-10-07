@@ -75,6 +75,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     markerControls,
     selectedElementIsMarker,
     markerAudienceNotice,
+    markerShareNotice,
     markerPanelOpen,
     markerPanelState,
     markerPanelIsDmOnly,
@@ -102,11 +103,11 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   const [fogPlugin] = useState(() =>
     createRollKeeperFogPlugin(resolveFogRendererOptions(fogAppearance))
   );
+  // PR04 P7: Table scenes project fog appearance for their scene id too.
   useFogAppearanceProjection({
     enabled:
       Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL) &&
-      battleMap !== undefined &&
-      !props.tableSceneAdapter,
+      battleMap !== undefined,
     campaignCode,
     battleMapId,
     dmId: props.dmId,
@@ -120,6 +121,17 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
       });
     },
   });
+
+  // C4-2: a refused Table marker publication is surfaced, never silent.
+  useEffect(() => {
+    if (!markerShareNotice) return;
+    addToast({
+      type: 'error',
+      title: markerShareNotice,
+      message:
+        'Marker details and loot stay saved in this scene. They are retried after your next marker change.',
+    });
+  }, [markerShareNotice, addToast]);
 
   useEffect(() => {
     if (viewport) {

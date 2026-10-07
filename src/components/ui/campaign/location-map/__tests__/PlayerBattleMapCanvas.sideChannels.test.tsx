@@ -1,18 +1,15 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, cleanup, act } from '@testing-library/react';
-import { SelectTool, Viewport, createShape } from '@fieldnotes/core';
+import { render, cleanup, act } from '@testing-library/react';
+import { SelectTool, Viewport } from '@fieldnotes/core';
 
 import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
-import { PLAYER_BAND_ORDER } from '../layerContract';
 
 /**
- * PR02 R4 client scope on the player surface: with Table v1 required, the
- * map-pinned side channels (marker details, loot, shop, fog appearance) stay
- * neutral until the server-resolved scene is this route's own map, a scene
- * change rebuilds the canvas with a visible notice, the own player band is
- * published only in its canonical form, and control-bearing tokens offer no
- * delete action. Harness copied from PlayerBattleMapCanvas.presence.test.tsx.
+ * PR04 P7/Q2(b) on the player surface: side channels are addressed by the
+ * resolved scene id, cleared on a scene change before any new fetch, a 404 is
+ * a neutral empty state (never stale data), and markers refresh every 10 s.
+ * Harness copied from PlayerBattleMapCanvas.tableScope.test.tsx.
  */
 
 vi.mock('@fieldnotes/react', async importOriginal => {
@@ -27,6 +24,12 @@ vi.mock('@fieldnotes/react', async importOriginal => {
 import { FieldNotesCanvas } from '@fieldnotes/react';
 
 vi.mock('../BattleMapMinimap', () => ({ BattleMapMinimap: () => null }));
+const registered = vi.hoisted(() => ({ markers: [] as unknown[][] }));
+vi.mock('../useMarkerRegistration', () => ({
+  useMarkerRegistration: (options: { markerDetails?: unknown[] }) => {
+    registered.markers.push(options.markerDetails ?? []);
+  },
+}));
 vi.mock('../BattleMapExportControl', () => ({
   BattleMapExportControl: () => null,
 }));
@@ -87,10 +90,6 @@ vi.mock('@/components/ui/campaign/location-map/awarenessSync', () => ({
 }));
 
 import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
-import {
-  fetchAndApplyFogAppearance,
-  startFogAppearancePoll,
-} from '../fog/fogAppearancePoll';
 
 const viewports: Viewport[] = [];
 
@@ -192,24 +191,37 @@ function renderPlayer() {
   );
 }
 
-describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
+const MARKERS_X =
+  '/api/campaign/CAMP01/battlemaps/scene-x/markers?role=player&playerId=char-a';
+const lastMarkers = () => registered.markers.at(-1) ?? [];
+const markerTitles = () =>
+  (lastMarkers() as Array<{ title?: string }>).map(marker => marker.title);
+
+describe('PlayerBattleMapCanvas: scene-keyed side channels (PR04)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
     table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
+  let markerResponses: Array<() => Response>;
 
   beforeEach(() => {
+    registered.markers.length = 0;
     connections.length = 0;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
     process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify({ markers: [] }), { status: 200 })
+    markerResponses = [];
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
+      (
+        markerResponses.shift() ??
+        (() => Response.json({ markers: [{ id: 'm1', title: 'Chest' }] }))
+      )()
     );
   });
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
     viewports.splice(0).forEach(viewport => viewport.destroy());
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -222,148 +234,70 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     }
   });
 
-  it('PR04: addresses side channels by the RESOLVED scene id once resolved', async () => {
+  it('clears scene markers on a scene change before any new fetch, and a 404 stays neutral', async () => {
     stubCanvas();
     renderPlayer();
     fireReady(makeViewport());
-    const options = lastOptions();
-    expect(fetchedUrls().some(url => url.includes('/markers'))).toBe(false);
-    expect(startFogAppearancePoll).not.toHaveBeenCalled();
-
-    await act(async () => {
-      options.onSceneResolved?.('scene-x');
-    });
-    expect(fetchedUrls()).toContain(
-      '/api/campaign/CAMP01/battlemaps/scene-x/markers?role=player&playerId=char-a'
-    );
-    expect(fetchedUrls().some(url => url.includes('/bm-1/markers'))).toBe(
-      false
-    );
-    expect(startFogAppearancePoll).toHaveBeenCalledWith(
-      expect.objectContaining({
-        url: '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=player&playerId=char-a',
-      })
-    );
-    await act(async () => options.onPoke?.('fog-appearance'));
-    expect(fetchAndApplyFogAppearance).toHaveBeenCalledWith(
-      expect.anything(),
-      '/api/campaign/CAMP01/battlemaps/scene-x/fog-appearance?role=player&playerId=char-a'
-    );
-  });
-
-  it('rebuilds the canvas with a visible notice when the presented scene changes', async () => {
-    stubCanvas();
-    renderPlayer();
-    fireReady(makeViewport());
-    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(1);
-    const first = connections[0]!;
+    await act(async () => lastOptions().onSceneResolved?.('scene-x'));
+    await vi.waitFor(() => expect(markerTitles()).toEqual(['Chest']));
+    const before = fetchedUrls().length;
     await act(async () =>
       lastOptions().onSceneChange?.({
         previousSceneId: 'scene-x',
-        sceneId: 'bm-1',
-        discardedOperationIds: ['op-1'],
+        sceneId: 'scene-y',
+        discardedOperationIds: [],
       })
     );
-    expect(first.stop).toHaveBeenCalled();
-    expect(screen.getByRole('status')).toHaveTextContent(
-      /scene changed.*1 unsent edit/i
-    );
+    expect(markerTitles()).toEqual([]);
+    expect(fetchedUrls().length).toBe(before);
     fireReady(makeViewport());
-    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);
-  });
-
-  it('publishes only the canonical own player band', () => {
-    stubCanvas();
-    renderPlayer();
-    const vp = makeViewport();
-    // A previously persisted/remote copy of the own band in a hiding shape.
-    vp.layerManager.addLayerDirect({
-      id: 'player-char-a',
-      name: 'My elements',
-      visible: false,
-      locked: true,
-      order: 777,
-      opacity: 0.4,
-    });
-    fireReady(vp);
-    const published = connections[0]!.publishLayerUpsert.mock.calls.map(
-      ([definition]) => definition
+    markerResponses.push(() =>
+      Response.json({ error: 'Not found' }, { status: 404 })
     );
-    expect(published).toEqual([
-      expect.objectContaining({
-        id: 'player-char-a',
-        visible: true,
-        locked: false,
-        opacity: 1,
-        order: PLAYER_BAND_ORDER,
-      }),
-    ]);
+    await act(async () => lastOptions().onSceneResolved?.('scene-y'));
+    await vi.waitFor(() =>
+      expect(fetchedUrls()).toContain(
+        '/api/campaign/CAMP01/battlemaps/scene-y/markers?role=player&playerId=char-a'
+      )
+    );
+    expect(markerTitles()).toEqual([]);
   });
 
-  it('offers no delete action for a selected control-bearing token', () => {
+  it('a 404 after markers were shown clears them (never stale data)', async () => {
     stubCanvas();
     renderPlayer();
-    const vp = makeViewport();
-    fireReady(vp);
-    const token = {
-      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
-      id: 'party-token',
-      layerId: 'player-char-a',
-      tokenKind: 'player',
-      characterId: 'char-a',
-      sceneMemberId: 'member-a',
-    };
-    const drawing = {
-      ...createShape({ position: { x: 50, y: 50 }, size: { w: 10, h: 10 } }),
-      id: 'own-drawing',
-      layerId: 'player-char-a',
-    };
-    act(() => {
-      vp.store.add(token);
-      vp.store.add(drawing);
+    fireReady(makeViewport());
+    await act(async () => lastOptions().onSceneResolved?.('scene-x'));
+    await vi.waitFor(() => expect(markerTitles()).toEqual(['Chest']));
+    markerResponses.push(() =>
+      Response.json({ error: 'Not found' }, { status: 404 })
+    );
+    await act(async () => lastOptions().onPoke?.('markers'));
+    await vi.waitFor(() => expect(markerTitles()).toEqual([]));
+  });
+
+  it('refreshes scene markers every 10 s while side channels are enabled', async () => {
+    vi.useFakeTimers({
+      toFake: ['setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
     });
-    const select = vp.toolManager.getTool<SelectTool>('select')!;
-    act(() => select.setSelection(['party-token']));
-    expect(screen.queryByLabelText('Delete selected')).toBeNull();
-    act(() => select.setSelection(['own-drawing']));
-    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
-  });
-
-  it('keeps delete for the own self-placed token in v1 (rule 12)', () => {
     stubCanvas();
-    renderPlayer();
-    const vp = makeViewport();
-    fireReady(vp);
-    const self = {
-      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
-      id: 'self-token',
-      layerId: 'player-char-a',
-      tokenKind: 'player',
-      characterId: 'char-a',
-    };
-    act(() => vp.store.add(self));
-    const select = vp.toolManager.getTool<SelectTool>('select')!;
-    act(() => select.setSelection(['self-token']));
-    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
-  });
-
-  it('keeps the legacy delete behavior outside Table v1', () => {
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-    stubCanvas();
-    renderPlayer();
-    const vp = makeViewport();
-    fireReady(vp);
-    const party = {
-      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
-      id: 'party-token',
-      layerId: 'player-char-a',
-      tokenKind: 'player',
-      characterId: 'char-a',
-      sceneMemberId: 'member-a',
-    };
-    act(() => vp.store.add(party));
-    const select = vp.toolManager.getTool<SelectTool>('select')!;
-    act(() => select.setSelection(['party-token']));
-    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
+    const { unmount } = renderPlayer();
+    fireReady(makeViewport());
+    await act(async () => lastOptions().onSceneResolved?.('scene-x'));
+    const count = () => fetchedUrls().filter(url => url === MARKERS_X).length;
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    const first = count();
+    expect(first).toBeGreaterThanOrEqual(1);
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(10_000);
+    });
+    expect(count()).toBe(first + 1);
+    unmount();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30_000);
+    });
+    expect(count()).toBe(first + 1);
   });
 });
