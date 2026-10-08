@@ -469,6 +469,59 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
     expect(panel()).not.toBeInTheDocument();
   });
 
+  it('Tab from Edit map while open moves into the panel (FA1)', () => {
+    const toggle = mount();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Set map image' }), {
+      key: 'Tab',
+      shiftKey: true,
+    });
+    expect(document.activeElement).toBe(toggle);
+    fireEvent.keyDown(toggle, { key: 'Tab' });
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Set map image' })
+    );
+    expect(panel()).toBeInTheDocument();
+  });
+
+  it('closes when focus leaves the button and the panel for another control (FA1)', () => {
+    const toggle = mount();
+    fireEvent.keyDown(screen.getByRole('button', { name: 'Set map image' }), {
+      key: 'Tab',
+      shiftKey: true,
+    });
+    const next = screen.getByRole('button', { name: 'Next tool' });
+    act(() => next.focus());
+    expect(panel()).not.toBeInTheDocument();
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    expect(document.activeElement).toBe(next);
+  });
+
+  it('follows a pure position shift of the anchor without a resize callback (FA2)', () => {
+    const frames = new Map<number, FrameRequestCallback>();
+    let nextFrame = 0;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      nextFrame += 1;
+      frames.set(nextFrame, callback);
+      return nextFrame;
+    });
+    vi.stubGlobal('cancelAnimationFrame', (id: number) => frames.delete(id));
+    const flush = () =>
+      act(() => {
+        const due = [...frames.values()];
+        frames.clear();
+        due.forEach(callback => callback(0));
+      });
+    const toggle = mount();
+    flush();
+    expect(panel()).toHaveStyle({ top: '104px' });
+    anchorBottom = 445;
+    flush();
+    expect(panel()).toHaveStyle({ top: '449px' });
+    fireEvent.click(toggle);
+    flush();
+    expect(frames.size).toBe(0);
+  });
+
   it('follows the anchor when the header grows, and disposes observers on close', () => {
     const toggle = mount();
     expect(panel()).toHaveStyle({ top: '104px' });

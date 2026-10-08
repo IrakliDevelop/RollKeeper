@@ -127,15 +127,26 @@ export function TableEditMapControl(props: {
       const rect = anchor?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(288, window.innerWidth - 16);
-      setPosition({
-        top: rect.bottom + 4,
-        left: Math.max(
-          8,
-          Math.min(rect.right - width, window.innerWidth - width - 8)
-        ),
-      });
+      const top = rect.bottom + 4;
+      const left = Math.max(
+        8,
+        Math.min(rect.right - width, window.innerWidth - width - 8)
+      );
+      setPosition(current =>
+        current?.top === top && current.left === left ? current : { top, left }
+      );
     };
     place();
+    // FA2: a pure position shift (e.g. the header growing above the dock
+    // row) resizes nothing the observer watches, so also check every frame
+    // while open; cancelled on close/unmount.
+    let frame = 0;
+    const tick = () => {
+      place();
+      frame = requestAnimationFrame(tick);
+    };
+    if (typeof requestAnimationFrame === 'function')
+      frame = requestAnimationFrame(tick);
     const observer =
       typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
     const targets = [
@@ -147,6 +158,7 @@ export function TableEditMapControl(props: {
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      if (frame) cancelAnimationFrame(frame);
       observer?.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
@@ -164,8 +176,20 @@ export function TableEditMapControl(props: {
       if (anchorRef.current?.contains(target)) return;
       setOpen(false);
     };
+    // FA1: focus leaving both the button and the panel closes it.
+    const onFocusIn = (event: FocusEvent) => {
+      const target = event.target as Node;
+      if (busyRef.current) return;
+      if (panelRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+      setOpen(false);
+    };
     document.addEventListener('pointerdown', onPointerDown);
-    return () => document.removeEventListener('pointerdown', onPointerDown);
+    document.addEventListener('focusin', onFocusIn);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('focusin', onFocusIn);
+    };
   }, [open, placed]);
 
   const onPanelKeyDown = (event: ReactKeyboardEvent) => {
@@ -263,6 +287,14 @@ export function TableEditMapControl(props: {
         onClick={() => setOpen(value => !value)}
         onKeyDown={event => {
           if (event.key === 'Escape' && open) setOpen(false);
+          // FA1: Tab from the open button enters the portalled panel.
+          if (event.key === 'Tab' && !event.shiftKey && open) {
+            const first = focusables(panelRef.current)[0];
+            if (first) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
         }}
       >
         <PencilRuler size={16} aria-hidden="true" />
