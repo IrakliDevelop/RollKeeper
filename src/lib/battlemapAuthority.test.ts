@@ -512,7 +512,6 @@ describe('A1 element submissions use JSON semantics', () => {
   });
 
   it('turns array holes into null, keeps non-plain objects as-is and an own __proto__ key as data (review 02 N2)', () => {
-     
     expect(withoutUndefined([, 1])).toEqual([null, 1]);
     const date = new Date(0);
     const map = new Map([['a', 1]]);
