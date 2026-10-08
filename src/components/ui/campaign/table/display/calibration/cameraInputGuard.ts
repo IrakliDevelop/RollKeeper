@@ -4,7 +4,8 @@ import type { CalibrationReport } from './session';
  * PR07 P7 / R3-2 / C7-3: camera input policy on the display canvas.
  *
  * - `free` (uncalibrated / unsupported): PR05 behaviour, nothing blocked.
- * - `pan-only` (verified): one-pointer HandTool pan only. Wheel (incl.
+ * - `pan-only` (verified): one primary-button HandTool pan only (no
+ *   middle/secondary or space+drag core pans, which glide). Wheel (incl.
  *   ctrl+wheel trackpad pinch), Safari `gesture*`, multi-touch and any
  *   second concurrent pointer are swallowed before core sees them; moves
  *   of pointers this guard did not let down are swallowed too.
@@ -62,12 +63,27 @@ export function attachCameraInputGuard(
     if (mode === 'frozen' || (mode === 'pan-only' && touches > 1))
       swallow(event);
   };
+  /** Space held: core turns a primary drag into a (gliding) camera pan. */
+  let spaceHeld = false;
+  const onKey = (event: Event) => {
+    if ((event as KeyboardEvent).key === ' ')
+      spaceHeld = event.type === 'keydown';
+  };
+  const onBlur = () => {
+    spaceHeld = false;
+  };
   const onDown = (event: Event) => {
-    const { pointerId } = event as PointerEvent;
+    const { pointerId, button } = event as PointerEvent;
     const mode = getMode();
     if (
       mode === 'frozen' ||
-      (mode === 'pan-only' && active.size > 0 && !active.has(pointerId))
+      (mode === 'pan-only' &&
+        // Review 02 N1: only primary-button HandTool pans (no inertia).
+        // Middle/secondary and space+drag are core camera pans that glide
+        // on release, which could move a camera after a freeze.
+        ((active.size > 0 && !active.has(pointerId)) ||
+          button !== 0 ||
+          spaceHeld))
     ) {
       blocked.add(pointerId);
       swallow(event);
@@ -106,7 +122,13 @@ export function attachCameraInputGuard(
   const options = { capture: true, passive: false } as const;
   for (const [type, listener] of listeners)
     container.addEventListener(type, listener, options);
+  window.addEventListener('keydown', onKey, true);
+  window.addEventListener('keyup', onKey, true);
+  window.addEventListener('blur', onBlur);
   return () => {
+    window.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('keyup', onKey, true);
+    window.removeEventListener('blur', onBlur);
     for (const [type, listener] of listeners)
       container.removeEventListener(type, listener, options);
     active.clear();

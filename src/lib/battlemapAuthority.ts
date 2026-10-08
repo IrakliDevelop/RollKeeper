@@ -66,25 +66,34 @@ interface SceneBinding {
 }
 
 /**
- * PR07 acceptance A1: JSON semantics for anything submitted to the authority
- * client. The SDK journal admits a proposal only if its frame serializes as
- * bounded JSON, which rejects `undefined`; the legacy wire (JSON.stringify)
- * silently dropped such keys. Object properties set to `undefined` (wrapped
- * extension envelopes, unset patches) are dropped, array holes become null,
- * null is kept. Returns a copy; the input is never mutated.
+ * PR07 acceptance A1: what the SDK can serialize. The SDK journal admits a
+ * proposal only if its frame serializes as bounded JSON, which rejects
+ * `undefined`; the legacy wire (JSON.stringify) silently dropped such keys.
+ * Plain objects (prototype `Object.prototype` or null) are copied without
+ * their `undefined`-valued properties (an own `__proto__` key stays a data
+ * key); arrays are copied with `undefined` entries and holes as null; null
+ * is kept; anything else (Date, Map, class instances) is passed through
+ * unchanged so the SDK still refuses it and the refusal is reported. The
+ * input is never mutated.
  */
 export function withoutUndefined<T>(value: T): T {
   if (Array.isArray(value))
-    return value.map(item =>
+    return Array.from(value, item =>
       item === undefined ? null : withoutUndefined(item)
     ) as T;
-  if (value !== null && typeof value === 'object') {
-    const copy: Record<string, unknown> = {};
-    for (const [key, child] of Object.entries(value))
-      if (child !== undefined) copy[key] = withoutUndefined(child);
-    return copy as T;
-  }
-  return value;
+  if (value === null || typeof value !== 'object') return value;
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (prototype !== Object.prototype && prototype !== null) return value;
+  const copy: Record<string, unknown> = {};
+  for (const [key, child] of Object.entries(value))
+    if (child !== undefined)
+      Object.defineProperty(copy, key, {
+        value: withoutUndefined(child),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+  return copy as T;
 }
 
 function canvasElement(element: Record<string, unknown>): CanvasElement {

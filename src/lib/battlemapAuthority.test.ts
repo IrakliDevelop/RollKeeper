@@ -511,6 +511,100 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
   });
 
+  it('turns array holes into null, keeps non-plain objects as-is and an own __proto__ key as data (review 02 N2)', () => {
+     
+    expect(withoutUndefined([, 1])).toEqual([null, 1]);
+    const date = new Date(0);
+    const map = new Map([['a', 1]]);
+    const out = withoutUndefined({ date, map, keep: 1, drop: undefined });
+    expect(out.date).toBe(date);
+    expect(out.map).toBe(map);
+    expect(Object.hasOwn(out, 'drop')).toBe(false);
+    const parsed = JSON.parse('{"__proto__":{"x":1},"a":2}') as Record<
+      string,
+      unknown
+    >;
+    parsed.b = undefined;
+    const safe = withoutUndefined(parsed);
+    expect(Object.hasOwn(safe, '__proto__')).toBe(true);
+    expect(Object.getPrototypeOf(safe)).toBe(Object.prototype);
+    expect((safe as { x?: unknown }).x).toBeUndefined();
+    expect(Object.hasOwn(safe, 'b')).toBe(false);
+    const bare = Object.assign(Object.create(null) as object, {
+      a: 1,
+      b: undefined,
+    });
+    expect(withoutUndefined(bare)).toEqual({ a: 1 });
+  });
+
+  it('normalizes layer and fog-meta records; not-ready/stopped stay silent, capacity reports; clear forwards expectedState (review 02 N4)', () => {
+    const fog = new FogManager();
+    const onDiagnostic = vi.fn();
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      fog: { manager: fog },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    authority.install({ ...documentWithFog(3), casToken: 'cas-token-1' });
+    connection.publishLayerUpsert({
+      id: 'layer-x',
+      name: 'X',
+      visible: true,
+      locked: false,
+      order: 1,
+      opacity: 1,
+      note: undefined,
+    } as never);
+    const layer = (
+      authority.submit.mock.calls.at(-1) as unknown as [
+        { layer: Record<string, unknown> },
+      ]
+    )[0];
+    expect(Object.hasOwn(layer.layer, 'note')).toBe(false);
+    const state = fog.getState()!;
+    vi.spyOn(fog, 'getState').mockReturnValue({
+      ...state,
+      definition: { ...state.definition, note: undefined },
+    } as never);
+    fog.reset('revealed');
+    const meta = (
+      authority.submit.mock.calls.at(-1) as unknown as [
+        { kind: string; record: { definition: Record<string, unknown> } },
+      ]
+    )[0];
+    expect(meta.kind).toBe('fog-meta');
+    expect(Object.hasOwn(meta.record.definition, 'note')).toBe(false);
+    for (const reason of ['not-ready', 'stopped'])
+      authority.submit.mockImplementationOnce((() => ({
+        status: 'refused',
+        reason,
+      })) as never);
+    connection.publishLayerRemove('layer-x');
+    connection.publishLayerRemove('layer-y');
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    connection.publishLayerRemove('layer-z');
+    expect(onDiagnostic).toHaveBeenCalledWith(
+      'A local layer-remove edit was not sent to the live room (capacity)'
+    );
+    store.clear();
+    expect(authority.submit).toHaveBeenLastCalledWith(
+      { kind: 'clear' },
+      { expectedState: 'cas-token-1' }
+    );
+    connection.stop();
+  });
+
   it('normalizes with JSON semantics: drops undefined properties, keeps null, never mutates', () => {
     const input = {
       a: 1,

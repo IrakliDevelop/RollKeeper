@@ -701,6 +701,33 @@ describe('input policy (P7, R3-2, C7-3)', () => {
     expect(camera()).toEqual(free);
   });
 
+  it('a middle-button flick never moves a verified display and nothing glides after a freeze (review 02 N1)', async () => {
+    const frames: FrameRequestCallback[] = [];
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      frames.push(callback);
+      return frames.length;
+    });
+    await mount();
+    await goLive();
+    await calibrate();
+    const before = camera();
+    const middle = { pointerType: 'mouse', button: 1, buttons: 4 };
+    pointer('pointerdown', 1, 300, 300, middle);
+    pointer('pointermove', 1, 340, 300, middle);
+    pointer('pointermove', 1, 420, 300, middle);
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(state()).toBe('verify-required');
+    pointer('pointerup', 1, 420, 300, { ...middle, buttons: 0 });
+    for (let index = 0; index < 20; index += 1) {
+      const pending = frames.splice(0);
+      act(() => pending.forEach(callback => callback(performance.now())));
+    }
+    expect(camera()).toEqual(before);
+  });
+
   it('a blocked second pointer moves nothing while the first keeps panning', async () => {
     await mount();
     await goLive();

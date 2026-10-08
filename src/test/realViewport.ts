@@ -23,7 +23,8 @@ const contextMethods = new Proxy(
   {},
   {
     get: (_target, key) => {
-      if (key === 'canvas') return undefined;
+      // Render frames read the backing size from `ctx.canvas`.
+      if (key === 'canvas') return { width: 1000, height: 800 };
       if (key === 'measureText') return () => ({ width: 0 });
       if (key === 'getImageData')
         return () => ({ data: new Uint8ClampedArray(4) });

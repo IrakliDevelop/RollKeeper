@@ -22,9 +22,10 @@ function touch(type: string, touches: number) {
   target.dispatchEvent(event);
   return event;
 }
-function pointer(type: string, pointerId: number) {
+function pointer(type: string, pointerId: number, button = 0) {
   const event = new PointerEvent(type, {
     pointerId,
+    button,
     bubbles: true,
     cancelable: true,
   });
@@ -92,4 +93,27 @@ describe('frozen end events (review 01 F3)', () => {
       expect(reached).toEqual(['pointerdown:1', `${end}:1`]);
     }
   );
+});
+
+describe('pan-only allows only primary-button HandTool pans (review 02 N1)', () => {
+  it('swallows middle and secondary button downs; free mode passes them', () => {
+    expect(pointer('pointerdown', 3, 1).defaultPrevented).toBe(true);
+    pointer('pointermove', 3);
+    pointer('pointerup', 3, 1);
+    expect(pointer('pointerdown', 4, 2).defaultPrevented).toBe(true);
+    pointer('pointerup', 4, 2);
+    expect(reached).toEqual([]);
+    mode = 'free';
+    pointer('pointerdown', 5, 1);
+    expect(reached).toEqual(['pointerdown:5']);
+  });
+
+  it('swallows a primary down while Space is held (core space-drag pan) and passes it after release', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    expect(pointer('pointerdown', 6).defaultPrevented).toBe(true);
+    pointer('pointerup', 6);
+    window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+    pointer('pointerdown', 7);
+    expect(reached).toEqual(['pointerdown:7']);
+  });
 });
