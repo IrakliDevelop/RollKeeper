@@ -285,4 +285,95 @@ describe('W3 one control session per workspace (D8)', () => {
       blanked: true,
     });
   });
+
+  describe('acceptance A3: transient A1b failures are not final', () => {
+    function failingReads() {
+      const failures = { next: 0 };
+      vi.stubGlobal(
+        'fetch',
+        vi.fn<typeof fetch>(async (input, init) => {
+          const isRead = !init?.method || init.method === 'GET';
+          if (isRead && failures.next > 0) {
+            failures.next -= 1;
+            return new Response('unavailable', { status: 503 });
+          }
+          return server.fetcher(input, init);
+        })
+      );
+      return failures;
+    }
+
+    it('re-runs a failed registration when the scene is selected again', async () => {
+      const failures = failingReads();
+      const { result, rerender } = mount(null);
+      await waitFor(() => expect(result.current.state.phase).toBe('ready'));
+      failures.next = 1;
+      rerender({ scene: room('scene-cave') });
+      await waitFor(() =>
+        expect(result.current.room).toMatchObject({
+          sceneId: 'scene-cave',
+          status: 'local',
+          message: 'Live registration is unavailable; this scene stays local.',
+          retryable: true,
+        })
+      );
+      rerender({ scene: room('scene-tavern') });
+      await waitFor(() => expect(result.current.room.status).toBe('ready'));
+      rerender({ scene: room('scene-cave') });
+      await waitFor(() =>
+        expect(result.current.room).toMatchObject({
+          sceneId: 'scene-cave',
+          status: 'ready',
+        })
+      );
+      expect(posted('acquire')).toHaveLength(1);
+      expect(posted('registerScene').map(command => command.sceneId)).toEqual([
+        'scene-tavern',
+        'scene-cave',
+      ]);
+    });
+
+    it('offers a retry that registers once without re-acquiring', async () => {
+      const failures = failingReads();
+      const { result, rerender } = mount(null);
+      await waitFor(() => expect(result.current.state.phase).toBe('ready'));
+      failures.next = 1;
+      rerender({ scene: room('scene-cave') });
+      await waitFor(() => expect(result.current.room.retryable).toBe(true));
+      act(() => {
+        result.current.retryRoom();
+        result.current.retryRoom();
+      });
+      await waitFor(() => expect(result.current.room.status).toBe('ready'));
+      expect(posted('registerScene')).toHaveLength(1);
+      expect(posted('acquire')).toHaveLength(1);
+      expect(result.current.canShow).toBe(true);
+    });
+
+    it('keeps a genuine refusal cached on reselect (registry-full retry stays explicit)', async () => {
+      server.registry.set('scene-cave', {
+        sceneId: 'scene-cave',
+        workspaceInstanceId: 'another-device',
+        sourceMapId: 'scene-cave',
+        registryRevision: 1,
+      });
+      const { result, rerender } = mount(room('scene-cave'));
+      await waitFor(() =>
+        expect(result.current.room.message).toMatch(/another device/u)
+      );
+      expect(result.current.room.retryable).toBe(false);
+      const reads = server.reads.length;
+      rerender({ scene: room('scene-tavern') });
+      await waitFor(() => expect(result.current.room.status).toBe('ready'));
+      const afterTavern = server.reads.length;
+      rerender({ scene: room('scene-cave') });
+      await act(async () => {
+        await new Promise(resolve => setTimeout(resolve, 20));
+      });
+      expect(result.current.room.status).toBe('local');
+      expect(server.reads.length).toBe(afterTavern);
+      expect(afterTavern).toBeGreaterThan(reads);
+      expect(posted('acquire')).toHaveLength(1);
+    });
+  });
 });

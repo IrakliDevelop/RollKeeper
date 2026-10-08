@@ -40,7 +40,12 @@ export function TableWorkspaceHeader(props: {
   clearedNotice: boolean;
   presentationProps: TablePresentationControlsProps;
   presentation: TablePresentationPanel;
-  notices: Array<{ id: string; text: string; tone: 'alert' | 'status' }>;
+  notices: Array<{
+    id: string;
+    text: string;
+    tone: 'alert' | 'status';
+    action?: { label: string; onClick: () => void };
+  }>;
   /** Workspace-level flows shown in the header (W7 prepare banner). */
   extra?: ReactNode;
   scene?: {
@@ -87,13 +92,19 @@ export function TableWorkspaceHeader(props: {
         onWorkOffline={authority.workOffline}
       />
       {props.notices.map(notice => (
-        <p
+        <div
           key={notice.id}
-          role={notice.tone}
-          className="text-accent-amber-text w-full text-xs"
+          className="flex w-full flex-wrap items-center gap-2"
         >
-          {notice.text}
-        </p>
+          <p role={notice.tone} className="text-accent-amber-text text-xs">
+            {notice.text}
+          </p>
+          {notice.action && (
+            <Button variant="outline" size="sm" onClick={notice.action.onClick}>
+              {notice.action.label}
+            </Button>
+          )}
+        </div>
       ))}
       {props.extra}
       <TablePresentationView

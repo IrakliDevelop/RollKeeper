@@ -236,6 +236,7 @@ import { TableWorkspace } from './index';
 
 let server: ReturnType<typeof registryServer>;
 const requests: string[] = [];
+const failControlReads = { next: 0 };
 
 function sceneRecord(
   workspaceKey: string,
@@ -352,6 +353,14 @@ function routeFetch() {
   return vi.fn<typeof fetch>(async (input, init) => {
     const url = String(input);
     requests.push(`${init?.method ?? 'GET'} ${url}`);
+    if (
+      url.includes('/table/control') &&
+      (!init?.method || init.method === 'GET') &&
+      failControlReads.next > 0
+    ) {
+      failControlReads.next -= 1;
+      return new Response('unavailable', { status: 503 });
+    }
     if (url.includes('/table/control') || url.includes('/authority/'))
       return server.fetcher(input, init);
     if (url.includes('/table/display/status'))
@@ -398,6 +407,7 @@ beforeEach(async () => {
   mocks.viewports.clear();
   mocks.openedWorkspaces = [];
   requests.length = 0;
+  failControlReads.next = 0;
   nav.push.mockClear();
   nav.replace.mockClear();
   server = registryServer();
@@ -853,6 +863,44 @@ describe('W3/W4 lifecycle (D8)', () => {
       store: ElementStore;
     };
     expect(viewport.store.getAll()).toEqual([]);
+  });
+
+  it('offers "Retry live registration" after a transient failure (A3)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    await waitFor(() =>
+      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+    );
+    failControlReads.next = 1;
+    await navigate('scene=scene-forest');
+    await settled('scene-forest');
+    expect(
+      await screen.findByText(
+        'Live registration is unavailable; this scene stays local.'
+      )
+    ).toBeInTheDocument();
+    const registers = () =>
+      server.commands.filter(
+        command =>
+          command.type === 'registerScene' && command.sceneId === 'scene-forest'
+      ).length;
+    expect(registers()).toBe(0);
+    const mounts = mocks.canvasMounts;
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Retry live registration' })
+    );
+    await waitFor(() => expect(registers()).toBe(1));
+    // The local canvas re-mints its relay token once registered.
+    await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
+    await waitFor(() =>
+      expect(
+        screen.queryByText(
+          'Live registration is unavailable; this scene stays local.'
+        )
+      ).toBeNull()
+    );
+    expect(server.commands.filter(c => c.type === 'acquire')).toHaveLength(1);
   });
 
   it('keeps the scene with "Still saving" when edits never settle', async () => {

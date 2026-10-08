@@ -38,14 +38,35 @@ type ReadySnapshot = Extract<TablePlayersSnapshot, { status: 'ready' }>;
 export interface TablePlayersCache {
   get(campaignCode: string): ReadySnapshot | null;
   set(campaignCode: string, snapshot: ReadySnapshot): void;
+  /**
+   * Acceptance A4: one shared read per campaign at a time — concurrent
+   * consumers (scene roster, combat panel, StrictMode re-runs) share it.
+   */
+  load(
+    campaignCode: string,
+    read: () => Promise<ReadySnapshot>
+  ): Promise<ReadySnapshot>;
 }
 
 /** PR06 W4: one players snapshot per workspace page, across scene panels. */
 export function createTablePlayersCache(): TablePlayersCache {
   const entries = new Map<string, ReadySnapshot>();
+  const inFlight = new Map<string, Promise<ReadySnapshot>>();
   return {
     get: campaignCode => entries.get(campaignCode) ?? null,
     set: (campaignCode, snapshot) => entries.set(campaignCode, snapshot),
+    load: (campaignCode, read) => {
+      const pending = inFlight.get(campaignCode);
+      if (pending) return pending;
+      const promise = read()
+        .then(ready => {
+          entries.set(campaignCode, ready);
+          return ready;
+        })
+        .finally(() => inFlight.delete(campaignCode));
+      inFlight.set(campaignCode, promise);
+      return promise;
+    },
   };
 }
 
@@ -121,8 +142,6 @@ export function useTablePlayersSnapshot(
     () => cache?.get(campaignCode) ?? { status: 'loading' }
   );
   const [attempt, setAttempt] = useState(0);
-  /** Mount read skipped while a workspace-cached snapshot is fresh. */
-  const reuseOnMount = useRef(true);
   const inFlight = useRef<AbortController | null>(null);
   const pollMs = options.pollMs ?? null;
   const refreshKey = options.refreshKey;
@@ -138,10 +157,40 @@ export function useTablePlayersSnapshot(
     []
   );
 
+  /** The (attempt, refreshKey) the last read was triggered by. */
+  const lastTrigger = useRef<{ attempt: number; refreshKey: unknown } | null>(
+    null
+  );
   useEffect(() => {
-    const cached = reuseOnMount.current ? cache?.get(campaignCode) : null;
-    reuseOnMount.current = false;
-    if (cached && Date.now() - cached.fetchedAt < CACHE_FRESH_MS) return;
+    const previous = lastTrigger.current;
+    lastTrigger.current = { attempt, refreshKey };
+    // A4: only an explicit refresh/poll/refreshKey change forces a read; a
+    // (re)mount — including StrictMode's effect re-run — reuses a fresh
+    // workspace snapshot.
+    const forced =
+      previous !== null &&
+      (previous.attempt !== attempt || previous.refreshKey !== refreshKey);
+    const cached = cache?.get(campaignCode);
+    if (!forced && cached && Date.now() - cached.fetchedAt < CACHE_FRESH_MS) {
+      setSnapshot(current => (current === cached ? current : cached));
+      return;
+    }
+    if (cache) {
+      let active = true;
+      void cache
+        .load(campaignCode, () =>
+          readPlayers(campaignCode, new AbortController().signal)
+        )
+        .then(ready => {
+          if (active) setSnapshot(ready);
+        })
+        .catch(() => {
+          if (active) markFailed();
+        });
+      return () => {
+        active = false;
+      };
+    }
     // Single in-flight request: a newer refresh supersedes the previous one.
     inFlight.current?.abort();
     const controller = new AbortController();
@@ -149,7 +198,6 @@ export function useTablePlayersSnapshot(
     void readPlayers(campaignCode, controller.signal)
       .then(ready => {
         if (controller.signal.aborted) return;
-        cache?.set(campaignCode, ready);
         setSnapshot(ready);
       })
       .catch(() => {
@@ -178,10 +226,16 @@ export function useTablePlayersSnapshot(
   const reload = useCallback((): Promise<TableCampaignPlayer[] | null> => {
     if (reloading.current) return reloading.current.promise;
     const controller = new AbortController();
-    const promise = readPlayers(campaignCode, controller.signal)
+    // A shared workspace read is never aborted by one consumer.
+    const promise = (
+      cache
+        ? cache.load(campaignCode, () =>
+            readPlayers(campaignCode, new AbortController().signal)
+          )
+        : readPlayers(campaignCode, controller.signal)
+    )
       .then(ready => {
         if (controller.signal.aborted) return null;
-        cache?.set(campaignCode, ready);
         setSnapshot(ready);
         return ready.players;
       })

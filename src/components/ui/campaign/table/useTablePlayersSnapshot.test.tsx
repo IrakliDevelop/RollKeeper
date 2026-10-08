@@ -1,5 +1,5 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
-import type { ReactNode } from 'react';
+import { StrictMode, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -179,5 +179,38 @@ describe('acceptance A1: reload() returns a fresh snapshot', () => {
     ]);
     await expect(second).resolves.toEqual(await first);
     expect(cache.get('CAMP')?.players).toHaveLength(1);
+  });
+});
+
+describe('acceptance A4: one players read per scene switch', () => {
+  it('dedupes the roster and combat reads (StrictMode) to one per switch', async () => {
+    const cache = createTablePlayersCache();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <StrictMode>
+        <TablePlayersCacheProvider value={cache}>
+          {children}
+        </TablePlayersCacheProvider>
+      </StrictMode>
+    );
+    const useScenePanels = () => {
+      // The scene's roster panel and combat panel each read the snapshot.
+      const roster = useTablePlayersSnapshot('CAMP');
+      const combat = useTablePlayersSnapshot('CAMP', { pollMs: null });
+      return { roster, combat };
+    };
+    const reads = () => vi.mocked(fetch).mock.calls.length;
+    for (let scene = 0; scene < 3; scene += 1) {
+      const before = reads();
+      const mounted = renderHook(useScenePanels, { wrapper });
+      await act(async () => {
+        await vi.runOnlyPendingTimersAsync();
+      });
+      expect(mounted.result.current.roster.snapshot.status).toBe('ready');
+      expect(mounted.result.current.combat.snapshot.status).toBe('ready');
+      expect(reads() - before).toBeLessThanOrEqual(1);
+      mounted.unmount();
+      // Switches spaced past the freshness window still read once.
+      vi.advanceTimersByTime(11_000);
+    }
   });
 });

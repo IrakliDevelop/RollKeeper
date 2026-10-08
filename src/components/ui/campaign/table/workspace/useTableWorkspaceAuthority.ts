@@ -37,6 +37,20 @@ export interface TableSceneRoomState {
    */
   status: 'idle' | 'registering' | 'ready' | 'local';
   message: string | null;
+  /** Acceptance A3: "Retry live registration" may be offered. */
+  retryable?: boolean;
+}
+
+/** A1b outcomes that are not final for (scene, controlEpoch) (A3). */
+function transient(result: TableSceneRoomResult | undefined): boolean {
+  return result?.status === 'failed';
+}
+
+function retryable(result: TableSceneRoomResult | undefined): boolean {
+  return (
+    transient(result) ||
+    (result?.status === 'rejected' && result.reason === 'registry-full')
+  );
 }
 
 const identityKey = (scene: TableSceneRoomInput) =>
@@ -154,11 +168,22 @@ export function useTableWorkspaceAuthority(options: {
   const started = useRef(new Set<string>());
   const chain = useRef<Promise<void>>(Promise.resolve());
   const [, settled] = useReducer((value: number) => value + 1, 0);
+  const [retryTick, setRetryTick] = useState(0);
+  /** A3: rooms registered by a Retry (the mounted canvas must re-mint). */
+  const retried = useRef(new Set<string>());
+  const [recovered, setRecovered] = useState(0);
 
   useEffect(() => {
     const input = latestScene.current;
     if (!holding || !session || !input || roomKey === null) return;
-    if (results.current.has(roomKey) || started.current.has(roomKey)) return;
+    if (started.current.has(roomKey)) return;
+    // A3: a transient failure is not final — selecting the scene again
+    // (or Retry) runs A1b again on the same session; refusals stay cached.
+    if (transient(results.current.get(roomKey))) {
+      results.current.delete(roomKey);
+      settled();
+    }
+    if (results.current.has(roomKey)) return;
     started.current.add(roomKey);
     const key = roomKey;
     chain.current = chain.current.then(async () => {
@@ -174,9 +199,21 @@ export function useTableWorkspaceAuthority(options: {
       });
       started.current.delete(key);
       results.current.set(key, result);
+      if (retried.current.delete(key) && result.status === 'ready')
+        setRecovered(value => value + 1);
       settled();
     });
-  }, [campaignCode, dmId, holding, roomKey, session]);
+  }, [campaignCode, dmId, holding, roomKey, session, retryTick]);
+
+  /** A3: explicit retry of the selected scene's registration (one at a time). */
+  const retryRoom = useCallback(() => {
+    const key = selectedRoomKey.current;
+    if (key === null || started.current.has(key)) return;
+    if (!retryable(results.current.get(key))) return;
+    results.current.delete(key);
+    retried.current.add(key);
+    setRetryTick(value => value + 1);
+  }, []);
 
   const result = roomKey === null ? undefined : results.current.get(roomKey);
   const room: TableSceneRoomState =
@@ -192,6 +229,7 @@ export function useTableWorkspaceAuthority(options: {
                 sceneId: scene.sceneId,
                 status: 'local',
                 message: sceneRoomMessage(result),
+                retryable: retryable(result),
               };
 
   // C6-2: after an explicit acquire the canvas re-mints only once A1b has
@@ -237,5 +275,8 @@ export function useTableWorkspaceAuthority(options: {
     waitSeconds: waiting ? Math.ceil((leaseUntil! - now) / 1_000) : 0,
     acquire,
     workOffline,
+    retryRoom,
+    /** Increments when a Retry registered the selected scene (A3). */
+    recovered,
   };
 }

@@ -79,7 +79,22 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       : []),
     ...(authority.room.message &&
     authority.room.sceneId === mountedScene?.sceneId
-      ? [{ id: 'room', text: authority.room.message, tone: 'status' as const }]
+      ? [
+          {
+            id: 'room',
+            text: authority.room.message,
+            tone: 'status' as const,
+            // A3: a transient failure is retried on the same session.
+            ...(authority.room.retryable
+              ? {
+                  action: {
+                    label: 'Retry live registration',
+                    onClick: authority.retryRoom,
+                  },
+                }
+              : {}),
+          },
+        ]
       : []),
   ];
   const adapter = switcher.adapter;

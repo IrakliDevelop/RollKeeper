@@ -228,6 +228,13 @@ export function useTableWorkspace(campaignCode: string) {
     lastExplicit.current = authority.explicitAcquired;
     if (!relayLive) setCanvasEpoch(value => value + 1);
   }, [authority.explicitAcquired, relayLive]);
+  // A3: after "Retry live registration" succeeds, a local canvas re-mints.
+  const lastRecovered = useRef(0);
+  useEffect(() => {
+    if (authority.recovered === lastRecovered.current) return;
+    lastRecovered.current = authority.recovered;
+    if (!relayLive) setCanvasEpoch(value => value + 1);
+  }, [authority.recovered, relayLive]);
 
   // ─── Camera memory (W4/R3-F8/C6-1): after load and after live ─────────
   const applied = useRef<{ viewport: unknown; phases: Set<string> }>({
