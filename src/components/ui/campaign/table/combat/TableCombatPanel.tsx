@@ -95,6 +95,22 @@ export function TableCombatPanel(props: {
   const [tab, setTab] = useState<'initiative' | 'selected'>('initiative');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const { model, running, selectedRun } = combat;
+  // PR07 P9: physical-mini badge source (scene member records).
+  const snapshot = combat.snapshot;
+  const physicalActorIds = useMemo(
+    () =>
+      new Set(
+        snapshot?.scenes
+          .find(scene => scene.sceneId === props.sceneId)
+          ?.members.filter(
+            member =>
+              member.representation === 'physical' &&
+              member.removedAt === undefined
+          )
+          .map(member => member.actorId) ?? []
+      ),
+    [snapshot, props.sceneId]
+  );
   const capabilityByEntity = useMemo(
     () => new Map(panel.capabilities.map(item => [item.entityId, item.caps])),
     [panel.capabilities]
@@ -187,6 +203,7 @@ export function TableCombatPanel(props: {
               }
               onResetImported={panel.end}
               onGoToActive={panel.goToActive}
+              physicalActorIds={physicalActorIds}
             />
           ) : undefined
         }

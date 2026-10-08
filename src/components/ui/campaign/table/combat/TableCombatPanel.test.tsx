@@ -22,6 +22,7 @@ import {
   revisionOf,
 } from '@/lib/table/combat.fixture';
 import type { TableRepository } from '@/lib/table/repository';
+import { runRosterCommand } from '@/lib/table/roster';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useCombatLogStore } from '@/store/combatLogStore';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -855,5 +856,32 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
     expect(await screen.findByText(/ROUND 1 · NOW/)).toBeVisible();
     expect(session.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('physical representation badge (PR07 P9)', () => {
+  it('marks physical participants in the prepared initiative list only', async () => {
+    const repository = await openFixture();
+    const result = await runRosterCommand(repository, {
+      expectedRevision: revisionOf(repository),
+      operationId: 'physical-goblin',
+      command: {
+        type: 'roster.setRepresentation',
+        sceneId: 'scene-1',
+        sceneMemberId: 'm-goblin',
+        representation: 'physical',
+        at: AT,
+      },
+    });
+    expect(result.status).toBe('committed');
+    renderPanel(repository);
+    await createRun('Bridge ambush');
+    await chooseParticipants(['Goblin', 'Knight']);
+    const list = screen.getByRole('list', { name: 'Participants' });
+    const rows = within(list).getAllByRole('listitem');
+    const goblin = rows.find(row => row.textContent?.includes('Goblin'))!;
+    const knight = rows.find(row => row.textContent?.includes('Knight'))!;
+    expect(within(goblin).getByText('Physical')).toBeVisible();
+    expect(within(knight).queryByText('Physical')).toBeNull();
   });
 });

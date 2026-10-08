@@ -117,16 +117,24 @@ end
 return cjson.encode({status='ok', control=raw, entry=entry})
 `;
 
+/** PR07 M1: the display's scale self-report enum (ACK and status). */
+const CALIBRATION_LUA = `
+local CALIBRATION = {['uncalibrated']=true, ['verified']=true,
+  ['verify-required']=true, ['unsupported']=true}
+`;
+
 /**
  * E7 ACK: KEYS control, session, ack, registry; ARGV capabilityHash,
  * nonceHash, ack JSON (exact keys, validated by the caller). The tuple must
  * equal the current control projection; the record is stamped with Redis
- * TIME and kept for 30 s.
+ * TIME and kept for 30 s. PR07 M1: an optional `calibration` enum is
+ * re-validated here and stored in the same v1 record (absent → omitted).
  */
 export const DISPLAY_ACK_SCRIPT = `
 local controlKey, sessionKey, ackKey, registryKey = KEYS[1], KEYS[2], KEYS[3], KEYS[4]
 ${VERIFY_LUA}
 ${PROJECT_LUA}
+${CALIBRATION_LUA}
 local raw = redis.call('GET', controlKey)
 local state, failure = decodeControl(raw)
 if not state then return cjson.encode({status=failure}) end
@@ -144,22 +152,27 @@ end
 if ack.phase == 'loaded' and sceneId == cjson.null then return cjson.encode({status='stale'}) end
 if ack.phase == 'blank' and sceneId ~= cjson.null then return cjson.encode({status='stale'}) end
 if ack.phase ~= 'loaded' and ack.phase ~= 'blank' then return cjson.encode({status='invalid'}) end
+local calibration = ack.calibration
+if calibration ~= nil and (type(calibration) ~= 'string' or not CALIBRATION[calibration]) then
+  return cjson.encode({status='invalid'})
+end
 local time = redis.call('TIME')
 local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
 redis.call('SET', ackKey, cjson.encode({v=1, displayGeneration=state.displayGeneration,
   epoch=state.epoch, presentationRevision=revision, sceneId=sceneId, blanked=blanked,
-  phase=ack.phase, receivedAt=now}), 'EX', 30)
+  phase=ack.phase, calibration=calibration, receivedAt=now}), 'EX', 30)
 return cjson.encode({status='recorded', receivedAt=now})
 `;
 
 /**
  * E13 DM status: KEYS control, ack, registry. Computed with Redis TIME
  * against current control; returns no capability, hash, nonce or
- * generation.
+ * generation. PR07 M1: `calibration` only for fresh matching records.
  */
 export const DISPLAY_STATUS_SCRIPT = `
 local controlKey, ackKey, registryKey = KEYS[1], KEYS[2], KEYS[3]
 ${PROJECT_LUA}
+${CALIBRATION_LUA}
 local none = cjson.encode({state='none', sceneId=cjson.null, ageMs=cjson.null})
 local raw = redis.call('GET', controlKey)
 if not raw then return none end
@@ -186,5 +199,9 @@ end
 local value = 'waiting'
 if blanked then value = 'blank'
 elseif sceneId ~= cjson.null and ack.phase == 'loaded' then value = 'loaded' end
-return cjson.encode({state=value, sceneId=sceneId, ageMs=age})
+local calibration = nil
+if type(ack.calibration) == 'string' and CALIBRATION[ack.calibration] then
+  calibration = ack.calibration
+end
+return cjson.encode({state=value, sceneId=sceneId, ageMs=age, calibration=calibration})
 `;

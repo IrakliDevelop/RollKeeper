@@ -70,6 +70,17 @@ export function describeEntry(
   entry: TableRosterEntry,
   liveIds: ReadonlySet<string>
 ): string {
+  const placement = describePlacement(entry, liveIds);
+  // PR07 P9: the DM's physical-mini indicator.
+  return entry.representation === 'physical'
+    ? `${placement} · Physical mini`
+    : placement;
+}
+
+function describePlacement(
+  entry: TableRosterEntry,
+  liveIds: ReadonlySet<string>
+): string {
   const label = controlLabel(entry);
   if (entry.mismatchedTokenIds.some(id => liveIds.has(id)))
     return `${label} · Repair needed`;

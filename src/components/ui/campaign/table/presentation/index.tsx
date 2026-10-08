@@ -8,6 +8,7 @@ import { OpenDisplayButton } from '../display/OpenDisplayButton';
 import { useTablePresentation } from './TablePresentationControls.hooks';
 import type { TablePresentationControlsProps } from './TablePresentationControls.types';
 import {
+  displayCalibrationLine,
   displayStatusLine,
   LIVE_CONTROL_REQUIRED,
   presentationActions,
@@ -98,6 +99,7 @@ export function TablePresentationView(
         labels,
       })
     : null;
+  const calibrationLine = displayCalibrationLine(display.status);
   return (
     <section
       aria-label="Audience presentation"
@@ -119,6 +121,11 @@ export function TablePresentationView(
               className={`${DISPLAY_TONE[displayLine.tone]} min-w-0 break-words`}
             >
               {displayLine.text}
+            </p>
+          )}
+          {calibrationLine && (
+            <p className="text-muted min-w-0 break-words">
+              {calibrationLine.text}
             </p>
           )}
         </div>

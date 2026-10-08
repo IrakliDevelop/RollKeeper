@@ -157,6 +157,40 @@ export function failureMessage(
 }
 
 /**
+ * PR07 P9 (R3-4): the display's scale self-report as an inline muted line
+ * (verified / unsupported). Verify-required is a workspace notice instead.
+ */
+export function displayCalibrationLine(
+  status: DisplayStatusRead | null
+): { text: string; tone: 'muted' } | null {
+  if (!status || status === 'error') return null;
+  if (status.calibration === 'verified')
+    return { text: 'Table reports scale verified', tone: 'muted' };
+  if (status.calibration === 'unsupported')
+    return {
+      text: 'Table reports calibrated minis unavailable on this scene — square grid required',
+      tone: 'muted',
+    };
+  return null;
+}
+
+/** PR07 P9 (FC-1): the never-collapsing DM notice for verify-required. */
+export function calibrationNotice(status: DisplayStatusRead | null): {
+  id: string;
+  text: string;
+  tone: 'alert';
+} | null {
+  if (!status || status === 'error') return null;
+  return status.calibration === 'verify-required'
+    ? {
+        id: 'table-scale',
+        text: 'Table reports scale needs verification — use Verify scale on the table display.',
+        tone: 'alert',
+      }
+    : null;
+}
+
+/**
  * E13: the table display line, from the server-computed DM display status
  * only (never from Published or relay state). `loaded` is a device report,
  * not optical proof; stale/unknown never take success styling.

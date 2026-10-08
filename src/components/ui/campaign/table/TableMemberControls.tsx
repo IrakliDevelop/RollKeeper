@@ -1,8 +1,17 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
 import type { TableRosterEntry } from '@/lib/table/roster';
 
+import {
+  PHYSICAL_MINI_HELP,
+  PHYSICAL_PLAYER_HELP,
+  REPRESENTATION_PENDING,
+} from './tableRepresentation';
 import type { TablePlayersSnapshot } from './useTablePlayersSnapshot';
 
 export interface TableMemberActions {
@@ -11,6 +20,8 @@ export interface TableMemberActions {
   onRepair: () => void;
   onBind: (tokenId: string) => void;
   onUnbind: (tokenId: string) => void;
+  /** PR07 M3: table-output representation (table display only). */
+  onRepresentation: (representation: 'physical' | 'digital') => void;
 }
 
 /** Explicit control reassignment and token binding (never automatic). */
@@ -22,6 +33,7 @@ export function TableMemberControls({
   liveIds,
   busy,
   actions,
+  liveHolder = false,
 }: {
   entry: TableRosterEntry;
   players: TablePlayersSnapshot;
@@ -31,6 +43,8 @@ export function TableMemberControls({
   liveIds: ReadonlySet<string>;
   busy: boolean;
   actions: TableMemberActions;
+  /** P10: tokens are retagged only while this tab holds live control. */
+  liveHolder?: boolean;
 }) {
   const playerControlled = entry.control.kind === 'player';
   const mismatched = entry.mismatchedTokenIds.filter(id => liveIds.has(id));
@@ -132,6 +146,33 @@ export function TableMemberControls({
             </Button>
           </div>
         ))}
+      </section>
+      <section className="space-y-2" aria-label="Table representation">
+        <h3 className="text-heading text-sm font-semibold">
+          Table representation
+        </h3>
+        <RadioGroupField
+          aria-label="Table representation"
+          value={entry.representation}
+          disabled={busy}
+          onValueChange={value =>
+            actions.onRepresentation(
+              value === 'physical' ? 'physical' : 'digital'
+            )
+          }
+        >
+          <RadioGroupItem value="digital" label="Digital token" size="sm" />
+          <RadioGroupItem value="physical" label="Physical mini" size="sm" />
+        </RadioGroupField>
+        <p className="text-muted text-xs">{PHYSICAL_MINI_HELP}</p>
+        {playerControlled && (
+          <p className="text-muted text-xs">{PHYSICAL_PLAYER_HELP}</p>
+        )}
+        {!liveHolder && (
+          <p className="text-accent-amber-text text-xs">
+            {REPRESENTATION_PENDING}
+          </p>
+        )}
       </section>
     </div>
   );

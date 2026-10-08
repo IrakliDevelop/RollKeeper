@@ -57,6 +57,10 @@ export function TableSceneStage(props: {
   onMessage: (message: string) => void;
   /** Review F9: Edit-map image work in flight. */
   onEditBusy?: (busy: boolean) => void;
+  /** PR07 P10: this tab holds live control (token representation sync). */
+  liveHolder?: boolean;
+  /** PR07 P9: the table reports a verified scale for this shown scene. */
+  scaleVerifiedHere?: boolean;
 }) {
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -163,6 +167,7 @@ export function TableSceneStage(props: {
           adapter={adapter}
           viewport={viewport}
           presentedHere={props.presentedHere}
+          scaleVerifiedHere={props.scaleVerifiedHere}
           onBusyChange={props.onEditBusy}
         />
       }
@@ -195,6 +200,7 @@ export function TableSceneStage(props: {
         dmId={props.dmId}
         canvas={rosterCanvas}
         live={props.relayLive}
+        liveHolder={props.liveHolder}
         arrival={{ arming, onArm: () => setArming(value => !value) }}
       />
     </DmBattleMapCanvas>

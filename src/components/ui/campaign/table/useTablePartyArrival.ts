@@ -13,6 +13,7 @@ import {
   type TableRosterCommandV1,
 } from '@/lib/table/roster';
 
+import { representationFields } from './tableRepresentation';
 import type { TableRosterCanvas } from './useTableRosterState';
 
 export interface TableArrivalNotice {
@@ -199,10 +200,13 @@ export function useTablePartyArrival(options: {
             ...(entry.avatarUrl ? { avatarUrl: entry.avatarUrl } : {}),
             color: dispositionColor({ type: 'player' }),
             tokenCells: entry.tokenCells,
-            fields: partyTokenFields(
-              entry.sceneMemberId,
-              entry.control.legacyPlayerId
-            ),
+            fields: {
+              ...partyTokenFields(
+                entry.sceneMemberId,
+                entry.control.legacyPlayerId
+              ),
+              ...representationFields(entry),
+            },
           },
           point,
           slot

@@ -6,6 +6,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/forms/button';
 
 import { TableCombatPanel } from '../combat/TableCombatPanel';
+import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
 import {
   createTablePlayersCache,
   TablePlayersCacheProvider,
@@ -58,7 +59,11 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
     );
   }
 
+  // PR07 P9: the display's scale self-report (fresh matching status only).
+  const displayStatus = workspace.presentation.display.status;
+  const scaleNotice = calibrationNotice(displayStatus);
   const notices = [
+    ...(scaleNotice ? [scaleNotice] : []),
     ...(workspace.sceneUnavailable
       ? [
           {
@@ -167,6 +172,18 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           onStatus={workspace.onStatus}
           onMessage={checkpoint.setSaveMessage}
           onEditBusy={workspace.onEditBusy}
+          liveHolder={
+            workspace.relayLive &&
+            authority.session !== null &&
+            !authority.session.isLost()
+          }
+          scaleVerifiedHere={
+            workspace.presentedHere &&
+            displayStatus !== null &&
+            displayStatus !== 'error' &&
+            displayStatus.sceneId === mountedScene.sceneId &&
+            displayStatus.calibration === 'verified'
+          }
         />
         {/* Outside the keyed canvas: an explicit acquire remounts the canvas
           only, so open dialogs and the command queue survive (F6). */}

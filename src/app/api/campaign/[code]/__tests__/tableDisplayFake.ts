@@ -9,6 +9,12 @@ import type { TableFakeRedis } from './tableFakeRedis';
 
 type Json = Record<string, unknown>;
 
+const CALIBRATION_REPORTS: ReadonlySet<string> = new Set([
+  'uncalibrated',
+  'verified',
+  'verify-required',
+  'unsupported',
+]);
 /**
  * PR05 route tests: a JavaScript model of the four display Lua scripts over
  * the in-memory table fake (the scripts themselves run against real Redis in
@@ -147,6 +153,11 @@ export function installDisplayEval(fake: TableFakeRedis, clock = Date.now) {
         (ack.phase === 'blank' && target.sceneId !== null)
       )
         return JSON.stringify({ status: 'stale' });
+      if (
+        ack.calibration !== undefined &&
+        !CALIBRATION_REPORTS.has(ack.calibration as string)
+      )
+        return JSON.stringify({ status: 'invalid' });
       const receivedAt = clock();
       fake.strings.set(
         ackKey!,
@@ -158,6 +169,10 @@ export function installDisplayEval(fake: TableFakeRedis, clock = Date.now) {
           sceneId: target.sceneId,
           blanked: target.blanked,
           phase: ack.phase,
+          // PR07 M1: the validated self-report (absent → omitted).
+          ...(typeof ack.calibration === 'string'
+            ? { calibration: ack.calibration }
+            : {}),
           receivedAt,
         })
       );
@@ -205,6 +220,9 @@ export function installDisplayEval(fake: TableFakeRedis, clock = Date.now) {
         state: value,
         sceneId: matches ? target.sceneId : ack.sceneId,
         ageMs,
+        ...(matches && CALIBRATION_REPORTS.has(ack.calibration as string)
+          ? { calibration: ack.calibration }
+          : {}),
       });
     }
     throw new Error('unexpected script in display fake');

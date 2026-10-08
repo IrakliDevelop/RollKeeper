@@ -298,6 +298,99 @@ describe('parseDisplayAck', () => {
   });
 });
 
+describe('PR07 M1 calibration self-report', () => {
+  const ack = {
+    displayGeneration: 77,
+    epoch: EPOCH,
+    presentationRevision: 3,
+    sceneId: 'scene-a',
+    blanked: false,
+    phase: 'loaded',
+  };
+  it('accepts the six keys plus one optional calibration enum', () => {
+    for (const calibration of [
+      'uncalibrated',
+      'verified',
+      'verify-required',
+      'unsupported',
+    ])
+      expect(parseDisplayAck({ ...ack, calibration })).toEqual({
+        ...ack,
+        calibration,
+      });
+    expect(parseDisplayAck(ack)).toEqual(ack);
+  });
+  it('rejects an invalid enum, null and any other extra key', () => {
+    for (const bad of [
+      { ...ack, calibration: 'calibrated' },
+      { ...ack, calibration: null },
+      { ...ack, calibration: 1 },
+      { ...ack, calibration: 'verified', extra: true },
+      { ...ack, calibrationState: 'verified' },
+    ])
+      expect(parseDisplayAck(bad)).toBeNull();
+  });
+  it('the ACK and status scripts carry the enum and fresh-match rule', () => {
+    expect(DISPLAY_ACK_SCRIPT).toContain('calibration=calibration');
+    for (const value of [
+      'uncalibrated',
+      'verified',
+      'verify-required',
+      'unsupported',
+    ]) {
+      expect(DISPLAY_ACK_SCRIPT).toContain(`'${value}'`);
+      expect(DISPLAY_STATUS_SCRIPT).toContain(`'${value}'`);
+    }
+  });
+  it('status returns calibration only as a valid enum string', async () => {
+    const rawRedis = {
+      get: vi.fn(),
+      eval: vi.fn(async () =>
+        JSON.stringify({
+          state: 'loaded',
+          sceneId: 'scene-a',
+          ageMs: 5,
+          calibration: 'verify-required',
+        })
+      ),
+    };
+    expect(await readDisplayStatus(rawRedis, CODE)).toEqual({
+      status: 'ok',
+      display: {
+        state: 'loaded',
+        sceneId: 'scene-a',
+        ageMs: 5,
+        calibration: 'verify-required',
+      },
+    });
+    rawRedis.eval.mockResolvedValueOnce(
+      JSON.stringify({
+        state: 'blank',
+        sceneId: null,
+        ageMs: 5,
+        calibration: 'bogus',
+      })
+    );
+    const bogus = await readDisplayStatus(rawRedis, CODE);
+    expect(bogus).toEqual({
+      status: 'ok',
+      display: { state: 'blank', sceneId: null, ageMs: 5 },
+    });
+    rawRedis.eval.mockResolvedValueOnce(
+      JSON.stringify({
+        state: 'updating',
+        sceneId: 'scene-a',
+        ageMs: 5,
+        calibration: 'verified',
+      })
+    );
+    expect(await readDisplayStatus(rawRedis, CODE)).toEqual({
+      status: 'ok',
+      display: { state: 'updating', sceneId: 'scene-a', ageMs: 5 },
+    });
+  });
+});
+
 describe('rotation, ACK and status script calls', () => {
   it('rotates through the dedicated script and redraws on a generation collision', async () => {
     const rawRedis = {

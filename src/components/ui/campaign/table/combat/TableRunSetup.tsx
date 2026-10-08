@@ -31,6 +31,8 @@ export function TableRunSetup(props: {
   onShowAndStart?: () => void;
   onResetImported: () => void;
   onGoToActive: () => void;
+  /** PR07 P9: actors whose scene member is a physical mini. */
+  physicalActorIds?: ReadonlySet<string>;
 }) {
   const { model } = props;
   if (model.importedActive) {
@@ -93,6 +95,7 @@ export function TableRunSetup(props: {
               view={view}
               highlightMissing={props.missingPrompt !== null}
               disabled={props.busy}
+              physical={props.physicalActorIds?.has(view.actorId) === true}
               onInitiative={value => props.onInitiative(view.actorId, value)}
               onHidden={hidden => props.onHidden(view.actorId, hidden)}
             />

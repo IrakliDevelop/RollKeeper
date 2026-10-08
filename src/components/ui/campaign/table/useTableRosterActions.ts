@@ -21,6 +21,7 @@ import type {
   TableMemberControlV1,
 } from '@/lib/table/schema';
 
+import { representationFields } from './tableRepresentation';
 import type { TableRosterCanvas } from './useTableRosterState';
 
 export interface TableRosterNotice {
@@ -282,6 +283,28 @@ export function useTableRosterActions(options: {
       stamp();
     },
     reassign,
+    /** PR07 M3: the canvas follows through the P10 reconciliation pass. */
+    setRepresentation: (
+      entry: TableRosterEntry,
+      representation: 'physical' | 'digital'
+    ) =>
+      !entry.sceneMemberId
+        ? notPrepared(entry)
+        : execute(
+            {
+              type: 'roster.setRepresentation',
+              sceneId,
+              sceneMemberId: entry.sceneMemberId,
+              representation,
+              at: at(),
+            },
+            {
+              success:
+                representation === 'physical'
+                  ? `${entry.name} is a physical mini on the table display.`
+                  : `${entry.name} shows as a digital token on the table display.`,
+            }
+          ),
     repair: (entry: TableRosterEntry) => {
       const control: TableMemberControlV1 =
         entry.control.kind === 'player'
@@ -341,10 +364,13 @@ export function useTableRosterActions(options: {
           type: entry.category === 'pc' ? 'player' : entry.category,
         }),
         tokenCells: entry.tokenCells,
-        fields:
-          control.kind === 'player'
+        fields: {
+          ...(control.kind === 'player'
             ? partyTokenFields(entry.sceneMemberId, control.legacyPlayerId)
-            : dmTokenFields(entry.sceneMemberId),
+            : dmTokenFields(entry.sceneMemberId)),
+          // PR07 P10: a physical member's new token is tagged at stamp time.
+          ...representationFields(entry),
+        },
       });
     },
   };

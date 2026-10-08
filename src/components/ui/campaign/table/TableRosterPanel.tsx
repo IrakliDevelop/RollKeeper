@@ -10,6 +10,10 @@ import { TableAddMemberDialog } from './TableAddMemberDialog';
 import { TableMemberDialog } from './TableMemberDialog';
 import { TablePartyArrival } from './TablePartyArrival';
 import { TableRosterNoticeLine } from './TableRosterNoticeLine';
+import {
+  representationSummary,
+  useTableRepresentationSync,
+} from './tableRepresentation';
 import { describeEntry, placedIndex, rosterEntities } from './tableRosterModel';
 import { useTableRosterActions } from './useTableRosterActions';
 import {
@@ -38,6 +42,8 @@ export function TableRosterPanel(props: {
   live: boolean;
   /** PR06 W11: party arrival actions (Table workspace). */
   arrival?: { arming: boolean; onArm: () => void };
+  /** PR07 P10: this tab holds live control (live relay + session). */
+  liveHolder?: boolean;
 }) {
   const state = useTableRosterState(props);
   const actions = useTableRosterActions({
@@ -65,6 +71,9 @@ export function TableRosterPanel(props: {
   );
   const details = detailsId ? (byMember.get(detailsId) ?? null) : null;
   const ambiguous = roster?.ambiguousTokenIds.length ?? 0;
+  const liveHolder = props.liveHolder === true;
+  useTableRepresentationSync({ canvas: props.canvas, roster, liveHolder });
+  const summary = roster ? representationSummary(roster.entries) : null;
 
   const closeAdd = (open: boolean) => {
     setAdding(open);
@@ -109,6 +118,7 @@ export function TableRosterPanel(props: {
             >
               Add to scene
             </Button>
+            {summary && <p className="text-muted px-1 text-xs">{summary}</p>}
             {props.arrival && (
               <TablePartyArrival
                 repository={props.repository}
@@ -185,6 +195,7 @@ export function TableRosterPanel(props: {
           if (details) void actions.remove(details);
           setDetailsId(null);
         }}
+        liveHolder={liveHolder}
         actions={{
           onGive: legacyPlayerId =>
             details &&
@@ -196,6 +207,8 @@ export function TableRosterPanel(props: {
             details && void actions.bind(details, tokenId, true),
           onUnbind: tokenId =>
             details && void actions.bind(details, tokenId, false),
+          onRepresentation: representation =>
+            details && void actions.setRepresentation(details, representation),
         }}
       />
     </>

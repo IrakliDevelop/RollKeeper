@@ -77,6 +77,11 @@ export interface TableSceneMemberV1 {
   control?: TableMemberControlV1;
   /** Membership tombstone; the actor and its other scenes are untouched. */
   removedAt?: string;
+  /**
+   * PR07 M3: a physical mini stands in for this member on the table display
+   * (its digital token is hidden there only). Absent = digital. Not secret.
+   */
+  representation?: 'physical';
 }
 
 export interface TableSceneRecordV1 {
@@ -620,14 +625,15 @@ function validateSceneMember(value: unknown): boolean {
     hasExactKeys(
       value,
       ['actorId', 'tokenIds'],
-      ['sceneMemberId', 'control', 'removedAt']
+      ['sceneMemberId', 'control', 'removedAt', 'representation']
     ) &&
     isStableId(value.actorId) &&
     Array.isArray(value.tokenIds) &&
     value.tokenIds.every(isStableId) &&
     (value.sceneMemberId === undefined || isStableId(value.sceneMemberId)) &&
     (value.control === undefined || validateMemberControl(value.control)) &&
-    (value.removedAt === undefined || isTimestamp(value.removedAt))
+    (value.removedAt === undefined || isTimestamp(value.removedAt)) &&
+    (value.representation === undefined || value.representation === 'physical')
   );
 }
 

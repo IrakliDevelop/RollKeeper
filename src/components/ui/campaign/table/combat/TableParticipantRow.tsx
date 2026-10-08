@@ -24,6 +24,8 @@ export function TableParticipantRow(props: {
   disabled: boolean;
   onInitiative: (value: number | null) => void;
   onHidden: (hidden: boolean) => void;
+  /** PR07 P9: the member is a physical mini on the table display. */
+  physical?: boolean;
 }) {
   const { view } = props;
   const stored = view.entity.initiative;
@@ -58,6 +60,11 @@ export function TableParticipantRow(props: {
           {view.identityUnresolved && (
             <Badge variant="warning" size="sm">
               identity unresolved
+            </Badge>
+          )}
+          {props.physical && (
+            <Badge variant="neutral" size="sm">
+              Physical
             </Badge>
           )}
         </div>

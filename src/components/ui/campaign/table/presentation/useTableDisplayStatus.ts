@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
+  DISPLAY_CALIBRATION_REPORTS,
   displayStatusUrl,
+  type DisplayCalibrationReport,
   type DisplayStatus,
 } from '../display/displayRequests';
 import type { DisplayStatusRead } from './TablePresentationControls.types';
@@ -19,6 +21,10 @@ const STATES = new Set([
   'stale',
 ]);
 
+const CALIBRATION_REPORTS: ReadonlySet<string> = new Set(
+  DISPLAY_CALIBRATION_REPORTS
+);
+
 function parse(value: unknown): DisplayStatus | null {
   if (!value || typeof value !== 'object') return null;
   const body = value as Record<string, unknown>;
@@ -27,6 +33,10 @@ function parse(value: unknown): DisplayStatus | null {
     state: body.state as DisplayStatus['state'],
     sceneId: typeof body.sceneId === 'string' ? body.sceneId : null,
     ageMs: typeof body.ageMs === 'number' ? body.ageMs : null,
+    // PR07 M1: the display's scale self-report (valid enum only).
+    ...(CALIBRATION_REPORTS.has(body.calibration as string)
+      ? { calibration: body.calibration as DisplayCalibrationReport }
+      : {}),
   };
 }
 

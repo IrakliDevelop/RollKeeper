@@ -15,7 +15,11 @@ import type {
 import type { TableAuthorityState } from '../workspace/useTableWorkspaceAuthority';
 
 import { TablePresentationControls } from '.';
-import { displayStatusLine } from './TablePresentationControls.utils';
+import {
+  calibrationNotice,
+  displayCalibrationLine,
+  displayStatusLine,
+} from './TablePresentationControls.utils';
 
 const HOLDER = 'table-session-1';
 const descriptor = (
@@ -374,5 +378,60 @@ describe('Open display launcher (E12)', () => {
         /\b(?:text|bg|border)-(?:white|black|gray|slate|zinc|red|green|blue|amber|emerald)-\d+\b/u
       );
     }
+  });
+});
+
+describe('PR07 P9 table scale reports (R3-4 wording)', () => {
+  const status = (calibration?: string) =>
+    ({
+      state: 'loaded',
+      sceneId: 'scene-tavern',
+      ageMs: 900,
+      ...(calibration ? { calibration } : {}),
+    }) as never;
+
+  it('words verified/unsupported as inline device reports and verify-required as a notice only', () => {
+    expect(displayCalibrationLine(status('verified'))).toEqual({
+      text: 'Table reports scale verified',
+      tone: 'muted',
+    });
+    expect(displayCalibrationLine(status('unsupported'))).toEqual({
+      text: 'Table reports calibrated minis unavailable on this scene — square grid required',
+      tone: 'muted',
+    });
+    for (const quiet of ['verify-required', 'uncalibrated', undefined])
+      expect(displayCalibrationLine(status(quiet))).toBeNull();
+    expect(displayCalibrationLine('error')).toBeNull();
+    expect(calibrationNotice(status('verify-required'))).toEqual({
+      id: 'table-scale',
+      text: 'Table reports scale needs verification — use Verify scale on the table display.',
+      tone: 'alert',
+    });
+    for (const quiet of ['verified', 'unsupported', 'uncalibrated', undefined])
+      expect(calibrationNotice(status(quiet))).toBeNull();
+    expect(calibrationNotice('error')).toBeNull();
+    expect(calibrationNotice(null)).toBeNull();
+  });
+
+  it('keeps a valid calibration enum from the status read and shows the inline line', async () => {
+    displayReply = () =>
+      Response.json({
+        state: 'loaded',
+        sceneId: 'scene-tavern',
+        ageMs: 1_000,
+        calibration: 'verified',
+      });
+    render(controls({}).element);
+    await settle();
+    expect(audienceStatus()).toHaveTextContent('Table reports scale verified');
+    displayReply = () =>
+      Response.json({
+        state: 'loaded',
+        sceneId: 'scene-tavern',
+        ageMs: 1_000,
+        calibration: 'bogus',
+      });
+    await settle(5_000);
+    expect(screen.queryByText(/Table reports scale/u)).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ vi.mock('../presentation', () => ({
 
 import type { TableAuthorityState } from './useTableWorkspaceAuthority';
 import { TableWorkspaceHeader, WORKSPACE_LABEL } from './TableWorkspaceHeader';
+import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
 
 afterEach(cleanup);
 
@@ -183,5 +184,23 @@ describe('FC-1 compact header never collapses alerts, notices or failures (R4-1)
   ])('never collapses the %s authority text', (_name, state, text) => {
     renderHeader({ state });
     expect(collapsing(screen.getByText(text))).toBeNull();
+  });
+});
+
+describe('PR07 P9 table scale notice (FC-1)', () => {
+  it('never collapses the verify-required notice in the compact header', () => {
+    const notice = calibrationNotice({
+      state: 'loaded',
+      sceneId: 'scene-a',
+      ageMs: 100,
+      calibration: 'verify-required',
+    });
+    expect(notice).not.toBeNull();
+    renderHeader({ notices: [notice!] });
+    const text = screen.getByText(
+      'Table reports scale needs verification — use Verify scale on the table display.'
+    );
+    expect(text).toHaveAttribute('role', 'alert');
+    expect(collapsing(text)).toBeNull();
   });
 });

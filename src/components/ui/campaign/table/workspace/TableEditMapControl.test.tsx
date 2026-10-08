@@ -126,7 +126,8 @@ function setup(
   probe: (url: string) => Promise<{ w: number; h: number }> = async () => ({
     w: 1000,
     h: 500,
-  })
+  }),
+  scaleVerifiedHere = false
 ) {
   const storeWrite = vi.spyOn(useBattleMapStore, 'setState');
   const localWrite = vi.spyOn(Storage.prototype, 'setItem');
@@ -137,6 +138,7 @@ function setup(
       adapter={adapter}
       viewport={vp}
       presentedHere={presentedHere}
+      scaleVerifiedHere={scaleVerifiedHere}
       upload={upload}
       decode={async () => ({ w: 1000, h: 500 })}
       probe={probe}
@@ -160,6 +162,24 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     expect(
       screen.queryByText('Editing the shown scene — changes are live')
     ).not.toBeInTheDocument();
+  });
+
+  it('hints that a grid geometry change needs re-verification while the table reports verified (PR07 P9)', () => {
+    setup(viewport(), true, undefined, undefined, true);
+    expect(
+      screen.getByText(
+        'Changing the grid geometry requires re-verifying the table scale.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows no scale hint otherwise', () => {
+    setup(viewport(), true);
+    expect(
+      screen.queryByText(
+        'Changing the grid geometry requires re-verifying the table scale.'
+      )
+    ).toBeNull();
   });
 
   it('says changes are live while editing the shown scene', () => {

@@ -44,6 +44,7 @@ export function TableMemberDialog(props: {
   onPlace: () => void;
   onRemove: () => void;
   actions: TableMemberActions;
+  liveHolder?: boolean;
 }) {
   const entry = props.entry;
   return (
@@ -94,6 +95,7 @@ export function TableMemberDialog(props: {
                 liveIds={props.liveIds}
                 busy={props.busy}
                 actions={props.actions}
+                liveHolder={props.liveHolder}
               />
             </DialogBody>
             <DialogFooter>
