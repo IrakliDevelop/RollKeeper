@@ -377,3 +377,167 @@ describe('F3 ensure runs locally when a configured relay is not live', () => {
     }
   });
 });
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes;
+    reject = no;
+  });
+  return { promise, resolve, reject };
+}
+
+describe('review 02 N3–N5', () => {
+  const map = { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } };
+  const roomImage = () =>
+    ({
+      ...createImage({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        src: '/room.webp',
+        layerId: MAP_LAYER_ID,
+      }),
+      locked: true,
+    }) as CanvasElement;
+
+  it('N4: re-checks after the probe and adds nothing when a snapshot arrived meanwhile', async () => {
+    const store = new ElementStore();
+    const probe = deferred<{ w: number; h: number }>();
+    const pending = ensureSceneMapImage(
+      { store },
+      map,
+      writes(),
+      () => probe.promise
+    );
+    store.loadSnapshot([roomImage()], { origin: 'remote' });
+    probe.resolve({ w: 10, h: 10 });
+    await expect(pending).resolves.toBe('present');
+    expect(images(store)).toHaveLength(1);
+    expect(images(store)[0]!.src).toBe('/room.webp');
+  });
+
+  it('N3: removes the unconfirmed local image when the live room already has another', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = new ElementStore();
+      const viewport = { store };
+      const { rerender } = renderHook(
+        ({ status }: { status: string }) =>
+          useEnsureSceneMapImage({
+            viewport,
+            relayConfigured: true,
+            relayStatus: status,
+            map,
+            writes: writes(),
+            decode: loads,
+          }),
+        { initialProps: { status: 'connecting' } }
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_500);
+      });
+      const [local] = images(store);
+      expect(local).toBeDefined();
+      const room = roomImage();
+      await act(async () => {
+        rerender({ status: 'live' });
+        // The room's snapshot plus the replayed local draft upsert.
+        store.loadSnapshot([room, structuredClone(local!)], {
+          origin: 'remote',
+        });
+      });
+      expect(images(store).map(image => image.id)).toEqual([room.id]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('N3: keeps the local image when the live room has no other map image', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = new ElementStore();
+      const viewport = { store };
+      const { rerender } = renderHook(
+        ({ status }: { status: string }) =>
+          useEnsureSceneMapImage({
+            viewport,
+            relayConfigured: true,
+            relayStatus: status,
+            map,
+            writes: writes(),
+            decode: loads,
+          }),
+        { initialProps: { status: 'connecting' } }
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(5_500);
+      });
+      const [local] = images(store);
+      await act(async () => {
+        rerender({ status: 'live' });
+        store.loadSnapshot([structuredClone(local!)], { origin: 'remote' });
+      });
+      expect(images(store).map(image => image.id)).toEqual([local!.id]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('N5: a probe settling after a scene switch neither notifies nor adds', async () => {
+    const first = { store: new ElementStore() };
+    const second = { store: new ElementStore() };
+    const probe = deferred<{ w: number; h: number }>();
+    const onUnavailable = vi.fn();
+    const decode = vi.fn(() => probe.promise);
+    const { rerender } = renderHook(
+      ({ viewport }: { viewport: { store: ElementStore } }) =>
+        useEnsureSceneMapImage({
+          viewport,
+          relayConfigured: false,
+          relayStatus: 'connecting',
+          map:
+            viewport === first
+              ? map
+              : { mapImageUrl: '', mapImageSize: { w: 0, h: 0 } },
+          writes: { ...writes(), onUnavailable },
+          decode,
+        }),
+      { initialProps: { viewport: first } }
+    );
+    await act(async () => {});
+    expect(decode).toHaveBeenCalledTimes(1);
+    rerender({ viewport: second });
+    await act(async () => {
+      probe.reject(new Error('404'));
+      await Promise.resolve();
+    });
+    expect(onUnavailable).not.toHaveBeenCalled();
+
+    const late = deferred<{ w: number; h: number }>();
+    const third = { store: new ElementStore() };
+    const fourth = { store: new ElementStore() };
+    const { rerender: switchAgain } = renderHook(
+      ({ viewport }: { viewport: { store: ElementStore } }) =>
+        useEnsureSceneMapImage({
+          viewport,
+          relayConfigured: false,
+          relayStatus: 'connecting',
+          map:
+            viewport === third
+              ? map
+              : { mapImageUrl: '', mapImageSize: { w: 0, h: 0 } },
+          writes: writes(),
+          decode: () => late.promise,
+        }),
+      { initialProps: { viewport: third } }
+    );
+    await act(async () => {});
+    switchAgain({ viewport: fourth });
+    await act(async () => {
+      late.resolve({ w: 10, h: 10 });
+      await Promise.resolve();
+    });
+    expect(images(third.store)).toEqual([]);
+  });
+});

@@ -469,3 +469,96 @@ test('create scene: uploaded image placed once; refusals create no scene', async
   expect(contextErrors).toEqual([]);
   await context.close();
 });
+
+/** Inside the viewport and not cut off by any scrolling/clipping ancestor. */
+async function expectUnclipped(locator: import('@playwright/test').Locator) {
+  await expect(locator).toBeVisible();
+  const problem = await locator.evaluate(element => {
+    const rect = element.getBoundingClientRect();
+    const slack = 1;
+    if (
+      rect.left < -slack ||
+      rect.top < -slack ||
+      rect.right > window.innerWidth + slack ||
+      rect.bottom > window.innerHeight + slack
+    )
+      return `outside viewport ${JSON.stringify(rect)}`;
+    for (
+      let parent = element.parentElement;
+      parent;
+      parent = parent.parentElement
+    ) {
+      const style = getComputedStyle(parent);
+      if (style.overflowX === 'visible' && style.overflowY === 'visible')
+        continue;
+      const box = parent.getBoundingClientRect();
+      if (
+        rect.left < box.left - slack ||
+        rect.top < box.top - slack ||
+        rect.right > box.right + slack ||
+        rect.bottom > box.bottom + slack
+      )
+        return `clipped by ${parent.tagName}.${parent.className}`;
+    }
+    return null;
+  });
+  expect(problem).toBeNull();
+}
+
+test('Edit map tools are reachable and unclipped at 1280, 2048 and 390 px', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.setViewportSize({ width: 2048, height: 1103 });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  await page.getByRole('button', { name: 'Close scenes' }).click();
+
+  for (const size of [
+    { width: 2048, height: 1103 },
+    { width: 1280, height: 800 },
+    { width: 390, height: 844 },
+  ]) {
+    await page.setViewportSize(size);
+    const toggle = page.getByRole('button', { name: 'Edit map' });
+    await expectUnclipped(toggle);
+    if ((await toggle.getAttribute('aria-expanded')) !== 'true')
+      await toggle.click();
+    const panel = page.getByRole('group', { name: 'Edit map' });
+    await expectUnclipped(panel);
+    await expectUnclipped(
+      panel.getByRole('button', { name: /(Set|Replace) map image/u })
+    );
+    await expectUnclipped(panel.getByRole('button', { name: 'Fit to map' }));
+    const grid = panel.getByRole('button', { name: /Grid:/u });
+    await expectUnclipped(grid);
+    if ((await grid.getAttribute('aria-expanded')) !== 'true')
+      await grid.click();
+    await expectUnclipped(page.getByTitle('Square grid'));
+    await page.getByTitle('Square grid').click();
+    for (const title of ['No grid', 'Hex grid', 'Square grid'])
+      await expectUnclipped(page.getByTitle(title));
+    for (const title of ['Grid cell size', 'Grid opacity', 'Grid color'])
+      await expectUnclipped(page.getByTitle(title));
+    // Close both popovers before the next size.
+    await page.keyboard.press('Escape');
+    await toggle.click();
+    await expect(panel).toHaveCount(0);
+  }
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth
+    )
+  ).toBe(true);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});

@@ -23,7 +23,8 @@ export interface SceneMapImageWrites {
 }
 
 interface Target {
-  store: Pick<ElementStore, 'getAll' | 'add' | 'update' | 'getById'>;
+  store: Pick<ElementStore, 'getAll' | 'add' | 'update' | 'getById'> &
+    Partial<Pick<ElementStore, 'remove'>>;
   requestRender?: () => void;
 }
 
@@ -53,7 +54,7 @@ function addMapImage(
   url: string,
   size: Size,
   writes: SceneMapImageWrites
-): void {
+): string {
   const image = {
     ...createImage({
       position: { x: 0, y: 0 },
@@ -66,6 +67,7 @@ function addMapImage(
   target.store.add(image);
   keepPublic(target, image.id, writes);
   target.requestRender?.();
+  return image.id;
 }
 
 /** Natural size through the same proxied, CORS-safe URL the canvas loads. */
@@ -90,8 +92,15 @@ export async function ensureSceneMapImage(
   target: Target,
   map: { mapImageUrl: string; mapImageSize: Size },
   writes: SceneMapImageWrites,
-  decode: (url: string) => Promise<Size> = decodeMapImageUrl
-): Promise<'none' | 'present' | 'added' | 'failed'> {
+  decode: (url: string) => Promise<Size> = decodeMapImageUrl,
+  /**
+   * Review N5: false once the viewport this run belongs to is gone (scene
+   * switch); a late probe then neither notifies nor adds.
+   */
+  isCurrent: () => boolean = () => true,
+  /** Review N3: the id of the image this run added. */
+  onAdded?: (id: string) => void
+): Promise<'none' | 'present' | 'added' | 'failed' | 'stale'> {
   if (!map.mapImageUrl) return 'none';
   if (mapLayerImages(target.store).length > 0) return 'present';
   // Review F6: probe the image through the proxied URL first; a broken or
@@ -100,9 +109,11 @@ export async function ensureSceneMapImage(
   try {
     natural = await decode(map.mapImageUrl);
   } catch {
+    if (!isCurrent()) return 'stale';
     writes.onUnavailable?.();
     return 'failed';
   }
+  if (!isCurrent()) return 'stale';
   // A snapshot may have arrived while loading.
   if (mapLayerImages(target.store).length > 0) return 'present';
   let size = map.mapImageSize;
@@ -114,7 +125,8 @@ export async function ensureSceneMapImage(
     size = { w: natural.w, h: natural.h };
     writes.writeSize(size);
   }
-  addMapImage(target, map.mapImageUrl, size, writes);
+  const id = addMapImage(target, map.mapImageUrl, size, writes);
+  onAdded?.(id);
   return 'added';
 }
 
@@ -191,19 +203,52 @@ export function useEnsureSceneMapImage(options: {
         ? 'local'
         : null;
   const url = map?.mapImageUrl ?? '';
+  // Review N5: the viewport currently mounted for this hook.
+  const mounted = useRef(viewport);
+  mounted.current = viewport;
+  useEffect(
+    () => () => {
+      mounted.current = null;
+    },
+    []
+  );
+  // Review N3: an image ensured before the room was live is unconfirmed.
+  const localImage = useRef<{ viewport: unknown; id: string } | null>(null);
   useEffect(() => {
     if (!viewport || phase === null || !url) return;
     if (done.current.viewport !== viewport)
       done.current = { viewport, phases: new Set() };
     if (done.current.phases.has(phase)) return;
     done.current.phases.add(phase);
+    if (phase === 'live') {
+      // N3: the live snapshot (applied synchronously before this effect)
+      // already has another map image → drop the unconfirmed local one.
+      const local = localImage.current;
+      localImage.current = null;
+      if (
+        local?.viewport === viewport &&
+        relayConfigured &&
+        mapLayerImages(viewport.store).some(image => image.id !== local.id) &&
+        viewport.store.getById(local.id)
+      ) {
+        viewport.store.remove?.(local.id);
+        viewport.requestRender?.();
+        return;
+      }
+    }
     const current = latest.current;
     if (!current.map) return;
+    const owner = viewport;
     void ensureSceneMapImage(
       viewport,
       current.map,
       current.writes,
-      current.decode
+      current.decode,
+      () => mounted.current === owner,
+      id => {
+        if (phase === 'local' && relayConfigured)
+          localImage.current = { viewport: owner, id };
+      }
     ).catch(() => undefined);
-  }, [phase, url, viewport]);
+  }, [phase, relayConfigured, url, viewport]);
 }

@@ -21,6 +21,7 @@ export function TablePartyArrival(props: {
   canvas: TableRosterCanvas | null;
   live: boolean;
   players: readonly TableCampaignPlayer[] | undefined;
+  reloadPlayers?: () => Promise<readonly TableCampaignPlayer[] | null>;
   arming: boolean;
   onArm: () => void;
 }) {

@@ -150,3 +150,34 @@ describe('W4 workspace players snapshot cache', () => {
     expect(vi.mocked(fetch).mock.calls.length).toBe(calls + 2);
   });
 });
+
+describe('acceptance A1: reload() returns a fresh snapshot', () => {
+  it('fetches now, updates the workspace cache and shares one in-flight read', async () => {
+    const cache = createTablePlayersCache();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TablePlayersCacheProvider value={cache}>
+        {children}
+      </TablePlayersCacheProvider>
+    );
+    const { result } = renderHook(() => useTablePlayersSnapshot('CAMP'), {
+      wrapper,
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    const before = vi.mocked(fetch).mock.calls.length;
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    await act(async () => {
+      first = result.current.reload();
+      second = result.current.reload();
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(vi.mocked(fetch).mock.calls.length).toBe(before + 1);
+    await expect(first).resolves.toEqual([
+      { playerId: 'legacy-aria', characterId: 'char-aria', name: 'Aria' },
+    ]);
+    await expect(second).resolves.toEqual(await first);
+    expect(cache.get('CAMP')?.players).toHaveLength(1);
+  });
+});

@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useReducer, useEffect, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
+import { createPortal } from 'react-dom';
 import { applyCameraView, type Viewport } from '@fieldnotes/core';
 import { Maximize, PencilRuler } from 'lucide-react';
 
@@ -83,6 +91,34 @@ export function TableEditMapControl(props: {
   };
 
   const { onBusyChange } = props;
+  // Acceptance A2: the panel is anchored below the button, kept inside the
+  // viewport, and follows resizes while open.
+  const anchorRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+    const place = () => {
+      const rect = anchorRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = Math.min(288, window.innerWidth - 16);
+      setPosition({
+        top: rect.bottom + 4,
+        left: Math.max(
+          8,
+          Math.min(rect.right - width, window.innerWidth - width - 8)
+        ),
+      });
+    };
+    place();
+    window.addEventListener('resize', place);
+    return () => window.removeEventListener('resize', place);
+  }, [open]);
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
@@ -142,7 +178,7 @@ export function TableEditMapControl(props: {
   };
 
   return (
-    <div className="relative">
+    <div className="relative" ref={anchorRef}>
       <Button
         variant={open ? 'primary' : 'ghost'}
         className="min-h-[44px] px-2"
@@ -153,62 +189,73 @@ export function TableEditMapControl(props: {
         <PencilRuler size={16} aria-hidden="true" />
         <span className="ml-1.5 text-xs">Edit map</span>
       </Button>
-      {open && (
-        <div
-          id={EDIT_MAP_PANEL_ID}
-          role="group"
-          aria-label="Edit map"
-          className="border-divider bg-surface-raised absolute top-full right-0 z-30 mt-1 flex w-[min(18rem,calc(100vw-1rem))] flex-col gap-2 rounded-lg border p-3 shadow-lg"
-        >
-          {props.presentedHere && (
-            <p className="text-accent-amber-text text-xs" role="status">
-              {LIVE_EDIT}
-            </p>
-          )}
-          <input
-            ref={fileRef}
-            type="file"
-            accept="image/png,image/jpeg,image/webp,image/gif"
-            aria-label="Map image file"
-            className="sr-only"
-            onChange={event => {
-              const file = event.target.files?.[0];
-              event.target.value = '';
-              if (file) void replaceImage(file);
-            }}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={busy || !viewport}
-            onClick={() => fileRef.current?.click()}
+      {open &&
+        position &&
+        createPortal(
+          <div
+            id={EDIT_MAP_PANEL_ID}
+            role="group"
+            aria-label="Edit map"
+            // Acceptance A2: portalled and fixed so no toolbar strip or dock
+            // overflow box can clip it.
+            style={{ top: position.top, left: position.left }}
+            className="border-divider bg-surface-raised pointer-events-auto fixed z-50 flex w-[min(18rem,calc(100vw-1rem))] flex-col gap-2 rounded-lg border p-3 shadow-lg"
           >
-            {battleMap?.mapImageUrl ? 'Replace map image' : 'Set map image'}
-          </Button>
-          {error && (
-            <p role="alert" className="text-accent-red-text text-xs">
-              {error}
+            {props.presentedHere && (
+              <p className="text-accent-amber-text text-xs" role="status">
+                {LIVE_EDIT}
+              </p>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/gif"
+              aria-label="Map image file"
+              className="sr-only"
+              onChange={event => {
+                const file = event.target.files?.[0];
+                event.target.value = '';
+                if (file) void replaceImage(file);
+              }}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={busy || !viewport}
+              onClick={() => fileRef.current?.click()}
+            >
+              {battleMap?.mapImageUrl ? 'Replace map image' : 'Set map image'}
+            </Button>
+            {error && (
+              <p role="alert" className="text-accent-red-text text-xs">
+                {error}
+              </p>
+            )}
+            <DmLocationGridPopover
+              gridEnabled={battleMap?.gridEnabled ?? false}
+              gridType={settings.gridType === 'hex' ? 'hex' : 'square'}
+              gridCellSize={settings.cellSize ?? DEFAULT_GRID.cellSize}
+              gridColor={settings.strokeColor ?? DEFAULT_GRID.strokeColor}
+              gridOpacity={settings.opacity ?? DEFAULT_GRID.opacity}
+              onSetGridType={grid.setGridMode}
+              onUpdateGridSettings={grid.updateGridSettings}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={fit}
+              disabled={!viewport}
+            >
+              <Maximize size={14} aria-hidden="true" />
+              Fit to map
+            </Button>
+            <p className="text-muted text-xs">
+              Notes and text marked DM-only stay private; players never receive
+              them.
             </p>
-          )}
-          <DmLocationGridPopover
-            gridEnabled={battleMap?.gridEnabled ?? false}
-            gridType={settings.gridType === 'hex' ? 'hex' : 'square'}
-            gridCellSize={settings.cellSize ?? DEFAULT_GRID.cellSize}
-            gridColor={settings.strokeColor ?? DEFAULT_GRID.strokeColor}
-            gridOpacity={settings.opacity ?? DEFAULT_GRID.opacity}
-            onSetGridType={grid.setGridMode}
-            onUpdateGridSettings={grid.updateGridSettings}
-          />
-          <Button size="sm" variant="ghost" onClick={fit} disabled={!viewport}>
-            <Maximize size={14} aria-hidden="true" />
-            Fit to map
-          </Button>
-          <p className="text-muted text-xs">
-            Notes and text marked DM-only stay private; players never receive
-            them.
-          </p>
-        </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

@@ -38,6 +38,11 @@ export function useTablePartyArrival(options: {
   canvas: TableRosterCanvas | null;
   live: boolean;
   players: readonly TableCampaignPlayer[] | undefined;
+  /**
+   * Acceptance A1: fresh campaign players read right before bringing the
+   * party (the snapshot may predate a player joining); null = unavailable.
+   */
+  reloadPlayers?: () => Promise<readonly TableCampaignPlayer[] | null>;
 }) {
   const latest = useRef(options);
   latest.current = options;
@@ -58,26 +63,32 @@ export function useTablePartyArrival(options: {
     ? 'Set an arrival point first.'
     : !options.live || !options.canvas?.stampAt
       ? NOT_LIVE
-      : !options.players
+      : !options.players && !options.reloadPlayers
         ? 'The campaign party is still loading.'
         : null;
 
-  const commit = useCallback(async (command: TableRosterCommandV1) => {
-    const { repository, players } = latest.current;
-    const snapshot = repository.getCurrent();
-    return runRosterCommand(repository, {
-      expectedRevision:
-        snapshot?.status === 'ready'
-          ? (snapshot.snapshot.campaign?.revision ?? 0)
-          : 0,
-      operationId: crypto.randomUUID(),
-      command,
-      players,
-    });
-  }, []);
+  const commit = useCallback(
+    async (
+      command: TableRosterCommandV1,
+      players: readonly TableCampaignPlayer[]
+    ) => {
+      const { repository } = latest.current;
+      const snapshot = repository.getCurrent();
+      return runRosterCommand(repository, {
+        expectedRevision:
+          snapshot?.status === 'ready'
+            ? (snapshot.snapshot.campaign?.revision ?? 0)
+            : 0,
+        operationId: crypto.randomUUID(),
+        command,
+        players,
+      });
+    },
+    []
+  );
 
   const bringParty = useCallback(async (): Promise<void> => {
-    const { repository, sceneId, campaignCode, dmId, canvas, live, players } =
+    const { repository, sceneId, campaignCode, dmId, canvas, live } =
       latest.current;
     const read = () => {
       const value = repository.getCurrent();
@@ -87,8 +98,22 @@ export function useTablePartyArrival(options: {
     const point = start?.scenes.find(
       item => item.sceneId === sceneId
     )?.arrivalPoint;
-    if (!start || !point || !live || !canvas?.stampAt || !players) return;
+    if (!start || !point || !live || !canvas?.stampAt) return;
     setBusy(true);
+    const reloaded = latest.current.reloadPlayers
+      ? await latest.current.reloadPlayers()
+      : latest.current.players;
+    if (!reloaded) {
+      setBusy(false);
+      setNotice({
+        tone: 'error',
+        message:
+          'Campaign players are unavailable. Nothing was placed — try again.',
+        retry: () => void bringParty(),
+      });
+      return;
+    }
+    const players = reloaded;
     const failed: string[] = [];
     try {
       const roster = () => {
@@ -111,16 +136,19 @@ export function useTablePartyArrival(options: {
             !entry.removed && entry.identityLegacyPlayerId === player.playerId
         );
         if (present) continue;
-        const result = await commit({
-          type: 'roster.addPartyMember',
-          sceneId,
-          campaignId: campaignCode,
-          legacyPlayerId: player.playerId,
-          characterId: player.characterId,
-          name: player.name,
-          ...newRosterIds(),
-          at: at(),
-        });
+        const result = await commit(
+          {
+            type: 'roster.addPartyMember',
+            sceneId,
+            campaignId: campaignCode,
+            legacyPlayerId: player.playerId,
+            characterId: player.characterId,
+            name: player.name,
+            ...newRosterIds(),
+            at: at(),
+          },
+          players
+        );
         if (result.status !== 'committed' && result.status !== 'unchanged')
           failed.push(player.name);
       }
@@ -147,13 +175,16 @@ export function useTablePartyArrival(options: {
         let tokenId = entry.boundTokenIds[0];
         if (!tokenId) {
           tokenId = crypto.randomUUID();
-          const bound = await commit({
-            type: 'roster.bindToken',
-            sceneId,
-            sceneMemberId: entry.sceneMemberId,
-            tokenId,
-            at: at(),
-          });
+          const bound = await commit(
+            {
+              type: 'roster.bindToken',
+              sceneId,
+              sceneMemberId: entry.sceneMemberId,
+              tokenId,
+              at: at(),
+            },
+            players
+          );
           if (bound.status !== 'committed' && bound.status !== 'unchanged') {
             failed.push(entry.name);
             continue;
@@ -178,6 +209,16 @@ export function useTablePartyArrival(options: {
         );
         slot += 1;
         if (!placed) failed.push(entry.name);
+      }
+      const partyMembers = (roster()?.entries ?? []).filter(
+        entry => !entry.removed && entry.control.kind === 'player'
+      ).length;
+      if (failed.length === 0 && partyMembers === 0) {
+        setNotice({
+          tone: 'info',
+          message: 'No players have joined this campaign yet.',
+        });
+        return;
       }
       setNotice(
         failed.length > 0

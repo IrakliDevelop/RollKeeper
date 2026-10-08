@@ -805,6 +805,56 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(mocks.adapters[0]!.disposed).toBe(0);
   });
 
+  it('shows "Map image could not be loaded" when the ensure probe fails (N4)', async () => {
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    await repository.mutateWorkspace(
+      current.snapshot.campaign?.revision ?? 0,
+      'broken-image-scene',
+      {
+        scenes: {
+          put: [
+            {
+              ...sceneRecord(
+                repository.workspaceIdentity,
+                'scene-broken',
+                'Ruins'
+              ),
+              map: {
+                ...sceneRecord(
+                  repository.workspaceIdentity,
+                  'scene-broken',
+                  'Ruins'
+                ).map,
+                mapImageUrl: 'https://expired.example.test/ruins.webp',
+                mapImageSize: { w: 100, h: 100 },
+              },
+            },
+          ],
+        },
+      }
+    );
+    class BrokenImage {
+      onload: (() => void) | null = null;
+      onerror: (() => void) | null = null;
+      crossOrigin = '';
+      set src(_value: string) {
+        setTimeout(() => this.onerror?.(), 0);
+      }
+    }
+    vi.stubGlobal('Image', BrokenImage);
+    nav.reset('scene=scene-broken');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-broken');
+    expect(
+      await screen.findByText('Map image could not be loaded')
+    ).toBeInTheDocument();
+    const viewport = mocks.viewports.get('scene-broken') as unknown as {
+      store: ElementStore;
+    };
+    expect(viewport.store.getAll()).toEqual([]);
+  });
+
   it('keeps the scene with "Still saving" when edits never settle', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);

@@ -228,4 +228,124 @@ describe('W11 party arrival', () => {
     expect(stamps).toEqual([]);
     expect(snapshot().scenes[0]!.members).toEqual([]);
   });
+
+  it('refreshes a stale players snapshot before bringing the party (acceptance A1)', async () => {
+    await setArrival();
+    const { canvas, stamps } = fakeCanvas();
+    const mira = { playerId: 'p-mira', characterId: 'p-mira', name: 'Mira' };
+    const reloadPlayers = vi.fn(async () => [mira]);
+    const { result } = renderHook(() =>
+      useTablePartyArrival({
+        repository,
+        sceneId: 'scene-forest',
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        canvas,
+        live: true,
+        // Loaded before anyone joined.
+        players: [],
+        reloadPlayers,
+      })
+    );
+    await waitFor(() => expect(result.current.canBring).toBe(true));
+    await act(async () => {
+      await result.current.bringParty();
+    });
+    expect(reloadPlayers).toHaveBeenCalledTimes(1);
+    expect(stamps.map(stamp => stamp.name)).toEqual(['Mira']);
+    expect(snapshot().scenes[0]!.members).toHaveLength(1);
+    expect(result.current.notice).toMatchObject({ tone: 'success' });
+  });
+
+  it('says no players have joined instead of "whole party is already here" (A1)', async () => {
+    await setArrival();
+    const { canvas, stamps } = fakeCanvas();
+    const { result } = renderHook(() =>
+      useTablePartyArrival({
+        repository,
+        sceneId: 'scene-forest',
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        canvas,
+        live: true,
+        players: [],
+        reloadPlayers: async () => [],
+      })
+    );
+    await waitFor(() => expect(result.current.canBring).toBe(true));
+    await act(async () => {
+      await result.current.bringParty();
+    });
+    expect(stamps).toEqual([]);
+    expect(result.current.notice).toMatchObject({
+      tone: 'info',
+      message: 'No players have joined this campaign yet.',
+    });
+  });
+
+  it('reports unavailable players without placing anything (A1)', async () => {
+    await setArrival();
+    const { canvas, stamps } = fakeCanvas();
+    const { result } = renderHook(() =>
+      useTablePartyArrival({
+        repository,
+        sceneId: 'scene-forest',
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        canvas,
+        live: true,
+        players: undefined,
+        reloadPlayers: async () => null,
+      })
+    );
+    await waitFor(() => expect(result.current.canBring).toBe(true));
+    await act(async () => {
+      await result.current.bringParty();
+    });
+    expect(stamps).toEqual([]);
+    expect(result.current.notice).toMatchObject({
+      tone: 'error',
+      message:
+        'Campaign players are unavailable. Nothing was placed — try again.',
+    });
+  });
+
+  it('says the whole party is already here only when members exist and all have tokens (N2)', async () => {
+    await addMember(PLAYERS[0]!);
+    await setArrival();
+    const { canvas, elements, stamps } = fakeCanvas();
+    await runRosterCommand(repository, {
+      expectedRevision: revision(),
+      operationId: 'bind-aria-2',
+      command: {
+        type: 'roster.bindToken',
+        sceneId: 'scene-forest',
+        sceneMemberId: 'member-p-aria',
+        tokenId: 'token-aria',
+        at: AT,
+      },
+    });
+    elements.push({ id: 'token-aria' });
+    const { result } = renderHook(() =>
+      useTablePartyArrival({
+        repository,
+        sceneId: 'scene-forest',
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        canvas,
+        live: true,
+        players: [],
+        reloadPlayers: async () => [PLAYERS[0]!],
+      })
+    );
+    await waitFor(() => expect(result.current.canBring).toBe(true));
+    await act(async () => {
+      await result.current.bringParty();
+    });
+    expect(stamps).toEqual([]);
+    expect(result.current.notice).toMatchObject({
+      tone: 'success',
+      message: 'The whole party is already here.',
+    });
+  });
 });

@@ -228,6 +228,21 @@ describe('TableRosterPanel', () => {
     expect(await screen.findByText(/DM-controlled/)).toBeInTheDocument();
   });
 
+  it('refreshes the players snapshot when the add dialog opens (acceptance A1)', async () => {
+    const repository = await repositoryWith();
+    renderPanel(repository, fakeCanvas());
+    const reads = () =>
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([input]) =>
+          String(input).endsWith('/api/campaign/CAMP/players')
+        ).length;
+    await waitFor(() => expect(reads()).toBeGreaterThanOrEqual(1));
+    const before = reads();
+    await openAddDialog();
+    await waitFor(() => expect(reads()).toBe(before + 1));
+  });
+
   it('adds a verified party member once through the accessible add dialog', async () => {
     const repository = await repositoryWith();
     renderPanel(repository, fakeCanvas());

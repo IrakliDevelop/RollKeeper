@@ -101,7 +101,11 @@ export function TableRosterPanel(props: {
               variant="outline"
               size="sm"
               fullWidth
-              onClick={() => setAdding(true)}
+              onClick={() => {
+                // Acceptance A1: players may have joined since the last read.
+                state.players.refresh();
+                setAdding(true);
+              }}
             >
               Add to scene
             </Button>
@@ -114,6 +118,7 @@ export function TableRosterPanel(props: {
                 canvas={props.canvas}
                 live={props.live}
                 players={state.playerList}
+                reloadPlayers={state.players.reload}
                 arming={props.arrival.arming}
                 onArm={props.arrival.onArm}
               />
