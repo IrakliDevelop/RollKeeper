@@ -1,6 +1,8 @@
 import type { EncounterEntity } from '@/types/encounter';
 
-export function rollHitDie(entity: EncounterEntity): {
+export function rollHitDie(
+  entity: EncounterEntity
+): {
   healAmount: number;
   hitDice: NonNullable<EncounterEntity['hitDice']>;
 } | null {
