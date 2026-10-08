@@ -7,6 +7,11 @@ import { runRosterCommand, type TableCampaignPlayer } from '@/lib/table/roster';
 import { runSceneCommand } from '@/lib/table/sceneCommands';
 
 import { useTablePartyArrival } from './useTablePartyArrival';
+import {
+  createTablePlayersCache,
+  TablePlayersCacheProvider,
+  useTablePlayersSnapshot,
+} from './useTablePlayersSnapshot';
 import type { TableRosterCanvas } from './useTableRosterState';
 
 const AT = '2026-10-08T00:00:00.000Z';
@@ -78,6 +83,8 @@ beforeEach(async () => {
 });
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
   repository.dispose();
 });
 
@@ -350,5 +357,68 @@ describe('W11 party arrival', () => {
       tone: 'success',
       message: 'The whole party is already here.',
     });
+  });
+});
+
+describe('FU-2 stalled players route', () => {
+  it('Bring party reports unavailable after 8 s and is not left busy', async () => {
+    await setArrival();
+    const fetchMock = vi.fn(() => new Promise<Response>(() => {}));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const cache = createTablePlayersCache();
+    const { canvas, stamps } = fakeCanvas();
+    const { result } = renderHook(
+      () => {
+        const players = useTablePlayersSnapshot('CAMP');
+        return useTablePartyArrival({
+          repository,
+          sceneId: 'scene-forest',
+          campaignCode: 'CAMP',
+          dmId: 'dm-1',
+          canvas,
+          live: true,
+          players:
+            players.snapshot.status === 'ready'
+              ? players.snapshot.players
+              : undefined,
+          reloadPlayers: players.reload,
+        });
+      },
+      {
+        wrapper: ({ children }) => (
+          <TablePlayersCacheProvider value={cache}>
+            {children}
+          </TablePlayersCacheProvider>
+        ),
+      }
+    );
+    for (let step = 0; step < 50 && !result.current.canBring; step += 1)
+      await act(async () => vi.advanceTimersByTimeAsync(10));
+    expect(result.current.canBring).toBe(true);
+    // The initial (effect) read is bounded too.
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    const reads = fetchMock.mock.calls.length;
+    let done = false;
+    act(() => {
+      void result.current.bringParty().then(() => (done = true));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(result.current.busy).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(reads + 1);
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    expect(done).toBe(true);
+    expect(result.current.busy).toBe(false);
+    expect(stamps).toEqual([]);
+    expect(result.current.notice).toMatchObject({
+      tone: 'error',
+      message:
+        'Campaign players are unavailable. Nothing was placed — try again.',
+    });
+    act(() => {
+      void result.current.bringParty();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(fetchMock).toHaveBeenCalledTimes(reads + 2);
   });
 });

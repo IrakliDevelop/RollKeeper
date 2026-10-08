@@ -78,8 +78,40 @@ export const TablePlayersCacheProvider = PlayersCacheContext.Provider;
  * Identity comes only from here; names are display data, never a key.
  * Read-only: no encounter or campaign store is touched.
  */
-/** One read of the DM-only players route (throws when unavailable). */
+/** FU-2: a players read that has not settled by then counts as unavailable. */
+export const PLAYERS_READ_TIMEOUT_MS = 8_000;
+
+/**
+ * One bounded read (FU-2): a `setTimeout` aborts the request and rejects via
+ * a race, so a stalled fetch or response body never pins the shared entry.
+ */
 async function readPlayers(
+  campaignCode: string,
+  signal?: AbortSignal
+): Promise<ReadySnapshot> {
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  if (signal?.aborted) abort();
+  else signal?.addEventListener('abort', abort, { once: true });
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      abort();
+      reject(new Error('players read timed out'));
+    }, PLAYERS_READ_TIMEOUT_MS);
+  });
+  try {
+    return await Promise.race([
+      readOnce(campaignCode, controller.signal),
+      timeout,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** One read of the DM-only players route (throws when unavailable). */
+async function readOnce(
   campaignCode: string,
   signal: AbortSignal
 ): Promise<ReadySnapshot> {
@@ -178,9 +210,7 @@ export function useTablePlayersSnapshot(
     if (cache) {
       let active = true;
       void cache
-        .load(campaignCode, () =>
-          readPlayers(campaignCode, new AbortController().signal)
-        )
+        .load(campaignCode, () => readPlayers(campaignCode))
         .then(ready => {
           if (active) setSnapshot(ready);
         })
@@ -229,9 +259,7 @@ export function useTablePlayersSnapshot(
     // A shared workspace read is never aborted by one consumer.
     const promise = (
       cache
-        ? cache.load(campaignCode, () =>
-            readPlayers(campaignCode, new AbortController().signal)
-          )
+        ? cache.load(campaignCode, () => readPlayers(campaignCode))
         : readPlayers(campaignCode, controller.signal)
     )
       .then(ready => {

@@ -214,3 +214,58 @@ describe('acceptance A4: one players read per scene switch', () => {
     }
   });
 });
+
+describe('FU-2 bounded players read (8 s)', () => {
+  const stalled = () =>
+    // Signal-agnostic: never settles even when aborted.
+    vi.fn(() => new Promise<Response>(() => {}));
+
+  it('times out a stalled read without a workspace cache and starts fresh on refresh', async () => {
+    const fetchMock = stalled();
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => useTablePlayersSnapshot('CAMP'));
+    await act(async () => vi.advanceTimersByTimeAsync(7_999));
+    expect(result.current.snapshot.status).toBe('loading');
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(result.current.snapshot.status).toBe('unavailable');
+    act(() => result.current.refresh());
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('times out a stalled response body on the shared read and releases the in-flight entry', async () => {
+    const fetchMock = vi.fn(
+      async () =>
+        ({
+          ok: true,
+          json: () => new Promise(() => {}),
+        }) as unknown as Response
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = createTablePlayersCache();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TablePlayersCacheProvider value={cache}>
+        {children}
+      </TablePlayersCacheProvider>
+    );
+    const { result } = renderHook(() => useTablePlayersSnapshot('CAMP'), {
+      wrapper,
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    expect(result.current.snapshot.status).toBe('unavailable');
+    let players: unknown = 'pending';
+    act(() => {
+      void result.current.reload().then(value => (players = value));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    expect(players).toBeNull();
+    act(() => {
+      void result.current.reload();
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(0));
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(vi.getTimerCount()).toBe(1);
+  });
+});
