@@ -377,4 +377,48 @@ describe('PlayerBattleMapCanvas: shared presence', () => {
     unmount();
     vp.destroy();
   });
+  it('PR05 E11: fits only on the first live of a canvas, never on later live notifications', () => {
+    stubCanvas();
+    // The viewport's own render loop also uses rAF; track only fit frames.
+    const frames: FrameRequestCallback[] = [];
+    let nextFrame = 100;
+    const fitFrameIds: number[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      nextFrame += 1;
+      if (callback.name !== 'loop') {
+        frames.push(callback);
+        fitFrameIds.push(nextFrame);
+      }
+      return nextFrame;
+    });
+    const cancel = vi.spyOn(window, 'cancelAnimationFrame');
+    seedCharacter({ id: 'char-a', name: 'Aria' });
+    const vp = makeViewport();
+    const fit = vi.spyOn(vp, 'fitToContent');
+    const { unmount } = renderPlayer({ characterId: 'char-a' });
+    fireReady(vp);
+    const onStatus = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onStatus!;
+    act(() => onStatus('live'));
+    act(() => onStatus('recovering'));
+    act(() => onStatus('live'));
+    act(() => onStatus('live'));
+    const fits = frames.length;
+    expect(fits).toBe(1);
+    frames.forEach(frame => frame(0));
+    expect(fit).toHaveBeenCalledTimes(1);
+    expect(awarenessHandle.announce).toHaveBeenCalledTimes(3);
+    const vp2 = makeViewport();
+    fireReady(vp2);
+    act(() =>
+      vi.mocked(createManagedBattleMapConnection).mock.calls[1]![0].onStatus!(
+        'live'
+      )
+    );
+    expect(frames).toHaveLength(2);
+    unmount();
+    expect(cancel).toHaveBeenCalledWith(fitFrameIds[1]);
+    vp.destroy();
+    vp2.destroy();
+  });
 });

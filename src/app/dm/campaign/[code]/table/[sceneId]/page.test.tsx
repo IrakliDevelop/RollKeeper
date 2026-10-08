@@ -556,7 +556,8 @@ describe('Table scene recovery UI', () => {
     render(<TableScenePage />);
     await screen.findByTestId('canvas');
     const canvasBefore = mocks.canvasMounts;
-    expect(mocks.combatMounts).toBe(1);
+    // R3-5: the combat panel mount is observed asynchronously.
+    await waitFor(() => expect(mocks.combatMounts).toBe(1));
     fireEvent.click(
       screen.getByRole('button', { name: /Acquire live control/i })
     );

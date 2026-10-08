@@ -82,6 +82,9 @@ export async function POST(
       dmId?: string;
       playerId?: string;
       displayKey?: string;
+      /** PR05 E5 (Table v1): the display capability and session nonce. */
+      displayCapability?: string;
+      displaySession?: string;
       sceneId?: string;
       protocols?: { fog?: number; authority?: number };
       kind?: string;
@@ -112,6 +115,15 @@ export async function POST(
     // resolution. A present valid scene ID always selects scene authority.
     const locationClaim =
       tableRequired && !sceneIdPresent && body.kind === 'location';
+    // Review 01 F4 (S4): the display capability is scoped to the current
+    // scene; it never mints a location room. Neutral body, so the display
+    // keeps its credential (not a credential denial).
+    if (locationClaim && body.role === 'display') {
+      return NextResponse.json(
+        { error: 'Scene is unavailable' },
+        { status: 403 }
+      );
+    }
     const tableV1 = tableRequired && !locationClaim;
     let legacyRoom: string | null = null;
     if (!tableV1) {
@@ -229,6 +241,18 @@ export async function POST(
           { status: 403 }
         );
       }
+      // R4-F2: a display token carries the generation its capability was
+      // verified at; a rotation between the two reads is an expired link.
+      if (
+        session.role === 'display' &&
+        (session.displayGeneration === undefined ||
+          resolution.displayGeneration !== session.displayGeneration)
+      ) {
+        return NextResponse.json(
+          { error: 'Display link expired' },
+          { status: 403 }
+        );
+      }
       if (!(await proveRelayAuthority(code))) {
         return NextResponse.json(
           { error: 'Live authority is unavailable' },
@@ -256,7 +280,7 @@ export async function POST(
           : {
               ...common,
               role: 'display' as const,
-              displayGeneration: resolution.displayGeneration as number,
+              displayGeneration: session.displayGeneration as number,
             },
         secret
       );

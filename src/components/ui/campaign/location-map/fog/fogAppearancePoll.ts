@@ -15,6 +15,8 @@ const appliedAppearances = new WeakMap<Viewport, ProjectedFogAppearance>();
 interface FogAppearancePollOptions {
   viewport: Viewport;
   url: string;
+  /** PR05 C5-2: e.g. the display's header credentials (never the URL). */
+  init?: RequestInit;
 }
 
 function invalidateFogAppearanceRequests(viewport: Viewport): void {
@@ -44,11 +46,12 @@ export function getAppliedFogAppearance(
 
 export function fetchAndApplyFogAppearance(
   viewport: Viewport,
-  url: string
+  url: string,
+  init?: RequestInit
 ): void {
   const requestVersion = (requestVersions.get(viewport) ?? 0) + 1;
   requestVersions.set(viewport, requestVersion);
-  void fetch(url)
+  void (init ? fetch(url, init) : fetch(url))
     .then(r => (r.ok ? r.json() : null))
     .then(data => {
       if (data && typeof data === 'object') {
@@ -70,15 +73,15 @@ export function fetchAndApplyFogAppearance(
 export function startFogAppearancePoll(
   opts: FogAppearancePollOptions
 ): () => void {
-  const { viewport, url } = opts;
+  const { viewport, url, init } = opts;
 
   const timer = setInterval(() => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    fetchAndApplyFogAppearance(viewport, url);
+    fetchAndApplyFogAppearance(viewport, url, init);
   }, POLL_INTERVAL_MS);
 
   const handleVisibility = (): void => {
-    if (!document.hidden) fetchAndApplyFogAppearance(viewport, url);
+    if (!document.hidden) fetchAndApplyFogAppearance(viewport, url, init);
   };
 
   if (typeof document !== 'undefined') {

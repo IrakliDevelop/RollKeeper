@@ -7,6 +7,7 @@ import {
 } from '@/lib/table/authorityLifecycle';
 
 import type {
+  DisplayStatusRead,
   PresentationLabels,
   PresentationMessage,
 } from './TablePresentationControls.types';
@@ -61,9 +62,7 @@ export function presentationStatusLines(input: {
   const audience = blanked
     ? 'Audience: blank (covered) · Published'
     : `Audience: ${labelOf(sceneId, input.sceneId, input.sceneName, input.labels)} · Published${
-        noMapLink
-          ? ' · no player map link for this scene (persistent display arrives later)'
-          : ''
+        noMapLink ? ' · no player map link for this scene' : ''
       }`;
   return {
     audience,
@@ -153,6 +152,51 @@ export function failureMessage(
       return {
         tone: 'error',
         text: 'Not changed — live control is unavailable',
+      };
+  }
+}
+
+/**
+ * E13: the table display line, from the server-computed DM display status
+ * only (never from Published or relay state). `loaded` is a device report,
+ * not optical proof; stale/unknown never take success styling.
+ */
+export function displayStatusLine(input: {
+  status: DisplayStatusRead;
+  sceneId: string;
+  sceneName: string;
+  labels: PresentationLabels;
+}): { text: string; tone: 'success' | 'muted' | 'warning' } {
+  const { status } = input;
+  if (status === 'error')
+    return { text: 'Display status unavailable', tone: 'muted' };
+  switch (status.state) {
+    case 'none':
+      return { text: 'Published · no display connected', tone: 'muted' };
+    case 'loaded':
+      return {
+        text: `Table reports displaying ${
+          status.sceneId
+            ? labelOf(
+                status.sceneId,
+                input.sceneId,
+                input.sceneName,
+                input.labels
+              )
+            : 'a scene'
+        }`,
+        tone: 'success',
+      };
+    case 'blank':
+      return { text: 'Table reports a blank (covered) screen', tone: 'muted' };
+    case 'waiting':
+      return { text: 'Table reports the waiting screen', tone: 'muted' };
+    case 'updating':
+      return { text: 'Display updating…', tone: 'muted' };
+    case 'stale':
+      return {
+        text: `Display last reported ${Math.floor((status.ageMs ?? 0) / 1000)} s ago`,
+        tone: 'warning',
       };
   }
 }

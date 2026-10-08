@@ -5,7 +5,9 @@ const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u;
 
 export type TableCompatibilityFeature =
-  'initiative' | 'battlemap' | 'initiativeRequest';
+  | 'initiative'
+  | 'battlemap'
+  | 'initiativeRequest';
 
 export function tableCampaignTag(code: string): string {
   if (!CAMPAIGN_CODE.test(code)) throw new Error('Invalid campaign code');
@@ -27,6 +29,12 @@ export const tableLedgerKey = (code: string): string =>
   tableKey(code, 'table-operations');
 export const tableLedgerOrderKey = (code: string): string =>
   tableKey(code, 'table-operations-order');
+/** PR05 E1: the display session binding `{displayGeneration, nonceHash}`. */
+export const tableDisplaySessionKey = (code: string): string =>
+  tableKey(code, 'display-session');
+/** PR05 E1: the last accepted display ACK record (EX 30). */
+export const tableDisplayAckKey = (code: string): string =>
+  tableKey(code, 'display-ack');
 export const tableAuthorityChallengeKey = (
   code: string,
   challengeId: string

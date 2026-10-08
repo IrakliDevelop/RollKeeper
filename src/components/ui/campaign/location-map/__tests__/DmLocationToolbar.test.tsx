@@ -378,4 +378,22 @@ describe('DmLocationToolbar marker chrome', () => {
       vi.unstubAllEnvs();
     }
   });
+  it('PR05 E12: shows the Open display failure message in battlemap mode', async () => {
+    const onOpenTvDisplay = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'popup-blocked' as const,
+      message:
+        'Popup blocked — allow popups for this site and click Open display again',
+    }));
+    render(
+      <DmLocationToolbar {...baseProps} onOpenTvDisplay={onOpenTvDisplay} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Open TV Display/u }));
+    expect(onOpenTvDisplay).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText(
+        'Popup blocked — allow popups for this site and click Open display again'
+      )
+    ).toBeVisible();
+  });
 });

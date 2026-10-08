@@ -17,6 +17,7 @@ import type {
   AuthorityReadContext,
 } from '@fieldnotes/sync-server';
 
+import { TableAccessBatcher } from './authority-access.js';
 import { RedisAuthorityDriver } from './authority-driver.js';
 import { ROLLKEEPER_PROVISION_LUA_V1 } from './authority-lua.js';
 import {
@@ -2823,5 +2824,102 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
         )
       );
     });
+  });
+});
+
+run('PR05 display generation rotation against real Redis', () => {
+  const client = createClient({ url: redisUrl });
+  const control = (displayGeneration: number) =>
+    JSON.stringify({
+      v: 1,
+      epoch: EPOCH,
+      writerFence: 7,
+      leaseUntil: Date.now() + 60_000,
+      presentation: { sceneId: 'scene-a', revision: 1, blanked: false },
+      displayGeneration,
+    });
+  const claim = (displayGeneration: number) => ({
+    v: 1,
+    campaign: CAMPAIGN,
+    resourceKind: 'scene',
+    sceneId: 'scene-a',
+    room: ROOM,
+    epoch: EPOCH,
+    role: 'display',
+    displayGeneration,
+    roomGeneration: GENERATION,
+  });
+  const readContext = (displayGeneration: number) =>
+    ({
+      room: ROOM,
+      actorId: 'display-a',
+      connectionId: 'connection-display',
+      userId: 'display-a',
+      role: 'display',
+      definitionId: 'rollkeeper-scene-v1',
+      roomGeneration: GENERATION,
+      authContext: claim(displayGeneration),
+    }) as unknown as AuthorityReadContext;
+  const readOptions = () => ({
+    deadlineAt: Date.now() + 5_000,
+    signal: new AbortController().signal,
+  });
+
+  beforeAll(async () => {
+    await client.connect();
+  });
+  beforeEach(async () => {
+    await client.del(declaredKeys);
+    await client.set(tableControlKey(CAMPAIGN), control(2));
+    await client.hSet(
+      tableRegistryKey(CAMPAIGN),
+      'scene-a',
+      JSON.stringify({ v: 1, sceneId: 'scene-a', roomId: ROOM, deleted: false })
+    );
+    await client.set(
+      keys.meta,
+      JSON.stringify({
+        v: 1,
+        generation: GENERATION,
+        revision: 0,
+        casToken: 'cas-initial',
+      })
+    );
+  });
+  afterAll(async () => {
+    if (client.isOpen) {
+      await client.del(declaredKeys);
+      await client.quit();
+    }
+  });
+
+  it('access and checkpoint Lua forbid a rotated display generation', async () => {
+    const access = new TableAccessBatcher(
+      client as unknown as ConstructorParameters<typeof TableAccessBatcher>[0],
+      0
+    );
+    const driver = new RedisAuthorityDriver(client);
+    expect(
+      await access.authorizeClaim(claim(2) as never, Date.now() + 5_000)
+    ).toBe(true);
+    const capture = await driver.checkpoint(readContext(2), readOptions());
+    await capture.release();
+
+    const MAX = 99_999_999_999_999;
+    await client.set(tableControlKey(CAMPAIGN), control(MAX));
+    expect(
+      await access.authorizeClaim(claim(2) as never, Date.now() + 5_000)
+    ).toBe(false);
+    await expect(
+      driver.checkpoint(readContext(2), readOptions())
+    ).rejects.toThrow(/forbidden/u);
+    expect(
+      await access.authorizeClaim(claim(MAX) as never, Date.now() + 5_000)
+    ).toBe(true);
+    expect(
+      await access.authorizeClaim(claim(MAX - 1) as never, Date.now() + 5_000)
+    ).toBe(false);
+    const rotated = await driver.checkpoint(readContext(MAX), readOptions());
+    await rotated.release();
   });
 });

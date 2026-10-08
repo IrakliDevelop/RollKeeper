@@ -749,3 +749,33 @@ describe('judgePresentationOutcome (PR04 Q1)', () => {
     ).toBe('changed');
   });
 });
+
+describe('Table control session across a display rotation (PR05 R4-F1)', () => {
+  /** Rotation Lua: display generation + capability hash only. */
+  const rotateDisplay = (server: ReturnType<typeof controlServer>) => {
+    const state = server.state as typeof server.state & {
+      displayGeneration?: number;
+    };
+    state.displayGeneration = (state.displayGeneration ?? 0) + 1;
+  };
+
+  it('renews with one command (no stale-control retry) and stays held', async () => {
+    const server = controlServer();
+    const prepared = await prepareTableSceneAuthority(
+      prepareOptions(server.fetcher)
+    );
+    if (prepared.status !== 'prepared') throw new Error('not prepared');
+    const revision = server.state.revision;
+    rotateDisplay(server);
+    expect(server.state.revision).toBe(revision);
+    await expect(prepared.renew()).resolves.toBe(true);
+    rotateDisplay(server);
+    await expect(
+      prepared.session.publishInitiative('run-a', initiative('run-a'))
+    ).resolves.toMatchObject({ status: 'committed' });
+    expect(
+      server.commands.filter(command => command.type === 'renew')
+    ).toHaveLength(1);
+    expect(prepared.session.isLost()).toBe(false);
+  });
+});

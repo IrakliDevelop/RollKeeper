@@ -7,6 +7,8 @@ import {
   tableCampaignTag,
   tableCompatibilityKey,
   tableControlKey,
+  tableDisplayAckKey,
+  tableDisplaySessionKey,
   tableLedgerKey,
   tableLedgerOrderKey,
   tableRegistryKey,
@@ -58,12 +60,23 @@ describe('Table v1 campaign keys', () => {
       tableCompatibilityKey('ABC123', 'initiative'),
       tableCompatibilityKey('ABC123', 'battlemap'),
       tableCompatibilityKey('ABC123', 'initiativeRequest'),
+      tableDisplaySessionKey('ABC123'),
+      tableDisplayAckKey('ABC123'),
       ...Object.values(
         tableAuthorityRoomKeys('ABC123', '123e4567-e89b-42d3-a456-426614174000')
       ),
     ];
     expect(keys).toHaveLength(new Set(keys).size);
     expect(keys.every(key => key.includes(tag))).toBe(true);
+  });
+
+  it('names the PR05 display binding and ACK keys in the campaign slot', () => {
+    const tag = tableCampaignTag('ABC123');
+    expect(tableDisplaySessionKey('ABC123')).toBe(
+      `campaign:${tag}:display-session`
+    );
+    expect(tableDisplayAckKey('ABC123')).toBe(`campaign:${tag}:display-ack`);
+    expect(() => tableDisplaySessionKey('bad code')).toThrow();
   });
 
   it('uses a validated UUID-addressed same-slot authority challenge key', () => {

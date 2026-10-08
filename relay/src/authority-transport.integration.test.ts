@@ -849,4 +849,117 @@ run('two relay authority transport', () => {
     ).toMatchObject({ visible: true });
     expect(closeEvents.some(event => event.code === 1013)).toBe(false);
   }, 20_000);
+
+  it('closes an admitted display socket with 4403 after rotation and sends no newer frames (PR05)', async () => {
+    // Earlier tests' clients would also see 4403 when control changes.
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    const control = (displayGeneration: number) => ({
+      v: 1,
+      epoch: EPOCH,
+      writerFence: 1,
+      holderPrincipal: 'legacy:dm-a',
+      leaseUntil: Date.now() + 300_000,
+      presentation: { sceneId: 'scene-a', revision: 3, blanked: false },
+      displayGeneration,
+    });
+    await redis.set(tableControlKey(CAMPAIGN), JSON.stringify(control(41)));
+    const claims = {
+      v: 1 as const,
+      room: ROOM,
+      exp: Date.now() + 60_000,
+      campaign: CAMPAIGN,
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-a',
+      epoch: EPOCH,
+      roomGeneration: GENERATION,
+    };
+    const connect = (relay: RelayHandle, clientId: string, token: string) => {
+      const client = createManagedAuthorityConnection({
+        scopeId: `${CAMPAIGN}:scene-a:${clientId}:rotation`,
+        clientId,
+        extensions: [createFogAuthorityClientExtension()],
+        resolveUrl: () => ({
+          url: `ws://127.0.0.1:${relay.address().port}?room=${ROOM}`,
+          protocols: bearerSubprotocols(token),
+        }),
+        transportFactory: transport,
+      });
+      clients.push(client);
+      return client;
+    };
+    const dm = connect(
+      first,
+      'dm-a',
+      signBattleMapToken(
+        { ...claims, userId: 'dm-a', role: 'dm', writerFence: 1 },
+        SECRET
+      )
+    );
+    const display = connect(
+      second,
+      `display-${CAMPAIGN}`,
+      signBattleMapToken(
+        {
+          ...claims,
+          userId: `display-${CAMPAIGN}`,
+          role: 'display',
+          displayGeneration: 41,
+        },
+        SECRET
+      )
+    );
+    await eventually(
+      () =>
+        dm.getState().status === 'live' && display.getState().status === 'live'
+    );
+    const visible = {
+      ...createShape({ position: { x: 5, y: 5 }, size: { w: 10, h: 10 } }),
+      id: 'before-rotation',
+    };
+    dm.submit({ kind: 'upsert', element: visible });
+    await eventually(
+      () =>
+        display
+          .getState()
+          .document?.elements.some(element => element.id === visible.id) ===
+        true
+    );
+
+    const rotatedAt = Date.now();
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify(control(99_999_999_999_999))
+    );
+    // S4: closed within the next relay poll (50 ms here) + the 1 s
+    // control-read bound; 150 ms covers this harness (the Redis SET round
+    // trip and the 20 ms `eventually` tick). Typically 20–90 ms.
+    const bound = 50 + 1_000 + 150;
+    await eventually(
+      () => closeEvents.some(event => event.code === 4403),
+      bound
+    );
+    expect(Date.now() - rotatedAt).toBeLessThanOrEqual(bound);
+    await eventually(() => display.getState().status === 'denied', 1_000);
+    expect(dm.getState().status).toBe('live');
+
+    const hidden = {
+      ...createShape({ position: { x: 9, y: 9 }, size: { w: 10, h: 10 } }),
+      id: 'after-rotation',
+    };
+    dm.submit({ kind: 'upsert', element: hidden });
+    await eventually(
+      () =>
+        dm
+          .getState()
+          .document?.elements.some(element => element.id === hidden.id) === true
+    );
+    await new Promise(resolve => setTimeout(resolve, 300));
+    expect(
+      display
+        .getState()
+        .document?.elements.some(element => element.id === hidden.id) ?? false
+    ).toBe(false);
+  }, 15_000);
 });

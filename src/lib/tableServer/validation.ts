@@ -343,10 +343,13 @@ export function parseTableCommand(value: unknown): TableCommand | null {
   return null;
 }
 
-export async function readBoundedJson(request: Request): Promise<unknown> {
+export async function readBoundedJson(
+  request: Request,
+  limit: number = TABLE_REQUEST_LIMIT
+): Promise<unknown> {
   const length = Number(request.headers.get('content-length'));
-  if (Number.isFinite(length) && length > TABLE_REQUEST_LIMIT) {
-    throw new Error('Request body exceeds 16 KiB');
+  if (Number.isFinite(length) && length > limit) {
+    throw new Error(`Request body exceeds ${limit / 1024} KiB`);
   }
   if (!request.body) return null;
   const reader = request.body.getReader();
@@ -357,8 +360,8 @@ export async function readBoundedJson(request: Request): Promise<unknown> {
       const { done, value } = await reader.read();
       if (done) break;
       size += value.byteLength;
-      if (size > TABLE_REQUEST_LIMIT)
-        throw new Error('Request body exceeds 16 KiB');
+      if (size > limit)
+        throw new Error(`Request body exceeds ${limit / 1024} KiB`);
       chunks.push(value);
     }
   } finally {

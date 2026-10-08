@@ -38,7 +38,10 @@ export interface DmLocationToolbarProps {
   /** ISO timestamp of last successful sync, or null if never synced */
   lastSyncedAt: string | null;
   mode?: EditorMode;
-  onOpenTvDisplay?: () => void;
+  /** May resolve to the PR05 launcher result (failure message shown). */
+  onOpenTvDisplay?: () => void | Promise<
+    import('@/lib/openTableDisplay').OpenTableDisplayResult | void
+  >;
   /** Live sync connection status (battlemap mode only); 'disabled' when the relay isn't configured. */
   syncStatus: BattleMapConnectionStatus | 'disabled';
   /** Whether the battle map is currently shared with players (battlemap mode only) */

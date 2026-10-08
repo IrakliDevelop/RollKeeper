@@ -1,9 +1,11 @@
+import { createHash } from 'node:crypto';
 import { NextRequest } from 'next/server';
 
 import {
   tableAuthorityRoomKeys,
   tableCompatibilityKey,
   tableControlKey,
+  tableDisplaySessionKey,
   tableRegistryKey,
 } from '@/lib/tableServer/keys';
 
@@ -115,6 +117,10 @@ export const CODE = 'PRIV04';
 export const DM_ID = 'dm-1';
 export const PLAYER_ID = 'char-a';
 export const DISPLAY_KEY = 'display-key-1';
+/** PR05 v1 display capability (43 base64url chars) and session nonce (22). */
+export const DISPLAY_CAPABILITY = 'Cap5Synthetic_display-capability_0123456789';
+export const DISPLAY_NONCE = 'Nonce5Synthetic_012345';
+export const DISPLAY_GENERATION = 4242;
 export const EPOCH = '19a12345-1234-4123-8123-123456789abc';
 export const ROOM_TAVERN = '123e4567-e89b-42d3-a456-426614174000';
 export const ROOM_FOREST = '223e4567-e89b-42d3-a456-426614174000';
@@ -147,6 +153,11 @@ export function setPresentation(
   sceneId: string | null,
   blanked = false
 ) {
+  // PR05: presentation changes keep any issued display capability.
+  const previous = fake.strings.get(tableControlKey(CODE));
+  const display = previous
+    ? (JSON.parse(previous) as Record<string, unknown>)
+    : { displayGeneration: 0, displayCapabilityHash: null };
   fake.strings.set(
     tableControlKey(CODE),
     JSON.stringify({
@@ -159,10 +170,35 @@ export function setPresentation(
       holderPrincipal: `legacy:${DM_ID}`,
       presentation: { sceneId, revision: 3, blanked },
       publicRunId: null,
-      displayGeneration: 0,
-      displayCapabilityHash: null,
+      displayGeneration: display.displayGeneration,
+      displayCapabilityHash: display.displayCapabilityHash,
     })
   );
+}
+
+export const sha256Hex = (value: string) =>
+  createHash('sha256').update(value, 'utf8').digest('hex');
+
+/**
+ * PR05: issues {@link DISPLAY_CAPABILITY} at {@link DISPLAY_GENERATION} on
+ * the current control (as rotation does) and, unless `bound` is false,
+ * binds {@link DISPLAY_NONCE} (as the first descriptor read does).
+ */
+export function issueDisplay(fake: TableFakeRedis, bound = true) {
+  const key = tableControlKey(CODE);
+  const control = JSON.parse(fake.strings.get(key)!) as Record<string, unknown>;
+  control.displayGeneration = DISPLAY_GENERATION;
+  control.displayCapabilityHash = sha256Hex(DISPLAY_CAPABILITY);
+  fake.strings.set(key, JSON.stringify(control));
+  if (bound)
+    fake.strings.set(
+      tableDisplaySessionKey(CODE),
+      JSON.stringify({
+        displayGeneration: DISPLAY_GENERATION,
+        nonceHash: sha256Hex(DISPLAY_NONCE),
+      })
+    );
+  else fake.strings.delete(tableDisplaySessionKey(CODE));
 }
 
 export function setRegistryEntry(

@@ -9,7 +9,14 @@
 export type SideChannelCredential =
   | { role: 'dm'; dmId: string }
   | { role: 'player'; playerId: string }
-  | { role: 'display'; displayKey: string };
+  /** Table v1 off: the legacy map-pinned display key (query). */
+  | { role: 'display'; displayKey: string }
+  /** Table v1 (PR05 E5): capability + bound session nonce, headers only. */
+  | { role: 'display'; capability: string; nonce: string };
+
+/** PR05 E5: display credential headers for side-channel GETs (v1). */
+export const DISPLAY_CAPABILITY_HEADER = 'x-rollkeeper-display-capability';
+export const DISPLAY_SESSION_HEADER = 'x-rollkeeper-display-session';
 
 export interface SideChannelRequest {
   url: string;
@@ -31,8 +38,27 @@ export function sideChannelCredentialQuery(
   if (credential.role === 'dm') params.set('dmId', credential.dmId);
   else if (credential.role === 'player')
     params.set('playerId', credential.playerId);
-  else params.set('displayKey', credential.displayKey);
+  else if ('displayKey' in credential)
+    params.set('displayKey', credential.displayKey);
   return params.toString();
+}
+
+/**
+ * The fetch init for a side-channel GET. A v1 display credential travels in
+ * headers (never the query, so it cannot reach logs or a Referer) with the
+ * CSRF header the server's same-origin read check requires.
+ */
+export function sideChannelReadInit(
+  credential: SideChannelCredential
+): RequestInit {
+  if (credential.role !== 'display' || !('capability' in credential)) return {};
+  return {
+    headers: {
+      [DISPLAY_CAPABILITY_HEADER]: credential.capability,
+      [DISPLAY_SESSION_HEADER]: credential.nonce,
+      'x-rollkeeper-csrf': '1',
+    },
+  };
 }
 
 export function battleMapListUrl(

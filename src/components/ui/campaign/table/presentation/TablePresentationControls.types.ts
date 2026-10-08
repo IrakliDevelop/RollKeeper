@@ -5,6 +5,10 @@ import type {
 } from '@/lib/table/authorityLifecycle';
 
 import type { TableAuthorityState } from '../useTableSceneAuthority';
+import type { DisplayStatus } from '../display/displayRequests';
+
+/** E13: the last DM display status read (`error` = read failed). */
+export type DisplayStatusRead = DisplayStatus | 'error';
 
 /** Registry-derived safe labels, keyed by scene id (DM read only). */
 export type PresentationLabels = Readonly<
