@@ -89,6 +89,7 @@ function fakeSession(): TableControlSession {
     renew: vi.fn(async () => ({ status: 'committed' as const })),
     publishInitiative: vi.fn(async () => ({ status: 'committed' as const })),
     endInitiative: vi.fn(async () => ({ status: 'committed' as const })),
+    registerScene: vi.fn(async () => ({ status: 'committed' as const })),
     show: vi.fn(async () => ({ status: 'committed' as const })),
     blank: vi.fn(async () => ({ status: 'committed' as const })),
     unpresent: vi.fn(async () => ({ status: 'committed' as const })),
@@ -513,7 +514,7 @@ describe('Table combat panel (D10)', () => {
       screen.getByRole('link', { name: 'Go to active run' })
     ).toHaveAttribute(
       'href',
-      '/dm/campaign/CAMP/table/scene-2?tableWorkspace=fork-1&run=far-run'
+      '/dm/campaign/CAMP/table?scene=scene-2&run=far-run&tableWorkspace=fork-1'
     );
     await chooseParticipants(['Goblin']);
     await setInitiative('Goblin', '3');

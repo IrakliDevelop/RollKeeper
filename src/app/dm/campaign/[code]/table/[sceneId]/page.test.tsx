@@ -1,592 +1,69 @@
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
-import type { ReactNode } from 'react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import fs from 'node:fs';
+import path from 'node:path';
 
-import type { TableSceneRecordV1 } from '@/lib/table/schema';
+import { describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({
-  activate: vi.fn(),
-  restore: vi.fn(),
-  save: vi.fn(),
-  createAdapter: vi.fn(),
-  workspace: vi.fn(),
-  canvasProps: vi.fn(),
-  rosterProps: vi.fn(),
-  combatProps: vi.fn(),
-  canvasMounts: 0,
-  combatMounts: 0,
-  query: '',
-}));
-
-vi.mock('next/navigation', () => ({
-  useParams: () => ({ code: 'CAMP', sceneId: 'scene-1' }),
-  useSearchParams: () => new URLSearchParams(mocks.query),
-}));
-vi.mock(
-  '@/components/ui/campaign/table/useAuthenticatedTableWorkspace',
-  () => ({
-    useAuthenticatedTableWorkspace: mocks.workspace,
+const redirect = vi.hoisted(() =>
+  vi.fn((href: string) => {
+    throw Object.assign(new Error('NEXT_REDIRECT'), { href });
   })
 );
-vi.mock('@/lib/table/authorityLifecycle', () => ({
-  prepareTableSceneAuthority: mocks.activate,
-  getTableAuthoritySessionId: () => 'table-session-1',
-}));
-vi.mock('@/lib/table/checkpoint', async importOriginal => {
-  const actual =
-    await importOriginal<typeof import('@/lib/table/checkpoint')>();
-  return {
-    ...actual,
-    restoreAuthorityFork: mocks.restore,
-    saveSceneCheckpoint: mocks.save,
-  };
-});
-vi.mock('@/lib/table/sceneAdapter', () => ({
-  createTableSceneAdapter: mocks.createAdapter,
-  isTableWorkspaceBoundToCampaign: (
-    selection: { workspace: { routeCampaignCode?: string | null } },
-    campaignCode: string
-  ) => selection.workspace.routeCampaignCode === campaignCode,
-}));
-vi.mock('@/store/dmStore', () => ({
-  useDmStore: (selector: (state: { dmId: string }) => unknown) =>
-    selector({ dmId: 'dm-1' }),
-}));
-vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', async () => {
-  const { useEffect } = await import('react');
-  return {
-    DmBattleMapCanvas: (props: {
-      sessionControls: ReactNode;
-      children?: ReactNode;
-      onViewportReady?: unknown;
-      tokenConfigRef?: unknown;
-      onStatus?: (status: string) => void;
-    }) => {
-      mocks.canvasProps(props);
-      useEffect(() => {
-        mocks.canvasMounts += 1;
-      }, []);
-      return (
-        <div data-testid="canvas">
-          {props.sessionControls}
-          {props.children}
-        </div>
-      );
-    },
-  };
-});
-vi.mock('@/components/ui/campaign/table/combat/TableCombatPanel', async () => {
-  const { useEffect } = await import('react');
-  return {
-    TableCombatPanel: (props: Record<string, unknown>) => {
-      mocks.combatProps(props);
-      useEffect(() => {
-        mocks.combatMounts += 1;
-      }, []);
-      return <div data-testid="table-combat" />;
-    },
-  };
-});
-vi.mock('@/components/ui/campaign/table/TableRosterPanel', () => ({
-  TableRosterPanel: (props: Record<string, unknown>) => {
-    mocks.rosterProps(props);
-    return <div data-testid="table-roster" />;
-  },
-}));
-vi.mock('@/components/ui/campaign/dm-vtt/TokenPlacementController', () => ({
-  TokenPlacementController: (props: { pending: unknown }) => (
-    <div data-testid="placement" data-pending={props.pending ? 'yes' : 'no'} />
-  ),
-}));
+vi.mock('next/navigation', () => ({ redirect }));
 
-import TableScenePage from './page';
+import LegacyTableScenePage from './page';
 
-function preparedSession(
-  renew: () => Promise<{ status: string; reason?: string }> = async () => ({
-    status: 'committed',
-  })
-) {
-  const session = {
-    holderSessionId: 'table-session-1',
-    current: () => ({
-      epoch: '10000000-0000-4000-8000-000000000001',
-      revision: 1,
-      writerFence: 1,
-      leaseUntil: Date.now() + 30_000,
-      holderSessionId: 'table-session-1',
-      presentation: { sceneId: null, revision: 0, blanked: false },
-      publicRunId: null,
-    }),
-    isLost: () => false,
-    lostReason: () => null,
-    renew: vi.fn(renew),
-    publishInitiative: vi.fn(),
-    endInitiative: vi.fn(),
-    subscribe: () => () => {},
-  };
-  return {
-    status: 'prepared',
-    session,
-    renew: async () => (await session.renew()).status === 'committed',
-  };
+async function target(
+  sceneId: string,
+  searchParams: Record<string, string | string[] | undefined>
+): Promise<string> {
+  redirect.mockClear();
+  await expect(
+    LegacyTableScenePage({
+      params: Promise.resolve({ code: 'CAMP', sceneId }),
+      searchParams: Promise.resolve(searchParams),
+    })
+  ).rejects.toThrow('NEXT_REDIRECT');
+  expect(redirect).toHaveBeenCalledTimes(1);
+  return redirect.mock.calls[0]![0];
 }
 
-function scene(): TableSceneRecordV1 {
-  const authorityState = {
-    elements: [{ id: 'token-1', type: 'token' }],
-    layers: [],
-    extensions: {
-      fog: { pluginName: 'fog', version: 1, data: null },
-    },
-    cursor: {
-      generation: 'generation-1',
-      streamId: '0123456789abcdef0123456789abcdef',
-      revision: 1,
-    },
-    casToken: 'cas-1',
-  };
-  return {
-    schemaVersion: 1,
-    workspaceKey: 'guest/workspace:workspace-1',
-    sceneId: 'scene-1',
-    originalMapId: 'map-original',
-    map: {
-      name: 'Crypt',
-      mapImageUrl: '/map.webp',
-      mapImageSize: { w: 100, h: 100 },
-      gridEnabled: false,
-      gridSettings: null,
-      markers: [],
-      dmOnlyElements: {},
-    },
-    canvasCheckpoint: {
-      protocolVersion: 1,
-      generation: 'generation-1',
-      revision: 1,
-      capturedAt: '2026-10-06T00:00:00.000Z',
-      state: authorityState,
-    },
-    localDraft: {
-      protocolVersion: 1,
-      generation: 'offline-1',
-      revision: 2,
-      capturedAt: '2026-10-06T00:01:00.000Z',
-      state: {
-        version: 4,
-        camera: { position: { x: 0, y: 0 }, zoom: 1 },
-        elements: [{ id: 'offline-token' }],
-        layers: [],
-        extensions: { fog: { version: 1, data: null } },
-      },
-    },
-    members: [],
-    arrivalPoint: null,
-    createdAt: '2026-10-06T00:00:00.000Z',
-    updatedAt: '2026-10-06T00:01:00.000Z',
-  };
-}
-
-describe('Table scene recovery UI', () => {
-  afterEach(cleanup);
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.query = '';
-    const stored = scene();
-    const repository = {
-      workspaceSelection: {
-        account: { kind: 'guest' },
-        workspace: {
-          localWorkspaceId: 'workspace-1',
-          routeCampaignCode: 'CAMP',
-        },
-      },
-      getCurrent: () => ({
-        status: 'ready',
-        snapshot: {
-          campaign: { revision: 3 },
-          scenes: [stored],
-        },
-      }),
-      reload: vi.fn(),
-    };
-    mocks.workspace.mockReturnValue({
-      repository,
-      revision: 1,
-      loading: false,
-      error: null,
-    });
-    mocks.createAdapter.mockReturnValue({
-      sceneId: 'scene-1',
-      sourceMapId: 'map-original',
-      getBattleMap: () => ({
-        id: 'scene-1',
-        name: 'Crypt',
-        canvasState: '{}',
-      }),
-      subscribe: () => () => {},
-      getLocalEditGeneration: () => 0,
-      getPendingConflict: () => null,
-      refreshPendingConflict: vi.fn(),
-      retryPendingConflict: vi.fn(),
-      discardPendingConflict: vi.fn(),
-      flush: vi.fn(),
-      dispose: vi.fn(),
-    });
-    mocks.canvasMounts = 0;
-    mocks.combatMounts = 0;
-    mocks.activate.mockResolvedValue(preparedSession());
-    mocks.restore.mockResolvedValue({ status: 'conflict' });
-  });
-
-  it('shows truthful persisted status and invokes guarded restore/reapply actions', async () => {
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    expect(screen.getByText(/local operations: pending/i)).toBeVisible();
-    expect(
-      screen.getByText(
-        /Local draft: saved.*authoritative checkpoint: committed locally/i
-      )
-    ).toBeVisible();
-
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Restore saved checkpoint' })
-    );
-    await waitFor(() => expect(mocks.restore).toHaveBeenCalledOnce());
-    expect(mocks.restore).toHaveBeenCalledWith(
-      expect.objectContaining({
-        campaignCode: 'CAMP',
-        dmId: 'dm-1',
-        sceneId: 'scene-1',
-        checkpoint: expect.objectContaining({ generation: 'generation-1' }),
-      })
-    );
-    expect(
-      await screen.findByText(
-        /was not restored because live authority changed/i
-      )
-    ).toBeVisible();
-
-    mocks.restore.mockResolvedValueOnce({ status: 'restored' });
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Reapply local draft' })
-    );
-    await waitFor(() => expect(mocks.restore).toHaveBeenCalledTimes(2));
-    expect(mocks.restore.mock.calls[1]?.[0]).toMatchObject({
-      checkpoint: { generation: 'offline-1' },
-    });
-    expect(
-      await screen.findByText(/Local draft restored to live authority/i)
-    ).toBeVisible();
-  });
-
-  it('PR04: shows audience presentation beside the authority status and feeds combat the descriptor', async () => {
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    expect(
-      await screen.findByRole('status', { name: 'Audience status' })
-    ).toHaveTextContent('Audience: nothing shown');
-    expect(screen.getByText('Preparing: Crypt (private)')).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Show this scene' })
-    ).toBeEnabled();
-    expect(mocks.combatProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        presentation: { sceneId: null, revision: 0, blanked: false },
-      })
+describe('W8 route matrix: /table/<sceneId> → canonical workspace', () => {
+  it('redirects to ?scene= and never presents (no client code runs)', async () => {
+    await expect(target('scene-1', {})).resolves.toBe(
+      '/dm/campaign/CAMP/table?scene=scene-1'
     );
   });
 
-  it('mounts the scene roster inside the canvas with the shared placement ref', async () => {
-    render(<TableScenePage />);
-    await screen.findByTestId('table-roster');
-    expect(screen.getByTestId('placement')).toHaveAttribute(
-      'data-pending',
-      'no'
-    );
-    const canvasProps = mocks.canvasProps.mock.calls.at(-1)![0] as {
-      onViewportReady?: unknown;
-      tokenConfigRef?: unknown;
-    };
-    expect(canvasProps.onViewportReady).toEqual(expect.any(Function));
-    expect(mocks.rosterProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        sceneId: 'scene-1',
-        campaignCode: 'CAMP',
-        dmId: 'dm-1',
-        canvas: null,
-        live: false,
-      })
+  it('preserves run and the imported workspace selection raw', async () => {
+    await expect(
+      target('scene-1', { run: 'run-2', tableWorkspace: 'imported-1' })
+    ).resolves.toBe(
+      '/dm/campaign/CAMP/table?scene=scene-1&run=run-2&tableWorkspace=imported-1'
     );
   });
 
-  it('preserves imported workspace selection in Battle Maps links', async () => {
-    mocks.query = 'tableWorkspace=fork-1';
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    expect(screen.getByRole('link', { name: 'Battle Maps' })).toHaveAttribute(
-      'href',
-      '/dm/campaign/CAMP/battlemaps?tableWorkspace=fork-1'
-    );
-    expect(mocks.workspace).toHaveBeenCalledWith(
-      expect.objectContaining({ localWorkspaceId: 'fork-1' })
+  it('never drops an oversized workspace selection to the default workspace', async () => {
+    await expect(
+      target('scene-1', { tableWorkspace: 'x'.repeat(600) })
+    ).resolves.toBe(
+      '/dm/campaign/CAMP/table?scene=scene-1&tableWorkspace=invalid'
     );
   });
 
-  it('surfaces refresh, deliberate retry and discard for a pending adapter conflict', async () => {
-    const refreshPendingConflict = vi.fn().mockResolvedValue(true);
-    const retryPendingConflict = vi.fn().mockResolvedValue('conflict');
-    const discardPendingConflict = vi.fn();
-    mocks.createAdapter.mockReturnValue({
-      sceneId: 'scene-1',
-      sourceMapId: 'map-original',
-      getBattleMap: () => ({
-        id: 'scene-1',
-        name: 'Crypt',
-        canvasState: '{}',
-      }),
-      subscribe: () => () => {},
-      getLocalEditGeneration: () => 0,
-      getPendingConflict: () => ({
-        operationId: 'stale-name',
-        fields: ['name'],
-        createdAt: '2026-10-06T00:02:00.000Z',
-      }),
-      refreshPendingConflict,
-      retryPendingConflict,
-      discardPendingConflict,
-      flush: vi.fn(),
-      dispose: vi.fn(),
-    });
-    render(<TableScenePage />);
-    await screen.findByText(/was not replayed/i);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Refresh winner' }));
-    await waitFor(() => expect(refreshPendingConflict).toHaveBeenCalledOnce());
-    fireEvent.click(screen.getByRole('button', { name: 'Retry pending edit' }));
-    await waitFor(() => expect(retryPendingConflict).toHaveBeenCalledOnce());
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Discard pending edit' })
-    );
-    expect(discardPendingConflict).toHaveBeenCalledOnce();
-  });
-
-  it('rejects a forged imported-workspace campaign route before adapter or authority calls', async () => {
-    mocks.query = 'tableWorkspace=fork-1';
-    const crossRouteRepository = {
-      workspaceSelection: {
-        account: { kind: 'guest' },
-        workspace: {
-          localWorkspaceId: 'fork-1',
-          routeCampaignCode: 'OTHER-CAMPAIGN',
-        },
-      },
-      getCurrent: () => ({
-        status: 'ready',
-        snapshot: { campaign: { revision: 1 }, scenes: [scene()] },
-      }),
-    };
-    mocks.workspace.mockReturnValue({
-      repository: crossRouteRepository,
-      revision: 1,
-      loading: false,
-      error: null,
-    });
-
-    render(<TableScenePage />);
-    expect(
-      await screen.findByText(/not bound to this campaign route/i)
-    ).toBeVisible();
-    expect(mocks.createAdapter).not.toHaveBeenCalled();
-    expect(mocks.activate).not.toHaveBeenCalled();
-    expect(screen.queryByTestId('canvas')).not.toBeInTheDocument();
-  });
-
-  it('keeps the initializing gate until the first authority outcome (C3-7)', async () => {
-    let resolve: (value: unknown) => void = () => {};
-    mocks.activate.mockReturnValue(
-      new Promise(next => {
-        resolve = next;
-      })
-    );
-    render(<TableScenePage />);
-    expect(
-      await screen.findByText(/preparing private authority/i)
-    ).toBeVisible();
-    expect(screen.queryByTestId('canvas')).toBeNull();
-    resolve(preparedSession());
-    await screen.findByTestId('canvas');
-    expect(screen.getByTestId('table-combat')).toBeVisible();
-  });
-
-  it('reloads while the old lease is live: canvas and combat stay mounted, acquire waits for the lease (R2-3)', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      mocks.activate.mockResolvedValueOnce({
-        status: 'failed',
-        reason: 'controller-active',
-        leaseUntil: Date.now() + 25_000,
-        holderSessionId: 'old-page-load',
-      });
-      render(<TableScenePage />);
-      await screen.findByTestId('canvas');
-      expect(screen.getByTestId('table-combat')).toBeVisible();
-      expect(
-        screen.getByText(/Another session holds live control/i)
-      ).toBeVisible();
-      const acquire = screen.getByRole('button', {
-        name: /Acquire live control/i,
-      });
-      expect(acquire).toBeDisabled();
-      expect(acquire).toHaveTextContent(/\d+\s*s/);
-      expect(mocks.combatProps).toHaveBeenLastCalledWith(
-        expect.objectContaining({ controlSession: null })
-      );
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(40_000);
-      });
-      // No automatic acquire or takeover while waiting.
-      expect(mocks.activate).toHaveBeenCalledTimes(1);
-      const enabled = screen.getByRole('button', {
-        name: /Acquire live control/i,
-      });
-      expect(enabled).toBeEnabled();
-      fireEvent.click(enabled);
-      await waitFor(() => expect(mocks.activate).toHaveBeenCalledTimes(2));
-      await waitFor(() =>
-        expect(mocks.combatProps).toHaveBeenLastCalledWith(
-          expect.objectContaining({
-            controlSession: expect.objectContaining({
-              holderSessionId: 'table-session-1',
-            }),
-          })
-        )
-      );
-      expect(screen.getByTestId('canvas')).toBeVisible();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('keeps canvas and combat mounted and usable after renew failure mid-fight (R2-3)', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    try {
-      mocks.activate.mockResolvedValueOnce(
-        preparedSession(async () => ({ status: 'lost', reason: 'lease-lost' }))
-      );
-      render(<TableScenePage />);
-      await screen.findByTestId('canvas');
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(10_500);
-      });
-      expect(await screen.findByText(/Live control lost/i)).toBeVisible();
-      expect(screen.getByTestId('canvas')).toBeVisible();
-      expect(screen.getByTestId('table-combat')).toBeVisible();
-      expect(mocks.combatProps).toHaveBeenLastCalledWith(
-        expect.objectContaining({ controlSession: null })
-      );
-      expect(mocks.activate).toHaveBeenCalledTimes(1);
-      expect(
-        screen.getByRole('button', { name: /Acquire live control/i })
-      ).toBeVisible();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('reconnects the canvas after an explicit acquire and asks combat to hold (C3-7)', async () => {
-    mocks.activate.mockResolvedValueOnce({
-      status: 'failed',
-      reason: 'network',
-    });
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    const mountsBefore = mocks.canvasMounts;
-    const epochBefore = (
-      mocks.combatProps.mock.calls.at(-1)![0] as { controlEpoch: number }
-    ).controlEpoch;
-    fireEvent.click(
-      screen.getByRole('button', { name: /Acquire live control/i })
-    );
-    await waitFor(() =>
-      expect(
-        (mocks.combatProps.mock.calls.at(-1)![0] as { controlEpoch: number })
-          .controlEpoch
-      ).toBeGreaterThan(epochBefore)
-    );
-    await waitFor(() =>
-      expect(mocks.canvasMounts).toBeGreaterThan(mountsBefore)
-    );
-    expect(screen.getByText(/Public initiative cleared/i)).toBeVisible();
-  });
-
-  it('labels a disabled Table v1 server as live publishing unavailable', async () => {
-    mocks.activate.mockResolvedValueOnce({
-      status: 'failed',
-      reason: 'live-unavailable',
-    });
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    expect(screen.getByText(/Live publishing unavailable/i)).toBeVisible();
-    expect(mocks.combatProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ liveUnavailable: true, controlSession: null })
+  it('encodes unusual scene ids instead of trusting them', async () => {
+    await expect(target('a b/c', {})).resolves.toBe(
+      '/dm/campaign/CAMP/table?scene=a+b%2Fc'
     );
   });
+});
 
-  it('passes the ?run= selection to the combat panel', async () => {
-    mocks.query = 'run=run-7';
-    render(<TableScenePage />);
-    await screen.findByTestId('table-combat');
-    expect(mocks.combatProps).toHaveBeenLastCalledWith(
-      expect.objectContaining({ requestedRunId: 'run-7', sceneId: 'scene-1' })
-    );
-  });
-
-  it('keeps the combat panel mounted across the canvas remount after an explicit acquire (F6)', async () => {
-    mocks.activate.mockResolvedValueOnce({
-      status: 'failed',
-      reason: 'network',
-    });
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    const canvasBefore = mocks.canvasMounts;
-    // R3-5: the combat panel mount is observed asynchronously.
-    await waitFor(() => expect(mocks.combatMounts).toBe(1));
-    fireEvent.click(
-      screen.getByRole('button', { name: /Acquire live control/i })
-    );
-    await waitFor(() =>
-      expect(mocks.canvasMounts).toBeGreaterThan(canvasBefore)
-    );
-    expect(mocks.combatMounts).toBe(1);
-  });
-
-  it('clears the "Public initiative cleared" banner once the panel reports a publish (F5)', async () => {
-    mocks.activate.mockResolvedValueOnce({
-      status: 'failed',
-      reason: 'network',
-    });
-    render(<TableScenePage />);
-    await screen.findByTestId('canvas');
-    fireEvent.click(
-      screen.getByRole('button', { name: /Acquire live control/i })
-    );
-    // The canvas (holding the banner) remounts after the acquire.
-    await waitFor(() =>
-      expect(screen.getByText(/Public initiative cleared/i)).toBeVisible()
-    );
-    const props = mocks.combatProps.mock.calls.at(-1)![0] as {
-      onPublicationStatus: (status: { kind: string; runId?: string }) => void;
-    };
-    act(() => props.onPublicationStatus({ kind: 'broadcasting', runId: 'r' }));
-    await waitFor(() =>
-      expect(screen.queryByText(/Public initiative cleared/i)).toBeNull()
-    );
+describe('W8 route matrix: display routes stay outside the DM workspace', () => {
+  const root = path.resolve(__dirname, '../../../../../..');
+  it.each([
+    'app/dm/campaign/[code]/battlemaps/[id]/display/page.tsx',
+    'app/table-display/[code]/page.tsx',
+  ])('%s never redirects into /table', file => {
+    const source = fs.readFileSync(path.join(root, file), 'utf8');
+    expect(source).not.toMatch(/\/table\?|redirect\(/u);
   });
 });

@@ -12,6 +12,7 @@ import {
 import {
   findSceneRunsForCampaign,
   findSceneRunsForEncounter,
+  findTableSceneForMap,
 } from './combatLibrary';
 import { TableRepository } from './repository';
 
@@ -135,6 +136,9 @@ describe('library "Open scene run" lookup (D10, R2-9)', () => {
         label: 'Adopted 0',
         localWorkspaceId: 'workspace-library',
         defaultWorkspace: true,
+        // PR06 W7 multi-run selector metadata (read-only).
+        sceneName: 'Map',
+        createdAt: AT,
       },
     ]);
     await expect(
@@ -165,5 +169,75 @@ describe('library "Open scene run" lookup (D10, R2-9)', () => {
       })
     ).resolves.toEqual(new Map());
     expect(await names(factory)).toEqual([]);
+  });
+});
+
+describe('W8 read-only source-map lookup for the original map route', () => {
+  it('finds the adopted scene of a source map and never creates the database', async () => {
+    const empty = new IDBFactory();
+    await expect(
+      findTableSceneForMap({
+        factory: empty,
+        account: fixtureSelection.account,
+        campaignCode: 'CAMP',
+        mapId: 'map-1',
+      })
+    ).resolves.toBeNull();
+    expect(await names(empty)).toEqual([]);
+
+    const factory = new IDBFactory();
+    const repository = new TableRepository({
+      factory,
+      selection: {
+        account: fixtureSelection.account,
+        workspace: {
+          localWorkspaceId: 'workspace-maps',
+          sourceCampaignCode: 'CAMP',
+        },
+      },
+      broadcastChannel: null,
+      events: null,
+    });
+    repositories.push(repository);
+    await repository.start();
+    await repository.mutateWorkspace(0, 'map-seed', {
+      campaign: {
+        sourceMappings: [
+          {
+            sourceCampaignId: 'CAMP',
+            sourceMapId: 'map-1',
+            sceneId: 'scene-9',
+          },
+        ],
+      },
+    });
+    await expect(
+      findTableSceneForMap({
+        factory,
+        account: fixtureSelection.account,
+        campaignCode: 'CAMP',
+        mapId: 'map-1',
+      })
+    ).resolves.toEqual({
+      sceneId: 'scene-9',
+      localWorkspaceId: 'workspace-maps',
+      defaultWorkspace: true,
+    });
+    await expect(
+      findTableSceneForMap({
+        factory,
+        account: fixtureSelection.account,
+        campaignCode: 'CAMP',
+        mapId: 'map-2',
+      })
+    ).resolves.toBeNull();
+    await expect(
+      findTableSceneForMap({
+        factory,
+        account: { kind: 'guest' },
+        campaignCode: 'CAMP',
+        mapId: 'map-1',
+      })
+    ).resolves.toBeNull();
   });
 });

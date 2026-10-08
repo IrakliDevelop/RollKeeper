@@ -2,6 +2,8 @@ import { readFile } from 'node:fs/promises';
 
 import { expect, test, type Page } from '@playwright/test';
 
+import { guardTableContext } from './tableContext';
+
 const CAMPAIGN = {
   code: 'E2ECOMBAT',
   name: 'Combat E2E',
@@ -102,6 +104,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
 }) => {
   test.setTimeout(180_000);
   const context = await browser.newContext({ acceptDownloads: true });
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       if (localStorage.getItem('rollkeeper-dm-data')) return;
@@ -311,5 +314,6 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
       combatLog: localStorage.getItem('rollkeeper-combat-log'),
     }))
   ).toEqual(legacyBefore);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });

@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { TableRepository } from '@/lib/table/repository';
 import { dmTokenFields, partyTokenFields } from '@/lib/table/roster';
+import { runSceneCommand } from '@/lib/table/sceneCommands';
 import type {
   JsonObject,
   TableActorRecordV1,
@@ -226,6 +227,62 @@ describe('TableRosterPanel', () => {
     );
     expect(snapshot(repository).campaign?.revision).toBe(2);
     expect(await screen.findByText(/DM-controlled/)).toBeInTheDocument();
+  });
+
+  it('Bring party here reloads the campaign players before placing (FU-3 / A1e)', async () => {
+    const repository = await repositoryWith();
+    await runSceneCommand(repository, {
+      expectedRevision: snapshot(repository).campaign?.revision ?? 0,
+      operationId: 'arrival',
+      command: {
+        type: 'scene.setArrivalPoint',
+        sceneId: 'tavern',
+        point: { x: 10, y: 10 },
+        at: AT,
+      },
+    });
+    const stampAt = vi.fn(() => true);
+    render(
+      <TableRosterPanel
+        repository={repository}
+        sceneId="tavern"
+        campaignCode="CAMP"
+        dmId="dm-a"
+        canvas={{ ...fakeCanvas(), stampAt }}
+        live
+        arrival={{ arming: false, onArm: vi.fn() }}
+      />
+    );
+    const reads = () =>
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([input]) =>
+          String(input).endsWith('/api/campaign/CAMP/players')
+        ).length;
+    const bring = await screen.findByRole('button', {
+      name: 'Bring party here',
+    });
+    await waitFor(() => expect(bring).toBeEnabled());
+    await waitFor(() => expect(reads()).toBeGreaterThanOrEqual(1));
+    const before = reads();
+    fireEvent.click(bring);
+    await waitFor(() => expect(stampAt).toHaveBeenCalledTimes(1));
+    expect(reads()).toBe(before + 1);
+  });
+
+  it('refreshes the players snapshot when the add dialog opens (acceptance A1)', async () => {
+    const repository = await repositoryWith();
+    renderPanel(repository, fakeCanvas());
+    const reads = () =>
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.filter(([input]) =>
+          String(input).endsWith('/api/campaign/CAMP/players')
+        ).length;
+    await waitFor(() => expect(reads()).toBeGreaterThanOrEqual(1));
+    const before = reads();
+    await openAddDialog();
+    await waitFor(() => expect(reads()).toBe(before + 1));
   });
 
   it('adds a verified party member once through the accessible add dialog', async () => {

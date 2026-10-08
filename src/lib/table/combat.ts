@@ -6,8 +6,9 @@ import {
   healHp,
   stackTempHp,
 } from '@/utils/combatMechanics';
-import type { EncounterEntity } from '@/types/encounter';
+import type { Encounter, EncounterEntity } from '@/types/encounter';
 
+import { actorFromEntity } from './adoption';
 import type { TableRepository, TableWorkspaceMutation } from './repository';
 import { isEditableActor } from './roster';
 import {
@@ -61,12 +62,56 @@ export type TableCombatStatChange =
   | { kind: 'setConditionRounds'; conditionId: string; rounds: number | null }
   | { kind: 'setReaction'; available: boolean };
 
+/**
+ * PR06 A3: JSON-only snapshot of a library encounter definition, taken once
+ * by the caller; a copy never reads or writes the library afterwards.
+ */
+export interface TableEncounterCopySnapshotV1 {
+  id: string;
+  name: string;
+  entities: JsonObject[];
+}
+
+export function encounterCopySnapshot(
+  encounter: Pick<Encounter, 'id' | 'name' | 'entities'>
+): TableEncounterCopySnapshotV1 {
+  return JSON.parse(
+    JSON.stringify({
+      id: encounter.id,
+      name: encounter.name,
+      entities: encounter.entities,
+    })
+  ) as TableEncounterCopySnapshotV1;
+}
+
+/** Creature entities a copy brings into the scene (players stay roster-only). */
+export function copiedEncounterEntities(
+  encounter: TableEncounterCopySnapshotV1
+): JsonObject[] {
+  return encounter.entities.filter(entity => entity.type !== 'player');
+}
+
 export type TableCombatCommandV1 =
   | {
       type: 'combat.createRun';
       sceneId: string;
       runId: string;
       label: string;
+      at: string;
+    }
+  | {
+      /**
+       * PR06 A3 "Prepare on map": copies a library encounter's creatures
+       * into the scene as DM-managed actors `${runId}:${entityId}` (R3-F7)
+       * with fresh scene members, and creates the inactive run.
+       */
+      type: 'combat.createRunFromEncounter';
+      sceneId: string;
+      runId: string;
+      label: string;
+      encounter: TableEncounterCopySnapshotV1;
+      /** One pre-allocated member id per copied creature, in order. */
+      sceneMemberIds: string[];
       at: string;
     }
   | { type: 'combat.selectRun'; runId: string | null; at: string }
@@ -188,6 +233,7 @@ export function sortedParticipantIds(run: TableEncounterRecordV1): string[] {
 
 const COMBAT_TYPES = new Set([
   'combat.createRun',
+  'combat.createRunFromEncounter',
   'combat.selectRun',
   'combat.setParticipants',
   'combat.setInitiative',
@@ -865,6 +911,114 @@ function planStat(
   return { status: 'planned', mutation };
 }
 
+function planEncounterCopy(
+  context: Context,
+  command: Extract<
+    TableCombatCommandV1,
+    { type: 'combat.createRunFromEncounter' }
+  >
+): TableCombatPlan {
+  const { snapshot } = context;
+  const scene = sceneOf(context, command.sceneId);
+  if (!scene) return rejected('invalid-reference', { detail: 'scene-missing' });
+  if (
+    context.runs.has(command.runId) ||
+    snapshot.tombstones.some(
+      tombstone =>
+        tombstone.kind === 'encounter' && tombstone.id === command.runId
+    )
+  )
+    return rejected('invalid-command', { detail: 'run-exists' });
+  if (!isRunLabel(command.label))
+    return rejected('invalid-command', { detail: 'label' });
+  const encounter = command.encounter;
+  if (
+    !encounter ||
+    typeof encounter.id !== 'string' ||
+    encounter.id.length === 0 ||
+    !Array.isArray(encounter.entities)
+  )
+    return rejected('invalid-command', { detail: 'encounter' });
+  const entities = copiedEncounterEntities(encounter);
+  if (
+    !Array.isArray(command.sceneMemberIds) ||
+    command.sceneMemberIds.length !== entities.length ||
+    new Set(command.sceneMemberIds).size !== entities.length ||
+    command.sceneMemberIds.some(id => typeof id !== 'string' || id.length === 0)
+  )
+    return rejected('invalid-command', { detail: 'member-ids' });
+  if (entities.length > MAX_RUN_PARTICIPANTS)
+    return rejected('participant-limit');
+  let actors: TableActorRecordV1[];
+  try {
+    actors = entities.map(entity =>
+      actorFromEntity(scene.workspaceKey, command.runId, entity, command.at)
+    );
+  } catch {
+    return rejected('invalid-command', { detail: 'entity' });
+  }
+  const actorIds = new Set(actors.map(actor => actor.actorId));
+  if (
+    actorIds.size !== actors.length ||
+    actors.some(
+      actor =>
+        context.actors.has(actor.actorId) ||
+        snapshot.tombstones.some(
+          tombstone =>
+            tombstone.kind === 'actor' && tombstone.id === actor.actorId
+        )
+    )
+  )
+    return rejected('invalid-command', { detail: 'actor-exists' });
+  const usedMemberIds = new Set(
+    snapshot.scenes.flatMap(item =>
+      item.members.flatMap(member =>
+        member.sceneMemberId ? [member.sceneMemberId] : []
+      )
+    )
+  );
+  if (command.sceneMemberIds.some(id => usedMemberIds.has(id)))
+    return rejected('invalid-command', { detail: 'member-exists' });
+  const run: TableEncounterRecordV1 = {
+    schemaVersion: 1,
+    workspaceKey: scene.workspaceKey,
+    runId: command.runId,
+    sceneId: scene.sceneId,
+    sourceEncounterId: encounter.id,
+    runGeneration: command.runId,
+    participants: actors.map(actor => ({
+      actorId: actor.actorId,
+      initiative: null,
+      turnResources: { ...RESET_TURN_RESOURCES },
+    })),
+    round: 0,
+    currentActorId: null,
+    isActive: false,
+    createdAt: command.at,
+    updatedAt: command.at,
+    label: command.label,
+  };
+  const members: TableSceneMemberV1[] = [
+    ...structuredClone(scene.members),
+    ...actors.map((actor, index) => ({
+      actorId: actor.actorId,
+      tokenIds: [],
+      sceneMemberId: command.sceneMemberIds[index]!,
+    })),
+  ];
+  return {
+    status: 'planned',
+    mutation: {
+      scenes: {
+        put: [{ ...structuredClone(scene), members, updatedAt: command.at }],
+      },
+      actors: { put: actors },
+      encounters: { put: [run] },
+      campaign: { selectedRunId: run.runId },
+    },
+  };
+}
+
 /** Plans one combat command against the snapshot at its expected revision. */
 export function planCombatCommand(
   snapshot: TableWorkspaceSnapshotV1,
@@ -922,6 +1076,8 @@ export function planCombatCommand(
         },
       };
     }
+    case 'combat.createRunFromEncounter':
+      return planEncounterCopy(context, command);
     case 'combat.selectRun': {
       // Exempt from imported-active: the selector must reach the reset (C3-9).
       if (command.runId !== null && !liveRun(context, command.runId))

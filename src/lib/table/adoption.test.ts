@@ -7,6 +7,7 @@ import {
   type TableWorkspaceSelection,
 } from './repository';
 import {
+  adoptMapLocally,
   adoptTableScene,
   captureAdoptionPreview,
   createPersistedLegacyTableAdoptionSource,
@@ -235,5 +236,98 @@ describe('Table scene adoption', () => {
     ).resolves.toMatchObject({ status: 'source-changed' });
     const loaded = await repository.reload();
     expect(loaded.status === 'ready' && loaded.snapshot.scenes).toHaveLength(0);
+  });
+});
+
+describe('W9 never-opened map adoption', () => {
+  it.each(['', '   '])(
+    'adopts a map whose canvasState is %j as an empty adoption checkpoint',
+    async canvasState => {
+      const neverOpened = JSON.stringify({
+        id: 'map-blank',
+        campaignCode: 'CAMP',
+        name: 'Fresh map',
+        mapImageUrl: '/maps/fresh.webp',
+        mapImageSize: { w: 640, h: 480 },
+        canvasState,
+        dmOnlyElements: {},
+        gridEnabled: false,
+        linkedEncounterIds: [],
+        markers: [],
+        createdAt: '2026-10-05T00:00:00.000Z',
+        updatedAt: '2026-10-05T00:00:00.000Z',
+      });
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const input = source(() => neverOpened);
+      const preview = await captureAdoptionPreview({
+        source: input,
+        workspaceKey: repository.workspaceIdentity,
+        sourceCampaignId: 'CAMP',
+        sourceMapId: 'map-blank',
+      });
+      expect(preview.scene.canvasCheckpoint?.state).toEqual({});
+      expect(preview.scene.map.mapImageUrl).toBe('/maps/fresh.webp');
+      await expect(
+        adoptTableScene({
+          repository,
+          source: input,
+          preview,
+          expectedRevision: 0,
+          operationId: 'adopt-blank',
+        })
+      ).resolves.toMatchObject({ status: 'committed' });
+    }
+  );
+});
+
+describe('R3-F1 local-only adoption for the workspace', () => {
+  it('captures and commits locally and sends no network request', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const result = await adoptMapLocally({
+        repository,
+        source: source(),
+        campaignCode: 'CAMP',
+        mapId: 'map-1',
+      });
+      expect(result).toMatchObject({ status: 'committed', name: 'Crypt' });
+      if (result.status !== 'committed') throw new Error('not committed');
+      const current = repository.getCurrent();
+      if (current?.status !== 'ready') throw new Error('not ready');
+      expect(current.snapshot.scenes.map(scene => scene.sceneId)).toEqual([
+        result.sceneId,
+      ]);
+      expect(current.snapshot.campaign?.sourceMappings).toEqual([
+        {
+          sourceCampaignId: 'CAMP',
+          sourceMapId: 'map-1',
+          sceneId: result.sceneId,
+        },
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      // A second adoption of the same map replays (same operation id).
+      await expect(
+        adoptMapLocally({
+          repository,
+          source: source(),
+          campaignCode: 'CAMP',
+          mapId: 'map-1',
+        })
+      ).resolves.toMatchObject({ status: 'rejected' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

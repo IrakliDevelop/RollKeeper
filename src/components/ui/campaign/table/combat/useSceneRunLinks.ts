@@ -19,7 +19,9 @@ import {
 
 const NONE: TableSceneRunLink[] = [];
 
-async function currentAccount(): Promise<TableWorkspaceSelection['account']> {
+export async function currentAccount(): Promise<
+  TableWorkspaceSelection['account']
+> {
   try {
     const client = createSupabaseBrowserClient();
     const id = client

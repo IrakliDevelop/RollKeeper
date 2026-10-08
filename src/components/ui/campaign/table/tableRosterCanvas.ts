@@ -1,6 +1,8 @@
 import type { CanvasElement, SelectTool, Viewport } from '@fieldnotes/core';
 
+import { stampCombatantToken } from '@/components/ui/campaign/dm-vtt/combatantToken';
 import type { PendingTokenPlacement } from '@/components/ui/campaign/dm-vtt/TokenPlacementController';
+import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
 import { PLAYER_BAND_ORDER } from '@/components/ui/campaign/location-map/layerContract';
 import {
   canonicalPlayerBand,
@@ -10,6 +12,29 @@ import type { BattleMapConnection } from '@/lib/battlemapSync';
 import type { TokenCellSize } from '@/types/encounter';
 
 import type { TableRosterCanvas } from './useTableRosterState';
+
+/** Deterministic arrival fan (cells): centre, then rings around it. */
+const FAN: ReadonlyArray<readonly [number, number]> = [
+  [0, 0],
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [-1, 1],
+  [1, -1],
+  [-1, -1],
+  [2, 0],
+  [-2, 0],
+  [0, 2],
+  [0, -2],
+];
+
+export function arrivalFanOffset(slot: number): { dx: number; dy: number } {
+  const [dx, dy] = FAN[slot % FAN.length]!;
+  const ring = Math.floor(slot / FAN.length) * 3;
+  return { dx: dx + ring, dy };
+}
 
 const CONTROL_KEYS = [
   'tokenKind',
@@ -77,6 +102,26 @@ export function createTableRosterCanvas(options: {
       for (const key of patch.unset) update[key] = undefined;
       viewport.store.update(tokenId, update as Partial<CanvasElement>);
       return true;
+    },
+    stampAt: (request, point, slot) => {
+      if (viewport.store.getById(request.tokenId)) return true;
+      const ctx = viewport.toolContext;
+      const cell = cellUnit(ctx);
+      const offset = arrivalFanOffset(slot);
+      stampCombatantToken(
+        {
+          entityId: request.sceneMemberId,
+          name: request.name,
+          avatarUrl: request.avatarUrl,
+          color: request.color,
+          tokenSize: request.tokenCells as TokenCellSize,
+          tokenId: request.tokenId,
+          fields: request.fields,
+        },
+        { x: point.x + offset.dx * cell, y: point.y + offset.dy * cell },
+        ctx
+      );
+      return viewport.store.getById(request.tokenId) !== undefined;
     },
     ensurePlayerBand: (legacyPlayerId, name) => {
       const id = playerLayerId(legacyPlayerId);

@@ -6,8 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 import {
-  adoptTableScene,
-  captureAdoptionPreview,
+  adoptMapLocally,
   compareTableSceneSource,
   createPersistedLegacyTableAdoptionSource,
   type TableAdoptionSource,
@@ -25,6 +24,7 @@ import { useDmStore } from '@/store/dmStore';
 import type { BattleMap } from '@/types/battlemap';
 import { isTableWorkspaceBoundToCampaign } from '@/lib/table/sceneAdapter';
 import { useAuthenticatedTableWorkspace } from './useAuthenticatedTableWorkspace';
+import { tableWorkspaceHref } from './workspace/tableWorkspaceRoutes';
 
 interface TableScenePanelProps {
   campaignCode: string;
@@ -121,20 +121,15 @@ export function TableScenePanel({
     if (!repository || current?.status !== 'ready') return;
     setStatus({ kind: 'working', message: `Capturing ${map.name}…` });
     try {
-      const preview = await captureAdoptionPreview({
-        source,
-        workspaceKey: repository.workspaceIdentity,
-        sourceCampaignId: campaignCode,
-        sourceMapId: map.id,
-      });
-      const result = await adoptTableScene({
+      const result = await adoptMapLocally({
         repository,
         source,
-        preview,
-        expectedRevision: current.snapshot.campaign?.revision ?? 0,
-        operationId: `adopt:${campaignCode}:${map.id}`,
+        campaignCode,
+        mapId: map.id,
       });
       if (result.status === 'committed') {
+        // The battle-maps page keeps its PR01 composition (it drops the
+        // session); the Table workspace adopts locally only (R3-F1).
         const live = await prepareTableSceneAuthority({
           campaignCode,
           dmId: useDmStore.getState().dmId,
@@ -143,8 +138,8 @@ export function TableScenePanel({
           workspaceInstanceId:
             repository.workspaceSelection.workspace.localWorkspaceId,
           contentRevision: result.revision,
-          safeLabel: preview.scene.map.name,
-          canvasState: preview.scene.canvasCheckpoint?.state ?? {},
+          safeLabel: result.name,
+          canvasState: result.canvasState,
           holderSessionId: getTableAuthoritySessionId(),
         });
         setStatus(
@@ -367,7 +362,10 @@ export function TableScenePanel({
               </p>
             )}
             <Link
-              href={`/dm/campaign/${campaignCode}/table/${scene.sceneId}${selectedWorkspaceId ? `?tableWorkspace=${encodeURIComponent(selectedWorkspaceId)}` : ''}`}
+              href={tableWorkspaceHref(campaignCode, {
+                scene: scene.sceneId,
+                tableWorkspace: selectedWorkspaceId,
+              })}
               className="mt-3 inline-block"
             >
               <Button variant="primary" size="sm">

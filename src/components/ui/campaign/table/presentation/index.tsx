@@ -28,6 +28,35 @@ const DISPLAY_TONE = {
 } as const;
 
 /**
+ * The presentation state of one page (PR04 P4 + PR05 E13): the control
+ * descriptor (holder session or the non-holder 10 s poll) and the 5 s
+ * display-status poll. PR06 W4: the workspace calls this ONCE so scene
+ * switches and canvas remounts never add a poll; the view may remount.
+ */
+export function useTablePresentationPanel(
+  props: TablePresentationControlsProps
+) {
+  const presentation = useTablePresentation(props);
+  // PR05 E13: the display line comes only from the server-computed display
+  // status, re-read at once after each committed presentation command.
+  const display = useTableDisplayStatus(
+    props.campaignCode,
+    props.dmId,
+    props.inactive !== true
+  );
+  const { refresh } = display;
+  const { committedCount } = presentation;
+  useEffect(() => {
+    if (committedCount > 0) refresh();
+  }, [committedCount, refresh]);
+  return { presentation, display };
+}
+
+export type TablePresentationPanel = ReturnType<
+  typeof useTablePresentationPanel
+>;
+
+/**
  * Explicit audience presentation for the Table page (PR04 P4): what players
  * see (server-acknowledged) apart from what this route privately prepares,
  * and holder-only Show / Blank / Reveal / Stop showing. Published is shown
@@ -37,28 +66,34 @@ const DISPLAY_TONE = {
 export function TablePresentationControls(
   props: TablePresentationControlsProps
 ) {
-  const presentation = useTablePresentation(props);
+  const panel = useTablePresentationPanel(props);
+  return <TablePresentationView {...props} panel={panel} />;
+}
+
+/** Presentational half: holds no subscription of its own. */
+export function TablePresentationView(
+  props: TablePresentationControlsProps & { panel: TablePresentationPanel }
+) {
+  const { presentation, display } = props.panel;
+  const { refresh } = display;
   const { descriptor, labels, pending, message, holder } = presentation;
+  const sceneId = props.sceneId ?? '';
   const lines = presentationStatusLines({
     descriptor,
-    sceneId: props.sceneId,
+    sceneId,
     sceneName: props.sceneName,
     labels,
   });
-  const actions = presentationActions(descriptor, props.sceneId);
+  const actions = presentationActions(descriptor, sceneId).filter(
+    action => action !== 'show' || props.sceneId !== null
+  );
   const disabled = !holder || pending;
-  // PR05 E13: the display line comes only from the server-computed display
-  // status, re-read at once after each committed presentation command.
-  const display = useTableDisplayStatus(props.campaignCode, props.dmId);
-  const { refresh } = display;
-  const { committedCount } = presentation;
-  useEffect(() => {
-    if (committedCount > 0) refresh();
-  }, [committedCount, refresh]);
+  // R3-F6: "Show this scene" waits for the selected scene's registration.
+  const showBlocked = props.canShow === false;
   const displayLine = display.status
     ? displayStatusLine({
         status: display.status,
-        sceneId: props.sceneId,
+        sceneId,
         sceneName: props.sceneName,
         labels,
       })
@@ -87,7 +122,7 @@ export function TablePresentationControls(
             </p>
           )}
         </div>
-        {lines.preparation && (
+        {lines.preparation && props.sceneId !== null && (
           <p className="text-muted break-words">{lines.preparation}</p>
         )}
       </div>
@@ -101,7 +136,12 @@ export function TablePresentationControls(
           <Button
             variant="primary"
             size="sm"
-            disabled={disabled}
+            disabled={disabled || showBlocked}
+            title={
+              showBlocked && holder
+                ? 'This scene is not registered for live play yet'
+                : undefined
+            }
             onClick={presentation.show}
           >
             Show this scene
@@ -114,7 +154,7 @@ export function TablePresentationControls(
             disabled={disabled}
             onClick={presentation.reveal}
           >
-            {revealLabel(descriptor, props.sceneId, props.sceneName, labels)}
+            {revealLabel(descriptor, sceneId, props.sceneName, labels)}
           </Button>
         )}
         {actions.includes('blank') && (

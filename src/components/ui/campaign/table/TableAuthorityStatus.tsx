@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/forms/button';
 
-import type { TableAuthorityState } from './useTableSceneAuthority';
+import type { TableAuthorityState } from './workspace/useTableWorkspaceAuthority';
 
 function message(state: TableAuthorityState): string | null {
   switch (state.phase) {
@@ -37,6 +37,8 @@ export function TableAuthorityStatus(props: {
   clearedNotice: boolean;
   onAcquire: () => void;
   onWorkOffline: () => void;
+  /** FU-5: hide the routine "held" explanation below `sm` (Details). */
+  collapseExplanation?: boolean;
 }) {
   const { state } = props;
   const text = message(state);
@@ -50,6 +52,10 @@ export function TableAuthorityStatus(props: {
         <p
           className={`min-w-0 flex-1 text-xs ${
             state.phase === 'ready' ? 'text-muted' : 'text-accent-amber-text'
+          } ${
+            props.collapseExplanation && state.phase === 'ready'
+              ? 'max-sm:hidden'
+              : ''
           }`}
           role={state.phase === 'lost' ? 'alert' : 'status'}
         >

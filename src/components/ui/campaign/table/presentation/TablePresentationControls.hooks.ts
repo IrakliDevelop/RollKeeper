@@ -120,12 +120,13 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
   }, [campaignCode, dmId]);
 
   // Non-holder: read-only status poll.
+  const inactive = props.inactive === true;
   useEffect(() => {
-    if (holder) return;
+    if (holder || inactive) return;
     void readControl();
     const timer = setInterval(() => void readControl(), POLL_MS);
     return () => clearInterval(timer);
-  }, [holder, readControl]);
+  }, [holder, inactive, readControl]);
 
   const descriptor = holder ? props.descriptor : (polled ?? props.descriptor);
   const presentedId = descriptor?.presentation.sceneId ?? null;
@@ -252,7 +253,9 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
     pending,
     message,
     committedCount,
-    show: () => intend({ type: 'show', sceneId }),
+    show: () => {
+      if (sceneId) intend({ type: 'show', sceneId });
+    },
     reveal: () => {
       if (presentedId) intend({ type: 'show', sceneId: presentedId });
     },

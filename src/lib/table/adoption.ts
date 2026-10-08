@@ -87,9 +87,14 @@ function jsonObject(value: unknown): JsonObject | null {
     : null;
 }
 
-function actorFromEntity(
+/**
+ * The one DM-managed actor builder for legacy encounter entities, shared by
+ * adoption (`idPrefix` = encounter id) and PR06 encounter copies (`idPrefix`
+ * = the new run id, R3-F7).
+ */
+export function actorFromEntity(
   workspaceKey: string,
-  encounterId: string,
+  idPrefix: string,
   value: unknown,
   now: string
 ): TableActorRecordV1 {
@@ -99,7 +104,7 @@ function actorFromEntity(
   return {
     schemaVersion: 1,
     workspaceKey,
-    actorId: `${encounterId}:${entityId}`,
+    actorId: `${idPrefix}:${entityId}`,
     actorKind: 'dm-managed',
     liveStats: {
       name: text(entity.name, 'Unnamed actor'),
@@ -226,7 +231,10 @@ export async function captureAdoptionPreview(options: {
   const newId = options.newId ?? (() => crypto.randomUUID());
   const now = (options.now ?? (() => new Date().toISOString()))();
   const sceneId = newId();
-  const canvasRaw = text(map.canvasState, '{}');
+  // W9: a never-opened legacy map persists `canvasState: ''` (list page and
+  // picker create it that way); its adoption checkpoint is an empty state.
+  const canvasText = text(map.canvasState, '{}');
+  const canvasRaw = canvasText.trim().length === 0 ? '{}' : canvasText;
   const canvasState = parseObject(canvasRaw);
   const mapSize = record(map.mapImageSize ?? {});
   const scene: TableSceneRecordV1 = {
@@ -390,6 +398,49 @@ export async function adoptTableScene(options: {
     revision: outcome.revision,
     sceneId: options.preview.scene.sceneId,
     runIds: options.preview.encounters.map(value => value.runId),
+  };
+}
+
+/**
+ * PR06 R3-F1: the local half of adoption (capture + one IndexedDB commit),
+ * shared by the battle-maps panel and the Table workspace. It sends no
+ * request: registration and room seeding happen later on the workspace's
+ * one control session (A1b), never here.
+ */
+export async function adoptMapLocally(options: {
+  repository: TableRepository;
+  source: TableAdoptionSource;
+  campaignCode: string;
+  mapId: string;
+}): Promise<
+  | (Extract<TableAdoptionResult, { status: 'committed' }> & {
+      name: string;
+      canvasState: JsonObject;
+    })
+  | Exclude<TableAdoptionResult, { status: 'committed' }>
+> {
+  const current = options.repository.getCurrent();
+  const preview = await captureAdoptionPreview({
+    source: options.source,
+    workspaceKey: options.repository.workspaceIdentity,
+    sourceCampaignId: options.campaignCode,
+    sourceMapId: options.mapId,
+  });
+  const result = await adoptTableScene({
+    repository: options.repository,
+    source: options.source,
+    preview,
+    expectedRevision:
+      current?.status === 'ready'
+        ? (current.snapshot.campaign?.revision ?? 0)
+        : 0,
+    operationId: `adopt:${options.campaignCode}:${options.mapId}`,
+  });
+  if (result.status !== 'committed') return result;
+  return {
+    ...result,
+    name: preview.scene.map.name,
+    canvasState: preview.scene.canvasCheckpoint?.state ?? {},
   };
 }
 

@@ -8,6 +8,7 @@ import type { TableRepository } from '@/lib/table/repository';
 
 import { TableAddMemberDialog } from './TableAddMemberDialog';
 import { TableMemberDialog } from './TableMemberDialog';
+import { TablePartyArrival } from './TablePartyArrival';
 import { TableRosterNoticeLine } from './TableRosterNoticeLine';
 import { describeEntry, placedIndex, rosterEntities } from './tableRosterModel';
 import { useTableRosterActions } from './useTableRosterActions';
@@ -35,6 +36,8 @@ export function TableRosterPanel(props: {
   dmId: string;
   canvas: TableRosterCanvas | null;
   live: boolean;
+  /** PR06 W11: party arrival actions (Table workspace). */
+  arrival?: { arming: boolean; onArm: () => void };
 }) {
   const state = useTableRosterState(props);
   const actions = useTableRosterActions({
@@ -93,14 +96,34 @@ export function TableRosterPanel(props: {
         hasLinkedEncounter
         emptyMessage="Add party members, creatures or manual PCs to this scene."
         headerActions={
-          <Button
-            variant="outline"
-            size="sm"
-            fullWidth
-            onClick={() => setAdding(true)}
-          >
-            Add to scene
-          </Button>
+          <>
+            <Button
+              variant="outline"
+              size="sm"
+              fullWidth
+              onClick={() => {
+                // Acceptance A1: players may have joined since the last read.
+                state.players.refresh();
+                setAdding(true);
+              }}
+            >
+              Add to scene
+            </Button>
+            {props.arrival && (
+              <TablePartyArrival
+                repository={props.repository}
+                sceneId={props.sceneId}
+                campaignCode={props.campaignCode}
+                dmId={props.dmId}
+                canvas={props.canvas}
+                live={props.live}
+                players={state.playerList}
+                reloadPlayers={state.players.reload}
+                arming={props.arrival.arming}
+                onArm={props.arrival.onArm}
+              />
+            )}
+          </>
         }
         describeRow={entity => {
           const entry = byMember.get(entity.id);

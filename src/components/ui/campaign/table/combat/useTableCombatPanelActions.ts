@@ -19,6 +19,7 @@ import {
   type TableCombatDraft,
 } from './tableEntityActions';
 import type { useTableCombat } from './useTableCombat';
+import { tableWorkspaceHref } from '../workspace/tableWorkspaceRoutes';
 
 const CATEGORY = { pc: 'Player character', npc: 'NPC', monster: 'Creature' };
 const now = () => new Date().toISOString();
@@ -107,17 +108,18 @@ export function useTableCombatPanelActions(options: {
   const activeScene = activeRun
     ? snapshot?.scenes.find(value => value.sceneId === activeRun.sceneId)
     : undefined;
-  const activeQuery = new URLSearchParams();
-  if (options.tableWorkspaceId)
-    activeQuery.set('tableWorkspace', options.tableWorkspaceId);
-  if (activeRun) activeQuery.set('run', activeRun.runId);
   const activeSummary = activeRun
     ? {
         runId: activeRun.runId,
         label: activeRun.label ?? 'Imported run',
         sameScene: activeRun.sceneId === sceneId,
         sceneName: activeScene?.map.name ?? 'another scene',
-        href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/table/${encodeURIComponent(activeRun.sceneId)}?${activeQuery.toString()}`,
+        // PR06 W8: the canonical workspace URL.
+        href: tableWorkspaceHref(options.campaignCode, {
+          scene: activeRun.sceneId,
+          run: activeRun.runId,
+          tableWorkspace: options.tableWorkspaceId,
+        }),
       }
     : null;
   const activeElsewhere =

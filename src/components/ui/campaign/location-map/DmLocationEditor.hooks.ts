@@ -131,6 +131,7 @@ import {
   installVttGridController,
   setViewportFogStyle,
 } from '@/lib/fieldnotesVtt';
+import { assetProxyUrl as proxyUrl } from '@/utils/assetProxyUrl';
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
  *  selector call that would defeat Zustand's referential equality check. */
@@ -145,17 +146,6 @@ const FIT_CAMERA_MAX_ZOOM = 1;
 /** Camera pan after fit (offsets map from UI chrome, e.g. toolbar). */
 const FIT_CAMERA_PAN_OFFSET_X = 100;
 const FIT_CAMERA_PAN_OFFSET_Y = 0;
-
-/**
- * Route an S3 URL through our own proxy to avoid CORS canvas tainting.
- * Non-S3 URLs (e.g. blob: or data:) are returned as-is.
- */
-function proxyUrl(url: string): string {
-  if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
-    return `/api/assets/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
 
 /** Upload to S3 via /api/assets/upload; base64 data-URL fallback when S3 is
  *  not configured. Returns the canonical (non-proxied) src to store. */
