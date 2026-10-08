@@ -5,6 +5,7 @@ import { ArrowLeft, Monitor } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
+import { TableMapEntryLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
@@ -92,6 +93,8 @@ export function DmVttTopBar({
       >
         <span className="hidden lg:inline">Open Display</span>
       </Button>
+      {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
+      <TableMapEntryLink campaignCode={campaignCode} mapId={battleMapId} />
       {display.message && (
         <span
           role="status"
