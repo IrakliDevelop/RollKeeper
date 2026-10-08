@@ -35,9 +35,11 @@ export function useFitMapVisibility(): boolean {
         setVisible(false);
       }, FIT_HIDE_MS);
     };
-    window.addEventListener('pointermove', handleMove);
+    // Capture phase on window: it runs before the PR07 canvas guard, which
+    // stops camera input at the canvas container (hover must still reveal).
+    window.addEventListener('pointermove', handleMove, true);
     return () => {
-      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointermove', handleMove, true);
       if (timer) clearTimeout(timer);
     };
   }, []);

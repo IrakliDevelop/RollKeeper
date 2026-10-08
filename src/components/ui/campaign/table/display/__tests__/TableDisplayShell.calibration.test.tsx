@@ -657,6 +657,23 @@ describe('input policy (P7, R3-2, C7-3)', () => {
     expect(screen.queryByRole('button', { name: 'Fit map' })).toBeNull();
   });
 
+  it('hovering the guarded canvas still reveals Centre map and the edge status', async () => {
+    await mount();
+    await goLive();
+    await calibrate();
+    await advance(3_000);
+    expect(screen.queryByRole('button', { name: 'Centre map' })).toBeNull();
+    // A real hover over the canvas: the guard swallows it for the camera,
+    // but the page-level visibility listener must still see it.
+    act(() =>
+      pointer('pointermove', 1, 420, 300, { pointerType: 'mouse', buttons: 0 })
+    );
+    expect(screen.getByRole('button', { name: 'Centre map' })).toBeTruthy();
+    expect(
+      screen.getByTestId('table-display-calibration').textContent
+    ).toContain('Scale verified');
+  });
+
   it('a blocked second pointer moves nothing while the first keeps panning', async () => {
     await mount();
     await goLive();
