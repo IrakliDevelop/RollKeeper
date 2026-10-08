@@ -674,6 +674,33 @@ describe('input policy (P7, R3-2, C7-3)', () => {
     ).toContain('Scale verified');
   });
 
+  it('a freeze mid-drag ends the drag: after Use uncalibrated a plain hover never pans (review F3)', async () => {
+    await mount();
+    await goLive();
+    await calibrate();
+    const mouse = { pointerType: 'mouse' };
+    pointer('pointerdown', 1, 300, 300, mouse);
+    pointer('pointermove', 1, 320, 310, mouse);
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(state()).toBe('verify-required');
+    const frozen = camera();
+    pointer('pointermove', 1, 360, 340, mouse);
+    pointer('pointerup', 1, 360, 340, { ...mouse, buttons: 0 });
+    expect(camera()).toEqual(frozen);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Use uncalibrated view' })
+    );
+    await flush();
+    expect(state()).toBe('uncalibrated');
+    const free = camera();
+    pointer('pointermove', 1, 500, 500, { ...mouse, buttons: 0 });
+    pointer('pointermove', 1, 600, 450, { ...mouse, buttons: 0 });
+    expect(camera()).toEqual(free);
+  });
+
   it('a blocked second pointer moves nothing while the first keeps panning', async () => {
     await mount();
     await goLive();

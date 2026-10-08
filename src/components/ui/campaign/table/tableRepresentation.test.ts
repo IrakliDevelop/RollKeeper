@@ -27,6 +27,7 @@ import {
 
 import { createDisplayProjection } from './display/displayProjection';
 import {
+  isLiveHolder,
   representationFields,
   representationPatches,
   representationSummary,
@@ -40,6 +41,58 @@ import type { TableRosterCanvas } from './useTableRosterState';
  * only), clears orphan tags on token-like elements and never touches other
  * elements; a mixed fight is otherwise unchanged.
  */
+
+function readyFixtureScene(workspaceKey: string) {
+  return {
+    schemaVersion: 1 as const,
+    workspaceKey,
+    sceneId: SCENE_ID,
+    originalMapId: null,
+    map: {
+      name: 'Removed',
+      mapImageUrl: '/map.webp',
+      mapImageSize: { w: 10, h: 10 },
+      gridEnabled: false,
+      gridSettings: null,
+      markers: [],
+      dmOnlyElements: {},
+    },
+    canvasCheckpoint: null,
+    members: [
+      {
+        actorId: 'goblin',
+        tokenIds: ['token-goblin'],
+        sceneMemberId: 'm-goblin',
+        removedAt: AT,
+        representation: 'physical' as const,
+      },
+    ],
+    arrivalPoint: null,
+    createdAt: AT,
+    updatedAt: AT,
+  };
+}
+function fixtureGoblin(workspaceKey: string) {
+  return {
+    schemaVersion: 1 as const,
+    workspaceKey,
+    actorId: 'goblin',
+    actorKind: 'dm-managed' as const,
+    liveStats: {
+      name: 'Goblin',
+      currentHp: 7,
+      maxHp: 7,
+      tempHp: 0,
+      armorClass: 15,
+      conditions: [],
+    },
+    playerReference: null,
+    cachedPlayerData: null,
+    playerConditionOverlay: null,
+    createdAt: AT,
+    updatedAt: AT,
+  };
+}
 
 afterEach(() => {
   cleanup();
@@ -410,5 +463,46 @@ describe('mixed fight: two physical and one digital actor (S5)', () => {
     ).toEqual(['token-orc']);
     expect(player.getById('token-aria')).toBeDefined();
     expect(player.count).toBe(3);
+  });
+});
+
+describe('review 01 F2 discriminating cases', () => {
+  it('WS_HOLDER: live holder needs a live relay and a held, not lost, control session', () => {
+    const held = { isLost: () => false };
+    const lost = { isLost: () => true };
+    expect(isLiveHolder(true, held)).toBe(true);
+    expect(isLiveHolder(false, held)).toBe(false);
+    expect(isLiveHolder(true, lost)).toBe(false);
+    expect(isLiveHolder(true, null)).toBe(false);
+  });
+
+  it('RECON_REMOVED: a removed physical member that kept token ids (imported record) tags nothing', async () => {
+    const repository = await openFixture({ seed: false });
+    const key = repository.workspaceIdentity;
+    const fixture = readyFixtureScene(key);
+    await repository.mutateWorkspace(0, 'removed-physical', {
+      scenes: { put: [fixture] },
+      actors: { put: [fixtureGoblin(key)] },
+    });
+    const elements: Record<string, unknown>[] = [
+      { ...goblinToken },
+      {
+        id: 'token-old',
+        ...dmTokenFields('m-goblin'),
+        tableRepresentation: 'physical',
+      },
+    ];
+    const derived = deriveRoster(repository, elements);
+    expect(derived.entries[0]).toMatchObject({
+      removed: true,
+      representation: 'physical',
+      boundTokenIds: ['token-goblin'],
+    });
+    expect(representationPatches(elements, derived)).toEqual([
+      {
+        tokenId: 'token-old',
+        patch: { set: {}, unset: ['tableRepresentation'] },
+      },
+    ]);
   });
 });

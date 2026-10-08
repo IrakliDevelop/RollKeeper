@@ -9,7 +9,8 @@ import type { CalibrationReport } from './session';
  *   second concurrent pointer are swallowed before core sees them; moves
  *   of pointers this guard did not let down are swallowed too.
  * - `frozen` (verify-required): every pointer, wheel, gesture and touch
- *   event is swallowed.
+ *   event is swallowed, except the end event of a pointer that went down
+ *   before the freeze (so core ends that gesture).
  *
  * Listeners are capture-phase on an ancestor of the core wrapper, so they
  * run before core's InputHandler (bubble/target phase on the wrapper).
@@ -83,8 +84,11 @@ export function attachCameraInputGuard(
   const onEnd = (event: Event) => {
     const { pointerId } = event as PointerEvent;
     const wasBlocked = blocked.delete(pointerId);
-    active.delete(pointerId);
-    if (wasBlocked || getMode() === 'frozen') swallow(event);
+    const wasActive = active.delete(pointerId);
+    // Review 01 F3: a pointer let down before a freeze must still end its
+    // core gesture (its moves stay swallowed, so the camera cannot move);
+    // otherwise core stays mid-drag and a later hover would pan.
+    if (wasBlocked || (getMode() === 'frozen' && !wasActive)) swallow(event);
   };
 
   const listeners: Array<[string, (event: Event) => void]> = [

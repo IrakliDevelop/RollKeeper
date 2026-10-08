@@ -545,6 +545,98 @@ describe('calibrated camera (P4, P8)', () => {
   });
 });
 
+describe('review 01 F2 discriminating cases', () => {
+  const savedPreference = () => {
+    window.localStorage.setItem(
+      CALIBRATION_STORAGE_KEY,
+      JSON.stringify({
+        v: 1,
+        cssPxPerSquare: 96,
+        squareMm: 25.4,
+        preferCalibrated: true,
+        savedAt: 1,
+      })
+    );
+    resetCalibrationStores();
+    store = getCalibrationStore(CODE);
+  };
+
+  it('KEEP_CENTRE: Confirm after a pan keeps the panned canvas-centre world point', async () => {
+    savedPreference();
+    start();
+    await tick(0);
+    await goLive();
+    expect(report()).toBe('verify-required');
+    // A pan before freezing (fresh-page input is frozen only by the shell).
+    current().vp.camera.pan(-233, 117);
+    const world = centreWorld();
+    expect(world.x).not.toBeCloseTo(1000, 3);
+    confirm();
+    expect(current().vp.camera.zoom).toBe(1.92);
+    const after = screenOf(world);
+    expect(after.x).toBeCloseTo(500, 9);
+    expect(after.y).toBeCloseTo(400, 9);
+  });
+
+  it('VIEWS_EXCL2: a non-live status on an uncovered calibrated camera never feeds the E11 view memory', async () => {
+    confirm();
+    start();
+    await tick(0);
+    await goLive();
+    expect(current().vp.camera.zoom).toBe(1.92);
+    const connection = connections.at(-1)!;
+    connection.options.onStatus?.('offline');
+    await tick(0);
+    store.invalidate();
+    connection.options.onStatus?.('denied');
+    await tick(1_000);
+    await goLive();
+    expect(cover()).toBeNull();
+    expect(report()).toBe('verify-required');
+    expect(applyView).not.toHaveBeenCalled();
+    expect(fitView.mock.calls.at(-1)?.[0]).toBe(current().vp);
+    expect(current().vp.camera.zoom).not.toBe(1.92);
+  });
+
+  it('REBIND_CALNULL: a rebind drops the old calibrated state, so a later uncalibrated camera is remembered (E11)', async () => {
+    confirm();
+    start();
+    await tick(0);
+    const key = last().canvas!.key;
+    const first = current();
+    const connection = connections.at(-1)!;
+    connection.options.onStatus?.('live');
+    connection.options.fog!.manager.loadState(null, { origin: 'remote' });
+    await tick(0);
+    await tick(1);
+    expect(first.vp.camera.zoom).toBe(1.92);
+    // Canvas remount, then the session is cleared before the new viewport
+    // is ready: the new camera is the E11 fit.
+    const second = mountViewport();
+    controller!.onViewportReady(key, second.vp);
+    store.invalidate();
+    await goLive();
+    expect(cover()).toBeNull();
+    expect(second.vp.camera.zoom).not.toBe(1.92);
+    second.vp.camera.pan(41, -17);
+    const panned = second.vp.getVisibleRect();
+    const next = connections.at(-1)!;
+    next.options.onStatus?.('offline');
+    next.options.onStatus?.('denied');
+    await tick(1_000);
+    // The hand-mounted remount shifted the auto-mount count: mount the
+    // retry's canvas explicitly.
+    const third = mountViewport();
+    controller!.onViewportReady(last().canvas!.key, third.vp);
+    await goLive();
+    expect(cover()).toBeNull();
+    expect(applyView).toHaveBeenCalled();
+    const restored = current().vp.getVisibleRect();
+    for (const side of ['x', 'y', 'w', 'h'] as const)
+      expect(restored[side]).toBeCloseTo(panned[side], 6);
+  });
+});
+
 describe('freeze and invalidation (P5, P6, R3-1, C7-1)', () => {
   it('an invalidation freezes the transform byte-identically and reports verify-required at once', async () => {
     confirm();

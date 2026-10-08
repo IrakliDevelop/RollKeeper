@@ -87,6 +87,17 @@ export function representationPatches(
   return patches;
 }
 
+/**
+ * P10: this tab may retag tokens only as the live holder — the canvas relay
+ * is live and the page's control session is held (not lost).
+ */
+export function isLiveHolder(
+  relayLive: boolean,
+  session: { isLost(): boolean } | null
+): boolean {
+  return relayLive && session !== null && !session.isLost();
+}
+
 /** Roster header summary when the scene mixes physical and digital members. */
 export function representationSummary(
   entries: readonly TableRosterEntry[]

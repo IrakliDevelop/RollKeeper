@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/forms/button';
 
 import { TableCombatPanel } from '../combat/TableCombatPanel';
 import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
+import { isLiveHolder } from '../tableRepresentation';
 import {
   createTablePlayersCache,
   TablePlayersCacheProvider,
@@ -172,11 +173,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           onStatus={workspace.onStatus}
           onMessage={checkpoint.setSaveMessage}
           onEditBusy={workspace.onEditBusy}
-          liveHolder={
-            workspace.relayLive &&
-            authority.session !== null &&
-            !authority.session.isLost()
-          }
+          liveHolder={isLiveHolder(workspace.relayLive, authority.session)}
           scaleVerifiedHere={
             workspace.presentedHere &&
             displayStatus !== null &&
