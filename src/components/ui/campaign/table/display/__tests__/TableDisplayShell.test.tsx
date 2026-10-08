@@ -368,6 +368,8 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
       sceneId: null,
       blanked: false,
       phase: 'blank',
+      // PR07 M1: the display's scale self-report.
+      calibration: 'uncalibrated',
     });
     setDescriptor(scene('tavern', 2));
     await advance(2_000);

@@ -1,3 +1,4 @@
+import type { DisplayCalibrationReport } from '../displayRequests';
 import type { EnvironmentSnapshot } from './environment';
 import type { SceneGeometry } from './geometry';
 import {
@@ -16,11 +17,7 @@ import {
  * scene's geometry; the reported state is derived from all three.
  */
 
-export type CalibrationReport =
-  | 'uncalibrated'
-  | 'verified'
-  | 'verify-required'
-  | 'unsupported';
+export type CalibrationReport = DisplayCalibrationReport;
 
 export interface CalibrationSession {
   cssPxPerSquare: number;
