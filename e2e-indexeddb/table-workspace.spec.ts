@@ -618,3 +618,75 @@ test('Edit map tools are reachable and unclipped at 1280, 2048 and 390 px', asyn
   expect(contextErrors).toEqual([]);
   await context.close();
 });
+
+test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clipped (light and dark)', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  const tavernId = sceneParam(page)!;
+
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate(value => {
+      localStorage.setItem('rollkeeper-theme', value);
+    }, theme);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
+    if (theme === 'dark')
+      await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+    else
+      await expect(page.locator('html')).not.toHaveAttribute(
+        'data-theme',
+        'dark'
+      );
+    const dock = page.getByTestId('dm-vtt-command-dock');
+    await expect(dock).toBeVisible();
+    await expect(page.getByText('Switching scene…')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
+    // Measured state: live control held, scene selected, no notices.
+    await expect(page.getByText('Live control held.')).toBeAttached();
+    await expect(dock.locator('[role="alert"]')).toHaveCount(0);
+    const dockBox = (await dock.boundingBox())!;
+    const canvasBox = (await page.locator('canvas').first().boundingBox())!;
+    const visible =
+      Math.min(canvasBox.y + canvasBox.height, 844) -
+      Math.max(canvasBox.y, dockBox.y + dockBox.height);
+    console.log(
+      `FU-5 ${theme}: dock ${Math.round(dockBox.height)}px, canvas visible ${Math.round(visible)}px`
+    );
+    expect(visible).toBeGreaterThanOrEqual(844 / 2);
+    for (const name of ['Scenes', 'Edit map', 'Back to campaign', 'Details'])
+      await expectUnclipped(
+        page.getByRole('button', { name: new RegExp(`^${name}`, 'u') }).first()
+      );
+    // Every visible header control (the toolbar strip below scrolls by
+    // design and is covered by the Edit map reachability test).
+    const header = dock.locator(':scope > div').first();
+    for (const control of await header.locator('button, a[href], select').all())
+      if (await control.isVisible()) await expectUnclipped(control);
+    const details = page.getByRole('button', { name: /^Details/u });
+    await details.click();
+    await expect(details).toHaveAttribute('aria-expanded', 'true');
+    await expectUnclipped(
+      page.getByRole('button', { name: 'Save checkpoint' })
+    );
+    await details.click();
+  }
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth
+    )
+  ).toBe(true);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});

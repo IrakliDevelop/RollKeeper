@@ -666,6 +666,57 @@ describe('W3/W4 lifecycle (D8)', () => {
     ).toBeInTheDocument();
   });
 
+  it('compact header: Details discloses secondary lines, never the conflict alert or notices (FU-5)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const entry = mocks.adapters[0]!;
+    entry.adapter.getPendingConflict = () => ({
+      operationId: 'op-1',
+      fields: ['name'],
+      createdAt: AT,
+    });
+    await navigate('scene=scene-forest');
+    const notice = await screen.findByText(
+      'Resolve the unsaved change on Tavern before switching'
+    );
+    const details = screen.getByRole('button', { name: /^Details/u });
+    expect(details).toHaveAttribute('aria-expanded', 'false');
+    const regions = (details.getAttribute('aria-controls') ?? '')
+      .split(' ')
+      .map(id => document.getElementById(id));
+    expect(regions).toHaveLength(2);
+    for (const region of regions) {
+      expect(region).not.toBeNull();
+      expect(region!.className).toMatch(/max-sm:hidden/u);
+    }
+    const collapsed = (node: Element) =>
+      regions.some(region => region!.contains(node));
+    const alerts = screen.getAllByRole('alert');
+    expect(
+      alerts.some(alert =>
+        /conflicted with a newer scene/u.test(alert.textContent ?? '')
+      )
+    ).toBe(true);
+    for (const alert of alerts) expect(collapsed(alert)).toBe(false);
+    for (const name of [
+      'Refresh winner',
+      'Retry pending edit',
+      'Discard pending edit',
+    ])
+      expect(collapsed(screen.getByRole('button', { name }))).toBe(false);
+    expect(collapsed(notice)).toBe(false);
+    expect(
+      collapsed(screen.getByRole('button', { name: 'Save checkpoint' }))
+    ).toBe(true);
+    expect(collapsed(screen.getByText(/^Relay:/u))).toBe(true);
+    expect(screen.getByText('Local scene runs')).toBeInTheDocument();
+    fireEvent.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    for (const region of regions)
+      expect(region!.className).not.toMatch(/max-sm:hidden/u);
+  });
+
   it('keeps the scene, the conflict and the URL on Back (popstate)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
