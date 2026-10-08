@@ -53,7 +53,7 @@ export function TableWorkspaceHeader(props: {
 }) {
   const { authority, scene } = props;
   return (
-    <div className="border-divider bg-surface-secondary pointer-events-auto flex w-full flex-wrap items-center gap-3 p-3">
+    <div className="border-divider bg-surface-secondary pointer-events-auto flex w-full flex-wrap items-center gap-2 p-2">
       <Link href={`/dm/campaign/${encodeURIComponent(props.campaignCode)}`}>
         <Button variant="ghost" size="sm">
           Back to campaign

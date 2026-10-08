@@ -11,7 +11,7 @@ import type { GridSettings } from '@/types/location';
 import { getVttGridController } from '@/lib/fieldnotesVtt';
 
 /** Mirrors the initial useState defaults in DmLocationEditor.hooks.ts:174-181. */
-const DEFAULT_GRID: Omit<GridSettings, 'gridType' | 'hexOrientation'> = {
+export const DEFAULT_GRID: Omit<GridSettings, 'gridType' | 'hexOrientation'> = {
   cellSize: 50,
   strokeColor: '#94a3b8',
   strokeWidth: 1,

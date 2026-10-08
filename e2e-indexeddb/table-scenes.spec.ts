@@ -531,9 +531,25 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
       request.onerror = () => reject(request.error);
     });
   }, recoverySeed);
-  expect(retained).toMatchObject({
-    localDraft: { state: { elements: [{ id: 'offline-retained' }] } },
-  });
+  // The offline draft element is retained. PR06 R3-F3: the scene's map
+  // image (absent from the adopted canvas) is ensured exactly once.
+  const draftElements = (
+    retained as {
+      localDraft: {
+        state: {
+          elements: Array<{ id: string; type: string; layerId?: string }>;
+        };
+      };
+    }
+  ).localDraft.state.elements;
+  expect(draftElements.map(element => element.id)).toContain(
+    'offline-retained'
+  );
+  expect(
+    draftElements.filter(
+      element => element.type === 'image' && element.layerId === 'layer-map'
+    )
+  ).toHaveLength(1);
   await context.close();
 });
 

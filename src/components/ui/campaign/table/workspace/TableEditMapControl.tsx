@@ -5,7 +5,10 @@ import { applyCameraView, type Viewport } from '@fieldnotes/core';
 import { Maximize, PencilRuler } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
-import { useDmVttGrid } from '@/components/ui/campaign/dm-vtt/useDmVttGrid';
+import {
+  DEFAULT_GRID,
+  useDmVttGrid,
+} from '@/components/ui/campaign/dm-vtt/useDmVttGrid';
 import DmLocationGridPopover from '@/components/ui/campaign/location-map/DmLocationGridPopover';
 import {
   reconcileMapFogBounds,
@@ -173,9 +176,9 @@ export function TableEditMapControl(props: {
           <DmLocationGridPopover
             gridEnabled={battleMap?.gridEnabled ?? false}
             gridType={settings.gridType === 'hex' ? 'hex' : 'square'}
-            gridCellSize={settings.cellSize ?? 50}
-            gridColor={settings.strokeColor ?? '#94a3b8'}
-            gridOpacity={settings.opacity ?? 0.5}
+            gridCellSize={settings.cellSize ?? DEFAULT_GRID.cellSize}
+            gridColor={settings.strokeColor ?? DEFAULT_GRID.strokeColor}
+            gridOpacity={settings.opacity ?? DEFAULT_GRID.opacity}
             onSetGridType={grid.setGridMode}
             onUpdateGridSettings={grid.updateGridSettings}
           />
