@@ -73,6 +73,27 @@ export function createTablePlayersCache(): TablePlayersCache {
 const PlayersCacheContext = createContext<TablePlayersCache | null>(null);
 export const TablePlayersCacheProvider = PlayersCacheContext.Provider;
 
+/** The workspace players cache, or null outside the Table workspace. */
+export function useTablePlayersCache(): TablePlayersCache | null {
+  return useContext(PlayersCacheContext);
+}
+
+/**
+ * FU-4: the shared workspace read for other readers on the Table canvas
+ * (e.g. the presence directory) — a fresh snapshot is reused unless forced,
+ * otherwise the one in-flight workspace read is joined.
+ */
+export function loadSharedPlayers(
+  cache: TablePlayersCache,
+  campaignCode: string,
+  force = false
+): Promise<ReadySnapshot> {
+  const cached = cache.get(campaignCode);
+  if (!force && cached && Date.now() - cached.fetchedAt < CACHE_FRESH_MS)
+    return Promise.resolve(cached);
+  return cache.load(campaignCode, () => readPlayers(campaignCode));
+}
+
 /**
  * Reads the server-authorized campaign players snapshot (DM-only route).
  * Identity comes only from here; names are display data, never a key.

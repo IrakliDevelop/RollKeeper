@@ -362,6 +362,62 @@ test('workspace: one session across 10+ private switches, redirect, history and 
   await context.close();
 });
 
+test('FU-4: at most one /players read per scene switch (no active run)', async ({
+  browser,
+}) => {
+  test.setTimeout(240_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  const playerReads: number[] = [];
+  page.on('request', request => {
+    if (
+      request.method() === 'GET' &&
+      new URL(request.url()).pathname ===
+        `/api/campaign/${CAMPAIGN.code}/players`
+    )
+      playerReads.push(Date.now());
+  });
+
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  await createScene(page, 'Forest');
+  await selected(page, 'Forest');
+
+  /** Reads until no new /players request for 1.5 s. */
+  const settledReads = async () => {
+    let last = -1;
+    for (;;) {
+      const count = playerReads.length;
+      if (count === last) return count;
+      last = count;
+      await page.waitForTimeout(1_500);
+    }
+  };
+  await settledReads();
+  const perSwitch: number[] = [];
+  // 12 switches; two of them after > 10 s idle (past the freshness window).
+  for (let index = 0; index < 12; index += 1) {
+    if (index === 4 || index === 9) await page.waitForTimeout(10_500);
+    const name = index % 2 === 0 ? 'Tavern' : 'Forest';
+    const before = playerReads.length;
+    await sceneList(page)
+      .getByRole('button', { name: new RegExp(name, 'u') })
+      .click();
+    await selected(page, name);
+    perSwitch.push((await settledReads()) - before);
+  }
+  console.log(`FU-4 /players reads per switch: ${JSON.stringify(perSwitch)}`);
+  expect(perSwitch.every(count => count <= 1)).toBe(true);
+  expect(server.of('acquire')).toHaveLength(1);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});
+
 test('create scene: uploaded image placed once; refusals create no scene', async ({
   browser,
 }) => {
