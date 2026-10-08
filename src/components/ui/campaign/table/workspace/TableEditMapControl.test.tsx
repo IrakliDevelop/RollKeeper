@@ -522,6 +522,46 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
     expect(added('resize')).toHaveLength(1);
   });
 
+  it('stays open while focus moves away during image work, closes once it settles (R5-2 / FA1d)', async () => {
+    let finish!: (url: string) => void;
+    mount(
+      vi.fn(
+        () =>
+          new Promise<string>(resolve => {
+            finish = resolve;
+          })
+      )
+    );
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [
+          new File([new Uint8Array(4)], 'a.webp', { type: 'image/webp' }),
+        ],
+      },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Set map image' })
+      ).toBeDisabled()
+    );
+    const next = screen.getByRole('button', { name: 'Next tool' });
+    act(() => next.focus());
+    expect(document.activeElement).toBe(next);
+    expect(panel()).toBeInTheDocument();
+    finish('https://x.test/a.webp');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Replace map image' })
+      ).toBeEnabled()
+    );
+    act(() =>
+      screen.getByRole('button', { name: 'Replace map image' }).focus()
+    );
+    expect(panel()).toBeInTheDocument();
+    act(() => next.focus());
+    expect(panel()).not.toBeInTheDocument();
+  });
+
   it('Tab from Edit map while open moves into the panel (FA1)', () => {
     const toggle = mount();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Set map image' }), {
