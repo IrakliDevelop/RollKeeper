@@ -1,10 +1,10 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, cleanup, renderHook } from '@testing-library/react';
 import {
   ElementStore,
   createImage,
   type CanvasElement,
 } from '@fieldnotes/core';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAP_LAYER_ID } from '@/components/ui/campaign/location-map/layerContract';
 import { assetProxyUrl } from '@/utils/assetProxyUrl';
@@ -32,6 +32,55 @@ function writes(dmOnly: Record<string, boolean> = {}) {
   };
   return value;
 }
+
+/**
+ * CI leak guard: every interval, and every timeout of 5 s or longer, created
+ * by a test must be cleared once the test's trees are unmounted — a live
+ * one fires after this file's jsdom is gone and crashes React in a later
+ * file of the same worker.
+ */
+const realTimers = {
+  setInterval: globalThis.setInterval,
+  clearInterval: globalThis.clearInterval,
+  setTimeout: globalThis.setTimeout,
+  clearTimeout: globalThis.clearTimeout,
+};
+const liveTimers = new Set<unknown>();
+function trackTimers() {
+  liveTimers.clear();
+  globalThis.setInterval = ((handler: () => void, delay?: number) => {
+    const id = realTimers.setInterval(handler, delay);
+    liveTimers.add(id);
+    return id;
+  }) as typeof setInterval;
+  globalThis.clearInterval = ((id: Parameters<typeof clearInterval>[0]) => {
+    liveTimers.delete(id);
+    realTimers.clearInterval(id);
+  }) as typeof clearInterval;
+  globalThis.setTimeout = ((handler: () => void, delay?: number) => {
+    const id = realTimers.setTimeout(() => {
+      liveTimers.delete(id);
+      handler();
+    }, delay);
+    if ((delay ?? 0) >= 5_000) liveTimers.add(id);
+    return id;
+  }) as typeof setTimeout;
+  globalThis.clearTimeout = ((id: Parameters<typeof clearTimeout>[0]) => {
+    liveTimers.delete(id);
+    realTimers.clearTimeout(id);
+  }) as typeof clearTimeout;
+}
+function expectNoLiveTimers() {
+  const live = liveTimers.size;
+  Object.assign(globalThis, realTimers);
+  expect(live, 'timers left running after the test').toBe(0);
+}
+
+beforeEach(() => trackTimers());
+afterEach(() => {
+  cleanup();
+  expectNoLiveTimers();
+});
 
 const images = (store: ElementStore) => mapLayerImages(store);
 /** F6: every add/replace is probed through the proxied URL first. */

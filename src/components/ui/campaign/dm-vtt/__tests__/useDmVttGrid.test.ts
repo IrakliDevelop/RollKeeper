@@ -1,4 +1,4 @@
-import { renderHook } from '@testing-library/react';
+import { cleanup, renderHook } from '@testing-library/react';
 import { ElementStore, LayerManager, type Viewport } from '@fieldnotes/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -32,7 +32,10 @@ function viewport(): Viewport {
   } as unknown as Viewport;
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 describe('useDmVttGrid (W10 refactor, legacy caller unchanged)', () => {
   it('writes the legacy battle-map store when no writer is supplied', () => {

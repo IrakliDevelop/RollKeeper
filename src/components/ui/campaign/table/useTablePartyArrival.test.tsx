@@ -1,4 +1,4 @@
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,7 +76,10 @@ beforeEach(async () => {
     },
   });
 });
-afterEach(() => repository.dispose());
+afterEach(() => {
+  cleanup();
+  repository.dispose();
+});
 
 async function addMember(player: TableCampaignPlayer) {
   await runRosterCommand(repository, {
