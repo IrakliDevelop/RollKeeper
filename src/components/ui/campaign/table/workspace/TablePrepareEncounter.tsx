@@ -14,6 +14,7 @@ import type { TableRepository } from '@/lib/table/repository';
 import type { TableSceneRecordV1 } from '@/lib/table/schema';
 import { useEncounterStore } from '@/store/encounterStore';
 
+import { runChoiceLabels } from '../combat/runChoiceLabel';
 import type { TableWorkspaceQuery } from './tableWorkspaceRoutes';
 
 const LABEL_MAX = 200;
@@ -92,6 +93,10 @@ export function TablePrepareEncounter(props: {
     : [];
   const selectedRun =
     existing.find(run => run.runId === chosenRun) ?? existing[0];
+  const existingTexts = runChoiceLabels(
+    existing,
+    () => scene?.map.name ?? 'Scene'
+  );
 
   async function copy() {
     if (!scene || !encounter) return;
@@ -167,9 +172,9 @@ export function TablePrepareEncounter(props: {
               onValueChange={setChosenRun}
               triggerProps={{ 'aria-label': 'Existing copies', size: 'sm' }}
             >
-              {existing.map(run => (
+              {existing.map((run, index) => (
                 <SelectItem key={run.runId} value={run.runId}>
-                  {`${run.label ?? 'Scene run'} · ${new Date(run.createdAt).toLocaleDateString()}`}
+                  {existingTexts[index]}
                 </SelectItem>
               ))}
             </SelectField>

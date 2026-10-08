@@ -147,4 +147,83 @@ describe('"Open scene run" library affordance (D10)', () => {
       '/dm/campaign/CAMP/table?scene=scene-forest&run=run-b'
     );
   });
+
+  it('distinguishes runs by date, short time and a per-scene copy ordinal (FU-7)', () => {
+    const when = (iso: string) =>
+      `${new Date(iso).toLocaleDateString()} ${new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' })}`;
+    const run = (
+      runId: string,
+      sceneId: string,
+      sceneName: string,
+      label: string,
+      createdAt: string,
+      localWorkspaceId = 'workspace-1'
+    ) => ({
+      runId,
+      sceneId,
+      label,
+      localWorkspaceId,
+      defaultWorkspace: localWorkspaceId === 'workspace-1',
+      sceneName,
+      createdAt,
+    });
+    const first = '2026-10-07T09:15:00.000Z';
+    const second = '2026-10-07T18:40:00.000Z';
+    links.value = [
+      run('run-b', 'scene-tavern', 'Tavern', 'Bandit ambush', second),
+      run('run-a', 'scene-tavern', 'Tavern', 'Bandit ambush', first),
+      run('run-c', 'scene-forest', 'Forest', 'Bandit ambush', first),
+      run('run-d', 'scene-tavern', 'Tavern', 'Bandit ambush', first, 'fork-1'),
+    ];
+    render(
+      <EncounterBattleMapButton campaignCode="CAMP" encounterId="enc-1" />
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: /Open scene run \(4\)/ })
+    );
+    const texts = screen
+      .getAllByRole('link')
+      .map(link => [link.getAttribute('href'), link.textContent]);
+    expect(texts).toEqual([
+      [
+        '/dm/campaign/CAMP/table?scene=scene-tavern&run=run-b',
+        `Tavern · Bandit ambush · ${when(second)} · copy 2`,
+      ],
+      [
+        '/dm/campaign/CAMP/table?scene=scene-tavern&run=run-a',
+        `Tavern · Bandit ambush · ${when(first)} · copy 1`,
+      ],
+      [
+        '/dm/campaign/CAMP/table?scene=scene-forest&run=run-c',
+        `Forest · Bandit ambush · ${when(first)}`,
+      ],
+      [
+        '/dm/campaign/CAMP/table?scene=scene-tavern&run=run-d&tableWorkspace=fork-1',
+        `Tavern · Bandit ambush · ${when(first)}`,
+      ],
+    ]);
+  });
+
+  it('adds the creation time to the single-run line (FU-7)', () => {
+    const at = '2026-10-07T18:40:00.000Z';
+    links.value = [
+      {
+        runId: 'run-0',
+        sceneId: 'scene-1',
+        label: 'Adopted fight',
+        localWorkspaceId: 'workspace-1',
+        defaultWorkspace: true,
+        sceneName: 'Tavern',
+        createdAt: at,
+      },
+    ];
+    render(
+      <EncounterBattleMapButton campaignCode="CAMP" encounterId="enc-1" />
+    );
+    expect(
+      screen.getByText(
+        `Adopted fight · ${new Date(at).toLocaleDateString()} ${new Date(at).toLocaleTimeString(undefined, { timeStyle: 'short' })} · saved on this device`
+      )
+    ).toBeInTheDocument();
+  });
 });

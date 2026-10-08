@@ -17,6 +17,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { MAP_LAYER_ID } from '@/components/ui/campaign/location-map/layerContract';
 import { TableRepository } from '@/lib/table/repository';
+import type { SceneImageUploader } from '@/lib/table/sceneImage';
 import {
   createTableSceneAdapter,
   type TableSceneAdapter,
@@ -364,7 +365,7 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
   });
 
   function mount(
-    upload: SceneImageUploaderMock = vi.fn(async () => 'https://x.test/a.webp')
+    upload: SceneImageUploader = vi.fn(async () => 'https://x.test/a.webp')
   ) {
     vi.stubGlobal('fetch', vi.fn());
     render(
@@ -497,5 +498,3 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
     expect(panel()).not.toBeInTheDocument();
   });
 });
-
-type SceneImageUploaderMock = (...args: never[]) => Promise<string>;

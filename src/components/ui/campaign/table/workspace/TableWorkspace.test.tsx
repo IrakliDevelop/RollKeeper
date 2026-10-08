@@ -1356,6 +1356,54 @@ describe('W7 encounter "Prepare on map"', () => {
     ).not.toBeInTheDocument();
   });
 
+  it('labels existing copies with date, short time and a copy ordinal on collision (FU-7)', async () => {
+    const key = repository.workspaceIdentity;
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    const times = {
+      'copy-b': '2026-10-07T18:40:00.000Z',
+      'copy-a': '2026-10-07T09:15:00.000Z',
+    };
+    await repository.mutateWorkspace(
+      current.snapshot.campaign?.revision ?? 0,
+      'colliding-copies',
+      {
+        encounters: {
+          put: Object.entries(times).map(([runId, createdAt]) => ({
+            schemaVersion: 1 as const,
+            workspaceKey: key,
+            runId,
+            sceneId: 'scene-tavern',
+            sourceEncounterId: 'enc-lib',
+            runGeneration: runId,
+            participants: [],
+            round: 0,
+            currentActorId: null,
+            isActive: false,
+            createdAt,
+            updatedAt: createdAt,
+            label: 'Bandit ambush',
+          })),
+        },
+      }
+    );
+    nav.reset('scene=scene-tavern&prepareEncounter=enc-lib');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Existing copies' })
+    );
+    const when = (iso: string) =>
+      `${new Date(iso).toLocaleDateString()} ${new Date(iso).toLocaleTimeString(undefined, { timeStyle: 'short' })}`;
+    expect(
+      (await screen.findAllByRole('option')).map(option => option.textContent)
+    ).toEqual([
+      `Tavern · Bandit ambush · ${when(times['copy-a'])} · copy 1`,
+      `Tavern · Bandit ambush · ${when(times['copy-b'])} · copy 2`,
+    ]);
+  });
+
   it('creates another copy only on explicit request', async () => {
     const key = repository.workspaceIdentity;
     const current = repository.getCurrent();

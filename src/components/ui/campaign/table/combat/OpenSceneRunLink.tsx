@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/forms/button';
 import type { TableSceneRunLink } from '@/lib/table/combatLibrary';
 
 import { tableWorkspaceHref } from '../workspace/tableWorkspaceRoutes';
+import { runChoiceLabels, runCreatedText } from './runChoiceLabel';
 import { useSceneRunLinks } from './useSceneRunLinks';
 
 function runHref(campaignCode: string, link: TableSceneRunLink): string {
@@ -46,12 +47,19 @@ export function OpenSceneRunLink(props: {
           </Button>
         </Link>
         <span className="text-faint text-[10px]">
-          {`${link.label ?? 'Scene run'} · saved on this device`}
+          {[
+            link.label ?? 'Scene run',
+            runCreatedText(link.createdAt),
+            'saved on this device',
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </span>
       </span>
     );
   }
   const listId = `scene-runs-${props.encounterId}`;
+  const texts = runChoiceLabels(links, run => run.sceneName ?? 'Scene');
   return (
     <span className="relative flex min-w-0 flex-col">
       <Button
@@ -75,14 +83,14 @@ export function OpenSceneRunLink(props: {
           aria-label="Scene runs of this encounter"
           className="border-divider bg-surface-raised z-20 mt-1 flex flex-col gap-1 rounded-lg border p-1 shadow-lg"
         >
-          {links.map(item => (
+          {links.map((item, index) => (
             <li key={`${item.localWorkspaceId}:${item.runId}`}>
               <Link
                 href={runHref(props.campaignCode, item)}
                 onClick={event => event.stopPropagation()}
                 className="hover:bg-surface-secondary text-body block rounded px-2 py-1 text-xs"
               >
-                {`${item.sceneName ?? 'Scene'} · ${item.label ?? 'Scene run'} · ${new Date(item.createdAt).toLocaleDateString()}`}
+                {texts[index]}
               </Link>
             </li>
           ))}
