@@ -75,6 +75,29 @@ describe('Play mode Table entry (FU-8)', () => {
     ).toHaveAttribute('href', '/dm/campaign/CAMP/table?panel=scenes');
   });
 
+  it.each([
+    [
+      'Open in Table',
+      { sceneId: 's', localWorkspaceId: 'w', defaultWorkspace: true },
+    ],
+    ['Use in Table', null],
+  ])(
+    'is compact below lg like Open display: icon, lg-only text, aria-label "%s" (R4-5)',
+    async (label, scene) => {
+      process.env[FLAG] = 'true';
+      lookup.scene = scene;
+      renderBar();
+      const link = await screen.findByRole('link', { name: label });
+      const button = link.querySelector('button')!;
+      expect(button).toHaveAttribute('aria-label', label);
+      expect(button.querySelector('svg')).not.toBeNull();
+      const text = Array.from(button.querySelectorAll('span')).find(
+        span => span.textContent === label
+      );
+      expect(text).toHaveClass('hidden', 'lg:inline');
+    }
+  );
+
   it('flag off: no Table link and no lookup (unchanged Play mode)', async () => {
     delete process.env[FLAG];
     lookup.scene = {

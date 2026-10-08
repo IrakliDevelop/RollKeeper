@@ -65,6 +65,8 @@ export function PrepareOnMapLink(props: {
 export function TableMapEntryLink(props: {
   campaignCode: string;
   mapId: string;
+  /** R4-5: Play-mode bar — icon below `lg`, text from `lg` (as Open display). */
+  compact?: boolean;
 }) {
   const enabled = tableEntriesEnabled();
   const [target, setTarget] = useState<
@@ -103,6 +105,21 @@ export function TableMapEntryLink(props: {
     };
   }, [campaignCode, enabled, mapId]);
   if (!enabled || !target) return null;
+  const label = target.kind === 'open' ? 'Open in Table' : 'Use in Table';
+  if (props.compact)
+    return (
+      <Link href={target.href} className="shrink-0">
+        <Button
+          variant="ghost"
+          size="lg"
+          leftIcon={<LayoutDashboard size={16} />}
+          aria-label={label}
+          className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
+        >
+          <span className="hidden lg:inline">{label}</span>
+        </Button>
+      </Link>
+    );
   return (
     <Link href={target.href}>
       <Button

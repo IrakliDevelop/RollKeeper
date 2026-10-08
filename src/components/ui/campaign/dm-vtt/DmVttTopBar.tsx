@@ -94,7 +94,11 @@ export function DmVttTopBar({
         <span className="hidden lg:inline">Open Display</span>
       </Button>
       {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
-      <TableMapEntryLink campaignCode={campaignCode} mapId={battleMapId} />
+      <TableMapEntryLink
+        campaignCode={campaignCode}
+        mapId={battleMapId}
+        compact
+      />
       {display.message && (
         <span
           role="status"
