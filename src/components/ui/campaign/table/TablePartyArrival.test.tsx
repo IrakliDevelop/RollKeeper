@@ -75,7 +75,16 @@ describe('W11 arrival point picker and marker', () => {
     const marker = screen.getByRole('img', { name: 'Party arrival point' });
     expect(marker).toHaveAttribute('title', 'Party arrival point');
     expect(marker.querySelector('svg')).not.toBeNull();
-    expect(marker.innerHTML).toMatch(/text-accent-emerald-text/u);
+    const pin = marker.querySelector('svg')!;
+    expect(pin).toHaveClass(
+      'text-accent-emerald-text',
+      'fill-accent-emerald-bg'
+    );
+    expect(screen.getByText('Arrival')).toHaveClass(
+      'bg-accent-emerald-bg',
+      'text-accent-emerald-text',
+      'border-accent-emerald-border'
+    );
     rerender(<TableArrivalMarker viewport={vp} point={null} />);
     expect(
       screen.queryByRole('img', { name: 'Party arrival point' })

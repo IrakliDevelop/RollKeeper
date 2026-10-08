@@ -233,6 +233,21 @@ describe('FU-2 bounded players read (8 s)', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('bounds reload() without a workspace cache (R4-4 / FU2h)', async () => {
+    vi.stubGlobal('fetch', stalled());
+    const { result } = renderHook(() => useTablePlayersSnapshot('CAMP'));
+    await act(async () => vi.advanceTimersByTimeAsync(8_000));
+    let players: unknown = 'pending';
+    act(() => {
+      void result.current.reload().then(value => (players = value));
+    });
+    await act(async () => vi.advanceTimersByTimeAsync(7_999));
+    expect(players).toBe('pending');
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(players).toBeNull();
+    expect(result.current.snapshot.status).toBe('unavailable');
+  });
+
   it('times out a stalled response body on the shared read and releases the in-flight entry', async () => {
     const fetchMock = vi.fn(
       async () =>

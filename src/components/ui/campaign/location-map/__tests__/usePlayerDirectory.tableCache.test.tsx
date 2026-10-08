@@ -83,4 +83,57 @@ describe('FU-4 Table canvas player directory shares the workspace players read',
     act(() => result.current.directory.ensureKnown(['char-new']));
     await waitFor(() => expect(reads()).toBe(2));
   });
+
+  it('a stalled shared read is bounded: the next unknown peer reads again (R4-4 / FU2i)', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const fetchMock = vi.fn(() => new Promise<Response>(() => {}));
+      vi.stubGlobal('fetch', fetchMock);
+      const { result } = renderHook(() => usePlayerDirectory('CAMP', true), {
+        wrapper,
+      });
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      await act(async () => vi.advanceTimersByTimeAsync(8_000));
+      act(() => result.current.ensureKnown(['char-late']));
+      await act(async () => vi.advanceTimersByTimeAsync(0));
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(result.current.directory).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a forced refresh queued during an in-flight read (R4-4 / FU4h)', async () => {
+    const resolvers: Array<(response: Response) => void> = [];
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>(resolve => {
+          resolvers.push(resolve);
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = renderHook(() => usePlayerDirectory('CAMP', true), {
+      wrapper,
+    });
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    act(() => result.current.ensureKnown(['char-new']));
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    // The first read lands (cache now fresh), the queued forced one still runs.
+    await act(async () => resolvers[0]!(Response.json({ players: [row] })));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await act(async () =>
+      resolvers[1]!(
+        Response.json({
+          players: [
+            row,
+            { ...row, playerId: 'legacy-n', characterId: 'char-new' },
+          ],
+        })
+      )
+    );
+    await waitFor(() =>
+      expect(result.current.directory?.ids.has('char-new')).toBe(true)
+    );
+  });
 });

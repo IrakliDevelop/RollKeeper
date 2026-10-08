@@ -502,6 +502,26 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
     expect(panel()).not.toBeInTheDocument();
   });
 
+  it('removes its scroll, resize and document listeners on close and unmount (R4-4 / FU1i)', () => {
+    const windowRemove = vi.spyOn(window, 'removeEventListener');
+    const documentRemove = vi.spyOn(document, 'removeEventListener');
+    const toggle = mount();
+    const added = (type: string) =>
+      windowRemove.mock.calls.filter(([name]) => name === type);
+    fireEvent.click(toggle);
+    expect(panel()).not.toBeInTheDocument();
+    expect(added('scroll')).toEqual([['scroll', expect.any(Function), true]]);
+    expect(added('resize')).toEqual([['resize', expect.any(Function)]]);
+    expect(documentRemove.mock.calls.map(([name]) => name)).toEqual(
+      expect.arrayContaining(['pointerdown', 'focusin'])
+    );
+    fireEvent.click(toggle);
+    windowRemove.mockClear();
+    cleanup();
+    expect(added('scroll')).toHaveLength(1);
+    expect(added('resize')).toHaveLength(1);
+  });
+
   it('Tab from Edit map while open moves into the panel (FA1)', () => {
     const toggle = mount();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Set map image' }), {
