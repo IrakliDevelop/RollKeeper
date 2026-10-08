@@ -350,6 +350,8 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
     sceneId: null,
     blanked: false,
     phase: 'blank',
+    // PR07 M1: the display's scale self-report.
+    calibration: 'uncalibrated',
   });
 
   // Blank survives a reload of the display tab with the same session nonce.
@@ -438,6 +440,236 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
     .not.toContain('#');
   await fresh.waitForTimeout(2_500);
   expect(display.descriptors).toEqual([]);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});
+
+/**
+ * PR07 calibrated minis in a real browser. This config has no relay (no
+ * scene can attach), so the display-side checks run on the covered page:
+ * the ruler square's real layout size, session-only verification, the
+ * storage audit, a stable-origin window resize, a real fullscreen change
+ * and the ACK self-report; the DM side shows the scale reports.
+ */
+test('PR07 calibration: ruler square size, session-only verification, signals, storage audit and DM scale reports', async ({
+  browser,
+}) => {
+  test.setTimeout(150_000);
+  // A fixed physical screen: only the browser viewport changes size below
+  // (Playwright otherwise emulates screen = viewport, a real P5 signal).
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 800 },
+    screen: { width: 1920, height: 1080 },
+  });
+  const contextErrors = await guardTableContext(context);
+  const display = displayServer();
+  await display.install(context, CAMPAIGN.code);
+  const tab = await context.newPage();
+  await tab.goto(`/table-display/${CAMPAIGN.code}#k=${CAPABILITY}`);
+  const root = tab.getByTestId('table-display');
+  await expect(tab.getByTestId('table-display-cover')).toHaveText(
+    'Waiting for the table'
+  );
+  await expect(root).toHaveAttribute('data-calibration-state', 'uncalibrated');
+  await expect
+    .poll(() => display.acks.at(-1)?.ack)
+    .toMatchObject({ phase: 'blank', calibration: 'uncalibrated' });
+
+  // The reference square is exactly C CSS px in real layout.
+  await tab.mouse.move(300, 300);
+  await tab.getByRole('button', { name: 'Calibrate minis' }).click();
+  const panel = tab.getByRole('region', { name: 'Ruler calibration' });
+  const square = tab.getByTestId('calibration-reference-square');
+  const size = async () => {
+    const box = (await square.boundingBox())!;
+    return [box.width, box.height];
+  };
+  expect(await size()).toEqual([96, 96]);
+  await tab.getByRole('button', { name: 'Increase by 1 px' }).click();
+  await tab.getByRole('button', { name: 'Increase by 0.1 px' }).click();
+  const [grown] = await size();
+  expect(grown).toBeCloseTo(97.1, 1);
+  await panel.focus();
+  await tab.keyboard.press('ArrowDown');
+  await tab.keyboard.press('Shift+ArrowDown');
+  expect(await size()).toEqual([96, 96]);
+  await expect(panel).toContainText(
+    'Hold a ruler against the square. Adjust until each side measures 25.4 mm on this screen, then Confirm.'
+  );
+  await tab.getByRole('button', { name: 'Confirm' }).click();
+  await expect(root).toHaveAttribute('data-calibration-state', 'verified');
+  await expect
+    .poll(() => display.acks.at(-1)?.ack)
+    .toMatchObject({ phase: 'blank', calibration: 'verified' });
+
+  // Storage audit: one namespaced key of non-secret numbers; the display
+  // credential stays in sessionStorage only.
+  const local = await tab.evaluate(() => ({ ...localStorage }));
+  expect(
+    Object.keys(local).filter(key => key.startsWith('rollkeeper:'))
+  ).toEqual(['rollkeeper:table-calibration:v1']);
+  expect(JSON.stringify(local)).not.toContain(CAPABILITY);
+  const saved = JSON.parse(local['rollkeeper:table-calibration:v1']!) as Record<
+    string,
+    unknown
+  >;
+  expect(Object.keys(saved).sort()).toEqual([
+    'cssPxPerSquare',
+    'preferCalibrated',
+    'savedAt',
+    'squareMm',
+    'v',
+  ]);
+  expect(saved).toMatchObject({
+    v: 1,
+    cssPxPerSquare: 96,
+    squareMm: 25.4,
+    preferCalibrated: true,
+  });
+  expect(
+    await tab.evaluate(
+      code => sessionStorage.getItem(`rollkeeper:table-display:${code}`),
+      CAMPAIGN.code
+    )
+  ).toContain(CAPABILITY);
+
+  // A stable-origin resize is not an invalidation signal. Playwright's
+  // viewport resize also emulates a new screen size (a real signal), so the
+  // display runs in a same-origin iframe whose size changes instead (the
+  // browser-acceptance host-page technique).
+  const host = await context.newPage();
+  await host.goto(`/table-display/HOSTPAGE`);
+  await host.evaluate(
+    ({ code, capability }) => {
+      const frame = document.createElement('iframe');
+      frame.id = 'tv';
+      frame.src = `/table-display/${code}#k=${capability}`;
+      frame.style.cssText =
+        'position:fixed;left:0;top:0;width:1000px;height:700px;border:0;z-index:1000';
+      document.body.append(frame);
+    },
+    { code: CAMPAIGN.code, capability: CAPABILITY }
+  );
+  const tv = host.frameLocator('#tv');
+  const tvRoot = tv.getByTestId('table-display');
+  await expect(tvRoot).toHaveAttribute(
+    'data-calibration-state',
+    'verify-required'
+  );
+  await tv.getByRole('button', { name: 'Verify scale' }).click();
+  await tv.getByRole('button', { name: 'Confirm' }).click();
+  await expect(tvRoot).toHaveAttribute('data-calibration-state', 'verified');
+  for (const [width, height] of [
+    [1200, 760],
+    [640, 420],
+    [1000, 700],
+  ]) {
+    await host.evaluate(
+      ([w, h]) => {
+        const frame = document.getElementById('tv')!;
+        frame.style.width = `${w}px`;
+        frame.style.height = `${h}px`;
+      },
+      [width, height]
+    );
+    await host.waitForTimeout(1_200);
+    await expect(tvRoot).toHaveAttribute('data-calibration-state', 'verified');
+  }
+  await host.close();
+
+  // Entering fullscreen (F, a user gesture) is a detected signal: frozen,
+  // "Scale needs verification" at the edge, verify-required in the ACK.
+  await tab.keyboard.press('f');
+  await expect(root).toHaveAttribute(
+    'data-calibration-state',
+    'verify-required',
+    {
+      timeout: 5_000,
+    }
+  );
+  await expect(tab.getByTestId('table-display-calibration')).toContainText(
+    'Scale needs verification'
+  );
+  await expect
+    .poll(() => display.acks.at(-1)?.ack)
+    .toMatchObject({ calibration: 'verify-required' });
+  await tab.evaluate(() => document.exitFullscreen?.().catch(() => {}));
+
+  // A reload never restores verification; the saved value is offered.
+  await tab.reload();
+  await expect(root).toHaveAttribute(
+    'data-calibration-state',
+    'verify-required'
+  );
+  await tab.getByRole('button', { name: 'Verify scale' }).click();
+  await expect(panel).toContainText(
+    /Saved ruler setting from .+ — confirm it with your ruler/u
+  );
+  expect(await size()).toEqual([96, 96]);
+  await tab.getByRole('button', { name: 'Confirm' }).click();
+  await expect(root).toHaveAttribute('data-calibration-state', 'verified');
+  await tab.mouse.move(310, 310);
+  await tab.getByRole('button', { name: 'Verify scale' }).click();
+  await tab.getByRole('button', { name: 'Use uncalibrated view' }).click();
+  await expect(root).toHaveAttribute('data-calibration-state', 'uncalibrated');
+  await expect
+    .poll(() => display.acks.at(-1)?.ack)
+    .toMatchObject({ calibration: 'uncalibrated' });
+
+  // DM side: the server-computed status carries the self-report.
+  await context.addInitScript(
+    ({ campaign, map }) => {
+      if (localStorage.getItem('rollkeeper-dm-data')) return;
+      localStorage.setItem(
+        'rollkeeper-dm-data',
+        JSON.stringify({
+          state: { dmId: 'dm-display', campaigns: [campaign] },
+          version: 1,
+        })
+      );
+      localStorage.setItem(
+        'rollkeeper-battlemap-data',
+        JSON.stringify({
+          state: { battleMaps: { [campaign.code]: { [map.id]: map } } },
+          version: 0,
+        })
+      );
+    },
+    { campaign: CAMPAIGN, map: MAP }
+  );
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
+  await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
+  await page.getByRole('button', { name: 'Open scene' }).click();
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  const status = page.getByRole('status', { name: 'Audience status' });
+  display.setStatus({
+    state: 'blank',
+    sceneId: null,
+    ageMs: 900,
+    calibration: 'verified',
+  });
+  await expect(status).toContainText('Table reports scale verified', {
+    timeout: 10_000,
+  });
+  display.setStatus({
+    state: 'blank',
+    sceneId: null,
+    ageMs: 900,
+    calibration: 'verify-required',
+  });
+  const notice = page.getByText(
+    'Table reports scale needs verification — use Verify scale on the table display.'
+  );
+  await expect(notice).toBeVisible({ timeout: 10_000 });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await notice.scrollIntoViewIfNeeded();
+  await expect(notice).toBeVisible();
+  const box = (await notice.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(0);
+  expect(box.x + box.width).toBeLessThanOrEqual(390);
   expect(contextErrors).toEqual([]);
   await context.close();
 });
