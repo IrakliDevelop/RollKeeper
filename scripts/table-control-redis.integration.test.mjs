@@ -1805,3 +1805,171 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
   assert.deepEqual(await access(MAX - 1), [0]);
   assert.deepEqual(await access(second.displayGeneration), [0]);
 });
+
+/**
+ * PR06 A1: one workspace session registers scenes through its own queue
+ * against the real control Lua — no second acquire per scene, idempotent
+ * re-preparation, identity conflicts and registry-full are not ownership
+ * loss, and ownership loss still is.
+ */
+test('PR06 session registerScene: one acquire, many scenes, refusals not lost', async t => {
+  const name = `rollkeeper-table-pr06-${randomUUID().slice(0, 8)}`;
+  const cli = await startRedis(t, name);
+  const { parseTableCommand } = await import(
+    '../src/lib/tableServer/validation.ts'
+  );
+  const { acquireTableControl, prepareTableSceneRoom } = await import(
+    '../src/lib/table/authorityLifecycle.ts'
+  );
+  const PRINCIPAL = 'account:synthetic-owner';
+  const lua = command =>
+    JSON.parse(
+      cli(
+        'EVAL',
+        script,
+        String(keys.length),
+        ...keys,
+        JSON.stringify(command),
+        createHash('sha256')
+          .update(JSON.stringify({ principal: PRINCIPAL, command }))
+          .digest('hex'),
+        PRINCIPAL,
+        randomUUID(),
+        randomUUID(),
+        new Date().toISOString()
+      )
+    );
+  const sent = [];
+  let initializes = 0;
+  const fetcher = async (url, init) => {
+    const href = String(url);
+    if (!init?.method || init.method === 'GET') {
+      const raw = cli('GET', keys[0]);
+      const fields = cli('HGETALL', keys[1]).split('\n').filter(Boolean);
+      const registry = [];
+      for (let index = 1; index < fields.length; index += 2)
+        registry.push(JSON.parse(fields[index]));
+      return Response.json({
+        current: raw ? JSON.parse(raw) : null,
+        registry,
+      });
+    }
+    if (href.endsWith('/authority/initialize-if-empty')) {
+      initializes += 1;
+      return Response.json({ status: 'provisioned' });
+    }
+    const command = parseTableCommand(JSON.parse(String(init.body)).command);
+    if (!command) return Response.json({ error: 'invalid' }, { status: 400 });
+    sent.push(command.type);
+    const result = lua(command);
+    const status =
+      result.status === 'committed'
+        ? 200
+        : result.status === 'conflict'
+          ? 409
+          : result.status === 'denied'
+            ? 403
+            : 503;
+    return Response.json(result, { status });
+  };
+  const options = { campaignCode: CODE, dmId: 'dm-1', fetcher };
+  const acquired = await acquireTableControl({
+    ...options,
+    holderSessionId: 'workspace-page',
+  });
+  assert.equal(acquired.status, 'acquired');
+  const session = acquired.session;
+  const room = sceneId => ({
+    sceneId,
+    sourceMapId: sceneId,
+    workspaceInstanceId: 'workspace-a',
+    contentRevision: 1,
+    safeLabel: `Scene ${sceneId}`,
+    canvasState: {},
+  });
+
+  for (let round = 0; round < 5; round += 1)
+    for (const sceneId of ['scene-forest', 'scene-tavern'])
+      assert.equal(
+        (await prepareTableSceneRoom(session, room(sceneId), options)).status,
+        'ready'
+      );
+  assert.deepEqual(
+    sent.filter(type => type !== 'initialize'),
+    ['acquire', 'registerScene', 'registerScene']
+  );
+  assert.equal(initializes, 10);
+  const forest = JSON.parse(cli('HGET', keys[1], 'scene-forest'));
+  assert.equal(forest.workspaceInstanceId, 'workspace-a');
+  assert.equal(forest.registryRevision, 1);
+
+  // Same-holder interleaved commit → one stale-control retry, committed.
+  const interleaved = lua({
+    type: 'renew',
+    operationId: randomUUID(),
+    expectedEpoch: session.current().epoch,
+    expectedRevision: session.current().revision,
+    expectedFence: session.current().writerFence,
+    holderSessionId: 'workspace-page',
+  });
+  assert.equal(interleaved.status, 'committed');
+  assert.equal(
+    (await prepareTableSceneRoom(session, room('scene-cave'), options)).status,
+    'ready'
+  );
+  assert.equal(session.isLost(), false);
+
+  // A registry entry of another workspace → identity conflict, not lost.
+  const conflict = await prepareTableSceneRoom(
+    session,
+    { ...room('scene-forest'), workspaceInstanceId: 'workspace-b' },
+    options
+  );
+  assert.deepEqual(conflict, {
+    status: 'conflict',
+    reason: 'scene-identity-conflict',
+  });
+  assert.equal(session.isLost(), false);
+
+  // Registry full (HLEN ≥ 100) → rejected, not lost.
+  for (let index = 0; index < 100; index += 1)
+    cli(
+      'HSET',
+      keys[1],
+      `filler-${index}`,
+      JSON.stringify({
+        v: 1,
+        sceneId: `filler-${index}`,
+        workspaceInstanceId: 'workspace-a',
+        sourceMapId: `filler-${index}`,
+        registryRevision: 1,
+        deleted: false,
+      })
+    );
+  assert.deepEqual(
+    await prepareTableSceneRoom(session, room('scene-overflow'), options),
+    { status: 'rejected', reason: 'registry-full' }
+  );
+  assert.equal(session.isLost(), false);
+  assert.equal((await session.renew()).status, 'committed');
+
+  // Ownership loss (explicit takeover elsewhere) → lost.
+  const latest = JSON.parse(cli('GET', keys[0]));
+  assert.equal(
+    lua({
+      type: 'takeover',
+      operationId: randomUUID(),
+      expectedEpoch: latest.epoch,
+      expectedRevision: latest.revision,
+      expectedFence: latest.writerFence,
+      holderSessionId: 'other-tab',
+    }).status,
+    'committed'
+  );
+  const lost = await prepareTableSceneRoom(session, room('scene-new'), {
+    ...options,
+  });
+  assert.equal(lost.status, 'lost');
+  assert.equal(session.isLost(), true);
+  assert.equal(sent.filter(type => type === 'acquire').length, 1);
+});

@@ -237,3 +237,49 @@ describe('Table scene adoption', () => {
     expect(loaded.status === 'ready' && loaded.snapshot.scenes).toHaveLength(0);
   });
 });
+
+describe('W9 never-opened map adoption', () => {
+  it.each(['', '   '])(
+    'adopts a map whose canvasState is %j as an empty adoption checkpoint',
+    async canvasState => {
+      const neverOpened = JSON.stringify({
+        id: 'map-blank',
+        campaignCode: 'CAMP',
+        name: 'Fresh map',
+        mapImageUrl: '/maps/fresh.webp',
+        mapImageSize: { w: 640, h: 480 },
+        canvasState,
+        dmOnlyElements: {},
+        gridEnabled: false,
+        linkedEncounterIds: [],
+        markers: [],
+        createdAt: '2026-10-05T00:00:00.000Z',
+        updatedAt: '2026-10-05T00:00:00.000Z',
+      });
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const input = source(() => neverOpened);
+      const preview = await captureAdoptionPreview({
+        source: input,
+        workspaceKey: repository.workspaceIdentity,
+        sourceCampaignId: 'CAMP',
+        sourceMapId: 'map-blank',
+      });
+      expect(preview.scene.canvasCheckpoint?.state).toEqual({});
+      expect(preview.scene.map.mapImageUrl).toBe('/maps/fresh.webp');
+      await expect(
+        adoptTableScene({
+          repository,
+          source: input,
+          preview,
+          expectedRevision: 0,
+          operationId: 'adopt-blank',
+        })
+      ).resolves.toMatchObject({ status: 'committed' });
+    }
+  );
+});

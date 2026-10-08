@@ -136,8 +136,32 @@ export interface TableControlSession {
     initiative: SharedInitiativeState
   ): Promise<TableControlOutcome>;
   endInitiative(): Promise<TableControlOutcome>;
+  /**
+   * PR06 A1: the existing `registerScene` control command through this
+   * session's queue (latest descriptor, one same-holder stale-control
+   * retry). Registry refusals that are not ownership loss are `rejected`
+   * and never mark the session lost.
+   */
+  registerScene(input: TableSceneRegistration): Promise<TableControlOutcome>;
   subscribe(listener: () => void): () => void;
 }
+
+export interface TableSceneRegistration {
+  sceneId: string;
+  workspaceInstanceId: string;
+  sourceMapId: string;
+  contentRevision: number;
+  safeLabel: string;
+  expectedRegistryRevision: number;
+}
+
+/** Registry refusals of `registerScene` that leave live control intact. */
+const REGISTRY_REJECTIONS = new Set([
+  'stale-registry',
+  'scene-already-registered',
+  'registry-full',
+  'entry-too-large',
+]);
 
 /** Control route body limit (`tableServer/validation.ts` TABLE_REQUEST_LIMIT). */
 const CONTROL_BODY_LIMIT = 16 * 1024;
@@ -324,7 +348,11 @@ export function createTableControlSession(options: {
     }
   };
 
-  type ControlType = 'renew' | 'publishInitiative' | 'endInitiative';
+  type ControlType =
+    | 'renew'
+    | 'publishInitiative'
+    | 'endInitiative'
+    | 'registerScene';
 
   const run = async (
     type: ControlType,
@@ -365,6 +393,19 @@ export function createTableControlSession(options: {
         ) {
           current = returned;
           continue;
+        }
+        if (
+          type === 'registerScene' &&
+          reason !== null &&
+          REGISTRY_REJECTIONS.has(reason)
+        ) {
+          if (returned) current = returned;
+          notify();
+          return {
+            status: 'rejected',
+            reason,
+            current: returned ? structuredClone(returned) : null,
+          };
         }
         if (returned) current = returned;
         markLost(reason ?? 'conflict');
@@ -514,6 +555,7 @@ export function createTableControlSession(options: {
     publishInitiative: (runId, initiative) =>
       enqueue('publishInitiative', { runId, initiative }),
     endInitiative: () => enqueue('endInitiative'),
+    registerScene: input => enqueue('registerScene', { ...input }),
     subscribe: listener => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -521,49 +563,72 @@ export function createTableControlSession(options: {
   };
 }
 
-/**
- * Acquires private control, registers the scene identity and initializes its
- * private authority room. It deliberately never changes public presentation;
- * a future explicit Show action owns that separate contract.
- */
-export async function prepareTableSceneAuthority(options: {
+export type TableControlAcquireResult =
+  | { status: 'acquired'; session: TableControlSession }
+  | {
+      status: 'failed';
+      reason: string;
+      /** Observed lease expiry of the current holder (acquire countdown). */
+      leaseUntil?: number;
+      holderSessionId?: string | null;
+    };
+
+interface ControlRequestOptions {
   campaignCode: string;
   dmId: string;
-  sceneId: string;
-  sourceMapId: string;
-  workspaceInstanceId: string;
-  contentRevision: number;
-  safeLabel: string;
-  canvasState: JsonObject;
-  holderSessionId: string;
   fetcher?: typeof fetch;
-}): Promise<LifecycleResult> {
+}
+
+const CONTROL_HEADERS = {
+  'Content-Type': 'application/json',
+  'x-rollkeeper-csrf': '1',
+};
+
+const tableBase = (campaignCode: string) =>
+  `/api/campaign/${encodeURIComponent(campaignCode)}/table`;
+
+/** One DM `GET table/control` (descriptor + DM-only registry). */
+async function readControl(
+  options: ControlRequestOptions
+): Promise<{ current: TableDescriptor | null; registry: unknown[] } | null> {
   const fetcher = options.fetcher ?? fetch;
-  const base = `/api/campaign/${encodeURIComponent(options.campaignCode)}/table`;
-  const headers = {
-    'Content-Type': 'application/json',
-    'x-rollkeeper-csrf': '1',
+  const response = await fetcher(
+    `${tableBase(options.campaignCode)}/control?dmId=${encodeURIComponent(options.dmId)}`,
+    { cache: 'no-store' }
+  );
+  if (!response.ok) return null;
+  const read = record((await response.json()) as unknown);
+  return {
+    current: descriptor(read?.current),
+    registry: Array.isArray(read?.registry) ? (read.registry as unknown[]) : [],
   };
+}
+
+/**
+ * PR06 A1(a): acquires (or renews) private live control exactly as the PR03
+ * prepare did — control read, initialize if missing, renew-or-acquire, never
+ * a takeover — and returns the page's one control session.
+ */
+export async function acquireTableControl(
+  options: ControlRequestOptions & { holderSessionId: string }
+): Promise<TableControlAcquireResult> {
+  const fetcher = options.fetcher ?? fetch;
   const request = async (command: Record<string, unknown>) => {
-    const response = await fetcher(`${base}/control`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({ dmId: options.dmId, command }),
-    });
+    const response = await fetcher(
+      `${tableBase(options.campaignCode)}/control`,
+      {
+        method: 'POST',
+        headers: CONTROL_HEADERS,
+        body: JSON.stringify({ dmId: options.dmId, command }),
+      }
+    );
     const body = record((await response.json()) as unknown);
     return { response, body, current: descriptor(body?.current) };
   };
   try {
-    const readResponse = await fetcher(
-      `${base}/control?dmId=${encodeURIComponent(options.dmId)}`,
-      { cache: 'no-store' }
-    );
-    if (!readResponse.ok) return { status: 'failed', reason: 'control-read' };
-    const read = record((await readResponse.json()) as unknown);
-    let current = descriptor(read?.current);
-    const registry = Array.isArray(read?.registry)
-      ? (read.registry as unknown[])
-      : [];
+    const read = await readControl(options);
+    if (!read) return { status: 'failed', reason: 'control-read' };
+    let current = read.current;
     if (!current) {
       const initialized = await request({
         type: 'initialize',
@@ -609,67 +674,193 @@ export async function prepareTableSceneAuthority(options: {
     } else {
       return { status: 'failed', reason: 'control-acquire' };
     }
-
-    const existing = registry
-      .map(value => record(value) as RegistryEntry | null)
-      .find(value => value?.sceneId === options.sceneId);
-    if (
-      existing &&
-      (existing.deleted === true ||
-        existing.workspaceInstanceId !== options.workspaceInstanceId ||
-        existing.sourceMapId !== options.sourceMapId)
-    ) {
-      return { status: 'failed', reason: 'scene-identity-conflict' };
-    }
-    if (!existing) {
-      const registered = await request({
-        type: 'registerScene',
-        operationId: operationId('register'),
-        expectedEpoch: current.epoch,
-        expectedRevision: current.revision,
-        expectedFence: current.writerFence,
-        holderSessionId: options.holderSessionId,
-        sceneId: options.sceneId,
-        workspaceInstanceId: options.workspaceInstanceId,
-        sourceMapId: options.sourceMapId,
-        contentRevision: options.contentRevision,
-        safeLabel: options.safeLabel,
-        expectedRegistryRevision: 0,
-      });
-      if (!registered.response.ok || !registered.current)
-        return { status: 'failed', reason: 'scene-register' };
-      current = registered.current;
-    }
-    const authority = await fetcher(`${base}/authority/initialize-if-empty`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        dmId: options.dmId,
-        sceneId: options.sceneId,
-        expectedGeneration: null,
-        expectedCasToken: null,
-        state: canvasStateToAuthorityState(options.canvasState, options.dmId),
-      }),
-    });
-    if (!authority.ok && authority.status !== 409) {
-      return { status: 'failed', reason: 'authority-initialize' };
-    }
-
-    const session = createTableControlSession({
-      campaignCode: options.campaignCode,
-      dmId: options.dmId,
-      holderSessionId: options.holderSessionId,
-      initial: current,
-      fetcher,
-    });
     return {
-      status: 'prepared',
-      session,
-      renew: async () => (await session.renew()).status === 'committed',
+      status: 'acquired',
+      session: createTableControlSession({
+        campaignCode: options.campaignCode,
+        dmId: options.dmId,
+        holderSessionId: options.holderSessionId,
+        initial: current,
+        fetcher,
+      }),
     };
   } catch {
     return { status: 'failed', reason: 'network' };
   }
+}
+
+export interface TableSceneRoomInput {
+  sceneId: string;
+  sourceMapId: string;
+  workspaceInstanceId: string;
+  contentRevision: number;
+  safeLabel: string;
+  canvasState: JsonObject;
+}
+
+export type TableSceneRoomResult =
+  | { status: 'ready'; registered: 'existing' | 'new' }
+  /** Registry entry of another identity, or deleted: local-only. */
+  | { status: 'conflict'; reason: 'scene-identity-conflict' }
+  /** Registry refusal that is not ownership loss (visible text). */
+  | { status: 'rejected'; reason: string }
+  /** Ownership lost while registering: the session is marked lost. */
+  | { status: 'lost'; reason: string }
+  | { status: 'failed'; reason: string };
+
+function registryEntry(
+  registry: unknown[],
+  sceneId: string
+): RegistryEntry | undefined {
+  return registry
+    .map(value => record(value) as RegistryEntry | null)
+    .find((value): value is RegistryEntry => value?.sceneId === sceneId);
+}
+
+function sameIdentity(entry: RegistryEntry, input: TableSceneRoomInput) {
+  return (
+    entry.deleted !== true &&
+    entry.workspaceInstanceId === input.workspaceInstanceId &&
+    entry.sourceMapId === input.sourceMapId
+  );
+}
+
+/**
+ * PR06 A1(b): registers one scene through the page's control session and
+ * seeds its private authority room. A fresh DM registry read decides
+ * (R3-F5): same identity → already registered; another identity or a
+ * deleted entry → `scene-identity-conflict`; otherwise `registerScene`
+ * through the session. `stale-registry` re-reads (same identity counts as
+ * registered); `scene-already-registered` is an identity conflict;
+ * `registry-full` / `entry-too-large` are rejected. None of these mark the
+ * session lost; ownership reasons do. `initialize-if-empty` 409 = success.
+ * Never sends a presentation command.
+ */
+export async function prepareTableSceneRoom(
+  session: TableControlSession,
+  input: TableSceneRoomInput,
+  options: ControlRequestOptions
+): Promise<TableSceneRoomResult> {
+  const fetcher = options.fetcher ?? fetch;
+  try {
+    if (session.isLost())
+      return { status: 'lost', reason: session.lostReason() ?? 'conflict' };
+    const read = await readControl(options);
+    if (!read) return { status: 'failed', reason: 'control-read' };
+    let existing = registryEntry(read.registry, input.sceneId);
+    let registered: 'existing' | 'new' = 'existing';
+    if (existing && !sameIdentity(existing, input))
+      return { status: 'conflict', reason: 'scene-identity-conflict' };
+    if (!existing) {
+      const outcome = await session.registerScene({
+        sceneId: input.sceneId,
+        workspaceInstanceId: input.workspaceInstanceId,
+        sourceMapId: input.sourceMapId,
+        contentRevision: input.contentRevision,
+        safeLabel: input.safeLabel,
+        expectedRegistryRevision: 0,
+      });
+      if (outcome.status === 'lost')
+        return { status: 'lost', reason: outcome.reason };
+      if (outcome.status === 'rejected') {
+        if (outcome.reason === 'scene-already-registered')
+          return { status: 'conflict', reason: 'scene-identity-conflict' };
+        if (outcome.reason !== 'stale-registry')
+          return { status: 'rejected', reason: outcome.reason };
+        const reread = await readControl(options);
+        if (!reread) return { status: 'failed', reason: 'control-read' };
+        existing = registryEntry(reread.registry, input.sceneId);
+        if (!existing || !sameIdentity(existing, input))
+          return { status: 'conflict', reason: 'scene-identity-conflict' };
+      } else if (outcome.status !== 'committed') {
+        return { status: 'failed', reason: 'scene-register' };
+      } else {
+        registered = 'new';
+      }
+    }
+    const authority = await fetcher(
+      `${tableBase(options.campaignCode)}/authority/initialize-if-empty`,
+      {
+        method: 'POST',
+        headers: CONTROL_HEADERS,
+        body: JSON.stringify({
+          dmId: options.dmId,
+          sceneId: input.sceneId,
+          expectedGeneration: null,
+          expectedCasToken: null,
+          state: canvasStateToAuthorityState(input.canvasState, options.dmId),
+        }),
+      }
+    );
+    if (!authority.ok && authority.status !== 409)
+      return { status: 'failed', reason: 'authority-initialize' };
+    return { status: 'ready', registered };
+  } catch {
+    return { status: 'failed', reason: 'network' };
+  }
+}
+
+/** Visible wording of a scene-room outcome that left the scene local-only. */
+export function sceneRoomMessage(result: TableSceneRoomResult): string | null {
+  switch (result.status) {
+    case 'ready':
+      return null;
+    case 'conflict':
+      return 'This scene is registered from another device or workspace. It stays local-only here.';
+    case 'rejected':
+      return result.reason === 'registry-full'
+        ? 'This campaign already has the maximum number of live scenes'
+        : result.reason === 'entry-too-large'
+          ? 'Scene name is too long to register'
+          : 'The server refused to register this scene';
+    case 'lost':
+      return 'Live control was lost while registering this scene.';
+    case 'failed':
+      return 'Live registration is unavailable; this scene stays local.';
+  }
+}
+
+/**
+ * Acquires private control, registers the scene identity and initializes its
+ * private authority room. It deliberately never changes public presentation;
+ * a future explicit Show action owns that separate contract. PR06: the
+ * composition of A1(a) + A1(b), kept for the battle-maps adoption panel
+ * (which drops the returned session).
+ */
+export async function prepareTableSceneAuthority(options: {
+  campaignCode: string;
+  dmId: string;
+  sceneId: string;
+  sourceMapId: string;
+  workspaceInstanceId: string;
+  contentRevision: number;
+  safeLabel: string;
+  canvasState: JsonObject;
+  holderSessionId: string;
+  fetcher?: typeof fetch;
+}): Promise<LifecycleResult> {
+  const acquired = await acquireTableControl(options);
+  if (acquired.status === 'failed') return acquired;
+  const session = acquired.session;
+  const room = await prepareTableSceneRoom(session, options, options);
+  if (room.status !== 'ready') {
+    return {
+      status: 'failed',
+      reason:
+        room.status === 'conflict'
+          ? 'scene-identity-conflict'
+          : room.status === 'failed' &&
+              (room.reason === 'authority-initialize' ||
+                room.reason === 'network')
+            ? room.reason
+            : 'scene-register',
+    };
+  }
+  return {
+    status: 'prepared',
+    session,
+    renew: async () => (await session.renew()).status === 'committed',
+  };
 }
 
 /**

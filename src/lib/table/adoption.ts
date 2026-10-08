@@ -87,9 +87,14 @@ function jsonObject(value: unknown): JsonObject | null {
     : null;
 }
 
-function actorFromEntity(
+/**
+ * The one DM-managed actor builder for legacy encounter entities, shared by
+ * adoption (`idPrefix` = encounter id) and PR06 encounter copies (`idPrefix`
+ * = the new run id, R3-F7).
+ */
+export function actorFromEntity(
   workspaceKey: string,
-  encounterId: string,
+  idPrefix: string,
   value: unknown,
   now: string
 ): TableActorRecordV1 {
@@ -99,7 +104,7 @@ function actorFromEntity(
   return {
     schemaVersion: 1,
     workspaceKey,
-    actorId: `${encounterId}:${entityId}`,
+    actorId: `${idPrefix}:${entityId}`,
     actorKind: 'dm-managed',
     liveStats: {
       name: text(entity.name, 'Unnamed actor'),
@@ -226,7 +231,10 @@ export async function captureAdoptionPreview(options: {
   const newId = options.newId ?? (() => crypto.randomUUID());
   const now = (options.now ?? (() => new Date().toISOString()))();
   const sceneId = newId();
-  const canvasRaw = text(map.canvasState, '{}');
+  // W9: a never-opened legacy map persists `canvasState: ''` (list page and
+  // picker create it that way); its adoption checkpoint is an empty state.
+  const canvasText = text(map.canvasState, '{}');
+  const canvasRaw = canvasText.trim().length === 0 ? '{}' : canvasText;
   const canvasState = parseObject(canvasRaw);
   const mapSize = record(map.mapImageSize ?? {});
   const scene: TableSceneRecordV1 = {
