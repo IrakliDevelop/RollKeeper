@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/layout/badge';
 import type { TableSceneRecordV1 } from '@/lib/table/schema';
 
 export const SCENES_PANEL_ID = 'table-scenes-panel';
+/** FU-6: stable id — the toggle remounts with the scene's header. */
+export const SCENES_TOGGLE_ID = 'table-scenes-toggle';
 
 /** Header toggle for the private Scenes panel (W5/W12). */
 export function TableScenesToggle(props: {
@@ -19,6 +21,7 @@ export function TableScenesToggle(props: {
     <Button
       variant={props.open ? 'primary' : 'outline'}
       size="sm"
+      id={SCENES_TOGGLE_ID}
       aria-expanded={props.open}
       aria-controls={SCENES_PANEL_ID}
       onClick={props.onToggle}
@@ -78,6 +81,11 @@ export function TableSceneBrowser(props: {
 }) {
   if (!props.open) return null;
   const presented = props.presentation?.sceneId ?? null;
+  // FU-6: focus the toggle that is mounted now, never a stale node.
+  const close = () => {
+    props.onClose();
+    document.getElementById(SCENES_TOGGLE_ID)?.focus();
+  };
   return (
     <section
       id={SCENES_PANEL_ID}
@@ -86,7 +94,7 @@ export function TableSceneBrowser(props: {
       onKeyDown={event => {
         if (event.key === 'Escape') {
           event.stopPropagation();
-          props.onClose();
+          close();
         }
       }}
       className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,4rem)] bottom-2 left-2 z-40 flex w-[min(20rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border shadow-xl"
@@ -97,7 +105,7 @@ export function TableSceneBrowser(props: {
           variant="ghost"
           size="sm"
           aria-label="Close scenes"
-          onClick={props.onClose}
+          onClick={close}
         >
           <X size={14} aria-hidden="true" />
         </Button>

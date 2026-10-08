@@ -1047,6 +1047,47 @@ describe('W5/W6 browser, creation and local adoption in the workspace', () => {
     expect(presentationCommands()).toEqual([]);
   });
 
+  it.each([
+    [
+      'Escape',
+      (panel: HTMLElement) => fireEvent.keyDown(panel, { key: 'Escape' }),
+    ],
+    [
+      'the close button',
+      (panel: HTMLElement) =>
+        fireEvent.click(
+          within(panel).getByRole('button', { name: 'Close scenes' })
+        ),
+    ],
+  ])(
+    'returns focus to the current Scenes toggle on %s after a scene switch (FU-6)',
+    async (_how, close) => {
+      nav.reset('scene=scene-tavern&panel=scenes');
+      render(<TableWorkspace campaignCode="CAMP" />);
+      await settled('scene-tavern');
+      const panel = await screen.findByRole('region', { name: 'Scenes' });
+      const first = screen.getByRole('button', { name: 'Scenes' });
+      fireEvent.click(within(panel).getByRole('button', { name: /Forest/u }));
+      await settled('scene-forest');
+      const current = screen.getByRole('button', { name: 'Scenes' });
+      expect(current).not.toBe(first);
+      const button = within(
+        screen.getByRole('region', { name: 'Scenes' })
+      ).getByRole('button', { name: /Forest/u });
+      button.focus();
+      close(screen.getByRole('region', { name: 'Scenes' }));
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('region', { name: 'Scenes' })
+        ).not.toBeInTheDocument()
+      );
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Scenes' })
+      );
+      expect(current.isConnected).toBe(true);
+    }
+  );
+
   it('collapses and expands panels without new subscriptions or camera/selection changes', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
