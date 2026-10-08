@@ -469,6 +469,39 @@ describe('FU-1 Edit map panel focus, dismissal and placement', () => {
     expect(panel()).not.toBeInTheDocument();
   });
 
+  it('reads busy synchronously: an outside click right after the work settles closes (R4-3)', async () => {
+    let finish!: (url: string) => void;
+    mount(
+      vi.fn(
+        () =>
+          new Promise<string>(resolve => {
+            finish = resolve;
+          })
+      )
+    );
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [
+          new File([new Uint8Array(4)], 'a.webp', { type: 'image/webp' }),
+        ],
+      },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Set map image' })
+      ).toBeDisabled()
+    );
+    finish('https://x.test/a.webp');
+    // Microtasks only: the work settles, but React has not re-rendered
+    // (nor run passive effects) yet.
+    for (let step = 0; step < 50; step += 1) await Promise.resolve();
+    expect(
+      screen.getByRole('button', { name: 'Set map image' })
+    ).toBeDisabled();
+    fireEvent.pointerDown(document.body);
+    expect(panel()).not.toBeInTheDocument();
+  });
+
   it('Tab from Edit map while open moves into the panel (FA1)', () => {
     const toggle = mount();
     fireEvent.keyDown(screen.getByRole('button', { name: 'Set map image' }), {

@@ -109,10 +109,13 @@ export function TableEditMapControl(props: {
   const anchorRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  // R4-3: the dismissal handlers read this; it is set together with the
+  // state (never a render behind).
   const busyRef = useRef(busy);
-  useEffect(() => {
-    busyRef.current = busy;
-  }, [busy]);
+  const updateBusy = (value: boolean) => {
+    busyRef.current = value;
+    setBusy(value);
+  };
   const [position, setPosition] = useState<{
     top: number;
     left: number;
@@ -225,7 +228,7 @@ export function TableEditMapControl(props: {
 
   async function replaceImage(file: File) {
     if (!viewport) return;
-    setBusy(true);
+    updateBusy(true);
     setError(null);
     try {
       const prepared = await prepareSceneImage(file, {
@@ -257,7 +260,7 @@ export function TableEditMapControl(props: {
         // Fog bounds stay as they were; fog tools report it.
       }
     } finally {
-      setBusy(false);
+      updateBusy(false);
     }
   }
 
