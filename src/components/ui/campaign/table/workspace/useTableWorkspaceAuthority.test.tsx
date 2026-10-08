@@ -382,4 +382,36 @@ describe('W3 one control session per workspace (D8)', () => {
       expect(posted('acquire')).toHaveLength(1);
     });
   });
+
+  it('keeps a registry-full refusal cached on reselect; only Retry re-runs it (FU-3 / A3b)', async () => {
+    for (let index = 0; index < 100; index += 1)
+      server.registry.set(`other-${index}`, {
+        sceneId: `other-${index}`,
+        workspaceInstanceId: 'workspace-1',
+        sourceMapId: `other-${index}`,
+        registryRevision: 1,
+      });
+    const { result, rerender } = mount(room('scene-full'));
+    await waitFor(() =>
+      expect(result.current.room).toMatchObject({
+        status: 'local',
+        retryable: true,
+        message: 'This campaign already has the maximum number of live scenes',
+      })
+    );
+    rerender({ scene: room('other-1') });
+    await waitFor(() => expect(result.current.room.status).toBe('ready'));
+    const registers = posted('registerScene').length;
+    const reads = server.reads.length;
+    rerender({ scene: room('scene-full') });
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+    expect(result.current.room.status).toBe('local');
+    expect(server.reads.length).toBe(reads);
+    expect(posted('registerScene')).toHaveLength(registers);
+    act(() => result.current.retryRoom());
+    await waitFor(() => expect(server.reads.length).toBe(reads + 1));
+    expect(posted('acquire')).toHaveLength(1);
+  });
 });
