@@ -64,6 +64,21 @@ describe('W11 arrival point picker and marker', () => {
     expect(after.x).not.toBe(before.x);
     expect(marker.style.left).toBe(`${after.x}px`);
     expect(marker.style.top).toBe(`${after.y}px`);
-    expect(marker.getAttribute('aria-hidden')).toBe('true');
+    expect(container.querySelector('canvas')).toBeNull();
+  });
+
+  it('is a labelled, accent-coloured pin only when an arrival point exists (FU-10)', () => {
+    const vp = viewport();
+    const { rerender } = render(
+      <TableArrivalMarker viewport={vp} point={{ x: 5, y: 5 }} />
+    );
+    const marker = screen.getByRole('img', { name: 'Party arrival point' });
+    expect(marker).toHaveAttribute('title', 'Party arrival point');
+    expect(marker.querySelector('svg')).not.toBeNull();
+    expect(marker.innerHTML).toMatch(/text-accent-emerald-text/u);
+    rerender(<TableArrivalMarker viewport={vp} point={null} />);
+    expect(
+      screen.queryByRole('img', { name: 'Party arrival point' })
+    ).toBeNull();
   });
 });

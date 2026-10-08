@@ -2,7 +2,7 @@
 
 import { useEffect, useReducer, useRef } from 'react';
 import type { Viewport } from '@fieldnotes/core';
-import { Crosshair, Users } from 'lucide-react';
+import { Crosshair, MapPin, Users } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import type { TableRepository } from '@/lib/table/repository';
@@ -102,18 +102,32 @@ export function TableArrivalPicker(props: {
 /** DM-only overlay marker (never a canvas element, never synced). */
 export function TableArrivalMarker(props: {
   viewport: Pick<Viewport, 'camera'>;
-  point: { x: number; y: number };
+  point: { x: number; y: number } | null;
 }) {
   const [, rerender] = useReducer((value: number) => value + 1, 0);
   const { camera } = props.viewport;
   useEffect(() => camera.onChange(() => rerender()), [camera]);
+  if (!props.point) return null;
   const screen = camera.worldToScreen(props.point);
+  // FU-10: a labelled pin whose tip sits on the point. DM-only DOM overlay,
+  // never a canvas element (players never receive it).
   return (
     <div
-      aria-hidden="true"
-      className="border-accent-emerald-border bg-accent-emerald-bg pointer-events-none fixed z-10 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2"
+      role="img"
+      aria-label="Party arrival point"
+      title="Party arrival point"
+      className="pointer-events-none fixed z-10 flex -translate-x-1/2 -translate-y-full flex-col items-center"
       style={{ left: screen.x, top: screen.y }}
-      title="Party arrival point (DM only)"
-    />
+    >
+      <span className="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text rounded border px-1 text-[10px] leading-4 font-semibold whitespace-nowrap shadow-sm">
+        Arrival
+      </span>
+      <MapPin
+        size={24}
+        strokeWidth={2.5}
+        aria-hidden="true"
+        className="text-accent-emerald-text fill-accent-emerald-bg drop-shadow"
+      />
+    </div>
   );
 }

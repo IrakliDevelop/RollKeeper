@@ -178,8 +178,8 @@ export function TableSceneStage(props: {
           onCancel={cancelPlacement}
         />
       )}
-      {viewport && arrivalPoint && (
-        <TableArrivalMarker viewport={viewport} point={arrivalPoint} />
+      {viewport && (
+        <TableArrivalMarker viewport={viewport} point={arrivalPoint ?? null} />
       )}
       {viewport && arming && (
         <TableArrivalPicker
