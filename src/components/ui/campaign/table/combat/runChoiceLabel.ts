@@ -16,8 +16,8 @@ interface RunChoice {
 /**
  * FU-7 / FC-8: distinguishable run choices — scene name, run label,
  * creation date and short time, plus "copy n" only when labels collide
- * within one (localWorkspaceId, sceneId) group, ordered by createdAt then
- * runId. Returned in the input order.
+ * within one (localWorkspaceId, sceneId) group; n counts the runs sharing
+ * that label, ordered by createdAt then runId. Returned in the input order.
  */
 export function runChoiceLabels<T extends RunChoice>(
   runs: readonly T[],
@@ -40,14 +40,15 @@ export function runChoiceLabels<T extends RunChoice>(
     );
   return runs.map(run => {
     const group = groups.get(groupOf(run)) ?? [run];
-    const collides =
-      group.filter(other => labelOf(other) === labelOf(run)).length > 1;
+    // R4-2: the ordinal counts only the runs sharing this label.
+    const same = group.filter(other => labelOf(other) === labelOf(run));
+    const collides = same.length > 1;
     const created = runCreatedText(run.createdAt);
     return [
       sceneName(run),
       labelOf(run),
       ...(created ? [created] : []),
-      ...(collides ? [`copy ${group.indexOf(run) + 1}`] : []),
+      ...(collides ? [`copy ${same.indexOf(run) + 1}`] : []),
     ].join(' · ');
   });
 }
