@@ -10,6 +10,7 @@ import { CampaignSettingsSyncControls } from '@/components/ui/campaign/CampaignS
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import DmLocationEditor from '@/components/ui/campaign/location-map/DmLocationEditor';
 import { DmVttScreen } from '@/components/ui/campaign/dm-vtt/DmVttScreen';
+import { TableMapEntryLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { VttErrorFallback } from '@/components/ui/campaign/dm-vtt/VttErrorFallback';
 import { useBattleMapMode } from '@/components/ui/campaign/dm-vtt/useBattleMapMode';
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -113,6 +114,8 @@ export default function BattleMapEditorPage() {
               </div>
             </div>
             <div className="flex items-center gap-3">
+              {/* PR06 W8: original editor; the Table entry is a link only. */}
+              <TableMapEntryLink campaignCode={code} mapId={id} />
               <div className="border-divider bg-surface-raised flex items-center gap-0.5 rounded-lg border p-0.5">
                 <Button
                   variant="primary"

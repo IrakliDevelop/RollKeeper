@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/forms/button';
 
 import { BattleMapPickerDialog } from '@/components/ui/campaign/battle-map/BattleMapPickerDialog';
 import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
+import { PrepareOnMapLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 
@@ -33,6 +34,11 @@ export function EncounterBattleMapButton({
   return (
     <>
       <OpenSceneRunLink
+        campaignCode={campaignCode}
+        encounterId={encounterId}
+        compact
+      />
+      <PrepareOnMapLink
         campaignCode={campaignCode}
         encounterId={encounterId}
         compact

@@ -63,7 +63,10 @@ describe('encounter library scene-run lookup (F7)', () => {
     render(<EncounterList campaignCode="CAMP" />);
     expect(
       await screen.findByRole('link', { name: /Open scene run/ })
-    ).toHaveAttribute('href', '/dm/campaign/CAMP/table/scene-1?run=run-2');
+    ).toHaveAttribute(
+      'href',
+      '/dm/campaign/CAMP/table?scene=scene-1&run=run-2'
+    );
     await waitFor(() => expect(lookups.campaign).toHaveBeenCalledTimes(1));
     expect(lookups.campaign).toHaveBeenCalledWith(
       expect.objectContaining({

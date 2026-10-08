@@ -14,6 +14,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registryServer } from '@/lib/table/controlServer.fixture';
 import { useBattleMapStore } from '@/store/battleMapStore';
+import { useCharacterStore } from '@/store/characterStore';
+import { useEncounterStore } from '@/store/encounterStore';
 import type { BattleMap } from '@/types/battlemap';
 import { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
@@ -903,5 +905,243 @@ describe('W5/W6 browser, creation and local adoption in the workspace', () => {
     const href = nav.push.mock.calls.at(-1)![0];
     await settled(new URLSearchParams(href.split('?')[1]).get('scene')!);
     expect(server.commands).toHaveLength(posts);
+  });
+});
+
+describe('W7 encounter "Prepare on map"', () => {
+  const ENCOUNTER = {
+    id: 'enc-lib',
+    name: 'Bandit ambush',
+    campaignCode: 'CAMP',
+    entities: [
+      {
+        id: 'e-bandit',
+        type: 'monster',
+        name: 'Bandit',
+        initiative: null,
+        initiativeModifier: 1,
+        currentHp: 11,
+        maxHp: 11,
+        tempHp: 0,
+        armorClass: 12,
+        conditions: [],
+      },
+      {
+        id: 'e-aria',
+        type: 'player',
+        name: 'Aria',
+        initiative: null,
+        initiativeModifier: 2,
+        currentHp: 20,
+        maxHp: 20,
+        tempHp: 0,
+        armorClass: 15,
+        conditions: [],
+      },
+    ],
+    currentTurn: 0,
+    round: 0,
+    isActive: false,
+    sortOrder: 'initiative',
+    createdAt: AT,
+    updatedAt: AT,
+  };
+  beforeEach(() => {
+    useCharacterStore.setState({ hasHydrated: true } as never);
+    useEncounterStore.setState({ encounters: [ENCOUNTER] } as never);
+  });
+  afterEach(() => {
+    useEncounterStore.setState({ encounters: [] } as never);
+  });
+
+  const runs = (sceneId: string) => {
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    return current.snapshot.encounters.filter(
+      run => run.sceneId === sceneId && run.sourceEncounterId === 'enc-lib'
+    );
+  };
+
+  it('copies the encounter into the chosen scene after explicit confirmation', async () => {
+    const libraryWrites = vi.spyOn(useEncounterStore, 'setState');
+    nav.reset('prepareEncounter=enc-lib&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    expect(
+      await screen.findByText(
+        'Prepare Bandit ambush: choose a scene or create one'
+      )
+    ).toBeInTheDocument();
+    const panel = screen.getByRole('region', { name: 'Scenes' });
+    fireEvent.click(within(panel).getByRole('button', { name: /Forest/u }));
+    expect(nav.push).toHaveBeenLastCalledWith(
+      '/dm/campaign/CAMP/table?scene=scene-forest&prepareEncounter=enc-lib',
+      { scroll: false }
+    );
+    await settled('scene-forest');
+    expect(runs('scene-forest')).toEqual([]);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Copy Bandit ambush into Forest',
+      })
+    );
+    await waitFor(() => expect(runs('scene-forest')).toHaveLength(1));
+    const [run] = runs('scene-forest');
+    expect(run!.participants.map(p => p.actorId)).toEqual([
+      `${run!.runId}:e-bandit`,
+    ]);
+    await waitFor(() =>
+      expect(nav.replace).toHaveBeenLastCalledWith(
+        `/dm/campaign/CAMP/table?scene=scene-forest&run=${run!.runId}`,
+        { scroll: false }
+      )
+    );
+    expect(
+      screen.queryByText(/Prepare Bandit ambush/u)
+    ).not.toBeInTheDocument();
+    expect(libraryWrites).not.toHaveBeenCalled();
+    expect(presentationCommands()).toEqual([]);
+  });
+
+  it('cancels without creating anything', async () => {
+    nav.reset('scene=scene-forest&prepareEncounter=enc-lib');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-forest');
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Cancel prepare' })
+    );
+    expect(nav.replace).toHaveBeenLastCalledWith(
+      '/dm/campaign/CAMP/table?scene=scene-forest',
+      { scroll: false }
+    );
+    expect(runs('scene-forest')).toEqual([]);
+  });
+
+  it('says "Encounter not found" for an unknown or foreign encounter and offers nothing else', async () => {
+    useEncounterStore.setState({
+      encounters: [{ ...ENCOUNTER, campaignCode: 'OTHER' }],
+    } as never);
+    nav.reset('scene=scene-forest&prepareEncounter=enc-lib');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-forest');
+    expect(await screen.findByText('Encounter not found')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^Copy /u })).toBeNull();
+    expect(runs('scene-forest')).toEqual([]);
+  });
+
+  it('offers the existing copy (with a selector for several) or an explicit new copy', async () => {
+    const key = repository.workspaceIdentity;
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    await repository.mutateWorkspace(
+      current.snapshot.campaign?.revision ?? 0,
+      'existing-copies',
+      {
+        encounters: {
+          put: ['copy-1', 'copy-2'].map(runId => ({
+            schemaVersion: 1 as const,
+            workspaceKey: key,
+            runId,
+            sceneId: 'scene-tavern',
+            sourceEncounterId: 'enc-lib',
+            runGeneration: runId,
+            participants: [],
+            round: 0,
+            currentActorId: null,
+            isActive: false,
+            createdAt: AT,
+            updatedAt: AT,
+            label: `Ambush ${runId}`,
+          })),
+        },
+      }
+    );
+    nav.reset('scene=scene-tavern&prepareEncounter=enc-lib');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const select = await screen.findByLabelText('Existing copies');
+    fireEvent.change(select, { target: { value: 'copy-2' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Open existing run' }));
+    expect(nav.replace).toHaveBeenLastCalledWith(
+      '/dm/campaign/CAMP/table?scene=scene-tavern&run=copy-2',
+      { scroll: false }
+    );
+    expect(runs('scene-tavern')).toHaveLength(2);
+    expect(
+      screen.queryByRole('button', { name: 'Create another copy' })
+    ).not.toBeInTheDocument();
+  });
+
+  it('creates another copy only on explicit request', async () => {
+    const key = repository.workspaceIdentity;
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    await repository.mutateWorkspace(
+      current.snapshot.campaign?.revision ?? 0,
+      'existing-copy',
+      {
+        encounters: {
+          put: [
+            {
+              schemaVersion: 1,
+              workspaceKey: key,
+              runId: 'copy-1',
+              sceneId: 'scene-tavern',
+              sourceEncounterId: 'enc-lib',
+              runGeneration: 'copy-1',
+              participants: [],
+              round: 0,
+              currentActorId: null,
+              isActive: false,
+              createdAt: AT,
+              updatedAt: AT,
+              label: 'Ambush',
+            },
+          ],
+        },
+      }
+    );
+    nav.reset('scene=scene-tavern&prepareEncounter=enc-lib');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    expect(
+      await screen.findByRole('button', { name: 'Open existing run' })
+    ).toBeInTheDocument();
+    expect(runs('scene-tavern')).toHaveLength(1);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Create another copy' })
+    );
+    await waitFor(() => expect(runs('scene-tavern')).toHaveLength(2));
+  });
+
+  it('never prompts for an encounter in a peaceful scene', async () => {
+    nav.reset('scene=scene-forest');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-forest');
+    expect(screen.queryByText(/Prepare /u)).toBeNull();
+    expect(screen.queryByRole('button', { name: /^Copy /u })).toBeNull();
+    expect(screen.queryByText('Encounter not found')).toBeNull();
+    expect(runs('scene-forest')).toEqual([]);
+  });
+
+  it('creates a new scene during preparation and copies into it', async () => {
+    nav.reset('prepareEncounter=enc-lib&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    fireEvent.click(await screen.findByRole('button', { name: 'New scene' }));
+    fireEvent.change(await screen.findByLabelText('Scene name'), {
+      target: { value: 'Swamp' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
+    await waitFor(() => expect(nav.push).toHaveBeenCalled());
+    const href = nav.push.mock.calls.at(-1)![0];
+    const params = new URLSearchParams(href.split('?')[1]);
+    expect(params.get('prepareEncounter')).toBe('enc-lib');
+    const sceneId = params.get('scene')!;
+    await settled(sceneId);
+    fireEvent.click(
+      await screen.findByRole('button', {
+        name: 'Copy Bandit ambush into Swamp',
+      })
+    );
+    await waitFor(() => expect(runs(sceneId)).toHaveLength(1));
   });
 });

@@ -11,6 +11,7 @@ import {
   TablePlayersCacheProvider,
 } from '../useTablePlayersSnapshot';
 import { TableCreateSceneDialog } from './TableCreateSceneDialog';
+import { TablePrepareEncounter } from './TablePrepareEncounter';
 import { TableSceneBrowser, TableScenesToggle } from './TableSceneBrowser';
 import { TableSceneStage } from './TableSceneStage';
 import { SCENE_UNAVAILABLE, useTableWorkspace } from './TableWorkspace.hooks';
@@ -96,6 +97,17 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       presentationProps={workspace.presentationProps}
       presentation={workspace.presentation}
       notices={notices}
+      extra={
+        workspace.query.prepareEncounter ? (
+          <TablePrepareEncounter
+            encounterId={workspace.query.prepareEncounter}
+            campaignCode={campaignCode}
+            repository={repository}
+            scene={mountedScene}
+            navigate={workspace.navigate}
+          />
+        ) : null
+      }
       scene={
         mountedScene && adapter
           ? {

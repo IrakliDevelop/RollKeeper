@@ -149,7 +149,11 @@ export function useTableWorkspace(campaignCode: string) {
     requestedSceneId: requestedScene?.sceneId ?? null,
     sceneName,
     onRevert: sceneId =>
-      navigate('replace', { scene: sceneId, panel: query.panel }),
+      navigate('replace', {
+        scene: sceneId,
+        prepareEncounter: query.prepareEncounter,
+        panel: query.panel,
+      }),
     // R3-F8: capture in the switch machine, before the canvas unmounts.
     onBeforeUnmount: sceneId => {
       const entry = viewportRef.current;
@@ -303,9 +307,14 @@ export function useTableWorkspace(campaignCode: string) {
     );
 
   // ─── W5 private browser: selection is a push, never a presentation ────
+  // W7: a selection made while preparing an encounter keeps preparing.
   const selectScene = useCallback(
-    (sceneId: string) => navigate('push', { scene: sceneId }),
-    [navigate]
+    (sceneId: string) =>
+      navigate('push', {
+        scene: sceneId,
+        prepareEncounter: query.prepareEncounter,
+      }),
+    [navigate, query.prepareEncounter]
   );
   const browser = useWorkspaceSceneBrowser({
     campaignCode,

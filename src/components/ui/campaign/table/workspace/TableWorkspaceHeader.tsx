@@ -41,6 +41,8 @@ export function TableWorkspaceHeader(props: {
   presentationProps: TablePresentationControlsProps;
   presentation: TablePresentationPanel;
   notices: Array<{ id: string; text: string; tone: 'alert' | 'status' }>;
+  /** Workspace-level flows shown in the header (W7 prepare banner). */
+  extra?: ReactNode;
   scene?: {
     name: string;
     stored: TableSceneRecordV1 | undefined;
@@ -93,6 +95,7 @@ export function TableWorkspaceHeader(props: {
           {notice.text}
         </p>
       ))}
+      {props.extra}
       <TablePresentationView
         {...props.presentationProps}
         panel={props.presentation}

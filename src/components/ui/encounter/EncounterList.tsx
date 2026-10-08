@@ -20,6 +20,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
 import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog';
 import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
+import { PrepareOnMapLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { SceneRunLinksProvider } from '@/components/ui/campaign/table/combat/useSceneRunLinks';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
@@ -240,8 +241,12 @@ function EncounterCard({
             <Trash2 size={14} />
           </Button>
         </div>
-        <div className="mt-2 empty:hidden">
+        <div className="mt-2 flex flex-col gap-2 empty:hidden">
           <OpenSceneRunLink
+            campaignCode={campaignCode}
+            encounterId={encounter.id}
+          />
+          <PrepareOnMapLink
             campaignCode={campaignCode}
             encounterId={encounter.id}
           />
