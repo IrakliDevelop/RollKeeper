@@ -1,6 +1,14 @@
 'use client';
 
-import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  useCallback,
+  useMemo,
+  useReducer,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import type { Viewport } from '@fieldnotes/core';
 
 import { DmBattleMapCanvas } from '@/components/ui/campaign/dm-vtt/DmBattleMapCanvas';
@@ -13,17 +21,23 @@ import {
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 import type { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import { runSceneCommand } from '@/lib/table/sceneCommands';
 
+import { TableArrivalMarker, TableArrivalPicker } from '../TablePartyArrival';
 import { createTableRosterCanvas } from '../tableRosterCanvas';
 import { TableRosterPanel } from '../TableRosterPanel';
+import { useEnsureSceneMapImage } from './sceneMapImage';
+import { TableEditMapControl } from './TableEditMapControl';
 
 const TOKEN_INFO = { mode: null, onCycle: () => {} };
+const RELAY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL);
 
 /**
  * Scene-level part of the workspace (W4), keyed by `${sceneId}:${epoch}`:
- * the one canvas writer (`DmBattleMapCanvas` + the scene adapter), token
- * placement and the scene roster. Everything here is created and torn down
- * with the scene; workspace-level state lives in `TableWorkspace`.
+ * the one canvas writer (`DmBattleMapCanvas` + the scene adapter) with its
+ * Edit map tools (W10), the map-image ensure step (R3-F3), token placement,
+ * the party arrival picker (W11) and the scene roster. Everything here is
+ * created and torn down with the scene.
  */
 export function TableSceneStage(props: {
   campaignCode: string;
@@ -32,21 +46,24 @@ export function TableSceneStage(props: {
   repository: TableRepository;
   adapter: TableSceneAdapter;
   header: ReactNode;
+  relayStatus: string;
   relayLive: boolean;
+  /** The scene is the shown, unblanked one (live editing wording). */
+  presentedHere: boolean;
   connection: BattleMapConnection | null;
   onViewportReady: (sceneId: string, viewport: Viewport) => void;
   onConnectionReady: (connection: BattleMapConnection | null) => void;
   onStatus: (sceneId: string, status: string) => void;
-  onExportError: (message: string) => void;
-  /** Extra scene-level chrome inside the canvas viewport (Phase C tools). */
-  children?: ReactNode;
+  onMessage: (message: string) => void;
 }) {
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
   const [pendingPlacement, setPendingPlacement] =
     useState<PendingTokenPlacement | null>(null);
+  const [arming, setArming] = useState(false);
   const cancelPlacement = useCallback(() => setPendingPlacement(null), []);
-  const { onViewportReady, onStatus, sceneId } = props;
+  const { adapter, onViewportReady, onStatus, onMessage, repository, sceneId } =
+    props;
   const handleViewportReady = useCallback(
     (next: Viewport) => {
       setViewport(next);
@@ -72,19 +89,78 @@ export function TableSceneStage(props: {
     [viewport, props.connection]
   );
 
+  const [, onScene] = useReducer((value: number) => value + 1, 0);
+  useEffect(() => adapter.subscribe(onScene), [adapter]);
+  const map = adapter.getBattleMap();
+  const writes = useMemo(
+    () => ({
+      isDmOnly: (id: string) =>
+        adapter.getBattleMap()?.dmOnlyElements[id] === true,
+      setDmOnly: (id: string, dmOnly: boolean) => adapter.setDmOnly(id, dmOnly),
+      writeSize: (size: { w: number; h: number }) =>
+        adapter.updateBattleMap({ mapImageSize: size }),
+    }),
+    [adapter]
+  );
+  useEnsureSceneMapImage({
+    viewport,
+    relayConfigured: RELAY_CONFIGURED,
+    relayStatus: props.relayStatus,
+    map: map
+      ? { mapImageUrl: map.mapImageUrl, mapImageSize: map.mapImageSize }
+      : null,
+    writes,
+  });
+
+  const current = repository.getCurrent();
+  const arrivalPoint =
+    current?.status === 'ready'
+      ? (current.snapshot.scenes.find(scene => scene.sceneId === sceneId)
+          ?.arrivalPoint ?? null)
+      : null;
+  const setArrival = async (point: { x: number; y: number }) => {
+    setArming(false);
+    const latest = repository.getCurrent();
+    const result = await runSceneCommand(repository, {
+      expectedRevision:
+        latest?.status === 'ready'
+          ? (latest.snapshot.campaign?.revision ?? 0)
+          : 0,
+      operationId: crypto.randomUUID(),
+      command: {
+        type: 'scene.setArrivalPoint',
+        sceneId,
+        point: { x: point.x, y: point.y },
+        at: new Date().toISOString(),
+      },
+    });
+    onMessage(
+      result.status === 'committed' || result.status === 'unchanged'
+        ? 'Party arrival point saved on this device.'
+        : 'The arrival point was not saved. Nothing changed.'
+    );
+  };
+
   return (
     <DmBattleMapCanvas
       campaignCode={props.campaignCode}
-      battleMapId={props.sceneId}
+      battleMapId={sceneId}
       dmId={props.dmId}
-      tableSceneAdapter={props.adapter}
+      tableSceneAdapter={adapter}
       onConnectionReady={props.onConnectionReady}
       onStatus={handleStatus}
       tokenConfigRef={tokenConfigRef}
       onViewportReady={handleViewportReady}
       tokenInfoToggle={TOKEN_INFO}
-      onExportError={props.onExportError}
+      onExportError={onMessage}
       sessionControls={props.header}
+      editMapControl={
+        <TableEditMapControl
+          adapter={adapter}
+          viewport={viewport}
+          presentedHere={props.presentedHere}
+        />
+      }
     >
       <TokenPlacementController
         pending={pendingPlacement}
@@ -97,15 +173,25 @@ export function TableSceneStage(props: {
           onCancel={cancelPlacement}
         />
       )}
+      {viewport && arrivalPoint && (
+        <TableArrivalMarker viewport={viewport} point={arrivalPoint} />
+      )}
+      {viewport && arming && (
+        <TableArrivalPicker
+          viewport={viewport}
+          onPick={point => void setArrival(point)}
+          onCancel={() => setArming(false)}
+        />
+      )}
       <TableRosterPanel
-        repository={props.repository}
-        sceneId={props.sceneId}
+        repository={repository}
+        sceneId={sceneId}
         campaignCode={props.campaignCode}
         dmId={props.dmId}
         canvas={rosterCanvas}
         live={props.relayLive}
+        arrival={{ arming, onArm: () => setArming(value => !value) }}
       />
-      {props.children}
     </DmBattleMapCanvas>
   );
 }

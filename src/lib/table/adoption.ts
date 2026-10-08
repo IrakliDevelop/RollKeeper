@@ -401,6 +401,49 @@ export async function adoptTableScene(options: {
   };
 }
 
+/**
+ * PR06 R3-F1: the local half of adoption (capture + one IndexedDB commit),
+ * shared by the battle-maps panel and the Table workspace. It sends no
+ * request: registration and room seeding happen later on the workspace's
+ * one control session (A1b), never here.
+ */
+export async function adoptMapLocally(options: {
+  repository: TableRepository;
+  source: TableAdoptionSource;
+  campaignCode: string;
+  mapId: string;
+}): Promise<
+  | (Extract<TableAdoptionResult, { status: 'committed' }> & {
+      name: string;
+      canvasState: JsonObject;
+    })
+  | Exclude<TableAdoptionResult, { status: 'committed' }>
+> {
+  const current = options.repository.getCurrent();
+  const preview = await captureAdoptionPreview({
+    source: options.source,
+    workspaceKey: options.repository.workspaceIdentity,
+    sourceCampaignId: options.campaignCode,
+    sourceMapId: options.mapId,
+  });
+  const result = await adoptTableScene({
+    repository: options.repository,
+    source: options.source,
+    preview,
+    expectedRevision:
+      current?.status === 'ready'
+        ? (current.snapshot.campaign?.revision ?? 0)
+        : 0,
+    operationId: `adopt:${options.campaignCode}:${options.mapId}`,
+  });
+  if (result.status !== 'committed') return result;
+  return {
+    ...result,
+    name: preview.scene.map.name,
+    canvasState: preview.scene.canvasCheckpoint?.state ?? {},
+  };
+}
+
 /** Rechecks an adopted scene against current persisted source bytes. */
 export async function compareTableSceneSource(options: {
   repository: TableRepository;

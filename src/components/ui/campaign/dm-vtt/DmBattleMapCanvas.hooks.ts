@@ -137,6 +137,8 @@ export interface DmBattleMapCanvasProps {
   dmId: string;
   /** Map/session controls rendered as the command dock's first row. */
   sessionControls?: React.ReactNode;
+  /** PR06 W10: Table "Edit map" tool group rendered in the dock. */
+  editMapControl?: React.ReactNode;
   /** Chrome rendered inside the ViewportContext.Provider. */
   children?: React.ReactNode;
   onStatus?: (status: BattleMapConnectionStatus) => void;
@@ -692,14 +694,22 @@ export function useDmBattleMapCanvas({
         markers,
         loot,
       });
+      // PR04 R3-2 (folded in PR06 W9): a refused or failed publish forgets
+      // its key so the next tick retries instead of waiting for a change.
+      const forget = () => {
+        if (lastPublishedKeyRef.current === publishKey)
+          lastPublishedKeyRef.current = null;
+      };
       void fetch(request.url, request.init)
         .then(response => {
+          if (!response.ok) forget();
           if (!tableSceneAdapter) return;
           setMarkerShareNotice(
             response.ok ? null : 'Markers not shared with players'
           );
         })
         .catch(error => {
+          forget();
           console.warn('Failed to publish marker details:', error);
           if (tableSceneAdapter)
             setMarkerShareNotice('Markers not shared with players');

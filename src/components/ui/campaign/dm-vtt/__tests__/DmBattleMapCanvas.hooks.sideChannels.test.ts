@@ -474,3 +474,64 @@ describe('Table side-channel acceptance repairs (PR04 A5, A6)', () => {
     expect(JSON.stringify(body.markers)).toContain('Locked chest');
   });
 });
+
+describe('PR04 R3-2 fold (PR06 W9)', () => {
+  it('retries a refused marker publication on the next tick', async () => {
+    let refuse = true;
+    fetchFn.mockImplementation(async (_input, init?: RequestInit) =>
+      init?.method === 'PUT' && refuse
+        ? Response.json({ error: 'unavailable' }, { status: 503 })
+        : Response.json({ success: true })
+    );
+    const { adapter } = tableAdapter([lootMarker()]);
+    const { result, rerender } = renderHook(() =>
+      useDmBattleMapCanvas(props(adapter))
+    );
+    act(() => result.current.handleReady(stubViewport()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    const puts = () =>
+      fetchFn.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'PUT'
+      ).length;
+    expect(puts()).toBe(1);
+    expect(result.current.markerShareNotice).toBe(
+      'Markers not shared with players'
+    );
+    refuse = false;
+    rerender();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(puts()).toBe(2);
+    expect(result.current.markerShareNotice).toBeNull();
+  });
+
+  it('retries after a network error too', async () => {
+    let fail = true;
+    fetchFn.mockImplementation(async (_input, init?: RequestInit) => {
+      if (init?.method === 'PUT' && fail) throw new TypeError('offline');
+      return Response.json({ success: true });
+    });
+    vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { adapter } = tableAdapter([lootMarker()]);
+    const { result, rerender } = renderHook(() =>
+      useDmBattleMapCanvas(props(adapter))
+    );
+    act(() => result.current.handleReady(stubViewport()));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    fail = false;
+    rerender();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(250);
+    });
+    expect(
+      fetchFn.mock.calls.filter(
+        ([, init]) => (init as RequestInit | undefined)?.method === 'PUT'
+      )
+    ).toHaveLength(2);
+  });
+});

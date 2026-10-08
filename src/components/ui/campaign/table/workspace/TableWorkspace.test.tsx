@@ -5,6 +5,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from '@testing-library/react';
 import { Camera } from '@fieldnotes/core';
 import { IDBFactory } from 'fake-indexeddb';
@@ -12,6 +13,8 @@ import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { registryServer } from '@/lib/table/controlServer.fixture';
+import { useBattleMapStore } from '@/store/battleMapStore';
+import type { BattleMap } from '@/types/battlemap';
 import { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 import type {
@@ -740,5 +743,165 @@ describe('W3/W4 lifecycle (D8)', () => {
     const show = await screen.findByRole('button', { name: 'Show this scene' });
     await waitFor(() => expect(show).toBeEnabled());
     expect(presentationCommands()).toEqual([]);
+  });
+});
+
+describe('W5/W6 browser, creation and local adoption in the workspace', () => {
+  const crypt = {
+    id: 'map-crypt',
+    campaignCode: 'CAMP',
+    name: 'Crypt',
+    mapImageUrl: '/maps/crypt.webp',
+    mapImageSize: { w: 640, h: 480 },
+    canvasState: '',
+    dmOnlyElements: {},
+    gridEnabled: false,
+    linkedEncounterIds: [],
+    markers: [],
+    createdAt: AT,
+    updatedAt: AT,
+  } as unknown as BattleMap;
+
+  function seedLegacyMap() {
+    useBattleMapStore.setState({
+      battleMaps: { CAMP: { 'map-crypt': crypt } },
+    });
+    window.localStorage.setItem(
+      'rollkeeper-battlemap-data',
+      JSON.stringify({
+        state: { battleMaps: { CAMP: { 'map-crypt': crypt } } },
+        version: 0,
+      })
+    );
+    window.localStorage.setItem(
+      'rollkeeper-dm-data',
+      JSON.stringify({
+        state: { campaigns: [{ code: 'CAMP', name: 'Camp' }] },
+        version: 1,
+      })
+    );
+  }
+  afterEach(() => {
+    useBattleMapStore.setState({ battleMaps: {} });
+    window.localStorage.clear();
+  });
+
+  it('opens the Scenes panel from ?panel=scenes and selects privately with a push', async () => {
+    nav.reset('scene=scene-tavern&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const panel = await screen.findByRole('region', { name: 'Scenes' });
+    expect(screen.getByRole('button', { name: 'Scenes' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
+    fireEvent.click(within(panel).getByRole('button', { name: /Forest/u }));
+    expect(nav.push).toHaveBeenCalledWith(
+      '/dm/campaign/CAMP/table?scene=scene-forest',
+      { scroll: false }
+    );
+    await settled('scene-forest');
+    expect(presentationCommands()).toEqual([]);
+  });
+
+  it('collapses and expands panels without new subscriptions or camera/selection changes', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const camera = mocks.viewports.get('scene-tavern')!.camera;
+    act(() => camera.moveTo(-40, -30));
+    const created = vi.spyOn(globalThis, 'setInterval');
+    const windowAdd = vi.spyOn(window, 'addEventListener');
+    const documentAdd = vi.spyOn(document, 'addEventListener');
+    const mounts = mocks.canvasMounts;
+    const toggle = screen.getByRole('button', { name: 'Scenes' });
+    for (let index = 0; index < 10; index += 1) {
+      fireEvent.click(toggle);
+      fireEvent.click(toggle);
+    }
+    expect(created).not.toHaveBeenCalled();
+    expect(windowAdd).not.toHaveBeenCalled();
+    expect(documentAdd).not.toHaveBeenCalled();
+    expect(mocks.canvasMounts).toBe(mounts);
+    expect(camera.position).toEqual({ x: -40, y: -30 });
+    expect(canvasScene()).toBe('scene-tavern');
+  });
+
+  it('creates a blank scene, selects it and registers it on the one session', async () => {
+    nav.reset('scene=scene-tavern&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    fireEvent.click(screen.getByRole('button', { name: 'New scene' }));
+    fireEvent.change(await screen.findByLabelText('Scene name'), {
+      target: { value: 'Swamp' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
+    await waitFor(() =>
+      expect(nav.push).toHaveBeenCalledWith(
+        expect.stringMatching(/^\/dm\/campaign\/CAMP\/table\?scene=/u),
+        { scroll: false }
+      )
+    );
+    const href = nav.push.mock.calls.at(-1)![0];
+    const sceneId = new URLSearchParams(href.split('?')[1]).get('scene')!;
+    await settled(sceneId);
+    await waitFor(() =>
+      expect(
+        server.commands.filter(
+          command =>
+            command.type === 'registerScene' && command.sceneId === sceneId
+        )
+      ).toHaveLength(1)
+    );
+    const register = server.commands.find(
+      command => command.sceneId === sceneId
+    )!;
+    expect(register.sourceMapId).toBe(sceneId);
+    expect(server.commands.filter(c => c.type === 'acquire')).toHaveLength(1);
+    expect(presentationCommands()).toEqual([]);
+  });
+
+  it('adopts a never-opened battle map locally and selects it (one acquire, one register)', async () => {
+    seedLegacyMap();
+    nav.reset('scene=scene-tavern&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    await waitFor(() =>
+      expect(
+        server.commands.filter(c => c.type === 'registerScene')
+      ).toHaveLength(1)
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add Crypt' }));
+    await waitFor(() => expect(nav.push).toHaveBeenCalled());
+    const href = nav.push.mock.calls.at(-1)![0];
+    const sceneId = new URLSearchParams(href.split('?')[1]).get('scene')!;
+    await settled(sceneId);
+    await waitFor(() =>
+      expect(
+        server.commands.filter(c => c.type === 'registerScene')
+      ).toHaveLength(2)
+    );
+    expect(server.commands.filter(c => c.type === 'acquire')).toHaveLength(1);
+    expect(server.commands.filter(c => c.type === 'renew')).toHaveLength(0);
+    expect(
+      server.commands.find(
+        c => c.type === 'registerScene' && c.sceneId === sceneId
+      )?.sourceMapId
+    ).toBe('map-crypt');
+  });
+
+  it('adopts while another session holds control with zero control requests', async () => {
+    seedLegacyMap();
+    server.other('acquire', 'other-session');
+    nav.reset('scene=scene-tavern&panel=scenes');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    await screen.findByText(/Another session holds live control/u);
+    const posts = server.commands.length;
+    fireEvent.click(screen.getByRole('button', { name: 'Add Crypt' }));
+    await waitFor(() => expect(nav.push).toHaveBeenCalled());
+    const href = nav.push.mock.calls.at(-1)![0];
+    await settled(new URLSearchParams(href.split('?')[1]).get('scene')!);
+    expect(server.commands).toHaveLength(posts);
   });
 });

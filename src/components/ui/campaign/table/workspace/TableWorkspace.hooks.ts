@@ -29,6 +29,7 @@ import { useSceneCheckpointActions } from './useSceneCheckpointActions';
 import { useTableSceneSwitch } from './useTableSceneSwitch';
 import { useTableWorkspaceAuthority } from './useTableWorkspaceAuthority';
 import { useWorkspaceCombatPublication } from './useWorkspaceCombatPublication';
+import { useWorkspaceSceneBrowser } from './useWorkspaceSceneBrowser';
 
 export const SCENE_UNAVAILABLE =
   'That scene is not available in this workspace';
@@ -301,6 +302,24 @@ export function useTableWorkspace(campaignCode: string) {
         publicationSeen.kind === 'saved-locally')
     );
 
+  // ─── W5 private browser: selection is a push, never a presentation ────
+  const selectScene = useCallback(
+    (sceneId: string) => navigate('push', { scene: sceneId }),
+    [navigate]
+  );
+  const browser = useWorkspaceSceneBrowser({
+    campaignCode,
+    repository,
+    initiallyOpen: query.panel === 'scenes',
+    onSelect: selectScene,
+  });
+  const presented = presentation.presentation.descriptor?.presentation ?? null;
+  const presentedHere =
+    presented !== null &&
+    mountedSceneId !== null &&
+    presented.sceneId === mountedSceneId &&
+    !presented.blanked;
+
   const checkpoint = useSceneCheckpointActions({
     repository,
     adapter: switcher.adapter,
@@ -339,5 +358,9 @@ export function useTableWorkspace(campaignCode: string) {
     combat,
     clearedNotice,
     checkpoint,
+    selectScene,
+    browser,
+    presented,
+    presentedHere,
   };
 }

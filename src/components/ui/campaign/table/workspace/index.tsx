@@ -10,6 +10,8 @@ import {
   createTablePlayersCache,
   TablePlayersCacheProvider,
 } from '../useTablePlayersSnapshot';
+import { TableCreateSceneDialog } from './TableCreateSceneDialog';
+import { TableSceneBrowser, TableScenesToggle } from './TableSceneBrowser';
 import { TableSceneStage } from './TableSceneStage';
 import { SCENE_UNAVAILABLE, useTableWorkspace } from './TableWorkspace.hooks';
 import { TableWorkspaceHeader } from './TableWorkspaceHeader';
@@ -83,6 +85,12 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   const header = (
     <TableWorkspaceHeader
       campaignCode={campaignCode}
+      leading={
+        <TableScenesToggle
+          open={workspace.browser.open}
+          onToggle={workspace.browser.toggle}
+        />
+      }
       authority={authority}
       clearedNotice={workspace.clearedNotice}
       presentationProps={workspace.presentationProps}
@@ -123,12 +131,14 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           repository={repository}
           adapter={adapter}
           header={header}
+          relayStatus={workspace.relayStatus}
           relayLive={workspace.relayLive}
+          presentedHere={workspace.presentedHere}
           connection={workspace.connection}
           onViewportReady={workspace.onViewportReady}
           onConnectionReady={workspace.setConnection}
           onStatus={workspace.onStatus}
-          onExportError={checkpoint.setSaveMessage}
+          onMessage={checkpoint.setSaveMessage}
         />
         {/* Outside the keyed canvas: an explicit acquire remounts the canvas
           only, so open dialogs and the command queue survive (F6). */}
@@ -166,6 +176,33 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           </p>
         </WorkspaceShell>
       )}
+      <TableSceneBrowser
+        open={workspace.browser.open}
+        onClose={() => workspace.browser.setOpen(false)}
+        scenes={workspace.scenes}
+        selectedSceneId={mountedScene?.sceneId ?? null}
+        presentation={workspace.presented}
+        onSelect={workspace.selectScene}
+        onCreate={() => workspace.browser.setCreating(true)}
+        adoptable={workspace.browser.adoptable}
+        onAdopt={mapId => void workspace.browser.adopt(mapId)}
+        busy={workspace.browser.busy}
+        status={workspace.browser.status}
+        battleMapsHref={`/dm/campaign/${encodeURIComponent(campaignCode)}/battlemaps${
+          workspace.query.tableWorkspace
+            ? `?tableWorkspace=${encodeURIComponent(workspace.query.tableWorkspace)}`
+            : ''
+        }`}
+      />
+      <TableCreateSceneDialog
+        open={workspace.browser.creating}
+        onOpenChange={workspace.browser.setCreating}
+        repository={repository}
+        onCreated={sceneId => {
+          workspace.browser.setCreating(false);
+          workspace.selectScene(sceneId);
+        }}
+      />
       {stage && switcher.switching && (
         <div
           role="status"

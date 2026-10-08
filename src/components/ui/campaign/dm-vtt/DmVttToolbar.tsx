@@ -90,6 +90,8 @@ export interface DmVttToolbarProps {
   viewsControl?: ReactNode;
   /** Shared-presence "who is viewing" + cursor-sharing switches. */
   presenceControl?: ReactNode;
+  /** PR06 W10: the Table "Edit map" tool group (absent on legacy maps). */
+  editMapControl?: ReactNode;
   fogControls?: DmFogControls;
   fogPresetControls?: FogPresetControls;
 }
@@ -134,6 +136,7 @@ export function DmVttToolbar({
   exportControl,
   viewsControl,
   presenceControl,
+  editMapControl,
   fogControls,
   fogPresetControls,
 }: DmVttToolbarProps) {
@@ -309,6 +312,7 @@ export function DmVttToolbar({
           {exportControl}
           {viewsControl}
           {presenceControl}
+          {editMapControl}
         </div>
       </div>
       <div className="border-divider w-full border-t empty:hidden">

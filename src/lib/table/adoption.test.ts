@@ -7,6 +7,7 @@ import {
   type TableWorkspaceSelection,
 } from './repository';
 import {
+  adoptMapLocally,
   adoptTableScene,
   captureAdoptionPreview,
   createPersistedLegacyTableAdoptionSource,
@@ -282,4 +283,51 @@ describe('W9 never-opened map adoption', () => {
       ).resolves.toMatchObject({ status: 'committed' });
     }
   );
+});
+
+describe('R3-F1 local-only adoption for the workspace', () => {
+  it('captures and commits locally and sends no network request', async () => {
+    const fetchSpy = vi.fn();
+    vi.stubGlobal('fetch', fetchSpy);
+    try {
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const result = await adoptMapLocally({
+        repository,
+        source: source(),
+        campaignCode: 'CAMP',
+        mapId: 'map-1',
+      });
+      expect(result).toMatchObject({ status: 'committed', name: 'Crypt' });
+      if (result.status !== 'committed') throw new Error('not committed');
+      const current = repository.getCurrent();
+      if (current?.status !== 'ready') throw new Error('not ready');
+      expect(current.snapshot.scenes.map(scene => scene.sceneId)).toEqual([
+        result.sceneId,
+      ]);
+      expect(current.snapshot.campaign?.sourceMappings).toEqual([
+        {
+          sourceCampaignId: 'CAMP',
+          sourceMapId: 'map-1',
+          sceneId: result.sceneId,
+        },
+      ]);
+      expect(fetchSpy).not.toHaveBeenCalled();
+      // A second adoption of the same map replays (same operation id).
+      await expect(
+        adoptMapLocally({
+          repository,
+          source: source(),
+          campaignCode: 'CAMP',
+          mapId: 'map-1',
+        })
+      ).resolves.toMatchObject({ status: 'rejected' });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
 });

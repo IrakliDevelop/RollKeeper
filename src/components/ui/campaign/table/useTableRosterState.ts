@@ -23,6 +23,15 @@ export interface TableRosterCanvas {
     patch: { set: Record<string, unknown>; unset: string[] }
   ): boolean;
   ensurePlayerBand(legacyPlayerId: string, name: string): void;
+  /**
+   * PR06 W11: place a bound token programmatically at `point` plus the
+   * deterministic fan offset of `slot` (snapped). True when it landed.
+   */
+  stampAt?(
+    request: TablePlacementRequest,
+    point: { x: number; y: number },
+    slot: number
+  ): boolean;
 }
 
 export interface TablePlacementRequest {

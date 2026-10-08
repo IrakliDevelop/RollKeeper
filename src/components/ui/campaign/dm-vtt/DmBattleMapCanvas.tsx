@@ -253,6 +253,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
                 }}
               />
             }
+            editMapControl={props.editMapControl}
             presenceControl={
               <PresenceControl
                 campaignCode={campaignCode}
