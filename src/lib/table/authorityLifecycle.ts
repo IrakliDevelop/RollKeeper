@@ -587,21 +587,35 @@ const CONTROL_HEADERS = {
 const tableBase = (campaignCode: string) =>
   `/api/campaign/${encodeURIComponent(campaignCode)}/table`;
 
-/** One DM `GET table/control` (descriptor + DM-only registry). */
+/**
+ * One DM `GET table/control` (descriptor + DM-only registry), aborted after
+ * the same 5 s as control commands (review F11): a hung read is a failed
+ * read, so the "Registering scene…" gate releases to local mode.
+ */
 async function readControl(
   options: ControlRequestOptions
 ): Promise<{ current: TableDescriptor | null; registry: unknown[] } | null> {
   const fetcher = options.fetcher ?? fetch;
-  const response = await fetcher(
-    `${tableBase(options.campaignCode)}/control?dmId=${encodeURIComponent(options.dmId)}`,
-    { cache: 'no-store' }
-  );
-  if (!response.ok) return null;
-  const read = record((await response.json()) as unknown);
-  return {
-    current: descriptor(read?.current),
-    registry: Array.isArray(read?.registry) ? (read.registry as unknown[]) : [],
-  };
+  const abort = new AbortController();
+  const timer = setTimeout(() => abort.abort(), CONTROL_TIMEOUT_MS);
+  try {
+    const response = await fetcher(
+      `${tableBase(options.campaignCode)}/control?dmId=${encodeURIComponent(options.dmId)}`,
+      { cache: 'no-store', signal: abort.signal }
+    );
+    if (!response.ok) return null;
+    const read = record((await response.json()) as unknown);
+    return {
+      current: descriptor(read?.current),
+      registry: Array.isArray(read?.registry)
+        ? (read.registry as unknown[])
+        : [],
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**

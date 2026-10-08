@@ -17,6 +17,8 @@ export interface TableWorkspaceQuery {
   tableWorkspace: string | null;
   prepareEncounter: string | null;
   panel: 'scenes' | null;
+  /** `scene` was present but not a usable id (W1 "not available"). */
+  sceneInvalid?: boolean;
 }
 
 const ORDER = [
@@ -37,15 +39,40 @@ function bounded(value: string | null | undefined): string | null {
   return value;
 }
 
+const encoder = new TextEncoder();
+
+/** A local workspace / scene id: 1–255 UTF-8 bytes, no control characters. */
+function isRouteId(value: string): boolean {
+  return (
+    value.length > 0 &&
+    encoder.encode(value).byteLength <= 255 &&
+    !CONTROL.test(value)
+  );
+}
+
+/**
+ * R3-F12 / review F2: an explicit workspace selection is never dropped —
+ * a present but unusable value becomes the refusal marker, so the client
+ * shows "not bound" instead of opening the default workspace.
+ */
+function workspaceSelection(value: string | null): string | null {
+  if (value === null) return null;
+  return isRouteId(value) ? value : INVALID_WORKSPACE_MARKER;
+}
+
 export function parseTableWorkspaceQuery(params: {
   get(name: string): string | null;
+  has?(name: string): boolean;
 }): TableWorkspaceQuery {
+  const rawScene = params.get('scene');
+  const scene = rawScene !== null && isRouteId(rawScene) ? rawScene : null;
   return {
-    scene: bounded(params.get('scene')),
+    scene,
     run: bounded(params.get('run')),
-    tableWorkspace: bounded(params.get('tableWorkspace')),
+    tableWorkspace: workspaceSelection(params.get('tableWorkspace')),
     prepareEncounter: bounded(params.get('prepareEncounter')),
     panel: params.get('panel') === 'scenes' ? 'scenes' : null,
+    sceneInvalid: rawScene !== null && scene === null,
   };
 }
 
@@ -64,7 +91,7 @@ export function tableWorkspaceHref(
 
 function first(value: string | string[] | undefined): string | null {
   const single = Array.isArray(value) ? value[0] : value;
-  return typeof single === 'string' && single.length > 0 ? single : null;
+  return typeof single === 'string' ? single : null;
 }
 
 /**
@@ -85,7 +112,9 @@ export function legacyTableRedirectHref(
     tableWorkspace:
       workspace === null
         ? null
-        : workspace.length > TABLE_QUERY_VALUE_LIMIT
+        : workspace.length === 0 ||
+            workspace.length > TABLE_QUERY_VALUE_LIMIT ||
+            CONTROL.test(workspace)
           ? INVALID_WORKSPACE_MARKER
           : workspace,
   });

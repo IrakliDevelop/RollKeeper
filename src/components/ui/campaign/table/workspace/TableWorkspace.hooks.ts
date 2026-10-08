@@ -1,7 +1,14 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from 'react';
 import {
   applyCameraView,
   captureCameraView,
@@ -105,7 +112,9 @@ export function useTableWorkspace(campaignCode: string) {
     ? scenes.find(scene => scene.sceneId === query.scene)
     : undefined;
   const sceneUnavailable =
-    query.scene !== null && snapshot !== null && !requestedScene;
+    (query.scene !== null || query.sceneInvalid === true) &&
+    snapshot !== null &&
+    !requestedScene;
 
   const navigate = useCallback(
     (mode: 'push' | 'replace', next: Partial<TableWorkspaceQuery>) => {
@@ -143,6 +152,11 @@ export function useTableWorkspace(campaignCode: string) {
   );
   const viewportRef = useRef(viewportState);
   viewportRef.current = viewportState;
+  /** Review F9: Edit-map image work in flight on the mounted scene. */
+  const editBusy = useRef(false);
+  const onEditBusy = useCallback((busy: boolean) => {
+    editBusy.current = busy;
+  }, []);
   const switcher = useTableSceneSwitch({
     repository,
     campaignCode,
@@ -165,7 +179,18 @@ export function useTableWorkspace(campaignCode: string) {
         // A destroyed viewport keeps the previously remembered view.
       }
     },
+    isBusy: () => editBusy.current,
   });
+  // Review F5: the workspace follows its adapter (conflict UI), and the
+  // "Resolve … before switching" notice clears once the conflict is gone.
+  const [adapterTick, onAdapter] = useReducer((value: number) => value + 1, 0);
+  const mountedAdapter = switcher.adapter;
+  useEffect(() => mountedAdapter?.subscribe(onAdapter), [mountedAdapter]);
+  const { notice: switchNotice, clearNotice } = switcher;
+  const conflictPending = mountedAdapter?.getPendingConflict() != null;
+  useEffect(() => {
+    if (switchNotice?.kind === 'conflict' && !conflictPending) clearNotice();
+  }, [adapterTick, clearNotice, conflictPending, switchNotice]);
   const mountedSceneId = switcher.mountedSceneId;
   const mountedScene = scenes.find(scene => scene.sceneId === mountedSceneId);
 
@@ -368,6 +393,7 @@ export function useTableWorkspace(campaignCode: string) {
     clearedNotice,
     checkpoint,
     selectScene,
+    onEditBusy,
     browser,
     presented,
     presentedHere,

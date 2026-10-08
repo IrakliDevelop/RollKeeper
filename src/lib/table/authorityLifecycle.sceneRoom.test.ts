@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   acquireTableControl,
@@ -240,5 +240,36 @@ describe('A1 session-scoped scene preparation', () => {
       holderSessionId: 'other-session',
     });
     expect(types(server, 'takeover')).toHaveLength(0);
+  });
+
+  it('times out a hung control read after 5 s and stays local with a reason (F11)', async () => {
+    const server = registryServer();
+    const session = await acquired(server);
+    vi.useFakeTimers();
+    try {
+      const hanging = vi.fn<typeof fetch>(
+        (_input, init) =>
+          new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            );
+          })
+      );
+      const pending = prepareTableSceneRoom(session, scene('scene-a'), {
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        fetcher: hanging,
+      });
+      await vi.advanceTimersByTimeAsync(5_000);
+      const result = await pending;
+      expect(result).toEqual({ status: 'failed', reason: 'control-read' });
+      expect(sceneRoomMessage(result)).toBe(
+        'Live registration is unavailable; this scene stays local.'
+      );
+      expect(hanging.mock.calls[0]![1]?.signal).toBeInstanceOf(AbortSignal);
+      expect(session.isLost()).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

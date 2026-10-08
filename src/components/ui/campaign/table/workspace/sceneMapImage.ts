@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   createImage,
   type CanvasElement,
@@ -18,6 +18,8 @@ export interface SceneMapImageWrites {
   isDmOnly(elementId: string): boolean;
   setDmOnly(elementId: string, dmOnly: boolean): void;
   writeSize(size: Size): void;
+  /** F6: the image could not be loaded; nothing was added. */
+  onUnavailable?(): void;
 }
 
 interface Target {
@@ -89,20 +91,28 @@ export async function ensureSceneMapImage(
   map: { mapImageUrl: string; mapImageSize: Size },
   writes: SceneMapImageWrites,
   decode: (url: string) => Promise<Size> = decodeMapImageUrl
-): Promise<'none' | 'present' | 'added'> {
+): Promise<'none' | 'present' | 'added' | 'failed'> {
   if (!map.mapImageUrl) return 'none';
+  if (mapLayerImages(target.store).length > 0) return 'present';
+  // Review F6: probe the image through the proxied URL first; a broken or
+  // expired image adds no element (it would fail every canvas render).
+  let natural: Size;
+  try {
+    natural = await decode(map.mapImageUrl);
+  } catch {
+    writes.onUnavailable?.();
+    return 'failed';
+  }
+  // A snapshot may have arrived while loading.
   if (mapLayerImages(target.store).length > 0) return 'present';
   let size = map.mapImageSize;
   if (!(size.w > 0 && size.h > 0)) {
-    try {
-      size = await decode(map.mapImageUrl);
-    } catch {
-      return 'none';
+    if (!(natural.w > 0 && natural.h > 0)) {
+      writes.onUnavailable?.();
+      return 'failed';
     }
-    if (!(size.w > 0 && size.h > 0)) return 'none';
+    size = { w: natural.w, h: natural.h };
     writes.writeSize(size);
-    // A snapshot may have arrived while decoding.
-    if (mapLayerImages(target.store).length > 0) return 'present';
   }
   addMapImage(target, map.mapImageUrl, size, writes);
   return 'added';
@@ -135,14 +145,18 @@ export function replaceSceneMapImage(
   return 'replaced';
 }
 
-const TERMINAL = new Set(['denied', 'upgrade-required', 'stopped']);
+const TERMINAL = new Set(['denied', 'upgrade-required', 'stopped', 'offline']);
+/** Review F3: still connecting/recovering after this long → local phase. */
+export const ENSURE_LOCAL_WAIT_MS = 5_000;
 
 /**
  * C6-1: runs `ensureSceneMapImage` from a React effect AFTER the canvas has
  * applied its initial state — once the relay status `live` committed (the
  * authority handler loads the snapshot synchronously right after reporting
- * it), or after the local load when no relay is configured or the room
- * refused us. Once per (viewport, phase).
+ * it), or after the local load when no relay is configured, the room
+ * refused us, the relay is offline, or it is still not live after a bounded
+ * wait (F3). Once per (viewport, phase); detection prevents duplicates when
+ * a live snapshot arrives later.
  */
 export function useEnsureSceneMapImage(options: {
   viewport: Target | null;
@@ -150,8 +164,19 @@ export function useEnsureSceneMapImage(options: {
   relayStatus: string;
   map: { mapImageUrl: string; mapImageSize: Size } | null;
   writes: SceneMapImageWrites;
+  decode?: (url: string) => Promise<Size>;
 }) {
   const { viewport, relayConfigured, relayStatus, map } = options;
+  // Review F3: a configured relay that is not live (offline, or still
+  // connecting/recovering after a bounded wait) counts as the local load.
+  const [waited, setWaited] = useState<unknown>(null);
+  const pendingLive =
+    relayConfigured && relayStatus !== 'live' && !TERMINAL.has(relayStatus);
+  useEffect(() => {
+    if (!viewport || !pendingLive) return;
+    const timer = setTimeout(() => setWaited(viewport), ENSURE_LOCAL_WAIT_MS);
+    return () => clearTimeout(timer);
+  }, [pendingLive, viewport]);
   const latest = useRef(options);
   latest.current = options;
   const done = useRef<{ viewport: unknown; phases: Set<string> }>({
@@ -162,7 +187,7 @@ export function useEnsureSceneMapImage(options: {
     ? 'local'
     : relayStatus === 'live'
       ? 'live'
-      : TERMINAL.has(relayStatus)
+      : TERMINAL.has(relayStatus) || (waited !== null && waited === viewport)
         ? 'local'
         : null;
   const url = map?.mapImageUrl ?? '';
@@ -174,8 +199,11 @@ export function useEnsureSceneMapImage(options: {
     done.current.phases.add(phase);
     const current = latest.current;
     if (!current.map) return;
-    void ensureSceneMapImage(viewport, current.map, current.writes).catch(
-      () => undefined
-    );
+    void ensureSceneMapImage(
+      viewport,
+      current.map,
+      current.writes,
+      current.decode
+    ).catch(() => undefined);
   }, [phase, url, viewport]);
 }

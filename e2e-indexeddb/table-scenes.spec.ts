@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+import { guardTableContext } from './tableContext';
+
 const CAMPAIGN = {
   code: 'E2ETABLE',
   name: 'Table E2E',
@@ -30,6 +32,7 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
   browser,
 }) => {
   const context = await browser.newContext({ acceptDownloads: true });
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaignRaw, mapRaw }) => {
       localStorage.setItem(
@@ -135,6 +138,7 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
   expect(
     await page.evaluate(() => localStorage.getItem('rollkeeper-battlemap-data'))
   ).toBe(sourceBefore);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -142,6 +146,7 @@ test('quota abort leaves adoption unpublished and the legacy source unchanged', 
   browser,
 }) => {
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       localStorage.setItem(
@@ -204,6 +209,7 @@ test('quota abort leaves adoption unpublished and the legacy source unchanged', 
     });
   });
   expect(sceneCount).toBe(0);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -211,6 +217,7 @@ test('unavailable IndexedDB disables Table while the original map remains usable
   browser,
 }) => {
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       localStorage.setItem(
@@ -241,6 +248,7 @@ test('unavailable IndexedDB disables Table while the original map remains usable
   await expect(
     page.getByRole('button', { name: 'Adopt Synthetic Map' })
   ).toBeDisabled();
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -270,6 +278,7 @@ test('Table namespaces are isolated between browser profiles', async ({
     );
   };
   const firstProfile = await browser.newContext();
+  const firstProfileErrors = await guardTableContext(firstProfile);
   await firstProfile.addInitScript(seed, { campaign: CAMPAIGN, map: MAP });
   const firstPage = await firstProfile.newPage();
   await firstPage.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
@@ -279,6 +288,7 @@ test('Table namespaces are isolated between browser profiles', async ({
   ).toBeVisible();
 
   const secondProfile = await browser.newContext();
+  const secondProfileErrors = await guardTableContext(secondProfile);
   await secondProfile.addInitScript(seed, { campaign: CAMPAIGN, map: MAP });
   const secondPage = await secondProfile.newPage();
   await secondPage.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
@@ -289,7 +299,9 @@ test('Table namespaces are isolated between browser profiles', async ({
     secondPage.getByRole('button', { name: 'Adopt Synthetic Map' })
   ).toBeEnabled();
 
+  expect(firstProfileErrors).toEqual([]);
   await firstProfile.close();
+  expect(secondProfileErrors).toEqual([]);
   await secondProfile.close();
 });
 
@@ -297,6 +309,7 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
   browser,
 }) => {
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       localStorage.setItem(
@@ -550,6 +563,7 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
       element => element.type === 'image' && element.layerId === 'layer-map'
     )
   ).toHaveLength(1);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -557,6 +571,7 @@ test('encounter-free scene roster persists party and manual PC members across re
   browser,
 }) => {
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       localStorage.setItem(
@@ -726,5 +741,6 @@ test('encounter-free scene roster persists party and manual PC members across re
       encounters: localStorage.getItem('rollkeeper-encounter-data'),
     }))
   ).toEqual(legacyBefore);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });

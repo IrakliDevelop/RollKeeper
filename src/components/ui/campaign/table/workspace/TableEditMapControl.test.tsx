@@ -120,7 +120,11 @@ function setup(
   presentedHere = false,
   upload = vi.fn(
     async () => 'https://bucket.s3.eu-west-1.amazonaws.com/maps/forest.webp'
-  )
+  ),
+  probe: (url: string) => Promise<{ w: number; h: number }> = async () => ({
+    w: 1000,
+    h: 500,
+  })
 ) {
   const storeWrite = vi.spyOn(useBattleMapStore, 'setState');
   const localWrite = vi.spyOn(Storage.prototype, 'setItem');
@@ -133,6 +137,7 @@ function setup(
       presentedHere={presentedHere}
       upload={upload}
       decode={async () => ({ w: 1000, h: 500 })}
+      probe={probe}
     />
   );
   fireEvent.click(screen.getByRole('button', { name: 'Edit map' }));
@@ -272,5 +277,58 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     const rect = vp.camera.getVisibleRect(800, 600);
     expect(rect.w).toBeGreaterThanOrEqual(1600 - 1);
     expect(rect.h).toBeGreaterThanOrEqual(1200 - 1);
+  });
+
+  it('adds or replaces nothing when the uploaded image cannot be loaded (F6)', async () => {
+    const { vp } = setup(viewport(), false, undefined, async () => {
+      throw new Error('broken');
+    });
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [
+          new File([new Uint8Array(4)], 'a.webp', { type: 'image/webp' }),
+        ],
+      },
+    });
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Map image could not be loaded'
+    );
+    expect(vp.store.getAll()).toEqual([]);
+    await adapter.flush();
+    expect(stored().map.mapImageUrl).toBe('');
+  });
+
+  it('reports in-flight image work to the switch machine (F9)', async () => {
+    const onBusyChange = vi.fn();
+    let finish!: (url: string) => void;
+    const upload = vi.fn(
+      () =>
+        new Promise<string>(resolve => {
+          finish = resolve;
+        })
+    );
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <TableEditMapControl
+        adapter={adapter}
+        viewport={viewport()}
+        presentedHere={false}
+        upload={upload}
+        decode={async () => ({ w: 10, h: 10 })}
+        probe={async () => ({ w: 10, h: 10 })}
+        onBusyChange={onBusyChange}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Edit map' }));
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [
+          new File([new Uint8Array(4)], 'a.webp', { type: 'image/webp' }),
+        ],
+      },
+    });
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(true));
+    finish('https://example.test/a.webp');
+    await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
   });
 });

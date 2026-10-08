@@ -34,6 +34,8 @@ function writes(dmOnly: Record<string, boolean> = {}) {
 }
 
 const images = (store: ElementStore) => mapLayerImages(store);
+/** F6: every add/replace is probed through the proxied URL first. */
+const loads = vi.fn(async () => ({ w: 10, h: 10 }));
 
 describe('R3-F3 ensure map image (real ElementStore)', () => {
   it('adds exactly one locked, proxied, public image for a never-opened map', async () => {
@@ -41,7 +43,8 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
     const result = await ensureSceneMapImage(
       { store },
       { mapImageUrl: S3, mapImageSize: { w: 1200, h: 800 } },
-      writes()
+      writes(),
+      loads
     );
     expect(result).toBe('added');
     const [image] = images(store);
@@ -67,7 +70,8 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
       await ensureSceneMapImage(
         { store },
         { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } },
-        writes()
+        writes(),
+        loads
       );
       state = store.snapshot();
     }
@@ -88,7 +92,8 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
       ensureSceneMapImage(
         { store },
         { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } },
-        writes()
+        writes(),
+        loads
       )
     ).resolves.toBe('present');
     expect(images(store)).toHaveLength(1);
@@ -100,7 +105,8 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
       ensureSceneMapImage(
         { store },
         { mapImageUrl: '', mapImageSize: { w: 0, h: 0 } },
-        writes()
+        writes(),
+        loads
       )
     ).resolves.toBe('none');
     expect(store.getAll()).toEqual([]);
@@ -129,7 +135,8 @@ describe('R3-F3 ensure map image (real ElementStore)', () => {
     await ensureSceneMapImage(
       { store },
       { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } },
-      write
+      write,
+      loads
     );
     const [image] = images(store);
     expect(write.isDmOnly(image!.id)).toBe(false);
@@ -225,6 +232,7 @@ describe('C6-1 ensure runs after the applied live snapshot', () => {
           relayStatus: status,
           map,
           writes: write,
+          decode: loads,
         }),
       { initialProps: { status: 'connecting' } }
     );
@@ -248,6 +256,7 @@ describe('C6-1 ensure runs after the applied live snapshot', () => {
           relayStatus: status,
           map,
           writes: writes(),
+          decode: loads,
         }),
       { initialProps: { status: 'connecting' } }
     );
@@ -273,9 +282,98 @@ describe('C6-1 ensure runs after the applied live snapshot', () => {
           relayStatus: 'connecting',
           map,
           writes: writes(),
+          decode: loads,
         })
       );
     });
     expect(images(store)).toHaveLength(1);
+  });
+});
+
+describe('F6 probe the map image before adding it', () => {
+  it('adds nothing and reports when the image cannot be loaded', async () => {
+    const store = new ElementStore();
+    const write = writes();
+    const onUnavailable = vi.fn();
+    await expect(
+      ensureSceneMapImage(
+        { store },
+        { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } },
+        { ...write, onUnavailable },
+        async () => {
+          throw new Error('404');
+        }
+      )
+    ).resolves.toBe('failed');
+    expect(store.getAll()).toEqual([]);
+    expect(onUnavailable).toHaveBeenCalledTimes(1);
+  });
+
+  it('probes through the proxied URL', async () => {
+    const decode = vi.fn(async () => ({ w: 4, h: 4 }));
+    await ensureSceneMapImage(
+      { store: new ElementStore() },
+      { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } },
+      writes(),
+      decode
+    );
+    expect(decode).toHaveBeenCalledWith(S3);
+  });
+});
+
+describe('F3 ensure runs locally when a configured relay is not live', () => {
+  const map = { mapImageUrl: S3, mapImageSize: { w: 10, h: 10 } };
+
+  it('runs after the local load when the relay is offline, without a duplicate on live', async () => {
+    const store = new ElementStore();
+    const { rerender } = renderHook(
+      ({ status }: { status: string }) =>
+        useEnsureSceneMapImage({
+          viewport: { store },
+          relayConfigured: true,
+          relayStatus: status,
+          map,
+          writes: writes(),
+          decode: loads,
+        }),
+      { initialProps: { status: 'offline' } }
+    );
+    await act(async () => {});
+    expect(images(store)).toHaveLength(1);
+    const local = store.snapshot();
+    await act(async () => {
+      rerender({ status: 'live' });
+      store.loadSnapshot(structuredClone(local), { origin: 'remote' });
+    });
+    expect(images(store)).toHaveLength(1);
+  });
+
+  it('runs after a bounded wait while still connecting', async () => {
+    vi.useFakeTimers();
+    try {
+      const store = new ElementStore();
+      // The canvas viewport is one stable object per mount.
+      const viewport = { store };
+      renderHook(() =>
+        useEnsureSceneMapImage({
+          viewport,
+          relayConfigured: true,
+          relayStatus: 'connecting',
+          map,
+          writes: writes(),
+          decode: loads,
+        })
+      );
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(4_000);
+      });
+      expect(images(store)).toHaveLength(0);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1_500);
+      });
+      expect(images(store)).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

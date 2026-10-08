@@ -3,6 +3,7 @@
 import { useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { useHydration } from '@/hooks/useHydration';
 import {
   copiedEncounterEntities,
@@ -159,20 +160,19 @@ export function TablePrepareEncounter(props: {
             {`${scene.map.name} already has ${existing.length} cop${existing.length === 1 ? 'y' : 'ies'} of this encounter.`}
           </p>
           {existing.length > 1 && (
-            <label className="text-body flex items-center gap-1 text-xs">
-              Existing copies
-              <select
-                className="border-divider bg-surface text-body rounded border px-1 py-0.5 text-xs"
-                value={selectedRun?.runId}
-                onChange={event => setChosenRun(event.target.value)}
-              >
-                {existing.map(run => (
-                  <option key={run.runId} value={run.runId}>
-                    {`${run.label ?? 'Scene run'} · ${new Date(run.createdAt).toLocaleDateString()}`}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SelectField
+              label="Existing copies"
+              wrapperClassName="w-auto min-w-[12rem]"
+              value={selectedRun?.runId}
+              onValueChange={setChosenRun}
+              triggerProps={{ 'aria-label': 'Existing copies', size: 'sm' }}
+            >
+              {existing.map(run => (
+                <SelectItem key={run.runId} value={run.runId}>
+                  {`${run.label ?? 'Scene run'} · ${new Date(run.createdAt).toLocaleDateString()}`}
+                </SelectItem>
+              ))}
+            </SelectField>
           )}
           <Button
             size="sm"

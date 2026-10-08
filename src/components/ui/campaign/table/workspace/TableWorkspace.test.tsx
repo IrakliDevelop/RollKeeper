@@ -7,6 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Camera, ElementStore } from '@fieldnotes/core';
 import { IDBFactory } from 'fake-indexeddb';
 import type { ReactNode } from 'react';
@@ -78,6 +79,7 @@ const mocks = vi.hoisted(() => ({
   holds: 0,
   publishers: 0,
   viewports: new Map<string, { camera: Camera }>(),
+  openedWorkspaces: [] as Array<string | null>,
 }));
 
 vi.mock('next/navigation', async () => {
@@ -93,14 +95,29 @@ vi.mock(
   async () => {
     const { useEffect, useState } = await import('react');
     return {
-      useAuthenticatedTableWorkspace: () => {
+      useAuthenticatedTableWorkspace: (options: {
+        localWorkspaceId?: string | null;
+      }) => {
         const repository = mocks.repository as TableRepository;
+        const [unknown] = useState(
+          Boolean(options.localWorkspaceId) &&
+            options.localWorkspaceId !==
+              repository.workspaceSelection.workspace.localWorkspaceId
+        );
         const [revision, setRevision] = useState(0);
         useEffect(
           () => repository.subscribe(() => setRevision(value => value + 1)),
           [repository]
         );
-        return { repository, revision, loading: false, error: null };
+        mocks.openedWorkspaces.push(options.localWorkspaceId ?? null);
+        return unknown
+          ? {
+              repository: null,
+              revision,
+              loading: false,
+              error: 'Table workspace is unavailable',
+            }
+          : { repository, revision, loading: false, error: null };
       },
     };
   }
@@ -160,6 +177,7 @@ vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', async () => {
     DmBattleMapCanvas: (props: {
       battleMapId: string;
       sessionControls: ReactNode;
+      editMapControl?: ReactNode;
       children?: ReactNode;
       onViewportReady?: (viewport: unknown) => void;
       onStatus?: (status: string) => void;
@@ -186,6 +204,7 @@ vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', async () => {
       return (
         <div data-testid="canvas" data-scene={battleMapId}>
           {props.sessionControls}
+          {props.editMapControl}
           {props.children}
         </div>
       );
@@ -377,6 +396,7 @@ beforeEach(async () => {
   mocks.holds = 0;
   mocks.publishers = 0;
   mocks.viewports.clear();
+  mocks.openedWorkspaces = [];
   requests.length = 0;
   nav.push.mockClear();
   nav.replace.mockClear();
@@ -481,6 +501,34 @@ describe('W1 canonical selection', () => {
       requests.filter(request => request.includes('/table/control'))
     ).toEqual([]);
     other.dispose();
+  });
+});
+
+describe('F2 invalid canonical parameters never open the default workspace', () => {
+  it.each([
+    ['over-length', 'w'.repeat(600)],
+    ['control character', 'a%0Ab'],
+  ])(
+    'refuses a %s tableWorkspace with the not-bound notice',
+    async (_l, value) => {
+      nav.reset(`scene=scene-tavern&tableWorkspace=${value}`);
+      render(<TableWorkspace campaignCode="CAMP" />);
+      expect(
+        await screen.findByText(/not bound to this campaign route/u)
+      ).toBeInTheDocument();
+      expect(mocks.openedWorkspaces).not.toContain(null);
+      expect(canvasScene()).toBeUndefined();
+      expect(server.commands).toEqual([]);
+    }
+  );
+
+  it('shows the W1 notice for a present but invalid scene', async () => {
+    nav.reset(`scene=${'z'.repeat(600)}`);
+    render(<TableWorkspace campaignCode="CAMP" />);
+    expect(
+      await screen.findByText('That scene is not available in this workspace')
+    ).toBeInTheDocument();
+    expect(canvasScene()).toBeUndefined();
   });
 });
 
@@ -688,6 +736,73 @@ describe('W3/W4 lifecycle (D8)', () => {
       'scene-forest',
     ]);
     expect(tavern.disposed).toBe(1);
+  });
+
+  it('keeps the mounted scene when the request returns to it within one flush (F4)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const tavern = mocks.adapters[0]!;
+    const mounts = mocks.canvasMounts;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const flush = tavern.adapter.flush;
+    tavern.adapter.flush = async () => {
+      await gate;
+      await flush();
+    };
+    await navigate('scene=scene-forest');
+    await navigate('scene=scene-tavern');
+    release();
+    await settled('scene-tavern');
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 30));
+    });
+    expect(mocks.adapters).toHaveLength(1);
+    expect(tavern.disposed).toBe(0);
+    expect(mocks.canvasMounts).toBe(mounts);
+  });
+
+  it('clears the conflict switch notice once the conflict is resolved (F5)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const entry = mocks.adapters[0]!;
+    let pending = true;
+    entry.adapter.getPendingConflict = () =>
+      pending ? { operationId: 'op-1', fields: ['name'], createdAt: AT } : null;
+    entry.adapter.discardPendingConflict = () => {
+      pending = false;
+    };
+    await navigate('scene=scene-forest');
+    const notice = 'Resolve the unsaved change on Tavern before switching';
+    expect(await screen.findByText(notice)).toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Discard pending edit' })
+    );
+    await waitFor(() => expect(screen.queryByText(notice)).toBeNull());
+    expect(canvasScene()).toBe('scene-tavern');
+  });
+
+  it('blocks a switch while an Edit-map image replace is in flight (F9)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit map' }));
+    // jsdom never decodes the file: the replace stays in flight.
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [new File([new Uint8Array(4)], 'm.png', { type: 'image/png' })],
+      },
+    });
+    await navigate('scene=scene-forest');
+    expect(
+      await screen.findByText('Still saving Tavern — try again')
+    ).toBeInTheDocument();
+    expect(canvasScene()).toBe('scene-tavern');
+    expect(mocks.adapters[0]!.disposed).toBe(0);
   });
 
   it('keeps the scene with "Still saving" when edits never settle', async () => {
@@ -1086,8 +1201,11 @@ describe('W7 encounter "Prepare on map"', () => {
     nav.reset('scene=scene-tavern&prepareEncounter=enc-lib');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
-    const select = await screen.findByLabelText('Existing copies');
-    fireEvent.change(select, { target: { value: 'copy-2' } });
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole('combobox', { name: 'Existing copies' })
+    );
+    fireEvent.click(await screen.findByRole('option', { name: /copy-2/u }));
     fireEvent.click(screen.getByRole('button', { name: 'Open existing run' }));
     expect(nav.replace).toHaveBeenLastCalledWith(
       '/dm/campaign/CAMP/table?scene=scene-tavern&run=copy-2',

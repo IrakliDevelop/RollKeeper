@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+import { guardTableContext } from './tableContext';
+
 /**
  * PR04 presentation UI on the real Table page (dev server, IndexedDB scene
  * workspace) against a scripted control API: private preparation never
@@ -188,6 +190,7 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
 }) => {
   test.setTimeout(120_000);
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       if (localStorage.getItem('rollkeeper-dm-data')) return;
@@ -277,5 +280,6 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390);
   }
+  expect(contextErrors).toEqual([]);
   await context.close();
 });

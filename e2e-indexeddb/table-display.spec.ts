@@ -6,6 +6,8 @@ import {
   type Route,
 } from '@playwright/test';
 
+import { guardTableContext } from './tableContext';
+
 /**
  * PR05 persistent campaign table display in a real browser (dev server)
  * against scripted control/display APIs: Open display opens a same-origin
@@ -262,6 +264,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
 }) => {
   test.setTimeout(150_000);
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   await context.addInitScript(
     ({ campaign, map }) => {
       if (localStorage.getItem('rollkeeper-dm-data')) return;
@@ -405,6 +408,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
     expect(box.x).toBeGreaterThanOrEqual(0);
     expect(box.x + box.width).toBeLessThanOrEqual(390);
   }
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -412,6 +416,7 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
   browser,
 }) => {
   const context = await browser.newContext();
+  const contextErrors = await guardTableContext(context);
   const page = await context.newPage();
   const display = displayServer();
   await display.install(context, CAMPAIGN.code);
@@ -433,5 +438,6 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
     .not.toContain('#');
   await fresh.waitForTimeout(2_500);
   expect(display.descriptors).toEqual([]);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });

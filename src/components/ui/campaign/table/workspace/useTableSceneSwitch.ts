@@ -41,6 +41,8 @@ export function useTableSceneSwitch(options: {
   onRevert: (sceneId: string | null) => void;
   /** Step 4: remember the outgoing scene's camera before unmount. */
   onBeforeUnmount: (sceneId: string) => void;
+  /** Review F9: scene work in flight (Edit-map image) counts as saving. */
+  isBusy?: () => boolean;
 }) {
   const { repository, campaignCode, requestedSceneId } = options;
   const latest = useRef(options);
@@ -90,7 +92,7 @@ export function useTableSceneSwitch(options: {
           const name = latest.current.sceneName(current.sceneId);
           const blocked: TableSwitchNotice | null = adapter.getPendingConflict()
             ? { kind: 'conflict', sceneName: name }
-            : !stable
+            : !stable || latest.current.isBusy?.() === true
               ? { kind: 'saving', sceneName: name }
               : null;
           if (blocked) {

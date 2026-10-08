@@ -1,5 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
+import { guardTableContext } from './tableContext';
+
 /**
  * PR06 unified Table workspace on the real canvas (dev server, IndexedDB,
  * scripted control API — no relay in this config): the old per-scene URL
@@ -234,6 +236,7 @@ test('workspace: one session across 10+ private switches, redirect, history and 
 }) => {
   test.setTimeout(180_000);
   const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
   const page = await context.newPage();
   const server = controlServer();
   await seed(page, server);
@@ -355,6 +358,7 @@ test('workspace: one session across 10+ private switches, redirect, history and 
   await page.keyboard.press('Escape');
   await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
   expect(sceneParam(page)).toBe(tavernId);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });
 
@@ -363,6 +367,7 @@ test('create scene: uploaded image placed once; refusals create no scene', async
 }) => {
   test.setTimeout(120_000);
   const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
   const page = await context.newPage();
   const server = controlServer();
   await seed(page, server);
@@ -461,5 +466,6 @@ test('create scene: uploaded image placed once; refusals create no scene', async
       ['show', 'blank', 'unpresent', 'deletePresented'].includes(command.type)
     )
   ).toEqual([]);
+  expect(contextErrors).toEqual([]);
   await context.close();
 });

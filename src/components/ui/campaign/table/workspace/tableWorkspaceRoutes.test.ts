@@ -37,6 +37,7 @@ describe('W1 canonical Table workspace URLs', () => {
       tableWorkspace: 'w1',
       prepareEncounter: 'e1',
       panel: 'scenes',
+      sceneInvalid: false,
     });
     const invalid = parseTableWorkspaceQuery(
       new URLSearchParams(
@@ -55,6 +56,34 @@ describe('W1 canonical Table workspace URLs', () => {
       parseTableWorkspaceQuery(new URLSearchParams('tableWorkspace=invalid'))
         .tableWorkspace
     ).toBe('invalid');
+  });
+
+  it.each([
+    ['over-length', 'w'.repeat(600)],
+    ['over 255 bytes', 'é'.repeat(200)],
+    ['control character', 'work%0Aspace'],
+    ['empty', ''],
+  ])(
+    'maps a present but %s tableWorkspace to the refusal marker (F2)',
+    (_label, value) => {
+      expect(
+        parseTableWorkspaceQuery(new URLSearchParams(`tableWorkspace=${value}`))
+          .tableWorkspace
+      ).toBe('invalid');
+    }
+  );
+
+  it('flags a present but invalid scene instead of dropping it (F2)', () => {
+    for (const value of ['x'.repeat(600), 'a%0Ab', '']) {
+      const query = parseTableWorkspaceQuery(
+        new URLSearchParams(`scene=${value}`)
+      );
+      expect(query.scene).toBeNull();
+      expect(query.sceneInvalid).toBe(true);
+    }
+    expect(
+      parseTableWorkspaceQuery(new URLSearchParams('panel=scenes')).sceneInvalid
+    ).toBe(false);
   });
 });
 
@@ -93,6 +122,12 @@ describe('W8 / R3-F12 legacy table/<sceneId> redirect target', () => {
     ).toBe(
       `/dm/campaign/CAMP/table?scene=scene-1&tableWorkspace=${'w'.repeat(512)}`
     );
+  });
+
+  it('never lets a control-character workspace reach the default workspace (F2)', () => {
+    expect(
+      legacyTableRedirectHref('CAMP', 'scene-1', { tableWorkspace: 'a\nb' })
+    ).toBe('/dm/campaign/CAMP/table?scene=scene-1&tableWorkspace=invalid');
   });
 
   it('carries an oversized scene id raw so the workspace shows its unavailable notice', () => {

@@ -24,6 +24,7 @@ import {
 import type { GridSettings } from '@/types/location';
 
 import {
+  decodeMapImageUrl,
   replaceSceneMapImage,
   type SceneMapImageWrites,
 } from './sceneMapImage';
@@ -45,6 +46,10 @@ export function TableEditMapControl(props: {
   presentedHere: boolean;
   upload?: SceneImageUploader;
   decode?: SceneImageDecoder;
+  /** Loads the uploaded image the way the canvas will (F6). */
+  probe?: (url: string) => Promise<{ w: number; h: number }>;
+  /** F9: image work in flight blocks a scene switch. */
+  onBusyChange?: (busy: boolean) => void;
 }) {
   const { adapter, viewport } = props;
   const [open, setOpen] = useState(false);
@@ -77,6 +82,12 @@ export function TableEditMapControl(props: {
     writeSize: size => adapter.updateBattleMap({ mapImageSize: size }),
   };
 
+  const { onBusyChange } = props;
+  useEffect(() => {
+    onBusyChange?.(busy);
+  }, [busy, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+
   async function replaceImage(file: File) {
     if (!viewport) return;
     setBusy(true);
@@ -89,6 +100,12 @@ export function TableEditMapControl(props: {
       });
       if (!prepared.ok) {
         setError(prepared.message);
+        return;
+      }
+      try {
+        await (props.probe ?? decodeMapImageUrl)(prepared.url);
+      } catch {
+        setError('Map image could not be loaded');
         return;
       }
       replaceSceneMapImage(viewport, prepared.url, prepared.size, writes);

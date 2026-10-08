@@ -55,6 +55,8 @@ export function TableSceneStage(props: {
   onConnectionReady: (connection: BattleMapConnection | null) => void;
   onStatus: (sceneId: string, status: string) => void;
   onMessage: (message: string) => void;
+  /** Review F9: Edit-map image work in flight. */
+  onEditBusy?: (busy: boolean) => void;
 }) {
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -99,8 +101,10 @@ export function TableSceneStage(props: {
       setDmOnly: (id: string, dmOnly: boolean) => adapter.setDmOnly(id, dmOnly),
       writeSize: (size: { w: number; h: number }) =>
         adapter.updateBattleMap({ mapImageSize: size }),
+      // Review F6: a broken image adds nothing and says so.
+      onUnavailable: () => onMessage('Map image could not be loaded'),
     }),
-    [adapter]
+    [adapter, onMessage]
   );
   useEnsureSceneMapImage({
     viewport,
@@ -159,6 +163,7 @@ export function TableSceneStage(props: {
           adapter={adapter}
           viewport={viewport}
           presentedHere={props.presentedHere}
+          onBusyChange={props.onEditBusy}
         />
       }
     >

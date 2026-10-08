@@ -151,6 +151,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           onConnectionReady={workspace.setConnection}
           onStatus={workspace.onStatus}
           onMessage={checkpoint.setSaveMessage}
+          onEditBusy={workspace.onEditBusy}
         />
         {/* Outside the keyed canvas: an explicit acquire remounts the canvas
           only, so open dialogs and the command queue survive (F6). */}
