@@ -1,7 +1,8 @@
-import { ElementStore } from '@fieldnotes/core';
+import { cleanup } from '@testing-library/react';
+import { ElementStore, type CanvasElement } from '@fieldnotes/core';
 import type { AuthorityClientStatus } from '@fieldnotes/sync';
 import { FogManager } from '@fieldnotes/vtt';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const authority = vi.hoisted(() => {
   let listener: (() => void) | null = null;
@@ -52,7 +53,21 @@ vi.mock('@fieldnotes/sync', async importOriginal => ({
   createManagedAuthorityConnection: () => authority.connection,
 }));
 
-import { createManagedBattleMapAuthorityConnection } from './battlemapAuthority';
+import { serializeAuthorityFrame } from '@fieldnotes/sync';
+import { createTableRosterCanvas } from '@/components/ui/campaign/table/tableRosterCanvas';
+import { pinGridToMapLayer } from '@/components/ui/campaign/location-map/gridPin';
+import {
+  fieldnotesElementRegistry,
+  getVttGridController,
+} from '@/lib/fieldnotesVtt';
+import {
+  mountRealViewport,
+  type RealViewportHarness,
+} from '@/test/realViewport';
+import {
+  createManagedBattleMapAuthorityConnection,
+  withoutUndefined,
+} from './battlemapAuthority';
 
 const definition = {
   version: 1 as const,
@@ -323,5 +338,193 @@ describe('rejected player edits', () => {
     expect(
       (store.getById('party-a') as unknown as { size: unknown }).size
     ).toEqual({ w: 400, h: 400 });
+  });
+});
+
+/**
+ * PR07 acceptance A1: the SDK journal admits a proposal only if its frame
+ * serializes as bounded JSON; an own `undefined` property (the wrapped
+ * `vtt:grid` envelope carries `groupId`/`rotation: undefined`; every unset
+ * patch writes `key: undefined`) made the real client refuse it silently.
+ * The mocked connection applies the real SDK frame serializer.
+ */
+describe('A1 element submissions use JSON semantics', () => {
+  const harnesses: RealViewportHarness[] = [];
+  const refusedOnce = { value: false };
+  beforeEach(() => {
+    authority.reset();
+    refusedOnce.value = false;
+    authority.submit.mockImplementation(((mutation: unknown) => {
+      if (refusedOnce.value) {
+        refusedOnce.value = false;
+        return { status: 'refused', reason: 'invalid' };
+      }
+      try {
+        serializeAuthorityFrame({
+          protocol: 'authority:1',
+          kind: 'propose',
+          generation: '723e4567-e89b-42d3-a456-426614174000',
+          clientOperationId:
+            'fn1:1791471900938:16ce41d4b9a87fa034d57dcaaad8e04f',
+          mutation,
+        } as never);
+      } catch {
+        return { status: 'refused', reason: 'invalid' };
+      }
+      return { status: 'admitted', clientOperationId: 'op' };
+    }) as never);
+  });
+  afterEach(() => {
+    for (const harness of harnesses.splice(0)) harness.destroy();
+    cleanup();
+  });
+
+  function startDm(store: ElementStore, onDiagnostic = vi.fn()) {
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    authority.install({
+      elements: [],
+      layers: [],
+      extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+    });
+    return { connection, onDiagnostic };
+  }
+  const upserts = () =>
+    (authority.submit.mock.calls as unknown as Array<[Record<string, unknown>]>)
+      .map(([mutation]) => mutation)
+      .filter(mutation => mutation.kind === 'upsert')
+      .map(mutation => mutation.element as Record<string, unknown>);
+  const results = () =>
+    authority.submit.mock.results.map(
+      result => (result.value as { status: string }).status
+    );
+  const hasUndefined = (value: unknown): boolean =>
+    value !== null &&
+    typeof value === 'object' &&
+    Object.values(value).some(
+      child => child === undefined || hasUndefined(child)
+    );
+
+  it('submits (and the SDK admits) the real grid from GridController.add and the map-layer pin', () => {
+    const harness = mountRealViewport({
+      elementRegistry: fieldnotesElementRegistry,
+    });
+    harnesses.push(harness);
+    const { connection, onDiagnostic } = startDm(harness.viewport.store);
+    getVttGridController(harness.viewport).add({
+      gridType: 'square',
+      cellSize: 50,
+    });
+    pinGridToMapLayer(harness.viewport);
+    const grids = upserts().filter(element => element.type === 'extension');
+    expect(grids.length).toBeGreaterThanOrEqual(2);
+    expect(grids.at(-1)).toMatchObject({
+      extensionType: 'vtt:grid',
+      layerId: 'layer-map',
+      locked: true,
+      data: expect.objectContaining({ gridType: 'square', cellSize: 50 }),
+    });
+    for (const grid of grids) expect(hasUndefined(grid)).toBe(false);
+    expect(results().every(status => status === 'admitted')).toBe(true);
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    // The store's own element is never rewritten by the submission.
+    const local = harness.viewport.store
+      .getAll()
+      .find(element => element.type === 'extension') as unknown as Record<
+      string,
+      unknown
+    >;
+    expect(Object.hasOwn(local, 'rotation')).toBe(true);
+    connection.stop();
+  });
+
+  it('submits an unset patch without the key (control conversion and P10 digital)', () => {
+    const store = new ElementStore();
+    const { connection } = startDm(store);
+    store.add({
+      id: 'token-a',
+      type: 'shape',
+      shape: 'ellipse',
+      position: { x: 0, y: 0 },
+      size: { w: 10, h: 10 },
+      zIndex: 1,
+      locked: false,
+      layerId: 'annotations',
+      strokeColor: '#000',
+      strokeWidth: 1,
+      fillColor: '#fff',
+      tokenKind: 'combatant',
+      entityId: 'member-a',
+      sceneMemberId: 'member-a',
+      tableRepresentation: 'physical',
+    } as unknown as CanvasElement);
+    const canvas = createTableRosterCanvas({
+      viewport: { store } as never,
+      connection: null,
+      onArm: vi.fn(),
+    });
+    canvas.applyTokenPatch('token-a', {
+      set: { tokenKind: 'player', characterId: 'legacy-a' },
+      unset: ['entityId'],
+    });
+    canvas.applyTokenPatch('token-a', {
+      set: {},
+      unset: ['tableRepresentation'],
+    });
+    const [converted, digital] = upserts().slice(-2);
+    expect(Object.hasOwn(converted!, 'entityId')).toBe(false);
+    expect(converted).toMatchObject({ tokenKind: 'player' });
+    expect(Object.hasOwn(digital!, 'tableRepresentation')).toBe(false);
+    expect(results().slice(-2)).toEqual(['admitted', 'admitted']);
+    connection.stop();
+  });
+
+  it('surfaces a refused submission through onDiagnostic without the payload', () => {
+    const store = new ElementStore();
+    const { connection, onDiagnostic } = startDm(store);
+    refusedOnce.value = true;
+    store.add({
+      id: 'secret-note-id',
+      type: 'shape',
+      shape: 'rectangle',
+      position: { x: 0, y: 0 },
+      size: { w: 1, h: 1 },
+      zIndex: 0,
+      locked: false,
+      layerId: 'annotations',
+      strokeColor: '#000',
+      strokeWidth: 1,
+      fillColor: '#fff',
+    } as unknown as CanvasElement);
+    expect(onDiagnostic).toHaveBeenCalledTimes(1);
+    const message = String(onDiagnostic.mock.calls[0]![0]);
+    expect(message).toMatch(/not sent/u);
+    expect(message).not.toContain('secret-note-id');
+    connection.stop();
+  });
+
+  it('normalizes with JSON semantics: drops undefined properties, keeps null, never mutates', () => {
+    const input = {
+      a: 1,
+      b: undefined,
+      c: null,
+      nested: { d: undefined, e: [1, undefined, { f: undefined, g: null }] },
+    };
+    const frozen = structuredClone(input);
+    expect(withoutUndefined(input)).toEqual({
+      a: 1,
+      c: null,
+      nested: { e: [1, null, { g: null }] },
+    });
+    expect(input).toEqual(frozen);
+    expect(Object.hasOwn(input, 'b')).toBe(true);
   });
 });

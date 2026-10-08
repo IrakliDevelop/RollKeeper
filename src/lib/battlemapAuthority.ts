@@ -65,6 +65,28 @@ interface SceneBinding {
   room: string | null;
 }
 
+/**
+ * PR07 acceptance A1: JSON semantics for anything submitted to the authority
+ * client. The SDK journal admits a proposal only if its frame serializes as
+ * bounded JSON, which rejects `undefined`; the legacy wire (JSON.stringify)
+ * silently dropped such keys. Object properties set to `undefined` (wrapped
+ * extension envelopes, unset patches) are dropped, array holes become null,
+ * null is kept. Returns a copy; the input is never mutated.
+ */
+export function withoutUndefined<T>(value: T): T {
+  if (Array.isArray(value))
+    return value.map(item =>
+      item === undefined ? null : withoutUndefined(item)
+    ) as T;
+  if (value !== null && typeof value === 'object') {
+    const copy: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value))
+      if (child !== undefined) copy[key] = withoutUndefined(child);
+    return copy as T;
+  }
+  return value;
+}
+
 function canvasElement(element: Record<string, unknown>): CanvasElement {
   const canvas = { ...element };
   delete canvas.audience;
@@ -170,9 +192,26 @@ export function createManagedBattleMapAuthorityConnection(
   };
 
   let connection = open(null);
+  type Mutation = Parameters<ManagedAuthorityConnection['submit']>[0];
+  type SubmitOptions = Parameters<ManagedAuthorityConnection['submit']>[1];
+  /** Every local submission: JSON-normalized, and a refusal is visible. */
+  const submit = (mutation: Mutation, submitOptions?: SubmitOptions): void => {
+    const normalized = withoutUndefined(mutation);
+    const result =
+      submitOptions === undefined
+        ? connection.submit(normalized)
+        : connection.submit(normalized, submitOptions);
+    if (
+      result.status === 'refused' &&
+      (result.reason === 'invalid' || result.reason === 'capacity')
+    )
+      options.onDiagnostic?.(
+        `A local ${mutation.kind} edit was not sent to the live room (${result.reason})`
+      );
+  };
   const submitElement = (element: CanvasElement): void => {
     const audience = options.resolveAudience?.(element);
-    connection.submit({
+    submit({
       kind: 'upsert',
       element: { ...element, ...(audience === undefined ? {} : { audience }) },
     });
@@ -197,7 +236,7 @@ export function createManagedBattleMapAuthorityConnection(
         !applyingRemote &&
         (meta.origin === undefined || meta.origin === 'local')
       ) {
-        connection.submit({ kind: 'remove', id: element.id });
+        submit({ kind: 'remove', id: element.id });
       }
     }),
     options.store.on('clear', (_empty, meta) => {
@@ -206,10 +245,7 @@ export function createManagedBattleMapAuthorityConnection(
         (meta.origin === undefined || meta.origin === 'local')
       ) {
         const state = connection.getState().document?.casToken;
-        connection.submit(
-          { kind: 'clear' },
-          state ? { expectedState: state } : undefined
-        );
+        submit({ kind: 'clear' }, state ? { expectedState: state } : undefined);
       }
     }),
   ];
@@ -226,7 +262,7 @@ export function createManagedBattleMapAuthorityConnection(
         const version = nextFogSequence();
         if (version === null) return;
         if (!state || event.kind !== 'tiles') {
-          connection.submit({
+          submit({
             kind: 'fog-meta',
             record: {
               version,
@@ -251,7 +287,7 @@ export function createManagedBattleMapAuthorityConnection(
           };
         });
         for (let offset = 0; offset < tiles.length; offset += 64) {
-          connection.submit({
+          submit({
             kind: 'fog-patch',
             generation: state.definition.generation,
             tiles: tiles.slice(offset, offset + 64),
@@ -451,7 +487,7 @@ export function createManagedBattleMapAuthorityConnection(
     },
     publishLayerUpsert(definition: Layer) {
       layerSequence += 1;
-      connection.submit({
+      submit({
         kind: 'layer-upsert',
         layer: definition,
         version: layerSequence,
@@ -460,7 +496,7 @@ export function createManagedBattleMapAuthorityConnection(
     },
     publishLayerRemove(id: string) {
       layerSequence += 1;
-      connection.submit({
+      submit({
         kind: 'layer-remove',
         id,
         version: layerSequence,
