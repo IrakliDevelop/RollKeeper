@@ -14,7 +14,7 @@ import type {
   TableControlSession,
   TableDescriptor,
 } from '@/lib/table/authorityLifecycle';
-import type { TableAuthorityState } from '../useTableSceneAuthority';
+import type { TableAuthorityState } from '../workspace/useTableWorkspaceAuthority';
 
 import { TablePresentationControls } from '.';
 

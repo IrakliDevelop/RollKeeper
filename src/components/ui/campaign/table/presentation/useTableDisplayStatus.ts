@@ -36,7 +36,11 @@ function parse(value: unknown): DisplayStatus | null {
  * unmount; `refresh()` re-reads at once (after a committed presentation
  * command or Open display).
  */
-export function useTableDisplayStatus(campaignCode: string, dmId: string) {
+export function useTableDisplayStatus(
+  campaignCode: string,
+  dmId: string,
+  enabled = true
+) {
   const [status, setStatus] = useState<DisplayStatusRead | null>(null);
   const inFlight = useRef<AbortController | null>(null);
   const mounted = useRef(true);
@@ -77,6 +81,7 @@ export function useTableDisplayStatus(campaignCode: string, dmId: string) {
   );
 
   useEffect(() => {
+    if (!enabled) return;
     mounted.current = true;
     void read();
     const timer = setInterval(() => void read(), POLL_MS);
@@ -88,7 +93,7 @@ export function useTableDisplayStatus(campaignCode: string, dmId: string) {
       inFlight.current = null;
       pendingRefresh.current = false;
     };
-  }, [read]);
+  }, [enabled, read]);
 
   const refresh = useCallback(() => void read(true), [read]);
   return { status, refresh };

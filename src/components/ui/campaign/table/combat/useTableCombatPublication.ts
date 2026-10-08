@@ -25,9 +25,13 @@ import type { TableCombatIntent } from './useTableCombat';
  * a tab holding the lease publishes; every (re)acquire bumps `controlEpoch`
  * and the publisher holds until an explicit "Publish current state" or a new
  * start/end intent. CombatConfig is the DM's existing setting, read-only.
+ * PR06 W4: the workspace owns the one publisher of the page (`enabled` is
+ * false in a panel fed by the workspace), so a scene switch never holds.
  */
 export function useTableCombatPublication(options: {
-  repository: TableRepository;
+  repository: TableRepository | null;
+  /** False: this caller does not own a publisher (the workspace does). */
+  enabled?: boolean;
   controlSession: TableControlSession | null;
   controlEpoch: number;
   tick: number;
@@ -43,10 +47,12 @@ export function useTableCombatPublication(options: {
   const config = useRef(combatConfig);
   config.current = combatConfig;
   const publisher = useRef<CombatPublisher | null>(null);
+  const enabled = options.enabled !== false;
 
   useEffect(() => {
+    if (!enabled) return;
     const readSnapshot = () => {
-      const current = latest.current.repository.getCurrent();
+      const current = latest.current.repository?.getCurrent();
       return current?.status === 'ready' ? current.snapshot : null;
     };
     const instance = createCombatPublisher({
@@ -85,7 +91,7 @@ export function useTableCombatPublication(options: {
       instance.dispose();
       publisher.current = null;
     };
-  }, []);
+  }, [enabled]);
 
   // Every (re)acquire wipes the public initiative: hold until explicit.
   useEffect(() => {

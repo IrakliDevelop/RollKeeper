@@ -5,8 +5,10 @@ import { useEffect, useMemo, useState } from 'react';
 import { StudioPanel } from '@/components/ui/campaign/dm-vtt/StudioPanel';
 import { TurnControl } from '@/components/ui/campaign/dm-vtt/TurnControl';
 import type { TableControlSession } from '@/lib/table/authorityLifecycle';
+import type { TableCombatResult } from '@/lib/table/combat';
 import type { PublicationStatus } from '@/lib/table/combatPublisher';
 import type { TableRepository } from '@/lib/table/repository';
+import type { CampaignPlayerData } from '@/types/campaign';
 
 import { TableCombatHistoryDialog } from './TableCombatHistoryDialog';
 import { TableCombatToolbar } from './TableCombatToolbar';
@@ -14,11 +16,22 @@ import { TableNewRunDialog } from './TableNewRunDialog';
 import { TableParticipantDialog } from './TableParticipantDialog';
 import { TableRunSetup } from './TableRunSetup';
 import { publicationLabel } from './tableCombatMessages';
-import { useTableCombat } from './useTableCombat';
+import { useTableCombat, type TableCombatIntent } from './useTableCombat';
 import { useTableCombatPanelActions } from './useTableCombatPanelActions';
 import { useTableCombatPublication } from './useTableCombatPublication';
 
 const NO_LINK = null;
+
+export interface TableCombatPublicationHandle {
+  status: PublicationStatus;
+  publishCurrentState: () => Promise<void>;
+}
+
+/** What the workspace publisher needs from the mounted scene panel. */
+export interface TableCombatBridge {
+  background: (intent: TableCombatIntent) => Promise<TableCombatResult>;
+  playerData: CampaignPlayerData[] | undefined;
+}
 
 /**
  * Scene combat for the Table route (PR03): explicit run selection,
@@ -42,16 +55,31 @@ export function TableCombatPanel(props: {
   onPublicationStatus?: (status: PublicationStatus) => void;
   /** Server-acknowledged audience presentation (combined Show + Start). */
   presentation?: { sceneId: string | null; blanked: boolean } | null;
+  /**
+   * PR06 W4: the workspace's one publication (no per-scene publisher, no
+   * hold on scene switch). Absent: this panel owns a publisher (PR03).
+   */
+  publication?: TableCombatPublicationHandle;
+  /** Feeds the workspace publisher this scene's queue and player data. */
+  onCombatBridge?: (bridge: TableCombatBridge | null) => void;
 }) {
   const combat = useTableCombat(props);
-  const publication = useTableCombatPublication({
+  const owned = useTableCombatPublication({
     repository: props.repository,
+    enabled: props.publication === undefined,
     controlSession: props.controlSession,
     controlEpoch: props.controlEpoch,
     tick: combat.tick,
     playerData: combat.playerData,
     background: combat.background,
   });
+  const publication = props.publication ?? owned;
+  const { onCombatBridge } = props;
+  const { background, playerData } = combat;
+  useEffect(() => {
+    onCombatBridge?.({ background, playerData });
+  }, [onCombatBridge, background, playerData]);
+  useEffect(() => () => onCombatBridge?.(null), [onCombatBridge]);
   const panel = useTableCombatPanelActions({
     combat,
     sceneId: props.sceneId,

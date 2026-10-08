@@ -1,7 +1,12 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useTablePlayersSnapshot } from './useTablePlayersSnapshot';
+import {
+  createTablePlayersCache,
+  TablePlayersCacheProvider,
+  useTablePlayersSnapshot,
+} from './useTablePlayersSnapshot';
 
 const body = {
   players: [
@@ -101,5 +106,47 @@ describe('Table players snapshot refresh (C3-6)', () => {
       status: 'ready',
       stale: false,
     });
+  });
+});
+
+describe('W4 workspace players snapshot cache', () => {
+  it('reuses a fresh cached snapshot on remount instead of refetching', async () => {
+    const cache = createTablePlayersCache();
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <TablePlayersCacheProvider value={cache}>
+        {children}
+      </TablePlayersCacheProvider>
+    );
+    const first = renderHook(() => useTablePlayersSnapshot('CAMP'), {
+      wrapper,
+    });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(first.result.current.snapshot.status).toBe('ready');
+    first.unmount();
+    const calls = vi.mocked(fetch).mock.calls.length;
+    const second = renderHook(() => useTablePlayersSnapshot('CAMP'), {
+      wrapper,
+    });
+    expect(second.result.current.snapshot.status).toBe('ready');
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls);
+    // An explicit refresh still reads the server.
+    act(() => second.result.current.refresh());
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls + 1);
+    // A stale cache (older than its window) refetches on mount.
+    second.unmount();
+    vi.advanceTimersByTime(11_000);
+    renderHook(() => useTablePlayersSnapshot('CAMP'), { wrapper });
+    await act(async () => {
+      await vi.runOnlyPendingTimersAsync();
+    });
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls + 2);
   });
 });

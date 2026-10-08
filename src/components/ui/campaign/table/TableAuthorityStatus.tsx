@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/forms/button';
 
-import type { TableAuthorityState } from './useTableSceneAuthority';
+import type { TableAuthorityState } from './workspace/useTableWorkspaceAuthority';
 
 function message(state: TableAuthorityState): string | null {
   switch (state.phase) {

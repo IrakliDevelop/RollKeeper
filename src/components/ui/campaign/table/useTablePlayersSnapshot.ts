@@ -1,6 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 import type { CampaignPlayer } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity';
 import type { TableCampaignPlayer } from '@/lib/table/roster';
@@ -23,6 +30,28 @@ export type TablePlayersSnapshot =
       fetchedAt: number;
     };
 
+/** A reused snapshot is fresh for this long after its fetch. */
+const CACHE_FRESH_MS = 10_000;
+
+type ReadySnapshot = Extract<TablePlayersSnapshot, { status: 'ready' }>;
+
+export interface TablePlayersCache {
+  get(campaignCode: string): ReadySnapshot | null;
+  set(campaignCode: string, snapshot: ReadySnapshot): void;
+}
+
+/** PR06 W4: one players snapshot per workspace page, across scene panels. */
+export function createTablePlayersCache(): TablePlayersCache {
+  const entries = new Map<string, ReadySnapshot>();
+  return {
+    get: campaignCode => entries.get(campaignCode) ?? null,
+    set: (campaignCode, snapshot) => entries.set(campaignCode, snapshot),
+  };
+}
+
+const PlayersCacheContext = createContext<TablePlayersCache | null>(null);
+export const TablePlayersCacheProvider = PlayersCacheContext.Provider;
+
 /**
  * Reads the server-authorized campaign players snapshot (DM-only route).
  * Identity comes only from here; names are display data, never a key.
@@ -40,15 +69,21 @@ export function useTablePlayersSnapshot(
   snapshot: TablePlayersSnapshot;
   refresh: () => void;
 } {
-  const [snapshot, setSnapshot] = useState<TablePlayersSnapshot>({
-    status: 'loading',
-  });
+  const cache = useContext(PlayersCacheContext);
+  const [snapshot, setSnapshot] = useState<TablePlayersSnapshot>(
+    () => cache?.get(campaignCode) ?? { status: 'loading' }
+  );
   const [attempt, setAttempt] = useState(0);
+  /** Mount read skipped while a workspace-cached snapshot is fresh. */
+  const reuseOnMount = useRef(true);
   const inFlight = useRef<AbortController | null>(null);
   const pollMs = options.pollMs ?? null;
   const refreshKey = options.refreshKey;
 
   useEffect(() => {
+    const cached = reuseOnMount.current ? cache?.get(campaignCode) : null;
+    reuseOnMount.current = false;
+    if (cached && Date.now() - cached.fetchedAt < CACHE_FRESH_MS) return;
     // Single in-flight request: a newer refresh supersedes the previous one.
     inFlight.current?.abort();
     const controller = new AbortController();
@@ -70,7 +105,7 @@ export function useTablePlayersSnapshot(
             typeof row.characterId === 'string'
         );
         if (controller.signal.aborted) return;
-        setSnapshot({
+        const ready: ReadySnapshot = {
           status: 'ready',
           players: rows.map(row => ({
             playerId: row.playerId,
@@ -91,7 +126,9 @@ export function useTablePlayersSnapshot(
           data: rows,
           stale: false,
           fetchedAt: Date.now(),
-        });
+        };
+        cache?.set(campaignCode, ready);
+        setSnapshot(ready);
       } catch {
         if (controller.signal.aborted) return;
         // F1: a failed poll keeps the last ready data and only marks it stale.
@@ -103,7 +140,7 @@ export function useTablePlayersSnapshot(
       }
     })();
     return () => controller.abort();
-  }, [campaignCode, attempt, refreshKey]);
+  }, [cache, campaignCode, attempt, refreshKey]);
 
   useEffect(() => {
     if (pollMs === null) return;
