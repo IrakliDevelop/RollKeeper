@@ -174,6 +174,8 @@ export function useEnsureSceneMapImage(options: {
     done.current.phases.add(phase);
     const current = latest.current;
     if (!current.map) return;
-    void ensureSceneMapImage(viewport, current.map, current.writes);
+    void ensureSceneMapImage(viewport, current.map, current.writes).catch(
+      () => undefined
+    );
   }, [phase, url, viewport]);
 }

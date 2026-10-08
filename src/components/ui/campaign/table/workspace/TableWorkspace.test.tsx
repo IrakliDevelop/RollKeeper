@@ -7,7 +7,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react';
-import { Camera } from '@fieldnotes/core';
+import { Camera, ElementStore } from '@fieldnotes/core';
 import { IDBFactory } from 'fake-indexeddb';
 import type { ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -172,6 +172,7 @@ vi.mock('@/components/ui/campaign/dm-vtt/DmBattleMapCanvas', async () => {
         const camera = new Camera();
         const viewport = {
           camera,
+          store: new ElementStore(),
           getVisibleRect: () => camera.getVisibleRect(800, 600),
           getCanvasSize: () => ({ w: 800, h: 600 }),
           requestRender: () => {},
