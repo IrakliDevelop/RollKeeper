@@ -662,6 +662,33 @@ describe('W3/W4 lifecycle (D8)', () => {
     ).toEqual([{ id: 'v1', name: 'Bar', view: { x: 1, y: 2, w: 3, h: 4 } }]);
   });
 
+  it('serializes requests arriving mid-switch: the latest wins after the gate (C6-4)', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    const tavern = mocks.adapters[0]!;
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const flush = tavern.adapter.flush;
+    tavern.adapter.flush = async () => {
+      await gate;
+      await flush();
+    };
+    await navigate('scene=scene-big');
+    await navigate('scene=scene-forest');
+    expect(canvasScene()).toBe('scene-tavern');
+    expect(tavern.disposed).toBe(0);
+    release();
+    await settled('scene-forest');
+    expect(mocks.adapters.map(entry => entry.adapter.sceneId)).toEqual([
+      'scene-tavern',
+      'scene-forest',
+    ]);
+    expect(tavern.disposed).toBe(1);
+  });
+
   it('keeps the scene with "Still saving" when edits never settle', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);

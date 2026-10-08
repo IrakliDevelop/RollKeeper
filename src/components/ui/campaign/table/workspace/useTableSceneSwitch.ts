@@ -73,7 +73,6 @@ export function useTableSceneSwitch(options: {
     const alive = () => ticket === generation.current;
     try {
       while (alive() && requested.current !== mountedRef.current.sceneId) {
-        const target = requested.current;
         const current = mountedRef.current;
         if (current.adapter && current.sceneId) {
           setSwitching(true);
@@ -101,9 +100,13 @@ export function useTableSceneSwitch(options: {
             latest.current.onRevert(current.sceneId);
             return;
           }
+          // C6-4: the latest request after the gate wins; returning to
+          // the mounted scene mid-flush keeps it (nothing is disposed).
+          if (requested.current === current.sceneId) break;
           latest.current.onBeforeUnmount(current.sceneId);
           adapter.dispose();
         }
+        const target = requested.current;
         setNotice(null);
         commit({
           sceneId: target,
