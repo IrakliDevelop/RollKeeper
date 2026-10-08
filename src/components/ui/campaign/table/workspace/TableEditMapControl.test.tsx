@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -332,3 +333,169 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     await waitFor(() => expect(onBusyChange).toHaveBeenLastCalledWith(false));
   });
 });
+
+describe('FU-1 Edit map panel focus, dismissal and placement', () => {
+  const observers: Array<{
+    callback: ResizeObserverCallback;
+    targets: Element[];
+    disconnected: boolean;
+  }> = [];
+  let anchorBottom = 100;
+  beforeEach(() => {
+    observers.length = 0;
+    anchorBottom = 100;
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        entry: (typeof observers)[number];
+        constructor(callback: ResizeObserverCallback) {
+          this.entry = { callback, targets: [], disconnected: false };
+          observers.push(this.entry);
+        }
+        observe(target: Element) {
+          this.entry.targets.push(target);
+        }
+        unobserve() {}
+        disconnect() {
+          this.entry.disconnected = true;
+        }
+      }
+    );
+  });
+
+  function mount(
+    upload: SceneImageUploaderMock = vi.fn(async () => 'https://x.test/a.webp')
+  ) {
+    vi.stubGlobal('fetch', vi.fn());
+    render(
+      <div data-testid="dm-vtt-command-dock">
+        <button type="button">Before</button>
+        <div>
+          <TableEditMapControl
+            adapter={adapter}
+            viewport={viewport()}
+            presentedHere={false}
+            upload={upload}
+            decode={async () => ({ w: 10, h: 10 })}
+            probe={async () => ({ w: 10, h: 10 })}
+          />
+        </div>
+        <button type="button">Next tool</button>
+      </div>
+    );
+    const toggle = screen.getByRole('button', { name: 'Edit map' });
+    vi.spyOn(toggle.parentElement!, 'getBoundingClientRect').mockImplementation(
+      () =>
+        ({
+          top: anchorBottom - 44,
+          bottom: anchorBottom,
+          left: 600,
+          right: 700,
+          width: 100,
+          height: 44,
+        }) as DOMRect
+    );
+    fireEvent.click(toggle);
+    return toggle;
+  }
+  const panel = () => screen.queryByRole('group', { name: 'Edit map' });
+
+  it('focuses the first visible control; Shift+Tab returns to Edit map', () => {
+    const toggle = mount();
+    const first = screen.getByRole('button', { name: 'Set map image' });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
+    expect(document.activeElement).toBe(toggle);
+    expect(panel()).toBeInTheDocument();
+  });
+
+  it('Tab from the last control closes the panel and moves on past Edit map', () => {
+    mount();
+    const last = screen.getByRole('button', { name: 'Fit to map' });
+    last.focus();
+    fireEvent.keyDown(last, { key: 'Tab' });
+    expect(panel()).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(
+      screen.getByRole('button', { name: 'Next tool' })
+    );
+  });
+
+  it('Escape closes an open grid popover first, then the panel, returning focus', () => {
+    const toggle = mount();
+    const gridButton = screen.getByRole('button', { name: /Grid:/u });
+    fireEvent.click(gridButton);
+    expect(gridButton).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.keyDown(gridButton, { key: 'Escape' });
+    expect(gridButton).toHaveAttribute('aria-expanded', 'false');
+    expect(panel()).toBeInTheDocument();
+    fireEvent.keyDown(gridButton, { key: 'Escape' });
+    expect(panel()).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  });
+
+  it('closes on an outside click, but not while image work is in flight', async () => {
+    let finish!: (url: string) => void;
+    mount(
+      vi.fn(
+        () =>
+          new Promise<string>(resolve => {
+            finish = resolve;
+          })
+      )
+    );
+    fireEvent.change(screen.getByLabelText('Map image file'), {
+      target: {
+        files: [
+          new File([new Uint8Array(4)], 'a.webp', { type: 'image/webp' }),
+        ],
+      },
+    });
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Set map image' })
+      ).toBeDisabled()
+    );
+    fireEvent.pointerDown(document.body);
+    expect(panel()).toBeInTheDocument();
+    finish('https://x.test/a.webp');
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: 'Replace map image' })
+      ).toBeEnabled()
+    );
+    fireEvent.pointerDown(document.body);
+    expect(panel()).not.toBeInTheDocument();
+  });
+
+  it('follows the anchor when the header grows, and disposes observers on close', () => {
+    const toggle = mount();
+    expect(panel()).toHaveStyle({ top: '104px' });
+    const dock = screen.getByTestId('dm-vtt-command-dock');
+    const watching = observers.filter(entry => !entry.disconnected);
+    expect(watching.flatMap(entry => entry.targets)).toEqual(
+      expect.arrayContaining([toggle.parentElement, dock])
+    );
+    anchorBottom = 160;
+    act(() =>
+      watching.forEach(entry =>
+        entry.callback([], entry as unknown as ResizeObserver)
+      )
+    );
+    expect(panel()).toHaveStyle({ top: '164px' });
+    anchorBottom = 120;
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+    expect(panel()).toHaveStyle({ top: '124px' });
+    fireEvent.click(toggle);
+    expect(observers.every(entry => entry.disconnected)).toBe(true);
+    anchorBottom = 300;
+    act(() => {
+      window.dispatchEvent(new Event('scroll'));
+    });
+    expect(panel()).not.toBeInTheDocument();
+  });
+});
+
+type SceneImageUploaderMock = (...args: never[]) => Promise<string>;

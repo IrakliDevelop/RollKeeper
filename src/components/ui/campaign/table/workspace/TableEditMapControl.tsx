@@ -1,6 +1,7 @@
 'use client';
 
 import {
+  type KeyboardEvent as ReactKeyboardEvent,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -38,6 +39,17 @@ import {
 } from './sceneMapImage';
 
 export const EDIT_MAP_PANEL_ID = 'table-edit-map-panel';
+
+const FOCUSABLE =
+  'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+/** Tab-order candidates inside `root` (FU-1). */
+function focusables(root: HTMLElement | null): HTMLElement[] {
+  if (!root) return [];
+  return Array.from(root.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+    item => item.tabIndex >= 0
+  );
+}
 const LIVE_EDIT = 'Editing the shown scene — changes are live';
 
 /**
@@ -91,9 +103,16 @@ export function TableEditMapControl(props: {
   };
 
   const { onBusyChange } = props;
-  // Acceptance A2: the panel is anchored below the button, kept inside the
-  // viewport, and follows resizes while open.
+  // Acceptance A2 / FU-1: the panel is anchored below the button, kept
+  // inside the viewport, and follows the anchor (toolbar row, workspace
+  // header/dock, scroll, resize) while open.
   const anchorRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const busyRef = useRef(busy);
+  useEffect(() => {
+    busyRef.current = busy;
+  }, [busy]);
   const [position, setPosition] = useState<{
     top: number;
     left: number;
@@ -103,8 +122,9 @@ export function TableEditMapControl(props: {
       setPosition(null);
       return;
     }
+    const anchor = anchorRef.current;
     const place = () => {
-      const rect = anchorRef.current?.getBoundingClientRect();
+      const rect = anchor?.getBoundingClientRect();
       if (!rect) return;
       const width = Math.min(288, window.innerWidth - 16);
       setPosition({
@@ -116,9 +136,64 @@ export function TableEditMapControl(props: {
       });
     };
     place();
+    const observer =
+      typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(place);
+    const targets = [
+      anchor,
+      anchor?.parentElement,
+      anchor?.closest('[data-testid="dm-vtt-command-dock"]'),
+    ];
+    targets.forEach(target => target && observer?.observe(target));
     window.addEventListener('resize', place);
-    return () => window.removeEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    };
   }, [open]);
+  const placed = position !== null;
+  useEffect(() => {
+    if (!open || !placed) return;
+    // FC-4: the first visible control (Set/Replace map image).
+    focusables(panelRef.current)[0]?.focus();
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (busyRef.current) return;
+      if (panelRef.current?.contains(target)) return;
+      if (anchorRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [open, placed]);
+
+  const onPanelKeyDown = (event: ReactKeyboardEvent) => {
+    const panel = panelRef.current;
+    if (!panel) return;
+    if (event.key === 'Escape') {
+      // Innermost layer first: an open grid popover handles its own Escape.
+      if (panel.querySelector('[aria-expanded="true"]')) return;
+      setOpen(false);
+      buttonRef.current?.focus();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const items = focusables(panel);
+    if (event.shiftKey && event.target === items[0]) {
+      event.preventDefault();
+      buttonRef.current?.focus();
+    } else if (!event.shiftKey && event.target === items.at(-1)) {
+      event.preventDefault();
+      setOpen(false);
+      const order = focusables(document.body).filter(
+        item => !panel.contains(item)
+      );
+      const button = buttonRef.current;
+      const next = button ? order[order.indexOf(button) + 1] : undefined;
+      (next ?? button)?.focus();
+    }
+  };
   useEffect(() => {
     onBusyChange?.(busy);
   }, [busy, onBusyChange]);
@@ -180,11 +255,15 @@ export function TableEditMapControl(props: {
   return (
     <div className="relative" ref={anchorRef}>
       <Button
+        ref={buttonRef}
         variant={open ? 'primary' : 'ghost'}
         className="min-h-[44px] px-2"
         aria-expanded={open}
         aria-controls={EDIT_MAP_PANEL_ID}
         onClick={() => setOpen(value => !value)}
+        onKeyDown={event => {
+          if (event.key === 'Escape' && open) setOpen(false);
+        }}
       >
         <PencilRuler size={16} aria-hidden="true" />
         <span className="ml-1.5 text-xs">Edit map</span>
@@ -193,9 +272,11 @@ export function TableEditMapControl(props: {
         position &&
         createPortal(
           <div
+            ref={panelRef}
             id={EDIT_MAP_PANEL_ID}
             role="group"
             aria-label="Edit map"
+            onKeyDown={onPanelKeyDown}
             // Acceptance A2: portalled and fixed so no toolbar strip or dock
             // overflow box can clip it.
             style={{ top: position.top, left: position.left }}
@@ -211,6 +292,7 @@ export function TableEditMapControl(props: {
               type="file"
               accept="image/png,image/jpeg,image/webp,image/gif"
               aria-label="Map image file"
+              tabIndex={-1}
               className="sr-only"
               onChange={event => {
                 const file = event.target.files?.[0];
