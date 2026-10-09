@@ -47,6 +47,11 @@ function controlServer(options: { foreignHolder?: boolean } = {}) {
     holderSessionId: null as string | null,
     leaseUntil: 0,
     initialized: false,
+    presentation: {
+      sceneId: null as string | null,
+      revision: 0,
+      blanked: false,
+    },
   };
   const registry: Array<Record<string, unknown>> = [];
   const commands: Command[] = [];
@@ -58,7 +63,7 @@ function controlServer(options: { foreignHolder?: boolean } = {}) {
     writerFence: state.writerFence,
     leaseUntil: state.leaseUntil,
     holderSessionId: state.holderSessionId,
-    presentation: { sceneId: null, revision: 0, blanked: false },
+    presentation: { ...state.presentation },
     publicRunId: null,
   });
   const json = (route: Route, status: number, body: unknown) =>
@@ -100,6 +105,13 @@ function controlServer(options: { foreignHolder?: boolean } = {}) {
         break;
       case 'renew':
         state.leaseUntil = Date.now() + 30_000;
+        break;
+      case 'show':
+        state.presentation = {
+          sceneId: String(command.sceneId),
+          revision: state.presentation.revision + 1,
+          blanked: false,
+        };
         break;
       case 'registerScene':
         registry.push({
@@ -771,7 +783,7 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   await context.close();
 });
 
-test('review 03 F1: header and tool strip stack below 2048 px (no tool scrolling) and sit side by side from 2048 px', async ({
+test('review 03 F1 / A2: the Table header always stacks above a full-width tool strip (no tool scrolling), also with a scene shown', async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -780,7 +792,7 @@ test('review 03 F1: header and tool strip stack below 2048 px (no tool scrolling
   const page = await context.newPage();
   const server = controlServer();
   await seed(page, server);
-  await page.setViewportSize({ width: 1536, height: 864 });
+  await page.setViewportSize({ width: 2048, height: 1103 });
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
   await expect(page.getByText('Live control held.')).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
@@ -791,16 +803,7 @@ test('review 03 F1: header and tool strip stack below 2048 px (no tool scrolling
   const strip = dock.locator('.overflow-x-auto').first();
   const overflow = async (target: typeof strip) =>
     target.evaluate(element => element.scrollWidth - element.clientWidth);
-  let normal2048 = 0;
-  for (const [width, height, sideBySide] of [
-    [1536, 864, false],
-    [1600, 900, false],
-    [1800, 1000, false],
-    [1920, 1080, false],
-    [2048, 1103, true],
-  ] as const) {
-    await page.setViewportSize({ width, height });
-    await page.waitForTimeout(300);
+  const expectStacked = async (label: string) => {
     const headerBox = (await header.boundingBox())!;
     const stripBox = (await strip.boundingBox())!;
     const { scrollWidth, clientWidth } = await strip.evaluate(element => ({
@@ -809,25 +812,29 @@ test('review 03 F1: header and tool strip stack below 2048 px (no tool scrolling
     }));
     const dockHeight = Math.round((await dock.boundingBox())!.height);
     console.log(
-      `F1 ${width}: dock ${dockHeight}px, strip ${clientWidth}/${scrollWidth}px, header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
+      `F1 ${label}: dock ${dockHeight}px, strip ${clientWidth}/${scrollWidth}px, header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
     );
-    if (width === 2048) {
-      normal2048 = scrollWidth - clientWidth;
-      // Owner decision: side by side only where just Viewers scrolls.
-      expect(normal2048).toBeLessThanOrEqual(86);
-    }
-    if (sideBySide) {
-      // Header beside the tools: same row, header to the left.
-      expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(stripBox.x + 1);
-      expect(Math.abs(headerBox.y - stripBox.y)).toBeLessThan(headerBox.height);
-    } else {
-      // Stacked: the tool row sits below the header and never scrolls.
-      expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(
-        stripBox.y + 1
-      );
-      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
-    }
+    expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(stripBox.y + 1);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  };
+  // A2: the scene shown (published, with the display line) at 2048.
+  await page.getByRole('button', { name: 'Show this scene' }).click();
+  await expect(
+    page.getByRole('status', { name: 'Audience status' })
+  ).toContainText('Published');
+  await expectStacked('2048 shown');
+  for (const [width, height] of [
+    [1536, 864],
+    [1600, 900],
+    [1800, 1000],
+    [1920, 1080],
+    [2048, 1103],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(300);
+    await expectStacked(String(width));
   }
+  const normal2048 = 0;
 
   // A banner row (another session holds live control) at 2048: the header
   // stacks above the tools, so the strip scrolls no more than normal.

@@ -66,7 +66,6 @@ export function TableWorkspaceHeader(props: {
   return (
     <div
       data-testid="table-workspace-header"
-      data-header-banners={bannersVisible ? 'shown' : 'none'}
       className="border-divider bg-surface-secondary pointer-events-auto flex w-full flex-col p-2"
     >
       <div

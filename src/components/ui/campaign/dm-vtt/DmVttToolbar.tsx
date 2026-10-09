@@ -94,12 +94,12 @@ export interface DmVttToolbarProps {
   editMapControl?: ReactNode;
   /**
    * When session controls and canvas tools share one row (otherwise they
-   * stack as full-width rows): `2xl` (default, legacy VTT screen) or `wide`
-   * (Table workspace, review 03 F1: only at ≥2048 px, never while header
-   * banners are shown, and with the header column capped so the tool strip
-   * scrolls no further than its trailing item).
+   * stack as full-width rows): `2xl` (default, legacy VTT screen) or `never`
+   * (Table workspace, acceptance A2: the header always stacks above a
+   * full-width tool strip, because its live line, banners and audience row
+   * leave too little width for the tools at any viewport).
    */
-  sideBySide?: '2xl' | 'wide';
+  sideBySide?: '2xl' | 'never';
   fogControls?: DmFogControls;
   fogPresetControls?: FogPresetControls;
 }
@@ -110,12 +110,7 @@ const SIDE_BY_SIDE = {
     dock: '2xl:flex-row 2xl:flex-wrap',
     session: '2xl:border-r 2xl:border-b-0',
   },
-  // Stacks while the header shows banner rows (`data-header-banners`).
-  wide: {
-    dock: 'min-[2048px]:[&:not(:has([data-header-banners=shown]))]:flex-row min-[2048px]:[&:not(:has([data-header-banners=shown]))]:flex-wrap',
-    session:
-      'min-[2048px]:[&:not(:has([data-header-banners=shown]))]:border-r min-[2048px]:[&:not(:has([data-header-banners=shown]))]:border-b-0 min-[2048px]:[&:not(:has([data-header-banners=shown]))]:max-w-[44rem]',
-  },
+  never: { dock: '', session: '' },
 } as const;
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
