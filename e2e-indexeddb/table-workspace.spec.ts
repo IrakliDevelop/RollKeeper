@@ -771,7 +771,7 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   await context.close();
 });
 
-test('review 03 F1: header and tool strip stack below 1920 px (no tool scrolling) and sit side by side from 1920 px', async ({
+test('review 03 F1: header and tool strip stack below 2048 px (no tool scrolling) and sit side by side from 2048 px', async ({
   browser,
 }) => {
   test.setTimeout(120_000);
@@ -796,7 +796,7 @@ test('review 03 F1: header and tool strip stack below 1920 px (no tool scrolling
     [1536, 864, false],
     [1600, 900, false],
     [1800, 1000, false],
-    [1920, 1080, true],
+    [1920, 1080, false],
     [2048, 1103, true],
   ] as const) {
     await page.setViewportSize({ width, height });
@@ -811,7 +811,11 @@ test('review 03 F1: header and tool strip stack below 1920 px (no tool scrolling
     console.log(
       `F1 ${width}: dock ${dockHeight}px, strip ${clientWidth}/${scrollWidth}px, header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
     );
-    if (width === 2048) normal2048 = scrollWidth - clientWidth;
+    if (width === 2048) {
+      normal2048 = scrollWidth - clientWidth;
+      // Owner decision: side by side only where just Viewers scrolls.
+      expect(normal2048).toBeLessThanOrEqual(86);
+    }
     if (sideBySide) {
       // Header beside the tools: same row, header to the left.
       expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(stripBox.x + 1);

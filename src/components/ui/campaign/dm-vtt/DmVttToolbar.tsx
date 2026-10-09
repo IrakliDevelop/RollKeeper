@@ -95,7 +95,7 @@ export interface DmVttToolbarProps {
   /**
    * When session controls and canvas tools share one row (otherwise they
    * stack as full-width rows): `2xl` (default, legacy VTT screen) or `wide`
-   * (Table workspace, review 03 F1: only at ≥1920 px, never while header
+   * (Table workspace, review 03 F1: only at ≥2048 px, never while header
    * banners are shown, and with the header column capped so the tool strip
    * scrolls no further than its trailing item).
    */
@@ -112,9 +112,9 @@ const SIDE_BY_SIDE = {
   },
   // Stacks while the header shows banner rows (`data-header-banners`).
   wide: {
-    dock: 'min-[1920px]:[&:not(:has([data-header-banners=shown]))]:flex-row min-[1920px]:[&:not(:has([data-header-banners=shown]))]:flex-wrap',
+    dock: 'min-[2048px]:[&:not(:has([data-header-banners=shown]))]:flex-row min-[2048px]:[&:not(:has([data-header-banners=shown]))]:flex-wrap',
     session:
-      'min-[1920px]:[&:not(:has([data-header-banners=shown]))]:border-r min-[1920px]:[&:not(:has([data-header-banners=shown]))]:border-b-0 min-[1920px]:[&:not(:has([data-header-banners=shown]))]:max-w-[44rem]',
+      'min-[2048px]:[&:not(:has([data-header-banners=shown]))]:border-r min-[2048px]:[&:not(:has([data-header-banners=shown]))]:border-b-0 min-[2048px]:[&:not(:has([data-header-banners=shown]))]:max-w-[44rem]',
   },
 } as const;
 
