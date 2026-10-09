@@ -555,8 +555,16 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
     'data-calibration-state',
     'uncalibrated'
   );
-  await host.mouse.move(400, 300);
-  await tv.getByRole('button', { name: 'Calibrate minis' }).click();
+  // `uncalibrated` is already in the server HTML: hover until the hydrated
+  // shell reveals its edge status.
+  const calibrateInFrame = tv.getByRole('button', { name: 'Calibrate minis' });
+  let nudge = 0;
+  await expect(async () => {
+    nudge += 1;
+    await host.mouse.move(400 + nudge, 300);
+    await expect(calibrateInFrame).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await calibrateInFrame.click();
   await tv.getByRole('button', { name: 'Confirm' }).click();
   await expect(tvRoot).toHaveAttribute('data-calibration-state', 'verified');
   for (const [width, height] of [
