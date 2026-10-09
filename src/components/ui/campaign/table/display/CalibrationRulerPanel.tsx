@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 
 import {
+  CALIBRATION_RULER_FIRST,
   CALIBRATION_REPOSITION,
   CALIBRATION_REQUIREMENTS,
   CALIBRATION_STORAGE_BLOCKED,
@@ -17,6 +18,18 @@ import {
   isValidSquareMm,
   type CalibrationSettings,
 } from './calibration/settings';
+
+/**
+ * O7-A4: a fixed (not theme-flipping) high-contrast double ring drawn inside
+ * the C box — dark border plus a light inset ring — so the measured outer
+ * edge stays exactly C CSS px on light and dark maps.
+ */
+const REFERENCE_RING = {
+  borderStyle: 'solid',
+  borderWidth: '2px',
+  borderColor: '#000000',
+  boxShadow: 'inset 0 0 0 2px #ffffff',
+} as const;
 
 const STEPS = [
   { delta: -1, label: '−1 px', name: 'Decrease by 1 px' },
@@ -37,7 +50,8 @@ export interface CalibrationRulerPanelProps {
   saved: CalibrationSettings | null;
   storageAvailable: boolean;
   onConfirm: (cssPxPerSquare: number, squareMm: number) => void;
-  onUseUncalibrated: () => void;
+  /** O7-A6: offered only in calibrated mode (else it equals Cancel). */
+  onUseUncalibrated?: () => void;
   onCancel: () => void;
 }
 
@@ -85,13 +99,20 @@ export function CalibrationRulerPanel({
       <div
         data-testid="calibration-reference-square"
         aria-hidden="true"
-        className="border-accent-amber-border pointer-events-none fixed top-1/2 left-1/2 z-[115] -translate-x-1/2 -translate-y-1/2 border-2"
+        className="pointer-events-none fixed top-1/2 left-1/2 z-[115] -translate-x-1/2 -translate-y-1/2"
         style={{
           width: `${cssPx}px`,
           height: `${cssPx}px`,
           boxSizing: 'border-box',
+          ...REFERENCE_RING,
         }}
       />
+      <p
+        className="bg-surface-raised text-heading pointer-events-none fixed left-1/2 z-[115] -translate-x-1/2 rounded px-2 py-0.5 text-xs font-medium"
+        style={{ top: `calc(50% + ${cssPx / 2 + 8}px)` }}
+      >
+        Measure this square
+      </p>
       <section
         ref={panelRef}
         aria-label="Ruler calibration"
@@ -102,6 +123,7 @@ export function CalibrationRulerPanel({
         <h2 className="text-heading text-base font-semibold">
           Calibrate minis
         </h2>
+        <p className="text-heading font-medium">{CALIBRATION_RULER_FIRST}</p>
         {saved && (
           <p className="text-muted text-xs">
             {calibrationSavedNote(new Date(saved.savedAt).toLocaleDateString())}
@@ -156,9 +178,11 @@ export function CalibrationRulerPanel({
           >
             Confirm
           </Button>
-          <Button size="sm" variant="secondary" onClick={onUseUncalibrated}>
-            Use uncalibrated view
-          </Button>
+          {onUseUncalibrated && (
+            <Button size="sm" variant="secondary" onClick={onUseUncalibrated}>
+              Use uncalibrated view
+            </Button>
+          )}
           <Button size="sm" variant="ghost" onClick={onCancel}>
             Cancel
           </Button>

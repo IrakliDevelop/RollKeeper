@@ -68,10 +68,15 @@ export function TableDisplayCalibration({
           });
           setPanelOpen(false);
         }}
-        onUseUncalibrated={() => {
-          store.useUncalibrated();
-          setPanelOpen(false);
-        }}
+        // O7-A6: from the uncalibrated view Cancel already is "uncalibrated".
+        onUseUncalibrated={
+          state.calibratedMode
+            ? () => {
+                store.useUncalibrated();
+                setPanelOpen(false);
+              }
+            : undefined
+        }
         onCancel={() => setPanelOpen(false)}
       />
     );

@@ -13,8 +13,11 @@ import {
  * and reconnects keep the session verification flag; a reload or a new
  * window starts with no session (verification is session-only).
  *
- * The session flag is independent of the preference and of the current
- * scene's geometry; the reported state is derived from all three.
+ * O7-1 / O7-A1: every page load starts uncalibrated. The in-memory
+ * `calibratedMode` flag (never persisted) is set only by Confirm and
+ * cleared only by "Use uncalibrated view"; invalidation keeps it (frozen,
+ * verify-required). The session flag is independent of that mode and of
+ * the current scene's geometry; the reported state derives from all three.
  */
 
 export type CalibrationReport = DisplayCalibrationReport;
@@ -27,7 +30,10 @@ export interface CalibrationSession {
 }
 
 export interface CalibrationPageState {
+  /** Saved ruler values, offered by Calibrate minis (never auto-applied). */
   settings: CalibrationSettings | null;
+  /** O7-A1: page-lifetime calibrated mode (false on every page load). */
+  calibratedMode: boolean;
   /** False → values live for this page only (small notice on the display). */
   storageAvailable: boolean;
   session: CalibrationSession | null;
@@ -36,28 +42,28 @@ export interface CalibrationPageState {
 export interface CalibrationStore {
   getState(): CalibrationPageState;
   subscribe(listener: () => void): () => void;
-  /** Ruler Confirm: saves C/squareMm, prefers calibrated, sets the session. */
+  /** Ruler Confirm: saves C/squareMm, enters calibrated mode, sets the session. */
   confirm(input: {
     cssPxPerSquare: number;
     squareMm: number;
     environment: EnvironmentSnapshot;
     now: number;
   }): void;
-  /** "Use uncalibrated view": PR05 behaviour; drops the session. */
+  /** "Use uncalibrated view": leaves calibrated mode (writes nothing). */
   useUncalibrated(): void;
   /** A detected invalidation (P5) or grid change: clears the session. */
   invalidate(): void;
 }
 
-export const preferCalibrated = (state: CalibrationPageState): boolean =>
-  state.settings?.preferCalibrated === true;
+export const inCalibratedMode = (state: CalibrationPageState): boolean =>
+  state.calibratedMode;
 
-/** R3-1 derivation; `geometry` null = no scene attached (blank/waiting). */
+/** R3-1 / O7-A1 derivation; `geometry` null = no scene shown (blank/waiting). */
 export function deriveCalibrationReport(
   state: CalibrationPageState,
   geometry: SceneGeometry | null
 ): CalibrationReport {
-  if (!preferCalibrated(state)) return 'uncalibrated';
+  if (!state.calibratedMode) return 'uncalibrated';
   if (!state.session) return 'verify-required';
   if (geometry && geometry.kind !== 'square') return 'unsupported';
   return 'verified';
@@ -67,6 +73,7 @@ function createStore(): CalibrationStore {
   const loaded = loadCalibrationSettings();
   let state: CalibrationPageState = {
     settings: loaded.settings,
+    calibratedMode: false,
     storageAvailable: loaded.available,
     session: null,
   };
@@ -88,23 +95,19 @@ function createStore(): CalibrationStore {
       const settings: CalibrationSettings = {
         cssPxPerSquare,
         squareMm,
-        preferCalibrated: true,
         savedAt: now,
       };
       const saved = persist(settings);
       set({
         settings,
+        calibratedMode: true,
         storageAvailable: saved,
         session: { cssPxPerSquare, squareMm, environment, verifiedAt: now },
       });
     },
     useUncalibrated() {
-      if (!state.session && !preferCalibrated(state)) return;
-      const settings = state.settings
-        ? { ...state.settings, preferCalibrated: false }
-        : null;
-      const saved = settings ? persist(settings) : state.storageAvailable;
-      set({ settings, storageAvailable: saved, session: null });
+      if (!state.session && !state.calibratedMode) return;
+      set({ ...state, calibratedMode: false, session: null });
     },
     invalidate() {
       if (!state.session) return;

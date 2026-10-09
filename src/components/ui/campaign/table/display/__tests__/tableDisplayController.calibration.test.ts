@@ -408,7 +408,7 @@ describe('calibrated camera (P4, P8)', () => {
     });
   });
 
-  it('keeps the canvas-centre world point when the user confirms on an uncovered attach', async () => {
+  it('O7-1a: a reload with saved values (legacy preferCalibrated) starts uncalibrated; Confirm on the uncovered attach keeps the canvas-centre world point', async () => {
     window.localStorage.setItem(
       CALIBRATION_STORAGE_KEY,
       JSON.stringify({
@@ -424,11 +424,11 @@ describe('calibrated camera (P4, P8)', () => {
     start();
     await tick(0);
     await goLive();
-    // Fresh page with saved values: E11 camera, no calibrated claim.
-    expect(report()).toBe('verify-required');
+    // Page start: the E11 camera, no calibrated claim and no freeze.
+    expect(report()).toBe('uncalibrated');
     expect(fitView).toHaveBeenCalledTimes(1);
     expect(current().vp.camera.zoom).not.toBe(1.92);
-    expect(acks.at(-1)).toMatchObject({ calibration: 'verify-required' });
+    expect(acks.at(-1)).toMatchObject({ calibration: 'uncalibrated' });
     const world = centreWorld();
     const sent = acks.length;
     confirm();
@@ -546,28 +546,11 @@ describe('calibrated camera (P4, P8)', () => {
 });
 
 describe('review 01 F2 discriminating cases', () => {
-  const savedPreference = () => {
-    window.localStorage.setItem(
-      CALIBRATION_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        cssPxPerSquare: 96,
-        squareMm: 25.4,
-        preferCalibrated: true,
-        savedAt: 1,
-      })
-    );
-    resetCalibrationStores();
-    store = getCalibrationStore(CODE);
-  };
-
-  it('KEEP_CENTRE: Confirm after a pan keeps the panned canvas-centre world point', async () => {
-    savedPreference();
+  it('KEEP_CENTRE: uncalibrated → pan → Calibrate → Confirm keeps the panned canvas-centre world point', async () => {
     start();
     await tick(0);
     await goLive();
-    expect(report()).toBe('verify-required');
-    // A pan before freezing (fresh-page input is frozen only by the shell).
+    expect(report()).toBe('uncalibrated');
     current().vp.camera.pan(-233, 117);
     const world = centreWorld();
     expect(world.x).not.toBeCloseTo(1000, 3);

@@ -28,6 +28,8 @@ export const CALIBRATION_UNSUPPORTED_GRID =
   'Calibrated minis need a square grid on this scene — showing the uncalibrated view';
 export const CALIBRATION_UNSUPPORTED_RANGE =
   "This scene's grid scale is outside the supported range";
+export const CALIBRATION_RULER_FIRST =
+  'Hold a real ruler against the outlined square on this screen.';
 export const CALIBRATION_REPOSITION =
   'After Confirm the map may shift — reposition minis if needed.';
 export const CALIBRATION_STORAGE_BLOCKED =

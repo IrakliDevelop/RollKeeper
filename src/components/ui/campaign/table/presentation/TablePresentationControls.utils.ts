@@ -161,9 +161,13 @@ export function failureMessage(
  * (verified / unsupported). Verify-required is a workspace notice instead.
  */
 export function displayCalibrationLine(
-  status: DisplayStatusRead | null
+  status: DisplayStatusRead | null,
+  /** O7-A5: `verified` was reported earlier in this DM page session. */
+  verifiedSeen = false
 ): { text: string; tone: 'muted' } | null {
   if (!status || status === 'error') return null;
+  if (status.calibration === 'uncalibrated' && verifiedSeen)
+    return { text: 'Table reports uncalibrated view', tone: 'muted' };
   if (status.calibration === 'verified')
     return { text: 'Table reports scale verified', tone: 'muted' };
   if (status.calibration === 'unsupported')

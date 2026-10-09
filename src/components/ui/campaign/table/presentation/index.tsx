@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 
@@ -50,7 +50,16 @@ export function useTablePresentationPanel(
   useEffect(() => {
     if (committedCount > 0) refresh();
   }, [committedCount, refresh]);
-  return { presentation, display };
+  // O7-A5: whether the table reported `verified` during this page session.
+  const [verifiedSeen, setVerifiedSeen] = useState(false);
+  const reported =
+    display.status && display.status !== 'error'
+      ? display.status.calibration
+      : undefined;
+  useEffect(() => {
+    if (reported === 'verified') setVerifiedSeen(true);
+  }, [reported]);
+  return { presentation, display, verifiedSeen };
 }
 
 export type TablePresentationPanel = ReturnType<
@@ -99,7 +108,10 @@ export function TablePresentationView(
         labels,
       })
     : null;
-  const calibrationLine = displayCalibrationLine(display.status);
+  const calibrationLine = displayCalibrationLine(
+    display.status,
+    props.panel.verifiedSeen
+  );
   return (
     <section
       aria-label="Audience presentation"

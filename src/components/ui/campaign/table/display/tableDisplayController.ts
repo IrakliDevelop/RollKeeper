@@ -46,7 +46,7 @@ import {
 } from './calibration/geometry';
 import {
   deriveCalibrationReport,
-  preferCalibrated,
+  inCalibratedMode,
   type CalibrationPageState,
   type CalibrationReport,
   type CalibrationSession,
@@ -958,7 +958,7 @@ export class TableDisplayController {
 
   private wantsCalibrated(): boolean {
     const state = this.calibrationState();
-    return !!state && preferCalibrated(state) && !!state.session;
+    return !!state && inCalibratedMode(state) && !!state.session;
   }
 
   private readGrid(viewport: Viewport): GridInfo | null {
@@ -973,7 +973,7 @@ export class TableDisplayController {
   private liveGeometry(): SceneGeometry | null {
     const state = this.calibrationState();
     const attach = this.attach;
-    if (!state || !preferCalibrated(state)) return null;
+    if (!state || !inCalibratedMode(state)) return null;
     if (!attach?.viewport || !attach.cameraApplied) return null;
     const cssPxPerSquare =
       state.session?.cssPxPerSquare ??
@@ -1014,7 +1014,7 @@ export class TableDisplayController {
     const state = this.calibrationState();
     const attach = this.attach;
     if (state && attach?.viewport && attach.cameraApplied) {
-      if (!preferCalibrated(state)) this.leaveCalibrated(attach);
+      if (!inCalibratedMode(state)) this.leaveCalibrated(attach);
       else if (
         state.session &&
         attach.calibrated?.session !== state.session &&
@@ -1038,7 +1038,7 @@ export class TableDisplayController {
     const state = this.calibrationState();
     if (!state) return;
     const session = state.session;
-    if (session && preferCalibrated(state)) {
+    if (session && inCalibratedMode(state)) {
       const info = this.readGrid(attach.viewport);
       const applied = attach.calibrated;
       if (applied && applied.session === session) {
@@ -1076,7 +1076,7 @@ export class TableDisplayController {
     const viewport = attach.viewport;
     if (!calibration || !state || !viewport) return 'skipped';
     const session = state.session;
-    if (!session || !preferCalibrated(state)) return 'skipped';
+    if (!session || !inCalibratedMode(state)) return 'skipped';
     const geometry = sceneGeometry(
       this.readGrid(viewport),
       session.cssPxPerSquare
@@ -1128,7 +1128,7 @@ export class TableDisplayController {
         const applied = attach.calibrated;
         const state = this.calibrationState();
         if (!applied || this.attach !== attach || !state) return;
-        if (state.session !== applied.session || !preferCalibrated(state))
+        if (state.session !== applied.session || !inCalibratedMode(state))
           return;
         if (Math.abs(camera.zoom - applied.zoom) > ZOOM_TOLERANCE) {
           const size = viewport.getCanvasSize();

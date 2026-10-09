@@ -373,6 +373,18 @@ describe('ruler calibration panel (P3)', () => {
     expect(square.style.width).toBe('96px');
     expect(square.style.height).toBe('96px');
     expect(square.style.boxSizing).toBe('border-box');
+    // O7-A4: a fixed light/dark double ring inside the C box, no outline
+    // or outer shadow; the label sits outside the measured edges.
+    expect(square.style.borderStyle).toBe('solid');
+    expect(square.style.borderColor).toBe('rgb(0, 0, 0)');
+    expect(square.style.boxShadow).toMatch(/^inset /u);
+    expect(square.style.outline).toBe('');
+    expect(square.className).not.toMatch(/outline|shadow|ring/u);
+    const label = screen.getByText('Measure this square');
+    expect(square.contains(label)).toBe(false);
+    expect(panel.querySelector('p')?.textContent).toBe(
+      'Hold a real ruler against the outlined square on this screen.'
+    );
     expect(panel.textContent).toContain(
       'Hold a ruler against the square. Adjust until each side measures 25.4 mm on this screen, then Confirm.'
     );
@@ -408,9 +420,9 @@ describe('ruler calibration panel (P3)', () => {
     const saved = JSON.parse(
       window.localStorage.getItem(CALIBRATION_STORAGE_KEY)!
     );
+    // O7-1d: no preference is stored.
     expect(Object.keys(saved).sort()).toEqual([
       'cssPxPerSquare',
-      'preferCalibrated',
       'savedAt',
       'squareMm',
       'v',
@@ -445,7 +457,7 @@ describe('ruler calibration panel (P3)', () => {
 });
 
 describe('session-only verification (P1)', () => {
-  it('StrictMode remount keeps verified; a new page with saved values is verify-required and offers the prior value', async () => {
+  it('StrictMode remount keeps verified; a new page starts uncalibrated and Calibrate minis offers the saved value (O7-1)', async () => {
     await mount(true);
     await goLive();
     await calibrate();
@@ -455,23 +467,85 @@ describe('session-only verification (P1)', () => {
     await goLive();
     expect(state()).toBe('verified');
     cleanup();
-    // A reload: the module store is gone, the saved values remain.
+    // A reload: the module store is gone, the saved values remain but
+    // never auto-apply (O7-1a): uncalibrated, E11 camera, input free.
+    // Saved C differs from the default to prove the prefill.
+    const stored = JSON.parse(
+      window.localStorage.getItem(CALIBRATION_STORAGE_KEY)!
+    ) as Record<string, unknown>;
+    window.localStorage.setItem(
+      CALIBRATION_STORAGE_KEY,
+      JSON.stringify({ ...stored, cssPxPerSquare: 101, preferCalibrated: true })
+    );
     resetCalibrationStores();
     await mount();
     await goLive();
-    expect(state()).toBe('verify-required');
+    expect(state()).toBe('uncalibrated');
     expect(viewport().camera.zoom).not.toBe(96 / 50);
-    const status = screen.getByTestId('table-display-calibration');
-    expect(status.textContent).toContain('Scale needs verification');
-    fireEvent.click(screen.getByRole('button', { name: 'Verify scale' }));
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    expect(acks.at(-1)!).toMatchObject({ calibration: 'uncalibrated' });
+    const zoom = viewport().camera.zoom;
+    wheel();
+    expect(viewport().camera.zoom).not.toBe(zoom);
+    fireEvent.pointerMove(window);
+    fireEvent.click(screen.getByRole('button', { name: 'Calibrate minis' }));
     const panel = screen.getByRole('region', { name: 'Ruler calibration' });
     expect(panel.textContent).toMatch(
       /Saved ruler setting from .+ — confirm it with your ruler/u
     );
     expect(panel.textContent).not.toMatch(/this monitor|identif/iu);
-    expect(acks.at(-1)!).toMatchObject({
-      calibration: 'verify-required',
+    expect(screen.getByTestId('calibration-reference-square').style.width).toBe(
+      '101px'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
+    await flush();
+    expect(state()).toBe('verified');
+    expect(viewport().camera.zoom).toBe(101 / 50);
+  });
+
+  it('O7-A1: calibrated mode survives a freeze and a StrictMode remount (verify-required, input frozen)', async () => {
+    await mount(true);
+    await goLive();
+    await calibrate();
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
     });
+    expect(state()).toBe('verify-required');
+    cleanup();
+    await mount(true);
+    await goLive();
+    expect(state()).toBe('verify-required');
+    const before = camera();
+    wheel();
+    mouseDrag(40, 40);
+    expect(camera()).toEqual(before);
+  });
+
+  it('O7-A6: from uncalibrated the panel offers Cancel only; Cancel from verify-required returns to the frozen state', async () => {
+    await mount();
+    await goLive();
+    fireEvent.pointerMove(window);
+    fireEvent.click(screen.getByRole('button', { name: 'Calibrate minis' }));
+    expect(
+      screen.queryByRole('button', { name: 'Use uncalibrated view' })
+    ).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(state()).toBe('uncalibrated');
+    await calibrate();
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Verify scale' }));
+    expect(
+      screen.getByRole('button', { name: 'Use uncalibrated view' })
+    ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+    expect(state()).toBe('verify-required');
+    expect(
+      screen.getByTestId('table-display-calibration').textContent
+    ).toContain('Scale needs verification');
   });
 });
 
@@ -783,20 +857,17 @@ describe('unsupported geometry (P4, C7-2, C7-3)', () => {
     expect(acks.at(-1)!).toMatchObject({ calibration: 'unsupported' });
   });
 
-  it('no session on a hex scene: Verify scale and the unsupported message, frozen input, ACK verify-required', async () => {
-    window.localStorage.setItem(
-      CALIBRATION_STORAGE_KEY,
-      JSON.stringify({
-        v: 1,
-        cssPxPerSquare: 96,
-        squareMm: 25.4,
-        preferCalibrated: true,
-        savedAt: 1,
-      })
-    );
-    descriptor = sceneDescriptor('cave', 2);
+  it('C7-2 (O7-A3): session cleared while a hex scene is shown: Verify scale and the unsupported message, frozen input, ACK verify-required', async () => {
     await mount();
     await goLive();
+    await calibrate();
+    await show(sceneDescriptor('cave', 3));
+    await goLive();
+    expect(state()).toBe('unsupported');
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
     expect(state()).toBe('verify-required');
     const status = screen.getByTestId('table-display-calibration');
     expect(status.textContent).toContain(
@@ -879,20 +950,11 @@ describe('testability and resource discipline (P12)', () => {
     vi.useRealTimers();
     trackTimers();
     try {
-      window.localStorage.setItem(
-        CALIBRATION_STORAGE_KEY,
-        JSON.stringify({
-          v: 1,
-          cssPxPerSquare: 96,
-          squareMm: 25.4,
-          preferCalibrated: true,
-          savedAt: 1,
-        })
-      );
       render(<TableDisplayShell code={CODE} deps={deps} />);
       await flush();
+      fireEvent.pointerMove(window);
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Verify scale' })
+        await screen.findByRole('button', { name: 'Calibrate minis' })
       );
       fireEvent.click(screen.getByRole('button', { name: 'Confirm' }));
       await flush();

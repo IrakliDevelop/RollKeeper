@@ -48,15 +48,22 @@ describe('saved values (P2)', () => {
       v: 1,
       cssPxPerSquare: 96,
       squareMm: 25.4,
-      preferCalibrated: true,
       savedAt: 1_700_000_000_000,
     };
     expect(parseCalibrationSettings(valid)).toEqual({
       cssPxPerSquare: 96,
       squareMm: 25.4,
-      preferCalibrated: true,
       savedAt: 1_700_000_000_000,
     });
+    // O7-1d: a legacy `preferCalibrated` is tolerated and ignored.
+    for (const legacy of [true, false, 'yes'])
+      expect(
+        parseCalibrationSettings({ ...valid, preferCalibrated: legacy })
+      ).toEqual({
+        cssPxPerSquare: 96,
+        squareMm: 25.4,
+        savedAt: 1_700_000_000_000,
+      });
     for (const broken of [
       { ...valid, v: 2 },
       { ...valid, cssPxPerSquare: 7.9 },
@@ -65,7 +72,7 @@ describe('saved values (P2)', () => {
       { ...valid, cssPxPerSquare: '96' },
       { ...valid, squareMm: 4.9 },
       { ...valid, squareMm: 100.1 },
-      { ...valid, preferCalibrated: 'yes' },
+      { ...valid, extra: 1 },
       { ...valid, savedAt: Number.POSITIVE_INFINITY },
       null,
       [],
@@ -81,7 +88,6 @@ describe('saved values (P2)', () => {
       saveCalibrationSettings({
         cssPxPerSquare: 97.5,
         squareMm: 25.4,
-        preferCalibrated: true,
         savedAt: 5,
       })
     ).toBe(true);
@@ -92,7 +98,6 @@ describe('saved values (P2)', () => {
       v: 1,
       cssPxPerSquare: 97.5,
       squareMm: 25.4,
-      preferCalibrated: true,
       savedAt: 5,
     });
     expect(Object.keys(window.localStorage)).toEqual([CALIBRATION_STORAGE_KEY]);
@@ -115,7 +120,6 @@ describe('saved values (P2)', () => {
       saveCalibrationSettings({
         cssPxPerSquare: 96,
         squareMm: 25.4,
-        preferCalibrated: true,
         savedAt: 1,
       })
     ).toBe(false);
@@ -156,17 +160,18 @@ describe('session verification flag (P1, R3-1)', () => {
     expect(deriveCalibrationReport(store.getState(), HEX)).toBe(
       'verify-required'
     );
+    const saved = window.localStorage.getItem(CALIBRATION_STORAGE_KEY);
     store.useUncalibrated();
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe(
       'uncalibrated'
     );
-    expect(store.getState().settings).toMatchObject({
-      cssPxPerSquare: 96,
-      preferCalibrated: false,
-    });
+    // O7-A1: leaving calibrated mode writes nothing; the saved C remains.
+    expect(window.localStorage.getItem(CALIBRATION_STORAGE_KEY)).toBe(saved);
+    expect(store.getState().settings).toMatchObject({ cssPxPerSquare: 96 });
+    expect(store.getState().calibratedMode).toBe(false);
   });
 
-  it('a fresh page with saved values is verify-required, never verified, and offers the prior C', () => {
+  it('O7-1a: a fresh page with saved values (even legacy preferCalibrated) starts uncalibrated and offers the prior C', () => {
     window.localStorage.setItem(
       CALIBRATION_STORAGE_KEY,
       JSON.stringify({
@@ -179,10 +184,35 @@ describe('session verification flag (P1, R3-1)', () => {
     );
     const store = getCalibrationStore('CAMP1');
     expect(store.getState().session).toBeNull();
+    expect(store.getState().calibratedMode).toBe(false);
     expect(store.getState().settings?.cssPxPerSquare).toBe(101.25);
+    expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe(
+      'uncalibrated'
+    );
+  });
+
+  it('O7-A1: calibrated mode is page-lifetime: invalidation keeps it (verify-required), a new page resets it', () => {
+    const store = getCalibrationStore('CAMP1');
+    store.confirm({
+      cssPxPerSquare: 96,
+      squareMm: 25.4,
+      environment: ENV,
+      now: 1,
+    });
+    expect(store.getState().calibratedMode).toBe(true);
+    store.invalidate();
+    expect(store.getState().calibratedMode).toBe(true);
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe(
       'verify-required'
     );
+    expect(getCalibrationStore('CAMP1').getState().calibratedMode).toBe(true);
+    expect(
+      JSON.parse(window.localStorage.getItem(CALIBRATION_STORAGE_KEY)!)
+    ).not.toHaveProperty('preferCalibrated');
+    resetCalibrationStores();
+    expect(
+      deriveCalibrationReport(getCalibrationStore('CAMP1').getState(), SQUARE)
+    ).toBe('uncalibrated');
   });
 
   it('survives controller/shell recreation (same page) but not a new page', () => {
@@ -200,7 +230,7 @@ describe('session verification flag (P1, R3-1)', () => {
     const fresh = getCalibrationStore('CAMP1');
     expect(fresh.getState().session).toBeNull();
     expect(deriveCalibrationReport(fresh.getState(), SQUARE)).toBe(
-      'verify-required'
+      'uncalibrated'
     );
   });
 

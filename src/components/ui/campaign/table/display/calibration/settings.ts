@@ -1,8 +1,10 @@
 /**
- * PR07 P2: saved ruler values. Display-local, non-secret numbers only: C
- * (CSS px per square), the square size in mm and the calibrated-mode
- * preference. U is never stored (it is read live from the scene grid), and
- * nothing here identifies a monitor, a capability or a campaign secret.
+ * PR07 P2 / O7-1d: saved ruler values. Display-local, non-secret numbers
+ * only: C (CSS px per square) and the square size in mm. They are offered
+ * only when the DM chooses Calibrate minis and never auto-apply. U is never
+ * stored (it is read live from the scene grid), and nothing here identifies
+ * a monitor, a capability or a campaign secret. A legacy `preferCalibrated`
+ * key (pre-O7 shape of this unreleased key) is tolerated and ignored.
  */
 
 export const CALIBRATION_STORAGE_KEY = 'rollkeeper:table-calibration:v1';
@@ -15,10 +17,12 @@ export const SQUARE_MM_RANGE = { min: 5, max: 100 } as const;
 export interface CalibrationSettings {
   cssPxPerSquare: number;
   squareMm: number;
-  preferCalibrated: boolean;
-  /** Epoch ms of the last Confirm/preference change (display wording only). */
+  /** Epoch ms of the last Confirm (display wording only). */
   savedAt: number;
 }
+
+const KEYS = new Set(['v', 'cssPxPerSquare', 'squareMm', 'savedAt']);
+const LEGACY_KEYS = new Set(['preferCalibrated']);
 
 const inRange = (value: unknown, range: { min: number; max: number }) =>
   typeof value === 'number' &&
@@ -37,10 +41,10 @@ export function parseCalibrationSettings(
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   if (
+    Object.keys(record).some(key => !KEYS.has(key) && !LEGACY_KEYS.has(key)) ||
     record.v !== 1 ||
     !isValidCssPxPerSquare(record.cssPxPerSquare) ||
     !isValidSquareMm(record.squareMm) ||
-    typeof record.preferCalibrated !== 'boolean' ||
     typeof record.savedAt !== 'number' ||
     !Number.isFinite(record.savedAt)
   )
@@ -48,7 +52,6 @@ export function parseCalibrationSettings(
   return {
     cssPxPerSquare: record.cssPxPerSquare,
     squareMm: record.squareMm,
-    preferCalibrated: record.preferCalibrated,
     savedAt: record.savedAt,
   };
 }

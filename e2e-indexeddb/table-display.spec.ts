@@ -451,7 +451,7 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
  * storage audit, a stable-origin window resize, a real fullscreen change
  * and the ACK self-report; the DM side shows the scale reports.
  */
-test('PR07 calibration: ruler square size, session-only verification, signals, storage audit and DM scale reports', async ({
+test('PR07 calibration: ruler square size, uncalibrated page start, signals, storage audit and DM scale reports', async ({
   browser,
 }) => {
   test.setTimeout(150_000);
@@ -494,8 +494,12 @@ test('PR07 calibration: ruler square size, session-only verification, signals, s
   await tab.keyboard.press('Shift+ArrowDown');
   expect(await size()).toEqual([96, 96]);
   await expect(panel).toContainText(
+    'Hold a real ruler against the outlined square on this screen.'
+  );
+  await expect(panel).toContainText(
     'Hold a ruler against the square. Adjust until each side measures 25.4 mm on this screen, then Confirm.'
   );
+  await expect(tab.getByText('Measure this square')).toBeVisible();
   await tab.getByRole('button', { name: 'Confirm' }).click();
   await expect(root).toHaveAttribute('data-calibration-state', 'verified');
   await expect
@@ -515,17 +519,11 @@ test('PR07 calibration: ruler square size, session-only verification, signals, s
   >;
   expect(Object.keys(saved).sort()).toEqual([
     'cssPxPerSquare',
-    'preferCalibrated',
     'savedAt',
     'squareMm',
     'v',
   ]);
-  expect(saved).toMatchObject({
-    v: 1,
-    cssPxPerSquare: 96,
-    squareMm: 25.4,
-    preferCalibrated: true,
-  });
+  expect(saved).toMatchObject({ v: 1, cssPxPerSquare: 96, squareMm: 25.4 });
   expect(
     await tab.evaluate(
       code => sessionStorage.getItem(`rollkeeper:table-display:${code}`),
@@ -552,11 +550,13 @@ test('PR07 calibration: ruler square size, session-only verification, signals, s
   );
   const tv = host.frameLocator('#tv');
   const tvRoot = tv.getByTestId('table-display');
+  // O7-1a: a new page starts uncalibrated; calibration is explicit.
   await expect(tvRoot).toHaveAttribute(
     'data-calibration-state',
-    'verify-required'
+    'uncalibrated'
   );
-  await tv.getByRole('button', { name: 'Verify scale' }).click();
+  await host.mouse.move(400, 300);
+  await tv.getByRole('button', { name: 'Calibrate minis' }).click();
   await tv.getByRole('button', { name: 'Confirm' }).click();
   await expect(tvRoot).toHaveAttribute('data-calibration-state', 'verified');
   for (const [width, height] of [
@@ -595,13 +595,16 @@ test('PR07 calibration: ruler square size, session-only verification, signals, s
     .toMatchObject({ calibration: 'verify-required' });
   await tab.evaluate(() => document.exitFullscreen?.().catch(() => {}));
 
-  // A reload never restores verification; the saved value is offered.
+  // O7-1a: a reload starts uncalibrated (no freeze, ACK uncalibrated);
+  // Calibrate minis offers the saved value.
   await tab.reload();
-  await expect(root).toHaveAttribute(
-    'data-calibration-state',
-    'verify-required'
-  );
-  await tab.getByRole('button', { name: 'Verify scale' }).click();
+  await expect(root).toHaveAttribute('data-calibration-state', 'uncalibrated');
+  await expect
+    .poll(() => display.acks.at(-1)?.ack)
+    .toMatchObject({ calibration: 'uncalibrated' });
+  await expect(tab.getByTestId('table-display-calibration')).toHaveCount(0);
+  await tab.mouse.move(320, 320);
+  await tab.getByRole('button', { name: 'Calibrate minis' }).click();
   await expect(panel).toContainText(
     /Saved ruler setting from .+ — confirm it with your ruler/u
   );
@@ -670,6 +673,17 @@ test('PR07 calibration: ruler square size, session-only verification, signals, s
   const box = (await notice.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(0);
   expect(box.x + box.width).toBeLessThanOrEqual(390);
+  // O7-A5: back to uncalibrated after verified was seen on this DM page.
+  display.setStatus({
+    state: 'blank',
+    sceneId: null,
+    ageMs: 900,
+    calibration: 'uncalibrated',
+  });
+  await expect(status).toContainText('Table reports uncalibrated view', {
+    timeout: 10_000,
+  });
+  await expect(notice).toHaveCount(0);
   expect(contextErrors).toEqual([]);
   await context.close();
 });

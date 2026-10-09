@@ -435,3 +435,29 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
     expect(screen.queryByText(/Table reports scale/u)).toBeNull();
   });
 });
+
+describe('O7-A5 uncalibrated after verified', () => {
+  it('shows "Table reports uncalibrated view" only after verified was seen in this DM page session', async () => {
+    const report = (calibration: string) => () =>
+      Response.json({
+        state: 'loaded',
+        sceneId: 'scene-tavern',
+        ageMs: 1_000,
+        calibration,
+      });
+    displayReply = report('uncalibrated');
+    render(controls({}).element);
+    await settle();
+    expect(screen.queryByText('Table reports uncalibrated view')).toBeNull();
+    displayReply = report('verified');
+    await settle(5_000);
+    expect(audienceStatus()).toHaveTextContent('Table reports scale verified');
+    displayReply = report('uncalibrated');
+    await settle(5_000);
+    const line = screen.getByText('Table reports uncalibrated view');
+    expect(line.className).toContain('text-muted');
+    expect(
+      screen.queryByText(/Table reports scale needs verification/u)
+    ).toBeNull();
+  });
+});
