@@ -31,3 +31,10 @@ export function saveMessageTone(
   if (FAILURE.some(pattern => pattern.test(message))) return 'failure';
   return message.endsWith('…') ? 'progress' : 'success';
 }
+
+/** Export errors carry arbitrary text: report them tagged as failures. */
+export function exportFailureReporter(
+  notify: (message: string, tone?: SaveMessageTone) => void
+): (message: string) => void {
+  return message => notify(message, 'failure');
+}

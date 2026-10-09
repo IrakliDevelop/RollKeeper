@@ -93,13 +93,30 @@ export interface DmVttToolbarProps {
   /** PR06 W10: the Table "Edit map" tool group (absent on legacy maps). */
   editMapControl?: ReactNode;
   /**
-   * PR06 acceptance A2: keep session controls and canvas tools on separate
-   * full-width rows at every width (the Table workspace header is wide).
+   * When session controls and canvas tools share one row (otherwise they
+   * stack as full-width rows): `2xl` (default, legacy VTT screen) or `wide`
+   * (Table workspace, review 03 F1: only at ≥1920 px, never while header
+   * banners are shown, and with the header column capped so the tool strip
+   * scrolls no further than its trailing item).
    */
-  stackRows?: boolean;
+  sideBySide?: '2xl' | 'wide';
   fogControls?: DmFogControls;
   fogPresetControls?: FogPresetControls;
 }
+
+// Literal class strings (Tailwind scans source text).
+const SIDE_BY_SIDE = {
+  '2xl': {
+    dock: '2xl:flex-row 2xl:flex-wrap',
+    session: '2xl:border-r 2xl:border-b-0',
+  },
+  // Stacks while the header shows banner rows (`data-header-banners`).
+  wide: {
+    dock: 'min-[1920px]:[&:not(:has([data-header-banners=shown]))]:flex-row min-[1920px]:[&:not(:has([data-header-banners=shown]))]:flex-wrap',
+    session:
+      'min-[1920px]:[&:not(:has([data-header-banners=shown]))]:border-r min-[1920px]:[&:not(:has([data-header-banners=shown]))]:border-b-0 min-[1920px]:[&:not(:has([data-header-banners=shown]))]:max-w-[44rem]',
+  },
+} as const;
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
   full: Eye,
@@ -142,7 +159,7 @@ export function DmVttToolbar({
   viewsControl,
   presenceControl,
   editMapControl,
-  stackRows,
+  sideBySide = '2xl',
   fogControls,
   fogPresetControls,
 }: DmVttToolbarProps) {
@@ -179,14 +196,14 @@ export function DmVttToolbar({
     <div
       ref={dockRef}
       className={`bg-surface-raised border-divider pointer-events-auto fixed inset-x-0 top-0 z-20 flex w-full flex-col overflow-hidden border-b shadow-xl ${
-        stackRows ? '' : '2xl:flex-row 2xl:flex-wrap'
+        SIDE_BY_SIDE[sideBySide].dock
       }`}
       data-testid="dm-vtt-command-dock"
     >
       {sessionControls && (
         <div
           className={`border-divider min-w-0 shrink-0 border-b ${
-            stackRows ? '' : '2xl:border-r 2xl:border-b-0'
+            SIDE_BY_SIDE[sideBySide].session
           }`}
         >
           {sessionControls}

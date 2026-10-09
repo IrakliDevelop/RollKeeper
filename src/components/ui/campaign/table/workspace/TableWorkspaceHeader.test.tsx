@@ -244,6 +244,11 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
       'polite'
     );
     expect(details()).toHaveAccessibleName('Details');
+    // HR-1: never inside Details.
+    const content = open();
+    expect(
+      within(content).queryByText('Local draft restored to live authority.')
+    ).toBeNull();
   });
 
   it.each<[string, TableAuthorityState, RegExp]>([
@@ -457,7 +462,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     expect(document.activeElement).toBe(details());
   });
 
-  it('Tab from the last control closes Details and focuses the next control after the trigger', () => {
+  it('Tab from the last control closes Details and focuses the next control after the trigger', async () => {
     renderHeader();
     const after = document.createElement('button');
     after.textContent = 'After header';
@@ -470,11 +475,12 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     act(() => {
       fireEvent.keyDown(last, { key: 'Tab' });
     });
+    // Radix returns focus on close in a deferred step: flush it first.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
     expect(popover()).toBeNull();
-    expect(document.activeElement).not.toBe(details());
-    expect(
-      document.activeElement?.closest('[data-testid="table-header-details"]')
-    ).toBeNull();
+    expect(document.activeElement).toBe(after);
     after.remove();
   });
 

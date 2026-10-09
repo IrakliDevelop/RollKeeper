@@ -770,3 +770,85 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   expect(contextErrors).toEqual([]);
   await context.close();
 });
+
+test('review 03 F1: header and tool strip stack below 1920 px (no tool scrolling) and sit side by side from 1920 px', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.setViewportSize({ width: 1536, height: 864 });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  await page.getByRole('button', { name: 'Close scenes' }).click();
+  const dock = page.getByTestId('dm-vtt-command-dock');
+  const header = page.getByTestId('table-workspace-header');
+  const strip = dock.locator('.overflow-x-auto').first();
+  const overflow = async (target: typeof strip) =>
+    target.evaluate(element => element.scrollWidth - element.clientWidth);
+  let normal2048 = 0;
+  for (const [width, height, sideBySide] of [
+    [1536, 864, false],
+    [1600, 900, false],
+    [1800, 1000, false],
+    [1920, 1080, true],
+    [2048, 1103, true],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(300);
+    const headerBox = (await header.boundingBox())!;
+    const stripBox = (await strip.boundingBox())!;
+    const { scrollWidth, clientWidth } = await strip.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    const dockHeight = Math.round((await dock.boundingBox())!.height);
+    console.log(
+      `F1 ${width}: dock ${dockHeight}px, strip ${clientWidth}/${scrollWidth}px, header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
+    );
+    if (width === 2048) normal2048 = scrollWidth - clientWidth;
+    if (sideBySide) {
+      // Header beside the tools: same row, header to the left.
+      expect(headerBox.x + headerBox.width).toBeLessThanOrEqual(stripBox.x + 1);
+      expect(Math.abs(headerBox.y - stripBox.y)).toBeLessThan(headerBox.height);
+    } else {
+      // Stacked: the tool row sits below the header and never scrolls.
+      expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(
+        stripBox.y + 1
+      );
+      expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+    }
+  }
+
+  // A banner row (another session holds live control) at 2048: the header
+  // stacks above the tools, so the strip scrolls no more than normal.
+  const foreign = await context.newPage();
+  await seed(foreign, controlServer({ foreignHolder: true }));
+  await foreign.setViewportSize({ width: 2048, height: 1103 });
+  await foreign.goto(
+    `/dm/campaign/${CAMPAIGN.code}/table?scene=${sceneParam(page)!}`
+  );
+  await expect(
+    foreign.getByText(/Another session holds live control/u)
+  ).toBeVisible();
+  await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
+  const foreignDock = foreign.getByTestId('dm-vtt-command-dock');
+  const foreignHeader = foreign.getByTestId('table-workspace-header');
+  const foreignStrip = foreignDock.locator('.overflow-x-auto').first();
+  await expect(foreignStrip).toBeVisible();
+  const bannerOverflow = await overflow(foreignStrip);
+  const headerBox = (await foreignHeader.boundingBox())!;
+  const stripBox = (await foreignStrip.boundingBox())!;
+  console.log(
+    `F1 2048 with banner: strip overflow ${bannerOverflow}px (normal ${normal2048}px), header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
+  );
+  expect(bannerOverflow).toBeLessThanOrEqual(normal2048);
+  expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(stripBox.y + 1);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});

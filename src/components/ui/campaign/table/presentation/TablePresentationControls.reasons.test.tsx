@@ -81,6 +81,16 @@ describe('visible disabled reasons (HR-7)', () => {
     ).toBeNull();
   });
 
+  it('a non-holder never sees the show-blocked reason; Show points at the live-control reason', () => {
+    view({ holder: false, canShow: false });
+    expect(
+      screen.queryByText('This scene is not registered for live play yet')
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Show this scene' })
+    ).toHaveAccessibleDescription(LIVE_CONTROL_REQUIRED);
+  });
+
   it('a holder sees why Show is blocked, outside the polite status region', () => {
     view({ holder: true, canShow: false });
     const reason = screen.getByText(

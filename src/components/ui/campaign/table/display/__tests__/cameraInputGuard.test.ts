@@ -116,4 +116,11 @@ describe('pan-only allows only primary-button HandTool pans (review 02 N1)', () 
     pointer('pointerdown', 7);
     expect(reached).toEqual(['pointerdown:7']);
   });
+
+  it('a window blur forgets a held Space (the keyup is lost)', () => {
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+    window.dispatchEvent(new Event('blur'));
+    pointer('pointerdown', 8);
+    expect(reached).toEqual(['pointerdown:8']);
+  });
 });

@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { saveMessageTone, type SaveMessageTone } from './saveMessageTone';
+import { vi } from 'vitest';
+
+import {
+  exportFailureReporter,
+  saveMessageTone,
+  type SaveMessageTone,
+} from './saveMessageTone';
 
 /**
  * O7-2 HN-1 / HR-1: every save/scene message string the Table page emits,
@@ -72,6 +78,13 @@ const MESSAGES: Array<[string, SaveMessageTone]> = [
 describe('save message tone (HN-1)', () => {
   it.each(MESSAGES)('%s → %s', (message, tone) => {
     expect(saveMessageTone(message)).toBe(tone);
+  });
+
+  it('export errors are reported tagged as failures (HN-1 source tag)', () => {
+    const notify = vi.fn();
+    exportFailureReporter(notify)('Map is still loading');
+    expect(notify).toHaveBeenCalledWith('Map is still loading', 'failure');
+    expect(saveMessageTone('Map is still loading')).toBe('success');
   });
 
   it('an explicit source tag wins (export errors carry arbitrary text)', () => {

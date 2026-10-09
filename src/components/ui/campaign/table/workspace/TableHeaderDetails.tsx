@@ -84,8 +84,11 @@ export function TableHeaderDetails(props: {
       // FC-4 pattern: leaving forward closes and continues after the trigger.
       event.preventDefault();
       const content = contentRef.current;
+      // N3: skip controls that are not rendered (display:none ancestors).
       const order = focusables(document.body).filter(
-        item => !content?.contains(item)
+        item =>
+          !content?.contains(item) &&
+          (typeof item.checkVisibility !== 'function' || item.checkVisibility())
       );
       const trigger = triggerRef.current;
       const next = trigger ? order[order.indexOf(trigger) + 1] : undefined;

@@ -26,7 +26,7 @@ import { runSceneCommand } from '@/lib/table/sceneCommands';
 import { TableArrivalMarker, TableArrivalPicker } from '../TablePartyArrival';
 import { createTableRosterCanvas } from '../tableRosterCanvas';
 import { TableRosterPanel } from '../TableRosterPanel';
-import type { SaveMessageTone } from './saveMessageTone';
+import { exportFailureReporter, type SaveMessageTone } from './saveMessageTone';
 import { useEnsureSceneMapImage } from './sceneMapImage';
 import { TableEditMapControl } from './TableEditMapControl';
 
@@ -161,7 +161,7 @@ export function TableSceneStage(props: {
       tokenConfigRef={tokenConfigRef}
       onViewportReady={handleViewportReady}
       tokenInfoToggle={TOKEN_INFO}
-      onExportError={message => onMessage(message, 'failure')}
+      onExportError={exportFailureReporter(onMessage)}
       sessionControls={props.header}
       editMapControl={
         <TableEditMapControl
