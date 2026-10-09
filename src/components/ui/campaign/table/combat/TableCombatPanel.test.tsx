@@ -539,9 +539,8 @@ describe('Table combat panel (D10)', () => {
     await setInitiative('Goblin', '12');
     await setInitiative('Aria', '15');
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(
-      await screen.findByText(/^Waiting for player data · Bridge ambush$/)
-    ).toBeVisible();
+    // O7-2 HR-2: the selected run is the active one, so no run suffix.
+    expect(await screen.findByText(/^Waiting for player data$/)).toBeVisible();
     expect(session.publishInitiative).not.toHaveBeenCalled();
     expect(screen.getAllByText(/HP —/).length).toBeGreaterThan(0);
     expect(screen.queryByText('0/0')).toBeNull();
@@ -883,5 +882,40 @@ describe('physical representation badge (PR07 P9)', () => {
     const knight = rows.find(row => row.textContent?.includes('Knight'))!;
     expect(within(goblin).getByText('Physical')).toBeVisible();
     expect(within(knight).queryByText('Physical')).toBeNull();
+  });
+});
+
+describe('publication status run suffix (O7-2 HR-2)', () => {
+  it('keeps "· <label>" when the active run is not the selected one (same scene)', async () => {
+    const repository = await openFixture();
+    const commands = [
+      {
+        type: 'combat.createRun',
+        sceneId: 'scene-1',
+        runId: 'alpha',
+        label: 'Alpha fight',
+      },
+      { type: 'combat.setParticipants', runId: 'alpha', actorIds: ['goblin'] },
+      {
+        type: 'combat.setInitiative',
+        runId: 'alpha',
+        actorId: 'goblin',
+        value: 4,
+      },
+      { type: 'combat.start', runId: 'alpha' },
+    ];
+    for (const [index, command] of commands.entries()) {
+      const result = await runCombatCommand(repository, {
+        expectedRevision: revisionOf(repository),
+        operationId: `alpha-${index}`,
+        command: { ...command, at: AT } as never,
+      });
+      expect(result.status).toBe('committed');
+    }
+    renderPanel(repository);
+    await createRun('Beta fight');
+    const status = await screen.findByTestId('table-publication-status');
+    await waitFor(() => expect(status).toHaveTextContent(/· Alpha fight$/u));
+    expect(status).not.toHaveTextContent(/\(scene /u);
   });
 });

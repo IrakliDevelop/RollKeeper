@@ -26,6 +26,7 @@ import { runSceneCommand } from '@/lib/table/sceneCommands';
 import { TableArrivalMarker, TableArrivalPicker } from '../TablePartyArrival';
 import { createTableRosterCanvas } from '../tableRosterCanvas';
 import { TableRosterPanel } from '../TableRosterPanel';
+import type { SaveMessageTone } from './saveMessageTone';
 import { useEnsureSceneMapImage } from './sceneMapImage';
 import { TableEditMapControl } from './TableEditMapControl';
 
@@ -54,7 +55,7 @@ export function TableSceneStage(props: {
   onViewportReady: (sceneId: string, viewport: Viewport) => void;
   onConnectionReady: (connection: BattleMapConnection | null) => void;
   onStatus: (sceneId: string, status: string) => void;
-  onMessage: (message: string) => void;
+  onMessage: (message: string, tone?: SaveMessageTone) => void;
   /** Review F9: Edit-map image work in flight. */
   onEditBusy?: (busy: boolean) => void;
   /** PR07 P10: this tab holds live control (token representation sync). */
@@ -160,7 +161,7 @@ export function TableSceneStage(props: {
       tokenConfigRef={tokenConfigRef}
       onViewportReady={handleViewportReady}
       tokenInfoToggle={TOKEN_INFO}
-      onExportError={onMessage}
+      onExportError={message => onMessage(message, 'failure')}
       sessionControls={props.header}
       editMapControl={
         <TableEditMapControl

@@ -40,7 +40,7 @@ const PNG = Buffer.from(
 
 type Command = Record<string, unknown> & { type: string };
 
-function controlServer() {
+function controlServer(options: { foreignHolder?: boolean } = {}) {
   const state = {
     revision: 0,
     writerFence: 0,
@@ -78,6 +78,17 @@ function controlServer() {
     }
     const command = (request.postDataJSON() as { command: Command }).command;
     commands.push(command);
+    // O7-2 HR-4: another session holds live control (banner state).
+    if (options.foreignHolder && command.type === 'acquire')
+      return json(route, 409, {
+        status: 'conflict',
+        reason: 'controller-active',
+        current: {
+          ...descriptor(),
+          holderSessionId: 'foreign-session',
+          leaseUntil: Date.now() + 30_000,
+        },
+      });
     switch (command.type) {
       case 'initialize':
         state.initialized = true;
@@ -669,7 +680,7 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
       );
     // Every visible header control (the toolbar strip below scrolls by
     // design and is covered by the Edit map reachability test).
-    const header = dock.locator(':scope > div').first();
+    const header = page.getByTestId('table-workspace-header');
     for (const control of await header.locator('button, a[href], select').all())
       if (await control.isVisible()) await expectUnclipped(control);
     const details = page.getByRole('button', { name: /^Details/u });
@@ -687,6 +698,75 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
         document.documentElement.clientWidth
     )
   ).toBe(true);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});
+
+test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds at most 40 px (light and dark)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(page.getByText('Live control held.')).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  const tavernId = sceneParam(page)!;
+  const header = page.getByTestId('table-workspace-header');
+  const measure = async (width: number, height: number) => {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(300);
+    return Math.round((await header.boundingBox())!.height);
+  };
+  const normal: Record<string, number> = {};
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate(value => {
+      localStorage.setItem('rollkeeper-theme', value);
+    }, theme);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
+    // HR-4 measured state: live control held, scene selected, no notices,
+    // panels closed.
+    await expect(page.getByTestId('dm-vtt-command-dock')).toBeVisible();
+    await expect(page.getByText('Switching scene…')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
+    await expect(page.getByText('Live control held.')).toBeVisible();
+    await expect(header.locator('[role="alert"]')).toHaveCount(0);
+    const at1280 = await measure(1280, 800);
+    const at2048 = await measure(2048, 1103);
+    const dock2048 = Math.round(
+      (await page.getByTestId('dm-vtt-command-dock').boundingBox())!.height
+    );
+    console.log(`O7-2 ${theme}: dock 2048=${dock2048}px`);
+    const at390 = await measure(390, 844);
+    console.log(
+      `O7-2 ${theme}: header 1280=${at1280}px 2048=${at2048}px 390=${at390}px`
+    );
+    expect(at1280).toBeLessThanOrEqual(100);
+    expect(at2048).toBeLessThanOrEqual(at1280);
+    normal[theme] = at1280;
+  }
+
+  // One banner row: another session holds live control (Acquire + Work
+  // offline inline with the text).
+  const foreign = await context.newPage();
+  await seed(foreign, controlServer({ foreignHolder: true }));
+  await foreign.setViewportSize({ width: 1280, height: 800 });
+  await foreign.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
+  await expect(
+    foreign.getByText(/Another session holds live control/u)
+  ).toBeVisible();
+  await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
+  const foreignHeader = foreign.getByTestId('table-workspace-header');
+  await expect(foreignHeader).toBeVisible();
+  const withBanner = Math.round((await foreignHeader.boundingBox())!.height);
+  console.log(`O7-2 banner: header 1280=${withBanner}px`);
+  expect(withBanner - normal.dark!).toBeLessThanOrEqual(40);
   expect(contextErrors).toEqual([]);
   await context.close();
 });

@@ -165,7 +165,13 @@ export function TableCombatPanel(props: {
               publication.status,
               props.liveUnavailable
             )}
-            publishedRun={panel.activeSummary}
+            // O7-2 HR-2: the run selector already names the selected run.
+            publishedRun={
+              panel.activeSummary &&
+              panel.activeSummary.runId !== selectedRun?.runId
+                ? panel.activeSummary
+                : null
+            }
             playersStale={
               combat.players.snapshot.status === 'ready' &&
               combat.players.snapshot.stale

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 import {
@@ -10,6 +10,8 @@ import {
 import type { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 import type { TableCanvasCheckpointV1 } from '@/lib/table/schema';
+
+import { saveMessageTone, type SaveMessageTone } from './saveMessageTone';
 
 /**
  * Checkpoint, restore and pending-conflict actions of the selected scene
@@ -26,8 +28,18 @@ export function useSceneCheckpointActions(options: {
 }) {
   const { repository, adapter, connection, campaignCode, dmId, sceneId } =
     options;
-  const [saveMessage, setSaveMessage] = useState('Local scene loading…');
+  const [save, setSave] = useState<{
+    message: string;
+    tone: SaveMessageTone;
+  }>({ message: 'Local scene loading…', tone: 'routine' });
+  /** O7-2 HN-1: the tone is fixed where the message is produced. */
+  const setSaveMessage = useCallback(
+    (message: string, tone?: SaveMessageTone) =>
+      setSave({ message, tone: saveMessageTone(message, tone) }),
+    []
+  );
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
     if (!adapter) return;
@@ -36,9 +48,18 @@ export function useSceneCheckpointActions(options: {
         ? 'Local scene ready'
         : 'Scene not found in this local workspace'
     );
-  }, [adapter]);
+  }, [adapter, setSaveMessage]);
 
   async function saveCheckpoint() {
+    setSaveBusy(true);
+    try {
+      await runSaveCheckpoint();
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function runSaveCheckpoint() {
     if (!repository || !adapter || !connection || !sceneId) {
       setSaveMessage(
         'Relay is not ready. The local draft remains saved on this device.'
@@ -127,9 +148,11 @@ export function useSceneCheckpointActions(options: {
   }
 
   return {
-    saveMessage,
+    saveMessage: save.message,
+    saveTone: save.tone,
     setSaveMessage,
     recoveryBusy,
+    saveBusy,
     saveCheckpoint,
     restore,
     reconcilePendingEdit,

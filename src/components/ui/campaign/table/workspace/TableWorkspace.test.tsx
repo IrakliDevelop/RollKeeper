@@ -424,6 +424,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Radix Popover measures with ResizeObserver/DOMRect (FC-4 precedent). */
+function stubPopoverLayout() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+}
+
 describe('W1 canonical selection', () => {
   it('opens ?scene= privately: one canvas, the scene registered, nothing presented', async () => {
     nav.reset('scene=scene-tavern');
@@ -434,8 +446,16 @@ describe('W1 canonical selection', () => {
         server.commands.filter(command => command.type === 'registerScene')
       ).toHaveLength(1)
     );
+    // O7-2 HR-6: the compact S1 label is always visible; the full sentence
+    // is in Details.
+    expect(screen.getByText('Local scene runs')).toBeVisible();
     expect(
-      screen.getByText('Saved on this device — scene runs are local')
+      screen.queryByText('Saved on this device — scene runs are local')
+    ).toBeNull();
+    stubPopoverLayout();
+    fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
+    expect(
+      await screen.findByText('Saved on this device — scene runs are local')
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to campaign/i })
@@ -666,7 +686,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     ).toBeInTheDocument();
   });
 
-  it('compact header: Details discloses secondary lines, never the conflict alert or notices (FU-5)', async () => {
+  it('compact header: the Details popover holds secondary lines, never the conflict alert or notices (FU-5, O7-2)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
@@ -682,16 +702,15 @@ describe('W3/W4 lifecycle (D8)', () => {
     );
     const details = screen.getByRole('button', { name: /^Details/u });
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    const regions = (details.getAttribute('aria-controls') ?? '')
-      .split(' ')
-      .map(id => document.getElementById(id));
-    expect(regions).toHaveLength(2);
-    for (const region of regions) {
-      expect(region).not.toBeNull();
-      expect(region!.className).toMatch(/max-sm:hidden/u);
-    }
-    const collapsed = (node: Element) =>
-      regions.some(region => region!.contains(node));
+    expect(
+      screen.queryByRole('button', { name: 'Save checkpoint' })
+    ).toBeNull();
+    stubPopoverLayout();
+    fireEvent.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    const content = await screen.findByTestId('table-header-details');
+    expect(details.getAttribute('aria-controls')).toBe(content.id);
+    const collapsed = (node: Element) => content.contains(node);
     const alerts = screen.getAllByRole('alert');
     expect(
       alerts.some(alert =>
@@ -709,12 +728,8 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(
       collapsed(screen.getByRole('button', { name: 'Save checkpoint' }))
     ).toBe(true);
-    expect(collapsed(screen.getByText(/^Relay:/u))).toBe(true);
-    expect(screen.getByText('Local scene runs')).toBeInTheDocument();
-    fireEvent.click(details);
-    expect(details).toHaveAttribute('aria-expanded', 'true');
-    for (const region of regions)
-      expect(region!.className).not.toMatch(/max-sm:hidden/u);
+    expect(collapsed(screen.getByText('Relay', { selector: 'dt' }))).toBe(true);
+    expect(collapsed(screen.getByText('Local scene runs'))).toBe(false);
   });
 
   it('keeps the scene, the conflict and the URL on Back (popstate)', async () => {

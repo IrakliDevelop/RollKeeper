@@ -254,7 +254,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               />
             }
             editMapControl={props.editMapControl}
-            stackRows={props.editMapControl !== undefined}
+            stackRows={false}
             presenceControl={
               <PresenceControl
                 campaignCode={campaignCode}
