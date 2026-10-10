@@ -124,7 +124,7 @@ afterEach(() => {
 });
 
 const audienceStatus = () =>
-  screen.getByRole('status', { name: 'Audience status' });
+  screen.getByRole('status', { name: 'What players see' });
 async function settle(ms = 0) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms);
@@ -145,27 +145,21 @@ describe('display status wording (E13)', () => {
         labels: LABELS,
       });
     expect(line('none', null, null)).toEqual({
-      text: 'Published · no display connected',
+      text: 'No TV connected',
       tone: 'muted',
     });
     expect(line('loaded', 'scene-tavern', 900)).toEqual({
-      text: 'Table reports displaying Tavern',
+      text: "TV says it's showing Tavern",
       tone: 'success',
     });
     expect(line('loaded', 'scene-forest', 900).text).toBe(
-      'Table reports displaying Private Forest'
+      "TV says it's showing Private Forest"
     );
-    expect(line('blank', null, 900).text).toBe(
-      'Table reports a blank (covered) screen'
-    );
-    expect(line('waiting', null, 900).text).toBe(
-      'Table reports the waiting screen'
-    );
-    expect(line('updating', 'scene-tavern', 900).text).toBe(
-      'Display updating…'
-    );
+    expect(line('blank', null, 900).text).toBe("TV says it's blank");
+    expect(line('waiting', null, 900).text).toBe("TV says it's waiting");
+    expect(line('updating', 'scene-tavern', 900).text).toBe('TV updating…');
     expect(line('stale', 'scene-tavern', 17_400)).toEqual({
-      text: 'Display last reported 17 s ago',
+      text: 'No word from the TV for 17 s',
       tone: 'warning',
     });
     expect(
@@ -175,7 +169,7 @@ describe('display status wording (E13)', () => {
         sceneName: 'Private Forest',
         labels: LABELS,
       })
-    ).toEqual({ text: 'Display status unavailable', tone: 'muted' });
+    ).toEqual({ text: "Couldn't check the TV", tone: 'muted' });
   });
 
   it('shows the display line in the audience status region and drops the PR04 suffix', async () => {
@@ -183,14 +177,12 @@ describe('display status wording (E13)', () => {
       Response.json({ state: 'loaded', sceneId: 'scene-tavern', ageMs: 1_000 });
     render(controls({}).element);
     await settle();
-    expect(audienceStatus()).toHaveTextContent(
-      'Table reports displaying Tavern'
-    );
+    expect(audienceStatus()).toHaveTextContent("TV says it's showing Tavern");
     cleanup();
     render(controls({ current: descriptor('scene-hall') }).element);
     await settle();
     expect(audienceStatus()).toHaveTextContent(
-      'Audience: Hall · Published · no player map link for this scene'
+      "Players see: Hall · TV only, not on players' devices"
     );
     expect(audienceStatus().textContent).not.toContain('arrives later');
   });
@@ -200,11 +192,11 @@ describe('display status wording (E13)', () => {
       Response.json({ state: 'stale', sceneId: 'scene-tavern', ageMs: 20_000 });
     render(controls({}).element);
     await settle();
-    const stale = screen.getByText('Display last reported 20 s ago');
+    const stale = screen.getByText('No word from the TV for 20 s');
     expect(stale.className).not.toContain('emerald');
     displayReply = () => new Response('{}', { status: 503 });
     await settle(5_000);
-    expect(screen.getByText('Display status unavailable')).toBeVisible();
+    expect(screen.getByText("Couldn't check the TV")).toBeVisible();
   });
 });
 
@@ -214,7 +206,7 @@ describe('display status read timeout (review 01 F1)', () => {
       Response.json({ state: 'loaded', sceneId: 'scene-tavern', ageMs: 1_000 });
     render(controls({}).element);
     await settle();
-    const loaded = screen.getByText('Table reports displaying Tavern');
+    const loaded = screen.getByText("TV says it's showing Tavern");
     expect(loaded.className).toContain('emerald');
     fetchFn.mockImplementation(async (url: string, init?: RequestInit) => {
       if (!String(url).includes('/table/display/status'))
@@ -230,9 +222,9 @@ describe('display status read timeout (review 01 F1)', () => {
     });
     await settle(5_000);
     await settle(5_000);
-    const line = screen.getByText('Display status unavailable');
+    const line = screen.getByText("Couldn't check the TV");
     expect(line.className).not.toContain('emerald');
-    expect(screen.queryByText('Table reports displaying Tavern')).toBeNull();
+    expect(screen.queryByText("TV says it's showing Tavern")).toBeNull();
   });
 });
 
@@ -363,7 +355,7 @@ describe('Open display launcher (E12)', () => {
       Response.json({ state: 'loaded', sceneId: 'scene-tavern', ageMs: 1_000 });
     render(controls({}).element);
     await settle();
-    const line = screen.getByText('Table reports displaying Tavern');
+    const line = screen.getByText("TV says it's showing Tavern");
     expect(line.className).toMatch(/break-words/u);
     const button = screen.getByRole('button', { name: 'Open display' });
     expect(button.closest('.flex-wrap')).not.toBeNull();
@@ -392,11 +384,11 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
 
   it('words verified/unsupported as inline device reports and verify-required as a notice only', () => {
     expect(displayCalibrationLine(status('verified'))).toEqual({
-      text: 'Table reports scale verified',
+      text: 'TV says the scale is checked',
       tone: 'muted',
     });
     expect(displayCalibrationLine(status('unsupported'))).toEqual({
-      text: 'Table reports calibrated minis unavailable on this scene — square grid required',
+      text: "TV says this scene can't use mini scale (it needs a square grid)",
       tone: 'muted',
     });
     for (const quiet of ['verify-required', 'uncalibrated', undefined])
@@ -404,7 +396,7 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
     expect(displayCalibrationLine('error')).toBeNull();
     expect(calibrationNotice(status('verify-required'))).toEqual({
       id: 'table-scale',
-      text: 'Table reports scale needs verification — use Verify scale on the table display.',
+      text: 'TV says the scale needs checking. Use Check scale on the TV.',
       tone: 'alert',
     });
     for (const quiet of ['verified', 'unsupported', 'uncalibrated', undefined])
@@ -423,7 +415,7 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
       });
     render(controls({}).element);
     await settle();
-    expect(audienceStatus()).toHaveTextContent('Table reports scale verified');
+    expect(audienceStatus()).toHaveTextContent('TV says the scale is checked');
     displayReply = () =>
       Response.json({
         state: 'loaded',
@@ -432,12 +424,12 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
         calibration: 'bogus',
       });
     await settle(5_000);
-    expect(screen.queryByText(/Table reports scale/u)).toBeNull();
+    expect(screen.queryByText(/TV says the scale/u)).toBeNull();
   });
 });
 
 describe('O7-A5 uncalibrated after verified', () => {
-  it('shows "Table reports uncalibrated view" only after verified was seen in this DM page session', async () => {
+  it('shows "TV says it is back to normal view" only after verified was seen in this DM page session', async () => {
     const report = (calibration: string) => () =>
       Response.json({
         state: 'loaded',
@@ -448,16 +440,14 @@ describe('O7-A5 uncalibrated after verified', () => {
     displayReply = report('uncalibrated');
     render(controls({}).element);
     await settle();
-    expect(screen.queryByText('Table reports uncalibrated view')).toBeNull();
+    expect(screen.queryByText("TV says it's back to normal view")).toBeNull();
     displayReply = report('verified');
     await settle(5_000);
-    expect(audienceStatus()).toHaveTextContent('Table reports scale verified');
+    expect(audienceStatus()).toHaveTextContent('TV says the scale is checked');
     displayReply = report('uncalibrated');
     await settle(5_000);
-    const line = screen.getByText('Table reports uncalibrated view');
+    const line = screen.getByText("TV says it's back to normal view");
     expect(line.className).toContain('text-muted');
-    expect(
-      screen.queryByText(/Table reports scale needs verification/u)
-    ).toBeNull();
+    expect(screen.queryByText(/TV says the scale needs checking/u)).toBeNull();
   });
 });

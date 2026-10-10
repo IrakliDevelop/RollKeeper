@@ -838,8 +838,8 @@ test('review 03 F1 / A2: the Table header always stacks above a full-width tool 
   // A2: the scene shown (published, with the display line) at 2048.
   await page.getByRole('button', { name: 'Show this scene' }).click();
   await expect(
-    page.getByRole('status', { name: 'Audience status' })
-  ).toContainText('Published');
+    page.getByRole('status', { name: 'What players see' })
+  ).toContainText(/Players see: (?!nothing|unknown)/u);
   await expectStacked('2048 shown');
   for (const [width, height] of [
     [1536, 864],

@@ -303,7 +303,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     expect(notice).not.toBeNull();
     renderHeader({ notices: [notice!] });
     const text = screen.getByText(
-      'Table reports scale needs verification — use Verify scale on the table display.'
+      'TV says the scale needs checking. Use Check scale on the TV.'
     );
     expect(text).toHaveAttribute('role', 'alert');
     expect(collapsing(text)).toBeNull();

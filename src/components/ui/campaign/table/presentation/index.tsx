@@ -17,7 +17,7 @@ import {
 } from './TablePresentationControls.utils';
 import { useTableDisplayStatus } from './useTableDisplayStatus';
 
-const SHOW_BLOCKED = 'This scene is not registered for live play yet';
+const SHOW_BLOCKED = "This scene isn't ready to show yet.";
 const MESSAGE_TONE = {
   success: 'text-accent-emerald-text',
   info: 'text-accent-amber-text',
@@ -126,12 +126,12 @@ export function TablePresentationView(
         : undefined;
   return (
     <section
-      aria-label="Audience presentation"
+      aria-label="What players see controls"
       className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
     >
       <div
         role="status"
-        aria-label="Audience status"
+        aria-label="What players see"
         aria-live="polite"
         className="min-w-0 text-xs"
       >
@@ -194,7 +194,7 @@ export function TablePresentationView(
             aria-describedby={reasonFor('other')}
             onClick={presentation.blank}
           >
-            Blank audience
+            Blank screen
           </Button>
         )}
         {actions.includes('unpresent') && (

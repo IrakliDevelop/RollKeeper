@@ -221,9 +221,11 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible();
 
-  const status = page.getByRole('status', { name: 'Audience status' });
-  await expect(status).toContainText('Audience: nothing shown');
-  await expect(status).toContainText('Preparing: Tavern Map (private)');
+  const status = page.getByRole('status', { name: 'What players see' });
+  await expect(status).toContainText('Players see: nothing');
+  await expect(status).toContainText(
+    "Preparing Tavern Map (players can't see it)"
+  );
   // Private preparation sent no presentation command.
   expect(
     server.commands.filter(command =>
@@ -232,36 +234,38 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
   ).toEqual([]);
 
   await page.getByRole('button', { name: 'Show this scene' }).click();
-  await expect(page.getByText('Published', { exact: true })).toBeVisible();
-  await expect(status).toContainText('Audience: Tavern Map · Published');
+  await expect(
+    page.getByText("Players' view updated", { exact: true })
+  ).toBeVisible();
+  await expect(status).toContainText('Players see: Tavern Map');
   await expect(status).toContainText(
-    'Editing the shown scene — changes are live'
+    "You're editing the scene players see. Changes show right away."
   );
 
-  await page.getByRole('button', { name: 'Blank audience' }).click();
-  await expect(status).toContainText('Audience: blank (covered) · Published');
+  await page.getByRole('button', { name: 'Blank screen' }).click();
+  await expect(status).toContainText('Players see: blank screen');
   await page.getByRole('button', { name: 'Reveal Tavern Map' }).click();
-  await expect(status).toContainText('Audience: Tavern Map · Published');
+  await expect(status).toContainText('Players see: Tavern Map');
 
   // An interleaved change: 409 is explained, never Published.
   server.faults.push('conflict');
-  await page.getByRole('button', { name: 'Blank audience' }).click();
+  await page.getByRole('button', { name: 'Blank screen' }).click();
   await expect(
-    page.getByText(
-      'Not changed: the audience changed in the meantime — controls refreshed'
-    )
+    page.getByText('Not changed: what players see changed in the meantime.')
   ).toBeVisible();
-  await expect(page.getByText('Published', { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Players' view updated", { exact: true })
+  ).toHaveCount(0);
 
   // A committed request whose response is lost: Retry re-sends it exactly.
   server.faults.push('drop');
   await page.getByRole('button', { name: 'Stop showing' }).click();
-  await expect(page.getByText('Not confirmed — Retry')).toBeVisible();
+  await expect(page.getByText("Couldn't confirm the change.")).toBeVisible();
   const lost = server.commands.at(-1)!;
   await page.getByRole('button', { name: 'Retry', exact: true }).click();
-  await expect(page.getByText('Published (confirmed)')).toBeVisible();
+  await expect(page.getByText("Players' view already updated")).toBeVisible();
   expect(server.commands.at(-1)).toEqual(lost);
-  await expect(status).toContainText('Audience: nothing shown');
+  await expect(status).toContainText('Players see: nothing');
 
   // 390 px: presentation and combat controls fit without horizontal scroll.
   await page.setViewportSize({ width: 390, height: 844 });

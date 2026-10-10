@@ -50,7 +50,8 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
     item => item.tabIndex >= 0
   );
 }
-const LIVE_EDIT = 'Editing the shown scene — changes are live';
+const LIVE_EDIT =
+  "You're editing the scene players see. Changes show right away.";
 const SCALE_HINT =
   'Changing the grid geometry requires re-verifying the table scale.';
 

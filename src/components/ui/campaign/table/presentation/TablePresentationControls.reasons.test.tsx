@@ -71,20 +71,20 @@ describe('visible disabled reasons (HR-7)', () => {
     expect(reasons).toHaveLength(1);
     const reason = reasons[0]!;
     expect(reason.id).not.toBe('');
-    for (const name of ['Show this scene', 'Blank audience', 'Stop showing']) {
+    for (const name of ['Show this scene', 'Blank screen', 'Stop showing']) {
       const button = screen.getByRole('button', { name });
       expect(button).toBeDisabled();
       expect(button).toHaveAccessibleDescription(LIVE_CONTROL_REQUIRED);
     }
     expect(
-      screen.queryByText('This scene is not registered for live play yet')
+      screen.queryByText("This scene isn't ready to show yet.")
     ).toBeNull();
   });
 
   it('a non-holder never sees the show-blocked reason; Show points at the live-control reason', () => {
     view({ holder: false, canShow: false });
     expect(
-      screen.queryByText('This scene is not registered for live play yet')
+      screen.queryByText("This scene isn't ready to show yet.")
     ).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Show this scene' })
@@ -93,15 +93,13 @@ describe('visible disabled reasons (HR-7)', () => {
 
   it('a holder sees why Show is blocked, outside the polite status region', () => {
     view({ holder: true, canShow: false });
-    const reason = screen.getByText(
-      'This scene is not registered for live play yet'
-    );
+    const reason = screen.getByText("This scene isn't ready to show yet.");
     expect(reason.closest('[aria-live]')).toBeNull();
     expect(reason.closest('[role="status"]')).toBeNull();
     const show = screen.getByRole('button', { name: 'Show this scene' });
     expect(show).toBeDisabled();
     expect(show).toHaveAccessibleDescription(
-      'This scene is not registered for live play yet'
+      "This scene isn't ready to show yet."
     );
     expect(screen.queryByText(LIVE_CONTROL_REQUIRED)).toBeNull();
   });
@@ -109,7 +107,7 @@ describe('visible disabled reasons (HR-7)', () => {
   it('wraps on one row: no stacked column or top border', () => {
     view({ holder: true });
     const section = screen.getByRole('region', {
-      name: 'Audience presentation',
+      name: 'What players see controls',
     });
     expect(section.className).toMatch(/flex-wrap/u);
     expect(section.className).not.toMatch(/flex-col|border-t/u);

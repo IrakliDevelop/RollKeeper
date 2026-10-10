@@ -186,10 +186,10 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
         if (current) judgedRevision.current = current.revision;
         const judged = current
           ? committedMessage(intent, current, true)
-          : { tone: 'info' as const, text: 'audience status unknown' };
+          : { tone: 'info' as const, text: "Couldn't check what players see" };
         setMessage({
           tone: judged.tone,
-          text: `${failed.text} · ${judged.text}`,
+          text: `${failed.text} ${judged.text.replace(/\.$/u, '')}.`,
         });
       }
     },

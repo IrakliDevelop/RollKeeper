@@ -160,7 +160,9 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
       )
     ).toBeInTheDocument();
     expect(
-      screen.queryByText('Editing the shown scene — changes are live')
+      screen.queryByText(
+        "You're editing the scene players see. Changes show right away."
+      )
     ).not.toBeInTheDocument();
   });
 
@@ -185,7 +187,9 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
   it('says changes are live while editing the shown scene', () => {
     setup(viewport(), true);
     expect(
-      screen.getByText('Editing the shown scene — changes are live')
+      screen.getByText(
+        "You're editing the scene players see. Changes show right away."
+      )
     ).toBeInTheDocument();
   });
 

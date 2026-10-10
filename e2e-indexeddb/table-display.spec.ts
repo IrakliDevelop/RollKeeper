@@ -308,8 +308,8 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible();
-  const status = page.getByRole('status', { name: 'Audience status' });
-  await expect(status).toContainText('Published · no display connected');
+  const status = page.getByRole('status', { name: 'What players see' });
+  await expect(status).toContainText('No TV connected');
 
   const popupPromise = context.waitForEvent('page');
   await page.getByRole('button', { name: 'Open display' }).click();
@@ -373,11 +373,11 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
 
   // The DM line is the server's device report, never derived from Published.
   display.setStatus({ state: 'blank', sceneId: null, ageMs: 900 });
-  await expect(status).toContainText('Table reports a blank (covered) screen', {
+  await expect(status).toContainText("TV says it's blank", {
     timeout: 10_000,
   });
   display.setStatus({ state: 'stale', sceneId: null, ageMs: 21_000 });
-  await expect(status).toContainText('Display last reported 21 s ago', {
+  await expect(status).toContainText('No word from the TV for 21 s', {
     timeout: 10_000,
   });
 
@@ -659,14 +659,14 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible();
-  const status = page.getByRole('status', { name: 'Audience status' });
+  const status = page.getByRole('status', { name: 'What players see' });
   display.setStatus({
     state: 'blank',
     sceneId: null,
     ageMs: 900,
     calibration: 'verified',
   });
-  await expect(status).toContainText('Table reports scale verified', {
+  await expect(status).toContainText('TV says the scale is checked', {
     timeout: 10_000,
   });
   display.setStatus({
@@ -676,7 +676,7 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
     calibration: 'verify-required',
   });
   const notice = page.getByText(
-    'Table reports scale needs verification — use Verify scale on the table display.'
+    'TV says the scale needs checking. Use Check scale on the TV.'
   );
   await expect(notice).toBeVisible({ timeout: 10_000 });
   await page.setViewportSize({ width: 390, height: 844 });
@@ -692,7 +692,7 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
     ageMs: 900,
     calibration: 'uncalibrated',
   });
-  await expect(status).toContainText('Table reports uncalibrated view', {
+  await expect(status).toContainText("TV says it's back to normal view", {
     timeout: 10_000,
   });
   await expect(notice).toHaveCount(0);
