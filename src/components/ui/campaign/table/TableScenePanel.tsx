@@ -176,7 +176,10 @@ export function TableScenePanel({
     } catch (error) {
       setStatus({
         kind: 'error',
-        message: error instanceof Error ? error.message : 'Adoption failed.',
+        message:
+          error instanceof Error
+            ? error.message
+            : "The scene couldn't be added.",
       });
     }
   }

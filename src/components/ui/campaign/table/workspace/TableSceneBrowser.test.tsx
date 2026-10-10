@@ -78,7 +78,7 @@ afterEach(() => {
 describe('W5 private scene browser', () => {
   it('lists scenes as buttons with Selected/Shown badges from the descriptor', () => {
     renderBrowser();
-    const list = screen.getByRole('list', { name: 'Scenes in this workspace' });
+    const list = screen.getByRole('list', { name: 'Scenes on this table' });
     const buttons = within(list).getAllByRole('button');
     expect(buttons.map(button => button.textContent)).toEqual([
       expect.stringContaining('Cave'),

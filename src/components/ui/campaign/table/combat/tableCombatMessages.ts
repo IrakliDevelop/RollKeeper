@@ -17,8 +17,7 @@ const REJECTIONS: Record<string, string> = {
   'archive-active': 'The running combat’s archive cannot be deleted.',
   'invalid-reference':
     'The table data on this device no longer matches this action. If this keeps happening, export your tables from Battle Maps.',
-  'limit-exceeded':
-    'This workspace is at its local size limit. Nothing was saved.',
+  'limit-exceeded': 'This table is full on this device. Nothing was saved.',
 };
 
 /** Visible message for a failed combat command (nothing was saved). */

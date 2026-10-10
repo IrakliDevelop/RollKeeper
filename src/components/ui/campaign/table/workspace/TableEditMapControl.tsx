@@ -374,7 +374,7 @@ export function TableEditMapControl(props: {
               Fit to map
             </Button>
             <p className="text-muted text-xs">
-              Notes and text marked DM-only stay private; players never receive
+              Notes and text marked DM-only stay hidden; players never receive
               them.
             </p>
           </div>,

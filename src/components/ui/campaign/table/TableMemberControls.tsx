@@ -94,7 +94,7 @@ export function TableMemberControls({
       <section className="space-y-2" aria-label="Tokens">
         <h3 className="text-heading text-sm font-semibold">Tokens</h3>
         {entry.boundTokenIds.length === 0 && bindable.length === 0 && (
-          <p className="text-muted text-xs">No token bound yet.</p>
+          <p className="text-muted text-xs">No token linked yet.</p>
         )}
         {entry.boundTokenIds.map(tokenId => (
           <div key={tokenId} className="flex flex-wrap items-center gap-2">

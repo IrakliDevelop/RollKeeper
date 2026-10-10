@@ -196,7 +196,7 @@ async function newContext(browser: import('@playwright/test').Browser) {
 }
 
 const sceneList = (page: Page) =>
-  page.getByRole('list', { name: 'Scenes in this workspace' });
+  page.getByRole('list', { name: 'Scenes on this table' });
 
 async function selected(page: Page, name: string) {
   await expect(

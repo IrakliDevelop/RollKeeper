@@ -156,7 +156,7 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     expect(toggle).toHaveAttribute('aria-controls', 'table-edit-map-panel');
     expect(
       screen.getByText(
-        'Notes and text marked DM-only stay private; players never receive them.'
+        'Notes and text marked DM-only stay hidden; players never receive them.'
       )
     ).toBeInTheDocument();
     expect(
