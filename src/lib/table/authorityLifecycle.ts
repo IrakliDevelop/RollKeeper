@@ -820,17 +820,17 @@ export function sceneRoomMessage(result: TableSceneRoomResult): string | null {
     case 'ready':
       return null;
     case 'conflict':
-      return 'This scene is registered from another device or workspace. It stays local-only here.';
+      return 'This scene was set up for live play on another device. Here it stays on this device only.';
     case 'rejected':
       return result.reason === 'registry-full'
-        ? 'This campaign already has the maximum number of live scenes'
+        ? 'This campaign has reached its limit of live scenes.'
         : result.reason === 'entry-too-large'
-          ? 'Scene name is too long to register'
-          : 'The server refused to register this scene';
+          ? 'This scene name is too long for live play. Shorten it.'
+          : "This scene couldn't be set up for live play.";
     case 'lost':
-      return 'Live control was lost while registering this scene.';
+      return 'You stopped being live while this scene was getting ready.';
     case 'failed':
-      return 'Live registration is unavailable; this scene stays local.';
+      return "Live play isn't available right now, so this scene stays on this device.";
   }
 }
 

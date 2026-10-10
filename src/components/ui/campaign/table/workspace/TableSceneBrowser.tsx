@@ -76,7 +76,7 @@ export function TableSceneBrowser(props: {
   adoptable: ReadonlyArray<{ id: string; name: string }>;
   onAdopt: (mapId: string) => void;
   busy?: boolean;
-  status?: { tone: 'alert' | 'status'; text: string } | null;
+  status?: { tone: 'alert' | 'status'; text: string; detail?: string } | null;
   battleMapsHref: string;
 }) {
   if (!props.open) return null;
@@ -111,7 +111,7 @@ export function TableSceneBrowser(props: {
         </Button>
       </div>
       <p className="text-muted px-3 pt-2 text-xs">
-        Private preparation: choosing a scene never changes what players see.
+        Picking a scene here doesn&apos;t change what players see.
       </p>
       <div className="flex flex-wrap gap-2 px-3 py-2">
         <Button size="sm" onClick={props.onCreate} disabled={props.busy}>
@@ -122,6 +122,7 @@ export function TableSceneBrowser(props: {
       {props.status && (
         <p
           role={props.status.tone}
+          title={props.status.detail}
           className={`px-3 text-xs ${props.status.tone === 'alert' ? 'text-accent-red-text' : 'text-muted'}`}
         >
           {props.status.text}
@@ -205,7 +206,7 @@ export function TableSceneBrowser(props: {
             href={props.battleMapsHref}
             className="text-link px-1 text-xs underline"
           >
-            Export or import a Table bundle (Battle Maps)
+            Export or import tables on Battle Maps
           </Link>
         </div>
       </div>

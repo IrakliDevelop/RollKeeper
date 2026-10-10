@@ -351,7 +351,7 @@ test('workspace: one session across 10+ private switches, redirect, history and 
   // An unknown scene shows the neutral notice and no other data.
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=nowhere`);
   await expect(
-    page.getByText('That scene is not available in this workspace')
+    page.getByText("That scene isn't on this device.")
   ).toBeVisible();
 
   // 390 px: the Scenes panel and its controls fit without overflow.
@@ -517,7 +517,7 @@ test('create scene: uploaded image placed once; refusals create no scene', async
         buffer: Buffer.from('not an image'),
       },
       mode: 'ok',
-      message: 'This image could not be read',
+      message: "Couldn't read this image.",
     },
     {
       file: { name: 'cellar.png', mimeType: 'image/png', buffer: PNG },

@@ -52,8 +52,7 @@ function focusables(root: HTMLElement | null): HTMLElement[] {
 }
 const LIVE_EDIT =
   "You're editing the scene players see. Changes show right away.";
-const SCALE_HINT =
-  'Changing the grid geometry requires re-verifying the table scale.';
+const SCALE_HINT = 'If you change the grid, check the scale on the TV again.';
 
 /**
  * W10 "Edit map" tool group (A4 subset): set/replace the map image, grid
@@ -248,7 +247,7 @@ export function TableEditMapControl(props: {
       try {
         await (props.probe ?? decodeMapImageUrl)(prepared.url);
       } catch {
-        setError('Map image could not be loaded');
+        setError("Couldn't load the map image.");
         return;
       }
       replaceSceneMapImage(viewport, prepared.url, prepared.size, writes);

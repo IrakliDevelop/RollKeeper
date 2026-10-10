@@ -170,7 +170,7 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     setup(viewport(), true, undefined, undefined, true);
     expect(
       screen.getByText(
-        'Changing the grid geometry requires re-verifying the table scale.'
+        'If you change the grid, check the scale on the TV again.'
       )
     ).toBeInTheDocument();
   });
@@ -179,7 +179,7 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     setup(viewport(), true);
     expect(
       screen.queryByText(
-        'Changing the grid geometry requires re-verifying the table scale.'
+        'If you change the grid, check the scale on the TV again.'
       )
     ).toBeNull();
   });
@@ -317,7 +317,7 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
       },
     });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Map image could not be loaded'
+      "Couldn't load the map image."
     );
     expect(vp.store.getAll()).toEqual([]);
     await adapter.flush();

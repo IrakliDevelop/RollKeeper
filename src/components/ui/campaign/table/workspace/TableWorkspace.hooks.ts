@@ -38,8 +38,7 @@ import { useTableWorkspaceAuthority } from './useTableWorkspaceAuthority';
 import { useWorkspaceCombatPublication } from './useWorkspaceCombatPublication';
 import { useWorkspaceSceneBrowser } from './useWorkspaceSceneBrowser';
 
-export const SCENE_UNAVAILABLE =
-  'That scene is not available in this workspace';
+export const SCENE_UNAVAILABLE = "That scene isn't on this device.";
 
 type ViewportCamera = Pick<
   Viewport,

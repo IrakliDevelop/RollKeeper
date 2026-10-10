@@ -61,7 +61,7 @@ export async function validateSceneImageFile(
   try {
     size = await decode(file);
   } catch {
-    return { ok: false, message: 'This image could not be read' };
+    return { ok: false, message: "Couldn't read this image." };
   }
   const within = (value: number) =>
     Number.isFinite(value) && value >= 1 && value <= SCENE_IMAGE_MAX_DIMENSION;
@@ -97,6 +97,9 @@ export async function prepareSceneImage(
     };
   }
   if (!url || !isSceneImageUrl(url))
-    return { ok: false, message: 'Upload did not return a secure image link' };
+    return {
+      ok: false,
+      message: "The upload didn't return a usable image link. Try again.",
+    };
   return { ok: true, url, size: valid.size };
 }

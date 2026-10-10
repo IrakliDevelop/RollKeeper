@@ -21,7 +21,7 @@ import { TableWorkspaceHeader } from './TableWorkspaceHeader';
 import { switchNoticeText } from './useTableSceneSwitch';
 
 const NOT_BOUND =
-  'This imported Table workspace is not bound to this campaign route. No private authority request was sent.';
+  "This imported table belongs to another campaign, so it can't go live here. Nothing was sent.";
 
 /**
  * PR06 unified Table workspace (W1–W4): one page per campaign, one control
@@ -44,10 +44,10 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       ? NOT_BOUND
       : (workspace.opened.error ??
         (current?.status === 'read-only'
-          ? 'This Table data uses an unsupported format. It is read-only; raw export remains available on Battle Maps.'
+          ? "This table's data is in a format the app can't edit. You can still export it from Battle Maps."
           : current?.status === 'unavailable'
             ? 'Table storage is unavailable on this device.'
-            : 'Local scenes loading…'));
+            : 'Loading scenes…'));
     return (
       <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
         <p className="text-heading text-lg font-semibold" role="status">
@@ -148,10 +148,10 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   // A canvas already on screen stays mounted while an explicit acquire
   // registers; it re-mints once afterwards (C6-2).
   const gate = !authority.firstOutcome
-    ? 'Registering scene and preparing private authority…'
+    ? 'Getting the table ready…'
     : authority.room.status === 'registering' &&
         shownScene.current !== mountedScene?.sceneId
-      ? 'Registering scene…'
+      ? 'Getting this scene ready…'
       : null;
   const stage =
     mountedScene && adapter && !gate ? (
@@ -214,7 +214,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
             {gate ??
               (switcher.switching
                 ? 'Switching scene…'
-                : 'Choose a scene to prepare. Selecting a scene never changes what players see.')}
+                : "Pick a scene to prepare. Players won't see it until you show it.")}
           </p>
         </WorkspaceShell>
       )}

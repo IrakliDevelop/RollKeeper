@@ -266,7 +266,7 @@ describe('W3 one control session per workspace (D8)', () => {
     const { result } = mount(room('scene-a'));
     await waitFor(() =>
       expect(result.current.room.message).toBe(
-        'This campaign already has the maximum number of live scenes'
+        'This campaign has reached its limit of live scenes.'
       )
     );
     expect(result.current.room.status).toBe('local');
@@ -319,7 +319,8 @@ describe('W3 one control session per workspace (D8)', () => {
         expect(result.current.room).toMatchObject({
           sceneId: 'scene-cave',
           status: 'local',
-          message: 'Live registration is unavailable; this scene stays local.',
+          message:
+            "Live play isn't available right now, so this scene stays on this device.",
           retryable: true,
         })
       );
@@ -396,7 +397,7 @@ describe('W3 one control session per workspace (D8)', () => {
       expect(result.current.room).toMatchObject({
         status: 'local',
         retryable: true,
-        message: 'This campaign already has the maximum number of live scenes',
+        message: 'This campaign has reached its limit of live scenes.',
       })
     );
     rerender({ scene: room('other-1') });

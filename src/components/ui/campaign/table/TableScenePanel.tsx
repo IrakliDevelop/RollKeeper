@@ -34,6 +34,8 @@ interface TableScenePanelProps {
 type Status = {
   kind: 'idle' | 'working' | 'success' | 'error';
   message: string;
+  /** O7-3: a raw outcome code, shown as a tooltip only. */
+  detail?: string;
 };
 
 export function TableScenePanel({
@@ -147,11 +149,13 @@ export function TableScenePanel({
             ? {
                 kind: 'success',
                 message:
-                  'Scene adopted and private authority prepared. Public presentation was not changed; the source records were not changed.',
+                  "Scene added to the Table. What players see and the original battle map weren't changed.",
               }
             : {
                 kind: 'error',
-                message: `Scene adopted locally, but private authority preparation failed (${live.reason}). Open the scene to retry or work offline.`,
+                message:
+                  "Scene added on this device, but it couldn't go live. Open the scene to try again or work offline.",
+                detail: live.reason,
               }
         );
         return;
@@ -165,7 +169,8 @@ export function TableScenePanel({
             }
           : {
               kind: 'error',
-              message: `Adoption did not complete (${result.status}).`,
+              message: "The scene wasn't added.",
+              detail: result.status,
             }
       );
     } catch (error) {
@@ -191,7 +196,7 @@ export function TableScenePanel({
       link.download = `rollkeeper-table-${campaignCode}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      setStatus({ kind: 'success', message: 'Table bundle exported.' });
+      setStatus({ kind: 'success', message: 'Tables exported.' });
     } catch (error) {
       setStatus({
         kind: 'error',
@@ -202,7 +207,7 @@ export function TableScenePanel({
 
   async function importBundle(file: File) {
     if (!repository) return;
-    setStatus({ kind: 'working', message: 'Validating Table bundle…' });
+    setStatus({ kind: 'working', message: 'Checking the file…' });
     const result = await importTableBundle({
       factory: repository.indexedDbFactory,
       account: repository.workspaceSelection.account,
@@ -218,11 +223,12 @@ export function TableScenePanel({
         ? {
             kind: 'success',
             message:
-              'Imported into a new local workspace. The active workspace was not overwritten.',
+              "Imported as a separate table on this device. Your current table wasn't changed.",
           }
         : {
             kind: 'error',
-            message: `Import did not complete (${result.reason}).`,
+            message: "The import didn't finish.",
+            detail: result.reason,
           }
     );
   }
@@ -242,9 +248,9 @@ export function TableScenePanel({
             Table scenes
           </h2>
           <p className="text-muted mt-1 max-w-3xl text-sm">
-            Scene runs are saved locally on this device. Export a Table bundle
-            separately; character backups and legacy campaign backups do not
-            include these scenes.
+            Scenes and fights are saved on this device only. Export them here:
+            character backups and older campaign backups don&apos;t include
+            them.
           </p>
         </div>
         <div className="flex gap-2">
@@ -283,13 +289,14 @@ export function TableScenePanel({
 
       {current?.status === 'unavailable' && (
         <p className="text-accent-red-text mt-4 text-sm" role="alert">
-          Table storage is unavailable. Original battle maps remain available.
+          This device can&apos;t store tables right now. Your battle maps are
+          still available.
         </p>
       )}
       {current?.status === 'read-only' && (
         <p className="text-accent-orange-text mt-4 text-sm" role="status">
-          This Table data uses an unsupported format. It is read-only; raw
-          export remains available.
+          This table&apos;s data is in a format the app can&apos;t edit. You can
+          still export it.
         </p>
       )}
       {status.message && (
@@ -300,6 +307,7 @@ export function TableScenePanel({
               : 'text-muted mt-4 text-sm'
           }
           role={status.kind === 'error' ? 'alert' : 'status'}
+          title={status.detail}
         >
           {status.message}
         </p>
@@ -311,30 +319,30 @@ export function TableScenePanel({
       )}
       {routeRejected && (
         <p className="text-accent-red-text mt-4 text-sm" role="alert">
-          This imported Table workspace is not bound to this campaign route. No
-          private authority request was sent.
+          This imported table belongs to another campaign, so it can&apos;t go
+          live here. Nothing was sent.
         </p>
       )}
       {selectedWorkspaceId && !routeRejected && (
         <p className="text-muted mt-4 text-sm" role="status">
-          Imported Table workspace selected.{' '}
+          Imported table selected.{' '}
           <Link
             className="text-link underline"
             href={`/dm/campaign/${campaignCode}/battlemaps`}
           >
-            Return to this campaign&apos;s Table workspace
+            Back to this campaign&apos;s table
           </Link>
           .
         </p>
       )}
       {importedWorkspaceId && !selectedWorkspaceId && (
         <p className="text-muted mt-4 text-sm" role="status">
-          Import validated into a separate local workspace.{' '}
+          Import checked and saved as a separate table.{' '}
           <Link
             className="text-link underline"
             href={`/dm/campaign/${campaignCode}/battlemaps?tableWorkspace=${encodeURIComponent(importedWorkspaceId)}`}
           >
-            Open imported workspace
+            Open imported table
           </Link>
           .
         </p>
@@ -349,11 +357,11 @@ export function TableScenePanel({
             <p className="text-heading font-medium">{scene.map.name}</p>
             <p className="text-muted mt-1 text-xs">
               {scene.localDraft
-                ? 'Local draft saved · authoritative checkpoint pending'
+                ? 'Changes not in a checkpoint yet'
                 : scene.canvasCheckpoint
                   ? scene.canvasCheckpoint.generation.startsWith('adoption:')
-                    ? 'Local adoption checkpoint saved'
-                    : 'Authoritative checkpoint committed locally'
+                    ? 'Starting copy saved'
+                    : 'Checkpoint saved'
                   : 'Ready to open'}
             </p>
             {changedScenes.has(scene.sceneId) && (

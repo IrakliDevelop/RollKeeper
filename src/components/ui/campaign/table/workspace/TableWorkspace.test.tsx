@@ -469,7 +469,7 @@ describe('W1 canonical selection', () => {
     nav.reset('scene=scene-elsewhere');
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText('That scene is not available in this workspace')
+      await screen.findByText("That scene isn't on this device.")
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(server.commands.filter(c => c.type === 'acquire')).toHaveLength(1)
@@ -526,7 +526,9 @@ describe('W1 canonical selection', () => {
     nav.reset('scene=scene-tavern&tableWorkspace=imported-x');
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText(/not bound to this campaign route/u)
+      await screen.findByText(
+        /belongs to another campaign, so it can't go live here/u
+      )
     ).toBeInTheDocument();
     expect(server.commands).toEqual([]);
     expect(
@@ -546,7 +548,9 @@ describe('F2 invalid canonical parameters never open the default workspace', () 
       nav.reset(`scene=scene-tavern&tableWorkspace=${value}`);
       render(<TableWorkspace campaignCode="CAMP" />);
       expect(
-        await screen.findByText(/not bound to this campaign route/u)
+        await screen.findByText(
+          /belongs to another campaign, so it can't go live here/u
+        )
       ).toBeInTheDocument();
       expect(mocks.openedWorkspaces).not.toContain(null);
       expect(canvasScene()).toBeUndefined();
@@ -558,7 +562,7 @@ describe('F2 invalid canonical parameters never open the default workspace', () 
     nav.reset(`scene=${'z'.repeat(600)}`);
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText('That scene is not available in this workspace')
+      await screen.findByText("That scene isn't on this device.")
     ).toBeInTheDocument();
     expect(canvasScene()).toBeUndefined();
   });
@@ -879,7 +883,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     });
     await navigate('scene=scene-forest');
     expect(
-      await screen.findByText('Still saving Tavern — try again')
+      await screen.findByText('Still saving Tavern. Try again in a moment.')
     ).toBeInTheDocument();
     expect(canvasScene()).toBe('scene-tavern');
     expect(mocks.adapters[0]!.disposed).toBe(0);
@@ -947,7 +951,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await settled('scene-forest');
     expect(
       await screen.findByText(
-        'Live registration is unavailable; this scene stays local.'
+        "Live play isn't available right now, so this scene stays on this device."
       )
     ).toBeInTheDocument();
     const registers = () =>
@@ -964,7 +968,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await waitFor(() =>
       expect(
         screen.queryByText(
-          'Live registration is unavailable; this scene stays local.'
+          "Live play isn't available right now, so this scene stays on this device."
         )
       ).toBeNull()
     );
@@ -980,7 +984,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     entry.adapter.getLocalEditGeneration = () => (generation += 1);
     await navigate('scene=scene-forest');
     expect(
-      await screen.findByText('Still saving Tavern — try again')
+      await screen.findByText('Still saving Tavern. Try again in a moment.')
     ).toBeInTheDocument();
     expect(canvasScene()).toBe('scene-tavern');
     expect(entry.disposed).toBe(0);

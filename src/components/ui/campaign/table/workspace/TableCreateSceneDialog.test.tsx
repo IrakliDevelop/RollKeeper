@@ -155,7 +155,7 @@ describe('W6 create scene dialog', () => {
           throw new Error('bad');
         }),
       },
-      'This image could not be read',
+      "Couldn't read this image.",
     ],
     [
       'a zero-size image',
@@ -174,7 +174,7 @@ describe('W6 create scene dialog', () => {
     [
       'a non-https upload result',
       { upload: vi.fn(async () => 'http://insecure.test/a.webp') },
-      'Upload did not return a secure image link',
+      "The upload didn't return a usable image link. Try again.",
     ],
   ])('refuses %s and creates no scene', async (_label, options, message) => {
     const { onCreated } = setup(options);

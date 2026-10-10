@@ -101,7 +101,7 @@ describe('Table scene panel acceptance states', () => {
       expect.objectContaining({ targetCampaignCode: 'CAMP' })
     );
     expect(
-      await screen.findByRole('link', { name: 'Open imported workspace' })
+      await screen.findByRole('link', { name: 'Open imported table' })
     ).toHaveAttribute(
       'href',
       '/dm/campaign/CAMP/battlemaps?tableWorkspace=fork-1'
@@ -132,7 +132,9 @@ describe('Table scene panel acceptance states', () => {
     });
 
     render(<TableScenePanel campaignCode="CAMPAIGN-B" battleMaps={[]} />);
-    expect(screen.getByText(/not bound to this campaign route/i)).toBeVisible();
+    expect(
+      screen.getByText(/belongs to another campaign, so it can't go live here/u)
+    ).toBeVisible();
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });

@@ -67,7 +67,9 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
     localStorage.getItem('rollkeeper-battlemap-data')
   );
   await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
-  await expect(page.getByText(/scene adopted/i)).toBeVisible();
+  await expect(
+    page.getByText(/^Scene added (to the Table|on this device)/u)
+  ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
 
   const stored = await page.evaluate(async () => {
@@ -125,12 +127,10 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
   expect(path).not.toBeNull();
   await page.locator('input[type=file][accept*="json"]').setInputFiles(path!);
   await expect(
-    page.getByText(/imported into a new local workspace/i)
+    page.getByText(/^Imported as a separate table on this device\./u)
   ).toBeVisible();
-  await page.getByRole('link', { name: 'Open imported workspace' }).click();
-  await expect(
-    page.getByText(/Imported Table workspace selected/i)
-  ).toBeVisible();
+  await page.getByRole('link', { name: 'Open imported table' }).click();
+  await expect(page.getByText(/Imported table selected/u)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
 
   await page.reload();
@@ -188,7 +188,7 @@ test('quota abort leaves adoption unpublished and the legacy source unchanged', 
     };
   });
   await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
-  await expect(page.getByText(/Adoption did not complete/i)).toBeVisible();
+  await expect(page.getByText(/^The scene wasn't added\.$/u)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open scene' })).toHaveCount(0);
   expect(
     await page.evaluate(() => localStorage.getItem('rollkeeper-battlemap-data'))
