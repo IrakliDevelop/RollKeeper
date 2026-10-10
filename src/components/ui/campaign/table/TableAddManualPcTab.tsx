@@ -40,8 +40,7 @@ export function TableAddManualPcTab({
   return (
     <form className="space-y-3" onSubmit={handleSubmit}>
       <p className="text-muted text-sm">
-        DM-managed character. Players cannot move it; it never claims a player
-        identity.
+        A character only you control. It isn&apos;t linked to any player.
       </p>
       <Input
         id={`${id}-name`}

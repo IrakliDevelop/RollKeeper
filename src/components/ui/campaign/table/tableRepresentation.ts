@@ -19,11 +19,10 @@ import type { TableRosterCanvas } from './useTableRosterState';
  */
 
 export const PHYSICAL_MINI_HELP =
-  'Physical minis are hidden on the table display only. Players and the DM still see the token; initiative, HP and fog are unchanged. Physical minis are not tracked — reveal fog manually with the fog tools.';
+  "Physical minis are hidden on the TV only. You and your players still see the token, and initiative, HP and fog work as usual. The app can't track real minis, so reveal fog yourself with the fog tools.";
 export const PHYSICAL_PLAYER_HELP =
-  "The player can still move their digital token; the table won't show it and it won't follow the real mini.";
-export const REPRESENTATION_PENDING =
-  'Table display updates when live control is connected.';
+  "The player can still move their token in the app. The TV won't show it, and it won't follow the real mini.";
+export const REPRESENTATION_PENDING = "The TV updates once you're live.";
 
 /** Stamp-time fields for a newly placed token of this member. */
 export function representationFields(

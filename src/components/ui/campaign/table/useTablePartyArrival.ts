@@ -22,7 +22,7 @@ export interface TableArrivalNotice {
   retry?: () => void;
 }
 
-const NOT_LIVE = 'Waiting for a live connection before placing tokens.';
+const NOT_LIVE = 'Waiting to connect before placing tokens.';
 
 /**
  * PR06 W11 "Bring party here": idempotently adds campaign players who are
@@ -109,7 +109,7 @@ export function useTablePartyArrival(options: {
       setNotice({
         tone: 'error',
         message:
-          'Campaign players are unavailable. Nothing was placed — try again.',
+          "Couldn't load the player list. Nothing was placed. Try again.",
         retry: () => void bringParty(),
       });
       return;

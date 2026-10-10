@@ -60,9 +60,9 @@ export function controlLabel(entry: TableRosterEntry): string {
   if (entry.control.kind === 'player') return 'Player-controlled';
   if (entry.control.kind === 'dm') return 'DM-controlled';
   if (entry.control.reason === 'verification-unavailable')
-    return 'Verification unavailable';
+    return "Can't check player";
   return entry.control.reason === 'identity-unresolved'
-    ? 'Identity unresolved'
+    ? 'Player not found'
     : 'Control unavailable';
 }
 

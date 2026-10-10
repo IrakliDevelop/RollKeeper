@@ -32,15 +32,15 @@ export interface TableRosterNotice {
 
 const REJECTIONS: Record<string, string> = {
   'control-unavailable':
-    'Player control is unavailable for that identity. It stays with the DM.',
+    "That player can't take control right now, so you keep it.",
   'read-only': 'This character’s stats are read-only here.',
   'member-missing': 'That member is no longer in this scene.',
-  'dm-only': 'This participant is DM-managed; players cannot control it.',
+  'dm-only': 'Only you can control this one.',
 };
 
 function failureMessage(result: TableRosterResult): string {
   if (result.status === 'conflict')
-    return 'The scene changed elsewhere. Nothing was saved — review and retry.';
+    return 'The scene changed in another tab or device. Nothing was saved. Check it and try again.';
   if (result.status === 'rejected') {
     if (result.reason === 'limit-exceeded')
       return 'This scene is at its local size limit. Nothing was saved.';
@@ -258,7 +258,7 @@ export function useTableRosterActions(options: {
           tokenId,
           at: at(),
         },
-        { success: bind ? 'Token bound.' : 'Token unbound.' }
+        { success: bind ? 'Token linked.' : 'Token unlinked.' }
       );
       if (!bind || !succeeded(result)) return;
       // Stamp the binding key on the token (R2); a failed canvas step stays
@@ -271,11 +271,10 @@ export function useTableRosterActions(options: {
           }) ?? false;
         setNotice(
           applied
-            ? { tone: 'success', message: 'Token bound.' }
+            ? { tone: 'success', message: 'Token linked.' }
             : {
                 tone: 'error',
-                message:
-                  'Binding saved, but the token was not updated on the map.',
+                message: "Link saved, but the token on the map didn't update.",
                 retry: stamp,
               }
         );
@@ -333,7 +332,7 @@ export function useTableRosterActions(options: {
       if (!canvas || !live) {
         setNotice({
           tone: 'info',
-          message: 'Waiting for a live connection before placing tokens.',
+          message: 'Waiting to connect before placing tokens.',
         });
         return;
       }

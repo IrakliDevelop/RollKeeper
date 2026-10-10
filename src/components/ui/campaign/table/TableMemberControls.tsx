@@ -69,7 +69,7 @@ export function TableMemberControls({
           </Button>
         ) : !entry.playerIdentity ? (
           <p className="text-muted text-xs">
-            DM-managed participant — players cannot control it.
+            Only you control this one. Players can&apos;t move it.
           </p>
         ) : players.status === 'ready' ? (
           <div className="flex flex-wrap gap-2">
@@ -87,7 +87,7 @@ export function TableMemberControls({
           </div>
         ) : (
           <p className="text-muted text-xs">
-            Campaign players are unavailable; control stays with the DM.
+            Couldn&apos;t load the player list, so you keep control for now.
           </p>
         )}
       </section>
@@ -108,7 +108,7 @@ export function TableMemberControls({
               disabled={busy}
               onClick={() => actions.onUnbind(tokenId)}
             >
-              {`Unbind ${tokenId}`}
+              {`Unlink ${tokenId}`}
             </Button>
           </div>
         ))}
@@ -131,10 +131,10 @@ export function TableMemberControls({
           <div key={tokenId} className="flex flex-wrap items-center gap-2">
             <span className="text-muted min-w-0 flex-1 truncate text-xs">
               {ambiguousTokenIds.includes(tokenId)
-                ? 'Ambiguous legacy token'
+                ? 'Matches more than one member'
                 : unmatchedTokenIds.includes(tokenId)
-                  ? 'Unbound map token'
-                  : 'Unbound legacy alias'}
+                  ? 'Not linked yet'
+                  : 'Older token, not linked'}
             </span>
             <Button
               variant="outline"
@@ -142,17 +142,15 @@ export function TableMemberControls({
               disabled={busy}
               onClick={() => actions.onBind(tokenId)}
             >
-              {`Bind ${tokenId}`}
+              {`Link ${tokenId}`}
             </Button>
           </div>
         ))}
       </section>
-      <section className="space-y-2" aria-label="Table representation">
-        <h3 className="text-heading text-sm font-semibold">
-          Table representation
-        </h3>
+      <section className="space-y-2" aria-label="On the TV">
+        <h3 className="text-heading text-sm font-semibold">On the TV</h3>
         <RadioGroupField
-          aria-label="Table representation"
+          aria-label="On the TV"
           value={entry.representation}
           disabled={busy}
           onValueChange={value =>

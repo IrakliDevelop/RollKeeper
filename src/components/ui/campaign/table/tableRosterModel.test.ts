@@ -93,7 +93,7 @@ describe('table roster model', () => {
           control: { kind: 'unavailable', reason: 'identity-unresolved' },
         })
       )
-    ).toBe('Identity unresolved');
+    ).toBe('Player not found');
     expect(
       controlLabel(
         entry({
