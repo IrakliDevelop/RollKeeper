@@ -94,7 +94,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
             ...(authority.room.retryable
               ? {
                   action: {
-                    label: 'Retry live registration',
+                    label: 'Try again',
                     onClick: authority.retryRoom,
                   },
                 }

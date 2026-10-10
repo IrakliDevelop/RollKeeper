@@ -448,14 +448,16 @@ describe('W1 canonical selection', () => {
     );
     // O7-2 HR-6: the compact S1 label is always visible; the full sentence
     // is in Details.
-    expect(screen.getByText('Local scene runs')).toBeVisible();
+    expect(screen.getByText('Saved on this device')).toBeVisible();
     expect(
-      screen.queryByText('Saved on this device — scene runs are local')
+      screen.queryByText('Scenes and fights are saved on this device only.')
     ).toBeNull();
     stubPopoverLayout();
     fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
     expect(
-      await screen.findByText('Saved on this device — scene runs are local')
+      await screen.findByText(
+        'Scenes and fights are saved on this device only.'
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to campaign/i })
@@ -682,7 +684,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(canvasScene()).toBe('scene-tavern');
     expect(entry.disposed).toBe(0);
     expect(
-      screen.getByRole('button', { name: 'Discard pending edit' })
+      screen.getByRole('button', { name: 'Discard my edit' })
     ).toBeInTheDocument();
   });
 
@@ -714,22 +716,26 @@ describe('W3/W4 lifecycle (D8)', () => {
     const alerts = screen.getAllByRole('alert');
     expect(
       alerts.some(alert =>
-        /conflicted with a newer scene/u.test(alert.textContent ?? '')
+        /changed in another tab or device, so your edit wasn't applied/u.test(
+          alert.textContent ?? ''
+        )
       )
     ).toBe(true);
     for (const alert of alerts) expect(collapsed(alert)).toBe(false);
     for (const name of [
-      'Refresh winner',
-      'Retry pending edit',
-      'Discard pending edit',
+      'Show newer version',
+      'Try my edit again',
+      'Discard my edit',
     ])
       expect(collapsed(screen.getByRole('button', { name }))).toBe(false);
     expect(collapsed(notice)).toBe(false);
     expect(
       collapsed(screen.getByRole('button', { name: 'Save checkpoint' }))
     ).toBe(true);
-    expect(collapsed(screen.getByText('Relay', { selector: 'dt' }))).toBe(true);
-    expect(collapsed(screen.getByText('Local scene runs'))).toBe(false);
+    expect(collapsed(screen.getByText('Connection', { selector: 'dt' }))).toBe(
+      true
+    );
+    expect(collapsed(screen.getByText('Saved on this device'))).toBe(false);
   });
 
   it('keeps the scene, the conflict and the URL on Back (popstate)', async () => {
@@ -855,9 +861,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await navigate('scene=scene-forest');
     const notice = 'Resolve the unsaved change on Tavern before switching';
     expect(await screen.findByText(notice)).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Discard pending edit' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Discard my edit' }));
     await waitFor(() => expect(screen.queryByText(notice)).toBeNull());
     expect(canvasScene()).toBe('scene-tavern');
   });
@@ -931,7 +935,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(viewport.store.getAll()).toEqual([]);
   });
 
-  it('offers "Retry live registration" after a transient failure (A3)', async () => {
+  it('offers "Try again" after a transient failure (A3)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
@@ -953,9 +957,7 @@ describe('W3/W4 lifecycle (D8)', () => {
       ).length;
     expect(registers()).toBe(0);
     const mounts = mocks.canvasMounts;
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Retry live registration' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(registers()).toBe(1));
     // The local canvas re-mints its relay token once registered.
     await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
@@ -983,7 +985,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(canvasScene()).toBe('scene-tavern');
     expect(entry.disposed).toBe(0);
     expect(
-      screen.queryByRole('button', { name: 'Discard pending edit' })
+      screen.queryByRole('button', { name: 'Discard my edit' })
     ).not.toBeInTheDocument();
   });
 

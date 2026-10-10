@@ -14,6 +14,7 @@ vi.mock('../presentation', () => ({
 }));
 
 import type { TableAuthorityState } from './useTableWorkspaceAuthority';
+import { fieldLabels } from './TableHeaderBanners';
 import { TableWorkspaceHeader, WORKSPACE_LABEL } from './TableWorkspaceHeader';
 import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
 import type { SaveMessageTone } from './saveMessageTone';
@@ -114,7 +115,7 @@ function renderHeader(
               ? { generation: 'checkpoint-1' }
               : null,
           } as never,
-          relayStatus: 'connected',
+          relayStatus: 'live',
           checkpoint: {
             saveMessage,
             saveTone:
@@ -172,7 +173,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
           id: 'room',
           text: 'Registration failed',
           tone: 'status',
-          action: { label: 'Retry live registration', onClick: vi.fn() },
+          action: { label: 'Try again', onClick: vi.fn() },
         },
       ],
     });
@@ -181,38 +182,42 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     expect(alerts.length).toBeGreaterThanOrEqual(3);
     for (const alert of alerts) expect(collapsing(alert)).toBeNull();
     for (const node of [
-      screen.getByText(/conflicted with a newer scene/u),
-      screen.getByRole('button', { name: 'Refresh winner' }),
-      screen.getByRole('button', { name: 'Retry pending edit' }),
-      screen.getByRole('button', { name: 'Discard pending edit' }),
+      screen.getByText(
+        /changed in another tab or device, so your edit wasn't applied/u
+      ),
+      screen.getByRole('button', { name: 'Show newer version' }),
+      screen.getByRole('button', { name: 'Try my edit again' }),
+      screen.getByRole('button', { name: 'Discard my edit' }),
       screen.getByText('Resolve the unsaved change on Tavern before switching'),
       screen.getByText('Registration failed'),
-      screen.getByRole('button', { name: 'Retry live registration' }),
+      screen.getByRole('button', { name: 'Try again' }),
       screen.getByText(FAILED_SAVE),
       screen.getByText(/You're no longer live/u),
       screen.getByRole('button', { name: 'Go live' }),
       screen.getByRole('button', { name: 'Work offline' }),
-      screen.getByText('Local scene runs'),
+      screen.getByText('Saved on this device'),
     ])
       expect(collapsing(node)).toBeNull();
-    expect(details()).toHaveAccessibleName(
-      'Details (2) — 2 items need attention'
-    );
+    expect(
+      screen.getByText(/Your edit changed: name\. Check the newer version/u)
+    ).toBeInTheDocument();
+    expect(
+      fieldLabels(['gridEnabled', 'gridSettings', 'canvasState', 'x'])
+    ).toBe('grid, map drawing, x');
+    expect(details()).toHaveAccessibleName('Details, 2 items need attention');
     expect(details()).toHaveTextContent(/^Details \(2\)$/u);
     expect(
-      screen.queryByRole('button', { name: 'Reapply local draft' })
+      screen.queryByRole('button', { name: 'Reapply changes' })
     ).toBeNull();
     const content = open();
     expect(
-      within(content).getByRole('button', { name: 'Reapply local draft' })
+      within(content).getByRole('button', { name: 'Reapply changes' })
     ).toBeInTheDocument();
   });
 
   it('shows "Details (1)" for a local draft to reapply, with an accessible name saying so', () => {
     renderHeader({ localDraft: true });
-    expect(details()).toHaveAccessibleName(
-      'Details (1) — 1 item needs attention'
-    );
+    expect(details()).toHaveAccessibleName('Details, 1 item needs attention');
     expect(details()).toHaveTextContent(/^Details \(1\)$/u);
     expect(details()).toHaveAttribute('aria-expanded', 'false');
   });
@@ -225,9 +230,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     'counts a failed save/restore (%s) and shows it as a failure banner in a status region (HR-1)',
     message => {
       renderHeader({ saveMessage: message, saveTone: 'failure' });
-      expect(details()).toHaveAccessibleName(
-        'Details (1) — 1 item needs attention'
-      );
+      expect(details()).toHaveAccessibleName('Details, 1 item needs attention');
       const line = screen.getByText(message);
       expect(collapsing(line)).toBeNull();
       expect(line.closest('[role="status"]')).not.toBeNull();
@@ -322,7 +325,7 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
       'The Very Long Scene Name Of The Lich King'
     );
     expect(title.className).not.toMatch(/truncate/u);
-    expect(within(bar).getByText('Local scene runs')).toBeInTheDocument();
+    expect(within(bar).getByText('Saved on this device')).toBeInTheDocument();
     expect(within(bar).getByText("You're live")).toBeInTheDocument();
     expect(screen.queryByText(WORKSPACE_LABEL)).toBeNull();
     for (const child of [...bar.children])
@@ -413,16 +416,24 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     const terms = [...content.querySelectorAll('dt')].map(
       node => node.textContent
     );
-    expect(terms).toEqual(['Relay', 'Local draft', 'Checkpoint']);
-    expect(content).toHaveTextContent('connected');
-    expect(content).toHaveTextContent('saved · local operations pending');
+    expect(terms).toEqual([
+      'Connection',
+      'Changes not in a checkpoint yet',
+      'Checkpoint',
+    ]);
+    expect(content).toHaveTextContent('Connected');
+    expect(within(content).getByText('Connected')).toHaveAttribute(
+      'title',
+      'live'
+    );
+    expect(content).toHaveTextContent('Yes, saved on this device');
     expect(content).toHaveTextContent('Local scene ready');
     fireEvent.click(
       within(content).getByRole('button', { name: 'Save checkpoint' })
     );
     expect(actions.saveCheckpoint).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      within(content).getByRole('button', { name: 'Reapply local draft' })
+      within(content).getByRole('button', { name: 'Reapply changes' })
     );
     expect(actions.restore).toHaveBeenCalledTimes(1);
     expect(popover()).not.toBeNull();
@@ -433,7 +444,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     let content = open();
     expect(content).toHaveTextContent('Restoring…');
     expect(
-      within(content).getByRole('button', { name: 'Reapply local draft' })
+      within(content).getByRole('button', { name: 'Reapply changes' })
     ).toBeDisabled();
     view.update({ localDraft: true, recoveryBusy: false, saveBusy: true });
     content = popover()!;
@@ -447,7 +458,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     renderHeader({ localDraft: true, checkpoint: true });
     const content = open();
     const first = within(content).getByRole('button', {
-      name: 'Reapply local draft',
+      name: 'Reapply changes',
     });
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
@@ -486,12 +497,12 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     const view = renderHeader({ localDraft: true, checkpoint: true });
     const content = open();
     expect(document.activeElement).toBe(
-      within(content).getByRole('button', { name: 'Reapply local draft' })
+      within(content).getByRole('button', { name: 'Reapply changes' })
     );
     view.update({ localDraft: false, checkpoint: true });
     expect(document.activeElement).toBe(
       within(popover()!).getByRole('button', {
-        name: 'Restore saved checkpoint',
+        name: 'Restore checkpoint',
       })
     );
   });

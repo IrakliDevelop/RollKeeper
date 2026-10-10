@@ -23,7 +23,7 @@ import type { useTableWorkspaceAuthority } from './useTableWorkspaceAuthority';
 
 export { WORKSPACE_LABEL } from './TableHeaderDetails';
 /** S1 compact label: always visible (FC-1); the sentence is in Details. */
-const WORKSPACE_LABEL_COMPACT = 'Local scene runs';
+const WORKSPACE_LABEL_COMPACT = 'Saved on this device';
 
 type Authority = ReturnType<typeof useTableWorkspaceAuthority>;
 type Checkpoint = ReturnType<typeof useSceneCheckpointActions>;

@@ -19,6 +19,29 @@ const SAVE_TONE: Record<Exclude<SaveMessageTone, 'routine'>, string> = {
   failure: 'text-accent-red-text',
 };
 
+/** O7-3: plain names for the scene fields a conflicted edit touched. */
+const FIELD_LABEL: Record<string, string> = {
+  name: 'name',
+  mapImageUrl: 'map image',
+  mapImageSize: 'map image',
+  canvasState: 'map drawing',
+  dmOnlyElements: 'hidden items',
+  gridEnabled: 'grid',
+  gridSettings: 'grid',
+  linkedEncounterIds: 'linked encounters',
+  cameraViews: 'saved views',
+  fogAppearance: 'fog look',
+  markers: 'markers',
+  createdAt: 'details',
+  updatedAt: 'details',
+};
+
+export function fieldLabels(fields: readonly string[]): string {
+  return [...new Set(fields.map(field => FIELD_LABEL[field] ?? field))].join(
+    ', '
+  );
+}
+
 /**
  * O7-2 H1/H4/HR-1: the slim banner rows of the Table header — authority,
  * workspace notices, workspace flows (`extra`), the save/scene message and
@@ -72,30 +95,28 @@ export function TableHeaderBanners(props: {
           role="alert"
         >
           <p className="text-accent-orange-text text-xs">
-            A local edit conflicted with a newer scene and was not replayed.
-            Pending fields: {conflict.fields.join(', ')}. Review the winner,
-            then retry deliberately or discard this edit.
+            {`This scene changed in another tab or device, so your edit wasn't applied. Your edit changed: ${fieldLabels(conflict.fields)}. Check the newer version, then try your edit again or discard it.`}
           </p>
           <Button
             variant="ghost"
             size="xs"
             onClick={() => conflict.onReconcile('refresh')}
           >
-            Refresh winner
+            Show newer version
           </Button>
           <Button
             variant="ghost"
             size="xs"
             onClick={() => conflict.onReconcile('retry')}
           >
-            Retry pending edit
+            Try my edit again
           </Button>
           <Button
             variant="ghost"
             size="xs"
             onClick={() => conflict.onReconcile('discard')}
           >
-            Discard pending edit
+            Discard my edit
           </Button>
         </div>
       )}

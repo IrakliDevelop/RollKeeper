@@ -13,7 +13,19 @@ import type { TableSceneRecordV1 } from '@/lib/table/schema';
 
 import type { useSceneCheckpointActions } from './useSceneCheckpointActions';
 
-export const WORKSPACE_LABEL = 'Saved on this device — scene runs are local';
+export const WORKSPACE_LABEL =
+  'Scenes and fights are saved on this device only.';
+
+/** O7-3: plain words for the connection state; the raw value is a tooltip. */
+const CONNECTION_LABEL: Record<string, string> = {
+  live: 'Connected',
+  connecting: 'Connecting…',
+  recovering: 'Reconnecting…',
+  offline: 'Offline',
+  denied: 'Not allowed',
+  'upgrade-required': 'Update needed',
+  stopped: 'Stopped',
+};
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -27,10 +39,10 @@ const focusables = (root: ParentNode | null): HTMLElement[] =>
 type Checkpoint = ReturnType<typeof useSceneCheckpointActions>;
 
 function checkpointLine(scene: TableSceneRecordV1 | undefined): string {
-  if (!scene?.canvasCheckpoint) return 'none';
+  if (!scene?.canvasCheckpoint) return 'None yet';
   return scene.canvasCheckpoint.generation.startsWith('adoption:')
-    ? 'not yet committed (local adoption snapshot available)'
-    : 'committed locally';
+    ? 'Not saved yet (starting copy available)'
+    : 'Saved';
 }
 
 /**
@@ -100,7 +112,7 @@ export function TableHeaderDetails(props: {
 
   const label =
     attention > 0
-      ? `Details (${attention}) — ${attention} item${attention === 1 ? ' needs' : 's need'} attention`
+      ? `Details, ${attention} item${attention === 1 ? ' needs' : 's need'} attention`
       : 'Details';
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>
@@ -136,10 +148,12 @@ export function TableHeaderDetails(props: {
             {WORKSPACE_LABEL}
           </p>
           <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-            <dt className="text-muted">Relay</dt>
-            <dd>{props.relayStatus}</dd>
-            <dt className="text-muted">Local draft</dt>
-            <dd>{draft ? 'saved · local operations pending' : 'none'}</dd>
+            <dt className="text-muted">Connection</dt>
+            <dd title={props.relayStatus}>
+              {CONNECTION_LABEL[props.relayStatus] ?? props.relayStatus}
+            </dd>
+            <dt className="text-muted">Changes not in a checkpoint yet</dt>
+            <dd>{draft ? 'Yes, saved on this device' : 'None'}</dd>
             <dt className="text-muted">Checkpoint</dt>
             <dd>{checkpointLine(stored)}</dd>
           </dl>
@@ -156,9 +170,9 @@ export function TableHeaderDetails(props: {
                 variant="outline"
                 size="sm"
                 disabled={checkpoint.recoveryBusy}
-                onClick={() => void checkpoint.restore(draft, 'Local draft')}
+                onClick={() => void checkpoint.restore(draft, 'Changes')}
               >
-                Reapply local draft
+                Reapply changes
               </Button>
             )}
             {saved && (
@@ -166,11 +180,9 @@ export function TableHeaderDetails(props: {
                 variant="outline"
                 size="sm"
                 disabled={checkpoint.recoveryBusy}
-                onClick={() =>
-                  void checkpoint.restore(saved, 'Saved checkpoint')
-                }
+                onClick={() => void checkpoint.restore(saved, 'Checkpoint')}
               >
-                Restore saved checkpoint
+                Restore checkpoint
               </Button>
             )}
             <Button
