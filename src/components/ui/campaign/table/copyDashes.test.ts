@@ -11,7 +11,9 @@ import { describe, expect, it } from 'vitest';
  * TypeScript parser separates them from literals, so a dash inside a string
  * that looks like a comment is still caught and a dash in a comment is not.
  */
-const DASHES = /[–—]/u;
+const DASHES = /[\u2013\u2014]/u;
+/** HTML entities JSX decodes to an en or em dash. */
+const DASH_ENTITY = /&(?:mdash|ndash|#821[12]|#x201[34]);/iu;
 
 /** Entries are `relative/path:line` and each needs a logged reason. */
 const ALLOW_LIST: readonly string[] = [];
@@ -59,7 +61,17 @@ export function findDashedLiterals(fileName: string, source: string) {
   const visit = (node: ts.Node) => {
     if (LITERAL_KINDS.has(node.kind)) {
       const text = node.getText(file);
-      if (DASHES.test(text)) {
+      // Raw source, the parsed (cooked) value, and for JSX the text after
+      // HTML entity decoding: `\u2014` escapes and `&mdash;` both count.
+      const cooked = (node as ts.LiteralLikeNode).text;
+      const jsx =
+        node.kind === ts.SyntaxKind.JsxText ||
+        node.parent?.kind === ts.SyntaxKind.JsxAttribute;
+      if (
+        DASHES.test(text) ||
+        DASHES.test(cooked) ||
+        (jsx && DASH_ENTITY.test(cooked))
+      ) {
         const { line } = file.getLineAndCharacterOfPosition(
           node.getStart(file)
         );
@@ -78,8 +90,8 @@ describe('O7-3 no em or en dashes in Table copy', () => {
     for (const file of FILES) expect(fs.existsSync(file)).toBe(true);
   });
 
-  it('flags literals and JSX text but ignores comments', () => {
-    const dash = '—';
+  it('flags literals, escapes, JSX text and entities but ignores comments', () => {
+    const dash = '\u2014';
     const source = [
       `// a comment ${dash} ignored`,
       `/* block ${dash} ignored */`,
@@ -88,10 +100,16 @@ describe('O7-3 no em or en dashes in Table copy', () => {
       `const c = '// not a comment ${dash}';`,
       `const d = <p>jsx ${dash} text</p>;`,
       `const e = 'plain';`,
+      `const f = '\\u2014 escaped';`,
+      `const g = \`t \\u2013 \${a}\`;`,
+      `const h = <p>a &mdash; b</p>;`,
+      `const i = <p title="a &ndash; b" />;`,
+      `const j = <p>a &#8212; b &#x2013;</p>;`,
+      `const k = 'a &mdash; b outside JSX is plain text';`,
     ].join('\n');
     expect(
       findDashedLiterals('sample.tsx', source).map(hit => hit.line)
-    ).toEqual([3, 4, 5, 6]);
+    ).toEqual([3, 4, 5, 6, 8, 9, 10, 11, 12]);
   });
 
   it.each(FILES.map(file => [path.relative(SRC, file), file]))(
