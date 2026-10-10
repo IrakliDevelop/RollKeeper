@@ -17,7 +17,7 @@ import type { TableAuthorityState } from './useTableWorkspaceAuthority';
 import { fieldLabels } from './TableHeaderBanners';
 import { TableWorkspaceHeader, WORKSPACE_LABEL } from './TableWorkspaceHeader';
 import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
-import type { SaveMessageTone } from './saveMessageTone';
+import type { SaveMessageTone } from './saveMessages';
 
 /**
  * O7-2 header compaction with the FC-1 invariants kept: alerts, notices,
@@ -65,13 +65,14 @@ function collapsing(node: Element): Element | null {
 }
 
 const FAILED_SAVE =
-  'Checkpoint not committed (relay-timeout); the local draft remains pending.';
+  'Checkpoint not saved. Your changes are still on this device.';
 
 function renderHeader(
   options: {
     state?: TableAuthorityState;
     saveMessage?: string;
     saveTone?: SaveMessageTone;
+    saveDetail?: string;
     localDraft?: boolean;
     checkpoint?: boolean;
     conflict?: boolean;
@@ -89,7 +90,7 @@ function renderHeader(
   };
   const element = (overrides: typeof options = {}) => {
     const merged = { ...options, ...overrides };
-    const saveMessage = merged.saveMessage ?? 'Local scene ready';
+    const saveMessage = merged.saveMessage ?? 'Scene ready';
     return (
       <TableWorkspaceHeader
         campaignCode="CAMP"
@@ -122,9 +123,10 @@ function renderHeader(
               merged.saveTone ??
               (saveMessage === FAILED_SAVE
                 ? 'failure'
-                : saveMessage === 'Local scene ready'
+                : saveMessage === 'Scene ready'
                   ? 'routine'
                   : 'success'),
+            saveDetail: merged.saveDetail,
             recoveryBusy: merged.recoveryBusy ?? false,
             saveBusy: merged.saveBusy ?? false,
             ...actions,
@@ -224,8 +226,8 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
 
   it.each([
     FAILED_SAVE,
-    'Local draft failed (unavailable); live authority and local data are unchanged.',
-    'Scene not found in this local workspace',
+    "Couldn't restore your changes. Nothing changed.",
+    "This scene isn't on this device.",
   ])(
     'counts a failed save/restore (%s) and shows it as a failure banner in a status region (HR-1)',
     message => {
@@ -238,10 +240,21 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     }
   );
 
+  it('a raw failure reason is a tooltip on the banner, never its text (O7-3)', () => {
+    renderHeader({
+      saveMessage: FAILED_SAVE,
+      saveTone: 'failure',
+      saveDetail: 'relay-timeout',
+    });
+    const line = screen.getByText(FAILED_SAVE);
+    expect(line).toHaveAttribute('title', 'relay-timeout');
+    expect(line.textContent).not.toMatch(/relay-timeout/u);
+  });
+
   it('a restore result shows as a banner while Details is closed (HR-1)', () => {
-    renderHeader({ saveMessage: 'Local draft restored to live authority.' });
+    renderHeader({ saveMessage: 'Changes restored.' });
     expect(popover()).toBeNull();
-    const line = screen.getByText('Local draft restored to live authority.');
+    const line = screen.getByText('Changes restored.');
     expect(line.closest('[role="status"]')).toHaveAttribute(
       'aria-live',
       'polite'
@@ -249,9 +262,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     expect(details()).toHaveAccessibleName('Details');
     // HR-1: never inside Details.
     const content = open();
-    expect(
-      within(content).queryByText('Local draft restored to live authority.')
-    ).toBeNull();
+    expect(within(content).queryByText('Changes restored.')).toBeNull();
   });
 
   it.each<[string, TableAuthorityState, RegExp]>([
@@ -427,7 +438,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
       'live'
     );
     expect(content).toHaveTextContent('Yes, saved on this device');
-    expect(content).toHaveTextContent('Local scene ready');
+    expect(content).toHaveTextContent('Scene ready');
     fireEvent.click(
       within(content).getByRole('button', { name: 'Save checkpoint' })
     );

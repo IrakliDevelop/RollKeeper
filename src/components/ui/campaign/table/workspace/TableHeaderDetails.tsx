@@ -170,7 +170,7 @@ export function TableHeaderDetails(props: {
                 variant="outline"
                 size="sm"
                 disabled={checkpoint.recoveryBusy}
-                onClick={() => void checkpoint.restore(draft, 'Changes')}
+                onClick={() => void checkpoint.restore(draft, 'changes')}
               >
                 Reapply changes
               </Button>
@@ -180,7 +180,7 @@ export function TableHeaderDetails(props: {
                 variant="outline"
                 size="sm"
                 disabled={checkpoint.recoveryBusy}
-                onClick={() => void checkpoint.restore(saved, 'Checkpoint')}
+                onClick={() => void checkpoint.restore(saved, 'checkpoint')}
               >
                 Restore checkpoint
               </Button>

@@ -111,6 +111,7 @@ export function TableWorkspaceHeader(props: {
             ? {
                 message: scene.checkpoint.saveMessage,
                 tone: scene.checkpoint.saveTone,
+                detail: scene.checkpoint.saveDetail,
               }
             : null
         }

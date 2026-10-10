@@ -522,11 +522,10 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
         await right.locator('body').innerText(),
       ];
       return {
-        restored: messages.filter(value =>
-          value.includes('Changes restored to live authority.')
-        ).length,
+        restored: messages.filter(value => value.includes('Changes restored.'))
+          .length,
         conflict: messages.filter(value =>
-          value.includes('was not restored because live authority changed')
+          value.includes("weren't restored because the scene changed")
         ).length,
       };
     })

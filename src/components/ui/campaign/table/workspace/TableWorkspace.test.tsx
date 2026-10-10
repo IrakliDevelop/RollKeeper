@@ -885,7 +885,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(mocks.adapters[0]!.disposed).toBe(0);
   });
 
-  it('shows "Map image could not be loaded" when the ensure probe fails (N4)', async () => {
+  it('shows "Couldn\'t load the map image." when the ensure probe fails (N4)', async () => {
     const current = repository.getCurrent();
     if (current?.status !== 'ready') throw new Error('not ready');
     await repository.mutateWorkspace(
@@ -927,7 +927,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-broken');
     expect(
-      await screen.findByText('Map image could not be loaded')
+      await screen.findByText("Couldn't load the map image.")
     ).toBeInTheDocument();
     const viewport = mocks.viewports.get('scene-broken') as unknown as {
       store: ElementStore;

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 
-import type { SaveMessageTone } from './saveMessageTone';
+import type { SaveMessageTone } from './saveMessages';
 
 export interface TableHeaderNotice {
   id: string;
@@ -52,7 +52,7 @@ export function TableHeaderBanners(props: {
   authority: ReactNode;
   notices: TableHeaderNotice[];
   extra?: ReactNode;
-  save: { message: string; tone: SaveMessageTone } | null;
+  save: { message: string; tone: SaveMessageTone; detail?: string } | null;
   conflict: {
     fields: string[];
     onReconcile: (action: 'refresh' | 'retry' | 'discard') => void;
@@ -86,7 +86,9 @@ export function TableHeaderBanners(props: {
       {/* HR-1: one polite region for every non-routine save/scene message. */}
       <div role="status" aria-live="polite" className="empty:hidden">
         {save && save.tone !== 'routine' && (
-          <p className={`text-xs ${SAVE_TONE[save.tone]}`}>{save.message}</p>
+          <p className={`text-xs ${SAVE_TONE[save.tone]}`} title={save.detail}>
+            {save.message}
+          </p>
         )}
       </div>
       {conflict && (
