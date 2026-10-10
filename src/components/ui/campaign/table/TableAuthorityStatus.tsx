@@ -9,19 +9,27 @@ import type { TableAuthorityState } from './workspace/useTableWorkspaceAuthority
 function bannerMessage(state: TableAuthorityState): string | null {
   switch (state.phase) {
     case 'offline':
-      return 'Working offline · not broadcasting. Local combat and drafts stay saved on this device.';
+      return "You're offline. Players and the TV won't see changes. Everything is still saved on this device.";
     case 'failed':
     case 'lost':
       if (state.reason === 'live-unavailable')
-        return 'Live publishing unavailable — Table live control is not enabled on this server. Scene combat stays local.';
+        return "Live play isn't set up on this server, so players and the TV won't see changes. Combat still works on this device.";
       if (state.foreignHolder)
-        return 'Another session holds live control. This page stays usable locally and broadcasts nothing.';
+        return "Another tab or device is live right now. You can keep working here, but players won't see these changes.";
       return state.phase === 'lost'
-        ? 'Live control lost. Local combat and drafts stay saved on this device; nothing is broadcast.'
-        : `Private authority preparation failed (${state.reason}). Local combat stays usable; nothing is broadcast.`;
+        ? "You're no longer live. Everything is still saved on this device, but players won't see new changes."
+        : "Couldn't go live. You can keep working on this device; players won't see changes.";
     default:
       return null;
   }
+}
+
+/** O7-3: a raw failure reason is a tooltip only, never inline text. */
+function failureReason(state: TableAuthorityState): string | undefined {
+  if (state.phase !== 'failed') return undefined;
+  if (state.reason === 'live-unavailable' || state.foreignHolder)
+    return undefined;
+  return state.reason;
 }
 
 /**
@@ -33,16 +41,16 @@ function bannerMessage(state: TableAuthorityState): string | null {
 export function TableLivePill({ state }: { state: TableAuthorityState }) {
   const { text, variant, live } =
     state.phase === 'ready'
-      ? { text: 'Live control held.', variant: 'primary' as const, live: true }
+      ? { text: "You're live", variant: 'primary' as const, live: true }
       : state.phase === 'initializing'
         ? {
-            text: 'Acquiring live control…',
+            text: 'Going live…',
             variant: 'neutral' as const,
             live: true,
           }
         : state.phase === 'idle'
           ? {
-              text: 'Live control: not started',
+              text: 'Not live yet',
               variant: 'neutral' as const,
               live: false,
             }
@@ -63,7 +71,7 @@ export function TableLivePill({ state }: { state: TableAuthorityState }) {
 
 /**
  * O7-2 H2: the live-control banner (R2-3): truthful status text with its
- * actions inline — an explicit, non-forcing "Acquire live control" that
+ * actions inline — an explicit, non-forcing "Go live" that
  * waits for an observed foreign lease (countdown in the label) and "Work
  * offline". There is no takeover control. Lost is an alert; offline and
  * failed are polite status.
@@ -92,14 +100,15 @@ export function TableAuthorityBanner(props: {
         <p
           className={`text-xs ${state.phase === 'offline' ? 'text-muted' : 'text-accent-amber-text'}`}
           role={state.phase === 'lost' ? 'alert' : 'status'}
+          title={failureReason(state)}
         >
           {text}
         </p>
       )}
       {cleared && (
         <p className="text-accent-amber-text text-xs" role="status">
-          Live control acquired. Public initiative cleared — Publish current
-          state from the combat panel.
+          You&apos;re live again. Players&apos; initiative list was cleared. Use
+          Share with players in the combat panel to send it again.
         </p>
       )}
       {canAcquire && (
@@ -110,8 +119,8 @@ export function TableAuthorityBanner(props: {
           onClick={props.onAcquire}
         >
           {props.waitSeconds > 0
-            ? `Acquire live control (${props.waitSeconds} s)`
-            : 'Acquire live control'}
+            ? `Go live in ${props.waitSeconds} s`
+            : 'Go live'}
         </Button>
       )}
       {(state.phase === 'failed' || state.phase === 'lost') && (

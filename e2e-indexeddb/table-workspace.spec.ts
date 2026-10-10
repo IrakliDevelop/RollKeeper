@@ -266,7 +266,9 @@ test('workspace: one session across 10+ private switches, redirect, history and 
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
   await expect(page.getByRole('region', { name: 'Scenes' })).toBeVisible();
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
 
   // Add a never-opened battle map locally, then create a blank scene.
   await page.getByRole('button', { name: 'Add Tavern' }).click();
@@ -405,7 +407,9 @@ test('FU-4: at most one /players read per scene switch (no active run)', async (
   });
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   await createScene(page, 'Forest');
@@ -478,7 +482,9 @@ test('create scene: uploaded image placed once; refusals create no scene', async
   );
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   const items = () => sceneList(page).getByRole('listitem');
 
   const refusals: Array<{
@@ -595,7 +601,9 @@ test('Edit map tools are reachable and unclipped at 1280, 2048 and 390 px', asyn
   await seed(page, server);
   await page.setViewportSize({ width: 2048, height: 1103 });
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   await page.getByRole('button', { name: 'Close scenes' }).click();
@@ -652,7 +660,9 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
   const server = controlServer();
   await seed(page, server);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   const tavernId = sceneParam(page)!;
@@ -675,7 +685,9 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
     await expect(page.getByText('Switching scene…')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
     // Measured state: live control held, scene selected, no notices.
-    await expect(page.getByText('Live control held.')).toBeAttached();
+    await expect(
+      page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+    ).toBeAttached();
     await expect(dock.locator('[role="alert"]')).toHaveCount(0);
     const dockBox = (await dock.boundingBox())!;
     const canvasBox = (await page.locator('canvas').first().boundingBox())!;
@@ -725,7 +737,9 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   await seed(page, server);
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   const tavernId = sceneParam(page)!;
@@ -747,7 +761,9 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
     await expect(page.getByTestId('dm-vtt-command-dock')).toBeVisible();
     await expect(page.getByText('Switching scene…')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
-    await expect(page.getByText('Live control held.')).toBeVisible();
+    await expect(
+      page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+    ).toBeVisible();
     await expect(header.locator('[role="alert"]')).toHaveCount(0);
     const at1280 = await measure(1280, 800);
     const at2048 = await measure(2048, 1103);
@@ -771,7 +787,7 @@ test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds a
   await foreign.setViewportSize({ width: 1280, height: 800 });
   await foreign.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
   await expect(
-    foreign.getByText(/Another session holds live control/u)
+    foreign.getByText(/Another tab or device is live right now/u)
   ).toBeVisible();
   await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
   const foreignHeader = foreign.getByTestId('table-workspace-header');
@@ -794,7 +810,9 @@ test('review 03 F1 / A2: the Table header always stacks above a full-width tool 
   await seed(page, server);
   await page.setViewportSize({ width: 2048, height: 1103 });
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   await page.getByRole('button', { name: 'Close scenes' }).click();
@@ -845,7 +863,7 @@ test('review 03 F1 / A2: the Table header always stacks above a full-width tool 
     `/dm/campaign/${CAMPAIGN.code}/table?scene=${sceneParam(page)!}`
   );
   await expect(
-    foreign.getByText(/Another session holds live control/u)
+    foreign.getByText(/Another tab or device is live right now/u)
   ).toBeVisible();
   await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
   const foreignDock = foreign.getByTestId('dm-vtt-command-dock');

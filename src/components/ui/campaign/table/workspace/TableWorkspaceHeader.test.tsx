@@ -189,8 +189,8 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
       screen.getByText('Registration failed'),
       screen.getByRole('button', { name: 'Retry live registration' }),
       screen.getByText(FAILED_SAVE),
-      screen.getByText(/Live control lost/u),
-      screen.getByRole('button', { name: 'Acquire live control' }),
+      screen.getByText(/You're no longer live/u),
+      screen.getByRole('button', { name: 'Go live' }),
       screen.getByRole('button', { name: 'Work offline' }),
       screen.getByText('Local scene runs'),
     ])
@@ -260,7 +260,7 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
         leaseUntil: null,
         foreignHolder: true,
       },
-      /Another session holds live control/u,
+      /Another tab or device is live right now/u,
     ],
     [
       'live unavailable',
@@ -270,10 +270,10 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
         leaseUntil: null,
         foreignHolder: false,
       },
-      /Live publishing unavailable/u,
+      /Live play isn't set up on this server/u,
     ],
-    ['offline', { phase: 'offline' }, /Working offline/u],
-    ['acquiring', { phase: 'initializing' }, /Acquiring live control/u],
+    ['offline', { phase: 'offline' }, /You're offline\./u],
+    ['acquiring', { phase: 'initializing' }, /Going live/u],
   ])('never collapses the %s authority text', (_name, state, text) => {
     renderHeader({ state });
     expect(collapsing(screen.getByText(text))).toBeNull();
@@ -323,25 +323,15 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
     );
     expect(title.className).not.toMatch(/truncate/u);
     expect(within(bar).getByText('Local scene runs')).toBeInTheDocument();
-    expect(within(bar).getByText('Live control held.')).toBeInTheDocument();
+    expect(within(bar).getByText("You're live")).toBeInTheDocument();
     expect(screen.queryByText(WORKSPACE_LABEL)).toBeNull();
     for (const child of [...bar.children])
       expect((child as HTMLElement).className).not.toMatch(/\bw-full\b/u);
   });
 
   it.each<[string, TableAuthorityState, string, boolean]>([
-    [
-      'ready',
-      { phase: 'ready', session: {} as never },
-      'Live control held.',
-      true,
-    ],
-    [
-      'initializing',
-      { phase: 'initializing' },
-      'Acquiring live control…',
-      true,
-    ],
+    ['ready', { phase: 'ready', session: {} as never }, "You're live", true],
+    ['initializing', { phase: 'initializing' }, 'Going live…', true],
     ['offline', { phase: 'offline' }, 'Offline', false],
     [
       'lost',
@@ -354,12 +344,7 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
       'Not live',
       false,
     ],
-    [
-      'idle',
-      { phase: 'idle' } as TableAuthorityState,
-      'Live control: not started',
-      false,
-    ],
+    ['idle', { phase: 'idle' } as TableAuthorityState, 'Not live yet', false],
   ])(
     'pill for %s: "%s"; one live region per state',
     (_name, state, text, pillLive) => {
@@ -378,13 +363,11 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
 
   it('offline gets a non-alert banner with Acquire; lost gets an alert with Acquire (countdown) and Work offline', () => {
     const view = renderHeader({ state: { phase: 'offline' } });
-    expect(screen.getByText(/Working offline/u)).toHaveAttribute(
+    expect(screen.getByText(/You're offline\./u)).toHaveAttribute(
       'role',
       'status'
     );
-    expect(
-      screen.getByRole('button', { name: 'Acquire live control' })
-    ).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Go live' })).toBeEnabled();
     view.update({
       state: {
         phase: 'lost',
@@ -394,14 +377,29 @@ describe('header bar (O7-2 H1, H2, HR-8)', () => {
       },
       waitSeconds: 7,
     });
-    expect(screen.getByText(/Live control lost/u)).toHaveAttribute(
+    expect(screen.getByText(/You're no longer live/u)).toHaveAttribute(
       'role',
       'alert'
     );
     expect(
-      screen.getByRole('button', { name: 'Acquire live control (7 s)' })
+      screen.getByRole('button', { name: 'Go live in 7 s' })
     ).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Work offline' })).toBeEnabled();
+  });
+
+  it('a failed go-live keeps the raw reason out of the text (O7-3 title only)', () => {
+    renderHeader({
+      state: {
+        phase: 'failed',
+        reason: 'controller-timeout',
+        leaseUntil: null,
+        foreignHolder: false,
+      },
+    });
+    const text = screen.getByText(/^Couldn't go live\./u);
+    expect(text).toHaveAttribute('role', 'status');
+    expect(text).toHaveAttribute('title', 'controller-timeout');
+    expect(text.textContent).not.toMatch(/controller-timeout/u);
   });
 });
 

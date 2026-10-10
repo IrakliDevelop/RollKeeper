@@ -287,9 +287,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   // A1: with the (tall, wrapped) live-control status header showing, the
   // panel's tabs, collapse control, an initiative input and Start combat are
   // inside the 390x844 viewport without scrolling any inner region.
-  await expect(
-    page.getByText(/Private authority preparation failed/)
-  ).toBeVisible();
+  await expect(page.getByText(/^Couldn't go live\./u)).toBeVisible();
   const panel = page.getByTestId('dm-vtt-studio-panel');
   for (const control of [
     panel.getByRole('button', { name: 'Initiative' }),

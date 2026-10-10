@@ -574,7 +574,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     const view = render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     const holdsAfterAcquire = mocks.holds;
     const createdBeforeSwitches = created.mock.calls.length;
@@ -936,7 +936,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     failControlReads.next = 1;
     await navigate('scene=scene-forest');
@@ -992,7 +992,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     const mounts = mocks.canvasMounts;
     const combat = mocks.combatMounts;
@@ -1001,7 +1001,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await settled('scene-forest');
     expect(
       await screen.findByText(
-        /Another session holds live control|Live control lost/u
+        /Another tab or device is live right now|You're no longer live/u
       )
     ).toBeInTheDocument();
     expect(screen.getByTestId('table-combat')).toBeInTheDocument();
@@ -1018,7 +1018,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-forest');
     expect(
-      await screen.findByText(/Another session holds live control/u)
+      await screen.findByText(/Another tab or device is live right now/u)
     ).toBeInTheDocument();
     const posts = server.commands.length;
     await navigate('scene=scene-tavern');
@@ -1026,12 +1026,12 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(server.commands).toHaveLength(posts);
     const mounts = mocks.canvasMounts;
     const acquire = screen.getByRole('button', {
-      name: /Acquire live control/u,
+      name: /Go live/u,
     });
     await waitFor(() => expect(acquire).toBeEnabled(), { timeout: 3_000 });
     fireEvent.click(acquire);
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
     await act(async () => {
@@ -1246,7 +1246,7 @@ describe('W5/W6 browser, creation and local adoption in the workspace', () => {
     nav.reset('scene=scene-tavern&panel=scenes');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
-    await screen.findByText(/Another session holds live control/u);
+    await screen.findByText(/Another tab or device is live right now/u);
     const posts = server.commands.length;
     fireEvent.click(screen.getByRole('button', { name: 'Add Crypt' }));
     await waitFor(() => expect(nav.push).toHaveBeenCalled());

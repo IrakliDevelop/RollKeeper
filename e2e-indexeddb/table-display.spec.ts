@@ -305,7 +305,9 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
   await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
   await page.getByRole('button', { name: 'Open scene' }).click();
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   const status = page.getByRole('status', { name: 'Audience status' });
   await expect(status).toContainText('Published · no display connected');
 
@@ -654,7 +656,9 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
   await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
   await page.getByRole('button', { name: 'Open scene' }).click();
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   const status = page.getByRole('status', { name: 'Audience status' });
   display.setStatus({
     state: 'blank',
