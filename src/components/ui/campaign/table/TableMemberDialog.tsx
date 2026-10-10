@@ -84,7 +84,7 @@ export function TableMemberDialog(props: {
                 <p className="text-muted text-xs">
                   {entry.adoptedPc
                     ? 'This copied PC is view only in this scene.'
-                    : 'Player character stats come from the player’s sheet and are read-only here.'}
+                    : 'Player character stats come from the player’s sheet and are view only here.'}
                 </p>
               )}
               <TableMemberControls

@@ -17,6 +17,7 @@ import type {
 import type { TableAuthorityState } from '../workspace/useTableWorkspaceAuthority';
 
 import { TablePresentationControls } from '.';
+import { recheckedMessage } from './TablePresentationControls.utils';
 
 const HOLDER = 'table-session-1';
 const descriptor = (
@@ -425,13 +426,10 @@ describe('Table presentation controls (PR04 P4)', () => {
     const before = fetchFn.mock.calls.length;
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     expect(
-      await screen.findByText(
-        /Couldn't confirm the change\. Check what players see above\./
-      )
+      await screen.findByText("Checked again: players' view is updated.")
     ).toBeVisible();
-    expect(
-      await screen.findByText(/Players' view already updated/)
-    ).toBeVisible();
+    // O7-3 review 06: the recheck replaces the failure sentence.
+    expect(screen.queryByText(/Couldn't confirm the change/)).toBeNull();
     expect(fetchFn.mock.calls.length).toBeGreaterThan(before);
   });
 
@@ -606,5 +604,26 @@ describe('Table presentation controls (PR04 P4)', () => {
       screen.getByText('Go live to change what players see.')
     ).toBeVisible();
     expect(screen.queryByText("Players' view updated")).toBeNull();
+  });
+});
+
+describe('recheck after an unconfirmed change (O7-3 review 06)', () => {
+  it('replaces the failure sentence with what the re-read says', () => {
+    expect(
+      recheckedMessage({ type: 'blank' }, descriptor('scene-tavern', true))
+    ).toEqual({
+      tone: 'success',
+      text: "Checked again: players' view is updated.",
+    });
+    expect(
+      recheckedMessage({ type: 'blank' }, descriptor('scene-tavern', false))
+    ).toEqual({
+      tone: 'info',
+      text: 'Checked again: that change went through earlier, but what players see has changed since.',
+    });
+    expect(recheckedMessage({ type: 'blank' }, null)).toEqual({
+      tone: 'info',
+      text: "Couldn't confirm the change, and couldn't check what players see.",
+    });
   });
 });

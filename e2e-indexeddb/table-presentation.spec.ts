@@ -215,7 +215,7 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
   const server = controlServer();
   await seed(page, server);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
+  await page.getByRole('button', { name: 'Add Tavern Map to Table' }).click();
   await page.getByRole('button', { name: 'Open scene' }).click();
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
@@ -237,7 +237,9 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
   await expect(
     page.getByText("Players' view updated", { exact: true })
   ).toBeVisible();
-  await expect(status).toContainText('Players see: Tavern Map');
+  await expect(status.getByText(/^Players see: /u)).toHaveText(
+    'Players see: Tavern Map'
+  );
   await expect(status).toContainText(
     "You're editing the scene players see. Changes show right away."
   );
@@ -245,7 +247,9 @@ test('Table presentation: explicit Show/Blank/Reveal/Stop, truthful failures, 39
   await page.getByRole('button', { name: 'Blank screen' }).click();
   await expect(status).toContainText('Players see: blank screen');
   await page.getByRole('button', { name: 'Reveal Tavern Map' }).click();
-  await expect(status).toContainText('Players see: Tavern Map');
+  await expect(status.getByText(/^Players see: /u)).toHaveText(
+    'Players see: Tavern Map'
+  );
 
   // An interleaved change: 409 is explained, never Published.
   server.faults.push('conflict');

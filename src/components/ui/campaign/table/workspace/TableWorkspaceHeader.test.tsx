@@ -206,8 +206,16 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     expect(
       fieldLabels(['gridEnabled', 'gridSettings', 'canvasState', 'x'])
     ).toBe('grid, map drawing, x');
-    expect(details()).toHaveAccessibleName('Details, 2 items need attention');
+    expect(details()).toHaveAccessibleName(
+      'Details (2): 2 items need attention'
+    );
     expect(details()).toHaveTextContent(/^Details \(2\)$/u);
+    // Label in name (WCAG 2.5.3): the accessible name starts with the visible text.
+    expect(
+      details()
+        .getAttribute('aria-label')
+        ?.startsWith(details().textContent ?? '')
+    ).toBe(true);
     expect(
       screen.queryByRole('button', { name: 'Reapply changes' })
     ).toBeNull();
@@ -219,7 +227,9 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
 
   it('shows "Details (1)" for a local draft to reapply, with an accessible name saying so', () => {
     renderHeader({ localDraft: true });
-    expect(details()).toHaveAccessibleName('Details, 1 item needs attention');
+    expect(details()).toHaveAccessibleName(
+      'Details (1): 1 item needs attention'
+    );
     expect(details()).toHaveTextContent(/^Details \(1\)$/u);
     expect(details()).toHaveAttribute('aria-expanded', 'false');
   });
@@ -232,7 +242,9 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     'counts a failed save/restore (%s) and shows it as a failure banner in a status region (HR-1)',
     message => {
       renderHeader({ saveMessage: message, saveTone: 'failure' });
-      expect(details()).toHaveAccessibleName('Details, 1 item needs attention');
+      expect(details()).toHaveAccessibleName(
+        'Details (1): 1 item needs attention'
+      );
       const line = screen.getByText(message);
       expect(collapsing(line)).toBeNull();
       expect(line.closest('[role="status"]')).not.toBeNull();

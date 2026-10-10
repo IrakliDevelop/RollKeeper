@@ -33,7 +33,7 @@ export interface TableRosterNotice {
 const REJECTIONS: Record<string, string> = {
   'control-unavailable':
     "That player can't take control right now, so you keep it.",
-  'read-only': 'This character’s stats are read-only here.',
+  'read-only': 'This character’s stats are view only here.',
   'member-missing': 'That member is no longer in this scene.',
   'dm-only': 'Only you can control this one.',
 };
@@ -43,7 +43,7 @@ function failureMessage(result: TableRosterResult): string {
     return 'The scene changed in another tab or device. Nothing was saved. Check it and try again.';
   if (result.status === 'rejected') {
     if (result.reason === 'limit-exceeded')
-      return 'This scene is at its local size limit. Nothing was saved.';
+      return 'This scene is full on this device. Nothing was saved.';
     return REJECTIONS[result.detail ?? ''] ?? 'The change was rejected.';
   }
   if (result.status === 'failed') {
@@ -300,8 +300,8 @@ export function useTableRosterActions(options: {
             {
               success:
                 representation === 'physical'
-                  ? `${entry.name} is a physical mini on the table display.`
-                  : `${entry.name} shows as a digital token on the table display.`,
+                  ? `${entry.name} is a physical mini on the TV.`
+                  : `${entry.name} shows as a digital token on the TV.`,
             }
           ),
     repair: (entry: TableRosterEntry) => {

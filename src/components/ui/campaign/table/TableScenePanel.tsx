@@ -165,7 +165,7 @@ export function TableScenePanel({
           ? {
               kind: 'error',
               message:
-                'The source changed during preview. Review it and adopt again.',
+                'The source changed during preview. Check it and add it again.',
             }
           : {
               kind: 'error',
@@ -199,7 +199,7 @@ export function TableScenePanel({
       link.download = `rollkeeper-table-${campaignCode}.json`;
       link.click();
       URL.revokeObjectURL(url);
-      setStatus({ kind: 'success', message: 'Tables exported.' });
+      setStatus({ kind: 'success', message: 'Table exported.' });
     } catch (error) {
       setStatus({
         kind: 'error',
@@ -226,7 +226,7 @@ export function TableScenePanel({
         ? {
             kind: 'success',
             message:
-              "Imported as a separate table on this device. Your current table wasn't changed.",
+              "Imported as a separate Table on this device. Your current Table wasn't changed.",
           }
         : {
             kind: 'error',
@@ -292,13 +292,13 @@ export function TableScenePanel({
 
       {current?.status === 'unavailable' && (
         <p className="text-accent-red-text mt-4 text-sm" role="alert">
-          This device can&apos;t store tables right now. Your battle maps are
-          still available.
+          This device can&apos;t store Table data right now. Your battle maps
+          are still available.
         </p>
       )}
       {current?.status === 'read-only' && (
         <p className="text-accent-orange-text mt-4 text-sm" role="status">
-          This table&apos;s data is in a format the app can&apos;t edit. You can
+          This Table&apos;s data is in a format the app can&apos;t edit. You can
           still export it.
         </p>
       )}
@@ -322,30 +322,30 @@ export function TableScenePanel({
       )}
       {routeRejected && (
         <p className="text-accent-red-text mt-4 text-sm" role="alert">
-          This imported table belongs to another campaign, so it can&apos;t go
+          This imported Table belongs to another campaign, so it can&apos;t go
           live here. Nothing was sent.
         </p>
       )}
       {selectedWorkspaceId && !routeRejected && (
         <p className="text-muted mt-4 text-sm" role="status">
-          Imported table selected.{' '}
+          Imported Table selected.{' '}
           <Link
             className="text-link underline"
             href={`/dm/campaign/${campaignCode}/battlemaps`}
           >
-            Back to this campaign&apos;s table
+            Back to this campaign&apos;s Table
           </Link>
           .
         </p>
       )}
       {importedWorkspaceId && !selectedWorkspaceId && (
         <p className="text-muted mt-4 text-sm" role="status">
-          Import checked and saved as a separate table.{' '}
+          Import checked and saved as a separate Table.{' '}
           <Link
             className="text-link underline"
             href={`/dm/campaign/${campaignCode}/battlemaps?tableWorkspace=${encodeURIComponent(importedWorkspaceId)}`}
           >
-            Open imported table
+            Open imported Table
           </Link>
           .
         </p>
@@ -407,7 +407,7 @@ export function TableScenePanel({
               }
               onClick={() => void adopt(map)}
             >
-              {adopted ? `${map.name} adopted` : `Adopt ${map.name}`}
+              {adopted ? `${map.name} added` : `Add ${map.name} to Table`}
             </Button>
           );
         })}

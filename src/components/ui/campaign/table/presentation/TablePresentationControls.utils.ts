@@ -17,7 +17,7 @@ const REASON_WORDS: Record<string, string> = {
   'scene-unregistered': "this scene isn't ready for live play yet",
   'no-presented-scene': 'nothing is being shown',
   'presentation-changed': 'what players see changed in the meantime',
-  'operation-id-reused': 'this request was already used, try again',
+  'operation-id-reused': 'this request was already used. Try again',
 };
 
 /** A presentation refusal reason in words (never a raw code). */
@@ -61,7 +61,7 @@ export function presentationStatusLines(input: {
   const audience = blanked
     ? 'Players see: blank screen'
     : `Players see: ${labelOf(sceneId, input.sceneId, input.sceneName, input.labels)}${
-        noMapLink ? " · TV only, not on players' devices" : ''
+        noMapLink ? ' (on the TV only)' : ''
       }`;
   return {
     audience,
@@ -118,6 +118,28 @@ export function committedMessage(
     : {
         tone: 'info',
         text: 'That change went through earlier, but what players see has changed since.',
+      };
+}
+
+/**
+ * O7-3 (review 06): after an unconfirmed change, the re-read replaces the
+ * failure sentence with what the fresh state says (Q1/Q6).
+ */
+export function recheckedMessage(
+  intent: PresentationIntent,
+  current: TableDescriptor | null
+): PresentationMessage {
+  if (!current)
+    return {
+      tone: 'info',
+      text: "Couldn't confirm the change, and couldn't check what players see.",
+    };
+  const judged = committedMessage(intent, current, true);
+  return judged.tone === 'success'
+    ? { tone: 'success', text: "Checked again: players' view is updated." }
+    : {
+        tone: judged.tone,
+        text: 'Checked again: that change went through earlier, but what players see has changed since.',
       };
 }
 

@@ -66,7 +66,9 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
   const sourceBefore = await page.evaluate(() =>
     localStorage.getItem('rollkeeper-battlemap-data')
   );
-  await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await page
+    .getByRole('button', { name: 'Add Synthetic Map to Table' })
+    .click();
   await expect(
     page.getByText(/^Scene added (to the Table|on this device)/u)
   ).toBeVisible();
@@ -127,10 +129,10 @@ test('visible Table adoption is isolated, reloadable and bundle-imports as a for
   expect(path).not.toBeNull();
   await page.locator('input[type=file][accept*="json"]').setInputFiles(path!);
   await expect(
-    page.getByText(/^Imported as a separate table on this device\./u)
+    page.getByText(/^Imported as a separate Table on this device\./u)
   ).toBeVisible();
-  await page.getByRole('link', { name: 'Open imported table' }).click();
-  await expect(page.getByText(/Imported table selected/u)).toBeVisible();
+  await page.getByRole('link', { name: 'Open imported Table' }).click();
+  await expect(page.getByText(/Imported Table selected/u)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
 
   await page.reload();
@@ -169,7 +171,7 @@ test('quota abort leaves adoption unpublished and the legacy source unchanged', 
   const page = await context.newPage();
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
   await expect(
-    page.getByRole('button', { name: 'Adopt Synthetic Map' })
+    page.getByRole('button', { name: 'Add Synthetic Map to Table' })
   ).toBeEnabled();
   const sourceBefore = await page.evaluate(() =>
     localStorage.getItem('rollkeeper-battlemap-data')
@@ -187,7 +189,9 @@ test('quota abort leaves adoption unpublished and the legacy source unchanged', 
       return original.apply(this, args as Parameters<IDBObjectStore['put']>);
     };
   });
-  await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await page
+    .getByRole('button', { name: 'Add Synthetic Map to Table' })
+    .click();
   await expect(page.getByText(/^The scene wasn't added\.$/u)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open scene' })).toHaveCount(0);
   expect(
@@ -246,7 +250,7 @@ test('unavailable IndexedDB disables Table while the original map remains usable
   await expect(page.getByText('IndexedDB is unavailable')).toBeVisible();
   await expect(page.getByText('Synthetic Map').first()).toBeVisible();
   await expect(
-    page.getByRole('button', { name: 'Adopt Synthetic Map' })
+    page.getByRole('button', { name: 'Add Synthetic Map to Table' })
   ).toBeDisabled();
   expect(contextErrors).toEqual([]);
   await context.close();
@@ -282,7 +286,9 @@ test('Table namespaces are isolated between browser profiles', async ({
   await firstProfile.addInitScript(seed, { campaign: CAMPAIGN, map: MAP });
   const firstPage = await firstProfile.newPage();
   await firstPage.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await firstPage.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await firstPage
+    .getByRole('button', { name: 'Add Synthetic Map to Table' })
+    .click();
   await expect(
     firstPage.getByRole('button', { name: 'Open scene' })
   ).toBeVisible();
@@ -296,7 +302,7 @@ test('Table namespaces are isolated between browser profiles', async ({
     secondPage.getByRole('button', { name: 'Open scene' })
   ).toHaveCount(0);
   await expect(
-    secondPage.getByRole('button', { name: 'Adopt Synthetic Map' })
+    secondPage.getByRole('button', { name: 'Add Synthetic Map to Table' })
   ).toBeEnabled();
 
   expect(firstProfileErrors).toEqual([]);
@@ -331,7 +337,9 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
   );
   const left = await context.newPage();
   await left.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await left.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await left
+    .getByRole('button', { name: 'Add Synthetic Map to Table' })
+    .click();
   await expect(left.getByRole('button', { name: 'Open scene' })).toBeVisible();
 
   const recoverySeed = await left.evaluate(async () => {
@@ -627,7 +635,9 @@ test('encounter-free scene roster persists party and manual PC members across re
     })
   );
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Synthetic Map' }).click();
+  await page
+    .getByRole('button', { name: 'Add Synthetic Map to Table' })
+    .click();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
   const legacyBefore = await page.evaluate(() => ({
     map: localStorage.getItem('rollkeeper-battlemap-data'),

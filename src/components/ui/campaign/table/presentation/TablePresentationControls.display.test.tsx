@@ -182,7 +182,7 @@ describe('display status wording (E13)', () => {
     render(controls({ current: descriptor('scene-hall') }).element);
     await settle();
     expect(audienceStatus()).toHaveTextContent(
-      "Players see: Hall · TV only, not on players' devices"
+      'Players see: Hall (on the TV only)'
     );
     expect(audienceStatus().textContent).not.toContain('arrives later');
   });

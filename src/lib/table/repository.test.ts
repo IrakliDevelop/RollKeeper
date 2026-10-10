@@ -152,7 +152,7 @@ describe('table repository', () => {
           sourceCampaignCode: 'LEGACY-CODE',
         },
       })
-    ).rejects.toThrow('More than one saved table matches this campaign');
+    ).rejects.toThrow('More than one saved Table matches this campaign');
   });
 
   it('commits campaign, actor, run, log and operation atomically and awaits completion', async () => {

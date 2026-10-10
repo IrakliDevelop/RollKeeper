@@ -17,6 +17,7 @@ import type {
 } from './TablePresentationControls.types';
 import {
   committedMessage,
+  recheckedMessage,
   failureMessage,
 } from './TablePresentationControls.utils';
 
@@ -184,13 +185,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
         const current = await readControl();
         if (!mounted.current) return;
         if (current) judgedRevision.current = current.revision;
-        const judged = current
-          ? committedMessage(intent, current, true)
-          : { tone: 'info' as const, text: "Couldn't check what players see" };
-        setMessage({
-          tone: judged.tone,
-          text: `${failed.text} ${judged.text.replace(/\.$/u, '')}.`,
-        });
+        setMessage(recheckedMessage(intent, current));
       }
     },
     [readControl, session]

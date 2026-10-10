@@ -303,7 +303,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
     }
   );
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
+  await page.getByRole('button', { name: 'Add Tavern Map to Table' }).click();
   await page.getByRole('button', { name: 'Open scene' }).click();
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
@@ -654,7 +654,7 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
   const server = controlServer();
   await seed(page, server);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Tavern Map' }).click();
+  await page.getByRole('button', { name: 'Add Tavern Map to Table' }).click();
   await page.getByRole('button', { name: 'Open scene' }).click();
   await expect(
     page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })

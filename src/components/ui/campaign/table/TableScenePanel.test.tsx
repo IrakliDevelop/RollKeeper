@@ -101,7 +101,7 @@ describe('Table scene panel acceptance states', () => {
       expect.objectContaining({ targetCampaignCode: 'CAMP' })
     );
     expect(
-      await screen.findByRole('link', { name: 'Open imported table' })
+      await screen.findByRole('link', { name: 'Open imported Table' })
     ).toHaveAttribute(
       'href',
       '/dm/campaign/CAMP/battlemaps?tableWorkspace=fork-1'

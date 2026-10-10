@@ -134,7 +134,7 @@ export function TableSceneBrowser(props: {
             No scenes yet. Create one or add a battle map.
           </p>
         ) : (
-          <ul aria-label="Scenes on this table" className="space-y-1">
+          <ul aria-label="Scenes on this Table" className="space-y-1">
             {props.scenes.map(scene => {
               const selected = scene.sceneId === props.selectedSceneId;
               const shown = presented === scene.sceneId;
@@ -185,7 +185,7 @@ export function TableSceneBrowser(props: {
           </h3>
           {props.adoptable.length === 0 ? (
             <p className="text-muted px-1 py-1 text-xs">
-              Every battle map is already on this table.
+              Every battle map is already on this Table.
             </p>
           ) : (
             <div className="flex flex-wrap gap-1 py-1">
@@ -206,7 +206,7 @@ export function TableSceneBrowser(props: {
             href={props.battleMapsHref}
             className="text-link px-1 text-xs underline"
           >
-            Export or import tables on Battle Maps
+            Export or import a Table on Battle Maps
           </Link>
         </div>
       </div>

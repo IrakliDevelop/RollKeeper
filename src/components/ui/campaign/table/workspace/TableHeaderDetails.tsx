@@ -112,7 +112,7 @@ export function TableHeaderDetails(props: {
 
   const label =
     attention > 0
-      ? `Details, ${attention} item${attention === 1 ? ' needs' : 's need'} attention`
+      ? `Details (${attention}): ${attention} item${attention === 1 ? ' needs' : 's need'} attention`
       : 'Details';
   return (
     <Popover.Root open={open} onOpenChange={setOpen}>

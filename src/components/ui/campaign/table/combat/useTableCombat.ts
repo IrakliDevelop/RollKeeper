@@ -156,7 +156,7 @@ export function useTableCombat(options: {
                 ? {
                     link: {
                       href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/battlemaps`,
-                      label: 'Export Table bundle',
+                      label: 'Export Table',
                     },
                   }
                 : {}),

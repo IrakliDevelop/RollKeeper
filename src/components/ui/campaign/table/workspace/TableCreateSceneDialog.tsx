@@ -98,7 +98,7 @@ export function TableCreateSceneDialog(props: {
       if (result.status !== 'committed') {
         setError(
           result.status === 'rejected' && result.reason === 'limit-exceeded'
-            ? 'This table is at its scene limit. Nothing was created.'
+            ? 'This Table is at its scene limit. Nothing was created.'
             : 'The scene could not be saved on this device. Nothing was created.'
         );
         return;

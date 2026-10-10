@@ -16,8 +16,8 @@ const REJECTIONS: Record<string, string> = {
     'Combat history is full. Export or delete an old archive in History to start a new fight.',
   'archive-active': 'The running combat’s archive cannot be deleted.',
   'invalid-reference':
-    'The table data on this device no longer matches this action. If this keeps happening, export your tables from Battle Maps.',
-  'limit-exceeded': 'This table is full on this device. Nothing was saved.',
+    'The Table data on this device no longer matches this action. If this keeps happening, export your Table from Battle Maps.',
+  'limit-exceeded': 'This Table is full on this device. Nothing was saved.',
 };
 
 /** Visible message for a failed combat command (nothing was saved). */

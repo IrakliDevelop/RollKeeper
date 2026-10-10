@@ -128,7 +128,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   const page = await context.newPage();
   await routeOffline(page);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Bridge Map' }).click();
+  await page.getByRole('button', { name: 'Add Bridge Map to Table' }).click();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
   const legacyBefore = await page.evaluate(() => ({
     map: localStorage.getItem('rollkeeper-battlemap-data'),

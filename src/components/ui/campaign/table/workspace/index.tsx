@@ -21,7 +21,7 @@ import { TableWorkspaceHeader } from './TableWorkspaceHeader';
 import { switchNoticeText } from './useTableSceneSwitch';
 
 const NOT_BOUND =
-  "This imported table belongs to another campaign, so it can't go live here. Nothing was sent.";
+  "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent.";
 
 /**
  * PR06 unified Table workspace (W1–W4): one page per campaign, one control
@@ -44,7 +44,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       ? NOT_BOUND
       : (workspace.opened.error ??
         (current?.status === 'read-only'
-          ? "This table's data is in a format the app can't edit. You can still export it from Battle Maps."
+          ? "This Table's data is in a format the app can't edit. You can still export it from Battle Maps."
           : current?.status === 'unavailable'
             ? 'Table storage is unavailable on this device.'
             : 'Loading scenes…'));
@@ -148,7 +148,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   // A canvas already on screen stays mounted while an explicit acquire
   // registers; it re-mints once afterwards (C6-2).
   const gate = !authority.firstOutcome
-    ? 'Getting the table ready…'
+    ? 'Getting the Table ready…'
     : authority.room.status === 'registering' &&
         shownScene.current !== mountedScene?.sceneId
       ? 'Getting this scene ready…'

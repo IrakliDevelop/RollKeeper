@@ -254,7 +254,7 @@ export async function resolveTableWorkspaceSelection(
       }
       if (schemaVersion(value) !== 1 || !validateCampaignRecord(value).ok) {
         throw new Error(
-          "This table can't open here: the saved table on this device doesn't match it."
+          "This Table can't open here: the saved Table on this device doesn't match it."
         );
       }
       return true;
@@ -267,7 +267,7 @@ export async function resolveTableWorkspaceSelection(
           );
     if (suppliedLocalId === null && sourceMatches.length > 1) {
       throw new Error(
-        'More than one saved table matches this campaign. Pick the one to open.'
+        'More than one saved Table matches this campaign. Pick the one to open.'
       );
     }
 
@@ -296,7 +296,7 @@ export async function resolveTableWorkspaceSelection(
         !validateCampaignRecord(existing).ok
       ) {
         throw new Error(
-          "This table can't open here: the saved table on this device doesn't match it."
+          "This Table can't open here: the saved Table on this device doesn't match it."
         );
       }
       const campaign = existing as TableCampaignRecordV1;
@@ -308,7 +308,7 @@ export async function resolveTableWorkspaceSelection(
         (routeCampaignCode !== null && storedRoute !== routeCampaignCode)
       ) {
         throw new Error(
-          "This imported table belongs to another campaign, so it can't go live here. Nothing was sent."
+          "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent."
         );
       }
       selection = {
@@ -321,7 +321,7 @@ export async function resolveTableWorkspaceSelection(
       };
     } else if (options.requireExistingLocalWorkspace) {
       throw new Error(
-        "This imported table belongs to another campaign, so it can't go live here. Nothing was sent."
+        "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent."
       );
     } else if (
       sourceCampaignCode !== null &&
@@ -330,7 +330,7 @@ export async function resolveTableWorkspaceSelection(
       )
     ) {
       throw new Error(
-        'More than one saved table matches this campaign. Pick the one to open.'
+        'More than one saved Table matches this campaign. Pick the one to open.'
       );
     } else {
       store.add(initialCampaignRecord(selection));

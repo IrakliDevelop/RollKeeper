@@ -78,7 +78,7 @@ afterEach(() => {
 describe('W5 private scene browser', () => {
   it('lists scenes as buttons with Selected/Shown badges from the descriptor', () => {
     renderBrowser();
-    const list = screen.getByRole('list', { name: 'Scenes on this table' });
+    const list = screen.getByRole('list', { name: 'Scenes on this Table' });
     const buttons = within(list).getAllByRole('button');
     expect(buttons.map(button => button.textContent)).toEqual([
       expect.stringContaining('Cave'),
@@ -133,7 +133,7 @@ describe('W5 private scene browser', () => {
     expect(props.onAdopt).toHaveBeenCalledWith('map-crypt');
     expect(
       screen.getByRole('link', {
-        name: /Export or import tables on Battle Maps/u,
+        name: /Export or import a Table on Battle Maps/u,
       })
     ).toHaveAttribute('href', '/dm/campaign/CAMP/battlemaps');
   });
