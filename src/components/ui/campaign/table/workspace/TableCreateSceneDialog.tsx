@@ -53,7 +53,7 @@ export function TableCreateSceneDialog(props: {
   async function create() {
     const trimmed = name.trim();
     if (!isSceneName(trimmed)) {
-      setError('Name the scene (1–200 characters).');
+      setError('Name the scene (1 to 200 characters).');
       return;
     }
     if (kind === 'image' && !file) {
@@ -98,7 +98,7 @@ export function TableCreateSceneDialog(props: {
       if (result.status !== 'committed') {
         setError(
           result.status === 'rejected' && result.reason === 'limit-exceeded'
-            ? 'This workspace is at its scene limit. Nothing was created.'
+            ? 'This Table is at its scene limit. Nothing was created.'
             : 'The scene could not be saved on this device. Nothing was created.'
         );
         return;

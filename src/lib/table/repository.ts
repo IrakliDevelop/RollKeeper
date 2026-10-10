@@ -253,7 +253,9 @@ export async function resolveTableWorkspaceSelection(
         return false;
       }
       if (schemaVersion(value) !== 1 || !validateCampaignRecord(value).ok) {
-        throw new Error('Existing Table workspace mapping is incompatible');
+        throw new Error(
+          "This Table can't open here: the saved Table on this device doesn't match it."
+        );
       }
       return true;
     }) as TableCampaignRecordV1[];
@@ -264,7 +266,9 @@ export async function resolveTableWorkspaceSelection(
             campaign => campaign.sourceCampaignCode === sourceCampaignCode
           );
     if (suppliedLocalId === null && sourceMatches.length > 1) {
-      throw new Error('Table workspace mapping collision requires selection');
+      throw new Error(
+        'More than one saved Table matches this campaign. Pick the one to open.'
+      );
     }
 
     let localWorkspaceId = suppliedLocalId;
@@ -291,7 +295,9 @@ export async function resolveTableWorkspaceSelection(
         schemaVersion(existing) !== 1 ||
         !validateCampaignRecord(existing).ok
       ) {
-        throw new Error('Existing Table workspace mapping is incompatible');
+        throw new Error(
+          "This Table can't open here: the saved Table on this device doesn't match it."
+        );
       }
       const campaign = existing as TableCampaignRecordV1;
       const storedRoute =
@@ -301,7 +307,9 @@ export async function resolveTableWorkspaceSelection(
         campaign.localWorkspaceId !== localWorkspaceId ||
         (routeCampaignCode !== null && storedRoute !== routeCampaignCode)
       ) {
-        throw new Error('Table workspace is not bound to this campaign route');
+        throw new Error(
+          "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent."
+        );
       }
       selection = {
         account: structuredClone(options.account),
@@ -312,14 +320,18 @@ export async function resolveTableWorkspaceSelection(
         },
       };
     } else if (options.requireExistingLocalWorkspace) {
-      throw new Error('Table workspace is not bound to this campaign route');
+      throw new Error(
+        "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent."
+      );
     } else if (
       sourceCampaignCode !== null &&
       sourceMatches.some(
         campaign => campaign.localWorkspaceId !== localWorkspaceId
       )
     ) {
-      throw new Error('Table workspace mapping collision requires selection');
+      throw new Error(
+        'More than one saved Table matches this campaign. Pick the one to open.'
+      );
     } else {
       store.add(initialCampaignRecord(selection));
     }

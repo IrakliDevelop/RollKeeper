@@ -100,7 +100,7 @@ describe('A1 session-scoped scene preparation', () => {
     );
     expect(result).toEqual({ status: 'rejected', reason: 'registry-full' });
     expect(sceneRoomMessage(result)).toBe(
-      'This campaign already has the maximum number of live scenes'
+      'This campaign has reached its limit of live scenes.'
     );
     expect(session.isLost()).toBe(false);
     expect(server.initializes).toHaveLength(0);
@@ -118,7 +118,9 @@ describe('A1 session-scoped scene preparation', () => {
       control(server.fetcher)
     );
     expect(result).toEqual({ status: 'rejected', reason: 'entry-too-large' });
-    expect(sceneRoomMessage(result)).toBe('Scene name is too long to register');
+    expect(sceneRoomMessage(result)).toBe(
+      'This scene name is too long for live play. Shorten it.'
+    );
     expect(session.isLost()).toBe(false);
   });
 
@@ -264,7 +266,7 @@ describe('A1 session-scoped scene preparation', () => {
       const result = await pending;
       expect(result).toEqual({ status: 'failed', reason: 'control-read' });
       expect(sceneRoomMessage(result)).toBe(
-        'Live registration is unavailable; this scene stays local.'
+        "Live play isn't available right now, so this scene stays on this device."
       );
       expect(hanging.mock.calls[0]![1]?.signal).toBeInstanceOf(AbortSignal);
       expect(session.isLost()).toBe(false);

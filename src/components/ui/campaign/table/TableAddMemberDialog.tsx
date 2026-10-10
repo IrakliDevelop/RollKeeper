@@ -98,8 +98,8 @@ export function TableAddMemberDialog(props: {
         <DialogHeader>
           <DialogTitle>Add to scene</DialogTitle>
           <DialogDescription>
-            Scene participants are saved on this device. Party members are
-            linked to their campaign player identity.
+            Everyone you add is saved on this device. Party members stay linked
+            to their players.
           </DialogDescription>
         </DialogHeader>
         <div
@@ -146,7 +146,7 @@ export function TableAddMemberDialog(props: {
                 <p className="text-muted text-sm">
                   {players.status === 'loading'
                     ? 'Loading campaign players…'
-                    : 'Campaign players are unavailable, so party control cannot be verified.'}
+                    : "Couldn't load the player list, so we can't check who controls each party member."}
                 </p>
                 {players.status === 'unavailable' && (
                   <Button

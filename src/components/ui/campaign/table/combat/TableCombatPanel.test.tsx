@@ -22,6 +22,7 @@ import {
   revisionOf,
 } from '@/lib/table/combat.fixture';
 import type { TableRepository } from '@/lib/table/repository';
+import { runRosterCommand } from '@/lib/table/roster';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useCombatLogStore } from '@/store/combatLogStore';
 import { useEncounterStore } from '@/store/encounterStore';
@@ -197,13 +198,13 @@ describe('Table combat panel (D10)', () => {
     await createRun('Bridge ambush');
     expect(
       screen.getByText(
-        'DM condition changes are not sent to player sheets in scene runs'
+        "Conditions you set here don't reach players' character sheets"
       )
     ).toBeVisible();
     await chooseParticipants(['Goblin', 'Knight', 'Aria']);
     for (const name of ['Orc', 'Bran', 'Bard'])
       expect(
-        screen.getByText(`${name} · Bystander — not in initiative`)
+        screen.getByText(`${name} · Bystander, not in initiative`)
       ).toBeVisible();
     expect(screen.queryByText(/Ghost/)).toBeNull();
     await setInitiative('Goblin', '12');
@@ -280,7 +281,7 @@ describe('Table combat panel (D10)', () => {
     expect(revisionOf(repository)).toBe(before + 1);
   });
 
-  it('surfaces a conflict as "Changed elsewhere" and never auto-replans', async () => {
+  it('surfaces a conflict as "Changed in another tab or device" and never auto-replans', async () => {
     const factory = new IDBFactory();
     const repository = await openFixture({ factory });
     await preparedAndStarted(repository);
@@ -303,7 +304,9 @@ describe('Table combat panel (D10)', () => {
     const revision = revisionOf(other);
     fireEvent.click(screen.getByRole('button', { name: /Next/ }));
     expect(
-      await screen.findByText(/Changed elsewhere — review and retry/)
+      await screen.findByText(
+        /Changed in another tab or device\. Check it and try again\./
+      )
     ).toBeVisible();
     expect(revisionOf(other)).toBe(revision);
     await other.reload();
@@ -334,7 +337,7 @@ describe('Table combat panel (D10)', () => {
     const repository = await openFixture();
     renderPanel(repository, { requestedRunId: IMPORTED_RUN });
     expect(
-      await screen.findByText(/Imported as active — not running here/)
+      await screen.findByText(/Imported mid-fight\. Not running here\./)
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Start combat' })).toBeNull();
     fireEvent.click(
@@ -361,7 +364,9 @@ describe('Table combat panel (D10)', () => {
     await setInitiative('Goblin', '12');
     await setInitiative('Aria', '15');
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(await screen.findByText(/Broadcasting initiative/)).toBeVisible();
+    expect(
+      await screen.findByText(/Initiative shared with players/)
+    ).toBeVisible();
     await waitFor(() =>
       expect(
         readySnapshot(repository).encounters.find(
@@ -382,7 +387,7 @@ describe('Table combat panel (D10)', () => {
     expect(revisionOf(repository)).toBe(revision + 1);
   });
 
-  it('shows "Started locally · not broadcasting" without live control', async () => {
+  it('shows "Started here, not shared with players" without live control', async () => {
     const repository = await openFixture();
     renderPanel(repository);
     await createRun('Bridge ambush');
@@ -390,7 +395,7 @@ describe('Table combat panel (D10)', () => {
     await setInitiative('Goblin', '12');
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
     expect(
-      await screen.findByText(/Started locally · not broadcasting/)
+      await screen.findByText(/Started here, not shared with players/)
     ).toBeVisible();
   });
 
@@ -407,7 +412,7 @@ describe('Table combat panel (D10)', () => {
     });
     fireEvent.click(
       within(dialog).getByRole('button', {
-        name: /Bridge ambush · generation 1/,
+        name: /Bridge ambush · version 1/,
       })
     );
     expect(within(dialog).getByText(/COMBAT STARTED/)).toBeVisible();
@@ -538,9 +543,8 @@ describe('Table combat panel (D10)', () => {
     await setInitiative('Goblin', '12');
     await setInitiative('Aria', '15');
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(
-      await screen.findByText(/^Waiting for player data · Bridge ambush$/)
-    ).toBeVisible();
+    // O7-2 HR-2: the selected run is the active one, so no run suffix.
+    expect(await screen.findByText(/^Waiting for player data$/)).toBeVisible();
     expect(session.publishInitiative).not.toHaveBeenCalled();
     expect(screen.getAllByText(/HP —/).length).toBeGreaterThan(0);
     expect(screen.queryByText('0/0')).toBeNull();
@@ -577,7 +581,7 @@ describe('Table combat panel (D10)', () => {
     expect(aria).not.toHaveProperty('currentHp');
     expect(aria).not.toHaveProperty('isDead');
     expect(
-      screen.getByText('Aria: player data unavailable — HP not broadcast')
+      screen.getByText("Aria: couldn't load player data, so HP isn't shared")
     ).toBeVisible();
   });
 });
@@ -698,7 +702,7 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
       screen.getByRole('button', { name: 'Show scene and start combat' })
     );
     expect(
-      await screen.findByText('Scene changed locally — review and retry')
+      await screen.findByText('The scene just changed. Check it and try again.')
     ).toBeVisible();
     expect(session.show).not.toHaveBeenCalled();
     expect(runOf(repository).isActive).toBe(false);
@@ -719,7 +723,7 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
     );
     expect(
       await screen.findByText(
-        /Scene not shown — combat did not start: this scene was deleted/
+        /Scene not shown \(this scene was deleted\), so combat didn't start\./
       )
     ).toBeVisible();
     expect(runOf(repository).isActive).toBe(false);
@@ -754,7 +758,7 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
       );
       expect(
         await screen.findByText(
-          'Show not confirmed — combat did not start; check the audience status'
+          "Couldn't confirm the scene is shown, so combat didn't start. Check what players see."
         )
       ).toBeVisible();
       expect(screen.queryByText(/Scene not shown/)).toBeNull();
@@ -776,7 +780,9 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
       screen.getByRole('button', { name: 'Show scene and start combat' })
     );
     expect(
-      await screen.findByText(/Scene not shown — combat did not start: /)
+      await screen.findByText(
+        /Scene not shown \(.+\), so combat didn't start\./
+      )
     ).toBeVisible();
     expect(runOf(repository).isActive).toBe(false);
   });
@@ -842,7 +848,7 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
     ).toBeVisible();
     expect(await screen.findByText(/ROUND 1 · NOW/)).toBeVisible();
     expect(
-      await screen.findByText(/Started locally · not broadcasting/)
+      await screen.findByText(/Started here, not shared with players/)
     ).toBeVisible();
     expect(runOf(repository).isActive).toBe(true);
   });
@@ -855,5 +861,67 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
     expect(await screen.findByText(/ROUND 1 · NOW/)).toBeVisible();
     expect(session.show).not.toHaveBeenCalled();
+  });
+});
+
+describe('physical representation badge (PR07 P9)', () => {
+  it('marks physical participants in the prepared initiative list only', async () => {
+    const repository = await openFixture();
+    const result = await runRosterCommand(repository, {
+      expectedRevision: revisionOf(repository),
+      operationId: 'physical-goblin',
+      command: {
+        type: 'roster.setRepresentation',
+        sceneId: 'scene-1',
+        sceneMemberId: 'm-goblin',
+        representation: 'physical',
+        at: AT,
+      },
+    });
+    expect(result.status).toBe('committed');
+    renderPanel(repository);
+    await createRun('Bridge ambush');
+    await chooseParticipants(['Goblin', 'Knight']);
+    const list = screen.getByRole('list', { name: 'Participants' });
+    const rows = within(list).getAllByRole('listitem');
+    const goblin = rows.find(row => row.textContent?.includes('Goblin'))!;
+    const knight = rows.find(row => row.textContent?.includes('Knight'))!;
+    expect(within(goblin).getByText('Physical')).toBeVisible();
+    expect(within(knight).queryByText('Physical')).toBeNull();
+  });
+});
+
+describe('publication status run suffix (O7-2 HR-2)', () => {
+  it('keeps "· <label>" when the active run is not the selected one (same scene)', async () => {
+    const repository = await openFixture();
+    const commands = [
+      {
+        type: 'combat.createRun',
+        sceneId: 'scene-1',
+        runId: 'alpha',
+        label: 'Alpha fight',
+      },
+      { type: 'combat.setParticipants', runId: 'alpha', actorIds: ['goblin'] },
+      {
+        type: 'combat.setInitiative',
+        runId: 'alpha',
+        actorId: 'goblin',
+        value: 4,
+      },
+      { type: 'combat.start', runId: 'alpha' },
+    ];
+    for (const [index, command] of commands.entries()) {
+      const result = await runCombatCommand(repository, {
+        expectedRevision: revisionOf(repository),
+        operationId: `alpha-${index}`,
+        command: { ...command, at: AT } as never,
+      });
+      expect(result.status).toBe('committed');
+    }
+    renderPanel(repository);
+    await createRun('Beta fight');
+    const status = await screen.findByTestId('table-publication-status');
+    await waitFor(() => expect(status).toHaveTextContent(/· Alpha fight$/u));
+    expect(status).not.toHaveTextContent(/\(scene /u);
   });
 });

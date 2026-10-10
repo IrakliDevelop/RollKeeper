@@ -60,13 +60,24 @@ export function controlLabel(entry: TableRosterEntry): string {
   if (entry.control.kind === 'player') return 'Player-controlled';
   if (entry.control.kind === 'dm') return 'DM-controlled';
   if (entry.control.reason === 'verification-unavailable')
-    return 'Verification unavailable';
+    return "Can't check player";
   return entry.control.reason === 'identity-unresolved'
-    ? 'Identity unresolved'
+    ? 'Player not found'
     : 'Control unavailable';
 }
 
 export function describeEntry(
+  entry: TableRosterEntry,
+  liveIds: ReadonlySet<string>
+): string {
+  const placement = describePlacement(entry, liveIds);
+  // PR07 P9: the DM's physical-mini indicator.
+  return entry.representation === 'physical'
+    ? `${placement} · Physical mini`
+    : placement;
+}
+
+function describePlacement(
   entry: TableRosterEntry,
   liveIds: ReadonlySet<string>
 ): string {

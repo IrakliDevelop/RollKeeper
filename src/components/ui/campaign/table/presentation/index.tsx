@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 
@@ -8,6 +8,7 @@ import { OpenDisplayButton } from '../display/OpenDisplayButton';
 import { useTablePresentation } from './TablePresentationControls.hooks';
 import type { TablePresentationControlsProps } from './TablePresentationControls.types';
 import {
+  displayCalibrationLine,
   displayStatusLine,
   LIVE_CONTROL_REQUIRED,
   presentationActions,
@@ -16,6 +17,7 @@ import {
 } from './TablePresentationControls.utils';
 import { useTableDisplayStatus } from './useTableDisplayStatus';
 
+const SHOW_BLOCKED = "This scene isn't ready to show yet.";
 const MESSAGE_TONE = {
   success: 'text-accent-emerald-text',
   info: 'text-accent-amber-text',
@@ -49,7 +51,16 @@ export function useTablePresentationPanel(
   useEffect(() => {
     if (committedCount > 0) refresh();
   }, [committedCount, refresh]);
-  return { presentation, display };
+  // O7-A5: whether the table reported `verified` during this page session.
+  const [verifiedSeen, setVerifiedSeen] = useState(false);
+  const reported =
+    display.status && display.status !== 'error'
+      ? display.status.calibration
+      : undefined;
+  useEffect(() => {
+    if (reported === 'verified') setVerifiedSeen(true);
+  }, [reported]);
+  return { presentation, display, verifiedSeen };
 }
 
 export type TablePresentationPanel = ReturnType<
@@ -98,14 +109,29 @@ export function TablePresentationView(
         labels,
       })
     : null;
+  const calibrationLine = displayCalibrationLine(
+    display.status,
+    props.panel.verifiedSeen
+  );
+  // O7-2 H5 / HR-7: why a presentation button is disabled, as visible text
+  // referenced by aria-describedby (LIVE_CONTROL_REQUIRED stays one node).
+  const liveReasonId = useId();
+  const blockedReasonId = useId();
+  const showBlockedReason = showBlocked && holder;
+  const reasonFor = (action: 'show' | 'other') =>
+    !holder
+      ? liveReasonId
+      : action === 'show' && showBlockedReason
+        ? blockedReasonId
+        : undefined;
   return (
     <section
-      aria-label="Audience presentation"
-      className="border-divider flex w-full min-w-0 flex-col gap-2 border-t pt-2"
+      aria-label="What players see controls"
+      className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1"
     >
       <div
         role="status"
-        aria-label="Audience status"
+        aria-label="What players see"
         aria-live="polite"
         className="min-w-0 text-xs"
       >
@@ -121,12 +147,17 @@ export function TablePresentationView(
               {displayLine.text}
             </p>
           )}
+          {calibrationLine && (
+            <p className="text-muted min-w-0 break-words">
+              {calibrationLine.text}
+            </p>
+          )}
         </div>
         {lines.preparation && props.sceneId !== null && (
           <p className="text-muted break-words">{lines.preparation}</p>
         )}
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         <OpenDisplayButton
           code={props.campaignCode}
           dmId={props.dmId}
@@ -137,11 +168,8 @@ export function TablePresentationView(
             variant="primary"
             size="sm"
             disabled={disabled || showBlocked}
-            title={
-              showBlocked && holder
-                ? 'This scene is not registered for live play yet'
-                : undefined
-            }
+            title={showBlockedReason ? SHOW_BLOCKED : undefined}
+            aria-describedby={reasonFor('show')}
             onClick={presentation.show}
           >
             Show this scene
@@ -152,6 +180,7 @@ export function TablePresentationView(
             variant="primary"
             size="sm"
             disabled={disabled}
+            aria-describedby={reasonFor('other')}
             onClick={presentation.reveal}
           >
             {revealLabel(descriptor, sceneId, props.sceneName, labels)}
@@ -162,9 +191,10 @@ export function TablePresentationView(
             variant="outline"
             size="sm"
             disabled={disabled}
+            aria-describedby={reasonFor('other')}
             onClick={presentation.blank}
           >
-            Blank audience
+            Blank screen
           </Button>
         )}
         {actions.includes('unpresent') && (
@@ -172,14 +202,24 @@ export function TablePresentationView(
             variant="ghost"
             size="sm"
             disabled={disabled}
+            aria-describedby={reasonFor('other')}
             onClick={presentation.unpresent}
           >
             Stop showing
           </Button>
         )}
       </div>
-      <div aria-live="polite" className="min-w-0 text-xs">
-        {!holder && <p className="text-muted">{LIVE_CONTROL_REQUIRED}</p>}
+      {showBlockedReason && (
+        <p id={blockedReasonId} className="text-muted text-xs">
+          {SHOW_BLOCKED}
+        </p>
+      )}
+      <div aria-live="polite" className="min-w-0 text-xs empty:hidden">
+        {!holder && (
+          <p id={liveReasonId} className="text-muted">
+            {LIVE_CONTROL_REQUIRED}
+          </p>
+        )}
         {pending && <p className="text-muted">Saving…</p>}
         {!pending && message && (
           <div className="flex flex-wrap items-center gap-2">

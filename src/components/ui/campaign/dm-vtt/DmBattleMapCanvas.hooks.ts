@@ -1097,6 +1097,10 @@ export function useDmBattleMapCanvas({
               : {}),
           },
           seedLocal: !tableSceneAdapter,
+          // PR07 A1 (review 02 N3): a refused live edit is never silent.
+          // Messages are payload-free (no element content or secrets).
+          onDiagnostic: message =>
+            console.warn('[RollKeeper] Live map:', message),
           resolveAudience: el =>
             readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):

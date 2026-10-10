@@ -6,6 +6,8 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/forms/button';
 
 import { TableCombatPanel } from '../combat/TableCombatPanel';
+import { calibrationNotice } from '../presentation/TablePresentationControls.utils';
+import { isLiveHolder } from '../tableRepresentation';
 import {
   createTablePlayersCache,
   TablePlayersCacheProvider,
@@ -19,7 +21,7 @@ import { TableWorkspaceHeader } from './TableWorkspaceHeader';
 import { switchNoticeText } from './useTableSceneSwitch';
 
 const NOT_BOUND =
-  'This imported Table workspace is not bound to this campaign route. No private authority request was sent.';
+  "This imported Table belongs to another campaign, so it can't go live here. Nothing was sent.";
 
 /**
  * PR06 unified Table workspace (W1–W4): one page per campaign, one control
@@ -42,10 +44,10 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       ? NOT_BOUND
       : (workspace.opened.error ??
         (current?.status === 'read-only'
-          ? 'This Table data uses an unsupported format. It is read-only; raw export remains available on Battle Maps.'
+          ? "This Table's data is in a format the app can't edit. You can still export it from Battle Maps."
           : current?.status === 'unavailable'
             ? 'Table storage is unavailable on this device.'
-            : 'Local scenes loading…'));
+            : 'Loading scenes…'));
     return (
       <main className="bg-surface flex min-h-screen flex-col items-center justify-center gap-4 p-6">
         <p className="text-heading text-lg font-semibold" role="status">
@@ -58,7 +60,11 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
     );
   }
 
+  // PR07 P9: the display's scale self-report (fresh matching status only).
+  const displayStatus = workspace.presentation.display.status;
+  const scaleNotice = calibrationNotice(displayStatus);
   const notices = [
+    ...(scaleNotice ? [scaleNotice] : []),
     ...(workspace.sceneUnavailable
       ? [
           {
@@ -88,7 +94,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
             ...(authority.room.retryable
               ? {
                   action: {
-                    label: 'Retry live registration',
+                    label: 'Try again',
                     onClick: authority.retryRoom,
                   },
                 }
@@ -142,10 +148,10 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   // A canvas already on screen stays mounted while an explicit acquire
   // registers; it re-mints once afterwards (C6-2).
   const gate = !authority.firstOutcome
-    ? 'Registering scene and preparing private authority…'
+    ? 'Getting the Table ready…'
     : authority.room.status === 'registering' &&
         shownScene.current !== mountedScene?.sceneId
-      ? 'Registering scene…'
+      ? 'Getting this scene ready…'
       : null;
   const stage =
     mountedScene && adapter && !gate ? (
@@ -167,6 +173,14 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
           onStatus={workspace.onStatus}
           onMessage={checkpoint.setSaveMessage}
           onEditBusy={workspace.onEditBusy}
+          liveHolder={isLiveHolder(workspace.relayLive, authority.session)}
+          scaleVerifiedHere={
+            workspace.presentedHere &&
+            displayStatus !== null &&
+            displayStatus !== 'error' &&
+            displayStatus.sceneId === mountedScene.sceneId &&
+            displayStatus.calibration === 'verified'
+          }
         />
         {/* Outside the keyed canvas: an explicit acquire remounts the canvas
           only, so open dialogs and the command queue survive (F6). */}
@@ -200,7 +214,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
             {gate ??
               (switcher.switching
                 ? 'Switching scene…'
-                : 'Choose a scene to prepare. Selecting a scene never changes what players see.')}
+                : "Pick a scene to prepare. Players won't see it until you show it.")}
           </p>
         </WorkspaceShell>
       )}

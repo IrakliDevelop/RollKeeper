@@ -528,6 +528,23 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     expect(again.showPlayerCursors).toBe(false);
   });
 
+  it('warns (payload-free) on a connection diagnostic such as a refused authority edit (PR07 A1, review 02 N3)', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    act(() => result.current.handleReady(makeVp()));
+    const onDiagnostic = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0].onDiagnostic;
+    expect(onDiagnostic).toBeTypeOf('function');
+    onDiagnostic!(
+      'A local upsert edit was not sent to the live room (invalid)'
+    );
+    expect(warn).toHaveBeenCalledWith(
+      '[RollKeeper] Live map:',
+      'A local upsert edit was not sent to the live room (invalid)'
+    );
+    warn.mockRestore();
+  });
+
   it('colorFor reads playerColors LIVE from the DM store', () => {
     const vp = makeVp();
     const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));

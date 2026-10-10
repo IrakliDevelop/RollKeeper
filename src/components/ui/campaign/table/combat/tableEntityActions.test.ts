@@ -267,7 +267,7 @@ describe('Table EntityActions adapter (R2-4, R2-5, C3-1, C3-2, C3-3)', () => {
       hp: false,
       conditions: false,
       reaction: true,
-      readOnlyNote: expect.stringMatching(/Read-only adopted PC/),
+      readOnlyNote: expect.stringMatching(/Copied PC \(view only\)/),
     });
   });
 

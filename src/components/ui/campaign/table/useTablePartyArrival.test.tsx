@@ -147,7 +147,7 @@ describe('W11 party arrival', () => {
       expect(result.current.arrivalPoint).toEqual({ x: 300, y: 200 })
     );
     expect(result.current.disabledReason).toBe(
-      'Waiting for a live connection before placing tokens.'
+      'Waiting to connect before placing tokens.'
     );
     rerender({ live: true });
     expect(result.current.canBring).toBe(true);
@@ -315,8 +315,7 @@ describe('W11 party arrival', () => {
     expect(stamps).toEqual([]);
     expect(result.current.notice).toMatchObject({
       tone: 'error',
-      message:
-        'Campaign players are unavailable. Nothing was placed — try again.',
+      message: "Couldn't load the player list. Nothing was placed. Try again.",
     });
   });
 
@@ -412,8 +411,7 @@ describe('FU-2 stalled players route', () => {
     expect(stamps).toEqual([]);
     expect(result.current.notice).toMatchObject({
       tone: 'error',
-      message:
-        'Campaign players are unavailable. Nothing was placed — try again.',
+      message: "Couldn't load the player list. Nothing was placed. Try again.",
     });
     act(() => {
       void result.current.bringParty();

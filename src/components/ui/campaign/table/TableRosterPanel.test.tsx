@@ -143,7 +143,7 @@ function fakeCanvas(elements: Record<string, unknown>[] = []) {
     subscribe: vi.fn(() => () => {}),
     select: vi.fn(),
     armPlacement: vi.fn(),
-    applyTokenPatch: vi.fn(() => true),
+    applyTokenPatch: vi.fn<TableRosterCanvas['applyTokenPatch']>(() => true),
     ensurePlayerBand: vi.fn(),
   } satisfies TableRosterCanvas;
   return canvas;
@@ -172,7 +172,8 @@ const playersResponse = {
 function renderPanel(
   repository: TableRepository,
   canvas: TableRosterCanvas,
-  live = true
+  live = true,
+  liveHolder = false
 ) {
   return render(
     <TableRosterPanel
@@ -182,6 +183,7 @@ function renderPanel(
       dmId="dm-a"
       canvas={canvas}
       live={live}
+      liveHolder={liveHolder}
     />
   );
 }
@@ -651,7 +653,7 @@ describe('TableRosterPanel', () => {
     );
     const dialog = await screen.findByRole('dialog');
     expect(
-      await within(dialog).findByText(/DM-managed participant/)
+      await within(dialog).findByText(/Only you control this one/)
     ).toBeInTheDocument();
     expect(
       within(dialog).queryByRole('button', { name: /Give .* control/ })
@@ -695,7 +697,7 @@ describe('TableRosterPanel', () => {
       unset: ['entityId'],
     });
     fireEvent.click(
-      within(dialog).getByRole('button', { name: 'Bind self-token' })
+      within(dialog).getByRole('button', { name: 'Link self-token' })
     );
     await waitFor(() =>
       expect(snapshot(repository).scenes[0]!.members[0]!.tokenIds).toEqual([
@@ -722,9 +724,7 @@ describe('TableRosterPanel', () => {
     );
     const canvas = fakeCanvas();
     renderPanel(repository, canvas);
-    expect(
-      await screen.findByText(/Verification unavailable/)
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Can't check player/)).toBeInTheDocument();
     expect(screen.queryByText(/Player-controlled/)).toBeNull();
     fireEvent.click(await rowButton('Aria'));
     await waitFor(() => expect(canvas.armPlacement).toHaveBeenCalledTimes(1));
@@ -764,12 +764,12 @@ describe('TableRosterPanel', () => {
     );
     const dialog = await screen.findByRole('dialog');
     const bind = within(dialog).queryByRole('button', {
-      name: 'Bind legacy-orc',
+      name: 'Link legacy-orc',
     });
     if (!bind) return expect.fail('legacy token not offered for binding');
     fireEvent.click(bind);
     expect(await within(dialog).findByRole('status')).toHaveTextContent(
-      /not updated on the map/i
+      /^Link saved, but the token on the map didn't update\.$/u
     );
     fireEvent.click(within(dialog).getByRole('button', { name: 'Retry' }));
     await waitFor(() =>
@@ -825,7 +825,7 @@ describe('TableRosterPanel', () => {
     });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Save stats' }));
     expect(await screen.findByRole('status')).toHaveTextContent(
-      /changed elsewhere/i
+      /changed in another tab or device\. Nothing was saved/u
     );
     expect(snapshot(repository).actors[0]!.liveStats?.currentHp).toBe(7);
     stale.mockRestore();
@@ -833,5 +833,167 @@ describe('TableRosterPanel', () => {
     await waitFor(() =>
       expect(snapshot(repository).actors[0]!.liveStats?.currentHp).toBe(2)
     );
+  });
+
+  describe('table representation (PR07 P9/P10)', () => {
+    const goblinToken = {
+      id: 'goblin-token',
+      ...dmTokenFields('m-g'),
+    };
+
+    it('sets a member to a physical mini through the accessible section and tags its tokens as live holder', async () => {
+      const repository = await repositoryWith(
+        [
+          {
+            actorId: 'goblin',
+            tokenIds: ['goblin-token'],
+            sceneMemberId: 'm-g',
+          },
+        ],
+        key => [creature(key, 'goblin')]
+      );
+      const token: Record<string, unknown> = { ...goblinToken };
+      const canvas = fakeCanvas([token]);
+      // The canvas applies patches like the real store does.
+      canvas.applyTokenPatch.mockImplementation(
+        (
+          _tokenId: string,
+          patch: { set: Record<string, unknown>; unset: string[] }
+        ) => {
+          Object.assign(token, patch.set);
+          for (const key of patch.unset) delete token[key];
+          return true;
+        }
+      );
+      renderPanel(repository, canvas, true, true);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Details for Goblin' })
+      );
+      const dialog = await screen.findByRole('dialog');
+      const group = within(dialog).getByRole('radiogroup', {
+        name: 'On the TV',
+      });
+      const digital = within(group).getByRole('radio', {
+        name: 'Digital token',
+      });
+      expect(digital).toHaveAttribute('aria-checked', 'true');
+      expect(dialog).toHaveTextContent(
+        "Physical minis are hidden on the TV only. You and your players still see the token, and initiative, HP and fog work as usual. The app can't track real minis, so reveal fog yourself with the fog tools."
+      );
+      expect(dialog).not.toHaveTextContent("The TV updates once you're live.");
+      fireEvent.click(
+        within(group).getByRole('radio', { name: 'Physical mini' })
+      );
+      await waitFor(() =>
+        expect(snapshot(repository).scenes[0]!.members[0]).toMatchObject({
+          representation: 'physical',
+        })
+      );
+      await waitFor(() =>
+        expect(canvas.applyTokenPatch).toHaveBeenCalledWith('goblin-token', {
+          set: { tableRepresentation: 'physical' },
+          unset: [],
+        })
+      );
+      expect(
+        await screen.findByText('DM-controlled · On map · Physical mini')
+      ).toBeInTheDocument();
+      // Keyboard: arrows move within the radio group (Radix roving focus).
+      const physicalRadio = within(group).getByRole('radio', {
+        name: 'Physical mini',
+      });
+      await waitFor(() =>
+        expect(physicalRadio).toHaveAttribute('aria-checked', 'true')
+      );
+      physicalRadio.focus();
+      fireEvent.keyDown(physicalRadio, { key: 'ArrowUp' });
+      await waitFor(() =>
+        expect(snapshot(repository).scenes[0]!.members[0]).not.toHaveProperty(
+          'representation'
+        )
+      );
+      await waitFor(() =>
+        expect(canvas.applyTokenPatch).toHaveBeenCalledWith('goblin-token', {
+          set: {},
+          unset: ['tableRepresentation'],
+        })
+      );
+    });
+
+    it('without live control the choice is saved, the map is not written and the update is pending', async () => {
+      const repository = await repositoryWith(
+        [
+          {
+            actorId: 'party-actor',
+            tokenIds: ['goblin-token'],
+            sceneMemberId: 'm-g',
+            control: { kind: 'player', legacyPlayerId: 'legacy-a' },
+          },
+        ],
+        key => [partyActor(key)]
+      );
+      const canvas = fakeCanvas([goblinToken]);
+      renderPanel(repository, canvas, true, false);
+      fireEvent.click(
+        await screen.findByRole('button', { name: 'Details for Aria' })
+      );
+      const dialog = await screen.findByRole('dialog');
+      expect(dialog).toHaveTextContent("The TV updates once you're live.");
+      expect(dialog).toHaveTextContent(
+        "The player can still move their token in the app. The TV won't show it, and it won't follow the real mini."
+      );
+      fireEvent.click(
+        within(dialog).getByRole('radio', { name: 'Physical mini' })
+      );
+      await waitFor(() =>
+        expect(snapshot(repository).scenes[0]!.members[0]).toMatchObject({
+          representation: 'physical',
+        })
+      );
+      expect(canvas.applyTokenPatch).not.toHaveBeenCalledWith(
+        'goblin-token',
+        expect.objectContaining({
+          set: { tableRepresentation: 'physical' },
+        })
+      );
+    });
+
+    it('stamps a newly placed token of a physical member and summarises a mixed roster', async () => {
+      const repository = await repositoryWith(
+        [
+          {
+            actorId: 'goblin',
+            tokenIds: [],
+            sceneMemberId: 'm-g',
+            representation: 'physical',
+          },
+          { actorId: 'orc', tokenIds: [], sceneMemberId: 'm-o' },
+        ],
+        key => [creature(key, 'goblin'), creature(key, 'orc')]
+      );
+      const canvas = fakeCanvas([]);
+      renderPanel(repository, canvas, true, true);
+      expect(
+        await screen.findByText('1 physical · 1 digital')
+      ).toBeInTheDocument();
+      fireEvent.click(
+        (
+          await screen.findAllByRole('button', { name: 'Details for Goblin' })
+        )[0]!
+      );
+      const dialog = await screen.findByRole('dialog');
+      fireEvent.click(
+        within(dialog).getByRole('button', { name: 'Place on map' })
+      );
+      await waitFor(() => expect(canvas.armPlacement).toHaveBeenCalled());
+      const request = canvas.armPlacement.mock.calls[0]![0] as {
+        fields: Record<string, unknown>;
+        sceneMemberId: string;
+      };
+      expect(request.fields).toEqual({
+        ...dmTokenFields(request.sceneMemberId),
+        tableRepresentation: 'physical',
+      });
+    });
   });
 });

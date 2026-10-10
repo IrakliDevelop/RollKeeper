@@ -182,7 +182,21 @@ describe('display camera with the real core camera helpers (acceptance A1)', () 
     controller!.onViewportReady(key, mounted.vp);
     expect(connections).toHaveLength(2);
     expect(connections[0]!.stop).toHaveBeenCalledTimes(1);
-    expect(connections[1]!.options.store).toBe(mounted.vp.store);
+    // PR07 M2: the connection syncs into the private store projected into
+    // the live viewport's store (never the destroyed one's).
+    const source = connections[1]!.options.store;
+    expect(source).not.toBe(destroyed.vp.store);
+    source.add(
+      {
+        id: 'probe',
+        type: 'shape',
+        position: { x: 0, y: 0 },
+        size: { w: 1, h: 1 },
+      } as never,
+      { origin: 'remote' }
+    );
+    expect(mounted.vp.store.getById('probe')).toBeDefined();
+    expect(destroyed.vp.store.getById('probe')).toBeUndefined();
     expect(destroyed.hooks.size).toBe(0);
     await goLive(mounted);
     expect(cover()).toBeNull();

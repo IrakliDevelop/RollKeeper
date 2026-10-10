@@ -128,7 +128,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   const page = await context.newPage();
   await routeOffline(page);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/battlemaps`);
-  await page.getByRole('button', { name: 'Adopt Bridge Map' }).click();
+  await page.getByRole('button', { name: 'Add Bridge Map to Table' }).click();
   await expect(page.getByRole('button', { name: 'Open scene' })).toBeVisible();
   const legacyBefore = await page.evaluate(() => ({
     map: localStorage.getItem('rollkeeper-battlemap-data'),
@@ -167,7 +167,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   await expect(dialog).toHaveCount(0);
   for (const name of ['Cora', 'Dax', 'Eli'])
     await expect(
-      page.getByText(`${name} · Bystander — not in initiative`)
+      page.getByText(`${name} · Bystander, not in initiative`)
     ).toBeVisible();
   await setInitiative(page, 'Aria', '15');
   await setInitiative(page, 'Nyx', '0');
@@ -179,7 +179,9 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   await page.getByRole('button', { name: 'Start combat' }).click();
   await expect(page.getByText('ROUND 1 · NOW')).toBeVisible();
   await expect(
-    page.getByText(/Started locally · not broadcasting|Not broadcasting/)
+    page.getByText(
+      /Started here, not shared with players|Not shared with players/
+    )
   ).toBeVisible();
   // A2: at desktop width the status line takes the toolbar width instead of
   // wrapping word-by-word beside the buttons.
@@ -213,7 +215,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   );
   await page.getByRole('button', { name: 'Next', exact: true }).click();
   await expect(
-    page.getByText('Changed elsewhere — review and retry')
+    page.getByText('Changed in another tab or device. Check it and try again.')
   ).toBeVisible();
   await other.close();
   await page.getByRole('button', { name: 'Retry' }).click();
@@ -253,7 +255,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   // History: view and export JSON.
   await page.getByRole('button', { name: 'History' }).click();
   await dialog
-    .getByRole('button', { name: /Bridge ambush · generation 1/ })
+    .getByRole('button', { name: /Bridge ambush · version 1/ })
     .click();
   await expect(dialog.getByText(/COMBAT STARTED/)).toBeVisible();
   const downloadPromise = page.waitForEvent('download');
@@ -287,9 +289,7 @@ test('scene combat: three of six members, manual initiatives, reload, conflict, 
   // A1: with the (tall, wrapped) live-control status header showing, the
   // panel's tabs, collapse control, an initiative input and Start combat are
   // inside the 390x844 viewport without scrolling any inner region.
-  await expect(
-    page.getByText(/Private authority preparation failed/)
-  ).toBeVisible();
+  await expect(page.getByText(/^Couldn't go live\./u)).toBeVisible();
   const panel = page.getByTestId('dm-vtt-studio-panel');
   for (const control of [
     panel.getByRole('button', { name: 'Initiative' }),

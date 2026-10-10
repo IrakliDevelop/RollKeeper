@@ -93,13 +93,25 @@ export interface DmVttToolbarProps {
   /** PR06 W10: the Table "Edit map" tool group (absent on legacy maps). */
   editMapControl?: ReactNode;
   /**
-   * PR06 acceptance A2: keep session controls and canvas tools on separate
-   * full-width rows at every width (the Table workspace header is wide).
+   * When session controls and canvas tools share one row (otherwise they
+   * stack as full-width rows): `2xl` (default, legacy VTT screen) or `never`
+   * (Table workspace, acceptance A2: the header always stacks above a
+   * full-width tool strip, because its live line, banners and audience row
+   * leave too little width for the tools at any viewport).
    */
-  stackRows?: boolean;
+  sideBySide?: '2xl' | 'never';
   fogControls?: DmFogControls;
   fogPresetControls?: FogPresetControls;
 }
+
+// Literal class strings (Tailwind scans source text).
+const SIDE_BY_SIDE = {
+  '2xl': {
+    dock: '2xl:flex-row 2xl:flex-wrap',
+    session: '2xl:border-r 2xl:border-b-0',
+  },
+  never: { dock: '', session: '' },
+} as const;
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
   full: Eye,
@@ -142,7 +154,7 @@ export function DmVttToolbar({
   viewsControl,
   presenceControl,
   editMapControl,
-  stackRows,
+  sideBySide = '2xl',
   fogControls,
   fogPresetControls,
 }: DmVttToolbarProps) {
@@ -179,14 +191,14 @@ export function DmVttToolbar({
     <div
       ref={dockRef}
       className={`bg-surface-raised border-divider pointer-events-auto fixed inset-x-0 top-0 z-20 flex w-full flex-col overflow-hidden border-b shadow-xl ${
-        stackRows ? '' : '2xl:flex-row 2xl:flex-wrap'
+        SIDE_BY_SIDE[sideBySide].dock
       }`}
       data-testid="dm-vtt-command-dock"
     >
       {sessionControls && (
         <div
           className={`border-divider min-w-0 shrink-0 border-b ${
-            stackRows ? '' : '2xl:border-r 2xl:border-b-0'
+            SIDE_BY_SIDE[sideBySide].session
           }`}
         >
           {sessionControls}

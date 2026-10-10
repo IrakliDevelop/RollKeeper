@@ -18,7 +18,7 @@ export type TableSwitchNotice =
 export function switchNoticeText(notice: TableSwitchNotice): string {
   return notice.kind === 'conflict'
     ? `Resolve the unsaved change on ${notice.sceneName} before switching`
-    : `Still saving ${notice.sceneName} — try again`;
+    : `Still saving ${notice.sceneName}. Try again in a moment.`;
 }
 
 /**

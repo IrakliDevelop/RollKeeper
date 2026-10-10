@@ -45,7 +45,7 @@ export function TableCombatHistoryDialog(props: {
       ? combatHistoryText(props.snapshot, current.archiveId)
       : '';
   const title = (item: (typeof archives)[number]) =>
-    `${item.label ?? 'Imported run'} · generation ${item.combatGeneration ?? '—'}`;
+    `${item.label ?? 'Imported run'} · version ${item.combatGeneration ?? 'not set'}`;
 
   const exportJson = () => {
     if (!current || !props.snapshot) return;

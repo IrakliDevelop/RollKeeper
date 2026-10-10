@@ -1574,6 +1574,63 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     (await display.readDisplayStatus(rawRedis, CODE)).display.state,
     'loaded'
   );
+  // Absent calibration (PR05 shape): no key stored, none reported.
+  assert.ok(!('calibration' in record));
+  assert.ok(
+    !(
+      'calibration' in (await display.readDisplayStatus(rawRedis, CODE)).display
+    )
+  );
+
+  // PR07 M1: the optional calibration self-report is validated by the Lua,
+  // stored in the same v1 record (same TTL) and returned with fresh matching
+  // loaded/blank/waiting status only.
+  for (const calibration of [
+    'uncalibrated',
+    'verified',
+    'verify-required',
+    'unsupported',
+  ]) {
+    const withReport = await sendAck(ackOf({ calibration }));
+    assert.equal(withReport.status, 'recorded', calibration);
+    const reportRecord = JSON.parse(cli('GET', ackKey));
+    assert.equal(reportRecord.v, 1);
+    assert.equal(reportRecord.calibration, calibration);
+    const reportTtl = Number(cli('TTL', ackKey));
+    assert.ok(reportTtl > 25 && reportTtl <= 30);
+    assert.deepEqual(
+      (await display.readDisplayStatus(rawRedis, CODE)).display.calibration,
+      calibration
+    );
+  }
+  cli('DEL', ackKey);
+  const calibrationHash = value =>
+    createHash('sha256').update(value, 'utf8').digest('hex');
+  for (const invalid of ['calibrated', 7, null])
+    assert.equal(
+      JSON.parse(
+        await rawRedis.eval(
+          DISPLAY_ACK_SCRIPT,
+          [controlKey, sessionKey, ackKey, tableKeys.tableRegistryKey(CODE)],
+          [
+            calibrationHash(first.capability),
+            calibrationHash(nonceA),
+            JSON.stringify(ackOf({ calibration: invalid })),
+          ]
+        )
+      ).status,
+      'invalid',
+      String(invalid)
+    );
+  assert.equal(cli('EXISTS', ackKey), '0');
+  assert.equal(
+    display.parseDisplayAck(ackOf({ calibration: 'verified', extra: 1 })),
+    null
+  );
+  assert.equal(
+    (await sendAck(ackOf({ calibration: 'verified' }))).status,
+    'recorded'
+  );
 
   cli('DEL', ackKey);
   for (const [label, ack, sessionNonce] of [
@@ -1596,21 +1653,30 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     'loaded while blanked'
   );
   assert.equal(
-    (await sendAck(ackOf({ sceneId: null, blanked: true, phase: 'blank' })))
-      .status,
+    (
+      await sendAck(
+        ackOf({
+          sceneId: null,
+          blanked: true,
+          phase: 'blank',
+          calibration: 'verify-required',
+        })
+      )
+    ).status,
     'recorded'
   );
   const blankStatus = (await display.readDisplayStatus(rawRedis, CODE)).display;
   assert.equal(blankStatus.state, 'blank');
   assert.equal(blankStatus.sceneId, null);
   assert.ok(blankStatus.ageMs >= 0 && blankStatus.ageMs < 15_000);
+  assert.equal(blankStatus.calibration, 'verify-required');
 
   // E13 with Redis TIME: updating (tuple differs), stale (>= 15 s), none.
   current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
-  assert.equal(
-    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
-    'updating'
-  );
+  const updatingStatus = (await display.readDisplayStatus(rawRedis, CODE))
+    .display;
+  assert.equal(updatingStatus.state, 'updating');
+  assert.ok(!('calibration' in updatingStatus), 'updating never reports it');
   const nowMs = Number(cli('TIME').split('\n')[0]) * 1000;
   cli(
     'SET',
@@ -1625,6 +1691,7 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
   const staleStatus = (await display.readDisplayStatus(rawRedis, CODE)).display;
   assert.equal(staleStatus.state, 'stale');
   assert.ok(staleStatus.ageMs >= 15_000);
+  assert.ok(!('calibration' in staleStatus), 'stale never reports it');
   cli('DEL', ackKey);
   assert.deepEqual((await display.readDisplayStatus(rawRedis, CODE)).display, {
     state: 'none',
@@ -1639,13 +1706,17 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
     'stale'
   );
   assert.equal(
-    (await sendAck(ackOf({ sceneId: null, phase: 'blank' }))).status,
+    (
+      await sendAck(
+        ackOf({ sceneId: null, phase: 'blank', calibration: 'unsupported' })
+      )
+    ).status,
     'recorded'
   );
-  assert.equal(
-    (await display.readDisplayStatus(rawRedis, CODE)).display.state,
-    'waiting'
-  );
+  const waitingStatus = (await display.readDisplayStatus(rawRedis, CODE))
+    .display;
+  assert.equal(waitingStatus.state, 'waiting');
+  assert.equal(waitingStatus.calibration, 'unsupported');
   current = await ok({ ...base(), type: 'show', sceneId: 'scene-tavern' });
 
   // R4-F5: an expired binding answers stale; the descriptor re-binds; a

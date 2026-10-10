@@ -44,6 +44,7 @@ export function TableMemberDialog(props: {
   onPlace: () => void;
   onRemove: () => void;
   actions: TableMemberActions;
+  liveHolder?: boolean;
 }) {
   const entry = props.entry;
   return (
@@ -82,8 +83,8 @@ export function TableMemberDialog(props: {
               ) : (
                 <p className="text-muted text-xs">
                   {entry.adoptedPc
-                    ? 'Adopted PC stats are read-only in this scene.'
-                    : 'Player character stats come from the player’s sheet and are read-only here.'}
+                    ? 'This copied PC is view only in this scene.'
+                    : 'Player character stats come from the player’s sheet and are view only here.'}
                 </p>
               )}
               <TableMemberControls
@@ -94,6 +95,7 @@ export function TableMemberDialog(props: {
                 liveIds={props.liveIds}
                 busy={props.busy}
                 actions={props.actions}
+                liveHolder={props.liveHolder}
               />
             </DialogBody>
             <DialogFooter>

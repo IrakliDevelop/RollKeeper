@@ -543,6 +543,120 @@ describe('PR05 display ACK route (E7)', () => {
   });
 });
 
+describe('PR07 M1 display calibration self-report', () => {
+  async function status() {
+    const response = await statusGET(
+      clientRequest(displayStatusUrl(CODE, DM_ID)),
+      params()
+    );
+    return (await response.json()) as Record<string, unknown>;
+  }
+
+  it('stores an optional calibration enum in the same v1 record and reports it for fresh matching tuples only', async () => {
+    issueDisplay(store);
+    const recorded = await send(
+      ackPOST,
+      displayAckRequest(CODE, credential, ack({ calibration: 'verified' }))
+    );
+    expect(recorded.status).toBe(200);
+    expect(JSON.parse(store.strings.get(tableDisplayAckKey(CODE))!)).toEqual({
+      v: 1,
+      displayGeneration: DISPLAY_GENERATION,
+      epoch: EPOCH,
+      presentationRevision: 3,
+      sceneId: 'scene-tavern',
+      blanked: false,
+      phase: 'loaded',
+      calibration: 'verified',
+      receivedAt: now,
+    });
+    expect(await status()).toEqual({
+      state: 'loaded',
+      sceneId: 'scene-tavern',
+      ageMs: 0,
+      calibration: 'verified',
+    });
+    // Updating (tuple moved on) and stale never carry it.
+    const changed = control();
+    changed.presentation.revision = 4;
+    store.strings.set(tableControlKey(CODE), JSON.stringify(changed));
+    expect(await status()).not.toHaveProperty('calibration');
+    changed.presentation.revision = 3;
+    store.strings.set(tableControlKey(CODE), JSON.stringify(changed));
+    now += 15_000;
+    expect(await status()).toMatchObject({ state: 'stale' });
+    expect(await status()).not.toHaveProperty('calibration');
+    now += 1;
+    // Blank and waiting carry it.
+    setPresentation(store, 'scene-tavern', true);
+    await send(
+      ackPOST,
+      displayAckRequest(
+        CODE,
+        credential,
+        ack({
+          sceneId: null,
+          blanked: true,
+          phase: 'blank',
+          calibration: 'verify-required',
+        })
+      )
+    );
+    expect(await status()).toMatchObject({
+      state: 'blank',
+      calibration: 'verify-required',
+    });
+    setPresentation(store, null);
+    await send(
+      ackPOST,
+      displayAckRequest(
+        CODE,
+        credential,
+        ack({ sceneId: null, phase: 'blank', calibration: 'unsupported' })
+      )
+    );
+    expect(await status()).toMatchObject({
+      state: 'waiting',
+      calibration: 'unsupported',
+    });
+    // Absent = unknown: no key stored, none reported.
+    await send(
+      ackPOST,
+      displayAckRequest(
+        CODE,
+        credential,
+        ack({ sceneId: null, phase: 'blank' })
+      )
+    );
+    expect(
+      JSON.parse(store.strings.get(tableDisplayAckKey(CODE))!)
+    ).not.toHaveProperty('calibration');
+    expect(await status()).not.toHaveProperty('calibration');
+  });
+
+  it('answers 400 for an invalid enum or any other extra ACK key, within the 2 KiB bound', async () => {
+    issueDisplay(store);
+    const built = displayAckRequest(CODE, credential, ack());
+    const body = JSON.parse(built.init.body as string) as Record<
+      string,
+      unknown
+    >;
+    for (const bad of [
+      { ...body, ack: { ...ack(), calibration: 'calibrated' } },
+      { ...body, ack: { ...ack(), calibration: null } },
+      { ...body, ack: { ...ack(), calibration: 'verified', note: 'x' } },
+      { ...body, calibration: 'verified' },
+    ]) {
+      const response = await send(ackPOST, {
+        url: built.url,
+        init: { ...built.init, body: JSON.stringify(bad) },
+      });
+      expect(response.status, JSON.stringify(bad)).toBe(400);
+    }
+    expect(store.strings.has(tableDisplayAckKey(CODE))).toBe(false);
+  });
+});
+
 describe('PR05 DM display status route (E13)', () => {
   async function status() {
     const response = await statusGET(

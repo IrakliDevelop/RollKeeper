@@ -30,6 +30,8 @@ export function useWorkspaceSceneBrowser(options: {
   const [status, setStatus] = useState<{
     tone: 'alert' | 'status';
     text: string;
+    /** O7-3: a raw outcome code, shown as a tooltip only. */
+    detail?: string;
   } | null>(null);
   const maps = useBattleMapStore(
     state => state.battleMaps[campaignCode] ?? NO_MAPS
@@ -77,7 +79,7 @@ export function useWorkspaceSceneBrowser(options: {
         if (result.status === 'committed') {
           setStatus({
             tone: 'status',
-            text: `${result.name} added to this workspace. The original map was not changed.`,
+            text: `${result.name} added. The original map wasn't changed.`,
           });
           onSelect(result.sceneId);
           return;
@@ -87,7 +89,8 @@ export function useWorkspaceSceneBrowser(options: {
           text:
             result.status === 'source-changed'
               ? 'The battle map changed while it was being added. Try again.'
-              : `The battle map was not added (${result.status}).`,
+              : "The battle map wasn't added.",
+          detail: result.status,
         });
       } catch (error) {
         setStatus({
@@ -95,7 +98,7 @@ export function useWorkspaceSceneBrowser(options: {
           text:
             error instanceof Error
               ? error.message
-              : 'The battle map could not be added.',
+              : "The battle map couldn't be added.",
         });
       } finally {
         setBusy(false);

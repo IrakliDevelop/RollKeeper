@@ -37,6 +37,26 @@ export interface DisplayRedis {
   eval(script: string, keys: string[], args: string[]): Promise<unknown>;
 }
 
+/**
+ * PR07 M1: the display's optional self-report of its S5 scale state. It is
+ * device-reported, grants nothing and is shown to the DM as "Table reports".
+ */
+export const DISPLAY_CALIBRATION_REPORTS = [
+  'uncalibrated',
+  'verified',
+  'verify-required',
+  'unsupported',
+] as const;
+export type DisplayCalibrationReport =
+  (typeof DISPLAY_CALIBRATION_REPORTS)[number];
+const CALIBRATION_REPORTS: ReadonlySet<string> = new Set(
+  DISPLAY_CALIBRATION_REPORTS
+);
+const isCalibrationReport = (
+  value: unknown
+): value is DisplayCalibrationReport =>
+  typeof value === 'string' && CALIBRATION_REPORTS.has(value);
+
 export interface DisplayAck {
   displayGeneration: number;
   epoch: string;
@@ -44,6 +64,7 @@ export interface DisplayAck {
   sceneId: string | null;
   blanked: boolean;
   phase: 'loaded' | 'blank';
+  calibration?: DisplayCalibrationReport;
 }
 
 export interface DisplayDescriptor {
@@ -84,6 +105,7 @@ export interface DisplayStatus {
   state: DisplayStatusState;
   sceneId: string | null;
   ageMs: number | null;
+  calibration?: DisplayCalibrationReport;
 }
 
 const expired = (): DisplayDenial => ({
@@ -291,11 +313,18 @@ const ACK_KEYS = [
   'sceneId',
 ];
 
-/** E7: exactly the six ACK keys; the client never sends a timestamp. */
+/**
+ * E7: exactly the six ACK keys plus (PR07 M1) one optional `calibration`
+ * enum; any other key is rejected. The client never sends a timestamp.
+ */
 export function parseDisplayAck(value: unknown): DisplayAck | null {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const ack = value as Record<string, unknown>;
-  const keys = Object.keys(ack).sort();
+  const hasCalibration = Object.hasOwn(ack, 'calibration');
+  if (hasCalibration && !isCalibrationReport(ack.calibration)) return null;
+  const keys = Object.keys(ack)
+    .filter(key => key !== 'calibration')
+    .sort();
   if (
     keys.length !== ACK_KEYS.length ||
     keys.some((key, index) => key !== ACK_KEYS[index])
@@ -418,6 +447,12 @@ const STATES: ReadonlySet<string> = new Set([
   'stale',
 ]);
 
+const FRESH_STATES: ReadonlySet<string> = new Set([
+  'loaded',
+  'blank',
+  'waiting',
+]);
+
 /** E13: the DM-only display status, computed server-side. */
 export async function readDisplayStatus(
   rawRedis: DisplayRedis,
@@ -447,6 +482,11 @@ export async function readDisplayStatus(
         state: result.state as DisplayStatusState,
         sceneId: typeof result.sceneId === 'string' ? result.sceneId : null,
         ageMs: typeof result.ageMs === 'number' ? result.ageMs : null,
+        // PR07 M1: fresh matching loaded/blank/waiting records only.
+        ...(isCalibrationReport(result.calibration) &&
+        FRESH_STATES.has(result.state)
+          ? { calibration: result.calibration }
+          : {}),
       },
     };
   } catch {

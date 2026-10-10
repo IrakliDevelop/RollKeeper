@@ -17,6 +17,7 @@ import type {
 import type { TableAuthorityState } from '../workspace/useTableWorkspaceAuthority';
 
 import { TablePresentationControls } from '.';
+import { recheckedMessage } from './TablePresentationControls.utils';
 
 const HOLDER = 'table-session-1';
 const descriptor = (
@@ -122,15 +123,15 @@ function renderControls(options: {
   return { ...utils, session };
 }
 
-const status = () => screen.getByRole('status', { name: 'Audience status' });
+const status = () => screen.getByRole('status', { name: 'What players see' });
 
 describe('Table presentation controls (PR04 P4)', () => {
   it('separates the public audience from private preparation', async () => {
     renderControls({});
-    expect(
-      await screen.findByText('Audience: Tavern · Published')
-    ).toBeVisible();
-    expect(status()).toHaveTextContent('Preparing: Private Forest (private)');
+    expect(await screen.findByText('Players see: Tavern')).toBeVisible();
+    expect(status()).toHaveTextContent(
+      "Preparing Private Forest (players can't see it)"
+    );
     expect(status()).toHaveAttribute('aria-live', 'polite');
   });
 
@@ -139,24 +140,24 @@ describe('Table presentation controls (PR04 P4)', () => {
       current: descriptor('scene-forest'),
     });
     expect(
-      await screen.findByText('Editing the shown scene — changes are live')
+      await screen.findByText(
+        "You're editing the scene players see. Changes show right away."
+      )
     ).toBeVisible();
-    expect(status()).toHaveTextContent('Audience: Private Forest · Published');
+    expect(status()).toHaveTextContent('Players see: Private Forest');
     cleanup();
     renderControls({ current: descriptor('scene-tavern', true) });
-    expect(
-      await screen.findByText('Audience: blank (covered) · Published')
-    ).toBeVisible();
+    expect(await screen.findByText('Players see: blank screen')).toBeVisible();
     cleanup();
     renderControls({ current: descriptor(null) });
-    expect(await screen.findByText('Audience: nothing shown')).toBeVisible();
+    expect(await screen.findByText('Players see: nothing')).toBeVisible();
     void rerender;
   });
 
   it('offers the actions that fit each audience state (holder only)', async () => {
     renderControls({ current: descriptor('scene-tavern') });
-    await screen.findByText('Audience: Tavern · Published');
-    for (const name of ['Show this scene', 'Blank audience', 'Stop showing'])
+    await screen.findByText('Players see: Tavern');
+    for (const name of ['Show this scene', 'Blank screen', 'Stop showing'])
       expect(screen.getByRole('button', { name })).toBeEnabled();
     expect(screen.queryByRole('button', { name: /Reveal/ })).toBeNull();
     cleanup();
@@ -164,18 +165,20 @@ describe('Table presentation controls (PR04 P4)', () => {
     expect(
       await screen.findByRole('button', { name: 'Reveal Tavern' })
     ).toBeEnabled();
-    expect(screen.queryByRole('button', { name: 'Blank audience' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Blank screen' })).toBeNull();
     cleanup();
     renderControls({ current: descriptor('scene-forest') });
-    await screen.findByText('Editing the shown scene — changes are live');
+    await screen.findByText(
+      "You're editing the scene players see. Changes show right away."
+    );
     expect(
       screen.queryByRole('button', { name: 'Show this scene' })
     ).toBeNull();
     cleanup();
     renderControls({ current: descriptor(null) });
-    await screen.findByText('Audience: nothing shown');
+    await screen.findByText('Players see: nothing');
     expect(screen.queryByRole('button', { name: 'Stop showing' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'Blank audience' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Blank screen' })).toBeNull();
   });
 
   it('reports Published only after the server commit, and disables controls while saving', async () => {
@@ -188,10 +191,8 @@ describe('Table presentation controls (PR04 P4)', () => {
       await screen.findByRole('button', { name: 'Show this scene' })
     );
     expect(screen.getByText('Saving…')).toBeVisible();
-    expect(
-      screen.getByRole('button', { name: 'Blank audience' })
-    ).toBeDisabled();
-    expect(screen.queryByText(/^Published/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Blank screen' })).toBeDisabled();
+    expect(screen.queryByText(/^Players' view/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Show this scene' }));
     expect(session.show).toHaveBeenCalledTimes(1);
     await act(async () =>
@@ -201,7 +202,7 @@ describe('Table presentation controls (PR04 P4)', () => {
         current: descriptor('scene-forest'),
       })
     );
-    expect(await screen.findByText('Published')).toBeVisible();
+    expect(await screen.findByText("Players' view updated")).toBeVisible();
     const [sceneId, operationId] = session.show.mock.calls[0] as unknown as [
       string,
       string,
@@ -218,7 +219,7 @@ describe('Table presentation controls (PR04 P4)', () => {
           reason: 'scene-deleted',
           current: descriptor('scene-tavern'),
         },
-        /Not changed: this scene was deleted — controls refreshed/,
+        /Not changed: this scene was deleted\./,
       ],
       [
         {
@@ -226,26 +227,29 @@ describe('Table presentation controls (PR04 P4)', () => {
           reason: 'presentation-changed',
           current: descriptor('scene-tavern'),
         },
-        /Not changed: the audience changed in the meantime — controls refreshed/,
+        /Not changed: what players see changed in the meantime\./,
       ],
       [
         { status: 'failed', reason: 'unavailable' },
-        /Not changed — live control is unavailable/,
+        /Not changed: live play isn't available right now\./,
       ],
       [
         { status: 'lost', reason: 'lease-lost' },
-        /Not changed — live control was lost/,
+        /Not changed: you're no longer live\./,
       ],
-      [{ status: 'failed', reason: 'network' }, /Not confirmed — Retry/],
+      [
+        { status: 'failed', reason: 'network' },
+        /^Couldn't confirm the change\.$/,
+      ],
     ];
     for (const [outcome, text] of cases) {
       const session = fakeSession({ blank: async () => outcome });
       renderControls({ session });
       fireEvent.click(
-        await screen.findByRole('button', { name: 'Blank audience' })
+        await screen.findByRole('button', { name: 'Blank screen' })
       );
       expect(await screen.findByText(text)).toBeVisible();
-      expect(screen.queryByText(/^Published/)).toBeNull();
+      expect(screen.queryByText(/^Players' view/)).toBeNull();
       cleanup();
     }
   });
@@ -273,7 +277,9 @@ describe('Table presentation controls (PR04 P4)', () => {
       await screen.findByRole('button', { name: 'Show this scene' })
     );
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('Published (confirmed)')).toBeVisible();
+    expect(
+      await screen.findByText("Players' view already updated")
+    ).toBeVisible();
     expect(session.resend).toHaveBeenCalledTimes(1);
     expect(session.resend).toHaveBeenCalledWith(command);
     expect(session.show).toHaveBeenCalledTimes(1);
@@ -305,14 +311,18 @@ describe('Table presentation controls (PR04 P4)', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: 'Show this scene' })
     );
-    expect(await screen.findByText('Not confirmed — Retry')).toBeVisible();
+    expect(
+      await screen.findByText("Couldn't confirm the change.")
+    ).toBeVisible();
     expect(screen.queryByText(/Not changed/)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
-    expect(await screen.findByText('Published (confirmed)')).toBeVisible();
+    expect(
+      await screen.findByText("Players' view already updated")
+    ).toBeVisible();
     expect(session.resend).toHaveBeenCalledWith(command);
   });
 
-  it('Concern 2: a definite HTTP 400 is "Not changed — request rejected" with no futile Retry', async () => {
+  it('Concern 2: a definite HTTP 400 is "Not changed: the request was refused." with no futile Retry', async () => {
     const session = fakeSession({
       blank: async () => ({
         status: 'failed',
@@ -330,13 +340,13 @@ describe('Table presentation controls (PR04 P4)', () => {
     });
     renderControls({ session });
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Blank audience' })
+      await screen.findByRole('button', { name: 'Blank screen' })
     );
     expect(
-      await screen.findByText('Not changed — request rejected')
+      await screen.findByText('Not changed: the request was refused.')
     ).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
-    expect(screen.queryByText(/Not confirmed/)).toBeNull();
+    expect(screen.queryByText(/Couldn't confirm/)).toBeNull();
   });
 
   it('F3: a hung status read is aborted after 5 s so later polls still run', async () => {
@@ -382,7 +392,7 @@ describe('Table presentation controls (PR04 P4)', () => {
     );
     expect(
       await screen.findByText(
-        'This request completed earlier, but the audience has since changed'
+        'That change went through earlier, but what players see has changed since.'
       )
     ).toBeVisible();
   });
@@ -405,7 +415,7 @@ describe('Table presentation controls (PR04 P4)', () => {
     });
     renderControls({ session });
     fireEvent.click(
-      await screen.findByRole('button', { name: 'Blank audience' })
+      await screen.findByRole('button', { name: 'Blank screen' })
     );
     fetchFn.mockImplementation(async () =>
       Response.json({
@@ -416,9 +426,10 @@ describe('Table presentation controls (PR04 P4)', () => {
     const before = fetchFn.mock.calls.length;
     fireEvent.click(await screen.findByRole('button', { name: 'Retry' }));
     expect(
-      await screen.findByText(/Not confirmed — status refreshed/)
+      await screen.findByText("Checked again: players' view is updated.")
     ).toBeVisible();
-    expect(await screen.findByText(/Published \(confirmed\)/)).toBeVisible();
+    // O7-3 review 06: the recheck replaces the failure sentence.
+    expect(screen.queryByText(/Couldn't confirm the change/)).toBeNull();
     expect(fetchFn.mock.calls.length).toBeGreaterThan(before);
   });
 
@@ -429,10 +440,10 @@ describe('Table presentation controls (PR04 P4)', () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(
-      screen.getByText('Live control is required to change what players see')
+      screen.getByText('Go live to change what players see.')
     ).toBeVisible();
-    expect(screen.getByText('Audience: Tavern · Published')).toBeVisible();
-    for (const name of ['Show this scene', 'Blank audience', 'Stop showing'])
+    expect(screen.getByText('Players see: Tavern')).toBeVisible();
+    for (const name of ['Show this scene', 'Blank screen', 'Stop showing'])
       expect(screen.getByRole('button', { name })).toBeDisabled();
     const reads = () =>
       fetchFn.mock.calls.filter(([url]) =>
@@ -458,15 +469,13 @@ describe('Table presentation controls (PR04 P4)', () => {
       Response.json({ current: descriptor('scene-x'), registry: REGISTRY })
     );
     renderControls({ current: descriptor('scene-x') });
-    expect(
-      await screen.findByText('Audience: another scene · Published')
-    ).toBeVisible();
+    expect(await screen.findByText('Players see: another scene')).toBeVisible();
   });
 
   it('private preparation never issues a presentation command', async () => {
     const session = fakeSession();
     renderControls({ session });
-    await screen.findByText('Audience: Tavern · Published');
+    await screen.findByText('Players see: Tavern');
     for (const method of ['show', 'blank', 'unpresent', 'resend'] as const)
       expect(session[method]).not.toHaveBeenCalled();
   });
@@ -518,9 +527,7 @@ describe('Table presentation controls (PR04 P4)', () => {
         />
       </StrictMode>
     );
-    expect(
-      await screen.findByText('Audience: Tavern · Published')
-    ).toBeVisible();
+    expect(await screen.findByText('Players see: Tavern')).toBeVisible();
   });
 
   it('A1: a failed label read is retried on the next descriptor change', async () => {
@@ -540,9 +547,7 @@ describe('Table presentation controls (PR04 P4)', () => {
         {...holderProps(session, descriptor('scene-tavern'))}
       />
     );
-    expect(
-      await screen.findByText('Audience: another scene · Published')
-    ).toBeVisible();
+    expect(await screen.findByText('Players see: another scene')).toBeVisible();
     rerender(
       <TablePresentationControls
         {...holderProps(session, {
@@ -551,9 +556,7 @@ describe('Table presentation controls (PR04 P4)', () => {
         })}
       />
     );
-    expect(
-      await screen.findByText('Audience: Tavern · Published')
-    ).toBeVisible();
+    expect(await screen.findByText('Players see: Tavern')).toBeVisible();
   });
 
   it('A3: the previous success notice clears when the audience changes or control is lost', async () => {
@@ -566,7 +569,7 @@ describe('Table presentation controls (PR04 P4)', () => {
     fireEvent.click(
       await screen.findByRole('button', { name: 'Show this scene' })
     );
-    expect(await screen.findByText('Published')).toBeVisible();
+    expect(await screen.findByText("Players' view updated")).toBeVisible();
     // Same state the message described: it stays.
     rerender(
       <TablePresentationControls
@@ -576,21 +579,21 @@ describe('Table presentation controls (PR04 P4)', () => {
         })}
       />
     );
-    expect(screen.getByText('Published')).toBeVisible();
+    expect(screen.getByText("Players' view updated")).toBeVisible();
     // Audience changed elsewhere: the notice no longer describes it.
     rerender(
       <TablePresentationControls
         {...holderProps(session, { ...descriptor(null), revision: 10 })}
       />
     );
-    expect(screen.queryByText('Published')).toBeNull();
+    expect(screen.queryByText("Players' view updated")).toBeNull();
     session.show.mockResolvedValueOnce({
       status: 'committed',
       duplicate: false,
       current: { ...descriptor('scene-forest'), revision: 11 },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Show this scene' }));
-    expect(await screen.findByText('Published')).toBeVisible();
+    expect(await screen.findByText("Players' view updated")).toBeVisible();
     // Control lost: no stale success beside "Live control is required…".
     rerender(
       <TablePresentationControls
@@ -598,8 +601,29 @@ describe('Table presentation controls (PR04 P4)', () => {
       />
     );
     expect(
-      screen.getByText('Live control is required to change what players see')
+      screen.getByText('Go live to change what players see.')
     ).toBeVisible();
-    expect(screen.queryByText('Published')).toBeNull();
+    expect(screen.queryByText("Players' view updated")).toBeNull();
+  });
+});
+
+describe('recheck after an unconfirmed change (O7-3 review 06)', () => {
+  it('replaces the failure sentence with what the re-read says', () => {
+    expect(
+      recheckedMessage({ type: 'blank' }, descriptor('scene-tavern', true))
+    ).toEqual({
+      tone: 'success',
+      text: "Checked again: players' view is updated.",
+    });
+    expect(
+      recheckedMessage({ type: 'blank' }, descriptor('scene-tavern', false))
+    ).toEqual({
+      tone: 'info',
+      text: 'Checked again: that change went through earlier, but what players see has changed since.',
+    });
+    expect(recheckedMessage({ type: 'blank' }, null)).toEqual({
+      tone: 'info',
+      text: "Couldn't confirm the change, and couldn't check what players see.",
+    });
   });
 });

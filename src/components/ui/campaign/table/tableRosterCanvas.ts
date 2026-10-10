@@ -42,6 +42,8 @@ const CONTROL_KEYS = [
   'sceneMemberId',
   'entityId',
   'layerId',
+  // PR07 P10: a changed table representation re-runs reconciliation.
+  'tableRepresentation',
 ] as const;
 
 /**

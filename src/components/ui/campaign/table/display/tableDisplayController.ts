@@ -1,5 +1,10 @@
-import type { CameraView, Viewport } from '@fieldnotes/core';
-import type { FogManager, FogPlugin } from '@fieldnotes/vtt';
+import type {
+  Bounds,
+  CameraView,
+  ElementStore,
+  Viewport,
+} from '@fieldnotes/core';
+import type { FogManager, FogPlugin, GridInfo } from '@fieldnotes/vtt';
 
 import type {
   BattleMapConnection,
@@ -26,6 +31,28 @@ import {
   DISPLAY_NOTHING_SHOWN,
   DISPLAY_WAITING,
 } from './displayMessages';
+import {
+  sameEnvironment,
+  type EnvironmentSnapshot,
+} from './calibration/environment';
+import {
+  DEFAULT_ZOOM_LIMITS,
+  ZOOM_TOLERANCE,
+  applyCalibratedZoom,
+  centreBoundsAt,
+  sceneGeometry,
+  setZoomLimits,
+  type SceneGeometry,
+} from './calibration/geometry';
+import {
+  deriveCalibrationReport,
+  inCalibratedMode,
+  type CalibrationPageState,
+  type CalibrationReport,
+  type CalibrationSession,
+  type CalibrationStore,
+} from './calibration/session';
+import { DEFAULT_CSS_PX_PER_SQUARE } from './calibration/settings';
 
 /** Injected platform pieces (real defaults live in `tableDisplayDeps.ts`). */
 export interface TableDisplayDeps {
@@ -47,9 +74,30 @@ export interface TableDisplayDeps {
   applyLayer?: (
     viewport: Viewport
   ) => NonNullable<ManagedConnectionOptions['layers']>['applyLayer'];
+  /**
+   * PR07 M2: the private store the connection syncs into, mirrored into the
+   * viewport store minus physical minis. Absent → the viewport store.
+   */
+  projectStore?: (viewport: Viewport) => {
+    store: ElementStore;
+    dispose: () => void;
+  };
+  /** PR07 P4: the scene grid as the viewport holds it (null: none). */
+  readGrid?: (viewport: Viewport) => GridInfo | null;
+  /** PR07 P5: grid change notifications for this viewport. */
+  onGridChange?: (viewport: Viewport, listener: () => void) => () => void;
+  /** PR07 P8: bounds of the visible content (arrival / Centre map). */
+  contentBounds?: (viewport: Viewport) => Bounds | null;
 }
 
 export type DisplayCredentialDenial = 'expired' | 'in-use';
+
+/** PR07: the scale state this page reports (and the shell renders). */
+export interface DisplayCalibrationView {
+  report: CalibrationReport;
+  /** Why calibrated minis are unavailable on the shown scene, if they are. */
+  unsupported: 'grid' | 'range' | null;
+}
 
 export interface TableDisplayView {
   /** Null = uncovered (a rendered, acknowledged-ready scene). */
@@ -58,7 +106,13 @@ export interface TableDisplayView {
   canvas: { key: number; fogPlugin: FogPlugin } | null;
   /** Uncovered and showing a scene: the Fit map affordance may show. */
   showing: boolean;
+  calibration: DisplayCalibrationView;
 }
+
+export const UNCALIBRATED_VIEW: DisplayCalibrationView = {
+  report: 'uncalibrated',
+  unsupported: null,
+};
 
 export interface TableDisplayControllerOptions {
   code: string;
@@ -74,6 +128,15 @@ export interface TableDisplayControllerOptions {
    * no ACK claims a scene this page does not show.
    */
   mapPinned?: { mapId: string };
+  /**
+   * PR07: the per-page calibration store and a reader of the current
+   * physical-setup snapshot (re-compared right before a calibrated camera
+   * is applied). Absent → PR05 behaviour and six-key ACKs.
+   */
+  calibration?: {
+    store: CalibrationStore;
+    readEnvironment: () => EnvironmentSnapshot;
+  };
 }
 
 const POLL_MS = 2_000;
@@ -110,7 +173,24 @@ interface Attach {
   uncovered: boolean;
   metadata: { fogAppearance?: unknown; updatedAt?: unknown } | null;
   disposers: Array<() => void>;
+  /** PR07 P8: the calibrated camera applied to this viewport, if any. */
+  calibrated: {
+    zoom: number;
+    cellSize: number;
+    session: CalibrationSession;
+  } | null;
+  /** PR07 P4: the one-tick wait for a late grid (never longer). */
+  gridWait: 'none' | 'pending' | 'done';
+  calibratedDisposers: Array<() => void>;
 }
+
+interface CalibratedOrigin {
+  x: number;
+  y: number;
+  zoom: number;
+}
+
+type CalibratedApply = 'applied' | 'skipped' | 'failed';
 
 function record(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -212,10 +292,14 @@ export class TableDisplayController {
   private heartbeat: ReturnType<typeof setInterval> | null = null;
   private readonly deferred = new Set<ReturnType<typeof setTimeout>>();
   private readonly views = new Map<string, CameraView>();
+  /** PR07 P8: per-scene calibrated translation (separate from E11 views). */
+  private readonly origins = new Map<string, CalibratedOrigin>();
+  private unsubscribeCalibration: (() => void) | null = null;
   private view: TableDisplayView = {
     cover: DISPLAY_WAITING,
     canvas: null,
     showing: false,
+    calibration: UNCALIBRATED_VIEW,
   };
 
   constructor(options: TableDisplayControllerOptions) {
@@ -224,11 +308,17 @@ export class TableDisplayController {
   }
 
   start(): void {
+    this.unsubscribeCalibration =
+      this.options.calibration?.store.subscribe(() =>
+        this.onCalibrationChange()
+      ) ?? null;
     this.emit({});
     void this.poll();
   }
 
   stop(): void {
+    this.unsubscribeCalibration?.();
+    this.unsubscribeCalibration = null;
     this.stopped = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);
     this.pollTimer = null;
@@ -241,10 +331,19 @@ export class TableDisplayController {
     this.deferred.clear();
   }
 
-  /** The explicit "Fit map" move: fits and remembers the view. */
+  /**
+   * The explicit "Fit map" move: fits and remembers the view. Verified
+   * calibrated: "Centre map" (pan only, zoom kept). Frozen: no camera move.
+   */
   fitMap(): void {
     const attach = this.attach;
     if (!attach?.viewport || !attach.uncovered) return;
+    const report = this.calibrationView().report;
+    if (report === 'verify-required') return;
+    if (attach.calibrated && report === 'verified') {
+      this.centreMap(attach);
+      return;
+    }
     try {
       this.options.deps.fitView(attach.viewport);
     } catch {
@@ -284,6 +383,8 @@ export class TableDisplayController {
           // Keep releasing the rest.
         }
       }
+      this.releaseCalibrated(attach);
+      attach.calibrated = null;
       attach.connection?.stop();
       attach.connection = null;
       attach.status = 'connecting';
@@ -291,6 +392,7 @@ export class TableDisplayController {
       attach.fogDefinition = null;
       attach.stage = 'idle';
       attach.cameraApplied = false;
+      attach.gridWait = 'none';
       attach.uncovered = false;
       attach.metadata = null;
       this.stopHeartbeat();
@@ -314,6 +416,14 @@ export class TableDisplayController {
         afterAll: () => this.onFrame(key),
       })
     );
+    if (deps.onGridChange)
+      attach.disposers.push(
+        deps.onGridChange(viewport, () => this.onGridChanged(key))
+      );
+    // PR07 M2: the connection syncs into a private store; the viewport
+    // store is its table-output projection (physical minis omitted).
+    const projection = deps.projectStore?.(viewport) ?? null;
+    if (projection) attach.disposers.push(projection.dispose);
     const relayUrl = this.options.relayUrl;
     if (!relayUrl) {
       this.emit({ cover: DISPLAY_NOT_CONFIGURED });
@@ -329,7 +439,7 @@ export class TableDisplayController {
       relayUrl,
       campaignCode: code,
       battleMapId: attach.scene.sourceMapId,
-      store: viewport.store,
+      store: projection?.store ?? viewport.store,
       clientId: `display-${code}`,
       tokenRequest: {
         role: 'display',
@@ -522,6 +632,9 @@ export class TableDisplayController {
       uncovered: false,
       metadata: null,
       disposers: [],
+      calibrated: null,
+      gridWait: 'none',
+      calibratedDisposers: [],
     };
     this.readinessTimer = setTimeout(() => {
       this.readinessTimer = null;
@@ -543,8 +656,14 @@ export class TableDisplayController {
     if (!attach) return;
     this.attach = null;
     this.emit({ cover: DISPLAY_WAITING, showing: false });
-    if (attach.uncovered && attach.viewport)
-      this.rememberView(attach.scene.sceneId, attach.viewport);
+    if (attach.uncovered && attach.viewport) {
+      // E11 views hold uncalibrated cameras only; calibrated ones are
+      // remembered as origins (a cleared session must not restore C/U).
+      if (!attach.calibrated)
+        this.rememberView(attach.scene.sceneId, attach.viewport);
+      this.rememberOrigin(attach);
+    }
+    this.releaseCalibrated(attach);
     for (const dispose of attach.disposers.splice(0)) {
       try {
         dispose();
@@ -589,8 +708,11 @@ export class TableDisplayController {
     if (attach.uncovered) {
       // Acceptance A2 (E11): remember an explicit local pan/zoom before
       // the view can be lost to a withdrawal and re-attach.
-      if (attach.viewport)
-        this.rememberView(attach.scene.sceneId, attach.viewport);
+      if (attach.viewport) {
+        if (!attach.calibrated)
+          this.rememberView(attach.scene.sceneId, attach.viewport);
+        this.rememberOrigin(attach);
+      }
       attach.uncovered = false;
       this.stopHeartbeat();
       this.emit({ cover: DISPLAY_WAITING, showing: false });
@@ -657,8 +779,36 @@ export class TableDisplayController {
     )
       return;
     if (!attach.cameraApplied) {
+      // PR07 P4: a grid may land one notification after `live`; wait one
+      // tick for it when a calibrated camera is wanted (never longer).
+      if (attach.gridWait === 'pending') return;
+      if (
+        attach.gridWait === 'none' &&
+        this.wantsCalibrated() &&
+        !this.readGrid(attach.viewport)
+      ) {
+        attach.gridWait = 'pending';
+        this.defer(() => {
+          if (this.attach !== attach) return;
+          attach.gridWait = 'done';
+          this.checkReadiness(gen);
+        });
+        return;
+      }
       attach.cameraApplied = true;
       const sceneId = attach.scene.sceneId;
+      const calibrated = this.applyCalibrated(attach, 'arrival');
+      if (calibrated === 'failed') {
+        this.origins.delete(sceneId);
+        this.failAttach(gen);
+        return;
+      }
+      if (calibrated === 'applied') {
+        attach.stage = 'awaitFrame';
+        attach.viewport.requestRender();
+        this.refreshCalibration();
+        return;
+      }
       try {
         const remembered = this.views.get(sceneId);
         if (remembered && isUsableView(remembered))
@@ -678,6 +828,7 @@ export class TableDisplayController {
     }
     attach.stage = 'awaitFrame';
     attach.viewport.requestRender();
+    this.refreshCalibration();
   }
 
   private onFrame(gen: number): void {
@@ -742,6 +893,9 @@ export class TableDisplayController {
       sceneId: phase === 'loaded' ? (this.attach?.scene.sceneId ?? null) : null,
       blanked: descriptor.presentation.blanked,
       phase,
+      ...(this.options.calibration
+        ? { calibration: this.calibrationView().report }
+        : {}),
     };
     const { url, init } = displayAckRequest(
       this.options.code,
@@ -788,7 +942,253 @@ export class TableDisplayController {
         patch.cover === DISPLAY_EXPIRED || patch.cover === DISPLAY_IN_USE;
       if (!credentialCover) return;
     }
-    this.view = { ...this.view, ...patch };
+    this.view = {
+      ...this.view,
+      ...patch,
+      calibration: this.calibrationView(),
+    };
     this.options.onView(this.view);
+  }
+
+  // ---- calibration (PR07 P1, P4, P5, P8, R3-1) ----------------------------
+
+  private calibrationState(): CalibrationPageState | null {
+    return this.options.calibration?.store.getState() ?? null;
+  }
+
+  private wantsCalibrated(): boolean {
+    const state = this.calibrationState();
+    return !!state && inCalibratedMode(state) && !!state.session;
+  }
+
+  private readGrid(viewport: Viewport): GridInfo | null {
+    try {
+      return this.options.deps.readGrid?.(viewport) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** Geometry of the shown scene (null: none shown, or not preferred). */
+  private liveGeometry(): SceneGeometry | null {
+    const state = this.calibrationState();
+    const attach = this.attach;
+    if (!state || !inCalibratedMode(state)) return null;
+    if (!attach?.viewport || !attach.cameraApplied) return null;
+    const cssPxPerSquare =
+      state.session?.cssPxPerSquare ??
+      state.settings?.cssPxPerSquare ??
+      DEFAULT_CSS_PX_PER_SQUARE;
+    return sceneGeometry(this.readGrid(attach.viewport), cssPxPerSquare);
+  }
+
+  private calibrationView(): DisplayCalibrationView {
+    const state = this.calibrationState();
+    if (!state) return UNCALIBRATED_VIEW;
+    const geometry = this.liveGeometry();
+    return {
+      report: deriveCalibrationReport(state, geometry),
+      unsupported:
+        geometry && geometry.kind === 'unsupported' ? geometry.reason : null,
+    };
+  }
+
+  /** Re-emits on a changed state and ACKs a changed report at once (P6). */
+  private refreshCalibration(): void {
+    if (!this.options.calibration || this.stopped) return;
+    const next = this.calibrationView();
+    const previous = this.view.calibration;
+    if (
+      next.report === previous.report &&
+      next.unsupported === previous.unsupported
+    )
+      return;
+    this.emit({});
+    if (next.report === previous.report) return;
+    if (this.isShown()) this.sendAck('loaded');
+    else if (!this.attach && this.target?.audienceEmpty) this.sendAck('blank');
+  }
+
+  private onCalibrationChange(): void {
+    if (this.stopped) return;
+    const state = this.calibrationState();
+    const attach = this.attach;
+    if (state && attach?.viewport && attach.cameraApplied) {
+      if (!inCalibratedMode(state)) this.leaveCalibrated(attach);
+      else if (
+        state.session &&
+        attach.calibrated?.session !== state.session &&
+        this.applyCalibrated(attach, 'keep-centre') === 'applied'
+      )
+        attach.viewport.requestRender();
+    }
+    this.refreshCalibration();
+  }
+
+  /**
+   * P5 / S5: a grid geometry change on the shown scene invalidates the
+   * session; style-only changes are ignored. A change that makes an
+   * unsupported scene supported also needs Confirm (never claim verified
+   * over an uncalibrated camera).
+   */
+  private onGridChanged(gen: number): void {
+    const attach = this.attach;
+    if (!attach || attach.gen !== gen || this.stopped) return;
+    if (!attach.viewport || !attach.cameraApplied) return;
+    const state = this.calibrationState();
+    if (!state) return;
+    const session = state.session;
+    if (session && inCalibratedMode(state)) {
+      const info = this.readGrid(attach.viewport);
+      const applied = attach.calibrated;
+      if (applied && applied.session === session) {
+        if (
+          !info ||
+          info.gridType !== 'square' ||
+          info.cellSize !== applied.cellSize
+        ) {
+          this.options.calibration?.store.invalidate();
+          return;
+        }
+      } else if (
+        sceneGeometry(info, session.cssPxPerSquare).kind === 'square'
+      ) {
+        this.options.calibration?.store.invalidate();
+        return;
+      }
+    }
+    this.refreshCalibration();
+  }
+
+  /**
+   * P8: applies C/U to this attach's camera. `arrival` (the E11 covered
+   * slot): remembered origin for an unchanged scale, else content centred.
+   * `keep-centre` (Confirm on a placed camera): the world point at the
+   * canvas centre stays there. R3-1: the environment snapshot is
+   * re-compared first; a mismatch clears the session and applies nothing.
+   */
+  private applyCalibrated(
+    attach: Attach,
+    mode: 'arrival' | 'keep-centre'
+  ): CalibratedApply {
+    const calibration = this.options.calibration;
+    const state = this.calibrationState();
+    const viewport = attach.viewport;
+    if (!calibration || !state || !viewport) return 'skipped';
+    const session = state.session;
+    if (!session || !inCalibratedMode(state)) return 'skipped';
+    const geometry = sceneGeometry(
+      this.readGrid(viewport),
+      session.cssPxPerSquare
+    );
+    if (geometry.kind !== 'square') return 'skipped';
+    let environment: EnvironmentSnapshot | null = null;
+    try {
+      environment = calibration.readEnvironment();
+    } catch {
+      environment = null;
+    }
+    if (!environment || !sameEnvironment(environment, session.environment)) {
+      calibration.store.invalidate();
+      return 'skipped';
+    }
+    const size = viewport.getCanvasSize();
+    if (!(size.w > 0 && size.h > 0)) return 'failed';
+    const camera = viewport.camera;
+    const centre = { x: size.w / 2, y: size.h / 2 };
+    if (!applyCalibratedZoom(camera, geometry.zoom, centre)) {
+      setZoomLimits(camera, DEFAULT_ZOOM_LIMITS);
+      return 'skipped';
+    }
+    if (mode === 'arrival') {
+      const origin = this.origins.get(attach.scene.sceneId);
+      if (origin && origin.zoom === geometry.zoom)
+        camera.moveTo(origin.x, origin.y);
+      else {
+        const bounds = this.contentBounds(viewport);
+        if (bounds) centreBoundsAt(camera, bounds, size);
+      }
+    }
+    this.releaseCalibrated(attach);
+    attach.calibrated = {
+      zoom: geometry.zoom,
+      cellSize: geometry.cellSize,
+      session,
+    };
+    this.rememberOrigin(attach);
+    this.watchCalibratedCamera(attach, viewport);
+    return 'applied';
+  }
+
+  /** R3-2 defence in depth: zoom stays C/U; explicit pans are remembered. */
+  private watchCalibratedCamera(attach: Attach, viewport: Viewport): void {
+    const camera = viewport.camera;
+    attach.calibratedDisposers.push(
+      camera.onChange(() => {
+        const applied = attach.calibrated;
+        const state = this.calibrationState();
+        if (!applied || this.attach !== attach || !state) return;
+        if (state.session !== applied.session || !inCalibratedMode(state))
+          return;
+        if (Math.abs(camera.zoom - applied.zoom) > ZOOM_TOLERANCE) {
+          const size = viewport.getCanvasSize();
+          applyCalibratedZoom(camera, applied.zoom, {
+            x: size.w / 2,
+            y: size.h / 2,
+          });
+          return;
+        }
+        if (attach.uncovered) this.rememberOrigin(attach);
+      })
+    );
+  }
+
+  private releaseCalibrated(attach: Attach): void {
+    for (const dispose of attach.calibratedDisposers.splice(0)) {
+      try {
+        dispose();
+      } catch {
+        // Keep releasing the rest.
+      }
+    }
+  }
+
+  /** Uncalibrated preference: default limits back, camera untouched (C7-1). */
+  private leaveCalibrated(attach: Attach): void {
+    if (!attach.calibrated) return;
+    this.releaseCalibrated(attach);
+    attach.calibrated = null;
+    if (attach.viewport)
+      setZoomLimits(attach.viewport.camera, DEFAULT_ZOOM_LIMITS);
+  }
+
+  private rememberOrigin(attach: Attach): void {
+    const applied = attach.calibrated;
+    const viewport = attach.viewport;
+    if (!applied || !viewport) return;
+    const state = this.calibrationState();
+    if (state?.session !== applied.session) return;
+    const { x, y } = viewport.camera.position;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+    this.origins.set(attach.scene.sceneId, { x, y, zoom: applied.zoom });
+  }
+
+  private contentBounds(viewport: Viewport): Bounds | null {
+    try {
+      return this.options.deps.contentBounds?.(viewport) ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  /** "Centre map": content centre at the canvas centre, zoom unchanged. */
+  private centreMap(attach: Attach): void {
+    const viewport = attach.viewport;
+    if (!viewport) return;
+    const bounds = this.contentBounds(viewport);
+    const size = viewport.getCanvasSize();
+    if (!bounds || !(size.w > 0 && size.h > 0)) return;
+    centreBoundsAt(viewport.camera, bounds, size);
+    this.rememberOrigin(attach);
   }
 }

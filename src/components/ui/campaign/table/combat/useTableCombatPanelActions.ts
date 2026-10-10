@@ -189,7 +189,7 @@ export function useTableCombatPanelActions(options: {
   > => {
     const session = options.controlSession;
     if (!session || session.isLost())
-      return { ok: false, reason: 'live control is required' };
+      return { ok: false, reason: 'you need to go live first' };
     const outcome = await session.show(sceneId, `show-${crypto.randomUUID()}`);
     switch (outcome.status) {
       case 'committed':
@@ -198,11 +198,11 @@ export function useTableCombatPanelActions(options: {
           outcome.current ?? session.current()
         ) === 'published'
           ? { ok: true }
-          : { ok: false, reason: 'the audience changed in the meantime' };
+          : { ok: false, reason: 'what players see changed in the meantime' };
       case 'rejected':
         return { ok: false, reason: presentationReasonWords(outcome.reason) };
       case 'lost':
-        return { ok: false, reason: 'live control was lost' };
+        return { ok: false, reason: "you're no longer live" };
       case 'unconfirmed':
       case 'failed':
         // N1: a sent Show whose outcome is uncertain may have committed —
@@ -213,8 +213,8 @@ export function useTableCombatPanelActions(options: {
               ok: false,
               reason:
                 outcome.status === 'failed' && outcome.httpStatus === 400
-                  ? 'the request was rejected'
-                  : 'live control is unavailable',
+                  ? 'the request was refused'
+                  : "live play isn't available right now",
             };
     }
   };
@@ -259,7 +259,7 @@ export function useTableCombatPanelActions(options: {
       .filter(view => view.playerDataUnavailable)
       .map(
         view =>
-          `${view.entity.name}: player data unavailable — HP not broadcast`
+          `${view.entity.name}: couldn't load player data, so HP isn't shared`
       ),
     loggingPaused: log?.loggingPaused === true,
     missingPrompt,

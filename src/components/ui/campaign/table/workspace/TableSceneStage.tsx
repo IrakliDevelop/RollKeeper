@@ -26,6 +26,11 @@ import { runSceneCommand } from '@/lib/table/sceneCommands';
 import { TableArrivalMarker, TableArrivalPicker } from '../TablePartyArrival';
 import { createTableRosterCanvas } from '../tableRosterCanvas';
 import { TableRosterPanel } from '../TableRosterPanel';
+import {
+  exportFailureReporter,
+  SAVE_MESSAGES,
+  type SaveMessageTone,
+} from './saveMessages';
 import { useEnsureSceneMapImage } from './sceneMapImage';
 import { TableEditMapControl } from './TableEditMapControl';
 
@@ -54,9 +59,13 @@ export function TableSceneStage(props: {
   onViewportReady: (sceneId: string, viewport: Viewport) => void;
   onConnectionReady: (connection: BattleMapConnection | null) => void;
   onStatus: (sceneId: string, status: string) => void;
-  onMessage: (message: string) => void;
+  onMessage: (message: string, tone: SaveMessageTone) => void;
   /** Review F9: Edit-map image work in flight. */
   onEditBusy?: (busy: boolean) => void;
+  /** PR07 P10: this tab holds live control (token representation sync). */
+  liveHolder?: boolean;
+  /** PR07 P9: the table reports a verified scale for this shown scene. */
+  scaleVerifiedHere?: boolean;
 }) {
   const tokenConfigRef = useRef<DmTokenConfig | null>(null);
   const [viewport, setViewport] = useState<Viewport | null>(null);
@@ -102,7 +111,11 @@ export function TableSceneStage(props: {
       writeSize: (size: { w: number; h: number }) =>
         adapter.updateBattleMap({ mapImageSize: size }),
       // Review F6: a broken image adds nothing and says so.
-      onUnavailable: () => onMessage('Map image could not be loaded'),
+      onUnavailable: () =>
+        onMessage(
+          SAVE_MESSAGES.mapImageFailed.text,
+          SAVE_MESSAGES.mapImageFailed.tone
+        ),
     }),
     [adapter, onMessage]
   );
@@ -138,11 +151,11 @@ export function TableSceneStage(props: {
         at: new Date().toISOString(),
       },
     });
-    onMessage(
+    const message =
       result.status === 'committed' || result.status === 'unchanged'
-        ? 'Party arrival point saved on this device.'
-        : 'The arrival point was not saved. Nothing changed.'
-    );
+        ? SAVE_MESSAGES.arrivalSaved
+        : SAVE_MESSAGES.arrivalNotSaved;
+    onMessage(message.text, message.tone);
   };
 
   return (
@@ -156,13 +169,14 @@ export function TableSceneStage(props: {
       tokenConfigRef={tokenConfigRef}
       onViewportReady={handleViewportReady}
       tokenInfoToggle={TOKEN_INFO}
-      onExportError={onMessage}
+      onExportError={exportFailureReporter(onMessage)}
       sessionControls={props.header}
       editMapControl={
         <TableEditMapControl
           adapter={adapter}
           viewport={viewport}
           presentedHere={props.presentedHere}
+          scaleVerifiedHere={props.scaleVerifiedHere}
           onBusyChange={props.onEditBusy}
         />
       }
@@ -195,6 +209,7 @@ export function TableSceneStage(props: {
         dmId={props.dmId}
         canvas={rosterCanvas}
         live={props.relayLive}
+        liveHolder={props.liveHolder}
         arrival={{ arming, onArm: () => setArming(value => !value) }}
       />
     </DmBattleMapCanvas>

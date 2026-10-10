@@ -424,6 +424,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/** Radix Popover measures with ResizeObserver/DOMRect (FC-4 precedent). */
+function stubPopoverLayout() {
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+}
+
 describe('W1 canonical selection', () => {
   it('opens ?scene= privately: one canvas, the scene registered, nothing presented', async () => {
     nav.reset('scene=scene-tavern');
@@ -434,8 +446,18 @@ describe('W1 canonical selection', () => {
         server.commands.filter(command => command.type === 'registerScene')
       ).toHaveLength(1)
     );
+    // O7-2 HR-6: the compact S1 label is always visible; the full sentence
+    // is in Details.
+    expect(screen.getByText('Saved on this device')).toBeVisible();
     expect(
-      screen.getByText('Saved on this device — scene runs are local')
+      screen.queryByText('Scenes and fights are saved on this device only.')
+    ).toBeNull();
+    stubPopoverLayout();
+    fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
+    expect(
+      await screen.findByText(
+        'Scenes and fights are saved on this device only.'
+      )
     ).toBeInTheDocument();
     expect(
       screen.getByRole('link', { name: /back to campaign/i })
@@ -447,7 +469,7 @@ describe('W1 canonical selection', () => {
     nav.reset('scene=scene-elsewhere');
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText('That scene is not available in this workspace')
+      await screen.findByText("That scene isn't on this device.")
     ).toBeInTheDocument();
     await waitFor(() =>
       expect(server.commands.filter(c => c.type === 'acquire')).toHaveLength(1)
@@ -504,7 +526,9 @@ describe('W1 canonical selection', () => {
     nav.reset('scene=scene-tavern&tableWorkspace=imported-x');
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText(/not bound to this campaign route/u)
+      await screen.findByText(
+        /belongs to another campaign, so it can't go live here/u
+      )
     ).toBeInTheDocument();
     expect(server.commands).toEqual([]);
     expect(
@@ -524,7 +548,9 @@ describe('F2 invalid canonical parameters never open the default workspace', () 
       nav.reset(`scene=scene-tavern&tableWorkspace=${value}`);
       render(<TableWorkspace campaignCode="CAMP" />);
       expect(
-        await screen.findByText(/not bound to this campaign route/u)
+        await screen.findByText(
+          /belongs to another campaign, so it can't go live here/u
+        )
       ).toBeInTheDocument();
       expect(mocks.openedWorkspaces).not.toContain(null);
       expect(canvasScene()).toBeUndefined();
@@ -536,7 +562,7 @@ describe('F2 invalid canonical parameters never open the default workspace', () 
     nav.reset(`scene=${'z'.repeat(600)}`);
     render(<TableWorkspace campaignCode="CAMP" />);
     expect(
-      await screen.findByText('That scene is not available in this workspace')
+      await screen.findByText("That scene isn't on this device.")
     ).toBeInTheDocument();
     expect(canvasScene()).toBeUndefined();
   });
@@ -554,7 +580,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     const view = render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     const holdsAfterAcquire = mocks.holds;
     const createdBeforeSwitches = created.mock.calls.length;
@@ -662,11 +688,11 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(canvasScene()).toBe('scene-tavern');
     expect(entry.disposed).toBe(0);
     expect(
-      screen.getByRole('button', { name: 'Discard pending edit' })
+      screen.getByRole('button', { name: 'Discard my edit' })
     ).toBeInTheDocument();
   });
 
-  it('compact header: Details discloses secondary lines, never the conflict alert or notices (FU-5)', async () => {
+  it('compact header: the Details popover holds secondary lines, never the conflict alert or notices (FU-5, O7-2)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
@@ -682,39 +708,38 @@ describe('W3/W4 lifecycle (D8)', () => {
     );
     const details = screen.getByRole('button', { name: /^Details/u });
     expect(details).toHaveAttribute('aria-expanded', 'false');
-    const regions = (details.getAttribute('aria-controls') ?? '')
-      .split(' ')
-      .map(id => document.getElementById(id));
-    expect(regions).toHaveLength(2);
-    for (const region of regions) {
-      expect(region).not.toBeNull();
-      expect(region!.className).toMatch(/max-sm:hidden/u);
-    }
-    const collapsed = (node: Element) =>
-      regions.some(region => region!.contains(node));
+    expect(
+      screen.queryByRole('button', { name: 'Save checkpoint' })
+    ).toBeNull();
+    stubPopoverLayout();
+    fireEvent.click(details);
+    expect(details).toHaveAttribute('aria-expanded', 'true');
+    const content = await screen.findByTestId('table-header-details');
+    expect(details.getAttribute('aria-controls')).toBe(content.id);
+    const collapsed = (node: Element) => content.contains(node);
     const alerts = screen.getAllByRole('alert');
     expect(
       alerts.some(alert =>
-        /conflicted with a newer scene/u.test(alert.textContent ?? '')
+        /changed in another tab or device, so your edit wasn't applied/u.test(
+          alert.textContent ?? ''
+        )
       )
     ).toBe(true);
     for (const alert of alerts) expect(collapsed(alert)).toBe(false);
     for (const name of [
-      'Refresh winner',
-      'Retry pending edit',
-      'Discard pending edit',
+      'Show newer version',
+      'Try my edit again',
+      'Discard my edit',
     ])
       expect(collapsed(screen.getByRole('button', { name }))).toBe(false);
     expect(collapsed(notice)).toBe(false);
     expect(
       collapsed(screen.getByRole('button', { name: 'Save checkpoint' }))
     ).toBe(true);
-    expect(collapsed(screen.getByText(/^Relay:/u))).toBe(true);
-    expect(screen.getByText('Local scene runs')).toBeInTheDocument();
-    fireEvent.click(details);
-    expect(details).toHaveAttribute('aria-expanded', 'true');
-    for (const region of regions)
-      expect(region!.className).not.toMatch(/max-sm:hidden/u);
+    expect(collapsed(screen.getByText('Connection', { selector: 'dt' }))).toBe(
+      true
+    );
+    expect(collapsed(screen.getByText('Saved on this device'))).toBe(false);
   });
 
   it('keeps the scene, the conflict and the URL on Back (popstate)', async () => {
@@ -840,9 +865,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await navigate('scene=scene-forest');
     const notice = 'Resolve the unsaved change on Tavern before switching';
     expect(await screen.findByText(notice)).toBeInTheDocument();
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Discard pending edit' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Discard my edit' }));
     await waitFor(() => expect(screen.queryByText(notice)).toBeNull());
     expect(canvasScene()).toBe('scene-tavern');
   });
@@ -860,13 +883,13 @@ describe('W3/W4 lifecycle (D8)', () => {
     });
     await navigate('scene=scene-forest');
     expect(
-      await screen.findByText('Still saving Tavern — try again')
+      await screen.findByText('Still saving Tavern. Try again in a moment.')
     ).toBeInTheDocument();
     expect(canvasScene()).toBe('scene-tavern');
     expect(mocks.adapters[0]!.disposed).toBe(0);
   });
 
-  it('shows "Map image could not be loaded" when the ensure probe fails (N4)', async () => {
+  it('shows "Couldn\'t load the map image." when the ensure probe fails (N4)', async () => {
     const current = repository.getCurrent();
     if (current?.status !== 'ready') throw new Error('not ready');
     await repository.mutateWorkspace(
@@ -908,7 +931,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-broken');
     expect(
-      await screen.findByText('Map image could not be loaded')
+      await screen.findByText("Couldn't load the map image.")
     ).toBeInTheDocument();
     const viewport = mocks.viewports.get('scene-broken') as unknown as {
       store: ElementStore;
@@ -916,19 +939,19 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(viewport.store.getAll()).toEqual([]);
   });
 
-  it('offers "Retry live registration" after a transient failure (A3)', async () => {
+  it('offers "Try again" after a transient failure (A3)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     failControlReads.next = 1;
     await navigate('scene=scene-forest');
     await settled('scene-forest');
     expect(
       await screen.findByText(
-        'Live registration is unavailable; this scene stays local.'
+        "Live play isn't available right now, so this scene stays on this device."
       )
     ).toBeInTheDocument();
     const registers = () =>
@@ -938,16 +961,14 @@ describe('W3/W4 lifecycle (D8)', () => {
       ).length;
     expect(registers()).toBe(0);
     const mounts = mocks.canvasMounts;
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Retry live registration' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     await waitFor(() => expect(registers()).toBe(1));
     // The local canvas re-mints its relay token once registered.
     await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
     await waitFor(() =>
       expect(
         screen.queryByText(
-          'Live registration is unavailable; this scene stays local.'
+          "Live play isn't available right now, so this scene stays on this device."
         )
       ).toBeNull()
     );
@@ -963,12 +984,12 @@ describe('W3/W4 lifecycle (D8)', () => {
     entry.adapter.getLocalEditGeneration = () => (generation += 1);
     await navigate('scene=scene-forest');
     expect(
-      await screen.findByText('Still saving Tavern — try again')
+      await screen.findByText('Still saving Tavern. Try again in a moment.')
     ).toBeInTheDocument();
     expect(canvasScene()).toBe('scene-tavern');
     expect(entry.disposed).toBe(0);
     expect(
-      screen.queryByRole('button', { name: 'Discard pending edit' })
+      screen.queryByRole('button', { name: 'Discard my edit' })
     ).not.toBeInTheDocument();
   });
 
@@ -977,7 +998,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     const mounts = mocks.canvasMounts;
     const combat = mocks.combatMounts;
@@ -986,7 +1007,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     await settled('scene-forest');
     expect(
       await screen.findByText(
-        /Another session holds live control|Live control lost/u
+        /Another tab or device is live right now|You're no longer live/u
       )
     ).toBeInTheDocument();
     expect(screen.getByTestId('table-combat')).toBeInTheDocument();
@@ -1003,7 +1024,7 @@ describe('W3/W4 lifecycle (D8)', () => {
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-forest');
     expect(
-      await screen.findByText(/Another session holds live control/u)
+      await screen.findByText(/Another tab or device is live right now/u)
     ).toBeInTheDocument();
     const posts = server.commands.length;
     await navigate('scene=scene-tavern');
@@ -1011,12 +1032,12 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(server.commands).toHaveLength(posts);
     const mounts = mocks.canvasMounts;
     const acquire = screen.getByRole('button', {
-      name: /Acquire live control/u,
+      name: /Go live/u,
     });
     await waitFor(() => expect(acquire).toBeEnabled(), { timeout: 3_000 });
     fireEvent.click(acquire);
     await waitFor(() =>
-      expect(screen.getByText('Live control held.')).toBeInTheDocument()
+      expect(screen.getByText("You're live")).toBeInTheDocument()
     );
     await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
     await act(async () => {
@@ -1231,7 +1252,7 @@ describe('W5/W6 browser, creation and local adoption in the workspace', () => {
     nav.reset('scene=scene-tavern&panel=scenes');
     render(<TableWorkspace campaignCode="CAMP" />);
     await settled('scene-tavern');
-    await screen.findByText(/Another session holds live control/u);
+    await screen.findByText(/Another tab or device is live right now/u);
     const posts = server.commands.length;
     fireEvent.click(screen.getByRole('button', { name: 'Add Crypt' }));
     await waitFor(() => expect(nav.push).toHaveBeenCalled());

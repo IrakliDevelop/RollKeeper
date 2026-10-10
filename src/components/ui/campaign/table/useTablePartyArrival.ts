@@ -13,6 +13,7 @@ import {
   type TableRosterCommandV1,
 } from '@/lib/table/roster';
 
+import { representationFields } from './tableRepresentation';
 import type { TableRosterCanvas } from './useTableRosterState';
 
 export interface TableArrivalNotice {
@@ -21,7 +22,7 @@ export interface TableArrivalNotice {
   retry?: () => void;
 }
 
-const NOT_LIVE = 'Waiting for a live connection before placing tokens.';
+const NOT_LIVE = 'Waiting to connect before placing tokens.';
 
 /**
  * PR06 W11 "Bring party here": idempotently adds campaign players who are
@@ -108,7 +109,7 @@ export function useTablePartyArrival(options: {
       setNotice({
         tone: 'error',
         message:
-          'Campaign players are unavailable. Nothing was placed — try again.',
+          "Couldn't load the player list. Nothing was placed. Try again.",
         retry: () => void bringParty(),
       });
       return;
@@ -199,10 +200,13 @@ export function useTablePartyArrival(options: {
             ...(entry.avatarUrl ? { avatarUrl: entry.avatarUrl } : {}),
             color: dispositionColor({ type: 'player' }),
             tokenCells: entry.tokenCells,
-            fields: partyTokenFields(
-              entry.sceneMemberId,
-              entry.control.legacyPlayerId
-            ),
+            fields: {
+              ...partyTokenFields(
+                entry.sceneMemberId,
+                entry.control.legacyPlayerId
+              ),
+              ...representationFields(entry),
+            },
           },
           point,
           slot

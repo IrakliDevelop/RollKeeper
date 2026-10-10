@@ -15,7 +15,7 @@ import { TableCombatToolbar } from './TableCombatToolbar';
 import { TableNewRunDialog } from './TableNewRunDialog';
 import { TableParticipantDialog } from './TableParticipantDialog';
 import { TableRunSetup } from './TableRunSetup';
-import { publicationLabel } from './tableCombatMessages';
+import { publicationDetail, publicationLabel } from './tableCombatMessages';
 import { useTableCombat, type TableCombatIntent } from './useTableCombat';
 import { useTableCombatPanelActions } from './useTableCombatPanelActions';
 import { useTableCombatPublication } from './useTableCombatPublication';
@@ -95,6 +95,22 @@ export function TableCombatPanel(props: {
   const [tab, setTab] = useState<'initiative' | 'selected'>('initiative');
   const [selectedEntityId, setSelectedEntityId] = useState<string | null>(null);
   const { model, running, selectedRun } = combat;
+  // PR07 P9: physical-mini badge source (scene member records).
+  const snapshot = combat.snapshot;
+  const physicalActorIds = useMemo(
+    () =>
+      new Set(
+        snapshot?.scenes
+          .find(scene => scene.sceneId === props.sceneId)
+          ?.members.filter(
+            member =>
+              member.representation === 'physical' &&
+              member.removedAt === undefined
+          )
+          .map(member => member.actorId) ?? []
+      ),
+    [snapshot, props.sceneId]
+  );
   const capabilityByEntity = useMemo(
     () => new Map(panel.capabilities.map(item => [item.entityId, item.caps])),
     [panel.capabilities]
@@ -118,8 +134,8 @@ export function TableCombatPanel(props: {
     );
   const activeName =
     model && model.encounter.currentTurn >= 0
-      ? (model.encounter.entities[model.encounter.currentTurn]?.name ?? '—')
-      : '—';
+      ? (model.encounter.entities[model.encounter.currentTurn]?.name ?? 'None')
+      : 'None';
 
   return (
     <>
@@ -149,7 +165,17 @@ export function TableCombatPanel(props: {
               publication.status,
               props.liveUnavailable
             )}
-            publishedRun={panel.activeSummary}
+            publicationDetail={publicationDetail(
+              publication.status,
+              props.liveUnavailable
+            )}
+            // O7-2 HR-2: the run selector already names the selected run.
+            publishedRun={
+              panel.activeSummary &&
+              panel.activeSummary.runId !== selectedRun?.runId
+                ? panel.activeSummary
+                : null
+            }
             playersStale={
               combat.players.snapshot.status === 'ready' &&
               combat.players.snapshot.stale
@@ -187,6 +213,7 @@ export function TableCombatPanel(props: {
               }
               onResetImported={panel.end}
               onGoToActive={panel.goToActive}
+              physicalActorIds={physicalActorIds}
             />
           ) : undefined
         }

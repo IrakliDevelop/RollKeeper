@@ -143,4 +143,23 @@ describe('createTableRosterCanvas', () => {
     });
     expect(setSelection).toHaveBeenCalledWith(['token-b']);
   });
+
+  it('re-runs subscribers on a tag-only table representation change (PR07 P10, CONTROL_KEYS)', () => {
+    const { viewport } = fakeViewport();
+    viewport.store.add(token());
+    const canvas = createTableRosterCanvas({
+      viewport: viewport as never,
+      connection: null,
+      onArm: vi.fn(),
+    });
+    const listener = vi.fn();
+    const off = canvas.subscribe(listener);
+    viewport.store.update('token-a', { position: { x: 5, y: 5 } } as never);
+    expect(listener).not.toHaveBeenCalled();
+    viewport.store.update('token-a', {
+      tableRepresentation: 'physical',
+    } as never);
+    expect(listener).toHaveBeenCalledTimes(1);
+    off();
+  });
 });

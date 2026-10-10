@@ -167,7 +167,7 @@ describe('Table bundles', () => {
           localWorkspaceId: 'bound-fork',
         })
       )
-    ).rejects.toThrow(/not bound/i);
+    ).rejects.toThrow(/belongs to another campaign/u);
   });
 
   it('rejects per-record and source raw-byte tampering even when family shape remains valid', async () => {

@@ -69,7 +69,7 @@ describe('W6 scene image validation (sceneImage.ts)', () => {
       validateSceneImageFile(file('image/png'), undecodable)
     ).resolves.toEqual({
       ok: false,
-      message: 'This image could not be read',
+      message: "Couldn't read this image.",
     });
   });
 
@@ -136,7 +136,7 @@ describe('W6 scene image upload (never a data: fallback)', () => {
       })
     ).resolves.toEqual({
       ok: false,
-      message: 'Upload did not return a secure image link',
+      message: "The upload didn't return a usable image link. Try again.",
     });
   });
 

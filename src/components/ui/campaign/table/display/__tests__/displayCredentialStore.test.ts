@@ -69,17 +69,17 @@ function environment(
 describe('display messages (C5-4)', () => {
   it('exports one exact constant per audience message', () => {
     expect(DISPLAY_EXPIRED).toBe(
-      'Display link expired — open the display again from the DM screen'
+      'This link has expired. Press Open display on your DM screen to start again.'
     );
     expect(DISPLAY_IN_USE).toBe(
-      'This display link is in use on another screen — open the display again from the DM screen'
+      'This link is open on another screen. Press Open display on your DM screen to show it here.'
     );
     expect(DISPLAY_NOTHING_SHOWN).toBe(
       'Nothing is being shown on this map right now'
     );
-    expect(DISPLAY_WAITING).toBe('Waiting for the table');
+    expect(DISPLAY_WAITING).toBe('Waiting for the DM');
     expect(DISPLAY_OPEN_FROM_DM).toBe(
-      'Open the display from the DM screen (Open display)'
+      'To use this screen, press Open display on your DM screen.'
     );
   });
 });

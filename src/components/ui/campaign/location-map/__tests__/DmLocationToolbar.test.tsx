@@ -383,7 +383,7 @@ describe('DmLocationToolbar marker chrome', () => {
       ok: false as const,
       reason: 'popup-blocked' as const,
       message:
-        'Popup blocked — allow popups for this site and click Open display again',
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.',
     }));
     render(
       <DmLocationToolbar {...baseProps} onOpenTvDisplay={onOpenTvDisplay} />
@@ -392,7 +392,7 @@ describe('DmLocationToolbar marker chrome', () => {
     expect(onOpenTvDisplay).toHaveBeenCalledTimes(1);
     expect(
       await screen.findByText(
-        'Popup blocked — allow popups for this site and click Open display again'
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.'
       )
     ).toBeVisible();
   });

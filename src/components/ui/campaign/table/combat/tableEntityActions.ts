@@ -10,7 +10,7 @@ import type {
 import type { JsonObject } from '@/lib/table/schema';
 import type { EncounterEntity } from '@/types/encounter';
 
-export const NOT_AVAILABLE_IN_SCENE_RUNS = 'Not available in scene runs';
+export const NOT_AVAILABLE_IN_SCENE_RUNS = 'Not available here';
 
 /** One combat command draft per user intent; the panel adds runId/at. */
 export type TableCombatDraft =
@@ -39,8 +39,8 @@ export function tableDetailCapabilities(
 ): CombatantDetailCapabilities {
   const editable = view.kind === 'editable';
   const notes: string[] = [];
-  if (view.kind === 'adopted-pc') notes.push('Read-only adopted PC');
-  if (view.identityUnresolved) notes.push('identity unresolved');
+  if (view.kind === 'adopted-pc') notes.push('Copied PC (view only)');
+  if (view.identityUnresolved) notes.push('player not found');
   if (view.removedFromScene) notes.push('removed from scene');
   return {
     hp: editable,

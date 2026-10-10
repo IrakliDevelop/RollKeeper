@@ -39,6 +39,7 @@ function entry(overrides: Partial<TableRosterEntry>): TableRosterEntry {
     aliasTokenIds: [],
     mismatchedTokenIds: [],
     removed: false,
+    representation: 'digital',
     ...overrides,
   };
 }
@@ -92,7 +93,7 @@ describe('table roster model', () => {
           control: { kind: 'unavailable', reason: 'identity-unresolved' },
         })
       )
-    ).toBe('Identity unresolved');
+    ).toBe('Player not found');
     expect(
       controlLabel(
         entry({
@@ -115,6 +116,19 @@ describe('table roster model', () => {
     expect(
       describeEntry(entry({ aliasTokenIds: ['a', 'b'] }), new Set(['a', 'b']))
     ).toBe('DM-controlled · 2 unbound aliases');
+  });
+
+  it('marks a physical mini in the roster subtitle (PR07 P9)', () => {
+    expect(
+      describeEntry(
+        entry({ representation: 'physical', boundTokenIds: ['t'] }),
+        new Set(['t'])
+      )
+    ).toBe('DM-controlled · On map · Physical mini');
+    expect(
+      describeEntry(entry({ representation: 'physical' }), new Set())
+    ).toBe('DM-controlled · Not on map · Physical mini');
+    expect(describeEntry(entry({}), new Set())).not.toContain('Physical');
   });
 
   it('copies creature stats and a safe profile from an encounter entity', () => {

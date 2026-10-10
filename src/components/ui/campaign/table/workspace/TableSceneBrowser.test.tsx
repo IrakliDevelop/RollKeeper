@@ -78,7 +78,7 @@ afterEach(() => {
 describe('W5 private scene browser', () => {
   it('lists scenes as buttons with Selected/Shown badges from the descriptor', () => {
     renderBrowser();
-    const list = screen.getByRole('list', { name: 'Scenes in this workspace' });
+    const list = screen.getByRole('list', { name: 'Scenes on this Table' });
     const buttons = within(list).getAllByRole('button');
     expect(buttons.map(button => button.textContent)).toEqual([
       expect.stringContaining('Cave'),
@@ -132,7 +132,9 @@ describe('W5 private scene browser', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Crypt' }));
     expect(props.onAdopt).toHaveBeenCalledWith('map-crypt');
     expect(
-      screen.getByRole('link', { name: /Export or import a Table bundle/u })
+      screen.getByRole('link', {
+        name: /Export or import a Table on Battle Maps/u,
+      })
     ).toHaveAttribute('href', '/dm/campaign/CAMP/battlemaps');
   });
 
@@ -168,5 +170,18 @@ describe('W5 private scene browser', () => {
     expect(
       screen.getByText('No scenes yet. Create one or add a battle map.')
     ).toBeInTheDocument();
+  });
+
+  it('keeps a raw add-map outcome code in the tooltip only (O7-3)', () => {
+    renderBrowser({
+      status: {
+        tone: 'alert',
+        text: "The battle map wasn't added.",
+        detail: 'limit-exceeded',
+      },
+    });
+    const line = screen.getByRole('alert');
+    expect(line).toHaveTextContent("The battle map wasn't added.");
+    expect(line).toHaveAttribute('title', 'limit-exceeded');
   });
 });

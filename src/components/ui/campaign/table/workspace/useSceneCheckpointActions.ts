@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 import {
@@ -10,6 +10,15 @@ import {
 import type { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
 import type { TableCanvasCheckpointV1 } from '@/lib/table/schema';
+
+import {
+  checkpointNotSaved,
+  restoreMessages,
+  SAVE_MESSAGES,
+  type RestoreKind,
+  type SaveMessage,
+  type SaveMessageTone,
+} from './saveMessages';
 
 /**
  * Checkpoint, restore and pending-conflict actions of the selected scene
@@ -26,33 +35,48 @@ export function useSceneCheckpointActions(options: {
 }) {
   const { repository, adapter, connection, campaignCode, dmId, sceneId } =
     options;
-  const [saveMessage, setSaveMessage] = useState('Local scene loading…');
+  const [save, setSave] = useState<SaveMessage>(SAVE_MESSAGES.loading);
+  /** O7-2 HN-1 / O7-3 W8R-7: the tone is fixed where the message is produced. */
+  const setSaveMessage = useCallback(
+    (text: string, tone: SaveMessageTone, detail?: string) =>
+      setSave({ text, tone, detail }),
+    []
+  );
+  const post = useCallback(
+    (message: SaveMessage) =>
+      setSaveMessage(message.text, message.tone, message.detail),
+    [setSaveMessage]
+  );
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
     if (!adapter) return;
-    setSaveMessage(
-      adapter.getBattleMap()
-        ? 'Local scene ready'
-        : 'Scene not found in this local workspace'
-    );
-  }, [adapter]);
+    post(adapter.getBattleMap() ? SAVE_MESSAGES.ready : SAVE_MESSAGES.notFound);
+  }, [adapter, post]);
 
   async function saveCheckpoint() {
+    setSaveBusy(true);
+    try {
+      await runSaveCheckpoint();
+    } finally {
+      setSaveBusy(false);
+    }
+  }
+
+  async function runSaveCheckpoint() {
     if (!repository || !adapter || !connection || !sceneId) {
-      setSaveMessage(
-        'Relay is not ready. The local draft remains saved on this device.'
-      );
+      post(SAVE_MESSAGES.notConnected);
       return;
     }
     await adapter.flush();
     const current = await repository.reload();
     if (current.status !== 'ready') {
-      setSaveMessage('Table storage is unavailable; checkpoint not committed.');
+      post(SAVE_MESSAGES.storageUnavailable);
       return;
     }
     const startGeneration = adapter.getLocalEditGeneration();
-    setSaveMessage('Waiting for explicit relay receipts…');
+    post(SAVE_MESSAGES.saving);
     const result = await saveSceneCheckpoint({
       repository,
       connection,
@@ -62,24 +86,25 @@ export function useSceneCheckpointActions(options: {
       hasNewLocalEditsSinceBarrier: () =>
         adapter.getLocalEditGeneration() > startGeneration,
     });
-    setSaveMessage(
+    post(
       result.status === 'committed'
         ? result.pending
-          ? 'Authoritative checkpoint committed; a newer local edit is still pending.'
-          : 'Authoritative checkpoint committed locally.'
+          ? SAVE_MESSAGES.savedWithNewerEdit
+          : SAVE_MESSAGES.saved
         : result.status === 'not-saved'
-          ? `Checkpoint not committed (${result.reason}); the local draft remains pending.`
-          : `Checkpoint not committed (${result.status}); the previous checkpoint is unchanged.`
+          ? checkpointNotSaved('changes-kept', result.reason)
+          : checkpointNotSaved('last-kept', result.status)
     );
   }
 
   async function restore(
     checkpoint: TableCanvasCheckpointV1 | null | undefined,
-    label: string
+    kind: RestoreKind
   ) {
     if (!checkpoint || !sceneId) return;
+    const messages = restoreMessages(kind);
     setRecoveryBusy(true);
-    setSaveMessage(`${label} is being guarded by the current generation…`);
+    post(messages.busy);
     const result = await restoreAuthorityFork({
       campaignCode,
       dmId,
@@ -87,12 +112,12 @@ export function useSceneCheckpointActions(options: {
       checkpoint,
     });
     setRecoveryBusy(false);
-    setSaveMessage(
+    post(
       result.status === 'restored'
-        ? `${label} restored to live authority.`
+        ? messages.restored
         : result.status === 'conflict'
-          ? `${label} was not restored because live authority changed. Review the current scene and retry deliberately.`
-          : `${label} failed (${result.reason}); live authority and local data are unchanged.`
+          ? messages.conflict
+          : messages.failed(result.reason)
     );
   }
 
@@ -100,36 +125,37 @@ export function useSceneCheckpointActions(options: {
     if (!adapter) return;
     if (action === 'discard') {
       adapter.discardPendingConflict();
-      setSaveMessage(
-        'Pending conflicted edit discarded. The winning scene remains unchanged.'
-      );
+      post(SAVE_MESSAGES.conflictDiscarded);
       return;
     }
     if (action === 'refresh') {
       const refreshed = await adapter.refreshPendingConflict();
-      setSaveMessage(
+      post(
         refreshed
-          ? 'Winning scene refreshed. The conflicted edit is still pending for deliberate retry or discard.'
-          : 'The winning scene could not be refreshed; the conflicted edit remains pending.'
+          ? SAVE_MESSAGES.conflictRefreshed
+          : SAVE_MESSAGES.conflictRefreshFailed
       );
       return;
     }
     const result = await adapter.retryPendingConflict();
-    setSaveMessage(
+    post(
       result === 'committed'
-        ? 'Pending edit deliberately reapplied to the latest scene without replacing unrelated winner fields.'
+        ? SAVE_MESSAGES.conflictApplied
         : result === 'conflict'
-          ? 'The scene changed again. The edit remains pending and was not replayed.'
+          ? SAVE_MESSAGES.conflictChangedAgain
           : result === 'none'
-            ? 'There is no pending conflicted edit.'
-            : 'The pending edit could not be applied and remains available.'
+            ? SAVE_MESSAGES.conflictNone
+            : SAVE_MESSAGES.conflictApplyFailed
     );
   }
 
   return {
-    saveMessage,
+    saveMessage: save.text,
+    saveTone: save.tone,
+    saveDetail: save.detail,
     setSaveMessage,
     recoveryBusy,
+    saveBusy,
     saveCheckpoint,
     restore,
     reconcilePendingEdit,

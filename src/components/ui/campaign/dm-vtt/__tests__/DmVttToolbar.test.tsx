@@ -112,6 +112,29 @@ describe('DmVttToolbar', () => {
     expect(dock.querySelector('.overflow-x-auto')).toBeInTheDocument();
   });
 
+  it('always stacks the session controls above the tools on the Table (A2)', () => {
+    const { container } = render(
+      <DmVttToolbar
+        onClearDrawings={vi.fn()}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        hiddenPlacementActive={false}
+        onToggleHiddenPlacement={vi.fn()}
+        hiddenElementCount={0}
+        onRevealAll={vi.fn()}
+        selectedElementId={null}
+        selectedElementIsDmOnly={false}
+        onToggleSelectedDmOnly={vi.fn()}
+        sessionControls={<div data-testid="session">Header</div>}
+        sideBySide="never"
+      />
+    );
+    const dock = container.firstChild as HTMLElement;
+    expect(dock.className).toContain('flex-col');
+    expect(dock.className).not.toMatch(/flex-row|flex-wrap/u);
+    const session = screen.getByTestId('session').parentElement as HTMLElement;
+    expect(session.className).not.toMatch(/border-r|max-w-/u);
+  });
+
   it('toggles hidden placement and offers reveal all', () => {
     const onToggle = vi.fn();
     const onRevealAll = vi.fn();

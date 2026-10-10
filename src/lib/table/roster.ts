@@ -175,6 +175,8 @@ export interface TableRosterEntry {
   /** Bound tokens whose control fields disagree with the member's control. */
   mismatchedTokenIds: string[];
   removed: boolean;
+  /** PR07 M3: table-output representation (absent field = digital). */
+  representation: 'physical' | 'digital';
 }
 
 export interface TableSceneRoster {
@@ -445,6 +447,8 @@ export function deriveSceneRoster(options: {
       aliasTokenIds: [],
       mismatchedTokenIds: [],
       removed: member.removedAt !== undefined,
+      representation:
+        member.representation === 'physical' ? 'physical' : 'digital',
     };
     return { entry, member, adopted };
   });
@@ -556,6 +560,14 @@ export type TableRosterCommandV1 =
       sceneId: string;
       sceneMemberId: string;
       at: string;
+    }
+  | {
+      /** PR07 M3: table-output representation; `digital` deletes the key. */
+      type: 'roster.setRepresentation';
+      sceneId: string;
+      sceneMemberId: string;
+      representation: 'physical' | 'digital';
+      at: string;
     };
 
 export type TableRosterRejection = Extract<
@@ -582,11 +594,18 @@ const ROSTER_TYPES = new Set([
   'roster.updateActorStats',
   'roster.reassignControl',
   'roster.removeMember',
+  'roster.setRepresentation',
 ]);
 
 function validateRosterCommand(command: unknown): boolean {
   const value = record(command);
   if (!value || !ROSTER_TYPES.has(String(value.type))) return false;
+  if (
+    value.type === 'roster.setRepresentation' &&
+    value.representation !== 'physical' &&
+    value.representation !== 'digital'
+  )
+    return false;
   try {
     canonicalJson(value);
   } catch {
@@ -882,6 +901,17 @@ export function planRosterCommand(
       if (member.removedAt !== undefined) return { status: 'unchanged' };
       member.removedAt = command.at;
       member.tokenIds = [];
+      return putScene(scene, members, command.at);
+    }
+    case 'roster.setRepresentation': {
+      const member = members[memberIndex];
+      if (!member || member.removedAt !== undefined)
+        return rejected('invalid-reference', 'member-missing');
+      const physical = command.representation === 'physical';
+      if ((member.representation === 'physical') === physical)
+        return { status: 'unchanged' };
+      if (physical) member.representation = 'physical';
+      else delete member.representation;
       return putScene(scene, members, command.at);
     }
   }

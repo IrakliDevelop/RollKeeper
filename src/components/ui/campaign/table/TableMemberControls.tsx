@@ -1,8 +1,17 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import {
+  RadioGroupField,
+  RadioGroupItem,
+} from '@/components/ui/forms/radio-group';
 import type { TableRosterEntry } from '@/lib/table/roster';
 
+import {
+  PHYSICAL_MINI_HELP,
+  PHYSICAL_PLAYER_HELP,
+  REPRESENTATION_PENDING,
+} from './tableRepresentation';
 import type { TablePlayersSnapshot } from './useTablePlayersSnapshot';
 
 export interface TableMemberActions {
@@ -11,6 +20,8 @@ export interface TableMemberActions {
   onRepair: () => void;
   onBind: (tokenId: string) => void;
   onUnbind: (tokenId: string) => void;
+  /** PR07 M3: table-output representation (table display only). */
+  onRepresentation: (representation: 'physical' | 'digital') => void;
 }
 
 /** Explicit control reassignment and token binding (never automatic). */
@@ -22,6 +33,7 @@ export function TableMemberControls({
   liveIds,
   busy,
   actions,
+  liveHolder = false,
 }: {
   entry: TableRosterEntry;
   players: TablePlayersSnapshot;
@@ -31,6 +43,8 @@ export function TableMemberControls({
   liveIds: ReadonlySet<string>;
   busy: boolean;
   actions: TableMemberActions;
+  /** P10: tokens are retagged only while this tab holds live control. */
+  liveHolder?: boolean;
 }) {
   const playerControlled = entry.control.kind === 'player';
   const mismatched = entry.mismatchedTokenIds.filter(id => liveIds.has(id));
@@ -55,7 +69,7 @@ export function TableMemberControls({
           </Button>
         ) : !entry.playerIdentity ? (
           <p className="text-muted text-xs">
-            DM-managed participant — players cannot control it.
+            Only you control this one. Players can&apos;t move it.
           </p>
         ) : players.status === 'ready' ? (
           <div className="flex flex-wrap gap-2">
@@ -73,14 +87,14 @@ export function TableMemberControls({
           </div>
         ) : (
           <p className="text-muted text-xs">
-            Campaign players are unavailable; control stays with the DM.
+            Couldn&apos;t load the player list, so you keep control for now.
           </p>
         )}
       </section>
       <section className="space-y-2" aria-label="Tokens">
         <h3 className="text-heading text-sm font-semibold">Tokens</h3>
         {entry.boundTokenIds.length === 0 && bindable.length === 0 && (
-          <p className="text-muted text-xs">No token bound yet.</p>
+          <p className="text-muted text-xs">No token linked yet.</p>
         )}
         {entry.boundTokenIds.map(tokenId => (
           <div key={tokenId} className="flex flex-wrap items-center gap-2">
@@ -94,7 +108,7 @@ export function TableMemberControls({
               disabled={busy}
               onClick={() => actions.onUnbind(tokenId)}
             >
-              {`Unbind ${tokenId}`}
+              {`Unlink ${tokenId}`}
             </Button>
           </div>
         ))}
@@ -117,10 +131,10 @@ export function TableMemberControls({
           <div key={tokenId} className="flex flex-wrap items-center gap-2">
             <span className="text-muted min-w-0 flex-1 truncate text-xs">
               {ambiguousTokenIds.includes(tokenId)
-                ? 'Ambiguous legacy token'
+                ? 'Matches more than one member'
                 : unmatchedTokenIds.includes(tokenId)
-                  ? 'Unbound map token'
-                  : 'Unbound legacy alias'}
+                  ? 'Not linked yet'
+                  : 'Older token, not linked'}
             </span>
             <Button
               variant="outline"
@@ -128,10 +142,35 @@ export function TableMemberControls({
               disabled={busy}
               onClick={() => actions.onBind(tokenId)}
             >
-              {`Bind ${tokenId}`}
+              {`Link ${tokenId}`}
             </Button>
           </div>
         ))}
+      </section>
+      <section className="space-y-2" aria-label="On the TV">
+        <h3 className="text-heading text-sm font-semibold">On the TV</h3>
+        <RadioGroupField
+          aria-label="On the TV"
+          value={entry.representation}
+          disabled={busy}
+          onValueChange={value =>
+            actions.onRepresentation(
+              value === 'physical' ? 'physical' : 'digital'
+            )
+          }
+        >
+          <RadioGroupItem value="digital" label="Digital token" size="sm" />
+          <RadioGroupItem value="physical" label="Physical mini" size="sm" />
+        </RadioGroupField>
+        <p className="text-muted text-xs">{PHYSICAL_MINI_HELP}</p>
+        {playerControlled && (
+          <p className="text-muted text-xs">{PHYSICAL_PLAYER_HELP}</p>
+        )}
+        {!liveHolder && (
+          <p className="text-accent-amber-text text-xs">
+            {REPRESENTATION_PENDING}
+          </p>
+        )}
       </section>
     </div>
   );

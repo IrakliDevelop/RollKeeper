@@ -40,13 +40,18 @@ const PNG = Buffer.from(
 
 type Command = Record<string, unknown> & { type: string };
 
-function controlServer() {
+function controlServer(options: { foreignHolder?: boolean } = {}) {
   const state = {
     revision: 0,
     writerFence: 0,
     holderSessionId: null as string | null,
     leaseUntil: 0,
     initialized: false,
+    presentation: {
+      sceneId: null as string | null,
+      revision: 0,
+      blanked: false,
+    },
   };
   const registry: Array<Record<string, unknown>> = [];
   const commands: Command[] = [];
@@ -58,7 +63,7 @@ function controlServer() {
     writerFence: state.writerFence,
     leaseUntil: state.leaseUntil,
     holderSessionId: state.holderSessionId,
-    presentation: { sceneId: null, revision: 0, blanked: false },
+    presentation: { ...state.presentation },
     publicRunId: null,
   });
   const json = (route: Route, status: number, body: unknown) =>
@@ -78,6 +83,17 @@ function controlServer() {
     }
     const command = (request.postDataJSON() as { command: Command }).command;
     commands.push(command);
+    // O7-2 HR-4: another session holds live control (banner state).
+    if (options.foreignHolder && command.type === 'acquire')
+      return json(route, 409, {
+        status: 'conflict',
+        reason: 'controller-active',
+        current: {
+          ...descriptor(),
+          holderSessionId: 'foreign-session',
+          leaseUntil: Date.now() + 30_000,
+        },
+      });
     switch (command.type) {
       case 'initialize':
         state.initialized = true;
@@ -89,6 +105,13 @@ function controlServer() {
         break;
       case 'renew':
         state.leaseUntil = Date.now() + 30_000;
+        break;
+      case 'show':
+        state.presentation = {
+          sceneId: String(command.sceneId),
+          revision: state.presentation.revision + 1,
+          blanked: false,
+        };
         break;
       case 'registerScene':
         registry.push({
@@ -173,7 +196,7 @@ async function newContext(browser: import('@playwright/test').Browser) {
 }
 
 const sceneList = (page: Page) =>
-  page.getByRole('list', { name: 'Scenes in this workspace' });
+  page.getByRole('list', { name: 'Scenes on this Table' });
 
 async function selected(page: Page, name: string) {
   await expect(
@@ -243,7 +266,9 @@ test('workspace: one session across 10+ private switches, redirect, history and 
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
   await expect(page.getByRole('region', { name: 'Scenes' })).toBeVisible();
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
 
   // Add a never-opened battle map locally, then create a blank scene.
   await page.getByRole('button', { name: 'Add Tavern' }).click();
@@ -326,7 +351,7 @@ test('workspace: one session across 10+ private switches, redirect, history and 
   // An unknown scene shows the neutral notice and no other data.
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=nowhere`);
   await expect(
-    page.getByText('That scene is not available in this workspace')
+    page.getByText("That scene isn't on this device.")
   ).toBeVisible();
 
   // 390 px: the Scenes panel and its controls fit without overflow.
@@ -382,7 +407,9 @@ test('FU-4: at most one /players read per scene switch (no active run)', async (
   });
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   await createScene(page, 'Forest');
@@ -455,7 +482,9 @@ test('create scene: uploaded image placed once; refusals create no scene', async
   );
 
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   const items = () => sceneList(page).getByRole('listitem');
 
   const refusals: Array<{
@@ -488,7 +517,7 @@ test('create scene: uploaded image placed once; refusals create no scene', async
         buffer: Buffer.from('not an image'),
       },
       mode: 'ok',
-      message: 'This image could not be read',
+      message: "Couldn't read this image.",
     },
     {
       file: { name: 'cellar.png', mimeType: 'image/png', buffer: PNG },
@@ -572,7 +601,9 @@ test('Edit map tools are reachable and unclipped at 1280, 2048 and 390 px', asyn
   await seed(page, server);
   await page.setViewportSize({ width: 2048, height: 1103 });
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   await page.getByRole('button', { name: 'Close scenes' }).click();
@@ -629,7 +660,9 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
   const server = controlServer();
   await seed(page, server);
   await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
-  await expect(page.getByText('Live control held.')).toBeVisible();
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Add Tavern' }).click();
   await selected(page, 'Tavern');
   const tavernId = sceneParam(page)!;
@@ -652,7 +685,9 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
     await expect(page.getByText('Switching scene…')).toHaveCount(0);
     await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
     // Measured state: live control held, scene selected, no notices.
-    await expect(page.getByText('Live control held.')).toBeAttached();
+    await expect(
+      page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+    ).toBeAttached();
     await expect(dock.locator('[role="alert"]')).toHaveCount(0);
     const dockBox = (await dock.boundingBox())!;
     const canvasBox = (await page.locator('canvas').first().boundingBox())!;
@@ -669,7 +704,7 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
       );
     // Every visible header control (the toolbar strip below scrolls by
     // design and is covered by the Edit map reachability test).
-    const header = dock.locator(':scope > div').first();
+    const header = page.getByTestId('table-workspace-header');
     for (const control of await header.locator('button, a[href], select').all())
       if (await control.isVisible()) await expectUnclipped(control);
     const details = page.getByRole('button', { name: /^Details/u });
@@ -687,6 +722,162 @@ test('FU-5: compact header leaves the canvas ≥ 50% of 390×844, nothing clippe
         document.documentElement.clientWidth
     )
   ).toBe(true);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});
+
+test('O7-2: header height budget at 1280, 2048 and 390 px; one banner row adds at most 40 px (light and dark)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  const tavernId = sceneParam(page)!;
+  const header = page.getByTestId('table-workspace-header');
+  const measure = async (width: number, height: number) => {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(300);
+    return Math.round((await header.boundingBox())!.height);
+  };
+  const normal: Record<string, number> = {};
+  for (const theme of ['light', 'dark'] as const) {
+    await page.evaluate(value => {
+      localStorage.setItem('rollkeeper-theme', value);
+    }, theme);
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
+    // HR-4 measured state: live control held, scene selected, no notices,
+    // panels closed.
+    await expect(page.getByTestId('dm-vtt-command-dock')).toBeVisible();
+    await expect(page.getByText('Switching scene…')).toHaveCount(0);
+    await expect(page.getByRole('region', { name: 'Scenes' })).toHaveCount(0);
+    await expect(
+      page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+    ).toBeVisible();
+    await expect(header.locator('[role="alert"]')).toHaveCount(0);
+    const at1280 = await measure(1280, 800);
+    const at2048 = await measure(2048, 1103);
+    const dock2048 = Math.round(
+      (await page.getByTestId('dm-vtt-command-dock').boundingBox())!.height
+    );
+    console.log(`O7-2 ${theme}: dock 2048=${dock2048}px`);
+    const at390 = await measure(390, 844);
+    console.log(
+      `O7-2 ${theme}: header 1280=${at1280}px 2048=${at2048}px 390=${at390}px`
+    );
+    expect(at1280).toBeLessThanOrEqual(100);
+    expect(at2048).toBeLessThanOrEqual(at1280);
+    normal[theme] = at1280;
+  }
+
+  // One banner row: another session holds live control (Acquire + Work
+  // offline inline with the text).
+  const foreign = await context.newPage();
+  await seed(foreign, controlServer({ foreignHolder: true }));
+  await foreign.setViewportSize({ width: 1280, height: 800 });
+  await foreign.goto(`/dm/campaign/${CAMPAIGN.code}/table?scene=${tavernId}`);
+  await expect(
+    foreign.getByText(/Another tab or device is live right now/u)
+  ).toBeVisible();
+  await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
+  const foreignHeader = foreign.getByTestId('table-workspace-header');
+  await expect(foreignHeader).toBeVisible();
+  const withBanner = Math.round((await foreignHeader.boundingBox())!.height);
+  console.log(`O7-2 banner: header 1280=${withBanner}px`);
+  expect(withBanner - normal.dark!).toBeLessThanOrEqual(40);
+  expect(contextErrors).toEqual([]);
+  await context.close();
+});
+
+test('review 03 F1 / A2: the Table header always stacks above a full-width tool strip (no tool scrolling), also with a scene shown', async ({
+  browser,
+}) => {
+  test.setTimeout(120_000);
+  const context = await newContext(browser);
+  const contextErrors = await guardTableContext(context);
+  const page = await context.newPage();
+  const server = controlServer();
+  await seed(page, server);
+  await page.setViewportSize({ width: 2048, height: 1103 });
+  await page.goto(`/dm/campaign/${CAMPAIGN.code}/table?panel=scenes`);
+  await expect(
+    page.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Add Tavern' }).click();
+  await selected(page, 'Tavern');
+  await page.getByRole('button', { name: 'Close scenes' }).click();
+  const dock = page.getByTestId('dm-vtt-command-dock');
+  const header = page.getByTestId('table-workspace-header');
+  const strip = dock.locator('.overflow-x-auto').first();
+  const overflow = async (target: typeof strip) =>
+    target.evaluate(element => element.scrollWidth - element.clientWidth);
+  const expectStacked = async (label: string) => {
+    const headerBox = (await header.boundingBox())!;
+    const stripBox = (await strip.boundingBox())!;
+    const { scrollWidth, clientWidth } = await strip.evaluate(element => ({
+      scrollWidth: element.scrollWidth,
+      clientWidth: element.clientWidth,
+    }));
+    const dockHeight = Math.round((await dock.boundingBox())!.height);
+    console.log(
+      `F1 ${label}: dock ${dockHeight}px, strip ${clientWidth}/${scrollWidth}px, header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
+    );
+    expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(stripBox.y + 1);
+    expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+  };
+  // A2: the scene shown (published, with the display line) at 2048.
+  await page.getByRole('button', { name: 'Show this scene' }).click();
+  await expect(
+    page.getByRole('status', { name: 'What players see' })
+  ).toContainText(/Players see: (?!nothing|unknown)/u);
+  await expectStacked('2048 shown');
+  for (const [width, height] of [
+    [1536, 864],
+    [1600, 900],
+    [1800, 1000],
+    [1920, 1080],
+    [2048, 1103],
+  ] as const) {
+    await page.setViewportSize({ width, height });
+    await page.waitForTimeout(300);
+    await expectStacked(String(width));
+  }
+  const normal2048 = 0;
+
+  // A banner row (another session holds live control) at 2048: the header
+  // stacks above the tools, so the strip scrolls no more than normal.
+  const foreign = await context.newPage();
+  await seed(foreign, controlServer({ foreignHolder: true }));
+  await foreign.setViewportSize({ width: 2048, height: 1103 });
+  await foreign.goto(
+    `/dm/campaign/${CAMPAIGN.code}/table?scene=${sceneParam(page)!}`
+  );
+  await expect(
+    foreign.getByText(/Another tab or device is live right now/u)
+  ).toBeVisible();
+  await expect(foreign.getByText('Switching scene…')).toHaveCount(0);
+  const foreignDock = foreign.getByTestId('dm-vtt-command-dock');
+  const foreignHeader = foreign.getByTestId('table-workspace-header');
+  const foreignStrip = foreignDock.locator('.overflow-x-auto').first();
+  await expect(foreignStrip).toBeVisible();
+  const bannerOverflow = await overflow(foreignStrip);
+  const headerBox = (await foreignHeader.boundingBox())!;
+  const stripBox = (await foreignStrip.boundingBox())!;
+  console.log(
+    `F1 2048 with banner: strip overflow ${bannerOverflow}px (normal ${normal2048}px), header ${Math.round(headerBox.width)}x${Math.round(headerBox.height)}`
+  );
+  expect(bannerOverflow).toBeLessThanOrEqual(normal2048);
+  expect(headerBox.y + headerBox.height).toBeLessThanOrEqual(stripBox.y + 1);
   expect(contextErrors).toEqual([]);
   await context.close();
 });

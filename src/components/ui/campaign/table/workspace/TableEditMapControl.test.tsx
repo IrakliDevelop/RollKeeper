@@ -126,7 +126,8 @@ function setup(
   probe: (url: string) => Promise<{ w: number; h: number }> = async () => ({
     w: 1000,
     h: 500,
-  })
+  }),
+  scaleVerifiedHere = false
 ) {
   const storeWrite = vi.spyOn(useBattleMapStore, 'setState');
   const localWrite = vi.spyOn(Storage.prototype, 'setItem');
@@ -137,6 +138,7 @@ function setup(
       adapter={adapter}
       viewport={vp}
       presentedHere={presentedHere}
+      scaleVerifiedHere={scaleVerifiedHere}
       upload={upload}
       decode={async () => ({ w: 1000, h: 500 })}
       probe={probe}
@@ -154,18 +156,40 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
     expect(toggle).toHaveAttribute('aria-controls', 'table-edit-map-panel');
     expect(
       screen.getByText(
-        'Notes and text marked DM-only stay private; players never receive them.'
+        'Notes and text marked DM-only stay hidden; players never receive them.'
       )
     ).toBeInTheDocument();
     expect(
-      screen.queryByText('Editing the shown scene — changes are live')
+      screen.queryByText(
+        "You're editing the scene players see. Changes show right away."
+      )
     ).not.toBeInTheDocument();
+  });
+
+  it('hints that a grid geometry change needs re-verification while the table reports verified (PR07 P9)', () => {
+    setup(viewport(), true, undefined, undefined, true);
+    expect(
+      screen.getByText(
+        'If you change the grid, check the scale on the TV again.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('shows no scale hint otherwise', () => {
+    setup(viewport(), true);
+    expect(
+      screen.queryByText(
+        'If you change the grid, check the scale on the TV again.'
+      )
+    ).toBeNull();
   });
 
   it('says changes are live while editing the shown scene', () => {
     setup(viewport(), true);
     expect(
-      screen.getByText('Editing the shown scene — changes are live')
+      screen.getByText(
+        "You're editing the scene players see. Changes show right away."
+      )
     ).toBeInTheDocument();
   });
 
@@ -293,7 +317,7 @@ describe('W10 Edit map tools write only through the scene adapter', () => {
       },
     });
     expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Map image could not be loaded'
+      "Couldn't load the map image."
     );
     expect(vp.store.getAll()).toEqual([]);
     await adapter.flush();

@@ -4,7 +4,7 @@ import type { Metadata } from 'next';
 import { TableDisplayShell } from '@/components/ui/campaign/table/display/TableDisplayShell';
 
 export const metadata: Metadata = {
-  title: 'Table display',
+  title: 'TV display',
   referrer: 'no-referrer',
   robots: { index: false, follow: false },
 };
