@@ -39,11 +39,11 @@ export function TableRunSetup(props: {
     return (
       <div className="space-y-2 px-3 py-4">
         <p className="text-accent-amber-text text-xs font-medium">
-          Imported as active — not running here
+          Imported mid-fight. Not running here.
         </p>
         <p className="text-muted text-xs">
-          This run was adopted while its original encounter was in combat. Reset
-          the imported state to prepare and start it here.
+          This fight was imported while its encounter was in combat. Reset the
+          imported state to prepare and start it here.
         </p>
         <Button
           variant="outline"
@@ -106,7 +106,7 @@ export function TableRunSetup(props: {
         <ul className="space-y-0.5 px-1" aria-label="Bystanders">
           {props.bystanders.map(bystander => (
             <li key={bystander.actorId} className="text-faint text-xs">
-              {`${bystander.name} · Bystander — not in initiative`}
+              {`${bystander.name} · Bystander, not in initiative`}
             </li>
           ))}
         </ul>

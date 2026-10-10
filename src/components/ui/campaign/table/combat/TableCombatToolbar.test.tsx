@@ -1,7 +1,10 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { PublicationStatus } from '@/lib/table/combatPublisher';
+
 import { TableCombatToolbar } from './TableCombatToolbar';
+import { publicationDetail, publicationLabel } from './tableCombatMessages';
 
 afterEach(cleanup);
 
@@ -40,11 +43,47 @@ describe('Table combat toolbar player-data hints (N1, N2)', () => {
       <TableCombatToolbar
         {...props}
         playersStale={false}
-        playerNotices={['Aria: player data unavailable — HP not broadcast']}
+        playerNotices={["Aria: couldn't load player data, so HP isn't shared"]}
       />
     );
     expect(
-      screen.getByText('Aria: player data unavailable — HP not broadcast')
+      screen.getByText("Aria: couldn't load player data, so HP isn't shared")
     ).toBeVisible();
+  });
+});
+
+describe('publication wording (O7-3)', () => {
+  it('keeps a raw not-shared reason out of the text and in the tooltip', () => {
+    const status: PublicationStatus = {
+      kind: 'not-broadcasting',
+      reason: 'relay-timeout',
+      pending: null,
+    };
+    expect(publicationLabel(status, false)).toBe('Not shared with players');
+    expect(publicationDetail(status, false)).toBe('relay-timeout');
+    render(
+      <TableCombatToolbar
+        {...props}
+        playersStale={false}
+        canPublish
+        publicationLabel={publicationLabel(status, false)}
+        publicationDetail={publicationDetail(status, false)}
+      />
+    );
+    const line = screen.getByTestId('table-publication-status');
+    expect(line).toHaveTextContent('Not shared with players');
+    expect(line).toHaveAttribute('title', 'relay-timeout');
+    expect(
+      screen.getByRole('button', { name: 'Share with players' })
+    ).toBeVisible();
+  });
+
+  it('says plainly when live play is unavailable, with no tooltip', () => {
+    const status: PublicationStatus = { kind: 'broadcasting', runId: 'r1' };
+    expect(publicationLabel(status, true)).toBe('Live play unavailable');
+    expect(publicationDetail(status, true)).toBeUndefined();
+    expect(publicationLabel(status, false)).toBe(
+      'Initiative shared with players'
+    );
   });
 });

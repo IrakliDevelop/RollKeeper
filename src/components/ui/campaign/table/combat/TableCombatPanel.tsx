@@ -15,7 +15,7 @@ import { TableCombatToolbar } from './TableCombatToolbar';
 import { TableNewRunDialog } from './TableNewRunDialog';
 import { TableParticipantDialog } from './TableParticipantDialog';
 import { TableRunSetup } from './TableRunSetup';
-import { publicationLabel } from './tableCombatMessages';
+import { publicationDetail, publicationLabel } from './tableCombatMessages';
 import { useTableCombat, type TableCombatIntent } from './useTableCombat';
 import { useTableCombatPanelActions } from './useTableCombatPanelActions';
 import { useTableCombatPublication } from './useTableCombatPublication';
@@ -134,8 +134,8 @@ export function TableCombatPanel(props: {
     );
   const activeName =
     model && model.encounter.currentTurn >= 0
-      ? (model.encounter.entities[model.encounter.currentTurn]?.name ?? '—')
-      : '—';
+      ? (model.encounter.entities[model.encounter.currentTurn]?.name ?? 'None')
+      : 'None';
 
   return (
     <>
@@ -162,6 +162,10 @@ export function TableCombatPanel(props: {
             running={running}
             loggingPaused={panel.loggingPaused}
             publicationLabel={publicationLabel(
+              publication.status,
+              props.liveUnavailable
+            )}
+            publicationDetail={publicationDetail(
               publication.status,
               props.liveUnavailable
             )}

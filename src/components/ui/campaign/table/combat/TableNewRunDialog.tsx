@@ -52,7 +52,7 @@ export function TableNewRunDialog(props: {
             value={label}
             maxLength={400}
             onChange={event => setLabel(event.target.value)}
-            error={valid ? undefined : 'Use 1–200 characters.'}
+            error={valid ? undefined : 'Use 1 to 200 characters.'}
             autoFocus
           />
           <DialogFooter>

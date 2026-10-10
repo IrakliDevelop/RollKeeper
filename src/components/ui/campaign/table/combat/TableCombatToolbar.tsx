@@ -30,6 +30,8 @@ export function TableCombatToolbar(props: {
   running: boolean;
   loggingPaused: boolean;
   publicationLabel: string;
+  /** O7-3: a raw reason for the publication label, shown as a tooltip. */
+  publicationDetail?: string;
   /** The run publication targets (campaign.activeRunId), possibly elsewhere. */
   publishedRun: { label: string; sameScene: boolean; sceneName: string } | null;
   canPublish: boolean;
@@ -80,6 +82,7 @@ export function TableCombatToolbar(props: {
           role="status"
           aria-live="polite"
           data-testid="table-publication-status"
+          title={props.publicationDetail}
         >
           {props.publishedRun
             ? `${props.publicationLabel} · ${props.publishedRun.label}${
@@ -91,7 +94,7 @@ export function TableCombatToolbar(props: {
         </p>
         {props.canPublish && (
           <Button variant="outline" size="sm" onClick={props.onPublish}>
-            Publish current state
+            Share with players
           </Button>
         )}
         {props.running && (
@@ -102,7 +105,7 @@ export function TableCombatToolbar(props: {
       </div>
       {run?.sourceEncounterId && (
         <p className="text-muted text-xs">
-          Adopted from a library encounter ·{' '}
+          Copied from a library encounter ·{' '}
           <Link
             className="text-accent-blue-text underline"
             href={`/dm/campaign/${encodeURIComponent(props.campaignCode)}/encounters/${encodeURIComponent(run.sourceEncounterId)}`}
@@ -123,12 +126,13 @@ export function TableCombatToolbar(props: {
       ))}
       {props.loggingPaused && (
         <p className="text-accent-amber-text text-xs">
-          Combat log paused (archive full)
+          Combat log paused: history is full
         </p>
       )}
       {run && (
         <p className="text-faint text-xs">
-          DM condition changes are not sent to player sheets in scene runs
+          Conditions you set here don&apos;t reach players&apos; character
+          sheets
         </p>
       )}
       {(props.saving || props.notice) && (

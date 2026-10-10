@@ -226,7 +226,7 @@ export function useTableCombat(options: {
           ) {
             setNotice({
               tone: 'error',
-              message: 'Scene changed locally — review and retry',
+              message: 'The scene just changed. Check it and try again.',
             });
             return null;
           }
@@ -235,8 +235,8 @@ export function useTableCombat(options: {
             setNotice({
               tone: 'error',
               message: shown.uncertain
-                ? 'Show not confirmed — combat did not start; check the audience status'
-                : `Scene not shown — combat did not start: ${shown.reason}`,
+                ? "Couldn't confirm the scene is shown, so combat didn't start. Check what players see."
+                : `Scene not shown (${shown.reason}), so combat didn't start.`,
             });
             return null;
           }

@@ -102,7 +102,7 @@ describe('W6 create scene dialog', () => {
     typeName('   ');
     fireEvent.click(screen.getByRole('button', { name: 'Create scene' }));
     expect(
-      await screen.findByText('Name the scene (1–200 characters).')
+      await screen.findByText('Name the scene (1 to 200 characters).')
     ).toBeInTheDocument();
     expect(onCreated).not.toHaveBeenCalled();
     expect(scenes()).toEqual([]);

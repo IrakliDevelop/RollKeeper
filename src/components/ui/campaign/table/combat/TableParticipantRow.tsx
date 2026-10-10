@@ -77,7 +77,7 @@ export function TableParticipantRow(props: {
         size="sm"
         wrapperClassName="w-16 shrink-0"
         className={missing ? 'border-accent-amber-border' : undefined}
-        placeholder="—"
+        placeholder="None"
         value={draft}
         disabled={props.disabled}
         onChange={event => setDraft(event.target.value)}
