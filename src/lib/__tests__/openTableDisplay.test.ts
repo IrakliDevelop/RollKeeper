@@ -69,7 +69,7 @@ describe('openTableDisplay (E12)', () => {
       ok: false,
       reason: 'popup-blocked',
       message:
-        'Popup blocked — allow popups for this site and click Open display again',
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.',
     });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(openSpy).toHaveBeenCalledTimes(1);
@@ -117,7 +117,7 @@ describe('openTableDisplay (E12)', () => {
 
   it('words 409 as not initialized', () => {
     expect(OPEN_DISPLAY_MESSAGES['not-initialized']).toBe(
-      'Live table is not initialized — open a Table scene first'
+      'Open a scene on the Table first, then try again.'
     );
   });
 });

@@ -308,7 +308,9 @@ describe('TableDisplayShell bootstrap (E8)', () => {
     window.sessionStorage.clear();
     fetchMock.mockClear();
     await mount();
-    expect(cover()).toBe('Open the display from the DM screen (Open display)');
+    expect(cover()).toBe(
+      'To use this screen, press Open display on your DM screen.'
+    );
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -323,7 +325,7 @@ describe('TableDisplayShell bootstrap (E8)', () => {
     });
     await mount();
     expect(screen.getByTestId('table-display-notice').textContent).toBe(
-      'This browser blocks session storage — reloading will need Open display again'
+      "This browser won't remember this link. If you reload, use Open display again."
     );
     expect(descriptorCalls()).toHaveLength(1);
   });
@@ -637,10 +639,10 @@ describe('TableDisplayShell without a relay (review 01 F5)', () => {
     delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     setDescriptor(scene('tavern', 2));
     await mount();
-    expect(cover()).toBe('Live display is not configured');
+    expect(cover()).toBe("The TV view isn't set up on this server.");
     for (let index = 0; index < 4; index += 1) {
       await advance(15_000);
-      expect(cover()).toBe('Live display is not configured');
+      expect(cover()).toBe("The TV view isn't set up on this server.");
     }
     expect(connections).toHaveLength(0);
     expect(canvas.mounts).toBe(0);

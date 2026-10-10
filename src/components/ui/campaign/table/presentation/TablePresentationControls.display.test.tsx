@@ -306,7 +306,7 @@ describe('Open display launcher (E12)', () => {
       await settle();
       expect(
         screen.getByText(
-          'Popup blocked — allow popups for this site and click Open display again'
+          'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.'
         )
       ).toBeVisible();
       expect(

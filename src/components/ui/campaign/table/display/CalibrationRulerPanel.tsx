@@ -145,7 +145,7 @@ export function CalibrationRulerPanel({
         />
         <div className="flex flex-col gap-2">
           <p className="text-heading font-medium" aria-live="polite">
-            {cssPx} CSS px per square
+            Square on screen: {cssPx} px
           </p>
           <div className="flex flex-wrap gap-2">
             {STEPS.map(item => (
@@ -180,7 +180,7 @@ export function CalibrationRulerPanel({
           </Button>
           {onUseUncalibrated && (
             <Button size="sm" variant="secondary" onClick={onUseUncalibrated}>
-              Use uncalibrated view
+              Use normal view
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={onCancel}>

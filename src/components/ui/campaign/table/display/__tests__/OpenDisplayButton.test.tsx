@@ -40,7 +40,7 @@ describe('Open display launcher button (E12)', () => {
     expect(open).toHaveBeenCalledWith('about:blank', '_blank');
     expect(
       await screen.findByText(
-        'Popup blocked — allow popups for this site and click Open display again'
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.'
       )
     ).toBeVisible();
     expect(fetch).not.toHaveBeenCalled();

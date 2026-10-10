@@ -13,11 +13,11 @@ export type OpenTableDisplayResult =
 
 export const OPEN_DISPLAY_MESSAGES: Record<OpenTableDisplayFailure, string> = {
   'popup-blocked':
-    'Popup blocked — allow popups for this site and click Open display again',
-  'not-initialized': 'Live table is not initialized — open a Table scene first',
-  denied: 'Only the campaign DM can open the display',
-  unavailable: 'The display could not be opened — try again',
-  network: 'The display could not be opened — check your connection',
+    'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.',
+  'not-initialized': 'Open a scene on the Table first, then try again.',
+  denied: 'Only the campaign DM can open the TV view.',
+  unavailable: "Couldn't open the TV view. Try again.",
+  network: "Couldn't open the TV view. Check your internet connection.",
 };
 
 const CAPABILITY = /^[A-Za-z0-9_-]{43}$/u;

@@ -315,7 +315,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   await page.getByRole('button', { name: 'Open display' }).click();
   const tab = await popupPromise;
   await expect(tab.getByTestId('table-display-cover')).toHaveText(
-    'Waiting for the table'
+    'Waiting for the DM'
   );
   expect(rotations).toEqual([{ dmId: 'dm-display' }]);
   await expect
@@ -360,7 +360,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   display.setPresentation({ sceneId: null, revision: 2, blanked: true });
   await tab.reload();
   await expect(tab.getByTestId('table-display-cover')).toHaveText(
-    'Waiting for the table'
+    'Waiting for the DM'
   );
   await expect
     .poll(() => display.acks.at(-1)?.ack)
@@ -384,7 +384,7 @@ test('Open display: same-origin tab, fragment-only handover, credential only in 
   // A rotated link: the display clears its credential and asks to reopen.
   display.failWith({ status: 403, body: { error: 'Display link expired' } });
   await expect(tab.getByTestId('table-display-cover')).toHaveText(
-    'Display link expired — open the display again from the DM screen',
+    'This link has expired. Press Open display on your DM screen to start again.',
     { timeout: 10_000 }
   );
   expect(
@@ -427,7 +427,7 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
   const response = await page.goto(`/table-display/${CAMPAIGN.code}`);
   expect(response!.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page.getByTestId('table-display-cover')).toHaveText(
-    'Open the display from the DM screen (Open display)'
+    'To use this screen, press Open display on your DM screen.'
   );
   // A fresh tab (a same-document hash change does not reload the shell).
   const fresh = await context.newPage();
@@ -435,7 +435,7 @@ test('display tab bootstrap: no-referrer, malformed and missing links never requ
     `/table-display/${CAMPAIGN.code}#k=123e4567-e89b-42d3-a456-426614174000`
   );
   await expect(fresh.getByTestId('table-display-cover')).toHaveText(
-    'Display link expired — open the display again from the DM screen'
+    'This link has expired. Press Open display on your DM screen to start again.'
   );
   await expect
     .poll(() => fresh.evaluate(() => location.href))
@@ -470,7 +470,7 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
   await tab.goto(`/table-display/${CAMPAIGN.code}#k=${CAPABILITY}`);
   const root = tab.getByTestId('table-display');
   await expect(tab.getByTestId('table-display-cover')).toHaveText(
-    'Waiting for the table'
+    'Waiting for the DM'
   );
   await expect(root).toHaveAttribute('data-calibration-state', 'uncalibrated');
   await expect
@@ -598,7 +598,7 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
     }
   );
   await expect(tab.getByTestId('table-display-calibration')).toContainText(
-    'Scale needs verification'
+    'Check the scale'
   );
   await expect
     .poll(() => display.acks.at(-1)?.ack)
@@ -616,14 +616,14 @@ test('PR07 calibration: ruler square size, uncalibrated page start, signals, sto
   await tab.mouse.move(320, 320);
   await tab.getByRole('button', { name: 'Calibrate minis' }).click();
   await expect(panel).toContainText(
-    /Saved ruler setting from .+ — confirm it with your ruler/u
+    /Last ruler setting from .+\. Check it with your ruler\./u
   );
   expect(await size()).toEqual([96, 96]);
   await tab.getByRole('button', { name: 'Confirm' }).click();
   await expect(root).toHaveAttribute('data-calibration-state', 'verified');
   await tab.mouse.move(310, 310);
-  await tab.getByRole('button', { name: 'Verify scale' }).click();
-  await tab.getByRole('button', { name: 'Use uncalibrated view' }).click();
+  await tab.getByRole('button', { name: 'Check scale' }).click();
+  await tab.getByRole('button', { name: 'Use normal view' }).click();
   await expect(root).toHaveAttribute('data-calibration-state', 'uncalibrated');
   await expect
     .poll(() => display.acks.at(-1)?.ack)

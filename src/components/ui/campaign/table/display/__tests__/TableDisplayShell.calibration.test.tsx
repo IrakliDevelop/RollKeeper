@@ -389,7 +389,7 @@ describe('ruler calibration panel (P3)', () => {
       'Hold a ruler against the square. Adjust until each side measures 25.4 mm on this screen, then Confirm.'
     );
     expect(panel.textContent).toContain(
-      'Calibrated minis support: extended monitor, browser fullscreen, browser zoom 100%. Verify scale again after moving the window to another display, changing browser zoom, OS scaling or resolution, or leaving fullscreen — the browser cannot detect every change.'
+      "Mini scale works on a second monitor or TV, in full screen, at 100% browser zoom. Check the scale again if you move the window to another screen, change zoom or display settings, or leave full screen. The browser can't spot every change."
     );
     fireEvent.click(screen.getByRole('button', { name: 'Increase by 1 px' }));
     fireEvent.click(screen.getByRole('button', { name: 'Increase by 1 px' }));
@@ -431,13 +431,15 @@ describe('ruler calibration panel (P3)', () => {
     expect(JSON.stringify(saved)).not.toContain(CAPABILITY);
   });
 
-  it('Cancel changes nothing; Use uncalibrated view keeps PR05 behaviour', async () => {
+  it('Cancel changes nothing; Use normal view keeps PR05 behaviour', async () => {
     await mount();
     await goLive();
     const before = camera();
     fireEvent.pointerMove(window);
     fireEvent.click(screen.getByRole('button', { name: 'Calibrate minis' }));
     fireEvent.click(screen.getByRole('button', { name: 'Increase by 1 px' }));
+    expect(screen.getByText(/^Square on screen: [\d.]+ px$/u)).toBeTruthy();
+    expect(screen.queryByText(/CSS px/u)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(state()).toBe('uncalibrated');
     expect(camera()).toEqual(before);
@@ -445,10 +447,8 @@ describe('ruler calibration panel (P3)', () => {
     await calibrate();
     expect(state()).toBe('verified');
     fireEvent.pointerMove(window);
-    fireEvent.click(screen.getByRole('button', { name: 'Verify scale' }));
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Use uncalibrated view' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Check scale' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use normal view' }));
     await flush();
     expect(state()).toBe('uncalibrated');
     fireEvent.pointerMove(window);
@@ -491,7 +491,7 @@ describe('session-only verification (P1)', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Calibrate minis' }));
     const panel = screen.getByRole('region', { name: 'Ruler calibration' });
     expect(panel.textContent).toMatch(
-      /Saved ruler setting from .+ — confirm it with your ruler/u
+      /Last ruler setting from .+\. Check it with your ruler\./u
     );
     expect(panel.textContent).not.toMatch(/this monitor|identif/iu);
     expect(screen.getByTestId('calibration-reference-square').style.width).toBe(
@@ -528,7 +528,7 @@ describe('session-only verification (P1)', () => {
     fireEvent.pointerMove(window);
     fireEvent.click(screen.getByRole('button', { name: 'Calibrate minis' }));
     expect(
-      screen.queryByRole('button', { name: 'Use uncalibrated view' })
+      screen.queryByRole('button', { name: 'Use normal view' })
     ).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(state()).toBe('uncalibrated');
@@ -537,15 +537,15 @@ describe('session-only verification (P1)', () => {
       physical.fullscreen = false;
       document.dispatchEvent(new Event('fullscreenchange'));
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Verify scale' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Check scale' }));
     expect(
-      screen.getByRole('button', { name: 'Use uncalibrated view' })
+      screen.getByRole('button', { name: 'Use normal view' })
     ).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     expect(state()).toBe('verify-required');
     expect(
       screen.getByTestId('table-display-calibration').textContent
-    ).toContain('Scale needs verification');
+    ).toContain('Check the scale');
   });
 });
 
@@ -634,7 +634,7 @@ describe('invalidation freezes the transform (P5, P6)', () => {
       expect(camera()).toEqual(before);
       expect(
         screen.getByTestId('table-display-calibration').textContent
-      ).toContain('Scale needs verification');
+      ).toContain('Check the scale');
       fireEvent.pointerMove(window);
       expect(
         screen.queryByRole('button', { name: /Centre map|Fit map/u })
@@ -745,7 +745,7 @@ describe('input policy (P7, R3-2, C7-3)', () => {
     expect(screen.getByRole('button', { name: 'Centre map' })).toBeTruthy();
     expect(
       screen.getByTestId('table-display-calibration').textContent
-    ).toContain('Scale verified');
+    ).toContain('Scale checked');
   });
 
   it('a freeze mid-drag ends the drag: after Use uncalibrated a plain hover never pans (review F3)', async () => {
@@ -764,9 +764,7 @@ describe('input policy (P7, R3-2, C7-3)', () => {
     pointer('pointermove', 1, 360, 340, mouse);
     pointer('pointerup', 1, 360, 340, { ...mouse, buttons: 0 });
     expect(camera()).toEqual(frozen);
-    fireEvent.click(
-      screen.getByRole('button', { name: 'Use uncalibrated view' })
-    );
+    fireEvent.click(screen.getByRole('button', { name: 'Use normal view' }));
     await flush();
     expect(state()).toBe('uncalibrated');
     const free = camera();
@@ -849,7 +847,7 @@ describe('unsupported geometry (P4, C7-2, C7-3)', () => {
     expect(
       screen.getByTestId('table-display-calibration').textContent
     ).toContain(
-      'Calibrated minis need a square grid on this scene — showing the uncalibrated view'
+      'Mini scale needs a square grid on this scene. Showing the normal view.'
     );
     const zoom = viewport().camera.zoom;
     wheel();
@@ -857,7 +855,7 @@ describe('unsupported geometry (P4, C7-2, C7-3)', () => {
     expect(acks.at(-1)!).toMatchObject({ calibration: 'unsupported' });
   });
 
-  it('C7-2 (O7-A3): session cleared while a hex scene is shown: Verify scale and the unsupported message, frozen input, ACK verify-required', async () => {
+  it('C7-2 (O7-A3): session cleared while a hex scene is shown: Check scale and the unsupported message, frozen input, ACK verify-required', async () => {
     await mount();
     await goLive();
     await calibrate();
@@ -871,11 +869,11 @@ describe('unsupported geometry (P4, C7-2, C7-3)', () => {
     expect(state()).toBe('verify-required');
     const status = screen.getByTestId('table-display-calibration');
     expect(status.textContent).toContain(
-      'Calibrated minis need a square grid on this scene — showing the uncalibrated view'
+      'Mini scale needs a square grid on this scene. Showing the normal view.'
     );
-    expect(screen.getByRole('button', { name: 'Verify scale' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Check scale' })).toBeTruthy();
     expect(
-      screen.getByRole('button', { name: 'Use uncalibrated view' })
+      screen.getByRole('button', { name: 'Use normal view' })
     ).toBeTruthy();
     const before = camera();
     wheel();

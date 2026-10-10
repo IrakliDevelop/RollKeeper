@@ -110,7 +110,7 @@ export function TableDisplayCalibration({
           variant={report === 'verify-required' ? 'primary' : 'secondary'}
           onClick={() => setPanelOpen(true)}
         >
-          {report === 'uncalibrated' ? 'Calibrate minis' : 'Verify scale'}
+          {report === 'uncalibrated' ? 'Calibrate minis' : 'Check scale'}
         </Button>
         {attention && (
           <Button
@@ -118,7 +118,7 @@ export function TableDisplayCalibration({
             variant="outline"
             onClick={() => store.useUncalibrated()}
           >
-            Use uncalibrated view
+            Use normal view
           </Button>
         )}
         <Button
@@ -127,7 +127,7 @@ export function TableDisplayCalibration({
           aria-expanded={helpOpen}
           onClick={() => setHelpOpen(open => !open)}
         >
-          Supported setup
+          Setup tips
         </Button>
       </div>
       {helpOpen && (
