@@ -71,10 +71,15 @@ scene rooms, player views and the TV cannot connect.
 ## Deployment order
 
 1. Deploy the relay first (authority Lua, scene rooms, room-key TTL) and
-   verify it (`/healthz`, then a synthetic authority room) **before** the app
-   change is merged or deployed. If merging would auto-deploy the app to
-   production, pause that auto-deploy until the relay is verified; otherwise
-   new clients ask for authority tokens the old relay cannot serve.
+   check that `curl -fsS https://<relay-host>/healthz` answers `ok`
+   (`relay/src/server.ts`) **before** the app change is merged or deployed.
+   If merging would auto-deploy the app to production, pause that
+   auto-deploy until the relay is verified; otherwise new clients ask for
+   authority tokens the old relay cannot serve. There is no automated
+   production check for an authority room; after the app is live, run a
+   short manual smoke check on a test campaign: **Open Table**, **Go live**,
+   **Show this scene**, then **Open display** and confirm the scene appears on
+   the TV.
 2. Then deploy the app. A new app build talks only the v1 protocol.
 3. Already-open relay sockets are not closed by the app deploy. When an old
    browser tab needs a new token, `battlemap-token` answers 426 "Client
@@ -146,11 +151,12 @@ database on downgrade.
 
 To roll back a live release:
 
-1. Stop broadcasting (the DM's live control lease lapses).
+1. Stop live play: stop broadcasting (the DM's live control lease lapses).
 2. Export a Table bundle from each DM device.
-3. Drain relay sockets: restart the relay so already admitted v1 sockets are
-   dropped (the app deploy alone never closes them).
-4. Restore a matching app + relay pair (relay first, as above).
+3. Roll back the app and the relay together, to the recorded previous
+   known-good pair (see "VTT v4 rollout and rollback" in `relay/README.md`):
+   the app first, then the relay. Replacing or restarting the relay drains
+   the already admitted v1 sockets; the app rollback alone never closes them.
 
 ## Relay room-key lifetime
 
