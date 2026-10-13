@@ -158,7 +158,8 @@ does not receive room keys. The sliding TTL reclaims them instead.
 
 - Unit: `src/lib/tableServer/**`, `src/app/api/campaign/[code]/**`,
   `src/lib/table/**`, `src/components/ui/campaign/table/**` (`npm run test`).
-- Real Redis: `npm run test:relay:redis` (needs `REDIS_TEST_URL`; fails
-  rather than skipping without it) and `npm run test:table-control:redis`
+- Real Redis: `npm run test:relay:redis` (needs `REDIS_TEST_URL` pointing at
+  Redis 7 or newer; fails rather than skipping without it, and fails fast on
+  an older server) and `npm run test:table-control:redis`
   (starts its own disposable Redis and serverless-redis-http containers). Both
   run in the CI job "Relay and Table control Redis suites".

@@ -45,6 +45,14 @@ its own npm script:
 | `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer ([relay](07-battlemap-fog-fieldnotes.md)-backed) and the DM battle-map creature drawer — nightly only, not part of normal CI |
 | `test:rollback:drill` | `scripts/run-rollback-drill.mjs` — storage rollback verification |
 
+Real-Redis Table suites (CI job "Relay and Table control Redis suites", see
+[15](15-scenes-and-table.md)):
+
+| Script | Covers |
+|---|---|
+| `test:relay:redis` | Relay authority, fog CAS and transport suites; needs `REDIS_TEST_URL` pointing at **Redis 7 or newer** (fails fast otherwise, never skips) |
+| `test:table-control:redis` | Table control Lua against disposable Redis and serverless-redis-http containers it starts itself (needs Docker) |
+
 Nightly/drill suites are **not** expected to run on every PR — they exist for
 scheduled verification of the storage-migration and sync subsystems
 specifically. If you're changing code in [03](03-persistence-and-storage-migration.md)

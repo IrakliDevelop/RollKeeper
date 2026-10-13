@@ -125,6 +125,15 @@ run('authority driver against real Redis', () => {
   beforeAll(async () => {
     await client.connect();
     await client.ping();
+    // The script-side clock tests rely on Redis >= 7 freezing TIME for the
+    // whole EVAL (review N2); fail fast instead of flaking on older servers.
+    const version = /redis_version:([^\r\n]+)/u.exec(
+      await client.info('server')
+    )?.[1];
+    if (!version || Number(version.split('.')[0]) < 7)
+      throw new Error(
+        `REDIS_TEST_URL must point at Redis >= 7 (found ${version ?? 'unknown'})`
+      );
   });
 
   beforeEach(async () => {
