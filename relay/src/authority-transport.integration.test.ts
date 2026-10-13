@@ -995,7 +995,11 @@ run('two relay authority transport', () => {
     );
     expect(Date.now() - rotatedAt).toBeLessThanOrEqual(bound);
     await eventually(() => display.getState().status === 'denied', 1_000);
-    expect(dm.getState().status).toBe('live');
+    // Rotation never withdraws the DM. Under added latency the DM client can
+    // be between a read timeout and its retry at this instant ('offline'),
+    // so assert it is not denied and is live again (review S2 hardening).
+    expect(dm.getState().status).not.toBe('denied');
+    await eventually(() => dm.getState().status === 'live', 2_000);
 
     const hidden = {
       ...createShape({ position: { x: 9, y: 9 }, size: { w: 10, h: 10 } }),
