@@ -48,6 +48,13 @@ export function useSceneCheckpointActions(options: {
     [setSaveMessage]
   );
   const [recoveryBusy, setRecoveryBusy] = useState(false);
+  /**
+   * Counts successful restores. A restore provisions a fresh room
+   * generation, so the relay withdraws the canvas's admitted socket; the
+   * workspace remounts the canvas on each increment so it re-mints a token
+   * for the new generation (PR08 desktop A1).
+   */
+  const [restoredCount, setRestoredCount] = useState(0);
   const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
@@ -112,6 +119,7 @@ export function useSceneCheckpointActions(options: {
       checkpoint,
     });
     setRecoveryBusy(false);
+    if (result.status === 'restored') setRestoredCount(value => value + 1);
     post(
       result.status === 'restored'
         ? messages.restored
@@ -155,6 +163,7 @@ export function useSceneCheckpointActions(options: {
     saveDetail: save.detail,
     setSaveMessage,
     recoveryBusy,
+    restoredCount,
     saveBusy,
     saveCheckpoint,
     restore,
