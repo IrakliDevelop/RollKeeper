@@ -165,17 +165,82 @@ describe('Table client mutation headers come from one helper (A1 guard)', () => 
     );
   });
 
-  it.each(
-    files
-      .filter(file =>
-        /method:\s*'(POST|PUT|PATCH|DELETE)'/u.test(
-          fs.readFileSync(file, 'utf8')
-        )
-      )
-      .map(file => [path.relative(root, file), file])
-  )('%s uses TABLE_MUTATION_HEADERS', (_label, file) => {
+  /**
+   * The `{ ... }` object literal that encloses `index` (the request init
+   * holding `method:`), found by brace balance. Strings and comments in
+   * these files never contain unbalanced braces near a request init.
+   */
+  function enclosingObject(source: string, index: number): string {
+    let depth = 0;
+    let open = index;
+    for (; open >= 0; open -= 1) {
+      const char = source[open];
+      if (char === '}') depth += 1;
+      else if (char === '{') {
+        if (depth === 0) break;
+        depth -= 1;
+      }
+    }
+    depth = 0;
+    let close = open;
+    for (; close < source.length; close += 1) {
+      const char = source[close];
+      if (char === '{') depth += 1;
+      else if (char === '}') {
+        depth -= 1;
+        if (depth === 0) break;
+      }
+    }
+    return source.slice(open, close + 1);
+  }
+
+  const callSites = files.flatMap(file => {
     const source = fs.readFileSync(file, 'utf8');
-    expect(source).toContain('TABLE_MUTATION_HEADERS');
-    expect(source).not.toMatch(/['"]x-rollkeeper-csrf['"]\s*:/u);
+    return [...source.matchAll(/method:\s*'(POST|PUT|PATCH|DELETE)'/gu)].map(
+      match => {
+        const line = source.slice(0, match.index).split('\n').length;
+        return [
+          `${path.relative(root, file)}:${line}`,
+          enclosingObject(source, match.index!),
+        ] as const;
+      }
+    );
   });
+
+  it('finds every mutation call site', () => {
+    const perFile: Record<string, number> = {};
+    for (const [site] of callSites) {
+      const file = site
+        .slice(0, site.lastIndexOf(':'))
+        .replaceAll(path.sep, '/');
+      perFile[file] = (perFile[file] ?? 0) + 1;
+    }
+    expect(perFile).toEqual({
+      // session command, acquire, scene-room initialize-if-empty
+      'lib/table/authorityLifecycle.ts': 3,
+      // restore capture + provision
+      'lib/table/checkpoint.ts': 2,
+      // marker publish, loot claim, battle-map delete
+      'components/ui/campaign/table/sideChannelRequests.ts': 3,
+      // shared `post` builder (capability, descriptor, ack)
+      'components/ui/campaign/table/display/displayRequests.ts': 1,
+      'hooks/useTableControl.ts': 1,
+    });
+  });
+
+  it.each(callSites)(
+    '%s sends TABLE_MUTATION_HEADERS in that request init (review S5)',
+    (_site, init) => {
+      expect(init).toMatch(/headers:\s*(\{\s*\.\.\.)?TABLE_MUTATION_HEADERS/u);
+    }
+  );
+
+  it.each(files.map(file => [path.relative(root, file), file]))(
+    '%s never hand-writes the CSRF header',
+    (_label, file) => {
+      expect(fs.readFileSync(file, 'utf8')).not.toMatch(
+        /['"]x-rollkeeper-csrf['"]\s*:/u
+      );
+    }
+  );
 });
