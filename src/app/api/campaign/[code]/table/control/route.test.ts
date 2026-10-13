@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   membership: vi.fn(),
@@ -54,7 +54,6 @@ function request(
 }
 
 beforeEach(() => {
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   mocks.membership.mockReset().mockResolvedValue({ mode: 'legacy' });
   mocks.dmAuthority.mockReset().mockResolvedValue('ok');
   mocks.eval
@@ -65,9 +64,6 @@ beforeEach(() => {
   mocks.hybridGuest.mockReturnValue(false);
   mocks.get.mockReset().mockResolvedValue(null);
   mocks.hgetall.mockReset().mockResolvedValue({});
-});
-afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
 });
 
 describe('Table control authorization and request boundary', () => {
@@ -175,12 +171,6 @@ describe('Table control authorization and request boundary', () => {
         )
       ).status
     ).toBe(400);
-  });
-
-  it('advertises unavailable when protocol is disabled', async () => {
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'false';
-    expect((await POST(request(), params)).status).toBe(503);
-    expect(mocks.eval).not.toHaveBeenCalled();
   });
 
   it('PR04: GET answers 503 JSON when control or registry reads fail', async () => {

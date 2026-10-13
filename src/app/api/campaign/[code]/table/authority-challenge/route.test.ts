@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authorizeTableDm, proveRelayAuthority } = vi.hoisted(() => ({
   authorizeTableDm: vi.fn(),
@@ -12,15 +12,12 @@ import { POST } from './route';
 
 describe('Table authority challenge route', () => {
   beforeEach(() => {
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     authorizeTableDm.mockResolvedValue({
       ok: true,
       principal: { id: 'legacy:dm-a', campaignCode: 'ABC123', role: 'dm' },
     });
     proveRelayAuthority.mockResolvedValue(true);
   });
-
-  afterEach(() => delete process.env.TABLE_PROTOCOL_V1_REQUIRED);
 
   it('returns success only after the relay reads the same authority', async () => {
     const request = new NextRequest(

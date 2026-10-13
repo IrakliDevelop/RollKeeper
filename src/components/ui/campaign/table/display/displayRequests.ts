@@ -107,16 +107,3 @@ export const displayAckRequest = (
 /** E13: DM display status (no secrets in the URL or the answer). */
 export const displayStatusUrl = (code: string, dmId: string): string =>
   `${displayBase(code)}/status?dmId=${encodeURIComponent(dmId)}`;
-
-/** Table v1 off: the legacy map-pinned display key mint (E3). */
-export const legacyDisplayKeyRequest = (
-  code: string,
-  dmId: string
-): SideChannelRequest => ({
-  url: `/api/campaign/${encodeURIComponent(code)}/display-key`,
-  init: {
-    method: 'POST',
-    headers: { ...MUTATION_HEADERS },
-    body: JSON.stringify({ dmId }),
-  },
-});

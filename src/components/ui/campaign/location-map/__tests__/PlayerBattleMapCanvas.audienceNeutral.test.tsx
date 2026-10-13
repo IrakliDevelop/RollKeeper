@@ -158,12 +158,10 @@ function renderPlayer() {
 describe('PlayerBattleMapCanvas: audience neutrality (PR04 P10)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
-    table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
   beforeEach(() => {
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input =>
       String(input).includes('/battlemap-token')
         ? Response.json({ error: 'Scene is unavailable' }, { status: 403 })
@@ -177,7 +175,6 @@ describe('PlayerBattleMapCanvas: audience neutrality (PR04 P10)', () => {
     vi.clearAllMocks();
     for (const [key, value] of [
       ['NEXT_PUBLIC_BATTLEMAP_RELAY_URL', saved.relay],
-      ['NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', saved.table],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

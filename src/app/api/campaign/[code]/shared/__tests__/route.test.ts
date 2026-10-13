@@ -300,7 +300,7 @@ describe('GET /api/campaign/[code]/shared', () => {
   });
 
   it('returns the stored initiative state', async () => {
-    seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+    seedRedis(tableCompatibilityKey('ABC123', 'initiative'), {
       encounterId: 'enc-1',
       isActive: true,
       round: 3,
@@ -321,33 +321,28 @@ describe('GET /api/campaign/[code]/shared', () => {
     expect(data.initiative.currentEntityId).toBe('a');
   });
 
-  it('reads only tagged reserved projections when Table v1 is required', async () => {
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
-    try {
-      seedRedis(campaignSharedKey('ABC123', 'initiative'), {
-        encounterId: 'legacy-preview',
-        isActive: true,
-        round: 99,
-        currentEntityId: null,
-        turnOrder: [],
-        updatedAt: 'legacy',
-      });
-      seedRedis(tableCompatibilityKey('ABC123', 'initiative'), {
-        encounterId: 'v1',
-        isActive: true,
-        round: 4,
-        currentEntityId: null,
-        turnOrder: [],
-        updatedAt: 'v1',
-      });
-      const response = await GET(
-        new NextRequest('http://localhost/api/campaign/ABC123/shared'),
-        createRouteParams({ code: 'ABC123' })
-      );
-      expect((await response.json()).initiative.round).toBe(4);
-    } finally {
-      delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    }
+  it('reads only tagged reserved projections', async () => {
+    seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+      encounterId: 'legacy-preview',
+      isActive: true,
+      round: 99,
+      currentEntityId: null,
+      turnOrder: [],
+      updatedAt: 'legacy',
+    });
+    seedRedis(tableCompatibilityKey('ABC123', 'initiative'), {
+      encounterId: 'v1',
+      isActive: true,
+      round: 4,
+      currentEntityId: null,
+      turnOrder: [],
+      updatedAt: 'v1',
+    });
+    const response = await GET(
+      new NextRequest('http://localhost/api/campaign/ABC123/shared'),
+      createRouteParams({ code: 'ABC123' })
+    );
+    expect((await response.json()).initiative.round).toBe(4);
   });
 
   it('returns null initiative when none is stored', async () => {
@@ -360,7 +355,7 @@ describe('GET /api/campaign/[code]/shared', () => {
   });
 
   it('does not return an initiative after its v1 lease deadline', async () => {
-    seedRedis(campaignSharedKey('ABC123', 'initiative'), {
+    seedRedis(tableCompatibilityKey('ABC123', 'initiative'), {
       encounterId: 'run-one',
       isActive: true,
       round: 1,
@@ -389,25 +384,20 @@ describe('POST /api/campaign/[code]/shared', () => {
   });
 
   it.each(['initiative', 'initiativeRequest', 'battlemap'])(
-    'rejects the reserved %s writer under the deployment protocol flag',
+    'rejects the reserved %s writer',
     async feature => {
-      process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
-      try {
-        const request = createNextRequest('/api/campaign/ABC123/shared', {
-          method: 'POST',
-          body: { feature, data: {}, dmId: 'dm-1' },
-        });
-        const response = await POST(
-          request as NextRequest,
-          createRouteParams({ code: 'ABC123' })
-        );
-        expect(response.status).toBe(426);
-        expect(getRedisStore().has(campaignSharedKey('ABC123', feature))).toBe(
-          false
-        );
-      } finally {
-        delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-      }
+      const request = createNextRequest('/api/campaign/ABC123/shared', {
+        method: 'POST',
+        body: { feature, data: {}, dmId: 'dm-1' },
+      });
+      const response = await POST(
+        request as NextRequest,
+        createRouteParams({ code: 'ABC123' })
+      );
+      expect(response.status).toBe(426);
+      expect(getRedisStore().has(campaignSharedKey('ABC123', feature))).toBe(
+        false
+      );
     }
   );
 

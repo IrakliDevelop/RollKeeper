@@ -201,6 +201,7 @@ describe('"Open scene run" library affordance (D10)', () => {
         '/dm/campaign/CAMP/table?scene=scene-tavern&run=run-d&tableWorkspace=fork-1',
         `Tavern · Bandit ambush · ${when(first)}`,
       ],
+      ['/dm/campaign/CAMP/table?prepareEncounter=enc-1', 'Prepare on map'],
     ]);
   });
 

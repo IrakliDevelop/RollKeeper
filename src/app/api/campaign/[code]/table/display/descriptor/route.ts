@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 import { getRawRedis } from '@/lib/redis';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import {
   projectDisplayTarget,
   verifyDisplayCapability,
@@ -25,8 +24,6 @@ const reply = (body: unknown, status = 200) =>
  * scene's `{sceneId, sourceMapId, label}` is ever disclosed.
  */
 export async function POST(request: NextRequest, { params }: Context) {
-  if (!isTableProtocolRequired())
-    return reply({ error: 'Table v1 is disabled' }, 503);
   const security = validateCampaignMembershipMutation(request);
   if (!security.ok) return reply({ error: security.error }, security.status);
   const { code } = await params;

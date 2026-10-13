@@ -124,7 +124,6 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   afterEach(() => {
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
     vi.unstubAllGlobals();
   });
 
@@ -139,7 +138,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store,
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       seedLocal,
       onStatus: s => statuses.push(s),
       onPoke,
@@ -189,7 +193,6 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   it('keeps location rooms on the legacy client when the global Table v1 flag is on', async () => {
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     const conn = createManagedBattleMapConnection({
       relayUrl: 'wss://relay.example',
       campaignCode: 'CODE',
@@ -226,7 +229,6 @@ describe('createManagedBattleMapConnection', () => {
   it('re-verifies a genuine location on credential refresh without manufacturing sceneId', async () => {
     vi.useFakeTimers();
     try {
-      process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
       const conn = createManagedBattleMapConnection({
         relayUrl: 'wss://relay.example',
         campaignCode: 'CODE',
@@ -260,7 +262,6 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   it('fails a legacy location adapter visibly when the server returns authority:1', async () => {
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -301,7 +302,6 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   it('opens no location socket and reports a diagnostic when token minting is rejected', async () => {
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     fetchMock.mockResolvedValue({ ok: false });
     const diagnostic = vi.fn();
     const conn = createManagedBattleMapConnection({
@@ -332,7 +332,6 @@ describe('createManagedBattleMapConnection', () => {
   });
 
   it('uses an explicitly supplied sceneId for v1 even with a location hint', async () => {
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     fetchMock.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -385,7 +384,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onTokenMetadata,
       transportFactory: url => {
         transportUrls.push(url);
@@ -471,7 +475,12 @@ describe('createManagedBattleMapConnection', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onTokenMetadata,
       transportFactory: url => {
         transportUrls.push(url);
@@ -540,7 +549,12 @@ describe('createManagedBattleMapConnection', () => {
         battleMapId: 'map-1',
         store,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         seedLocal: true,
         onStatus: s => statuses.push(s),
         transportFactory: url => {
@@ -651,7 +665,12 @@ describe('createManagedBattleMapConnection', () => {
         battleMapId: 'map-1',
         store,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         onStatus: s => statuses.push(s),
         transportFactory: url => {
           transportUrls.push(url);
@@ -759,7 +778,12 @@ describe('createManagedBattleMapConnection layer sync (call-site wiring)', () =>
       battleMapId: 'map-1',
       store: vp.store as ElementStore,
       clientId,
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: clientId },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: clientId,
+        kind: 'location',
+      },
       seedLocal: roleWiring === 'dm',
       layers: {
         applyLayer: makeApplyRemoteLayer(vp, roleWiring, { ownLayerId }),
@@ -846,7 +870,12 @@ describe('createManagedBattleMapConnection layer sync (call-site wiring)', () =>
         battleMapId: 'map-1',
         store: vp.store as ElementStore,
         clientId: 'dm-1',
-        tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+        tokenRequest: {
+          role: 'dm',
+          battleMapId: 'map-1',
+          dmId: 'dm-1',
+          kind: 'location',
+        },
         seedLocal: true,
         layers: {
           applyLayer: update => {
@@ -1020,7 +1049,12 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
       battleMapId: 'map-1',
       store: new ElementStore(),
       clientId: 'dm-1',
-      tokenRequest: { role: 'dm', battleMapId: 'map-1', dmId: 'dm-1' },
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-1',
+        dmId: 'dm-1',
+        kind: 'location',
+      },
       onStatus: s => statuses.push(s),
       onPoke,
       transportFactory: () => fakeTransport,
@@ -1143,6 +1177,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -1363,6 +1398,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -1676,6 +1712,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       onStatus: s => statuses.push(s),
       onPoke: feature => pokes.push(feature),
@@ -2013,6 +2050,7 @@ describe('createManagedBattleMapConnection — player marker filtering (task B11
         role: 'player',
         battleMapId: 'map-1',
         playerId: 'player-1',
+        kind: 'location',
       },
       transportFactory: () => fakeTransport,
     });
@@ -2175,8 +2213,13 @@ describe('managed connection fog lifecycle with the published SDK', () => {
       clientId,
       tokenRequest:
         role === 'dm'
-          ? { role, battleMapId: 'map-1', dmId: clientId }
-          : { role, battleMapId: 'map-1', playerId: clientId },
+          ? { role, battleMapId: 'map-1', dmId: clientId, kind: 'location' }
+          : {
+              role,
+              battleMapId: 'map-1',
+              playerId: clientId,
+              kind: 'location',
+            },
       fog: {
         manager: fog,
         preserveLocalWhenRemoteMissing: role === 'dm',

@@ -1,11 +1,7 @@
 import { signBattleMapToken } from '@/lib/battlemapToken';
 import { battleMapRelayRoom } from '@/lib/battlemapRoom';
 import { listLiveMapRooms, MAX_LIVE_MAP_ROOMS } from '@/lib/liveMapRooms';
-import { campaignSharedKey } from '@/lib/redis';
-import {
-  isTableProtocolRequired,
-  tableCompatibilityKey,
-} from '@/lib/tableServer/control';
+import { tableCompatibilityKey } from '@/lib/tableServer/control';
 
 import type { LiveMapRoomsReader } from '@/lib/liveMapRooms';
 import type { SharedBattleMapState } from '@/types/sharedState';
@@ -25,7 +21,11 @@ interface RedisReader {
 }
 
 export type BattleMapPokeFeature =
-  'initiative' | 'players' | 'markers' | 'fog-appearance' | 'shop';
+  | 'initiative'
+  | 'players'
+  | 'markers'
+  | 'fog-appearance'
+  | 'shop';
 
 /**
  * Shared body behind every battle-map poke: env-var guard, token signing,
@@ -90,9 +90,7 @@ async function readActiveBattleMapId(
 ): Promise<string | null> {
   try {
     const raw = await redis.get<string | SharedBattleMapState>(
-      isTableProtocolRequired()
-        ? tableCompatibilityKey(code, 'battlemap')
-        : campaignSharedKey(code, 'battlemap')
+      tableCompatibilityKey(code, 'battlemap')
     );
     if (!raw) return null;
     const battleMap: SharedBattleMapState =

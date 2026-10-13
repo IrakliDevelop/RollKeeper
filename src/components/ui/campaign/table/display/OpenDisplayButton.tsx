@@ -41,12 +41,7 @@ export function OpenDisplayButton({
   );
 }
 
-/**
- * Campaign dashboard launcher: rendered only under the existing Table v1
- * public flag (the capability route answers 503 without v1). No new flag.
- */
+/** Campaign dashboard launcher for the persistent campaign display. */
 export function CampaignDisplayLauncher(props: OpenDisplayButtonProps) {
-  if (process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED !== 'true')
-    return null;
   return <OpenDisplayButton {...props} />;
 }

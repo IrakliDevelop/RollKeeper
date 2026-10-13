@@ -36,7 +36,6 @@ import {
 import { openTvDisplay } from '@/lib/openTvDisplay';
 import type { OpenTableDisplayResult } from '@/lib/openTableDisplay';
 import { uploadAsset } from '@/utils/uploadAsset';
-import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
   migrateCanvasToContract,
@@ -213,10 +212,6 @@ export interface DmLocationEditorState {
   syncStatus: BattleMapConnectionStatus | 'disabled';
   /** Actionable publication failure shown beside the editor controls. */
   syncError: string | null;
-
-  // Share with players (battlemap mode only)
-  sharedWithPlayers: boolean;
-  handleToggleShareWithPlayers: () => void;
 
   // Handlers
   handleReady: (vp: Viewport) => void;
@@ -621,10 +616,6 @@ export function useDmLocationEditor(
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
-
-  // Share with players (battlemap mode only) — hydrated from server truth
-  const { sharedWithPlayers, handleToggleShareWithPlayers } =
-    useShareWithPlayers(campaignCode, dmId, location, mode === 'battlemap');
 
   // Build tools once. Battle-map setup also supports FieldNotes' stroke eraser.
   const tools = useMemo<Tool[]>(() => {
@@ -1872,11 +1863,11 @@ export function useDmLocationEditor(
     [fogControls, getVp]
   );
 
-  // PR05 E12: under Table v1 this opens the campaign display; the toolbar
-  // shows a failure message from the returned result.
+  // PR05 E12: this opens the campaign display; the toolbar shows a failure
+  // message from the returned result.
   const handleOpenTvDisplay = useCallback(
-    () => openTvDisplay(campaignCode, location.id, dmId),
-    [campaignCode, dmId, location.id]
+    () => openTvDisplay(campaignCode, dmId),
+    [campaignCode, dmId]
   );
 
   const handleFitToMap = useCallback(() => {
@@ -1934,8 +1925,6 @@ export function useDmLocationEditor(
     lastSyncedAt,
     syncStatus,
     syncError,
-    sharedWithPlayers,
-    handleToggleShareWithPlayers,
     imageUploading,
     setImageUploading,
     handleReady,

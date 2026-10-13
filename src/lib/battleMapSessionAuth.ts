@@ -1,10 +1,6 @@
 import type { NextRequest } from 'next/server';
 import type { Redis } from '@upstash/redis';
-import {
-  campaignPlayersKey,
-  campaignDisplayKeyKey,
-  getRawRedis,
-} from '@/lib/redis';
+import { campaignPlayersKey, getRawRedis } from '@/lib/redis';
 import { verifyDmAuthority } from '@/lib/dmAuth';
 import type { BattleMapRole } from '@/lib/battlemapToken';
 import {
@@ -13,7 +9,6 @@ import {
 } from '@/lib/guestSessionSecurity';
 import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 import { authorizeCampaignMembershipRoute } from '@/lib/supabase/campaignMembershipServer';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import { verifyDisplayCapability } from '@/lib/tableServer/displayCapability';
 import {
   DISPLAY_CAPABILITY_HEADER,
@@ -133,17 +128,16 @@ export async function authorizeBattleMapSession(
   },
   options: { mutation: boolean } = { mutation: true }
 ): Promise<BattleMapSessionResult> {
-  const { role, dmId, playerId, displayKey } = body;
+  const { role, dmId, playerId } = body;
   if (!role) {
     return { authorized: false, error: 'role is required', status: 400 };
   }
-  if (role === 'display' && isTableProtocolRequired())
+  // Table protocol v1: display access is only ever the fenced display
+  // capability; the legacy campaign display key is never accepted.
+  if (role === 'display')
     return authorizeTableDisplay(code, request, body, options.mutation);
 
-  const membership =
-    role === 'display'
-      ? ({ mode: 'legacy' } as const)
-      : await authorizeCampaignMembershipRoute(code, false);
+  const membership = await authorizeCampaignMembershipRoute(code, false);
   if (membership.mode === 'denied') {
     return {
       authorized: false,
@@ -214,21 +208,6 @@ export async function authorizeBattleMapSession(
       };
     }
     return { authorized: true, role: 'player', userId: playerId };
-  }
-
-  if (role === 'display') {
-    if (!displayKey) {
-      return {
-        authorized: false,
-        error: 'displayKey is required',
-        status: 400,
-      };
-    }
-    const stored = await redis.get<string>(campaignDisplayKeyKey(code));
-    if (!stored || stored !== displayKey) {
-      return { authorized: false, error: 'Invalid display key', status: 403 };
-    }
-    return { authorized: true, role: 'display', userId: `display-${code}` };
   }
 
   return { authorized: false, error: 'Unknown role', status: 400 };

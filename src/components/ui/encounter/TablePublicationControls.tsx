@@ -4,28 +4,9 @@ import type { useTableControl } from '@/hooks/useTableControl';
 interface Props {
   control: ReturnType<typeof useTableControl>;
   combatActive: boolean;
-  publicationError: string | null;
-  legacyBroadcasting: boolean;
 }
 
-export function TablePublicationControls({
-  control,
-  combatActive,
-  publicationError,
-  legacyBroadcasting,
-}: Props) {
-  if (control.status === 'legacy') {
-    if (!publicationError) return null;
-    return (
-      <div
-        className="border-divider bg-surface-secondary text-accent-red-text border-b px-4 py-2 text-sm"
-        role="alert"
-      >
-        {legacyBroadcasting ? 'Broadcasting initiative' : 'Not broadcasting'}:{' '}
-        {publicationError}
-      </div>
-    );
-  }
+export function TablePublicationControls({ control, combatActive }: Props) {
   const activeLease =
     !!control.current && control.current.leaseUntil > Date.now();
   const message =

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeTableDm } from '@/lib/tableServer/auth';
-import {
-  isTableProtocolRequired,
-  TableControlService,
-} from '@/lib/tableServer/control';
+import { TableControlService } from '@/lib/tableServer/control';
 import {
   parseTableCommand,
   readBoundedJson,
@@ -39,12 +36,6 @@ export async function GET(request: NextRequest, { params }: Context) {
 }
 
 export async function POST(request: NextRequest, { params }: Context) {
-  if (!isTableProtocolRequired()) {
-    return NextResponse.json(
-      { error: 'Table v1 is disabled' },
-      { status: 503 }
-    );
-  }
   const { code } = await params;
   let body: unknown;
   try {

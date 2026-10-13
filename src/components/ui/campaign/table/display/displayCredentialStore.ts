@@ -9,9 +9,6 @@ import type { DisplayCredential } from './displayRequests';
  */
 export const displayStorageKey = (code: string) =>
   `rollkeeper:table-display:${code}`;
-/** Table v1 off: the legacy map-pinned key keeps its own entry (C5-4). */
-export const legacyDisplayStorageKey = (code: string) =>
-  `rollkeeper:legacy-display-key:${code}`;
 
 const CAPABILITY = /^[A-Za-z0-9_-]{43}$/u;
 const NONCE = /^[A-Za-z0-9_-]{22}$/u;
@@ -141,27 +138,18 @@ export function bootstrapCampaignDisplay(
 }
 
 /**
- * Old map-pinned URL `?dk=` (E8 map-pinned, C5-4): under Table v1 the key
- * is consumed exactly like the fragment (same campaign entry, fresh nonce);
- * with v1 off the legacy key keeps its own entry and legacy auth. The query
- * is scrubbed before any request in both modes.
+ * Old map-pinned URL `?dk=` (E8 map-pinned, C5-4): the key is consumed
+ * exactly like the fragment (same campaign entry, fresh nonce), so a
+ * pre-PR05 key fails verification and shows "expired". The query is
+ * scrubbed before any request.
  */
 export function bootstrapMapPinnedDisplay(
   code: string,
-  v1: boolean,
   env: DisplayEnvironment = browserDisplayEnvironment()
-): DisplayBootstrap | { status: 'legacy'; displayKey: string } {
+): DisplayBootstrap {
   const key = new URLSearchParams(env.location.search).get('dk');
   if (key !== null) env.history.replaceState(null, '', env.location.pathname);
-  if (v1) return key === null ? fromStorage(env, code) : adopt(env, code, key);
-  if (key !== null && key.length > 0 && key.length <= 200) {
-    writeStored(env, legacyDisplayStorageKey(code), key);
-    return { status: 'legacy', displayKey: key };
-  }
-  const stored = readStored(env, legacyDisplayStorageKey(code));
-  return stored
-    ? { status: 'legacy', displayKey: stored }
-    : { status: 'missing' };
+  return key === null ? fromStorage(env, code) : adopt(env, code, key);
 }
 
 /**

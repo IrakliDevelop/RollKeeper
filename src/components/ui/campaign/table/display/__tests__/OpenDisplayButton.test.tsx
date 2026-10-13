@@ -13,7 +13,6 @@ import {
 } from '../OpenDisplayButton';
 
 const CAPABILITY = 'Cap5Synthetic_display-capability_0123456789';
-const saved = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -27,9 +26,6 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  if (saved === undefined)
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-  else process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = saved;
 });
 
 describe('Open display launcher button (E12)', () => {
@@ -68,15 +64,8 @@ describe('Open display launcher button (E12)', () => {
   });
 });
 
-describe('campaign dashboard launcher gate (E12)', () => {
-  it('renders only with the existing Table v1 public flag', () => {
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-    const { container } = render(
-      <CampaignDisplayLauncher code="CAMP" dmId="dm-1" />
-    );
-    expect(container.innerHTML).toBe('');
-    cleanup();
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+describe('campaign dashboard launcher (E12)', () => {
+  it('always renders the Open display button', () => {
     render(<CampaignDisplayLauncher code="CAMP" dmId="dm-1" />);
     expect(screen.getByRole('button', { name: 'Open display' })).toBeVisible();
   });

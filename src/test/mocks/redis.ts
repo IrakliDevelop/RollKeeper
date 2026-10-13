@@ -329,6 +329,8 @@ vi.mock('@/lib/redis', () => ({
   campaignBattleMapKey: (code: string, battleMapId: string) =>
     `campaign:${code}:battlemap:${battleMapId}`,
   campaignDisplayKeyKey: (code: string) => `campaign:${code}:displaykey`,
+  campaignMarkerLootKey: (code: string, mapId: string) =>
+    `campaign:${code}:marker-loot:${mapId}`,
   campaignFogAppearanceKey: (code: string, battleMapId: string) =>
     `campaign:${code}:fog-appearance:${battleMapId}`,
   campaignLiveMapRoomsKey: (code: string) => `campaign:${code}:live-maps`,

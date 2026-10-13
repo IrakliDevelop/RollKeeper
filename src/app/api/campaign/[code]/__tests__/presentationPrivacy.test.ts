@@ -156,11 +156,9 @@ beforeEach(() => {
   fake.current = store;
   seedTavernAndForest(store);
   issueDisplay(store);
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
 });
 afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
   delete process.env.BATTLEMAP_RELAY_SECRET;
 });
 
@@ -418,31 +416,5 @@ describe('PR04 privacy: DM reads, locations and flag-off stay as before', () => 
       'loc-1'
     );
     expect(markers.status).toBe(200);
-  });
-
-  it('with Table v1 off every reader behaves exactly as at base', async () => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    const list = await read(listGET, `/api/campaign/${CODE}/battlemaps`);
-    expect(JSON.parse(list.text).battlemaps).toHaveLength(2);
-    const detail = await read(
-      detailGET,
-      `/api/campaign/${CODE}/battlemaps/map-forest`,
-      'map-forest'
-    );
-    expect(JSON.parse(detail.text).battleMap.id).toBe('map-forest');
-    const markers = await read(
-      markersGET,
-      `/api/campaign/${CODE}/battlemaps/map-forest/markers`,
-      'map-forest'
-    );
-    expect(JSON.parse(markers.text).markers[0].title).toBe(
-      'Legacy forest marker'
-    );
-    const fog = await read(
-      battleMapFogGET,
-      fogAppearanceReadUrl('battlemap', CODE, 'map-tavern', player),
-      'map-tavern'
-    );
-    expect(JSON.parse(fog.text).fogAppearance).toBe('solid');
   });
 });

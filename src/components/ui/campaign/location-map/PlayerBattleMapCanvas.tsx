@@ -334,10 +334,8 @@ export function PlayerBattleMapCanvas({
   // the presented scene. PR04 P7: side channels (marker details, loot, shop,
   // fog appearance) are addressed by the RESOLVED scene id — never the
   // source map id — and stay neutral until the token resolves one.
-  const tableScoped =
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
-  const sideChannelId = tableScoped ? resolvedSceneId : battleMapId;
+  const sideChannelId = resolvedSceneId;
   const sideChannelsEnabled = sideChannelId !== null;
   const sideChannelIdRef = useRef(sideChannelId);
   sideChannelIdRef.current = sideChannelId;
@@ -364,11 +362,10 @@ export function PlayerBattleMapCanvas({
   const [canvasEpoch, setCanvasEpoch] = useState(0);
   const [sceneNotice, setSceneNotice] = useState<string | null>(null);
   // Table v1 relay rule 12: players delete only their own self-placed token
-  // among control-bearing elements (never a bound or DM-placed one). Legacy
-  // rooms keep the existing delete behavior.
+  // among control-bearing elements (never a bound or DM-placed one).
   const playerMayDelete = useCallback(
     (element: CanvasElement): boolean => {
-      if (!tableScoped || !isControlBearingElement(element)) return true;
+      if (!isControlBearingElement(element)) return true;
       const rec = element as unknown as Record<string, unknown>;
       const absent = (key: string) =>
         rec[key] === undefined || rec[key] === null;
@@ -380,7 +377,7 @@ export function PlayerBattleMapCanvas({
         absent('entityId')
       );
     },
-    [tableScoped, characterId]
+    [characterId]
   );
   const [publishedMarkers, setPublishedMarkers] =
     useState<PublicMarkerDetail[]>(suppliedMarkers);
@@ -484,7 +481,7 @@ export function PlayerBattleMapCanvas({
       if (!response.ok) {
         // Table v1: 404 (not presented/blanked/deleted) is a neutral empty
         // state — never the previous scene's details.
-        if (tableScoped) setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
+        setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
         return;
       }
       const data = (await response.json()) as {
@@ -499,7 +496,7 @@ export function PlayerBattleMapCanvas({
       // can retry, and a marker poke will refresh connected clients later.
       console.warn('Failed to refresh marker details:', error);
     }
-  }, [campaignCode, characterId, sideChannelId, tableScoped]);
+  }, [campaignCode, characterId, sideChannelId]);
   const refreshMarkersRef = useRef(refreshMarkers);
   refreshMarkersRef.current = refreshMarkers;
 
@@ -508,7 +505,7 @@ export function PlayerBattleMapCanvas({
   // resolved: one request in flight, paused while hidden, refreshed on
   // visibility, disposed on unmount or scene change.
   useEffect(() => {
-    if (!tableScoped || sideChannelId === null) return;
+    if (sideChannelId === null) return;
     let disposed = false;
     const tick = () => {
       if (disposed || document.hidden) return;
@@ -526,7 +523,7 @@ export function PlayerBattleMapCanvas({
       document.removeEventListener('visibilitychange', onVisibility);
       markersAbortRef.current?.abort();
     };
-  }, [tableScoped, sideChannelId]);
+  }, [sideChannelId]);
 
   useEffect(() => {
     setPublishedMarkers(suppliedMarkers);
@@ -845,7 +842,6 @@ export function PlayerBattleMapCanvas({
         }
         if (
           s === 'denied' &&
-          tableScoped &&
           tokenDenialRef.current !== 'credential' &&
           !reconnect.identityInvalid &&
           reconnect.timer === null

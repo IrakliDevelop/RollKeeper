@@ -60,7 +60,6 @@ import {
   displayCapabilityRequest,
   displayDescriptorRequest,
   displayStatusUrl,
-  legacyDisplayKeyRequest,
   type DisplayAck,
 } from '@/components/ui/campaign/table/display/displayRequests';
 
@@ -127,12 +126,10 @@ beforeEach(() => {
   fake.current = store;
   membership.value = { mode: 'legacy' };
   seedTavernAndForest(store);
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
   delete process.env.SUPABASE_HYBRID_GUEST_ENABLED;
 });
 afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
   delete process.env.BATTLEMAP_RELAY_SECRET;
   delete process.env.SUPABASE_HYBRID_GUEST_ENABLED;
 });
@@ -221,7 +218,7 @@ describe('PR05 capability rotation route (E3, M1, M2)', () => {
     expect(control().displayGeneration).not.toBe(0);
   });
 
-  it('bounds the body, needs an initialized control and is off without v1', async () => {
+  it('bounds the body and needs an initialized control', async () => {
     const built = displayCapabilityRequest(CODE, DM_ID);
     const oversized = await send(capabilityPOST, {
       url: built.url,
@@ -242,59 +239,27 @@ describe('PR05 capability rotation route (E3, M1, M2)', () => {
     expect(missing.body).toEqual({
       error: 'Live table is not initialized — open a Table scene first',
     });
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    expect((await send(capabilityPOST, built)).status).toBe(503);
   });
 });
 
 describe('PR05 legacy display-key route', () => {
-  it('answers 426 under v1 and never mints the plaintext key', async () => {
-    const response = await send(
-      displayKeyPOST,
-      legacyDisplayKeyRequest(CODE, DM_ID)
-    );
+  it('always answers 426 and never mints the plaintext key', async () => {
+    const response = await send(displayKeyPOST, {
+      url: `/api/campaign/${CODE}/display-key`,
+      init: {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-rollkeeper-csrf': '1',
+        },
+        body: JSON.stringify({ dmId: DM_ID }),
+      },
+    });
     expect(response.status).toBe(426);
     expect(response.body).toEqual({
       error: 'Use Open display from a Table scene or the campaign page',
     });
     expect(store.strings.get(`campaign:${CODE}:displaykey`)).toBe(DISPLAY_KEY);
-  });
-
-  it('flag off keeps the legacy key behind account-aware DM auth, origin/CSRF and a bounded body', async () => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    const ok = await send(displayKeyPOST, legacyDisplayKeyRequest(CODE, DM_ID));
-    expect(ok.status).toBe(200);
-    expect(typeof ok.body.displayKey).toBe('string');
-    expect(store.strings.get(`campaign:${CODE}:displaykey`)).toBe(
-      ok.body.displayKey
-    );
-    expect(
-      (
-        await send(displayKeyPOST, legacyDisplayKeyRequest(CODE, DM_ID), {
-          'x-rollkeeper-csrf': null,
-        })
-      ).status
-    ).toBe(403);
-    membership.value = {
-      mode: 'account',
-      principal: { role: 'player', accountId: 'acct-player' },
-    };
-    expect(
-      (await send(displayKeyPOST, legacyDisplayKeyRequest(CODE, DM_ID))).status
-    ).toBe(403);
-    membership.value = { mode: 'legacy' };
-    const built = legacyDisplayKeyRequest(CODE, DM_ID);
-    expect(
-      (
-        await send(displayKeyPOST, {
-          url: built.url,
-          init: {
-            ...built.init,
-            body: JSON.stringify({ dmId: DM_ID, pad: 'x'.repeat(17_000) }),
-          },
-        })
-      ).status
-    ).toBe(400);
   });
 });
 
@@ -412,7 +377,7 @@ describe('PR05 display descriptor route (E4, E6)', () => {
     }
   });
 
-  it('answers 503 when the authority read fails and is off without v1', async () => {
+  it('answers 503 when the authority read fails', async () => {
     issueDisplay(store);
     Object.assign(store.rawRedis, {
       eval: async () => {
@@ -425,11 +390,6 @@ describe('PR05 display descriptor route (E4, E6)', () => {
     );
     expect(failed.status).toBe(503);
     expect(failed.body).toEqual({ error: 'Live authority is unavailable' });
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    expect(
-      (await send(descriptorPOST, displayDescriptorRequest(CODE, credential)))
-        .status
-    ).toBe(503);
   });
 });
 

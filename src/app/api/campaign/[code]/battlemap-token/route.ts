@@ -10,11 +10,7 @@ import {
 } from '@/lib/fogOfWar';
 import type { ProjectedFogAppearance } from '@/types/battlemap';
 import { proveRelayAuthority } from '@/lib/tableServer/authorityProof';
-import {
-  isTableProtocolRequired,
-  tableControlKey,
-  tableRegistryKey,
-} from '@/lib/tableServer/control';
+import { tableControlKey, tableRegistryKey } from '@/lib/tableServer/control';
 import { tableAuthorityRoomKeys } from '@/lib/tableServer/keys';
 import { resolvePresentedTableScene } from '@/lib/tableServer/presentation';
 import {
@@ -96,25 +92,22 @@ export async function POST(
         { status: 400 }
       );
     }
-    const tableRequired = isTableProtocolRequired();
     const sceneIdPresent = Object.prototype.hasOwnProperty.call(
       body,
       'sceneId'
     );
     if (
-      tableRequired &&
-      (!isSafeResourceId(battleMapId) ||
-        (sceneIdPresent && !isSafeResourceId(body.sceneId)))
+      !isSafeResourceId(battleMapId) ||
+      (sceneIdPresent && !isSafeResourceId(body.sceneId))
     ) {
       return NextResponse.json(
         { error: 'Invalid scene or battle map identifier' },
         { status: 400 }
       );
     }
-    // Under Table v1, only a no-scene location hint is eligible for legacy
-    // resolution. A present valid scene ID always selects scene authority.
-    const locationClaim =
-      tableRequired && !sceneIdPresent && body.kind === 'location';
+    // Only a no-scene location hint is eligible for legacy resolution. A
+    // present valid scene ID always selects scene authority.
+    const locationClaim = !sceneIdPresent && body.kind === 'location';
     // Review 01 F4 (S4): the display capability is scoped to the current
     // scene; it never mints a location room. Neutral body, so the display
     // keeps its credential (not a credential denial).
@@ -124,7 +117,7 @@ export async function POST(
         { status: 403 }
       );
     }
-    const tableV1 = tableRequired && !locationClaim;
+    const tableV1 = !locationClaim;
     let legacyRoom: string | null = null;
     if (!tableV1) {
       try {

@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback } from 'react';
 import { useTableControl } from '@/hooks/useTableControl';
 import type {
   InitiativeRollRequest,
@@ -10,45 +10,20 @@ interface UseDmInitiativeSyncOptions {
   dmId: string;
 }
 
+/**
+ * DM initiative publication. Table protocol v1 is the only path: initiative
+ * and roll requests publish through the Table control session (the legacy
+ * shared-state writer answers 426).
+ */
 export function useDmInitiativeSync({
   campaignCode,
   dmId,
 }: UseDmInitiativeSyncOptions) {
   const control = useTableControl(campaignCode, dmId);
   const { status, error, publish } = control;
-  const [publicationError, setPublicationError] = useState<string | null>(null);
-  const [legacyBroadcasting, setLegacyBroadcasting] = useState(false);
-  const pushLegacy = useCallback(
-    async (feature: string, data: unknown) => {
-      try {
-        const response = await fetch(`/api/campaign/${campaignCode}/shared`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-rollkeeper-csrf': '1',
-          },
-          body: JSON.stringify({ feature, data, dmId }),
-        });
-        if (!response.ok)
-          throw new Error(`Publication failed (${response.status})`);
-        setPublicationError(null);
-        if (feature === 'initiative') {
-          setLegacyBroadcasting((data as SharedInitiativeState).isActive);
-        }
-      } catch (failure) {
-        setLegacyBroadcasting(false);
-        setPublicationError(
-          failure instanceof Error ? failure.message : 'Publication failed'
-        );
-        throw failure;
-      }
-    },
-    [campaignCode, dmId]
-  );
 
   const pushInitiative = useCallback(
     async (state: SharedInitiativeState) => {
-      if (status === 'legacy') return pushLegacy('initiative', state);
       if (status === 'checking') throw new Error('Checking table capability');
       if (status !== 'controlling' && status !== 'broadcasting')
         throw new Error(error ?? 'Not broadcasting');
@@ -59,25 +34,22 @@ export function useDmInitiativeSync({
           : undefined
       );
     },
-    [status, error, publish, pushLegacy]
+    [status, error, publish]
   );
 
   const pushInitiativeRequest = useCallback(
     async (data: InitiativeRollRequest | null) => {
-      if (status === 'legacy') return pushLegacy('initiativeRequest', data);
       if (status === 'checking') throw new Error('Checking table capability');
       if (status !== 'controlling' && status !== 'broadcasting')
         throw new Error(error ?? 'Not broadcasting');
       return publish('publishInitiativeRequest', { request: data });
     },
-    [status, error, publish, pushLegacy]
+    [status, error, publish]
   );
 
   return {
     pushInitiative,
     pushInitiativeRequest,
     control,
-    publicationError,
-    legacyBroadcasting,
   };
 }

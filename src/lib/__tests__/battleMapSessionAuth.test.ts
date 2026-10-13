@@ -173,33 +173,20 @@ describe('authorizeBattleMapSession', () => {
     expect(result.authorized).toBe(false);
   });
 
-  it('authorizes display with valid key', async () => {
+  it('never accepts the retired campaign display key', async () => {
     const redis = fakeRedis();
     vi.mocked(redis.get).mockResolvedValue('key-123');
-    const result = await authorizeBattleMapSession(
-      redis,
-      'CODE',
-      fakeRequest(),
-      { role: 'display', displayKey: 'key-123' }
-    );
-    expect(result).toEqual({
-      authorized: true,
+    const request = {
+      ...fakeRequest(),
+      url: 'http://localhost/api/campaign/CODE/battlemap-token',
+      headers: new Headers({ origin: 'http://localhost' }),
+    } as unknown as NextRequest;
+    const result = await authorizeBattleMapSession(redis, 'CODE', request, {
       role: 'display',
-      userId: 'display-CODE',
+      displayKey: 'key-123',
     });
-  });
-
-  it('rejects display with wrong key', async () => {
-    const redis = fakeRedis();
-    vi.mocked(redis.get).mockResolvedValue('key-123');
-    const result = await authorizeBattleMapSession(
-      redis,
-      'CODE',
-      fakeRequest(),
-      { role: 'display', displayKey: 'wrong' }
-    );
     expect(result.authorized).toBe(false);
-    if (!result.authorized) expect(result.status).toBe(403);
+    expect(redis.get).not.toHaveBeenCalled();
   });
 
   it('rejects unknown role', async () => {

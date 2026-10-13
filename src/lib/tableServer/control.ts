@@ -64,10 +64,6 @@ function decode<T>(value: T | string | null): T | null {
   return typeof value === 'string' ? (JSON.parse(value) as T) : value;
 }
 
-export function isTableProtocolRequired(): boolean {
-  return process.env.TABLE_PROTOCOL_V1_REQUIRED === 'true';
-}
-
 export class TableControlService {
   // An explicit field (not a parameter property) keeps this file runnable
   // under Node type stripping for the real-REST integration test.

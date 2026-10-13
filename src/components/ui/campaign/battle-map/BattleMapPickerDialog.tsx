@@ -17,8 +17,6 @@ import { Input } from '@/components/ui/forms/input';
 
 import { modeStorageKey } from '@/components/ui/campaign/dm-vtt/useBattleMapMode';
 import { generateBattleMapId, useBattleMapStore } from '@/store/battleMapStore';
-import { useDmStore } from '@/store/dmStore';
-import { useDmBattleMapSync } from '@/hooks/useDmBattleMapSync';
 import { findLinkedBattleMap, planMapLinkSwitch } from '@/utils/battleMapLinks';
 
 import { BattleMapPickerRow } from './BattleMapPickerRow';
@@ -44,30 +42,18 @@ export function BattleMapPickerDialog({
   const router = useRouter();
   const { getBattleMaps, addBattleMap, linkEncounter, unlinkEncounter } =
     useBattleMapStore();
-  const dmId = useDmStore(s => s.dmId);
-  const { pushActive } = useDmBattleMapSync(campaignCode, dmId);
   const [newName, setNewName] = useState('');
-  // PR04 P9: under Table v1 opening/linking a map never claims to make it
-  // live; the audience follows Show on a Table scene.
-  const tableV1 = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
 
   const battleMaps = getBattleMaps(campaignCode);
   const current = findLinkedBattleMap(battleMaps, encounterId);
 
-  // `pushLive` moves the campaign's live-map pointer to the chosen map so
-  // players following the "join map" banner land on it without a combat
-  // restart. Skipped for freshly created blank maps — those open in setup for
-  // the DM to build, and pushing one live would strand players on an empty
-  // canvas. See useDmBattleMapSync / EncounterView.pushLinkedMapLive.
-  function applyAndGo(mapId: string, pushLive = true) {
+  // PR04 P9: opening/linking a map never claims to make it live; the
+  // audience follows Show on a Table scene.
+  function applyAndGo(mapId: string) {
     const plan = planMapLinkSwitch(current?.id ?? null, mapId);
     if (plan.unlinkFrom)
       unlinkEncounter(campaignCode, plan.unlinkFrom, encounterId);
     if (plan.linkTo) linkEncounter(campaignCode, plan.linkTo, encounterId);
-    if (pushLive && !tableV1) {
-      const name = battleMaps.find(m => m.id === mapId)?.name;
-      void pushActive(mapId, name);
-    }
     onOpenChange(false);
     router.push(`/dm/campaign/${campaignCode}/battlemaps/${mapId}`);
   }
@@ -98,7 +84,7 @@ export function BattleMapPickerDialog({
       // Ignore localStorage errors
     }
     setNewName('');
-    applyAndGo(id, false);
+    applyAndGo(id);
   }
 
   return (
@@ -111,11 +97,9 @@ export function BattleMapPickerDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-4">
-          {tableV1 && (
-            <p className="text-muted text-sm" role="note">
-              Show maps to players from their Table scene
-            </p>
-          )}
+          <p className="text-muted text-sm" role="note">
+            Show maps to players from their Table scene
+          </p>
           {battleMaps.length === 0 ? (
             <p className="text-muted text-sm">
               No battle maps in this campaign yet — create one below.

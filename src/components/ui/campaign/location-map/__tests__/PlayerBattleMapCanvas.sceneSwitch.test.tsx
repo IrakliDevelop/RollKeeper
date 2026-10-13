@@ -210,7 +210,6 @@ async function goLive(instance: FakeInstance) {
 describe('PlayerBattleMapCanvas: real presentation switch (R4)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
-    table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
   let presented = { room: ROOM_X, sceneId: 'scene-x' };
   let mints = 0;
@@ -220,7 +219,6 @@ describe('PlayerBattleMapCanvas: real presentation switch (R4)', () => {
     mints = 0;
     presented = { room: ROOM_X, sceneId: 'scene-x' };
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       if (String(input).includes('/battlemap-token')) {
@@ -241,7 +239,6 @@ describe('PlayerBattleMapCanvas: real presentation switch (R4)', () => {
     vi.clearAllMocks();
     for (const [key, value] of [
       ['NEXT_PUBLIC_BATTLEMAP_RELAY_URL', saved.relay],
-      ['NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', saved.table],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

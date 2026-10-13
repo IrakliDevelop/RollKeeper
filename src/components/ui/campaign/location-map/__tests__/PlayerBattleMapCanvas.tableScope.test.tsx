@@ -195,14 +195,12 @@ function renderPlayer() {
 describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
-    table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
 
   beforeEach(() => {
     connections.length = 0;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       new Response(JSON.stringify({ markers: [] }), { status: 200 })
     );
@@ -215,7 +213,6 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     vi.clearAllMocks();
     for (const [key, value] of [
       ['NEXT_PUBLIC_BATTLEMAP_RELAY_URL', saved.relay],
-      ['NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', saved.table],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
@@ -344,26 +341,6 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     act(() => vp.store.add(self));
     const select = vp.toolManager.getTool<SelectTool>('select')!;
     act(() => select.setSelection(['self-token']));
-    expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
-  });
-
-  it('keeps the legacy delete behavior outside Table v1', () => {
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-    stubCanvas();
-    renderPlayer();
-    const vp = makeViewport();
-    fireReady(vp);
-    const party = {
-      ...createShape({ position: { x: 0, y: 0 }, size: { w: 10, h: 10 } }),
-      id: 'party-token',
-      layerId: 'player-char-a',
-      tokenKind: 'player',
-      characterId: 'char-a',
-      sceneMemberId: 'member-a',
-    };
-    act(() => vp.store.add(party));
-    const select = vp.toolManager.getTool<SelectTool>('select')!;
-    act(() => select.setSelection(['party-token']));
     expect(screen.getByLabelText('Delete selected')).toBeInTheDocument();
   });
 });

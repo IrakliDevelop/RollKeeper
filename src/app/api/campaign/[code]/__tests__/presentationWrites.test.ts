@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   CODE,
@@ -129,12 +129,8 @@ beforeEach(() => {
   store = createTableFakeRedis();
   fake.current = store;
   seedTavernAndForest(store);
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   loot.seed.mockClear();
   loot.claim.mockClear();
-});
-afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
 });
 
 describe('PR04 scene-id writes use mutation authorization (C4-2)', () => {
@@ -254,17 +250,15 @@ describe('PR04 battle-map POST/DELETE (P6, Q9)', () => {
     },
   });
 
-  it('legacy map publication is 426 under v1 and an id mismatch is 400 in both modes', async () => {
+  it('legacy map publication is always 426 and never writes', async () => {
+    const before = store.strings.size;
     expect(
       (await send(detailPOST, post('map-x', 'map-x'), 'map-x')).status
     ).toBe(426);
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
     expect(
       (await send(detailPOST, post('map-x', 'map-y'), 'map-x')).status
-    ).toBe(400);
-    expect(
-      (await send(detailPOST, post('map-x', 'map-x'), 'map-x')).status
-    ).toBe(200);
+    ).toBe(426);
+    expect(store.strings.size).toBe(before);
   });
 
   it('DELETE answers 404 for any registered scene id, including tombstoned ones', async () => {
@@ -380,15 +374,5 @@ describe('PR04 shared POST allowlist (P6)', () => {
     ).not.toContain('forged');
     for (const feature of ['battlemap', 'initiative', 'initiativeRequest'])
       expect((await send(sharedPOST, shared(feature, {}))).status).toBe(426);
-  });
-
-  it('flag off: the default branch still stores arbitrary features as at base', async () => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    expect(
-      (await send(sharedPOST, shared('custom-feature', { a: 1 }))).status
-    ).toBe(200);
-    expect(store.strings.get(`campaign:${CODE}:shared:custom-feature`)).toBe(
-      JSON.stringify({ a: 1 })
-    );
   });
 });

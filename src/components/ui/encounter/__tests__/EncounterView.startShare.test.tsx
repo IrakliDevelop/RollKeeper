@@ -5,18 +5,11 @@ import { useBattleMapStore } from '@/store/battleMapStore';
 import { useEncounterStore } from '@/store/encounterStore';
 import type { BattleMap } from '@/types/battlemap';
 
-const hooks = vi.hoisted(() => ({ pushActive: vi.fn(async () => {}) }));
-
-vi.mock('@/hooks/useDmBattleMapSync', () => ({
-  useDmBattleMapSync: () => ({ pushActive: hooks.pushActive }),
-}));
 vi.mock('@/hooks/useDmInitiativeSync', () => ({
   useDmInitiativeSync: () => ({
     pushInitiative: vi.fn(async () => {}),
     pushInitiativeRequest: vi.fn(async () => {}),
     control: { status: 'not-broadcasting' },
-    publicationError: null,
-    legacyBroadcasting: false,
   }),
 }));
 vi.mock('@/hooks/useDmEffectsSync', () => ({
@@ -66,10 +59,10 @@ const MAP = {
   updatedAt: '2026-10-07T00:00:00.000Z',
 } as BattleMap;
 
-let previous: string | undefined;
+const fetchMock = vi.fn(async () => new Response('{}', { status: 200 }));
 beforeEach(() => {
-  previous = process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-  hooks.pushActive.mockClear();
+  fetchMock.mockClear();
+  vi.stubGlobal('fetch', fetchMock);
   useBattleMapStore.getState().addBattleMap('CAMP', MAP);
   useEncounterStore.setState({
     encounters: [
@@ -91,24 +84,21 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   useBattleMapStore.getState().removeBattleMap('CAMP', 'map-a');
-  if (previous === undefined)
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-  else process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = previous;
+  vi.unstubAllGlobals();
 });
 
 describe('EncounterView start combat auto-share wiring (D9)', () => {
-  it('does not push the linked map live when Table v1 is required', () => {
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
+  it('never pushes the linked map live through the legacy shared writer', () => {
     render(<EncounterView encounterId="enc-1" campaignCode="CAMP" />);
     fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
     expect(useEncounterStore.getState().encounters[0]?.isActive).toBe(true);
-    expect(hooks.pushActive).not.toHaveBeenCalled();
-  });
-
-  it('keeps the legacy auto-share when Table v1 is not required', () => {
-    delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
-    render(<EncounterView encounterId="enc-1" campaignCode="CAMP" />);
-    fireEvent.click(screen.getByRole('button', { name: 'Start combat' }));
-    expect(hooks.pushActive).toHaveBeenCalledWith('map-a', 'Cave');
+    const legacyBattleMapWrites = fetchMock.mock.calls.filter(call => {
+      const [url, init] = call as unknown as [string, RequestInit | undefined];
+      return (
+        String(url).includes('/shared') &&
+        String(init?.body ?? '').includes('"battlemap"')
+      );
+    });
+    expect(legacyBattleMapWrites).toHaveLength(0);
   });
 });
