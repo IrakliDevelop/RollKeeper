@@ -356,9 +356,7 @@ describe('DmLocationToolbar marker chrome', () => {
     const share = screen.getByRole('button', { name: 'Share with players' });
     expect(share).toBeDisabled();
     expect(
-      screen.getByText(
-        'Join-banner sharing is managed by Table scenes while Table v1 is enabled'
-      )
+      screen.getByText('Players now see maps through Table scenes.')
     ).toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Live for players' })

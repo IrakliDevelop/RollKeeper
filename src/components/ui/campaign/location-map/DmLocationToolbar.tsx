@@ -50,7 +50,7 @@ const BASE_TOOL_DEFS = [
 
 /** PR04 P9: why the retired join-banner toggle is disabled. */
 export const TABLE_V1_SHARE_DISABLED_REASON =
-  'Join-banner sharing is managed by Table scenes while Table v1 is enabled';
+  'Players now see maps through Table scenes.';
 
 /** Battle maps only: grid-distance, movement and cleanup tools. */
 const BATTLEMAP_ONLY_TOOL_DEFS = [

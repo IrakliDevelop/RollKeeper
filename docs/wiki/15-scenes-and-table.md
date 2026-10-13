@@ -70,14 +70,29 @@ scene rooms, player views and the TV cannot connect.
 
 ## Deployment order
 
-1. Deploy the relay first (authority Lua, scene rooms, room-key TTL).
+1. Deploy the relay first (authority Lua, scene rooms, room-key TTL) and
+   check that `curl -fsS https://<relay-host>/healthz` answers `ok`
+   (`relay/src/server.ts`) **before** the app change is merged or deployed.
+   If merging would auto-deploy the app to production, pause that
+   auto-deploy until the relay is verified; otherwise new clients ask for
+   authority tokens the old relay cannot serve. There is no automated
+   production check for an authority room; after the app is live, run a
+   short manual smoke check on a test campaign: **Open Table**, **Go live**,
+   **Show this scene**, then **Open display** and confirm the scene appears on
+   the TV.
 2. Then deploy the app. A new app build talks only the v1 protocol.
 3. Already-open relay sockets are not closed by the app deploy. When an old
    browser tab needs a new token, `battlemap-token` answers 426 "Client
-   upgrade required — please refresh your browser" unless it negotiates
-   `protocols: { fog: 1, authority: 1 }`
-   (`src/app/api/campaign/[code]/battlemap-token/route.ts`). Tokens live
-   5 minutes (`TOKEN_TTL_MS`).
+   upgrade required — please refresh your browser"
+   (`src/app/api/campaign/[code]/battlemap-token/route.ts`):
+   - any scene request (a present `sceneId`, or any request that is not a
+     no-scene `kind: 'location'` claim) must negotiate
+     `protocols: { fog: 1, authority: 1 }`;
+   - a no-scene `kind: 'location'` claim stays on the legacy room path and
+     needs only `fog: 1`, and only when `BATTLEMAP_FOG_PROTOCOL_REQUIRED` is
+     `true`.
+
+   Tokens live 5 minutes (`TOKEN_TTL_MS`).
 
 ## Release notes (behaviour changes for existing users)
 
@@ -134,9 +149,14 @@ database on downgrade.
 | App rolled back to a pre-Table build | Table data stays in IndexedDB untouched; tagged Redis keys are ignored and expire by TTL | Redeploy a Table build; data reappears |
 | Relay rolled back without authority support | Scene rooms unavailable; app answers 503/unavailable for live play | Roll the relay forward first, then the app (deployment order) |
 
-To roll back a live release: stop broadcasting (the DM's live control lease
-lapses), export a Table bundle from each DM device, then restore a matching
-app + relay pair.
+To roll back a live release:
+
+1. Stop live play: stop broadcasting (the DM's live control lease lapses).
+2. Export a Table bundle from each DM device.
+3. Roll back the app and the relay together, to the recorded previous
+   known-good pair (see "VTT v4 rollout and rollback" in `relay/README.md`):
+   the app first, then the relay. Replacing or restarting the relay drains
+   the already admitted v1 sockets; the app rollback alone never closes them.
 
 ## Relay room-key lifetime
 
