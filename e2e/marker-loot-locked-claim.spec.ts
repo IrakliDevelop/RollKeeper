@@ -671,9 +671,12 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
  *
  * Root cause (see `stale-panel-fix-report.md`): the markers PUT/POST routes
  * called `sendBattleMapPoke`, which resolves the poke's target room from the
- * campaign's "active battle map" (`campaignSharedKey(code, 'battlemap')`,
- * written only by the DM's explicit "share battle map" action /
- * `useDmBattleMapSync.pushActive`), not from this route's own `id` param.
+ * campaign's "active battle map" (today the Table control compatibility
+ * projection `tableCompatibilityKey(code, 'battlemap')`, written by
+ * `TABLE_CONTROL_SCRIPT` from the shown, unblanked scene's source map; at
+ * the time, the DM's separate "share battle map" toggle), not from this
+ * route's own `id` param. The routes now poke their own room
+ * (`sendBattleMapPokeToRoom`).
  * This test's player joins the map by direct URL (the same thing a real
  * session does when a DM never toggles that separate "activate" flag), so
  * `activeBattleMapId` is never set and the poke silently no-ops — the

@@ -204,10 +204,10 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
 
 /**
  * This receive site's role for `attachFocusReceiver`. Pulled out to a named,
- * directly-assertable constant — swapping this literal with the display
- * page's `DISPLAY_FOCUS_OPTIONS` would otherwise pass type-check, lint, and
- * every test while making a DM's "send to the TV" move every player's
- * camera instead. See PlayerBattleMapCanvas.focusOptions.test.ts.
+ * directly-assertable constant — swapping this literal for the display role
+ * would otherwise pass type-check, lint, and every test while making a DM's
+ * "send to the TV" move every player's camera instead. See
+ * PlayerBattleMapCanvas.focusOptions.test.ts.
  */
 export const PLAYER_FOCUS_OPTIONS = {
   role: 'player',
