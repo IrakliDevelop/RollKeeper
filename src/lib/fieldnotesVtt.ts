@@ -1,6 +1,12 @@
-import { getDefaultElementRegistry, type Viewport } from '@fieldnotes/core';
+import {
+  getDefaultElementRegistry,
+  type CanvasElement,
+  type Viewport,
+} from '@fieldnotes/core';
 import {
   createFogPlugin,
+  createGrid,
+  gridElementTypeDefinition,
   FogManager,
   FogManagerKey,
   GridController,
@@ -21,6 +27,39 @@ if (!hasGridAdapter && !hasTemplateAdapter) {
   registerVttElementTypes(registry);
 } else if (hasGridAdapter !== hasTemplateAdapter) {
   throw new Error('Field Notes VTT element registration is incomplete');
+}
+
+/**
+ * Default grid fields for a new grid (Edit map, location editor and
+ * adoption). Mirrors the location editor's initial state.
+ */
+export const VTT_GRID_DEFAULTS = {
+  cellSize: 50,
+  strokeColor: '#94a3b8',
+  strokeWidth: 1,
+  opacity: 0.5,
+} as const;
+
+/**
+ * The `vtt:grid` envelope that `GridController.add` followed by
+ * `pinGridToMapLayer` leaves in a store: the same `createGrid` element,
+ * wrapped by the registered grid definition, on the map layer and locked.
+ * For code that builds canvas state without a viewport (Table adoption).
+ */
+export function createPinnedVttGridElement(
+  settings: {
+    gridType: 'square' | 'hex';
+    hexOrientation?: 'pointy' | 'flat';
+    cellSize: number;
+    strokeColor: string;
+    strokeWidth: number;
+    opacity: number;
+  },
+  mapLayerId: string
+): CanvasElement {
+  return gridElementTypeDefinition.wrap(
+    createGrid({ ...settings, layerId: mapLayerId, locked: true })
+  ) as CanvasElement;
 }
 
 const fogPlugins = new WeakMap<FogManager, FogPlugin>();
