@@ -172,6 +172,8 @@ jobs:
       # Table control Lua against real Redis and serverless-redis-http; the
       # suite starts its own disposable containers with the runner's Docker.
       - name: Table control Redis suite
+        # Report this suite even when the relay step fails (review R2).
+        if: ${{ !cancelled() }}
         run: npm run test:table-control:redis
 
   local-supabase:
