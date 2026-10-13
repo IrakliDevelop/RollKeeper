@@ -82,6 +82,20 @@ describe('useDmInitiativeSync (Table control publication)', () => {
     expect(fetch).not.toHaveBeenCalled();
   });
 
+  it('says live control is still being checked before the first answer', async () => {
+    control.status = 'checking';
+    const { result } = renderHook(() =>
+      useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
+    );
+    await expect(result.current.pushInitiative(state)).rejects.toThrow(
+      'Checking live control'
+    );
+    await expect(result.current.pushInitiativeRequest(request)).rejects.toThrow(
+      'Checking live control'
+    );
+    expect(control.publish).not.toHaveBeenCalled();
+  });
+
   it('rejects instead of publishing while not broadcasting', async () => {
     control.status = 'not-broadcasting';
     control.error = 'Live control lease expired';

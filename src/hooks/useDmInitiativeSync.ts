@@ -24,7 +24,7 @@ export function useDmInitiativeSync({
 
   const pushInitiative = useCallback(
     async (state: SharedInitiativeState) => {
-      if (status === 'checking') throw new Error('Checking table capability');
+      if (status === 'checking') throw new Error('Checking live control');
       if (status !== 'controlling' && status !== 'broadcasting')
         throw new Error(error ?? 'Not broadcasting');
       return publish(
@@ -39,7 +39,7 @@ export function useDmInitiativeSync({
 
   const pushInitiativeRequest = useCallback(
     async (data: InitiativeRollRequest | null) => {
-      if (status === 'checking') throw new Error('Checking table capability');
+      if (status === 'checking') throw new Error('Checking live control');
       if (status !== 'controlling' && status !== 'broadcasting')
         throw new Error(error ?? 'Not broadcasting');
       return publish('publishInitiativeRequest', { request: data });
