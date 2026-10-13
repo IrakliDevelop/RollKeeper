@@ -1,11 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Pencil, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Search, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { EventDialog } from './EventDialog';
 import { EventMarker } from './EventMarker';
+import {
+  compareEventsWithinDay,
+  type EventMoveDirection,
+} from '@/utils/calendarEventOrder';
 import type {
   CalendarConfig,
   CalendarEvent,
@@ -22,6 +26,7 @@ interface EventListViewProps {
     updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
   ) => void;
   onDeleteEvent: (eventId: string) => void;
+  onMoveEvent?: (eventId: string, direction: EventMoveDirection) => void;
 }
 
 function compareDateKeys(a: CalendarEvent, b: CalendarEvent): number {
@@ -39,6 +44,7 @@ export function EventListView({
   config,
   onUpdateEvent,
   onDeleteEvent,
+  onMoveEvent,
 }: EventListViewProps) {
   const [search, setSearch] = useState('');
   const [monthFilter, setMonthFilter] = useState<string>('all');
@@ -70,11 +76,16 @@ export function EventListView({
 
     const sorted = [...result];
     switch (sortOrder) {
+      // Within a day, both date sorts keep the DM's arranged order.
       case 'date-asc':
-        sorted.sort(compareDateKeys);
+        sorted.sort(
+          (a, b) => compareDateKeys(a, b) || compareEventsWithinDay(a, b)
+        );
         break;
       case 'date-desc':
-        sorted.sort((a, b) => compareDateKeys(b, a));
+        sorted.sort(
+          (a, b) => compareDateKeys(b, a) || compareEventsWithinDay(a, b)
+        );
         break;
       case 'recent':
         sorted.sort((a, b) => b.createdAt - a.createdAt);
@@ -83,6 +94,10 @@ export function EventListView({
 
     return sorted;
   }, [events, search, monthFilter, yearFilter, sortOrder]);
+
+  // Reordering only makes sense when rows show the day's arranged order and
+  // every event of the day is visible (filters can hide some).
+  const canReorder = !!onMoveEvent && sortOrder !== 'recent' && search === '';
 
   // Group events by date
   const grouped = useMemo(() => {
@@ -196,7 +211,7 @@ export function EventListView({
                 {formatGroupDate(group.year, group.month, group.day)}
               </h3>
               <div className="bg-surface-secondary rounded-lg">
-                {group.events.map(event => (
+                {group.events.map((event, index) => (
                   <div
                     key={event.id}
                     className="hover:bg-surface-elevated border-divider group flex w-full items-center gap-2 border-b px-3 py-2.5 transition-colors duration-150 last:border-b-0"
@@ -215,7 +230,29 @@ export function EventListView({
                         {event.title}
                       </span>
                     </button>
-                    <div className="ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-hover:opacity-100">
+                    <div className="ml-auto flex shrink-0 items-center gap-1 opacity-0 transition-opacity duration-150 group-focus-within:opacity-100 group-hover:opacity-100">
+                      {canReorder && group.events.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            aria-label={`Move ${event.title} earlier`}
+                            disabled={index === 0}
+                            onClick={() => onMoveEvent?.(event.id, 'up')}
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                          >
+                            <ChevronUp size={12} />
+                          </button>
+                          <button
+                            type="button"
+                            aria-label={`Move ${event.title} later`}
+                            disabled={index === group.events.length - 1}
+                            onClick={() => onMoveEvent?.(event.id, 'down')}
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                          >
+                            <ChevronDown size={12} />
+                          </button>
+                        </>
+                      )}
                       <button
                         type="button"
                         onClick={() => handleEditEvent(event)}

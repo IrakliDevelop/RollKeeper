@@ -19,7 +19,7 @@
   battle-map canvas SDK. Authored by this project's maintainer, not a
   third-party dependency to treat as a black box — see
   [07](07-battlemap-fog-fieldnotes.md).
-- **`@3d-dice/dice-box`** + `dice-ui` — 3D dice roller. **`@tiptap/*`** — rich
+- **`pollyroll`** — 3D dice (`pollyroll` core, `pollyroll/render` tray). **`@tiptap/*`** — rich
   text editor (background/notes). **`tldraw`** and **`reactflow`** — canvas
   primitives used in the VTT/map surfaces.
 

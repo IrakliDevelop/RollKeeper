@@ -714,7 +714,7 @@ git commit -m "test: add InventoryManager interaction tests"
 
 Component at `src/components/ui/game/DiceRoller.tsx`.
 
-This component uses `useDiceRoller` hook which imports `@3d-dice/dice-box` (WebGL 3D library). The entire hook must be mocked since jsdom has no WebGL:
+This component uses `useDiceRoller`, which renders dice with Pollyroll (WebGL). The entire hook must be mocked since jsdom has no WebGL:
 
 ```typescript
 const mockRoll = vi.fn();

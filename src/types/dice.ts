@@ -1,4 +1,6 @@
-// Dice roll result types for 3D Dice Box library
+import type { Skin } from 'pollyroll';
+
+// Dice roll result types. Values come from Pollyroll; the shape is what the sheet reads.
 
 export interface DiceResult {
   sides: number;
@@ -17,6 +19,13 @@ export interface ParsedDiceNotation {
   sides: number;
   modifier: number;
   originalNotation: string;
+}
+
+/** Per-character Pollyroll appearance. Omitted characters use the classic set. */
+export interface CharacterDiceSet {
+  skin: Skin;
+  /** Largest die size. Rolls with many dice shrink to fit. */
+  dieScale: number;
 }
 
 export interface RollSummary {

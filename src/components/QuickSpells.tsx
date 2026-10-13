@@ -31,6 +31,7 @@ import { getTotalLevel } from '@/utils/multiclass';
 import { SpellCastModal } from '@/components/ui/game/SpellCastModal';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import { RollSummary } from '@/types/dice';
+import { d20Notation } from '@/utils/sheetRoll';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 
@@ -499,7 +500,7 @@ export function QuickSpells({
 
     if (animateRoll) {
       try {
-        const rollResult = await animateRoll('1d20');
+        const rollResult = await animateRoll(d20Notation(spellAttackBonus));
         if (
           rollResult &&
           typeof rollResult === 'object' &&

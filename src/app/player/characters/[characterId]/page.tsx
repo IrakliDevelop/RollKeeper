@@ -44,6 +44,7 @@ import {
 } from '@/utils/calculations';
 import { exportCharacterToFile } from '@/utils/fileOperations';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import { parseDiceSet } from '@/utils/diceSet';
 import {
   AbilityName,
   SkillName,
@@ -92,8 +93,15 @@ export default function CharacterSheet() {
 
   const hasHydrated = useHydration();
 
+  const storedDiceSet = useCharacterStore(state => state.character.diceSet);
+  const characterDiceSet = useMemo(
+    () => parseDiceSet(storedDiceSet),
+    [storedDiceSet]
+  );
   const { isReady: diceBoxInitialized, roll: rollDice } = useSimpleDiceRoll({
     containerId: 'main-dice-container',
+    skin: characterDiceSet?.skin,
+    dieScale: characterDiceSet?.dieScale,
     onRollComplete: (summary: RollSummary) => {
       console.log('Dice roll completed:', summary);
     },

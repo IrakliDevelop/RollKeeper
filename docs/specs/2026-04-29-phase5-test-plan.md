@@ -901,7 +901,7 @@ git commit -m "test: add InventoryManager visual stories (light + dark)"
 
 - [ ] **Step 1: Write the story file**
 
-Read `src/components/ui/game/DiceRoller.tsx` to confirm the full props interface. This component uses `useDiceRoller` which imports `@3d-dice/dice-box` (WebGL). The hook must be mocked since Chromium in headless mode may not support WebGL canvas for dice rendering.
+Read `src/components/ui/game/DiceRoller.tsx` to confirm the full props interface. This component uses `useDiceRoller`, which renders dice with Pollyroll (WebGL). The hook must be mocked since Chromium in headless mode may not support WebGL canvas for dice rendering.
 
 ```tsx
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';

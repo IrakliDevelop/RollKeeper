@@ -9,6 +9,13 @@ import type {
   CampaignCalendar,
   WeatherType,
 } from '@/types/calendar';
+import {
+  isSameEventDay,
+  moveEventWithinDay,
+  nextSortOrderForDay,
+  sortEventsWithinDay,
+  type EventMoveDirection,
+} from '@/utils/calendarEventOrder';
 
 const CALENDAR_STORAGE_KEY = 'rollkeeper-calendar-data';
 
@@ -35,6 +42,11 @@ interface CalendarStoreState {
     updates: Partial<Omit<CalendarEvent, 'id' | 'createdAt'>>
   ) => void;
   deleteEvent: (campaignCode: string, eventId: string) => void;
+  moveEvent: (
+    campaignCode: string,
+    eventId: string,
+    direction: EventMoveDirection
+  ) => void;
   setWeather: (campaignCode: string, weather: WeatherType) => void;
   getEventsForDay: (
     campaignCode: string,
@@ -119,28 +131,56 @@ export const useCalendarStore = create<CalendarStoreState>()(
       },
 
       addEvent: (campaignCode, event) => {
-        const newEvent: CalendarEvent = {
-          ...event,
-          id: generateEventId(),
-          createdAt: Date.now(),
-        };
         set(state => ({
-          calendars: state.calendars.map(c =>
-            c.campaignCode === campaignCode
-              ? { ...c, events: [...(c.events ?? []), newEvent] }
-              : c
-          ),
+          calendars: state.calendars.map(c => {
+            if (c.campaignCode !== campaignCode) return c;
+            const events = c.events ?? [];
+            const { sortOrder: _ignored, ...input } = event;
+            void _ignored;
+            const sortOrder = nextSortOrderForDay(events, event);
+            const newEvent: CalendarEvent = {
+              ...input,
+              ...(sortOrder === undefined ? {} : { sortOrder }),
+              id: generateEventId(),
+              createdAt: Date.now(),
+            };
+            return { ...c, events: [...events, newEvent] };
+          }),
         }));
       },
 
       updateEvent: (campaignCode, eventId, updates) => {
         set(state => ({
+          calendars: state.calendars.map(c => {
+            if (c.campaignCode !== campaignCode) return c;
+            const events = c.events ?? [];
+            return {
+              ...c,
+              events: events.map(e => {
+                if (e.id !== eventId) return e;
+                const updated = { ...e, ...updates };
+                if (isSameEventDay(e, updated)) return updated;
+                // Moved to another day: append after that day's events.
+                const { sortOrder: _previous, ...rest } = updated;
+                void _previous;
+                const sortOrder = nextSortOrderForDay(events, updated, e.id);
+                return sortOrder === undefined ? rest : { ...rest, sortOrder };
+              }),
+            };
+          }),
+        }));
+      },
+
+      moveEvent: (campaignCode, eventId, direction) => {
+        set(state => ({
           calendars: state.calendars.map(c =>
             c.campaignCode === campaignCode
               ? {
                   ...c,
-                  events: (c.events ?? []).map(e =>
-                    e.id === eventId ? { ...e, ...updates } : e
+                  events: moveEventWithinDay(
+                    c.events ?? [],
+                    eventId,
+                    direction
                   ),
                 }
               : c
@@ -171,9 +211,11 @@ export const useCalendarStore = create<CalendarStoreState>()(
           c => c.campaignCode === campaignCode
         );
         if (!calendar) return [];
-        return (calendar.events ?? [])
-          .filter(e => e.year === year && e.month === month && e.day === day)
-          .sort((a, b) => a.createdAt - b.createdAt);
+        return sortEventsWithinDay(
+          (calendar.events ?? []).filter(e =>
+            isSameEventDay(e, { year, month, day })
+          )
+        );
       },
     }),
     {

@@ -26,6 +26,7 @@ export type SkillName =
   | 'stealth'
   | 'survival';
 
+import type { CharacterDiceSet } from './dice';
 import type { SpellbookState } from './spells';
 import type { Summon } from './summon';
 import type { SpellAoe } from './spellAoe';
@@ -728,6 +729,8 @@ export interface CharacterState {
   sharePartyView?: boolean; // Whether to share the read-only party sheet view with party members (default true)
   spellSlotsExpanded?: boolean; // Whether the full Spell Slot Tracker panel is expanded (default false)
   stackableInspiration?: boolean; // House-rule: allow holding more than one Heroic Inspiration. Default false. When in a campaign, materialized from the DM's setting.
+  /** 3D dice appearance. Absent uses Pollyroll's classic set. */
+  diceSet?: CharacterDiceSet;
 
   // Summons (familiars, summoned creatures)
   summons?: Summon[];
