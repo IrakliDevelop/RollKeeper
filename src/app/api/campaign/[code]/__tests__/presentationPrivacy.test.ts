@@ -42,7 +42,6 @@ vi.mock('@/lib/tableServer/authorityProof', () => ({
 vi.mock('@/lib/relayPoke', () => ({
   sendBattleMapPokeToRoom: vi.fn(),
   sendBattleMapPoke: vi.fn(),
-  sendInitiativePoke: vi.fn(),
 }));
 
 import { GET as listGET } from '../battlemaps/route';

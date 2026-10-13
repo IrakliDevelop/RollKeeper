@@ -281,7 +281,6 @@ describe('fog protocol capability gate', () => {
     seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
     seedRedis(`campaign:${CODE}:location:loc-a`, validLocation('loc-a'));
     seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
-    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
   });
 
   it('accepts any request when the gate is off', async () => {
@@ -932,7 +931,6 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
     proveRelayAuthority.mockResolvedValue(true);
     seedRedisSet(`campaign:${CODE}:players`, ['player-a']);
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
-    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
     const { createHash } = await import('node:crypto');
     tag = `{rk-table-v1:${createHash('sha256').update(CODE).digest('hex')}}`;
     await present('scene-x');

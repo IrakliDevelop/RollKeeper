@@ -61,7 +61,6 @@ vi.mock('@/lib/markerLootClaims', async importOriginal => ({
 vi.mock('@/lib/relayPoke', () => ({
   sendBattleMapPokeToRoom: vi.fn(),
   sendBattleMapPoke: vi.fn(),
-  sendInitiativePoke: vi.fn(),
 }));
 
 import {
