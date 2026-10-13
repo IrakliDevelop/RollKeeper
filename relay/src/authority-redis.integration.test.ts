@@ -2053,6 +2053,114 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
     // Control and registry keep their own (app-owned) lifetime.
     expect(await client.pTTL(tableControlKey(CAMPAIGN))).toBe(-1);
     expect(await client.pTTL(tableRegistryKey(CAMPAIGN))).toBe(-1);
+
+    // Review R6: the claim script gives a freshly created claims hash the
+    // room lifetime (the commit loop never creates keys).
+    expect(await client.exists(keys.outboxClaims)).toBe(0);
+    const readOptions = {
+      deadlineAt: Date.now() + 5_000,
+      signal: new AbortController().signal,
+    };
+    const claims = await driver.claimPublications(
+      'worker-ttl',
+      { entries: 1, bytes: 1024 * 1024, leaseMs: 30_000 },
+      readOptions
+    );
+    expect(claims).toHaveLength(1);
+    expectSliding(await roomKeyTtls(), ['outboxClaims']);
+
+    // Review R6: fog meta and fog tiles written by a fog commit slide too.
+    const fogDefinition = {
+      version: 1,
+      base: 'covered' as const,
+      bounds: { x: 0, y: 0, w: 1024, h: 1024 },
+      cellSize: 1,
+      tileCells: 128 as const,
+      generation: 'fog-generation-ttl',
+    };
+    const fogMeta = {
+      kind: 'fog-meta' as const,
+      record: { version: 1, editor: 'dm-a', definition: fogDefinition },
+    };
+    const fogPatch = {
+      kind: 'fog-patch' as const,
+      generation: fogDefinition.generation,
+      tiles: [
+        {
+          generation: fogDefinition.generation,
+          x: 0,
+          y: 0,
+          version: 1,
+          editor: 'dm-a',
+        },
+      ],
+    };
+    for (const [operationId, mutation] of [
+      ['ttl-fog-meta', fogMeta],
+      ['ttl-fog-patch', fogPatch],
+    ] as const) {
+      expect(
+        await driver.commit(
+          operationContext(operationId),
+          requestFor(operationId, mutation, {
+            schema: 1,
+            kind: 'extension',
+            key: 'fog',
+            version: 1,
+            payload: prepareFogAuthorityIntent(mutation),
+          })
+        )
+      ).toMatchObject({ status: 'committed' });
+    }
+    expectSliding(await roomKeyTtls(), ['fogMeta', 'fogTiles']);
+  });
+
+  it('re-provisions a room whose keys expired under a still-live registry (review R7)', async () => {
+    const control = JSON.parse(
+      (await client.get(tableControlKey(CAMPAIGN)))!
+    ) as Record<string, unknown>;
+    control.holderPrincipal = 'principal-a';
+    await client.set(tableControlKey(CAMPAIGN), JSON.stringify(control));
+    const driver = new RedisAuthorityDriver(client);
+    expect(await driver.commit(context(), upsert())).toMatchObject({
+      status: 'committed',
+    });
+    // The room's sliding TTL elapsed; control and registry are still live.
+    await client.del(Object.values(keys));
+    expect(await client.exists(tableRegistryKey(CAMPAIGN))).toBe(1);
+    await expect(
+      driver.commit(
+        operationContext('after-expiry'),
+        upsert('element-b', 'after-expiry')
+      )
+    ).resolves.toEqual({ status: 'rejected', reason: 'generation-mismatch' });
+    // initialize-if-empty: no expected generation, so the empty room is
+    // provisioned again from the DM's local state.
+    const replacement = '623e4567-e89b-42d3-a456-426614174000';
+    expect(
+      await driver.provision({
+        campaign: CAMPAIGN,
+        sceneId: 'scene-a',
+        room: ROOM,
+        epoch: EPOCH,
+        writerFence: 7,
+        principal: 'principal-a',
+        deadlineAt: Date.now() + 5_000,
+        generation: replacement,
+        casToken: 'cas-recovered',
+        expectedGeneration: null,
+        expectedCasToken: null,
+        state: {
+          elements: [],
+          layers: [],
+          extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+        } as never,
+      })
+    ).toEqual({ status: 'provisioned', generation: replacement });
+    expect(JSON.parse((await client.get(keys.meta))!)).toMatchObject({
+      generation: replacement,
+      revision: 0,
+    });
   });
 
   it('guards initialize-if-empty and whole-generation restore with generation and CAS', async () => {
