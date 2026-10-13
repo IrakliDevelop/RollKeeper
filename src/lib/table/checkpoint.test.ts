@@ -361,6 +361,42 @@ describe('restore reasons are truthful (PR08 desktop P3)', () => {
   ])('HTTP %i %j → %j', async (status, body, expected) => {
     expect(await restoreWith(status, body)).toEqual(expected);
   });
+
+  it('maps a capture-step 403 (live control lost) to forbidden (review S3)', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      Response.json(
+        { error: 'Current live control is required' },
+        { status: 403 }
+      )
+    );
+    await expect(
+      restoreAuthorityFork({
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        sceneId: 'scene-1',
+        checkpoint: retained,
+        fetcher,
+      })
+    ).resolves.toEqual({ status: 'failed', reason: 'forbidden' });
+    // Only the capture ran; nothing was provisioned.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps other capture failures as a capture failure', async () => {
+    for (const status of [500, 503]) {
+      await expect(
+        restoreAuthorityFork({
+          campaignCode: 'CAMP',
+          dmId: 'dm-1',
+          sceneId: 'scene-1',
+          checkpoint: retained,
+          fetcher: vi.fn<typeof fetch>(
+            async () => new Response('down', { status })
+          ),
+        })
+      ).resolves.toEqual({ status: 'failed', reason: 'capture' });
+    }
+  });
 });
 
 describe('PR02 checkpoint provenance and roster durability', () => {

@@ -396,6 +396,10 @@ export async function restoreAuthorityFork(options: {
   } catch {
     return { status: 'failed', reason: 'capture' };
   }
+  // A 403 here is the route's "Current live control is required": this tab
+  // no longer holds live control (review S3).
+  if (currentResponse.status === 403)
+    return { status: 'failed', reason: 'forbidden' };
   if (!currentResponse.ok) return { status: 'failed', reason: 'capture' };
   const current = object((await currentResponse.json()) as unknown);
   const nested = object(current?.checkpoint);
