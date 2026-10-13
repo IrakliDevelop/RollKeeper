@@ -44,6 +44,7 @@ single-player use.
 | 12 | [Conventions & Workflow](12-conventions-and-workflow.md) | Naming, commits, branches, PRs, the per-provider skill-duplication pattern |
 | 13 | [Feature Flags & Gated Work](13-feature-flags-and-gated-work.md) | Why "is X shipped?" needs a flag check, not an assumption |
 | 14 | [Agent Guidance](14-agent-guidance.md) | What to check before touching sync/storage code; where the real gates are |
+| 15 | [Scenes and Table](15-scenes-and-table.md) | Table workspace routes and auth, relay requirement, deployment order, release notes, local-only storage, rollback matrix |
 
 ## How to use this wiki safely
 
