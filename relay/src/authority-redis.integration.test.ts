@@ -39,6 +39,11 @@ const declaredKeys = [
   tableRegistryKey(CAMPAIGN),
 ];
 
+/** -2 absent, -1 persistent, otherwise a live (sliding) TTL. */
+function ttlClass(ttl: number): string {
+  return ttl < 0 ? String(ttl) : 'expiring';
+}
+
 function operationDigest(operationId: string): string {
   return createHash('sha256').update(operationId).digest('hex');
 }
@@ -288,7 +293,9 @@ run('authority driver against real Redis', () => {
           client.pTTL(key),
           client.sendCommand<Buffer | null>(['DUMP', key]),
         ]);
-        return `${key}\0${type}\0${ttl}\0${dump?.toString('base64') ?? ''}`;
+        // A live TTL decays between reads; a rejected write must neither add
+        // nor drop one (review B3 sliding room TTL), so compare its class.
+        return `${key}\0${type}\0${ttlClass(ttl)}\0${dump?.toString('base64') ?? ''}`;
       })
     );
   }
@@ -1911,6 +1918,89 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
     }
   );
 
+  it('keeps every authority room key on the sliding room TTL (review B3)', async () => {
+    const ROOM_TTL_MS = 172_800_000;
+    const roomKeyTtls = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          Object.entries(keys).map(
+            async ([name, key]) => [name, await client.pTTL(key)] as const
+          )
+        )
+      );
+    const expectSliding = (ttls: Record<string, number>, names: string[]) => {
+      for (const name of names) {
+        expect(ttls[name], name).toBeGreaterThan(ROOM_TTL_MS - 60_000);
+        expect(ttls[name], name).toBeLessThanOrEqual(ROOM_TTL_MS);
+      }
+    };
+    await client.del(keys.meta);
+    const control = JSON.parse(
+      (await client.get(tableControlKey(CAMPAIGN)))!
+    ) as Record<string, unknown>;
+    control.holderPrincipal = 'principal-a';
+    await client.set(tableControlKey(CAMPAIGN), JSON.stringify(control));
+    // Pre-existing keys without a TTL (legacy data) are adopted too.
+    await client.hSet(keys.playerRate, 'old-rate', '{}');
+    const driver = new RedisAuthorityDriver(client);
+    expect(
+      await driver.provision({
+        campaign: CAMPAIGN,
+        sceneId: 'scene-a',
+        room: ROOM,
+        epoch: EPOCH,
+        writerFence: 7,
+        principal: 'principal-a',
+        deadlineAt: Date.now() + 5_000,
+        generation: GENERATION,
+        casToken: 'cas-provisioned',
+        expectedGeneration: null,
+        expectedCasToken: null,
+        state: {
+          elements: [
+            {
+              ...createShape({
+                position: { x: 1, y: 2 },
+                size: { w: 10, h: 10 },
+              }),
+              id: 'seed-a',
+              ownerId: 'dm-a',
+            },
+          ],
+          layers: [],
+          extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+        } as never,
+      })
+    ).toEqual({ status: 'provisioned', generation: GENERATION });
+    expectSliding(await roomKeyTtls(), ['meta', 'elements', 'ownership']);
+
+    // Age the room, then a commit slides every written and existing key.
+    for (const key of Object.values(keys)) await client.pExpire(key, 1_000);
+    await client.hSet(keys.playerRate, 'old-rate', '{}');
+    await client.pExpire(keys.playerRate, 1_000);
+    expect(await driver.commit(context(), upsert())).toMatchObject({
+      status: 'committed',
+    });
+    const afterCommit = await roomKeyTtls();
+    expectSliding(afterCommit, [
+      'meta',
+      'elements',
+      'ownership',
+      'dedupe',
+      'dedupeOrder',
+      'receipts',
+      'history',
+      'evidence',
+      'outbox',
+      'playerRate',
+    ]);
+    // Absent keys stay absent (-2): EXPIRE never creates a key.
+    expect(afterCommit.fogMeta).toBe(-2);
+    // Control and registry keep their own (app-owned) lifetime.
+    expect(await client.pTTL(tableControlKey(CAMPAIGN))).toBe(-1);
+    expect(await client.pTTL(tableRegistryKey(CAMPAIGN))).toBe(-1);
+  });
+
   it('guards initialize-if-empty and whole-generation restore with generation and CAS', async () => {
     await client.del(keys.meta);
     const first = new RedisAuthorityDriver(client);
@@ -2172,7 +2262,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
           } else if (type === 'string') {
             content = await client.get(key);
           }
-          return `${key}\0${type}\0${await client.pTTL(key)}\0${JSON.stringify(content)}`;
+          return `${key}\0${type}\0${ttlClass(await client.pTTL(key))}\0${JSON.stringify(content)}`;
         })
       );
     }

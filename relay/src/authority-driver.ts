@@ -38,6 +38,7 @@ import {
   type AuthorityRoomKeys,
 } from './authority-keys.js';
 import {
+  AUTHORITY_ROOM_TTL_SECONDS,
   ROLLKEEPER_AUTHORITY_HOST_V1,
   ROLLKEEPER_CHECKPOINT_LUA_V1,
   ROLLKEEPER_PROVISION_LUA_V1,
@@ -555,7 +556,7 @@ export class RedisAuthorityDriver implements AuthorityDriver {
       const token = randomBytes(16).toString('hex');
       const raw = arrayResult(
         await this.redis.eval(
-          "local e=redis.call('LINDEX',KEYS[1],0); if not e then return {0,''} end; local p=cjson.decode(e); local f=p.position.generation..':'..p.position.revision; local c=redis.call('HGET',KEYS[2],f); local n=tonumber(ARGV[3]); if c then local d=cjson.decode(c); if d.expiresAt>n then return {0,''} end end; redis.call('HSET',KEYS[2],f,cjson.encode({ownerId=ARGV[1],token=ARGV[2],expiresAt=n+tonumber(ARGV[4])})); return {1,e}",
+          "local e=redis.call('LINDEX',KEYS[1],0); if not e then return {0,''} end; local p=cjson.decode(e); local f=p.position.generation..':'..p.position.revision; local c=redis.call('HGET',KEYS[2],f); local n=tonumber(ARGV[3]); if c then local d=cjson.decode(c); if d.expiresAt>n then return {0,''} end end; redis.call('HSET',KEYS[2],f,cjson.encode({ownerId=ARGV[1],token=ARGV[2],expiresAt=n+tonumber(ARGV[4])})); redis.call('EXPIRE',KEYS[2],tonumber(ARGV[5])); return {1,e}",
           {
             keys: [ref.keys.outbox, ref.keys.outboxClaims],
             arguments: [
@@ -563,6 +564,8 @@ export class RedisAuthorityDriver implements AuthorityDriver {
               token,
               String(Date.now()),
               String(limits.leaseMs),
+              // Review B3: a claims hash created here shares the room TTL.
+              String(AUTHORITY_ROOM_TTL_SECONDS),
             ],
           }
         )
