@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 import {
@@ -55,6 +55,11 @@ export function useSceneCheckpointActions(options: {
    * for the new generation (PR08 desktop A1).
    */
   const [restoredCount, setRestoredCount] = useState(0);
+  /** The scene mounted now: a restore that outlives it is ignored (S4). */
+  const mountedSceneRef = useRef(sceneId);
+  useEffect(() => {
+    mountedSceneRef.current = sceneId;
+  }, [sceneId]);
   const [saveBusy, setSaveBusy] = useState(false);
 
   useEffect(() => {
@@ -119,6 +124,9 @@ export function useSceneCheckpointActions(options: {
       checkpoint,
     });
     setRecoveryBusy(false);
+    // Another scene was mounted meanwhile: never remount its canvas or show
+    // this scene's result on it.
+    if (mountedSceneRef.current !== sceneId) return;
     if (result.status === 'restored') setRestoredCount(value => value + 1);
     post(
       result.status === 'restored'
