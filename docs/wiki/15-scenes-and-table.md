@@ -6,9 +6,8 @@ VTT ([07](07-battlemap-fog-fieldnotes.md)) but has its own local storage,
 server control service and relay authority. This page describes the code as
 of the Scenes and Table release; when in doubt, read the cited file.
 
-**There is no feature switch.** Table protocol v1 is always on (the former
-`TABLE_PROTOCOL_V1_REQUIRED` / `NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED` pair was
-removed). Entry points ("Open Table", "Prepare on map", "Open in Table" / "Use
+**There is no feature switch.** Table protocol v1 is always on; the former
+server and client deployment switches for it were removed. Entry points ("Open Table", "Prepare on map", "Open in Table" / "Use
 in Table", "Open display") always render.
 
 ## Routes and auth model
