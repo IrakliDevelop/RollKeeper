@@ -666,8 +666,14 @@ run('two relay authority transport', () => {
     };
     withdrawn.presentation.blanked = true;
     await redis.set(tableControlKey(CAMPAIGN), JSON.stringify(withdrawn));
+    // Wait for the withdrawal close itself (review S2): the observer can
+    // leave `live` on a denied authority read a moment before the relay's
+    // revocation poll closes its socket with 4403.
     await eventually(
-      () => reconnected.status() === 'live' && observerStatus !== 'live',
+      () =>
+        reconnected.status() === 'live' &&
+        observerStatus !== 'live' &&
+        closeEvents.some(event => event.code === 4403),
       2_000
     ).catch(() => {
       throw new Error(
