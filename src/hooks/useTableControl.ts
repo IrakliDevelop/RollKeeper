@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TableCommand } from '@/lib/tableServer/validation';
 import type { TableDescriptor, TableResult } from '@/lib/tableServer/control';
+import { TABLE_MUTATION_HEADERS } from '@/lib/table/tableRequestHeaders';
 
 type TableStatus =
   | 'checking'
@@ -122,10 +123,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
               `/api/campaign/${encodeURIComponent(campaignCode)}/table/control`,
               {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'x-rollkeeper-csrf': '1',
-                },
+                headers: TABLE_MUTATION_HEADERS,
                 body: JSON.stringify({ dmId, command }),
               }
             );

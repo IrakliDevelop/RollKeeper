@@ -12,6 +12,7 @@ import type {
   TableCanvasCheckpointV1,
   TableSceneRecordV1,
 } from './schema';
+import { TABLE_MUTATION_HEADERS } from './tableRequestHeaders';
 
 function object(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -353,7 +354,7 @@ export async function restoreAuthorityFork(options: {
   try {
     currentResponse = await fetcher(`${base}/checkpoint`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: TABLE_MUTATION_HEADERS,
       body: JSON.stringify({ dmId: options.dmId, sceneId: options.sceneId }),
     });
   } catch {
@@ -396,7 +397,7 @@ export async function restoreAuthorityFork(options: {
   try {
     response = await fetcher(`${base}/initialize-if-empty`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: TABLE_MUTATION_HEADERS,
       body: JSON.stringify({
         dmId: options.dmId,
         sceneId: options.sceneId,

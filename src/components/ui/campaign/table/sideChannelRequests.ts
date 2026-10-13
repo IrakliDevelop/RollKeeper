@@ -1,3 +1,6 @@
+import { CAMPAIGN_MEMBERSHIP_CSRF_HEADER } from '@/lib/campaignMembershipSecurity';
+import { TABLE_MUTATION_HEADERS } from '@/lib/table/tableRequestHeaders';
+
 /**
  * The one wire shape for map-keyed side channels (PR04 Q4/C4-2). Clients
  * build every marker, loot, fog-appearance and battle-map metadata request
@@ -22,11 +25,6 @@ export interface SideChannelRequest {
   url: string;
   init: RequestInit;
 }
-
-const MUTATION_HEADERS = {
-  'Content-Type': 'application/json',
-  'x-rollkeeper-csrf': '1',
-} as const;
 
 const campaignBase = (campaignCode: string) =>
   `/api/campaign/${encodeURIComponent(campaignCode)}`;
@@ -56,7 +54,7 @@ export function sideChannelReadInit(
     headers: {
       [DISPLAY_CAPABILITY_HEADER]: credential.capability,
       [DISPLAY_SESSION_HEADER]: credential.nonce,
-      'x-rollkeeper-csrf': '1',
+      [CAMPAIGN_MEMBERSHIP_CSRF_HEADER]: '1',
     },
   };
 }
@@ -85,7 +83,7 @@ export function battleMapDeleteRequest(
     url: `${campaignBase(campaignCode)}/battlemaps/${encodeURIComponent(mapId)}`,
     init: {
       method: 'DELETE',
-      headers: { ...MUTATION_HEADERS },
+      headers: { ...TABLE_MUTATION_HEADERS },
       body: JSON.stringify({ dmId }),
     },
   };
@@ -111,7 +109,7 @@ export function markerPublishRequest(
     url: markersBase(campaignCode, mapId),
     init: {
       method: 'PUT',
-      headers: { ...MUTATION_HEADERS },
+      headers: { ...TABLE_MUTATION_HEADERS },
       body: JSON.stringify(body),
     },
   };
@@ -132,7 +130,7 @@ export function lootClaimRequest(
     url: markersBase(campaignCode, mapId),
     init: {
       method: 'POST',
-      headers: { ...MUTATION_HEADERS },
+      headers: { ...TABLE_MUTATION_HEADERS },
       body: JSON.stringify(body),
     },
   };

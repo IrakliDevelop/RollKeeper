@@ -1,4 +1,5 @@
 import type { SideChannelRequest } from '../sideChannelRequests';
+import { TABLE_MUTATION_HEADERS } from '@/lib/table/tableRequestHeaders';
 
 /**
  * PR05 wire shapes for the campaign display (Q4/C4-2 style): the launcher,
@@ -57,11 +58,6 @@ export interface DisplayStatus {
   calibration?: DisplayCalibrationReport;
 }
 
-const MUTATION_HEADERS = {
-  'Content-Type': 'application/json',
-  'x-rollkeeper-csrf': '1',
-} as const;
-
 const displayBase = (code: string) =>
   `/api/campaign/${encodeURIComponent(code)}/table/display`;
 
@@ -69,7 +65,7 @@ const post = (url: string, body: unknown): SideChannelRequest => ({
   url,
   init: {
     method: 'POST',
-    headers: { ...MUTATION_HEADERS },
+    headers: { ...TABLE_MUTATION_HEADERS },
     body: JSON.stringify(body),
     cache: 'no-store',
     referrerPolicy: 'no-referrer',
