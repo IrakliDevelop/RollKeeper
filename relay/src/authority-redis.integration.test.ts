@@ -18,7 +18,7 @@ import type {
 } from '@fieldnotes/sync-server';
 
 import { TableAccessBatcher } from './authority-access.js';
-import { RedisAuthorityDriver } from './authority-driver.js';
+import { AUTHORITY_SCRIPT, RedisAuthorityDriver } from './authority-driver.js';
 import { ROLLKEEPER_PROVISION_LUA_V1 } from './authority-lua.js';
 import {
   authorityRoomKeys,
@@ -283,6 +283,61 @@ run('authority driver against real Redis', () => {
       },
       intent,
     } as AuthorityCommitRequest;
+  }
+
+  /** Sentinel window timestamps that the clock-seeded prelude rewrites. */
+  const SENTINEL_CREATED_AT = 1_000_000_000_000;
+
+  /** Order and receipt of the replay target; its dedupe entry is written by
+   * the commit script itself (see `clockSeededClient`). */
+  async function seedTargetOrderAndReceipt() {
+    const target = validWindowEntry({
+      operationId: 'operation-a',
+      createdAt: SENTINEL_CREATED_AT,
+      revision: '1',
+      digest: operationDigest('operation-a'),
+    });
+    await client.hSet(keys.receipts, 'operation-a', target.receipt);
+    await client.rPush(keys.dedupeOrder, 'operation-a');
+    return target;
+  }
+
+  /**
+   * A client whose authority script first writes the target dedupe entry
+   * with `expiresAt = TIME + msBeforeExpiry`, using the same Redis TIME the
+   * commit host reads (TIME is frozen within one EVAL). The production
+   * script runs unchanged after this test-only prelude.
+   */
+  function clockSeededClient(msBeforeExpiry: number) {
+    const template = validWindowEntry({
+      operationId: 'operation-a',
+      createdAt: SENTINEL_CREATED_AT,
+      revision: '1',
+      digest: operationDigest('operation-a'),
+    }).dedupe;
+    const prelude = `do
+  local t = redis.call('TIME')
+  local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+  local created = now - 86400000 + ${msBeforeExpiry}
+  local entry = [==[${template}]==]
+  entry = (string.gsub(entry, '"createdAt":${SENTINEL_CREATED_AT}',
+    '"createdAt":' .. string.format('%.0f', created)))
+  entry = (string.gsub(entry, '"expiresAt":${SENTINEL_CREATED_AT + 86_400_000}',
+    '"expiresAt":' .. string.format('%.0f', created + 86400000)))
+  redis.call('HSET', KEYS[7], 'operation-a', entry)
+end
+`;
+    return new Proxy(client, {
+      get(target, key) {
+        if (key === 'scriptLoad')
+          return (script: string) =>
+            target.scriptLoad(
+              script === AUTHORITY_SCRIPT ? prelude + script : script
+            );
+        const value = Reflect.get(target, key, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
   }
 
   async function snapshot(): Promise<readonly string[]> {
@@ -1372,26 +1427,25 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
       new RedisAuthorityDriver(client).commit(context(), upsert())
     ).resolves.toMatchObject({ status: 'committed' });
 
-    let replayed = false;
-    for (let attempt = 0; attempt < 50 && !replayed; attempt += 1) {
-      await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
-      const now = (await client.time()).getTime();
-      const target = validWindowEntry({
-        operationId: 'operation-a',
-        createdAt: now - 86_399_999,
-        revision: '1',
-        digest: operationDigest('operation-a'),
-      });
-      await client.hSet(keys.dedupe, 'operation-a', target.dedupe);
-      await client.hSet(keys.receipts, 'operation-a', target.receipt);
-      await client.rPush(keys.dedupeOrder, 'operation-a');
-      const result = await new RedisAuthorityDriver(client).commit(
-        context(),
-        upsert()
-      );
-      replayed = result.status === 'committed' && result.replayed;
-    }
-    expect(replayed).toBe(true);
+    // The boundary is taken from the commit script's own Redis TIME (frozen
+    // for one EVAL), so client/Redis latency cannot move it (review R1).
+    await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
+    await seedTargetOrderAndReceipt();
+    const inside = await new RedisAuthorityDriver(clockSeededClient(1)).commit(
+      context(),
+      upsert()
+    );
+    expect(inside).toMatchObject({ status: 'committed', replayed: true });
+
+    // The other side of the same boundary: expiresAt equal to script TIME.
+    await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
+    await seedTargetOrderAndReceipt();
+    await expect(
+      new RedisAuthorityDriver(clockSeededClient(0)).commit(context(), upsert())
+    ).resolves.toEqual({
+      status: 'rejected',
+      reason: 'retry-window-expired',
+    });
   });
 
   it('retires expiresAt equal to Redis time with its paired receipt and order entry', async () => {
