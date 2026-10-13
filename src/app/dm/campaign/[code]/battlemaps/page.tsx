@@ -24,7 +24,7 @@ import { uploadAsset } from '@/utils/uploadAsset';
 import { TableScenePanel } from '@/components/ui/campaign/table/TableScenePanel';
 import { battleMapDeleteRequest } from '@/components/ui/campaign/table/sideChannelRequests';
 
-/** PR04 P9: a Table v1 delete refusal in words (never a bare status). */
+/** PR04 P9: a battle map delete refusal in words (never a bare status). */
 function tableDeleteRefusal(status: number): string {
   if (status === 404) return 'Not deleted — this map is used by a Table scene.';
   if (status === 403)
@@ -267,30 +267,19 @@ export default function CampaignBattleMapsPage() {
                 campaignCode={code}
                 onDelete={async id => {
                   setDeleteError('');
-                  const tableV1 =
-                    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED ===
-                    'true';
                   const request = battleMapDeleteRequest(code, id, dmId);
                   let status = 0;
-                  let networkMessage = 'Delete failed';
                   try {
                     const response = await fetch(request.url, request.init);
                     status = response.ok ? 200 : response.status;
-                  } catch (error) {
-                    if (error instanceof Error && error.message)
-                      networkMessage = error.message;
+                  } catch {
+                    // Network failure: status 0 maps to the generic refusal.
                   }
                   if (status === 200) {
                     removeBattleMap(code, id);
                     return;
                   }
-                  setDeleteError(
-                    tableV1
-                      ? tableDeleteRefusal(status)
-                      : status === 0
-                        ? networkMessage
-                        : `Delete was rejected (${status})`
-                  );
+                  setDeleteError(tableDeleteRefusal(status));
                 }}
               />
             ))}

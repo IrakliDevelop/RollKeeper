@@ -115,7 +115,6 @@ describe('sendInitiativePoke', () => {
   });
 
   it('reads the tagged active-map projection when Table v1 is required', async () => {
-    vi.stubEnv('TABLE_PROTOCOL_V1_REQUIRED', 'true');
     const fetchFn = vi.fn();
     const redis = redisWith(null);
     await sendInitiativePoke(CODE, redis, { fetchFn });

@@ -36,7 +36,6 @@ import DmOnlyToggle from './DmOnlyToggle';
 import { MARKER_TOOL_NAME } from './DmMarkerTool';
 import type { DmLocationToolbarProps } from './DmLocationToolbar.types';
 import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
-import { TABLE_V1_SHARE_DISABLED_REASON } from './useShareWithPlayers';
 
 const BASE_TOOL_DEFS = [
   { name: 'hand', icon: Hand, label: 'Pan' },
@@ -48,6 +47,10 @@ const BASE_TOOL_DEFS = [
   { name: 'arrow', icon: ArrowRight, label: 'Arrow' },
   { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
+
+/** PR04 P9: why the retired join-banner toggle is disabled. */
+export const TABLE_V1_SHARE_DISABLED_REASON =
+  'Join-banner sharing is managed by Table scenes while Table v1 is enabled';
 
 /** Battle maps only: grid-distance, movement and cleanup tools. */
 const BATTLEMAP_ONLY_TOOL_DEFS = [
@@ -122,8 +125,6 @@ export default function DmLocationToolbar({
   mode,
   onOpenTvDisplay,
   syncStatus,
-  sharedWithPlayers,
-  onToggleShareWithPlayers,
   arrangeMapsActive,
   onToggleArrangeMaps,
   exportControl,
@@ -133,8 +134,6 @@ export default function DmLocationToolbar({
   liveSyncConfigured = false,
 }: DmLocationToolbarProps) {
   const displayLauncher = useDisplayLauncher();
-  const tableV1Share =
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
   const [activeTool, setTool] = useActiveTool();
   const { canUndo, canRedo, undo, redo } = useHistory();
   const toolDefs =
@@ -414,9 +413,9 @@ export default function DmLocationToolbar({
                       : 'Sync off'}
             </span>
           )}
-          {mode === 'battlemap' && tableV1Share && (
-            // PR04 P9: Table v1 owns the join banner (Show on a Table scene);
-            // this legacy toggle never claims "Live for players".
+          {mode === 'battlemap' && (
+            // PR04 P9: Table owns the join banner (Show on a Table scene);
+            // this retired toggle never claims "Live for players".
             <span className="flex items-center gap-1.5">
               <Button
                 variant="outline"
@@ -433,20 +432,6 @@ export default function DmLocationToolbar({
                 {TABLE_V1_SHARE_DISABLED_REASON}
               </span>
             </span>
-          )}
-          {mode === 'battlemap' && !tableV1Share && (
-            <Button
-              variant={sharedWithPlayers ? 'success' : 'outline'}
-              onClick={onToggleShareWithPlayers}
-              className="flex items-center gap-1.5 px-3 py-1 text-xs"
-              title={
-                sharedWithPlayers
-                  ? 'Players see the join banner — click to end'
-                  : 'Show a join banner on player character sheets'
-              }
-            >
-              {sharedWithPlayers ? 'Live for players' : 'Share with players'}
-            </Button>
           )}
           {mode !== 'battlemap' && (
             <Button

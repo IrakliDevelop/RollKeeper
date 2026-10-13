@@ -7,7 +7,6 @@ import {
   DISPLAY_SESSION_HEADER,
 } from '@/components/ui/campaign/table/sideChannelRequests';
 import { authorizeTableDm } from './auth';
-import { isTableProtocolRequired } from './control';
 import { resolveTableResource, type TableResource } from './presentation';
 
 /**
@@ -38,8 +37,7 @@ export interface TableAccessCredential {
   role?: string | null;
   dmId?: string | null;
   playerId?: string | null;
-  displayKey?: string | null;
-  /** PR05 E5 (v1): from headers, never the query. */
+  /** PR05 E5: from headers, never the query. */
   displayCapability?: string | null;
   displaySession?: string | null;
 }
@@ -58,23 +56,19 @@ export type TableResourceAccess =
 
 /**
  * Q4 wire shape: `role=player&playerId=` | `role=dm&dmId=` | `role=display`
- * with the PR05 capability + session headers under Table v1 (a query
- * `displayKey` is ignored there) or `displayKey=` with Table v1 off.
+ * with the PR05 capability + session headers (a query `displayKey` is
+ * always ignored).
  */
 export function credentialFromQuery(
   request: NextRequest
 ): TableAccessCredential {
   const search = request.nextUrl.searchParams;
-  const v1 = isTableProtocolRequired();
   return {
     role: search.get('role'),
     dmId: search.get('dmId'),
     playerId: search.get('playerId'),
-    displayKey: v1 ? null : search.get('displayKey'),
-    displayCapability: v1
-      ? request.headers.get(DISPLAY_CAPABILITY_HEADER)
-      : null,
-    displaySession: v1 ? request.headers.get(DISPLAY_SESSION_HEADER) : null,
+    displayCapability: request.headers.get(DISPLAY_CAPABILITY_HEADER),
+    displaySession: request.headers.get(DISPLAY_SESSION_HEADER),
   };
 }
 
@@ -129,7 +123,6 @@ export async function verifyTableCredential(
       {
         role: credential.role,
         playerId: credential.playerId ?? undefined,
-        displayKey: credential.displayKey ?? undefined,
         displayCapability: credential.displayCapability ?? undefined,
         displaySession: credential.displaySession ?? undefined,
       },
@@ -158,7 +151,7 @@ export async function verifyTableCredential(
 
 /**
  * PR04 P5: the one presentation access decision for map-keyed HTTP reads
- * under `TABLE_PROTOCOL_V1_REQUIRED`. The resource kind is resolved server
+ * (Table protocol v1). The resource kind is resolved server
  * side by id (path family and caller `kind` never matter); a verified
  * location returns `location` so the route keeps its own existing path.
  * Otherwise the credential is verified (403), then: a scene is readable by

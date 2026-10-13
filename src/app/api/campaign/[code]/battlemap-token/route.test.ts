@@ -63,12 +63,19 @@ describe('membership-aware relay authority minting', () => {
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
+    seedRedis(`campaign:${CODE}:location:loc-a`, validLocation('loc-a'));
     seedRedisSet(`campaign:${CODE}:players`, ['legacy-a', 'stale-a']);
   });
 
   it('keeps untouched campaigns on byte-compatible Redis membership', async () => {
     const response = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
     expect(response.status).toBe(200);
@@ -91,7 +98,12 @@ describe('membership-aware relay authority minting', () => {
     });
     const stale = await POST(
       request(
-        { role: 'player', battleMapId: 'map-a', playerId: 'stale-a' },
+        {
+          role: 'player',
+          battleMapId: 'map-a',
+          playerId: 'stale-a',
+          kind: 'location',
+        },
         true
       ),
       params
@@ -99,7 +111,12 @@ describe('membership-aware relay authority minting', () => {
     expect(stale.status).toBe(403);
     const explicit = await POST(
       request(
-        { role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' },
+        {
+          role: 'player',
+          battleMapId: 'map-a',
+          playerId: 'legacy-a',
+          kind: 'location',
+        },
         true
       ),
       params
@@ -124,7 +141,12 @@ describe('membership-aware relay authority minting', () => {
     expect(
       (
         await POST(
-          request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }),
+          request({
+            role: 'dm',
+            battleMapId: 'map-a',
+            dmId: 'dm-a',
+            kind: 'location',
+          }),
           params
         )
       ).status
@@ -132,7 +154,15 @@ describe('membership-aware relay authority minting', () => {
     expect(
       (
         await POST(
-          request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }, true),
+          request(
+            {
+              role: 'dm',
+              battleMapId: 'map-a',
+              dmId: 'dm-a',
+              kind: 'location',
+            },
+            true
+          ),
           params
         )
       ).status
@@ -146,27 +176,17 @@ describe('membership-aware relay authority minting', () => {
     });
     const response = await POST(
       request(
-        { role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' },
+        {
+          role: 'player',
+          battleMapId: 'map-a',
+          playerId: 'legacy-a',
+          kind: 'location',
+        },
         true
       ),
       params
     );
     expect(response.status).toBe(503);
-  });
-
-  it('leaves display-only live-runtime authority on the isolated display key path', async () => {
-    authorizeCampaignMembershipRoute.mockClear();
-    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
-    const response = await POST(
-      request({
-        role: 'display',
-        battleMapId: 'map-a',
-        displayKey: 'display-a',
-      }),
-      params
-    );
-    expect(response.status).toBe(200);
-    expect(authorizeCampaignMembershipRoute).not.toHaveBeenCalled();
   });
 });
 
@@ -178,23 +198,9 @@ describe('live map room registration', () => {
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
+    seedRedis(`campaign:${CODE}:location:loc-a`, validLocation('loc-a'));
     seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
-  });
-
-  it('records the requested battleMapId for the campaign on a successful mint', async () => {
-    const response = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
-      params
-    );
-    expect(response.status).toBe(200);
-    expect(mockRedis.zadd).toHaveBeenCalledWith(
-      `campaign:${CODE}:live-maps`,
-      expect.objectContaining({ member: 'map-a' })
-    );
-    const body = (await response.json()) as { token: string };
-    expect(
-      verifyBattleMapToken(body.token, 'synthetic-relay-secret')
-    ).toMatchObject({ room: `${CODE}_map-a` });
   });
 
   it('tags a location room in the registry when the request says kind: location', async () => {
@@ -218,23 +224,6 @@ describe('live map room registration', () => {
     ).toMatchObject({ room: `${CODE}_loc-a` });
   });
 
-  it('treats an unknown kind as battlemap rather than trusting the client string', async () => {
-    const response = await POST(
-      request({
-        role: 'player',
-        battleMapId: 'map-a',
-        playerId: 'legacy-a',
-        kind: 'tv',
-      }),
-      params
-    );
-    expect(response.status).toBe(200);
-    expect(mockRedis.zadd).toHaveBeenCalledWith(
-      `campaign:${CODE}:live-maps`,
-      expect.objectContaining({ member: 'map-a' })
-    );
-  });
-
   it('rejects a battleMapId that cannot produce a Fieldnotes-safe room', async () => {
     const response = await POST(
       request({
@@ -256,6 +245,7 @@ describe('live map room registration', () => {
         role: 'player',
         battleMapId: 'map-a',
         playerId: 'not-a-member',
+        kind: 'location',
       }),
       params
     );
@@ -266,7 +256,12 @@ describe('live map room registration', () => {
   it('still returns 200 with a valid token when the registry write throws', async () => {
     mockRedis.zadd.mockRejectedValueOnce(new Error('redis unavailable'));
     const response = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
     expect(response.status).toBe(200);
@@ -283,14 +278,20 @@ describe('fog protocol capability gate', () => {
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
+    seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
+    seedRedis(`campaign:${CODE}:location:loc-a`, validLocation('loc-a'));
     seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
-    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
   });
 
   it('accepts any request when the gate is off', async () => {
     delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
     const response = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
     expect(response.status).toBe(200);
@@ -304,6 +305,7 @@ describe('fog protocol capability gate', () => {
         battleMapId: 'map-a',
         playerId: 'legacy-a',
         protocols: { fog: 1 },
+        kind: 'location',
       }),
       params
     );
@@ -313,7 +315,12 @@ describe('fog protocol capability gate', () => {
   it('rejects missing protocols with 426 when the gate is on', async () => {
     process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
     const response = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
     expect(response.status).toBe(426);
@@ -350,13 +357,23 @@ describe('fog protocol capability gate', () => {
   it('gate applies to all roles: dm, player, display', async () => {
     process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED = 'true';
     const dmResp = await POST(
-      request({ role: 'dm', battleMapId: 'map-a', dmId: 'dm-a' }),
+      request({
+        role: 'dm',
+        battleMapId: 'map-a',
+        dmId: 'dm-a',
+        kind: 'location',
+      }),
       params
     );
     expect(dmResp.status).toBe(426);
 
     const playerResp = await POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
     expect(playerResp.status).toBe(426);
@@ -379,6 +396,7 @@ describe('fog protocol capability gate', () => {
         role: 'player',
         battleMapId: 'map-a',
         playerId: 'not-a-member',
+        kind: 'location',
       }),
       params
     );
@@ -391,7 +409,6 @@ describe('Table v1 authority token minting', () => {
     resetRedis();
     vi.clearAllMocks();
     delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     proveRelayAuthority.mockResolvedValue(true);
@@ -478,7 +495,7 @@ describe('Table v1 authority token minting', () => {
     });
   });
 
-  it('keeps location requests on the legacy room/token path while the flag is on', async () => {
+  it('keeps location requests on the legacy room/token path', async () => {
     seedRedis(
       `campaign:${CODE}:location:location-a`,
       validLocation('location-a')
@@ -784,10 +801,6 @@ describe('Table v1 authority token minting', () => {
     );
     expect(unavailable.status).toBe(503);
   });
-
-  afterEach(() => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-  });
 });
 
 describe('fog appearance token metadata', () => {
@@ -798,11 +811,17 @@ describe('fog appearance token metadata', () => {
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     seedRedisSet(`campaign:${CODE}:players`, ['legacy-a']);
+    seedRedis(`campaign:${CODE}:location:map-a`, validLocation('map-a'));
   });
 
   async function mint() {
     return POST(
-      request({ role: 'player', battleMapId: 'map-a', playerId: 'legacy-a' }),
+      request({
+        role: 'player',
+        battleMapId: 'map-a',
+        playerId: 'legacy-a',
+        kind: 'location',
+      }),
       params
     );
   }
@@ -907,13 +926,11 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
         : baseEval(script, keys, args)
     );
     delete process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED;
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     process.env.BATTLEMAP_RELAY_SECRET = 'synthetic-relay-secret';
     authorizeCampaignMembershipRoute.mockResolvedValue({ mode: 'legacy' });
     proveRelayAuthority.mockResolvedValue(true);
     seedRedisSet(`campaign:${CODE}:players`, ['player-a']);
     seedRedis(`campaign:${CODE}`, { dmId: 'dm-a', campaignName: 'Synthetic' });
-    seedRedis(`campaign:${CODE}:displaykey`, 'display-a');
     const { createHash } = await import('node:crypto');
     tag = `{rk-table-v1:${createHash('sha256').update(CODE).digest('hex')}}`;
     await present('scene-x');
@@ -946,7 +963,6 @@ describe('R4 presented Table scene resolution for map-pinned audiences', () => {
   });
 
   afterEach(() => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
     mockRedis.eval.mockImplementation(baseEval);
   });
 

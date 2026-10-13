@@ -44,9 +44,6 @@ export interface DmLocationToolbarProps {
   >;
   /** Live sync connection status (battlemap mode only); 'disabled' when the relay isn't configured. */
   syncStatus: BattleMapConnectionStatus | 'disabled';
-  /** Whether the battle map is currently shared with players (battlemap mode only) */
-  sharedWithPlayers?: boolean;
-  onToggleShareWithPlayers?: () => void;
   /** Add a map image onto the locked map layer (battlemap mode only). */
   onPickMapImage?: () => void;
   /** Whether arrange-maps mode is active (battlemap mode only). */

@@ -223,7 +223,6 @@ type Mint =
 describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
-    table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
   let mint: Mint = { ok: true, room: ROOM_X, sceneId: 'scene-x' };
   let mints = 0;
@@ -236,7 +235,6 @@ describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2
     mints = 0;
     mint = { ok: true, room: ROOM_X, sceneId: 'scene-x' };
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     vi.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       if (String(input).includes('/battlemap-token')) {
@@ -267,7 +265,6 @@ describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2
     vi.clearAllMocks();
     for (const [key, value] of [
       ['NEXT_PUBLIC_BATTLEMAP_RELAY_URL', saved.relay],
-      ['NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', saved.table],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

@@ -116,7 +116,6 @@ beforeEach(() => {
   vi.useFakeTimers({
     toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'],
   });
-  process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
   process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
   window.sessionStorage.clear();
   window.history.replaceState(null, '', `${PATH}?dk=${CAPABILITY}`);
@@ -156,7 +155,6 @@ afterEach(() => {
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
-  delete process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED;
   delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
   window.history.replaceState(null, '', '/');
 });

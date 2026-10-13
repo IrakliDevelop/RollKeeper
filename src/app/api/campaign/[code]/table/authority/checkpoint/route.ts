@@ -6,17 +6,11 @@ import {
   captureAuthorityCheckpoint,
   readAuthorityRequest,
 } from '@/lib/tableServer/authorityAdmin';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
-  if (!isTableProtocolRequired())
-    return NextResponse.json(
-      { error: 'Table v1 is disabled' },
-      { status: 503 }
-    );
   const { code } = await params;
   let body: Record<string, unknown>;
   try {

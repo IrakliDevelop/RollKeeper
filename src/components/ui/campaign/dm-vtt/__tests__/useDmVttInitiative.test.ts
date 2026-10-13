@@ -5,6 +5,18 @@ import { useEncounterStore } from '@/store/encounterStore';
 import { createMockEncounter, createMockEncounterEntity } from '@/test/helpers';
 import { useDmVttInitiative } from '../useDmVttInitiative';
 
+// Table control is the only publication path; its own hook has its own
+// suite. Here the status is driven directly (default: still checking).
+const control = vi.hoisted(() => ({
+  status: 'checking' as string,
+  error: null as string | null,
+  current: null,
+  publish: vi.fn(async () => {}),
+}));
+vi.mock('@/hooks/useTableControl', () => ({
+  useTableControl: () => control,
+}));
+
 function resetStore() {
   useEncounterStore.setState({
     encounters: [],
@@ -17,15 +29,12 @@ type FetchMock = ReturnType<typeof vi.fn>;
 describe('useDmVttInitiative', () => {
   beforeEach(() => {
     resetStore();
+    control.status = 'checking';
+    control.error = null;
+    control.publish.mockClear();
     vi.stubGlobal(
       'fetch',
-      vi.fn((url: string) =>
-        Promise.resolve(
-          url.endsWith('/capability')
-            ? { ok: true, json: async () => ({ required: false }) }
-            : { ok: true }
-        )
-      )
+      vi.fn(() => Promise.resolve({ ok: true }))
     );
   });
   afterEach(() => vi.unstubAllGlobals());
@@ -238,7 +247,8 @@ describe('useDmVttInitiative', () => {
     expect(result.current.activeEntity).toBeNull();
   });
 
-  it('handleNextTurn advances currentTurn and pushes a /shared initiative POST', async () => {
+  it('handleNextTurn advances currentTurn and publishes through Table control', async () => {
+    control.status = 'broadcasting';
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -263,7 +273,7 @@ describe('useDmVttInitiative', () => {
       })
     );
 
-    (fetch as FetchMock).mockClear();
+    control.publish.mockClear();
 
     await act(async () => {
       result.current.handleNextTurn();
@@ -271,18 +281,17 @@ describe('useDmVttInitiative', () => {
 
     expect(useEncounterStore.getState().encounters[0].currentTurn).toBe(1);
 
-    await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaign/ABC/shared',
-        expect.objectContaining({ method: 'POST' })
+    await waitFor(() => expect(control.publish).toHaveBeenCalled());
+    const lastCall = control.publish.mock.calls[
+      control.publish.mock.calls.length - 1
+    ] as unknown as [string, { initiative: { encounterId: string } }];
+    expect(lastCall[0]).toBe('publishInitiative');
+    expect(lastCall[1].initiative.encounterId).toBe('enc-1');
+    expect(
+      (fetch as FetchMock).mock.calls.some(
+        call => call[0] === '/api/campaign/ABC/shared'
       )
-    );
-    const lastCall = (fetch as FetchMock).mock.calls[
-      (fetch as FetchMock).mock.calls.length - 1
-    ];
-    const body = JSON.parse(lastCall[1].body);
-    expect(body.feature).toBe('initiative');
-    expect(body.data.encounterId).toBe('enc-1');
+    ).toBe(false);
   });
 
   it('handlePrevTurn calls the store prevTurn action for the followed encounter', async () => {
@@ -334,7 +343,8 @@ describe('useDmVttInitiative', () => {
     expect(useEncounterStore.getState().encounters).toHaveLength(0);
   });
 
-  it('push guard: does not POST when the followed encounter has no campaignCode', async () => {
+  it('push guard: does not publish when the followed encounter has no campaignCode', async () => {
+    control.status = 'broadcasting';
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -354,14 +364,11 @@ describe('useDmVttInitiative', () => {
       })
     );
 
-    expect(
-      vi
-        .mocked(fetch)
-        .mock.calls.some(call => call[0] === '/api/campaign/ABC/shared')
-    ).toBe(false);
+    expect(control.publish).not.toHaveBeenCalled();
   });
 
   it('pushes on mount for an already-started campaign-linked encounter', async () => {
+    control.status = 'broadcasting';
     useEncounterStore.setState({
       encounters: [
         createMockEncounter({
@@ -382,9 +389,9 @@ describe('useDmVttInitiative', () => {
     );
 
     await waitFor(() =>
-      expect(fetch).toHaveBeenCalledWith(
-        '/api/campaign/ABC/shared',
-        expect.objectContaining({ method: 'POST' })
+      expect(control.publish).toHaveBeenCalledWith(
+        'publishInitiative',
+        expect.objectContaining({ runId: 'enc-1' })
       )
     );
   });

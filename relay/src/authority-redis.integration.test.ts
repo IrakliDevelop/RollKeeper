@@ -18,7 +18,7 @@ import type {
 } from '@fieldnotes/sync-server';
 
 import { TableAccessBatcher } from './authority-access.js';
-import { RedisAuthorityDriver } from './authority-driver.js';
+import { AUTHORITY_SCRIPT, RedisAuthorityDriver } from './authority-driver.js';
 import { ROLLKEEPER_PROVISION_LUA_V1 } from './authority-lua.js';
 import {
   authorityRoomKeys,
@@ -38,6 +38,11 @@ const declaredKeys = [
   tableControlKey(CAMPAIGN),
   tableRegistryKey(CAMPAIGN),
 ];
+
+/** -2 absent, -1 persistent, otherwise a live (sliding) TTL. */
+function ttlClass(ttl: number): string {
+  return ttl < 0 ? String(ttl) : 'expiring';
+}
 
 function operationDigest(operationId: string): string {
   return createHash('sha256').update(operationId).digest('hex');
@@ -120,6 +125,15 @@ run('authority driver against real Redis', () => {
   beforeAll(async () => {
     await client.connect();
     await client.ping();
+    // The script-side clock tests rely on Redis >= 7 freezing TIME for the
+    // whole EVAL (review N2); fail fast instead of flaking on older servers.
+    const version = /redis_version:([^\r\n]+)/u.exec(
+      await client.info('server')
+    )?.[1];
+    if (!version || Number(version.split('.')[0]) < 7)
+      throw new Error(
+        `REDIS_TEST_URL must point at Redis >= 7 (found ${version ?? 'unknown'})`
+      );
   });
 
   beforeEach(async () => {
@@ -280,6 +294,61 @@ run('authority driver against real Redis', () => {
     } as AuthorityCommitRequest;
   }
 
+  /** Sentinel window timestamps that the clock-seeded prelude rewrites. */
+  const SENTINEL_CREATED_AT = 1_000_000_000_000;
+
+  /** Order and receipt of the replay target; its dedupe entry is written by
+   * the commit script itself (see `clockSeededClient`). */
+  async function seedTargetOrderAndReceipt() {
+    const target = validWindowEntry({
+      operationId: 'operation-a',
+      createdAt: SENTINEL_CREATED_AT,
+      revision: '1',
+      digest: operationDigest('operation-a'),
+    });
+    await client.hSet(keys.receipts, 'operation-a', target.receipt);
+    await client.rPush(keys.dedupeOrder, 'operation-a');
+    return target;
+  }
+
+  /**
+   * A client whose authority script first writes the target dedupe entry
+   * with `expiresAt = TIME + msBeforeExpiry`, using the same Redis TIME the
+   * commit host reads (TIME is frozen within one EVAL). The production
+   * script runs unchanged after this test-only prelude.
+   */
+  function clockSeededClient(msBeforeExpiry: number) {
+    const template = validWindowEntry({
+      operationId: 'operation-a',
+      createdAt: SENTINEL_CREATED_AT,
+      revision: '1',
+      digest: operationDigest('operation-a'),
+    }).dedupe;
+    const prelude = `do
+  local t = redis.call('TIME')
+  local now = tonumber(t[1]) * 1000 + math.floor(tonumber(t[2]) / 1000)
+  local created = now - 86400000 + ${msBeforeExpiry}
+  local entry = [==[${template}]==]
+  entry = (string.gsub(entry, '"createdAt":${SENTINEL_CREATED_AT}',
+    '"createdAt":' .. string.format('%.0f', created)))
+  entry = (string.gsub(entry, '"expiresAt":${SENTINEL_CREATED_AT + 86_400_000}',
+    '"expiresAt":' .. string.format('%.0f', created + 86400000)))
+  redis.call('HSET', KEYS[7], 'operation-a', entry)
+end
+`;
+    return new Proxy(client, {
+      get(target, key) {
+        if (key === 'scriptLoad')
+          return (script: string) =>
+            target.scriptLoad(
+              script === AUTHORITY_SCRIPT ? prelude + script : script
+            );
+        const value = Reflect.get(target, key, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+  }
+
   async function snapshot(): Promise<readonly string[]> {
     return Promise.all(
       declaredKeys.map(async key => {
@@ -288,7 +357,9 @@ run('authority driver against real Redis', () => {
           client.pTTL(key),
           client.sendCommand<Buffer | null>(['DUMP', key]),
         ]);
-        return `${key}\0${type}\0${ttl}\0${dump?.toString('base64') ?? ''}`;
+        // A live TTL decays between reads; a rejected write must neither add
+        // nor drop one (review B3 sliding room TTL), so compare its class.
+        return `${key}\0${type}\0${ttlClass(ttl)}\0${dump?.toString('base64') ?? ''}`;
       })
     );
   }
@@ -1365,26 +1436,25 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
       new RedisAuthorityDriver(client).commit(context(), upsert())
     ).resolves.toMatchObject({ status: 'committed' });
 
-    let replayed = false;
-    for (let attempt = 0; attempt < 50 && !replayed; attempt += 1) {
-      await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
-      const now = (await client.time()).getTime();
-      const target = validWindowEntry({
-        operationId: 'operation-a',
-        createdAt: now - 86_399_999,
-        revision: '1',
-        digest: operationDigest('operation-a'),
-      });
-      await client.hSet(keys.dedupe, 'operation-a', target.dedupe);
-      await client.hSet(keys.receipts, 'operation-a', target.receipt);
-      await client.rPush(keys.dedupeOrder, 'operation-a');
-      const result = await new RedisAuthorityDriver(client).commit(
-        context(),
-        upsert()
-      );
-      replayed = result.status === 'committed' && result.replayed;
-    }
-    expect(replayed).toBe(true);
+    // The boundary is taken from the commit script's own Redis TIME (frozen
+    // for one EVAL), so client/Redis latency cannot move it (review R1).
+    await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
+    await seedTargetOrderAndReceipt();
+    const inside = await new RedisAuthorityDriver(clockSeededClient(1)).commit(
+      context(),
+      upsert()
+    );
+    expect(inside).toMatchObject({ status: 'committed', replayed: true });
+
+    // The other side of the same boundary: expiresAt equal to script TIME.
+    await client.del([keys.dedupe, keys.dedupeOrder, keys.receipts]);
+    await seedTargetOrderAndReceipt();
+    await expect(
+      new RedisAuthorityDriver(clockSeededClient(0)).commit(context(), upsert())
+    ).resolves.toEqual({
+      status: 'rejected',
+      reason: 'retry-window-expired',
+    });
   });
 
   it('retires expiresAt equal to Redis time with its paired receipt and order entry', async () => {
@@ -1911,6 +1981,197 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
     }
   );
 
+  it('keeps every authority room key on the sliding room TTL (review B3)', async () => {
+    const ROOM_TTL_MS = 172_800_000;
+    const roomKeyTtls = async () =>
+      Object.fromEntries(
+        await Promise.all(
+          Object.entries(keys).map(
+            async ([name, key]) => [name, await client.pTTL(key)] as const
+          )
+        )
+      );
+    const expectSliding = (ttls: Record<string, number>, names: string[]) => {
+      for (const name of names) {
+        expect(ttls[name], name).toBeGreaterThan(ROOM_TTL_MS - 60_000);
+        expect(ttls[name], name).toBeLessThanOrEqual(ROOM_TTL_MS);
+      }
+    };
+    await client.del(keys.meta);
+    const control = JSON.parse(
+      (await client.get(tableControlKey(CAMPAIGN)))!
+    ) as Record<string, unknown>;
+    control.holderPrincipal = 'principal-a';
+    await client.set(tableControlKey(CAMPAIGN), JSON.stringify(control));
+    // Pre-existing keys without a TTL (legacy data) are adopted too.
+    await client.hSet(keys.playerRate, 'old-rate', '{}');
+    const driver = new RedisAuthorityDriver(client);
+    expect(
+      await driver.provision({
+        campaign: CAMPAIGN,
+        sceneId: 'scene-a',
+        room: ROOM,
+        epoch: EPOCH,
+        writerFence: 7,
+        principal: 'principal-a',
+        deadlineAt: Date.now() + 5_000,
+        generation: GENERATION,
+        casToken: 'cas-provisioned',
+        expectedGeneration: null,
+        expectedCasToken: null,
+        state: {
+          elements: [
+            {
+              ...createShape({
+                position: { x: 1, y: 2 },
+                size: { w: 10, h: 10 },
+              }),
+              id: 'seed-a',
+              ownerId: 'dm-a',
+            },
+          ],
+          layers: [],
+          extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+        } as never,
+      })
+    ).toEqual({ status: 'provisioned', generation: GENERATION });
+    expectSliding(await roomKeyTtls(), ['meta', 'elements', 'ownership']);
+
+    // Age the room, then a commit slides every written and existing key.
+    for (const key of Object.values(keys)) await client.pExpire(key, 1_000);
+    await client.hSet(keys.playerRate, 'old-rate', '{}');
+    await client.pExpire(keys.playerRate, 1_000);
+    expect(await driver.commit(context(), upsert())).toMatchObject({
+      status: 'committed',
+    });
+    const afterCommit = await roomKeyTtls();
+    expectSliding(afterCommit, [
+      'meta',
+      'elements',
+      'ownership',
+      'dedupe',
+      'dedupeOrder',
+      'receipts',
+      'history',
+      'evidence',
+      'outbox',
+      'playerRate',
+    ]);
+    // Absent keys stay absent (-2): EXPIRE never creates a key.
+    expect(afterCommit.fogMeta).toBe(-2);
+    // Control and registry keep their own (app-owned) lifetime.
+    expect(await client.pTTL(tableControlKey(CAMPAIGN))).toBe(-1);
+    expect(await client.pTTL(tableRegistryKey(CAMPAIGN))).toBe(-1);
+
+    // Review R6: the claim script gives a freshly created claims hash the
+    // room lifetime (the commit loop never creates keys).
+    expect(await client.exists(keys.outboxClaims)).toBe(0);
+    const readOptions = {
+      deadlineAt: Date.now() + 5_000,
+      signal: new AbortController().signal,
+    };
+    const claims = await driver.claimPublications(
+      'worker-ttl',
+      { entries: 1, bytes: 1024 * 1024, leaseMs: 30_000 },
+      readOptions
+    );
+    expect(claims).toHaveLength(1);
+    expectSliding(await roomKeyTtls(), ['outboxClaims']);
+
+    // Review R6: fog meta and fog tiles written by a fog commit slide too.
+    const fogDefinition = {
+      version: 1,
+      base: 'covered' as const,
+      bounds: { x: 0, y: 0, w: 1024, h: 1024 },
+      cellSize: 1,
+      tileCells: 128 as const,
+      generation: 'fog-generation-ttl',
+    };
+    const fogMeta = {
+      kind: 'fog-meta' as const,
+      record: { version: 1, editor: 'dm-a', definition: fogDefinition },
+    };
+    const fogPatch = {
+      kind: 'fog-patch' as const,
+      generation: fogDefinition.generation,
+      tiles: [
+        {
+          generation: fogDefinition.generation,
+          x: 0,
+          y: 0,
+          version: 1,
+          editor: 'dm-a',
+        },
+      ],
+    };
+    for (const [operationId, mutation] of [
+      ['ttl-fog-meta', fogMeta],
+      ['ttl-fog-patch', fogPatch],
+    ] as const) {
+      expect(
+        await driver.commit(
+          operationContext(operationId),
+          requestFor(operationId, mutation, {
+            schema: 1,
+            kind: 'extension',
+            key: 'fog',
+            version: 1,
+            payload: prepareFogAuthorityIntent(mutation),
+          })
+        )
+      ).toMatchObject({ status: 'committed' });
+    }
+    expectSliding(await roomKeyTtls(), ['fogMeta', 'fogTiles']);
+  });
+
+  it('re-provisions a room whose keys expired under a still-live registry (review R7)', async () => {
+    const control = JSON.parse(
+      (await client.get(tableControlKey(CAMPAIGN)))!
+    ) as Record<string, unknown>;
+    control.holderPrincipal = 'principal-a';
+    await client.set(tableControlKey(CAMPAIGN), JSON.stringify(control));
+    const driver = new RedisAuthorityDriver(client);
+    expect(await driver.commit(context(), upsert())).toMatchObject({
+      status: 'committed',
+    });
+    // The room's sliding TTL elapsed; control and registry are still live.
+    await client.del(Object.values(keys));
+    expect(await client.exists(tableRegistryKey(CAMPAIGN))).toBe(1);
+    await expect(
+      driver.commit(
+        operationContext('after-expiry'),
+        upsert('element-b', 'after-expiry')
+      )
+    ).resolves.toEqual({ status: 'rejected', reason: 'generation-mismatch' });
+    // initialize-if-empty: no expected generation, so the empty room is
+    // provisioned again from the DM's local state.
+    const replacement = '623e4567-e89b-42d3-a456-426614174000';
+    expect(
+      await driver.provision({
+        campaign: CAMPAIGN,
+        sceneId: 'scene-a',
+        room: ROOM,
+        epoch: EPOCH,
+        writerFence: 7,
+        principal: 'principal-a',
+        deadlineAt: Date.now() + 5_000,
+        generation: replacement,
+        casToken: 'cas-recovered',
+        expectedGeneration: null,
+        expectedCasToken: null,
+        state: {
+          elements: [],
+          layers: [],
+          extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+        } as never,
+      })
+    ).toEqual({ status: 'provisioned', generation: replacement });
+    expect(JSON.parse((await client.get(keys.meta))!)).toMatchObject({
+      generation: replacement,
+      revision: 0,
+    });
+  });
+
   it('guards initialize-if-empty and whole-generation restore with generation and CAS', async () => {
     await client.del(keys.meta);
     const first = new RedisAuthorityDriver(client);
@@ -2172,7 +2433,7 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
           } else if (type === 'string') {
             content = await client.get(key);
           }
-          return `${key}\0${type}\0${await client.pTTL(key)}\0${JSON.stringify(content)}`;
+          return `${key}\0${type}\0${ttlClass(await client.pTTL(key))}\0${JSON.stringify(content)}`;
         })
       );
     }

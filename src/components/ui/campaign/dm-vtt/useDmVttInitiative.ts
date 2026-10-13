@@ -56,7 +56,7 @@ export function useDmVttInitiative({
   const nextTurn = useEncounterStore(state => state.nextTurn);
   const prevTurn = useEncounterStore(state => state.prevTurn);
 
-  const { pushInitiative, control, publicationError } = useDmInitiativeSync({
+  const { pushInitiative, control } = useDmInitiativeSync({
     campaignCode,
     dmId,
   });
@@ -75,16 +75,12 @@ export function useDmVttInitiative({
     const followed =
       encounter && started.length > 1 ? `Following: ${encounter.name}` : null;
     if (control.status === 'checking') return followed;
-    if (control.status === 'legacy')
-      return publicationError
-        ? `${followed ? `${followed} · ` : ''}Not broadcasting: ${publicationError}`
-        : followed;
     const publication =
       control.status === 'broadcasting'
         ? 'Broadcasting initiative'
         : `Not broadcasting${control.error ? `: ${control.error}` : ''}`;
     return followed ? `${followed} · ${publication}` : publication;
-  }, [encounter, started, control.status, control.error, publicationError]);
+  }, [encounter, started, control.status, control.error]);
 
   const activeEntity = useMemo(() => {
     if (!encounter || !encounter.isActive) return null;
@@ -95,11 +91,7 @@ export function useDmVttInitiative({
   // Only fires for campaign-linked encounters; safe when encounter is null.
   useEffect(() => {
     if (!encounter || !encounter.campaignCode) return;
-    if (
-      control.status !== 'legacy' &&
-      control.status !== 'controlling' &&
-      control.status !== 'broadcasting'
-    )
+    if (control.status !== 'controlling' && control.status !== 'broadcasting')
       return;
     void pushInitiative(buildSharedInitiative(encounter, combatConfig)).catch(
       () => {}

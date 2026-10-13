@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authorizeTableDm, authorityAdminContext, captureAuthorityCheckpoint } =
   vi.hoisted(() => ({
@@ -20,7 +20,6 @@ import { POST } from './route';
 
 describe('authority checkpoint route', () => {
   beforeEach(() => {
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     authorizeTableDm.mockResolvedValue({
       ok: true,
       principal: { id: 'legacy:dm-a' },
@@ -32,7 +31,6 @@ describe('authority checkpoint route', () => {
       })
     );
   });
-  afterEach(() => delete process.env.TABLE_PROTOCOL_V1_REQUIRED);
 
   it('returns the coherent relay checkpoint for the current holder', async () => {
     const response = await POST(

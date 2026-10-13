@@ -11,10 +11,8 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-const pushActiveMock = vi.fn();
-vi.mock('@/hooks/useDmBattleMapSync', () => ({
-  useDmBattleMapSync: () => ({ pushActive: pushActiveMock }),
-}));
+// The retired join-banner writer: opening a map must never reach the network.
+const fetchMock = vi.fn();
 
 function map(id: string, linked: string[] = []): BattleMap {
   return {
@@ -53,7 +51,8 @@ describe('BattleMapPickerDialog', () => {
   beforeEach(() => {
     localStorage.clear();
     pushMock.mockClear();
-    pushActiveMock.mockClear();
+    fetchMock.mockClear();
+    vi.stubGlobal('fetch', fetchMock);
     // Reset the persisted store between tests: remove every seeded map.
     const state = useBattleMapStore.getState();
     for (const m of state.getBattleMaps('ABC123')) {
@@ -61,7 +60,10 @@ describe('BattleMapPickerDialog', () => {
     }
   });
 
-  afterEach(() => cleanup());
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   it('lists maps with a Current badge on the linked one', () => {
     seed([map('m1'), map('m2', ['e1'])]);
@@ -83,20 +85,13 @@ describe('BattleMapPickerDialog', () => {
     expect(pushMock).toHaveBeenCalledWith('/dm/campaign/ABC123/battlemaps/m2');
   });
 
-  it('pushes the switched map live so players follow without a combat restart', () => {
-    seed([map('m1', ['e1']), map('m2')]);
-    renderDialog();
-    fireEvent.click(screen.getByRole('button', { name: /switch & open/i }));
-    expect(pushActiveMock).toHaveBeenCalledWith('m2', 'Map m2');
-  });
-
   it('does not push a freshly created blank map live (would strand players on an empty canvas)', () => {
     renderDialog();
     fireEvent.change(screen.getByLabelText('New battle map name'), {
       target: { value: 'Cave of Chaos' },
     });
     fireEvent.click(screen.getByRole('button', { name: /create & open/i }));
-    expect(pushActiveMock).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('unlinks the current map without navigating', () => {
@@ -167,21 +162,14 @@ describe('BattleMapPickerDialog', () => {
     ).toBeInTheDocument();
   });
 
-  it('PR04 Table v1: opening a map never claims to make it live', () => {
-    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
-    try {
-      seed([map('m1', ['e1']), map('m2')]);
-      renderDialog();
-      expect(
-        screen.getByText('Show maps to players from their Table scene')
-      ).toBeInTheDocument();
-      fireEvent.click(screen.getByRole('button', { name: /switch & open/i }));
-      expect(pushActiveMock).not.toHaveBeenCalled();
-      expect(pushMock).toHaveBeenCalledWith(
-        '/dm/campaign/ABC123/battlemaps/m2'
-      );
-    } finally {
-      vi.unstubAllEnvs();
-    }
+  it('PR04: opening a map never claims to make it live', () => {
+    seed([map('m1', ['e1']), map('m2')]);
+    renderDialog();
+    expect(
+      screen.getByText('Show maps to players from their Table scene')
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /switch & open/i }));
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(pushMock).toHaveBeenCalledWith('/dm/campaign/ABC123/battlemaps/m2');
   });
 });

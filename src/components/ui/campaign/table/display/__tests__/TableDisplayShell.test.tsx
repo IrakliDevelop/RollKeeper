@@ -417,6 +417,16 @@ describe('TableDisplayShell descriptor following (E9, E10)', () => {
     expect(screen.queryByText(/Tavern|Forest/u)).toBeNull();
   });
 
+  it('paints markers but never activates them on the TV (gesture null)', async () => {
+    markers.register.mockClear();
+    await mount();
+    setDescriptor(scene('tavern', 2));
+    await advance(2_000);
+    expect(markers.register).toHaveBeenCalled();
+    for (const [options] of markers.register.mock.calls)
+      expect(options).toMatchObject({ gesture: null });
+  });
+
   it('never shows an old scene from a late or reordered descriptor', async () => {
     let releaseSlow!: (response: Response) => void;
     descriptors.push(

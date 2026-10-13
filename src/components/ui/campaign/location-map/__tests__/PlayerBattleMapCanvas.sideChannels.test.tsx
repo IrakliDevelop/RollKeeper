@@ -200,7 +200,6 @@ const markerTitles = () =>
 describe('PlayerBattleMapCanvas: scene-keyed side channels (PR04)', () => {
   const saved = {
     relay: process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL,
-    table: process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED,
   };
   let markerResponses: Array<() => Response>;
 
@@ -209,7 +208,6 @@ describe('PlayerBattleMapCanvas: scene-keyed side channels (PR04)', () => {
     connections.length = 0;
     vi.spyOn(window, 'requestAnimationFrame').mockImplementation(() => 0);
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED = 'true';
     markerResponses = [];
     vi.spyOn(globalThis, 'fetch').mockImplementation(async () =>
       (
@@ -227,7 +225,6 @@ describe('PlayerBattleMapCanvas: scene-keyed side channels (PR04)', () => {
     vi.clearAllMocks();
     for (const [key, value] of [
       ['NEXT_PUBLIC_BATTLEMAP_RELAY_URL', saved.relay],
-      ['NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', saved.table],
     ] as const) {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;

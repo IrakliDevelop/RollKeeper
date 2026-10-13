@@ -1,4 +1,14 @@
 /**
+ * Sliding lifetime of every authority room key (review B3). It is at least
+ * the app's 24 h control/registry TTL and matches the legacy relay
+ * `ROOM_TTL_SECONDS` default, so an abandoned room (expired registry,
+ * re-registered scene, deleted scene) is reclaimed instead of living forever.
+ * Every successful commit or provision re-arms it on all room keys at once,
+ * so the keys of one room never expire independently.
+ */
+export const AUTHORITY_ROOM_TTL_SECONDS = 172800;
+
+/**
  * Trusted host appended to the frozen Fieldnotes fog authority library.
  * KEYS[1..2] and ARGV[1] are permanently reserved for the fog ABI.
  */
@@ -516,6 +526,13 @@ redis.call('HSET', receiptsKey, app.clientOperationId, receiptJson)
 redis.call('RPUSH', outboxKey, publicationJson)
 redis.call('HSET', dedupeKey, app.clientOperationId, pendingDedupeJson)
 redis.call('RPUSH', dedupeOrderKey, app.clientOperationId)
+-- Review B3: slide the room lifetime on every room key (never control or
+-- registry, KEYS[14..15], which the app owns). EXPIRE never creates a key.
+for index = 1, 16 do
+  if index ~= 14 and index ~= 15 then
+    redis.call('EXPIRE', KEYS[index], ${AUTHORITY_ROOM_TTL_SECONDS})
+  end
+end
 return {1, result}
 `;
 
@@ -675,5 +692,10 @@ if fog ~= cjson.null then
   for _, tile in ipairs(fog.tiles) do redis.call('HSET',KEYS[8],tostring(tile.x)..','..tostring(tile.y),cjson.encode(tile)) end
 end
 redis.call('SET',KEYS[3],cjson.encode({v=1,generation=app.generation,revision=0,casToken=app.casToken}))
+-- Review B3: the provisioned room starts its sliding lifetime on every room
+-- key (KEYS[3..16]); control and registry (KEYS[1..2]) are app-owned.
+for index = 3, 16 do
+  redis.call('EXPIRE', KEYS[index], ${AUTHORITY_ROOM_TTL_SECONDS})
+end
 return {1,app.generation}
 `;

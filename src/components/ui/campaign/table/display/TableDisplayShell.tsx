@@ -100,12 +100,10 @@ export function TableDisplayShell({
     // Refs survive StrictMode's effect replay: a consumed fragment/query
     // (and a memory-only credential) is never bootstrapped twice.
     if (!bootRef.current) {
-      const result =
+      bootRef.current =
         mapId === undefined
           ? bootstrapCampaignDisplay(code)
-          : bootstrapMapPinnedDisplay(code, true);
-      bootRef.current =
-        result.status === 'legacy' ? { status: 'missing' } : result;
+          : bootstrapMapPinnedDisplay(code);
     }
     setBoot(bootRef.current);
   }, [code, mapId]);

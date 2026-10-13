@@ -128,12 +128,10 @@ beforeEach(() => {
   fake.current = store;
   seedTavernAndForest(store);
   issueDisplay(store);
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   process.env.BATTLEMAP_RELAY_SECRET = SECRET;
   delete process.env.SUPABASE_HYBRID_GUEST_ENABLED;
 });
 afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
   delete process.env.BATTLEMAP_RELAY_SECRET;
   delete process.env.SUPABASE_HYBRID_GUEST_ENABLED;
 });
@@ -242,25 +240,6 @@ describe('PR05 token mint with the display capability (E5, R4-F2, C5-5)', () => 
     expect(minted.status).toBe(403);
     expect(minted.body).toEqual({ error: 'Scene is unavailable' });
     expect(minted.result).toBeNull();
-  });
-
-  it('flag off keeps the legacy plaintext display key path unchanged', async () => {
-    delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
-    const minted = await mint({
-      role: 'display',
-      battleMapId: 'map-tavern',
-      displayKey: DISPLAY_KEY,
-    });
-    expect(minted.status).toBe(200);
-    expect(
-      verifyBattleMapToken(String(minted.body.token), SECRET)
-    ).toMatchObject({ role: 'display', userId: `display-${CODE}` });
-    const wrong = await mint({
-      role: 'display',
-      battleMapId: 'map-tavern',
-      displayKey: 'wrong',
-    });
-    expect(wrong.status).toBe(403);
   });
 });
 

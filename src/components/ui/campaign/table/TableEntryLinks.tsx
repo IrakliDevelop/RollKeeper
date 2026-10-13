@@ -10,18 +10,8 @@ import { findTableSceneForMap } from '@/lib/table/combatLibrary';
 import { currentAccount } from './combat/useSceneRunLinks';
 import { tableWorkspaceHref } from './workspace/tableWorkspaceRoutes';
 
-/**
- * PR06 A6: Table entry points render only under the existing deployment
- * protocol flag (as the PR05 display launcher). No new flag; flag off keeps
- * the legacy UX unchanged. The `/table` route itself is not gated.
- */
-function tableEntriesEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true';
-}
-
 /** Campaign dashboard "Open Table" (W1 primary play entry). */
 export function CampaignTableLauncher(props: { code: string }) {
-  if (!tableEntriesEnabled()) return null;
   return (
     <Link href={tableWorkspaceHref(props.code, {})}>
       <Button
@@ -41,7 +31,6 @@ export function PrepareOnMapLink(props: {
   encounterId: string;
   compact?: boolean;
 }) {
-  if (!tableEntriesEnabled()) return null;
   return (
     <Link
       href={tableWorkspaceHref(props.campaignCode, {
@@ -58,8 +47,7 @@ export function PrepareOnMapLink(props: {
 }
 
 /**
- * W8: the original map route stays the original editor; under the flag it
- * links its adopted scene ("Open in Table", read-only IndexedDB lookup that
+ * W8: the original map route stays the original editor; it links its adopted scene ("Open in Table", read-only IndexedDB lookup that
  * never creates the database) or the Scenes panel ("Use in Table").
  */
 export function TableMapEntryLink(props: {
@@ -68,13 +56,11 @@ export function TableMapEntryLink(props: {
   /** R4-5: Play-mode bar — icon below `lg`, text from `lg` (as Open display). */
   compact?: boolean;
 }) {
-  const enabled = tableEntriesEnabled();
   const [target, setTarget] = useState<
     { kind: 'open'; href: string } | { kind: 'use'; href: string } | null
   >(null);
   const { campaignCode, mapId } = props;
   useEffect(() => {
-    if (!enabled) return;
     let cancelled = false;
     void (async () => {
       const found = await findTableSceneForMap({
@@ -103,8 +89,8 @@ export function TableMapEntryLink(props: {
     return () => {
       cancelled = true;
     };
-  }, [campaignCode, enabled, mapId]);
-  if (!enabled || !target) return null;
+  }, [campaignCode, mapId]);
+  if (!target) return null;
   const label = target.kind === 'open' ? 'Open in Table' : 'Use in Table';
   if (props.compact)
     return (

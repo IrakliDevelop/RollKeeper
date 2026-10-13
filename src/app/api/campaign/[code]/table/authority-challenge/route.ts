@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authorizeTableDm } from '@/lib/tableServer/auth';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import { proveRelayAuthority } from '@/lib/tableServer/authorityProof';
 import { readBoundedJson } from '@/lib/tableServer/validation';
 
@@ -8,11 +7,6 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
-  if (!isTableProtocolRequired())
-    return NextResponse.json(
-      { error: 'Table v1 is disabled' },
-      { status: 503 }
-    );
   const { code } = await params;
   let body: unknown;
   try {

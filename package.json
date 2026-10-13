@@ -53,6 +53,8 @@
     "test:visual": "vitest run --project storybook",
     "test:all": "vitest run",
     "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs scripts/spawn-next-dev.test.mjs",
+    "test:relay:redis": "node -e \"if (!process.env.REDIS_TEST_URL) { console.error('REDIS_TEST_URL is required (the Redis suites would otherwise skip)'); process.exit(1) }\" && npm test --prefix relay",
+    "test:table-control:redis": "node --test scripts/table-control-redis.integration.test.mjs",
     "test:db:integration": "node --test scripts/supabase-integration.test.mjs",
     "test:db:backup-restore": "node --test scripts/backup-restore-drill.test.mjs",
     "test:guest:http": "node --test scripts/guest-http.integration.test.mjs",

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getRawRedis } from '@/lib/redis';
 import { authorizeTableDm } from '@/lib/tableServer/auth';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import { readDisplayStatus } from '@/lib/tableServer/displayCapability';
 
 type Context = { params: Promise<{ code: string }> };
@@ -19,8 +18,6 @@ const reply = (body: unknown, status = 200) =>
  * session nonce or the display generation.
  */
 export async function GET(request: NextRequest, { params }: Context) {
-  if (!isTableProtocolRequired())
-    return reply({ error: 'Table v1 is disabled' }, 503);
   const { code } = await params;
   const auth = await authorizeTableDm(
     request,

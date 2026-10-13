@@ -14,7 +14,6 @@ import {
   type BattleMapFogAppearanceProjection,
 } from '@/lib/fogOfWar';
 import type { ProjectedFogAppearance } from '@/types/battlemap';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import {
   authorizeTableResourceAccess,
   authorizeTableSceneWrite,
@@ -49,15 +48,13 @@ export async function handleFogAppearanceGet(
 
     // PR04 P5: both path families resolve the same server-side resource
     // kind; a verified location keeps the existing session check below.
-    if (isTableProtocolRequired()) {
-      const access = await authorizeTableResourceAccess({
-        request,
-        code,
-        id,
-        credential: credentialFromQuery(request),
-      });
-      if (access.status === 'denied') return access.response;
-    }
+    const access = await authorizeTableResourceAccess({
+      request,
+      code,
+      id,
+      credential: credentialFromQuery(request),
+    });
+    if (access.status === 'denied') return access.response;
     const redis = getRedis();
     const body = Object.fromEntries(new URL(request.url).searchParams);
     const session = await authorizeBattleMapSession(
@@ -130,9 +127,12 @@ export async function handleFogAppearancePut(
     const redis = getRedis();
     // PR04 C4-2: a scene id needs campaign DM mutation authority and a
     // registered, non-deleted scene; other ids keep the existing check.
-    const sceneWrite = isTableProtocolRequired()
-      ? await authorizeTableSceneWrite({ request, code, id, dmId: body.dmId })
-      : ({ status: 'legacy' } as const);
+    const sceneWrite = await authorizeTableSceneWrite({
+      request,
+      code,
+      id,
+      dmId: body.dmId,
+    });
     if (sceneWrite.status === 'denied') return sceneWrite.response;
     const session =
       sceneWrite.status === 'allowed'

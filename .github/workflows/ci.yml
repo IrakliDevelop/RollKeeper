@@ -133,6 +133,49 @@ jobs:
 
       - run: npm run build --prefix relay
 
+  redis-suites:
+    name: Relay and Table control Redis suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            relay/package-lock.json
+
+      - run: npm ci
+
+      - run: npm ci --prefix relay
+
+      # Fenced authority, fog CAS and transport suites (no skips: the script
+      # fails when REDIS_TEST_URL is missing).
+      - name: Relay Redis suites
+        env:
+          REDIS_TEST_URL: redis://localhost:6379
+        run: npm run test:relay:redis
+
+      # Table control Lua against real Redis and serverless-redis-http; the
+      # suite starts its own disposable containers with the runner's Docker.
+      - name: Table control Redis suite
+        # Report this suite even when the relay step fails (review R2).
+        if: ${{ !cancelled() }}
+        run: npm run test:table-control:redis
+
   local-supabase:
     name: Local Supabase database suite
     runs-on: ubuntu-latest

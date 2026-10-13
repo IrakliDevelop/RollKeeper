@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { getRawRedis } from '@/lib/redis';
 import { authorizeTableDm } from '@/lib/tableServer/auth';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import { rotateDisplayCapability } from '@/lib/tableServer/displayCapability';
 import { readBoundedJson } from '@/lib/tableServer/validation';
 
@@ -23,8 +22,6 @@ const reply = (body: unknown, status = 200) =>
  * plaintext capability exists only in this response.
  */
 export async function POST(request: NextRequest, { params }: Context) {
-  if (!isTableProtocolRequired())
-    return reply({ error: 'Table v1 is disabled' }, 503);
   const { code } = await params;
   let body: unknown;
   try {

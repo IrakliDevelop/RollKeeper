@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   membership: vi.fn(),
@@ -54,7 +54,6 @@ function request(
 }
 
 beforeEach(() => {
-  process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
   mocks.membership.mockReset().mockResolvedValue({ mode: 'legacy' });
   mocks.dmAuthority.mockReset().mockResolvedValue('ok');
   mocks.eval
@@ -65,9 +64,6 @@ beforeEach(() => {
   mocks.hybridGuest.mockReturnValue(false);
   mocks.get.mockReset().mockResolvedValue(null);
   mocks.hgetall.mockReset().mockResolvedValue({});
-});
-afterEach(() => {
-  delete process.env.TABLE_PROTOCOL_V1_REQUIRED;
 });
 
 describe('Table control authorization and request boundary', () => {
@@ -89,6 +85,7 @@ describe('Table control authorization and request boundary', () => {
       params
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toMatchObject({
       current: null,
       registry: [
@@ -177,18 +174,13 @@ describe('Table control authorization and request boundary', () => {
     ).toBe(400);
   });
 
-  it('advertises unavailable when protocol is disabled', async () => {
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'false';
-    expect((await POST(request(), params)).status).toBe(503);
-    expect(mocks.eval).not.toHaveBeenCalled();
-  });
-
   it('PR04: GET answers 503 JSON when control or registry reads fail', async () => {
     const url =
       'http://localhost/api/campaign/SYNTH03A/table/control?dmId=dm-one';
     mocks.get.mockResolvedValue('{not json');
     let response = await GET(new NextRequest(url), params);
     expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({
       error: 'Table control is unavailable',
     });

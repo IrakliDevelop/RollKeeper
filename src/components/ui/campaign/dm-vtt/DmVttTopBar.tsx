@@ -85,9 +85,7 @@ export function DmVttTopBar({
         variant="ghost"
         size="lg"
         leftIcon={<Monitor size={16} />}
-        onClick={() =>
-          display.launch(() => openTvDisplay(campaignCode, battleMapId, dmId))
-        }
+        onClick={() => display.launch(() => openTvDisplay(campaignCode, dmId))}
         className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
         aria-label="Open display"
       >

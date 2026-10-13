@@ -6,7 +6,6 @@ import {
   clearDisplayCredential,
   displayStorageKey,
   generateDisplayNonce,
-  legacyDisplayStorageKey,
   scrubDisplayUrl,
   type DisplayEnvironment,
 } from '../displayCredentialStore';
@@ -202,7 +201,7 @@ describe('map-pinned display bootstrap (E8, C5-4)', () => {
   it('v1: consumes ?dk into the campaign entry with a fresh nonce and scrubs the query', () => {
     const storage = memoryStorage();
     const env = environment(`${path}?dk=${CAPABILITY}`, storage);
-    const result = bootstrapMapPinnedDisplay('CAMP1', true, env);
+    const result = bootstrapMapPinnedDisplay('CAMP1', env);
     expect(result).toMatchObject({
       status: 'ready',
       credential: { capability: CAPABILITY },
@@ -211,7 +210,7 @@ describe('map-pinned display bootstrap (E8, C5-4)', () => {
     expect(storage.getItem(displayStorageKey('CAMP1'))).not.toBeNull();
     // Reload after the scrub keeps the consumed credential.
     expect(
-      bootstrapMapPinnedDisplay('CAMP1', true, environment(path, storage))
+      bootstrapMapPinnedDisplay('CAMP1', environment(path, storage))
     ).toEqual(result);
   });
 
@@ -221,28 +220,11 @@ describe('map-pinned display bootstrap (E8, C5-4)', () => {
       `${path}?dk=123e4567-e89b-42d3-a456-426614174000`,
       storage
     );
-    expect(bootstrapMapPinnedDisplay('CAMP1', true, env)).toEqual({
+    expect(bootstrapMapPinnedDisplay('CAMP1', env)).toEqual({
       status: 'expired',
     });
     expect(env.current()).toBe(path);
     expect(storage.length).toBe(0);
-  });
-
-  it('flag off: keeps the legacy key under its own entry and still scrubs the URL', () => {
-    const storage = memoryStorage();
-    const env = environment(`${path}?dk=legacy-uuid-key`, storage);
-    expect(bootstrapMapPinnedDisplay('CAMP1', false, env)).toEqual({
-      status: 'legacy',
-      displayKey: 'legacy-uuid-key',
-    });
-    expect(env.current()).toBe(path);
-    expect(storage.getItem(legacyDisplayStorageKey('CAMP1'))).toBe(
-      'legacy-uuid-key'
-    );
-    expect(storage.getItem(displayStorageKey('CAMP1'))).toBeNull();
-    expect(
-      bootstrapMapPinnedDisplay('CAMP1', false, environment(path, storage))
-    ).toEqual({ status: 'legacy', displayKey: 'legacy-uuid-key' });
   });
 });
 

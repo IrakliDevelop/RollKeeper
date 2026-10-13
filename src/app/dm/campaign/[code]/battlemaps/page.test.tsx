@@ -62,7 +62,6 @@ async function clickDelete() {
 
 describe('Battle maps list delete (PR04 P9)', () => {
   it('Table v1: sends the P6 DELETE and removes the local copy on success', async () => {
-    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
     fetchFn.mockResolvedValue(Response.json({ success: true }));
     await clickDelete();
     const [url, init] = fetchFn.mock.calls[0] as [string, RequestInit];
@@ -75,7 +74,6 @@ describe('Battle maps list delete (PR04 P9)', () => {
   });
 
   it('Table v1: a refusal is explained in words and keeps the local map', async () => {
-    vi.stubEnv('NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED', 'true');
     for (const [status, text] of [
       [404, 'Not deleted — this map is used by a Table scene.'],
       [403, 'Not deleted — only the campaign DM can delete battle maps.'],
@@ -90,13 +88,5 @@ describe('Battle maps list delete (PR04 P9)', () => {
       fetchFn.mockReset();
     }
     expect(removeBattleMap).not.toHaveBeenCalled();
-  });
-
-  it('legacy: the existing rejection message is unchanged', async () => {
-    fetchFn.mockResolvedValue(Response.json({}, { status: 403 }));
-    await clickDelete();
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Delete was rejected (403)'
-    );
   });
 });

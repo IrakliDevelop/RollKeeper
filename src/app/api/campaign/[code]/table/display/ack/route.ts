@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 
 import { validateCampaignMembershipMutation } from '@/lib/campaignMembershipSecurity';
 import { getRawRedis } from '@/lib/redis';
-import { isTableProtocolRequired } from '@/lib/tableServer/control';
 import {
   parseDisplayAck,
   recordDisplayAck,
@@ -26,8 +25,6 @@ const BODY_KEYS = ['ack', 'capability', 'nonce'];
  * `stale` (the display re-polls its descriptor), never a credential 403.
  */
 export async function POST(request: NextRequest, { params }: Context) {
-  if (!isTableProtocolRequired())
-    return reply({ error: 'Table v1 is disabled' }, 503);
   const security = validateCampaignMembershipMutation(request);
   if (!security.ok) return reply({ error: security.error }, security.status);
   const { code } = await params;

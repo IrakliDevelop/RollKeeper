@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { authorizeTableDm, authorityAdminContext, provisionAuthorityRoom } =
   vi.hoisted(() => ({
@@ -27,7 +27,6 @@ const emptyState = {
 describe('authority initialize-if-empty route', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.TABLE_PROTOCOL_V1_REQUIRED = 'true';
     authorizeTableDm.mockResolvedValue({
       ok: true,
       principal: { id: 'legacy:dm-a' },
@@ -43,7 +42,6 @@ describe('authority initialize-if-empty route', () => {
       )
     );
   });
-  afterEach(() => delete process.env.TABLE_PROTOCOL_V1_REQUIRED);
 
   const request = (extra: Record<string, unknown> = {}) =>
     new NextRequest('http://localhost/initialize', {

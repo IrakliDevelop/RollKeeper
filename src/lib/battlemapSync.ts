@@ -307,10 +307,12 @@ export function createManagedBattleMapConnection(
   let stopped = false;
   let legacyAccessDenied = false;
 
+  // Table protocol v1: every non-location room (and any request naming a
+  // scene) uses fenced scene authority; only a bare location hint stays on
+  // the legacy managed sync room.
   if (
-    process.env.NEXT_PUBLIC_TABLE_PROTOCOL_V1_REQUIRED === 'true' &&
-    (opts.tokenRequest.kind !== 'location' ||
-      opts.tokenRequest.sceneId !== undefined)
+    opts.tokenRequest.kind !== 'location' ||
+    opts.tokenRequest.sceneId !== undefined
   ) {
     return createManagedBattleMapAuthorityConnection({
       ...opts,

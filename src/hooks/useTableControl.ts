@@ -4,7 +4,6 @@ import type { TableDescriptor, TableResult } from '@/lib/tableServer/control';
 
 type TableStatus =
   | 'checking'
-  | 'legacy'
   | 'waiting'
   | 'controlling'
   | 'broadcasting'
@@ -77,18 +76,6 @@ export function useTableControl(campaignCode: string, dmId: string) {
     let cancelled = false;
     const check = async () => {
       try {
-        const { response, data } = await fetchBoundedJson<{
-          required: boolean;
-        }>(
-          `/api/campaign/${encodeURIComponent(campaignCode)}/table/capability`
-        );
-        if (!response.ok)
-          throw new Error(`Capability check failed (${response.status})`);
-        if (cancelled || generation !== contextGeneration.current) return;
-        if (!data.required) {
-          setStatus('legacy');
-          return;
-        }
         const control = await refresh();
         if (!cancelled && generation === contextGeneration.current)
           setStatus(control ? 'not-broadcasting' : 'waiting');
@@ -264,14 +251,12 @@ export function useTableControl(campaignCode: string, dmId: string) {
   useEffect(() => {
     const handleOffline = () => {
       authorityGeneration.current += 1;
-      if (status !== 'legacy') {
-        setStatus('not-broadcasting');
-        setError('Disconnected; remote initiative may be stale');
-      }
+      setStatus('not-broadcasting');
+      setError('Disconnected; remote initiative may be stale');
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
-  }, [status]);
+  }, []);
 
   useEffect(() => {
     if ((status !== 'broadcasting' && status !== 'controlling') || !current)
