@@ -35,7 +35,10 @@ import { useEnsureSceneMapImage } from './sceneMapImage';
 import { TableEditMapControl } from './TableEditMapControl';
 
 const TOKEN_INFO = { mode: null, onCycle: () => {} };
-const RELAY_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL);
+/** Read at render (not module load) so tests and env changes are honoured. */
+function isRelayConfigured(): boolean {
+  return Boolean(process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL);
+}
 
 /**
  * Scene-level part of the workspace (W4), keyed by `${sceneId}:${epoch}`:
@@ -121,7 +124,7 @@ export function TableSceneStage(props: {
   );
   useEnsureSceneMapImage({
     viewport,
-    relayConfigured: RELAY_CONFIGURED,
+    relayConfigured: isRelayConfigured(),
     relayStatus: props.relayStatus,
     map: map
       ? { mapImageUrl: map.mapImageUrl, mapImageSize: map.mapImageSize }

@@ -395,6 +395,9 @@ async function settled(sceneId: string) {
 let repository: TableRepository;
 
 beforeEach(async () => {
+  // Independent of the developer's .env: this suite runs the stage without a
+  // relay (the image ensure path), whatever NEXT_PUBLIC_BATTLEMAP_RELAY_URL is.
+  vi.stubEnv('NEXT_PUBLIC_BATTLEMAP_RELAY_URL', '');
   mocks.canvasMounts = 0;
   mocks.canvasUnmounts = 0;
   mocks.canvasProps = [];
@@ -421,6 +424,7 @@ afterEach(() => {
   cleanup();
   repository.dispose();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
   vi.restoreAllMocks();
 });
 
