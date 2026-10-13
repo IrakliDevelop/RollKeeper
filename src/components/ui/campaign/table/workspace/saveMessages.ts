@@ -102,13 +102,18 @@ export function restoreMessages(kind: RestoreKind) {
       `${changes ? "Changes weren't" : "Checkpoint wasn't"} restored because the scene changed. Check it, then try again.`,
       'failure'
     ),
-    failed: (reason: string): SaveMessage => ({
-      text: changes
-        ? "Couldn't restore your changes. Nothing changed."
-        : "Couldn't restore the checkpoint. Nothing changed.",
-      tone: 'failure',
-      detail: reason,
-    }),
+    failed: (reason: string): SaveMessage => {
+      const what = changes ? 'your changes' : 'the checkpoint';
+      const text =
+        reason === 'forbidden'
+          ? `Couldn't restore ${what} because you no longer have live control. Go live again, then try again.`
+          : reason === 'expired'
+            ? `Restoring ${what} took too long. Nothing changed. Try again.`
+            : reason === 'invalid'
+              ? `Couldn't restore ${what} because the saved copy can't be used. Nothing changed.`
+              : `Couldn't restore ${what}. Nothing changed.`;
+      return { text, tone: 'failure', detail: reason };
+    },
   };
 }
 

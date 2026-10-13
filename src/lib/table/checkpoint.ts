@@ -334,7 +334,43 @@ export async function restoreSceneCheckpoint(options: {
 export type AuthorityRestoreResult =
   | { status: 'restored' }
   | { status: 'conflict' }
-  | { status: 'failed'; reason: 'capture' | 'invalid-current' | 'restore' };
+  | {
+      status: 'failed';
+      reason:
+        | 'capture'
+        | 'invalid-current'
+        | 'restore'
+        | 'forbidden'
+        | 'expired'
+        | 'invalid';
+    };
+
+/**
+ * Maps a failed restore response to a truthful outcome (PR08 desktop P3).
+ * The relay answers every provision rejection with 409 and
+ * `{ status: 'rejected', reason }`; the app's own generation/CAS guard
+ * answers 409 without a reason. Only a CAS conflict (or a 409 without a
+ * known reason, as older relays send) means "the scene changed".
+ */
+async function restoreFailure(
+  response: Response
+): Promise<Exclude<AuthorityRestoreResult, { status: 'restored' }>> {
+  let reason: unknown = null;
+  try {
+    reason = object((await response.json()) as unknown)?.reason;
+  } catch {
+    reason = null;
+  }
+  if (response.status === 409) {
+    if (reason === 'forbidden' || reason === 'expired' || reason === 'invalid')
+      return { status: 'failed', reason };
+    if (reason === 'overloaded') return { status: 'failed', reason: 'restore' };
+    return { status: 'conflict' };
+  }
+  if (response.status === 403) return { status: 'failed', reason: 'forbidden' };
+  if (response.status === 400) return { status: 'failed', reason: 'invalid' };
+  return { status: 'failed', reason: 'restore' };
+}
 
 /**
  * Explicit recovery only: capture the current generation/CAS, then ask the
@@ -413,8 +449,5 @@ export async function restoreAuthorityFork(options: {
   } catch {
     return { status: 'failed', reason: 'restore' };
   }
-  if (response.status === 409) return { status: 'conflict' };
-  return response.ok
-    ? { status: 'restored' }
-    : { status: 'failed', reason: 'restore' };
+  return response.ok ? { status: 'restored' } : restoreFailure(response);
 }

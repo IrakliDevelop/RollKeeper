@@ -185,6 +185,53 @@ run('two relay authority transport', () => {
     const appContractMetaKey = `campaign:${tableCampaignTag(CAMPAIGN)}:room:${ROOM}:meta`;
     expect(await redis.get(appContractMetaKey)).not.toBeNull();
 
+    // The app's restore maps the rejection reason in the body; the status
+    // stays 409 for every provision rejection (PR08 desktop P3).
+    const reprovision = (overrides: Record<string, unknown>) =>
+      fetch(
+        `http://127.0.0.1:${first.address().port}/authority-admin/provision`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-rollkeeper-relay-secret': SECRET,
+          },
+          body: JSON.stringify({
+            campaign: CAMPAIGN,
+            sceneId: 'scene-a',
+            room: ROOM,
+            epoch: EPOCH,
+            writerFence: 1,
+            principal: 'legacy:dm-a',
+            generation: '723e4567-e89b-42d3-a456-426614174000',
+            casToken: 'b'.repeat(64),
+            state: {
+              elements: [],
+              layers: [],
+              extensions: {
+                fog: { pluginName: 'fog', version: 1, data: null },
+              },
+            },
+            ...overrides,
+          }),
+        }
+      );
+    const conflict = await reprovision({});
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({
+      status: 'rejected',
+      reason: 'conflict',
+    });
+    const forbidden = await reprovision({ writerFence: 2 });
+    expect(forbidden.status).toBe(409);
+    expect(await forbidden.json()).toEqual({
+      status: 'rejected',
+      reason: 'forbidden',
+    });
+    expect(JSON.parse((await redis.get(appContractMetaKey))!)).toMatchObject({
+      generation: GENERATION,
+    });
+
     const checkpoint = await fetch(
       `http://127.0.0.1:${first.address().port}/authority-admin/checkpoint`,
       {

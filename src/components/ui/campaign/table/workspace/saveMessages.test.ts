@@ -61,6 +61,23 @@ describe('save messages carry their tone at the source (O7-3 W5)', () => {
     }
   );
 
+  it.each(['changes', 'checkpoint'] as const)(
+    'restore failures say why in plain words (%s)',
+    kind => {
+      const messages = restoreMessages(kind);
+      const forbidden = messages.failed('forbidden').text;
+      const expired = messages.failed('expired').text;
+      const invalid = messages.failed('invalid').text;
+      expect(forbidden).toMatch(/live control/u);
+      expect(expired).toMatch(/took too long/u);
+      expect(invalid).toMatch(/can't be used/u);
+      expect(messages.conflict.text).toMatch(/scene changed/u);
+      for (const text of [forbidden, expired, invalid])
+        expect(text).not.toMatch(/[\u2014\u2013]/u);
+      expect(new Set([forbidden, expired, invalid]).size).toBe(3);
+    }
+  );
+
   it('checkpoint failures keep the raw reason as detail only', () => {
     const draft: SaveMessage = checkpointNotSaved(
       'changes-kept',
