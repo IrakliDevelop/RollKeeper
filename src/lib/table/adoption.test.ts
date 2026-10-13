@@ -1,6 +1,10 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gridElementTypeDefinition } from '@fieldnotes/vtt';
+import { validateAuthorityState } from '@/lib/tableServer/authorityAdmin';
+
+import { canvasStateToAuthorityState } from './authorityLifecycle';
+import { validateSceneRecord } from './schema';
 
 import {
   TableRepository,
@@ -459,4 +463,54 @@ describe('PR08 desktop A2: adoption draws an enabled grid the source canvas lack
       expect(grids(state.elements)).toEqual([]);
     }
   });
+
+  it.each([
+    ['square', { gridType: 'square', cellSize: 50 }],
+    ['hex', { gridType: 'hex', cellSize: 40, hexOrientation: 'flat' }],
+  ])(
+    'commits the %s grid scene and the room accepts its state (review S1)',
+    async (_label, settings) => {
+      const raw = gridMap(settings);
+      const { preview, state } = await adopt(raw);
+      const [grid] = grids(state.elements);
+      // JSON-clean like the store's exportJSON: no undefined keys.
+      expect(JSON.parse(JSON.stringify(grid))).toEqual(grid);
+      expect(Object.values(grid!).some(value => value === undefined)).toBe(
+        false
+      );
+      expect(validateSceneRecord(preview.scene)).toEqual({ ok: true });
+
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const result = await adoptMapLocally({
+        repository,
+        source: source(() => raw),
+        campaignCode: 'CAMP',
+        mapId: 'map-grid',
+      });
+      expect(result).toMatchObject({ status: 'committed', name: 'Tavern' });
+      if (result.status !== 'committed') throw new Error('not committed');
+      const current = repository.getCurrent();
+      if (current?.status !== 'ready') throw new Error('not ready');
+      const committed = current.snapshot.scenes[0]!.canvasCheckpoint!.state as {
+        elements: Array<Record<string, unknown>>;
+      };
+      expect(grids(committed.elements)).toHaveLength(1);
+
+      // The room provision path (initialize-if-empty) accepts the state.
+      const authority = canvasStateToAuthorityState(result.canvasState, 'dm-1');
+      const accepted = await validateAuthorityState(authority);
+      expect(accepted).not.toBeNull();
+      expect(
+        grids(
+          (accepted as unknown as { elements: Array<Record<string, unknown>> })
+            .elements
+        )
+      ).toHaveLength(1);
+    }
+  );
 });

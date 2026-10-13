@@ -45,6 +45,7 @@ export const VTT_GRID_DEFAULTS = {
  * `pinGridToMapLayer` leaves in a store: the same `createGrid` element,
  * wrapped by the registered grid definition, on the map layer and locked.
  * For code that builds canvas state without a viewport (Table adoption).
+ * Returns the JSON form the canvas state stores.
  */
 export function createPinnedVttGridElement(
   settings: {
@@ -57,8 +58,15 @@ export function createPinnedVttGridElement(
   },
   mapLayerId: string
 ): CanvasElement {
-  return gridElementTypeDefinition.wrap(
-    createGrid({ ...settings, layerId: mapLayerId, locked: true })
+  // JSON-clean, as the store persists it on the UI path (`exportJSON` /
+  // JSON.stringify drop the wrapper's undefined `groupId`/`rotation`); an
+  // undefined key is not a JSON value and fails scene validation.
+  return JSON.parse(
+    JSON.stringify(
+      gridElementTypeDefinition.wrap(
+        createGrid({ ...settings, layerId: mapLayerId, locked: true })
+      )
+    )
   ) as CanvasElement;
 }
 
