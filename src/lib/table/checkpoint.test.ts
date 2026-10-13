@@ -294,6 +294,111 @@ describe('scene checkpoint persistence', () => {
   });
 });
 
+describe('restore reasons are truthful (PR08 desktop P3)', () => {
+  const retained = {
+    protocolVersion: 1 as const,
+    generation: 'old',
+    revision: 1,
+    capturedAt: '2026-10-05T00:00:00.000Z',
+    state: checkpoint,
+  };
+  const restoreWith = (status: number, body: unknown) =>
+    restoreAuthorityFork({
+      campaignCode: 'CAMP',
+      dmId: 'dm-1',
+      sceneId: 'scene-1',
+      checkpoint: retained,
+      fetcher: vi.fn<typeof fetch>(async input =>
+        String(input).endsWith('/checkpoint')
+          ? new Response(
+              JSON.stringify({ generation: 'current', casToken: 'cas' })
+            )
+          : new Response(JSON.stringify(body), { status })
+      ),
+    });
+
+  it.each([
+    // The relay answers every provision rejection with 409 and its reason.
+    [409, { status: 'rejected', reason: 'conflict' }, { status: 'conflict' }],
+    [
+      409,
+      { status: 'rejected', reason: 'forbidden' },
+      { status: 'failed', reason: 'forbidden' },
+    ],
+    [
+      409,
+      { status: 'rejected', reason: 'expired' },
+      { status: 'failed', reason: 'expired' },
+    ],
+    [
+      409,
+      { status: 'rejected', reason: 'invalid' },
+      { status: 'failed', reason: 'invalid' },
+    ],
+    [
+      409,
+      { status: 'rejected', reason: 'overloaded' },
+      { status: 'failed', reason: 'restore' },
+    ],
+    // The app's own guard and older relays: a 409 without a reason is a CAS conflict.
+    [409, { error: 'Authority state changed' }, { status: 'conflict' }],
+    [409, null, { status: 'conflict' }],
+    [
+      403,
+      { error: 'Current live control is required' },
+      { status: 'failed', reason: 'forbidden' },
+    ],
+    [
+      400,
+      { error: 'Invalid authority state' },
+      { status: 'failed', reason: 'invalid' },
+    ],
+    [
+      503,
+      { error: 'Authority relay unavailable' },
+      { status: 'failed', reason: 'restore' },
+    ],
+  ])('HTTP %i %j → %j', async (status, body, expected) => {
+    expect(await restoreWith(status, body)).toEqual(expected);
+  });
+
+  it('maps a capture-step 403 (live control lost) to forbidden (review S3)', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () =>
+      Response.json(
+        { error: 'Current live control is required' },
+        { status: 403 }
+      )
+    );
+    await expect(
+      restoreAuthorityFork({
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        sceneId: 'scene-1',
+        checkpoint: retained,
+        fetcher,
+      })
+    ).resolves.toEqual({ status: 'failed', reason: 'forbidden' });
+    // Only the capture ran; nothing was provisioned.
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps other capture failures as a capture failure', async () => {
+    for (const status of [500, 503]) {
+      await expect(
+        restoreAuthorityFork({
+          campaignCode: 'CAMP',
+          dmId: 'dm-1',
+          sceneId: 'scene-1',
+          checkpoint: retained,
+          fetcher: vi.fn<typeof fetch>(
+            async () => new Response('down', { status })
+          ),
+        })
+      ).resolves.toEqual({ status: 'failed', reason: 'capture' });
+    }
+  });
+});
+
 describe('PR02 checkpoint provenance and roster durability', () => {
   it('keeps ownerId and token control fields through checkpoint, reload and provisioning state', async () => {
     const factory = new IDBFactory();

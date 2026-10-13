@@ -1,5 +1,6 @@
 import type { JsonObject } from './schema';
 import type { SharedInitiativeState } from '@/types/sharedState';
+import { TABLE_MUTATION_HEADERS } from './tableRequestHeaders';
 
 export interface TableDescriptor {
   epoch: string;
@@ -315,10 +316,7 @@ export function createTableControlSession(options: {
     try {
       const response = await fetcher(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-rollkeeper-csrf': '1',
-        },
+        headers: TABLE_MUTATION_HEADERS,
         body,
         signal: abort.signal,
       });
@@ -579,11 +577,6 @@ interface ControlRequestOptions {
   fetcher?: typeof fetch;
 }
 
-const CONTROL_HEADERS = {
-  'Content-Type': 'application/json',
-  'x-rollkeeper-csrf': '1',
-};
-
 const tableBase = (campaignCode: string) =>
   `/api/campaign/${encodeURIComponent(campaignCode)}/table`;
 
@@ -632,7 +625,7 @@ export async function acquireTableControl(
       `${tableBase(options.campaignCode)}/control`,
       {
         method: 'POST',
-        headers: CONTROL_HEADERS,
+        headers: TABLE_MUTATION_HEADERS,
         body: JSON.stringify({ dmId: options.dmId, command }),
       }
     );
@@ -796,7 +789,7 @@ export async function prepareTableSceneRoom(
       `${tableBase(options.campaignCode)}/authority/initialize-if-empty`,
       {
         method: 'POST',
-        headers: CONTROL_HEADERS,
+        headers: TABLE_MUTATION_HEADERS,
         body: JSON.stringify({
           dmId: options.dmId,
           sceneId: input.sceneId,

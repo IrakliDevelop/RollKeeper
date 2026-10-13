@@ -185,6 +185,53 @@ run('two relay authority transport', () => {
     const appContractMetaKey = `campaign:${tableCampaignTag(CAMPAIGN)}:room:${ROOM}:meta`;
     expect(await redis.get(appContractMetaKey)).not.toBeNull();
 
+    // The app's restore maps the rejection reason in the body; the status
+    // stays 409 for every provision rejection (PR08 desktop P3).
+    const reprovision = (overrides: Record<string, unknown>) =>
+      fetch(
+        `http://127.0.0.1:${first.address().port}/authority-admin/provision`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'x-rollkeeper-relay-secret': SECRET,
+          },
+          body: JSON.stringify({
+            campaign: CAMPAIGN,
+            sceneId: 'scene-a',
+            room: ROOM,
+            epoch: EPOCH,
+            writerFence: 1,
+            principal: 'legacy:dm-a',
+            generation: '723e4567-e89b-42d3-a456-426614174000',
+            casToken: 'b'.repeat(64),
+            state: {
+              elements: [],
+              layers: [],
+              extensions: {
+                fog: { pluginName: 'fog', version: 1, data: null },
+              },
+            },
+            ...overrides,
+          }),
+        }
+      );
+    const conflict = await reprovision({});
+    expect(conflict.status).toBe(409);
+    expect(await conflict.json()).toEqual({
+      status: 'rejected',
+      reason: 'conflict',
+    });
+    const forbidden = await reprovision({ writerFence: 2 });
+    expect(forbidden.status).toBe(409);
+    expect(await forbidden.json()).toEqual({
+      status: 'rejected',
+      reason: 'forbidden',
+    });
+    expect(JSON.parse((await redis.get(appContractMetaKey))!)).toMatchObject({
+      generation: GENERATION,
+    });
+
     const checkpoint = await fetch(
       `http://127.0.0.1:${first.address().port}/authority-admin/checkpoint`,
       {
@@ -619,8 +666,14 @@ run('two relay authority transport', () => {
     };
     withdrawn.presentation.blanked = true;
     await redis.set(tableControlKey(CAMPAIGN), JSON.stringify(withdrawn));
+    // Wait for the withdrawal close itself (review S2): the observer can
+    // leave `live` on a denied authority read a moment before the relay's
+    // revocation poll closes its socket with 4403.
     await eventually(
-      () => reconnected.status() === 'live' && observerStatus !== 'live',
+      () =>
+        reconnected.status() === 'live' &&
+        observerStatus !== 'live' &&
+        closeEvents.some(event => event.code === 4403),
       2_000
     ).catch(() => {
       throw new Error(
@@ -942,7 +995,11 @@ run('two relay authority transport', () => {
     );
     expect(Date.now() - rotatedAt).toBeLessThanOrEqual(bound);
     await eventually(() => display.getState().status === 'denied', 1_000);
-    expect(dm.getState().status).toBe('live');
+    // Rotation never withdraws the DM. Under added latency the DM client can
+    // be between a read timeout and its retry at this instant ('offline'),
+    // so assert it is not denied and is live again (review S2 hardening).
+    expect(dm.getState().status).not.toBe('denied');
+    await eventually(() => dm.getState().status === 'live', 2_000);
 
     const hidden = {
       ...createShape({ position: { x: 9, y: 9 }, size: { w: 10, h: 10 } }),
@@ -962,4 +1019,150 @@ run('two relay authority transport', () => {
         .document?.elements.some(element => element.id === hidden.id) ?? false
     ).toBe(false);
   }, 15_000);
+
+  it('restore to a fresh room generation withdraws admitted DM and player sockets; re-minted tokens join the restored state (PR08 desktop A1)', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 4, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const before = JSON.parse((await redis.get(keys.meta))!) as {
+      generation: string;
+      casToken: string;
+    };
+    const claimsFor = (roomGeneration: string) => ({
+      v: 1 as const,
+      room: ROOM,
+      exp: Date.now() + 60_000,
+      campaign: CAMPAIGN,
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-a',
+      epoch: EPOCH,
+      roomGeneration,
+    });
+    const connect = (
+      relay: RelayHandle,
+      clientId: string,
+      roomGeneration: string,
+      role: 'dm' | 'player'
+    ) => {
+      const token = signBattleMapToken(
+        role === 'dm'
+          ? {
+              ...claimsFor(roomGeneration),
+              userId: clientId,
+              role,
+              writerFence: 1,
+            }
+          : {
+              ...claimsFor(roomGeneration),
+              userId: clientId,
+              role,
+              playerPrincipal: clientId,
+            },
+        SECRET
+      );
+      const client = createManagedAuthorityConnection({
+        scopeId: `${CAMPAIGN}:scene-a:${clientId}:restore:${roomGeneration}`,
+        clientId,
+        extensions: [createFogAuthorityClientExtension()],
+        resolveUrl: () => ({
+          url: `ws://127.0.0.1:${relay.address().port}?room=${ROOM}`,
+          protocols: bearerSubprotocols(token),
+        }),
+        transportFactory: transport,
+      });
+      clients.push(client);
+      return client;
+    };
+    const oldDm = connect(first, 'dm-a', before.generation, 'dm');
+    const oldPlayer = connect(second, 'player-a', before.generation, 'player');
+    await eventually(
+      () =>
+        oldDm.getState().status === 'live' &&
+        oldPlayer.getState().status === 'live'
+    );
+
+    // The app's restore: provision a fresh generation guarded by the
+    // current generation and CAS token (initialize-if-empty replace).
+    const restoredGeneration = '923e4567-e89b-42d3-a456-426614174000';
+    const restoredToken = {
+      ...createShape({ position: { x: 1, y: 1 }, size: { w: 10, h: 10 } }),
+      id: 'restored-token',
+    };
+    const restore = await fetch(
+      `http://127.0.0.1:${first.address().port}/authority-admin/provision`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-rollkeeper-relay-secret': SECRET,
+        },
+        body: JSON.stringify({
+          campaign: CAMPAIGN,
+          sceneId: 'scene-a',
+          room: ROOM,
+          epoch: EPOCH,
+          writerFence: 1,
+          principal: 'legacy:dm-a',
+          generation: restoredGeneration,
+          casToken: 'c'.repeat(64),
+          expectedGeneration: before.generation,
+          expectedCasToken: before.casToken,
+          state: {
+            elements: [{ ...restoredToken, ownerId: 'legacy:dm-a' }],
+            layers: [],
+            extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+          },
+        }),
+      }
+    );
+    expect(restore.status).toBe(200);
+    expect(await restore.json()).toEqual({
+      status: 'provisioned',
+      generation: restoredGeneration,
+    });
+
+    // Admitted sockets of the old generation are withdrawn (4403)...
+    await eventually(
+      () => closeEvents.filter(event => event.code === 4403).length >= 2,
+      2_000
+    );
+    await eventually(
+      () =>
+        oldDm.getState().status !== 'live' &&
+        oldPlayer.getState().status !== 'live',
+      2_000
+    );
+
+    // ...and tokens re-minted for the new generation join the restored state.
+    const newDm = connect(second, 'dm-a', restoredGeneration, 'dm');
+    const newPlayer = connect(first, 'player-a', restoredGeneration, 'player');
+    await eventually(
+      () =>
+        [newDm, newPlayer].every(
+          client =>
+            client.getState().status === 'live' &&
+            client
+              .getState()
+              .document?.elements.some(
+                element => element.id === restoredToken.id
+              ) === true
+        ),
+      3_000
+    );
+    // An old-generation token is no longer admitted.
+    const stale = connect(first, 'player-a', before.generation, 'player');
+    await eventually(() => stale.getState().status === 'denied', 3_000);
+  }, 20_000);
 });

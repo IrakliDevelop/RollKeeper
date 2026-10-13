@@ -1,5 +1,10 @@
 import { IDBFactory } from 'fake-indexeddb';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { gridElementTypeDefinition } from '@fieldnotes/vtt';
+import { validateAuthorityState } from '@/lib/tableServer/authorityAdmin';
+
+import { canvasStateToAuthorityState } from './authorityLifecycle';
+import { validateSceneRecord } from './schema';
 
 import {
   TableRepository,
@@ -330,4 +335,182 @@ describe('R3-F1 local-only adoption for the workspace', () => {
       vi.unstubAllGlobals();
     }
   });
+});
+
+describe('PR08 desktop A2: adoption draws an enabled grid the source canvas lacks', () => {
+  const gridMap = (
+    gridSettings: Record<string, unknown> | null,
+    elements: unknown[] = [],
+    gridEnabled = true
+  ) =>
+    JSON.stringify({
+      id: 'map-grid',
+      campaignCode: 'CAMP',
+      name: 'Tavern',
+      mapImageUrl: '/maps/tavern.webp',
+      mapImageSize: { w: 1000, h: 800 },
+      canvasState: JSON.stringify({ elements }),
+      dmOnlyElements: {},
+      gridEnabled,
+      gridSettings,
+      linkedEncounterIds: [],
+      markers: [],
+      createdAt: '2026-10-05T00:00:00.000Z',
+      updatedAt: '2026-10-05T00:00:00.000Z',
+    });
+  const adopt = async (raw: string) => {
+    const preview = await captureAdoptionPreview({
+      source: source(() => raw),
+      workspaceKey: resolveTableWorkspaceKey(selection),
+      sourceCampaignId: 'CAMP',
+      sourceMapId: 'map-grid',
+      newId: () => crypto.randomUUID(),
+    });
+    const state = preview.scene.canvasCheckpoint!.state as {
+      elements: Array<Record<string, unknown>>;
+    };
+    return { preview, state };
+  };
+  const grids = (elements: Array<Record<string, unknown>>) =>
+    elements.filter(
+      element =>
+        element.type === 'extension' && element.extensionType === 'vtt:grid'
+    );
+
+  it('adds one square vtt:grid element (cell size 50) on the map layer, as Edit map would', async () => {
+    const raw = gridMap({
+      gridType: 'square',
+      cellSize: 50,
+      strokeColor: '#94a3b8',
+      strokeWidth: 1,
+      opacity: 0.5,
+    });
+    const { preview, state } = await adopt(raw);
+    const [grid, ...rest] = grids(state.elements);
+    expect(rest).toEqual([]);
+    expect(grid).toMatchObject({
+      type: 'extension',
+      extensionType: 'vtt:grid',
+      layerId: 'layer-map',
+      locked: true,
+      data: {
+        gridType: 'square',
+        hexOrientation: 'pointy',
+        cellSize: 50,
+        strokeColor: '#94a3b8',
+        strokeWidth: 1,
+        opacity: 0.5,
+      },
+    });
+    // The exact gate GridController.getInfo uses (TV mini scale reads it).
+    expect(
+      gridElementTypeDefinition.validateData(
+        (grid as { data: Record<string, unknown> }).data
+      )
+    ).toBe(true);
+    // The source map record and its captured bytes are never modified.
+    expect(preview.sources.find(value => value.kind === 'map')?.raw).toBe(raw);
+    expect(JSON.parse(JSON.parse(raw).canvasState).elements).toEqual([]);
+  });
+
+  it('adds a hex grid with the default fields the grid controller uses', async () => {
+    const { state } = await adopt(gridMap({ gridType: 'hex', cellSize: 40 }));
+    expect(grids(state.elements)).toEqual([
+      expect.objectContaining({
+        data: {
+          gridType: 'hex',
+          hexOrientation: 'pointy',
+          cellSize: 40,
+          strokeColor: '#94a3b8',
+          strokeWidth: 1,
+          opacity: 0.5,
+        },
+      }),
+    ]);
+  });
+
+  it('leaves a canvas that already has a grid element unchanged', async () => {
+    const existing = {
+      id: 'grid-existing',
+      type: 'extension',
+      extensionType: 'vtt:grid',
+      position: { x: 0, y: 0 },
+      zIndex: 0,
+      locked: true,
+      layerId: 'layer-map',
+      data: {
+        gridType: 'square',
+        hexOrientation: 'pointy',
+        cellSize: 70,
+        strokeColor: '#000000',
+        strokeWidth: 1,
+        opacity: 1,
+      },
+    };
+    const { state } = await adopt(
+      gridMap({ gridType: 'square', cellSize: 50 }, [existing])
+    );
+    expect(state.elements).toEqual([existing]);
+  });
+
+  it('adds nothing for a disabled grid or unusable grid metadata', async () => {
+    for (const raw of [
+      gridMap({ gridType: 'square', cellSize: 50 }, [], false),
+      gridMap(null),
+      gridMap({ size: 50 }),
+    ]) {
+      const { state } = await adopt(raw);
+      expect(grids(state.elements)).toEqual([]);
+    }
+  });
+
+  it.each([
+    ['square', { gridType: 'square', cellSize: 50 }],
+    ['hex', { gridType: 'hex', cellSize: 40, hexOrientation: 'flat' }],
+  ])(
+    'commits the %s grid scene and the room accepts its state (review S1)',
+    async (_label, settings) => {
+      const raw = gridMap(settings);
+      const { preview, state } = await adopt(raw);
+      const [grid] = grids(state.elements);
+      // JSON-clean like the store's exportJSON: no undefined keys.
+      expect(JSON.parse(JSON.stringify(grid))).toEqual(grid);
+      expect(Object.values(grid!).some(value => value === undefined)).toBe(
+        false
+      );
+      expect(validateSceneRecord(preview.scene)).toEqual({ ok: true });
+
+      const repository = new TableRepository({
+        factory: new IDBFactory(),
+        selection,
+      });
+      repositories.push(repository);
+      await repository.start();
+      const result = await adoptMapLocally({
+        repository,
+        source: source(() => raw),
+        campaignCode: 'CAMP',
+        mapId: 'map-grid',
+      });
+      expect(result).toMatchObject({ status: 'committed', name: 'Tavern' });
+      if (result.status !== 'committed') throw new Error('not committed');
+      const current = repository.getCurrent();
+      if (current?.status !== 'ready') throw new Error('not ready');
+      const committed = current.snapshot.scenes[0]!.canvasCheckpoint!.state as {
+        elements: Array<Record<string, unknown>>;
+      };
+      expect(grids(committed.elements)).toHaveLength(1);
+
+      // The room provision path (initialize-if-empty) accepts the state.
+      const authority = canvasStateToAuthorityState(result.canvasState, 'dm-1');
+      const accepted = await validateAuthorityState(authority);
+      expect(accepted).not.toBeNull();
+      expect(
+        grids(
+          (accepted as unknown as { elements: Array<Record<string, unknown>> })
+            .elements
+        )
+      ).toHaveLength(1);
+    }
+  );
 });

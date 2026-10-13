@@ -361,6 +361,9 @@ function routeFetch() {
       failControlReads.next -= 1;
       return new Response('unavailable', { status: 503 });
     }
+    // Restore first captures the current room generation and CAS token.
+    if (url.endsWith('/authority/checkpoint'))
+      return Response.json({ generation: 'room-gen-1', casToken: 'cas-1' });
     if (url.includes('/table/control') || url.includes('/authority/'))
       return server.fetcher(input, init);
     if (url.includes('/table/display/status'))
@@ -1053,6 +1056,67 @@ describe('W3/W4 lifecycle (D8)', () => {
       server.commands.filter(command => command.type === 'registerScene')
     ).toHaveLength(1);
     expect(server.commands.filter(c => c.type === 'takeover')).toHaveLength(0);
+  });
+
+  it('remounts the canvas after a successful restore so it re-joins the new room generation (PR08 desktop A1)', async () => {
+    const current = repository.getCurrent();
+    if (current?.status !== 'ready') throw new Error('not ready');
+    const tavern = current.snapshot.scenes.find(
+      scene => scene.sceneId === 'scene-tavern'
+    )!;
+    await repository.mutateWorkspace(
+      current.snapshot.campaign?.revision ?? 0,
+      'seed-checkpoint',
+      {
+        scenes: {
+          put: [
+            {
+              ...tavern,
+              canvasCheckpoint: {
+                protocolVersion: 1,
+                generation: 'saved-gen',
+                revision: 1,
+                capturedAt: AT,
+                state: {
+                  cursor: { generation: 'saved-gen', revision: 1 },
+                  elements: [],
+                  layers: [],
+                  extensions: {
+                    fog: { pluginName: 'fog', version: 1, data: null },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }
+    );
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    await waitFor(() =>
+      expect(screen.getByText("You're live")).toBeInTheDocument()
+    );
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    });
+    const mounts = mocks.canvasMounts;
+    fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Restore checkpoint' })
+    );
+    await waitFor(() =>
+      expect(
+        screen.getAllByText('Checkpoint restored.').length
+      ).toBeGreaterThan(0)
+    );
+    expect(
+      server.initializes.filter(
+        body => body.expectedGeneration === 'room-gen-1'
+      )
+    ).toHaveLength(1);
+    await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
+    expect(canvasScene()).toBe('scene-tavern');
   });
 
   it('disables "Show this scene" until the selected scene is registered', async () => {

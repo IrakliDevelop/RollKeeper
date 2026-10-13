@@ -1,4 +1,9 @@
 import type { BattleMap, MarkerDetail } from '@/types/battlemap';
+import { MAP_LAYER_ID } from '@/components/ui/campaign/location-map/layerContract';
+import {
+  createPinnedVttGridElement,
+  VTT_GRID_DEFAULTS,
+} from '@/lib/fieldnotesVtt';
 
 import type { TableRepository } from './repository';
 import type {
@@ -214,6 +219,59 @@ async function capture(
   };
 }
 
+const isVttGrid = (value: unknown): boolean =>
+  !!value &&
+  typeof value === 'object' &&
+  (value as Record<string, unknown>).type === 'extension' &&
+  (value as Record<string, unknown>).extensionType === 'vtt:grid';
+
+const finiteOr = (value: unknown, fallback: number): number =>
+  typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+
+/**
+ * PR08 desktop A2: a source map can say `gridEnabled` with square or hex
+ * `gridSettings` while its canvas holds no `vtt:grid` element (the metadata
+ * persists at once, the canvas on a debounce). The scene's canvas, which the
+ * room and the TV read, then gets the grid Edit map would draw: the same
+ * element `GridController.add` + `pinGridToMapLayer` produce, from the same
+ * defaults. Only the scene copy changes; the source map is never written.
+ * Without a usable grid type, or when a grid element exists, nothing changes.
+ */
+function withEnabledGrid(
+  state: Record<string, unknown>,
+  map: Record<string, unknown>
+): Record<string, unknown> {
+  if (map.gridEnabled !== true || !Array.isArray(state.elements)) return state;
+  if (state.elements.some(isVttGrid)) return state;
+  const settings = jsonObject(map.gridSettings);
+  const gridType =
+    settings?.gridType === 'square' || settings?.gridType === 'hex'
+      ? settings.gridType
+      : null;
+  if (!settings || !gridType) return state;
+  const grid = createPinnedVttGridElement(
+    {
+      gridType,
+      hexOrientation:
+        settings.hexOrientation === 'flat' && gridType === 'hex'
+          ? 'flat'
+          : 'pointy',
+      cellSize: finiteOr(settings.cellSize, VTT_GRID_DEFAULTS.cellSize),
+      strokeColor:
+        typeof settings.strokeColor === 'string'
+          ? settings.strokeColor
+          : VTT_GRID_DEFAULTS.strokeColor,
+      strokeWidth: finiteOr(
+        settings.strokeWidth,
+        VTT_GRID_DEFAULTS.strokeWidth
+      ),
+      opacity: finiteOr(settings.opacity, VTT_GRID_DEFAULTS.opacity),
+    },
+    MAP_LAYER_ID
+  );
+  return { ...state, elements: [...state.elements, grid] };
+}
+
 /** Captures immutable exact source bytes and builds a no-write preview. */
 export async function captureAdoptionPreview(options: {
   source: TableAdoptionSource;
@@ -235,7 +293,7 @@ export async function captureAdoptionPreview(options: {
   // picker create it that way); its adoption checkpoint is an empty state.
   const canvasText = text(map.canvasState, '{}');
   const canvasRaw = canvasText.trim().length === 0 ? '{}' : canvasText;
-  const canvasState = parseObject(canvasRaw);
+  const canvasState = withEnabledGrid(parseObject(canvasRaw), map);
   const mapSize = record(map.mapImageSize ?? {});
   const scene: TableSceneRecordV1 = {
     schemaVersion: 1,

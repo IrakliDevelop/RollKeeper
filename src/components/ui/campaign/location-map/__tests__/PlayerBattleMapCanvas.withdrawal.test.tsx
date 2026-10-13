@@ -339,6 +339,23 @@ describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2
       expect(instance.stop).toHaveBeenCalled();
   });
 
+  it('after a restore (same scene and room, new generation) stays covered, re-mints and goes live again (PR08 desktop A1)', async () => {
+    renderPlayer();
+    await connectFresh();
+    expect(cover()).toBeNull();
+    const before = mints;
+    // The relay withdraws the old-generation socket (4403); the room and
+    // scene are unchanged, only the room generation moved.
+    await withdraw();
+    expect(cover()).not.toBeNull();
+    expect(cover()).not.toBe('Access denied');
+    await rebuild();
+    await connectFresh();
+    expect(mints).toBeGreaterThan(before);
+    expect(cover()).toBeNull();
+    expect(screen.queryByText(/presented scene changed/i)).toBeNull();
+  });
+
   it('shows the neutral cover (never "Access denied") while the scene is unavailable', async () => {
     renderPlayer();
     await connectFresh();

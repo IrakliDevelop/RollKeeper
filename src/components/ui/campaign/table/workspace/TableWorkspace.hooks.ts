@@ -368,6 +368,15 @@ export function useTableWorkspace(campaignCode: string) {
     dmId,
     sceneId: mountedSceneId,
   });
+  // PR08 desktop A1: a restore replaces the room generation and the relay
+  // withdraws the current socket, so the canvas always re-mints through a
+  // fresh mount (live or not).
+  const lastRestored = useRef(0);
+  useEffect(() => {
+    if (checkpoint.restoredCount === lastRestored.current) return;
+    lastRestored.current = checkpoint.restoredCount;
+    setCanvasEpoch(value => value + 1);
+  }, [checkpoint.restoredCount]);
 
   return {
     query,
