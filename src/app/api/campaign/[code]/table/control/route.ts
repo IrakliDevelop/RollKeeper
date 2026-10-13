@@ -10,6 +10,9 @@ import { getRedis } from '@/lib/redis';
 
 type Context = { params: Promise<{ code: string }> };
 
+/** The DM-only control/registry read is never cached (review B7). */
+const NO_STORE = { 'Cache-Control': 'no-store' };
+
 export async function GET(request: NextRequest, { params }: Context) {
   const { code } = await params;
   const auth = await authorizeTableDm(
@@ -19,18 +22,21 @@ export async function GET(request: NextRequest, { params }: Context) {
     false
   );
   if (!auth.ok)
-    return NextResponse.json({ error: auth.error }, { status: auth.status });
+    return NextResponse.json(
+      { error: auth.error },
+      { status: auth.status, headers: NO_STORE }
+    );
   try {
     const service = new TableControlService();
     const [current, registry] = await Promise.all([
       service.read(code),
       service.registry(auth.principal),
     ]);
-    return NextResponse.json({ current, registry });
+    return NextResponse.json({ current, registry }, { headers: NO_STORE });
   } catch {
     return NextResponse.json(
       { error: 'Table control is unavailable' },
-      { status: 503 }
+      { status: 503, headers: NO_STORE }
     );
   }
 }

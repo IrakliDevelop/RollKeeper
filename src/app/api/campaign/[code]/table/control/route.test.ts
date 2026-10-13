@@ -85,6 +85,7 @@ describe('Table control authorization and request boundary', () => {
       params
     );
     expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toMatchObject({
       current: null,
       registry: [
@@ -179,6 +180,7 @@ describe('Table control authorization and request boundary', () => {
     mocks.get.mockResolvedValue('{not json');
     let response = await GET(new NextRequest(url), params);
     expect(response.status).toBe(503);
+    expect(response.headers.get('cache-control')).toBe('no-store');
     await expect(response.json()).resolves.toEqual({
       error: 'Table control is unavailable',
     });
