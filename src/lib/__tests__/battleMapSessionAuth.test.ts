@@ -7,7 +7,10 @@ vi.mock('@/lib/guestSessionSecurity', () => ({
   isHybridGuestServerEnabled: vi.fn(() => false),
   GUEST_SESSION_COOKIE: 'guest-session',
 }));
-vi.mock('@/lib/campaignMembershipSecurity', () => ({
+vi.mock('@/lib/campaignMembershipSecurity', async importOriginal => ({
+  ...(await importOriginal<
+    typeof import('@/lib/campaignMembershipSecurity')
+  >()),
   validateCampaignMembershipMutation: vi.fn(() => ({ ok: true })),
 }));
 vi.mock('@/lib/supabase/campaignMembershipServer', () => ({
