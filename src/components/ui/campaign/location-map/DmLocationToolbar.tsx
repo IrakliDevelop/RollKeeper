@@ -48,11 +48,11 @@ const BASE_TOOL_DEFS = [
   { name: MARKER_TOOL_NAME, icon: Flag, label: 'Marker' },
 ] as const;
 
-/** Battle maps only: grid-distance, movement and cleanup tools. */
 /** PR04 P9: why the retired join-banner toggle is disabled. */
 export const TABLE_V1_SHARE_DISABLED_REASON =
   'Join-banner sharing is managed by Table scenes while Table v1 is enabled';
 
+/** Battle maps only: grid-distance, movement and cleanup tools. */
 const BATTLEMAP_ONLY_TOOL_DEFS = [
   { name: 'measure', icon: Ruler, label: 'Measure' },
   { name: 'path', icon: Footprints, label: 'Move' },
