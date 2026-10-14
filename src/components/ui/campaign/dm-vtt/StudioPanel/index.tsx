@@ -55,6 +55,11 @@ export interface StudioPanelProps {
   widthClassName?: string;
   /** Scroll the toolbar together with the tab content (narrow viewports). */
   scrollToolbar?: boolean;
+  /**
+   * Fixed footer below the scrolling content (Table save status, C1): what
+   * appears there never moves the rows above it.
+   */
+  footer?: ReactNode;
 }
 
 const TABS: {
@@ -91,6 +96,7 @@ export function StudioPanel({
   hpUnknownEntityIds,
   widthClassName = 'w-[min(390px,40vw)]',
   scrollToolbar = false,
+  footer,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -202,6 +208,7 @@ export function StudioPanel({
           </p>
         )}
       </div>
+      {footer && <div className="shrink-0">{footer}</div>}
     </div>
   );
 }
