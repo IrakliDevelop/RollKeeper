@@ -111,7 +111,8 @@ export function TablePresentationView(
     : null;
   const calibrationLine = displayCalibrationLine(
     display.status,
-    props.panel.verifiedSeen
+    props.panel.verifiedSeen,
+    props.isSquareScene
   );
   // O7-2 H5 / HR-7: why a presentation button is disabled, as visible text
   // referenced by aria-describedby (LIVE_CONTROL_REQUIRED stays one node).

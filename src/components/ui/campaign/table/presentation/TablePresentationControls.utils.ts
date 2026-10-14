@@ -189,9 +189,16 @@ export function failureMessage(
 export function displayCalibrationLine(
   status: DisplayStatusRead | null,
   /** O7-A5: `verified` was reported earlier in this DM page session. */
-  verifiedSeen = false
+  verifiedSeen = false,
+  /**
+   * O8-2 (review U3): whether a scene has a square grid. No mini-scale line
+   * at all while the TV shows a scene without one.
+   */
+  isSquareScene?: (sceneId: string) => boolean
 ): { text: string; tone: 'muted' } | null {
   if (!status || status === 'error') return null;
+  if (status.sceneId && isSquareScene && !isSquareScene(status.sceneId))
+    return null;
   if (status.calibration === 'uncalibrated' && verifiedSeen)
     return { text: "TV says it's back to normal view", tone: 'muted' };
   if (status.calibration === 'verified')

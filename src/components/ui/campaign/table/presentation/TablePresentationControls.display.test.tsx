@@ -382,6 +382,33 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
       ...(calibration ? { calibration } : {}),
     }) as never;
 
+  it('O8-2 (review U3): no mini-scale line while the shown scene is not square', () => {
+    // Tavern has a square grid; the hex scene does not.
+    const isSquare = (sceneId: string) => sceneId === 'scene-tavern';
+    const square = () => true;
+    // A calibrated TV on a hex scene reports uncalibrated after `verified`.
+    expect(
+      displayCalibrationLine(status('uncalibrated'), true, isSquare)
+    ).toEqual({ text: "TV says it's back to normal view", tone: 'muted' });
+    const hex = {
+      ...(status('uncalibrated') as object),
+      sceneId: 'scene-hex',
+    } as never;
+    expect(displayCalibrationLine(hex, true, isSquare)).toBeNull();
+    for (const report of ['verified', 'unsupported'])
+      expect(
+        displayCalibrationLine(
+          { ...(status(report) as object), sceneId: 'scene-hex' } as never,
+          true,
+          isSquare
+        )
+      ).toBeNull();
+    expect(displayCalibrationLine(hex, true, square)).toEqual({
+      text: "TV says it's back to normal view",
+      tone: 'muted',
+    });
+  });
+
   it('words verified/unsupported as inline device reports and verify-required as a notice only', () => {
     expect(displayCalibrationLine(status('verified'))).toEqual({
       text: 'TV says the scale is checked',
