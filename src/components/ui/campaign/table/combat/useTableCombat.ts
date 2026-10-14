@@ -136,27 +136,42 @@ export function useTableCombat(options: {
   const noticeOwner = useRef(0);
   /** Tone of the notice on screen (read synchronously by queued results). */
   const noticeTone = useRef<TableCombatNotice['tone'] | null>(null);
-  const setNotice = useCallback((value: TableCombatNotice | null) => {
-    sequence.current += 1;
-    noticeOwner.current = sequence.current;
+  /** The last action number allocated when the shown error appeared. */
+  const errorShownAt = useRef(0);
+  const show = useCallback((owner: number, value: TableCombatNotice | null) => {
+    noticeOwner.current = Math.max(noticeOwner.current, owner);
     noticeTone.current = value?.tone ?? null;
+    if (value?.tone === 'error') errorShownAt.current = sequence.current;
     setNoticeState(value);
+  }, []);
+  const setNotice = useCallback(
+    (value: TableCombatNotice | null) => {
+      sequence.current += 1;
+      show(sequence.current, value);
+    },
+    [show]
+  );
+  /**
+   * Whether a success (or a newly started action) of `owner` may clear the
+   * notice on screen:
+   * - an info notice ("Still saving") always (review V2);
+   * - an error with its Retry only if the action started after the error
+   *   appeared, so a queued edit started before it keeps it (U1) while a
+   *   Retry or any later edit clears it (review V1);
+   * - any other notice only if it is not from a later action.
+   */
+  const mayClear = useCallback((owner: number): boolean => {
+    if (noticeTone.current === null) return true;
+    if (noticeTone.current === 'info') return true;
+    if (noticeTone.current === 'error') return owner > errorShownAt.current;
+    return noticeOwner.current <= owner;
   }, []);
   const settleNotice = useCallback(
     (owner: number, value: TableCombatNotice | null) => {
-      if (value === null) {
-        // A success never erases a notice raised by a later action, nor
-        // another action's error and Retry (review U1); it may clear its own
-        // notice or a passing info notice such as "Still saving".
-        if (noticeOwner.current > owner) return;
-        if (noticeTone.current === 'error' && noticeOwner.current !== owner)
-          return;
-      }
-      noticeOwner.current = Math.max(noticeOwner.current, owner);
-      noticeTone.current = value?.tone ?? null;
-      setNoticeState(value);
+      if (value === null && !mayClear(owner)) return;
+      show(owner, value);
     },
-    []
+    [mayClear, show]
   );
   const begin = useCallback(() => {
     pending.current += 1;
@@ -195,6 +210,10 @@ export function useTableCombat(options: {
         return refuse();
       sequence.current += 1;
       const owner = sequence.current;
+      // A new action supersedes an error shown before it: the toolbar shows
+      // "Saving…" instead of a stale error and Retry (review V1).
+      if (noticeTone.current === 'error' && owner > errorShownAt.current)
+        settleNotice(owner, null);
       begin();
       const task = queue.current.then(async () => {
         try {

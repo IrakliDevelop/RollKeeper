@@ -119,7 +119,7 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     expect(goblin?.displayName).toBe('Enemy');
   });
 
-  it('still refuses a second lifecycle step while one saves, and keeps that notice', async () => {
+  it('still refuses a second lifecycle step while one saves, with a visible notice', async () => {
     const repository = await preparedRun();
     const { result } = renderHook(() =>
       useTableCombat({
@@ -146,13 +146,15 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
       first = result.current.execute(create);
       second = result.current.execute(create);
     });
+    // The refusal is visible while the first step saves.
+    expect(result.current.notice?.message).toMatch(/try again/iu);
     await act(async () => {
       await first;
     });
     expect(await first).toMatchObject({ status: 'committed' });
     expect(await second).toBeNull();
-    // The refusal is not erased by the earlier intent's success.
-    expect(result.current.notice?.message).toMatch(/try again/iu);
+    // Review V2: the "Still saving" notice ends with the save it refers to.
+    expect(result.current.notice).toBeNull();
   });
 
   it('keeps an earlier queued intent error and Retry when a later one commits (review U1)', async () => {
@@ -255,6 +257,122 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
           }) as TableCombatCommandV1
       );
       await later;
+    });
+    expect(result.current.notice).toBeNull();
+  });
+
+  const mountHook = async () => {
+    const repository = await preparedRun();
+    const view = renderHook(() =>
+      useTableCombat({
+        repository,
+        sceneId: SCENE_ID,
+        campaignCode: 'CAMP',
+        requestedRunId: 'run-a',
+      })
+    );
+    await waitFor(() =>
+      expect(view.result.current.selectedRun?.runId).toBe('run-a')
+    );
+    return { repository, ...view };
+  };
+  const rejected = () =>
+    ({
+      type: 'combat.setHidden',
+      runId: 'run-a',
+      actorId: 'nobody',
+      hidden: true,
+      at: AT,
+    }) as TableCombatCommandV1;
+
+  it('a Retry that commits clears the error and its Retry (review V1)', async () => {
+    const { repository, result } = await mountHook();
+    // The intent targets an unknown participant until the cause is fixed.
+    let actorId = 'nobody';
+    const flaky = () =>
+      ({
+        type: 'combat.setHidden',
+        runId: 'run-a',
+        actorId,
+        hidden: true,
+        at: AT,
+      }) as TableCombatCommandV1;
+    await act(async () => {
+      await result.current.execute(flaky);
+    });
+    expect(result.current.notice?.tone).toBe('error');
+    const retry = result.current.notice!.retry!;
+    actorId = 'goblin';
+    await act(async () => {
+      retry();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(result.current.saving).toBe(false));
+    const run = readySnapshot(repository).encounters.find(
+      value => value.runId === 'run-a'
+    )!;
+    expect(run.participants.find(p => p.actorId === 'goblin')?.hidden).toBe(
+      true
+    );
+    expect(result.current.notice).toBeNull();
+  });
+
+  it('an edit started after the error commits and clears it; while it saves the toolbar is not stale (review V1)', async () => {
+    const { result } = await mountHook();
+    await act(async () => {
+      await result.current.execute(rejected);
+    });
+    expect(result.current.notice?.tone).toBe('error');
+    let later!: Promise<unknown>;
+    act(() => {
+      later = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setInitiative',
+            runId: 'run-a',
+            actorId: 'orc',
+            value: 11,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+    });
+    // A new action supersedes the old error at once ("Saving…" shows).
+    expect(result.current.notice).toBeNull();
+    expect(result.current.saving).toBe(true);
+    await act(async () => {
+      await later;
+    });
+    expect(result.current.notice).toBeNull();
+  });
+
+  it('any success clears a "Still saving" info notice, even one raised later (review V2)', async () => {
+    const { result } = await mountHook();
+    let first!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setInitiative',
+            runId: 'run-a',
+            actorId: 'orc',
+            value: 7,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+      void result.current.execute(
+        () =>
+          ({
+            type: 'combat.createRun',
+            sceneId: SCENE_ID,
+            runId: 'run-z',
+            label: 'Refused',
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+    });
+    expect(result.current.notice?.tone).toBe('info');
+    await act(async () => {
+      await first;
     });
     expect(result.current.notice).toBeNull();
   });
