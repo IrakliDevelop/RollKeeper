@@ -158,3 +158,98 @@ test('narrow headers keep accessible names at 360 px', async ({ page }) => {
     page.getByRole('button', { name: 'Play', exact: true })
   ).toBeVisible();
 });
+
+/**
+ * PR08 D1: the editor top bar in Play mode (DmVttTopBar, scrolls sideways)
+ * keeps the Table link and Setup/Play pinned on screen. The map is added
+ * to the Table first, so the async link reads "Open in Table" as in the
+ * manual run; the relay status chip shows ("Connecting…").
+ */
+async function adoptMapIntoTable(page: Page): Promise<void> {
+  await page.goto(`/dm/campaign/${CODE}/battlemaps`);
+  await page.getByRole('button', { name: `Add ${MAP_NAME} to Table` }).click();
+  await expect(
+    page.getByRole('button', { name: `${MAP_NAME} added` })
+  ).toBeVisible();
+}
+
+/** The control is inside the viewport and is what a tap at its centre hits. */
+async function reachable(page: Page, name: string, role: 'link' | 'button') {
+  const control = page.getByRole(role, { name, exact: true });
+  await expect(control).toBeVisible();
+  return control.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      box.left + box.width / 2,
+      box.top + box.height / 2
+    );
+    return {
+      right: box.right,
+      left: box.left,
+      innerWidth: window.innerWidth,
+      hit: hit !== null && (hit === element || element.contains(hit)),
+    };
+  });
+}
+
+async function expectTheme(page: Page, theme: string): Promise<void> {
+  if (theme === 'light')
+    await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/u);
+  else await expect(page.locator('html')).toHaveAttribute('data-theme', theme);
+}
+
+async function editorTopBar(
+  page: Page,
+  options: { width: number; theme: string; adopted: boolean }
+): Promise<void> {
+  // A dark system preference proves the stored light theme wins.
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await page.setViewportSize({ width: options.width, height: 720 });
+  await seed(page, options.theme);
+  await page.addInitScript(
+    ({ key }) => window.localStorage.setItem(key, 'play'),
+    { key: `rollkeeper-battlemap-mode:${MAP_ID}` }
+  );
+  if (options.adopted) await adoptMapIntoTable(page);
+  await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
+  await expectTheme(page, options.theme);
+  await expect(page.getByText('Connecting…')).toBeAttached();
+  const tableLink = options.adopted ? 'Open in Table' : 'Use in Table';
+  for (const [name, role] of [
+    [tableLink, 'link'],
+    ['Setup', 'button'],
+    ['Play', 'button'],
+  ] as const) {
+    const box = await reachable(page, name, role);
+    expect(box.left, name).toBeGreaterThanOrEqual(0);
+    expect(box.right, name).toBeLessThanOrEqual(box.innerWidth);
+    expect(box.hit, name).toBe(true);
+  }
+  // The rest of the bar still scrolls, and its controls stay reachable.
+  const off = page.getByRole('button', { name: 'Off', exact: true });
+  const scroller = await off.evaluate(element => {
+    const area = element.closest('.overflow-x-auto')!;
+    return { clientWidth: area.clientWidth, scrollWidth: area.scrollWidth };
+  });
+  expect(scroller.clientWidth).toBeGreaterThan(0);
+  if (options.width === 360)
+    expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth);
+  await off.scrollIntoViewIfNeeded();
+  const offBox = await reachable(page, 'Off', 'button');
+  expect(offBox.right).toBeLessThanOrEqual(offBox.innerWidth);
+  expect(offBox.hit).toBe(true);
+}
+
+for (const theme of ['parchment', 'dark', 'light'])
+  for (const width of [390, 360])
+    test(`editor top bar pins Open in Table and Setup/Play at ${width} px (${theme})`, async ({
+      page,
+    }) => {
+      await editorTopBar(page, { width, theme, adopted: true });
+    });
+
+test('editor top bar pins Use in Table and Setup/Play at 360 px (not on the Table)', async ({
+  page,
+}) => {
+  await editorTopBar(page, { width: 360, theme: 'parchment', adopted: false });
+});

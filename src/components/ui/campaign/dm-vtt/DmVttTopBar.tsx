@@ -57,82 +57,90 @@ export function DmVttTopBar({
   // PR05 E12: under Table v1 this opens the persistent campaign display.
   const display = useDisplayLauncher();
   return (
-    <div className="scrollbar-thin flex min-h-[52px] min-w-0 items-center justify-start gap-2 overflow-x-auto overscroll-x-contain px-2 py-1 sm:gap-3 sm:px-3">
-      <Link
-        href={`/dm/campaign/${campaignCode}/battlemaps`}
-        className="shrink-0"
-      >
-        <Button variant="ghost" size="lg" aria-label="Back to battle maps">
-          <ArrowLeft size={18} />
-        </Button>
-      </Link>
-      <span className="text-heading min-w-[5rem] flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
-        {mapName}
-      </span>
-      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-        {GRID_OPTIONS.map(({ key, label }) => (
-          <Button
-            key={key}
-            variant={gridMode === key ? 'primary' : 'ghost'}
-            onClick={() => onSetGridMode(key)}
-            className="min-h-[44px] px-2 text-xs"
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-      <Button
-        variant="ghost"
-        size="lg"
-        leftIcon={<Monitor size={16} />}
-        onClick={() => display.launch(() => openTvDisplay(campaignCode, dmId))}
-        className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
-        aria-label="Open display"
-      >
-        <span className="hidden lg:inline">Open Display</span>
-      </Button>
-      {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
-      <TableMapEntryLink
-        campaignCode={campaignCode}
-        mapId={battleMapId}
-        compact
-      />
-      {display.message && (
-        <span
-          role="status"
-          className="text-accent-amber-text max-w-[16rem] shrink-0 text-xs break-words"
+    <div className="flex min-h-[52px] min-w-0 items-center gap-2 px-1 sm:gap-3 sm:px-2">
+      {/* PR08 D1: everything but the Table link and Setup/Play scrolls. */}
+      <div className="scrollbar-thin flex min-w-0 flex-initial items-center justify-start gap-2 overflow-x-auto overscroll-x-contain p-1 sm:gap-3">
+        <Link
+          href={`/dm/campaign/${campaignCode}/battlemaps`}
+          className="shrink-0"
         >
-          {display.message}
-        </span>
-      )}
-      <span
-        className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
-          status === 'live'
-            ? 'bg-accent-emerald-bg text-accent-emerald-text'
-            : status === 'denied'
-              ? 'bg-accent-red-bg text-accent-red-text'
-              : 'bg-accent-amber-bg text-accent-amber-text'
-        }`}
-      >
-        <span className="sr-only sm:not-sr-only">
-          {status === 'live'
-            ? 'Live'
-            : status === 'denied'
-              ? 'Access denied'
-              : 'Connecting…'}
-        </span>
-      </span>
-      <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-        {MODE_OPTIONS.map(({ key, label }) => (
-          <Button
-            key={key}
-            variant={mode === key ? 'primary' : 'ghost'}
-            onClick={() => onModeChange(key)}
-            className="min-h-[44px] px-2 text-xs"
-          >
-            {label}
+          <Button variant="ghost" size="lg" aria-label="Back to battle maps">
+            <ArrowLeft size={18} />
           </Button>
-        ))}
+        </Link>
+        <span className="text-heading min-w-[5rem] flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
+          {mapName}
+        </span>
+        <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
+          {GRID_OPTIONS.map(({ key, label }) => (
+            <Button
+              key={key}
+              variant={gridMode === key ? 'primary' : 'ghost'}
+              onClick={() => onSetGridMode(key)}
+              className="min-h-[44px] px-2 text-xs"
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+        <Button
+          variant="ghost"
+          size="lg"
+          leftIcon={<Monitor size={16} />}
+          onClick={() =>
+            display.launch(() => openTvDisplay(campaignCode, dmId))
+          }
+          className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
+          aria-label="Open display"
+        >
+          <span className="hidden lg:inline">Open Display</span>
+        </Button>
+        {display.message && (
+          <span
+            role="status"
+            className="text-accent-amber-text max-w-[16rem] shrink-0 text-xs break-words"
+          >
+            {display.message}
+          </span>
+        )}
+        <span
+          className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
+            status === 'live'
+              ? 'bg-accent-emerald-bg text-accent-emerald-text'
+              : status === 'denied'
+                ? 'bg-accent-red-bg text-accent-red-text'
+                : 'bg-accent-amber-bg text-accent-amber-text'
+          }`}
+        >
+          <span className="sr-only sm:not-sr-only">
+            {status === 'live'
+              ? 'Live'
+              : status === 'denied'
+                ? 'Access denied'
+                : 'Connecting…'}
+          </span>
+        </span>
+      </div>
+      {/* Pinned at the right edge, never scrolled off (360 px included). */}
+      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+        {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
+        <TableMapEntryLink
+          campaignCode={campaignCode}
+          mapId={battleMapId}
+          compact
+        />
+        <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
+          {MODE_OPTIONS.map(({ key, label }) => (
+            <Button
+              key={key}
+              variant={mode === key ? 'primary' : 'ghost'}
+              onClick={() => onModeChange(key)}
+              className="min-h-[44px] px-2 text-xs"
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
       </div>
     </div>
   );
