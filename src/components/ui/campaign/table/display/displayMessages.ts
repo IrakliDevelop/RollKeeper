@@ -12,6 +12,8 @@ export const DISPLAY_NOTHING_SHOWN =
   'Nothing is being shown on this map right now';
 /** Campaign shell: covered (waiting, blank, switching or recovering). */
 export const DISPLAY_WAITING = 'Waiting for the DM';
+/** PR08 desktop B4: a hidden tab renders nothing, so it cannot show the map. */
+export const DISPLAY_KEEP_VISIBLE = 'Keep this screen visible to show the map.';
 /** No credential at all. */
 export const DISPLAY_OPEN_FROM_DM =
   'To use this screen, press Open display on your DM screen.';
@@ -25,8 +27,6 @@ export const CALIBRATION_REQUIREMENTS =
   "Mini scale works on a second monitor or TV, in full screen, at 100% browser zoom. Check the scale again if you move the window to another screen, change zoom or display settings, or leave full screen. The browser can't spot every change.";
 export const CALIBRATION_NEEDS_VERIFY = 'Check the scale';
 export const CALIBRATION_VERIFIED = 'Scale checked';
-export const CALIBRATION_UNSUPPORTED_GRID =
-  'Mini scale needs a square grid on this scene. Showing the normal view.';
 export const CALIBRATION_UNSUPPORTED_RANGE =
   "This scene's grid can't be matched to minis.";
 export const CALIBRATION_RULER_FIRST =

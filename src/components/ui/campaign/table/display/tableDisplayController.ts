@@ -29,6 +29,7 @@ import {
   DISPLAY_IN_USE,
   DISPLAY_NOT_CONFIGURED,
   DISPLAY_NOTHING_SHOWN,
+  DISPLAY_KEEP_VISIBLE,
   DISPLAY_WAITING,
 } from './displayMessages';
 import {
@@ -95,8 +96,19 @@ export type DisplayCredentialDenial = 'expired' | 'in-use';
 /** PR07: the scale state this page reports (and the shell renders). */
 export interface DisplayCalibrationView {
   report: CalibrationReport;
-  /** Why calibrated minis are unavailable on the shown scene, if they are. */
-  unsupported: 'grid' | 'range' | null;
+  /** Why calibrated minis are unavailable on the shown square scene. */
+  unsupported: 'range' | null;
+  /**
+   * O8-2: the shown scene's live grid is not square (hex, none, invalid).
+   * The TV then shows no calibration UI at all and uses the normal view.
+   */
+  nonSquare: boolean;
+  /**
+   * Review U2: a scene is attaching and its grid is not known yet (camera
+   * not applied). No calibration UI shows until it is, so a non-square
+   * scene never flashes scale controls.
+   */
+  sceneLoading: boolean;
 }
 
 export interface TableDisplayView {
@@ -112,6 +124,8 @@ export interface TableDisplayView {
 export const UNCALIBRATED_VIEW: DisplayCalibrationView = {
   report: 'uncalibrated',
   unsupported: null,
+  nonSquare: false,
+  sceneLoading: false,
 };
 
 export interface TableDisplayControllerOptions {
@@ -312,6 +326,8 @@ export class TableDisplayController {
       this.options.calibration?.store.subscribe(() =>
         this.onCalibrationChange()
       ) ?? null;
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.emit({});
     void this.poll();
   }
@@ -319,6 +335,8 @@ export class TableDisplayController {
   stop(): void {
     this.unsubscribeCalibration?.();
     this.unsubscribeCalibration = null;
+    if (typeof document !== 'undefined')
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.stopped = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);
     this.pollTimer = null;
@@ -636,11 +654,7 @@ export class TableDisplayController {
       gridWait: 'none',
       calibratedDisposers: [],
     };
-    this.readinessTimer = setTimeout(() => {
-      this.readinessTimer = null;
-      if (this.attach?.gen === gen && !this.attach.uncovered)
-        this.failAttach(gen);
-    }, READINESS_TIMEOUT_MS);
+    this.armReadinessTimer(gen);
     this.emit({
       cover: DISPLAY_WAITING,
       canvas: { key: gen, fogPlugin },
@@ -723,12 +737,7 @@ export class TableDisplayController {
       status === 'stopped'
     )
       this.failAttach(gen);
-    else if (!this.readinessTimer)
-      this.readinessTimer = setTimeout(() => {
-        this.readinessTimer = null;
-        if (this.attach?.gen === gen && !this.attach.uncovered)
-          this.failAttach(gen);
-      }, READINESS_TIMEOUT_MS);
+    else if (!this.readinessTimer) this.armReadinessTimer(gen);
   }
 
   private onTokenDenied(gen: number, denial: BattleMapTokenDenial): void {
@@ -737,6 +746,56 @@ export class TableDisplayController {
       return;
     if (denial.status === 403 || denial.status === 409) this.failAttach(gen);
   }
+
+  /**
+   * E10 readiness bound: an attach that never uncovers is retried. B4: a
+   * hidden tab renders no frames, so it is never failed for that; the
+   * bound re-arms when the tab is visible again.
+   */
+  private armReadinessTimer(gen: number): void {
+    if (this.readinessTimer) clearTimeout(this.readinessTimer);
+    this.readinessTimer = setTimeout(() => {
+      this.readinessTimer = null;
+      if (this.attach?.gen !== gen || this.attach.uncovered) return;
+      if (this.tabHidden()) return;
+      this.failAttach(gen);
+    }, READINESS_TIMEOUT_MS);
+  }
+
+  private tabHidden(): boolean {
+    return (
+      typeof document !== 'undefined' && document.visibilityState !== 'visible'
+    );
+  }
+
+  /**
+   * PR08 desktop B4: hidden while attaching → a plain "keep visible" cover;
+   * visible again → render now (the ACK follows the confirming frames) or
+   * retry a failed attach at once, without waiting for the backoff.
+   */
+  private readonly onVisibilityChange = (): void => {
+    if (this.stopped || this.denied) return;
+    const attach = this.attach;
+    if (this.tabHidden()) {
+      if (attach && !attach.uncovered)
+        this.emit({ cover: DISPLAY_KEEP_VISIBLE });
+      return;
+    }
+    if (attach) {
+      if (attach.uncovered) return;
+      this.emit({ cover: DISPLAY_WAITING });
+      if (!this.readinessTimer) this.armReadinessTimer(attach.gen);
+      if (attach.stage === 'awaitFrame') attach.viewport?.requestRender();
+      else if (attach.stage === 'awaitSecondFrame')
+        this.requestConfirmingFrame(attach.gen);
+      else this.defer(() => this.checkReadiness(attach.gen));
+      return;
+    }
+    if (this.retryTimer && this.target?.scene) {
+      this.clearRetry();
+      this.retarget();
+    }
+  };
 
   // ---- readiness (E10) and camera (E11) -----------------------------------
 
@@ -942,6 +1001,13 @@ export class TableDisplayController {
         patch.cover === DISPLAY_EXPIRED || patch.cover === DISPLAY_IN_USE;
       if (!credentialCover) return;
     }
+    if (
+      patch.cover === DISPLAY_WAITING &&
+      this.attach &&
+      !this.attach.uncovered &&
+      this.tabHidden()
+    )
+      patch = { ...patch, cover: DISPLAY_KEEP_VISIBLE };
     this.view = {
       ...this.view,
       ...patch,
@@ -969,11 +1035,14 @@ export class TableDisplayController {
     }
   }
 
-  /** Geometry of the shown scene (null: none shown, or not preferred). */
+  /**
+   * Geometry of the shown scene (null: none shown). O8-2: read in every
+   * mode, so a non-square scene hides the calibration UI before Calibrate.
+   */
   private liveGeometry(): SceneGeometry | null {
     const state = this.calibrationState();
     const attach = this.attach;
-    if (!state || !inCalibratedMode(state)) return null;
+    if (!state) return null;
     if (!attach?.viewport || !attach.cameraApplied) return null;
     const cssPxPerSquare =
       state.session?.cssPxPerSquare ??
@@ -986,10 +1055,19 @@ export class TableDisplayController {
     const state = this.calibrationState();
     if (!state) return UNCALIBRATED_VIEW;
     const geometry = this.liveGeometry();
+    const nonSquare =
+      geometry?.kind === 'unsupported' && geometry.reason === 'grid';
     return {
       report: deriveCalibrationReport(state, geometry),
+      // Range limits matter only for a square scene in calibrated mode.
       unsupported:
-        geometry && geometry.kind === 'unsupported' ? geometry.reason : null,
+        inCalibratedMode(state) &&
+        geometry?.kind === 'unsupported' &&
+        geometry.reason === 'range'
+          ? 'range'
+          : null,
+      nonSquare,
+      sceneLoading: !!this.attach && !this.attach.cameraApplied,
     };
   }
 
@@ -1000,7 +1078,9 @@ export class TableDisplayController {
     const previous = this.view.calibration;
     if (
       next.report === previous.report &&
-      next.unsupported === previous.unsupported
+      next.unsupported === previous.unsupported &&
+      next.nonSquare === previous.nonSquare &&
+      next.sceneLoading === previous.sceneLoading
     )
       return;
     this.emit({});

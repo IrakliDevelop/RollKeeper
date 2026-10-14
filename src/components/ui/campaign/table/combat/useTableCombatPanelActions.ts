@@ -18,6 +18,7 @@ import {
   tableDetailCapabilities,
   type TableCombatDraft,
 } from './tableEntityActions';
+import { combatDraftLabel } from './tableCombatMessages';
 import type { useTableCombat } from './useTableCombat';
 import { tableWorkspaceHref } from '../workspace/tableWorkspaceRoutes';
 
@@ -43,7 +44,7 @@ export function useTableCombatPanelActions(options: {
   controlSession?: TableControlSession | null;
 }) {
   const { combat, sceneId } = options;
-  const { snapshot, model, selectedRun, execute, setNotice } = combat;
+  const { snapshot, model, selectedRun, execute, notify } = combat;
   const runId = selectedRun?.runId ?? null;
   const [newRunOpen, setNewRunOpen] = useState(false);
   const [newRunKey, setNewRunKey] = useState(0);
@@ -132,11 +133,15 @@ export function useTableCombatPanelActions(options: {
       )
     : undefined;
 
-  const withRun = (build: (runId: string) => TableCombatCommandV1) => () => {
-    if (!runId) return Promise.resolve(null);
-    const target = runId;
-    return execute(() => build(target));
-  };
+  const withRun =
+    (label: string, build: (runId: string) => TableCombatCommandV1) => () => {
+      if (!runId) return Promise.resolve(null);
+      const target = runId;
+      return execute(() => build(target), label);
+    };
+  const nameOf = (actorId: string) =>
+    model?.participants.find(view => view.actorId === actorId)?.entity.name ??
+    actorId;
 
   const entityActions = useMemo(
     () =>
@@ -152,19 +157,20 @@ export function useTableCombatPanelActions(options: {
         dispatch: (draft: TableCombatDraft) => {
           if (!model) return;
           const target = model.run.runId;
+          const name =
+            model.participants.find(view => view.actorId === draft.actorId)
+              ?.entity.name ?? draft.actorId;
           void execute(
             () =>
-              ({ ...draft, runId: target, at: now() }) as TableCombatCommandV1
+              ({ ...draft, runId: target, at: now() }) as TableCombatCommandV1,
+            combatDraftLabel(draft, name)
           );
         },
-        notify: message => setNotice({ tone: 'info', message }),
+        notify,
       }),
-    [model, execute, setNotice]
+    [model, execute, notify]
   );
 
-  const nameOf = (actorId: string) =>
-    model?.participants.find(view => view.actorId === actorId)?.entity.name ??
-    actorId;
   const start = async () => {
     if (!model || !runId) return;
     const lacking = model.run.participants
@@ -175,11 +181,10 @@ export function useTableCombatPanelActions(options: {
       return;
     }
     setMissing(null);
-    const result = await execute(() => ({
-      type: 'combat.start',
-      runId,
-      at: now(),
-    }));
+    const result = await execute(
+      () => ({ type: 'combat.start', runId, at: now() }),
+      'Start combat'
+    );
     if (result?.status === 'rejected' && result.reason === 'missing-initiative')
       setMissing({ runId, actorIds: result.actorIds ?? [] });
   };
@@ -280,34 +285,35 @@ export function useTableCombatPanelActions(options: {
     historyOpen,
     setHistoryOpen,
     selectRun: (target: string) =>
-      void execute(() => ({
-        type: 'combat.selectRun',
-        runId: target,
-        at: now(),
-      })),
+      void execute(
+        () => ({ type: 'combat.selectRun', runId: target, at: now() }),
+        'Run choice'
+      ),
     goToActive: () => {
       if (!activeRunId) return;
-      void execute(() => ({
-        type: 'combat.selectRun',
-        runId: activeRunId,
-        at: now(),
-      }));
+      void execute(
+        () => ({ type: 'combat.selectRun', runId: activeRunId, at: now() }),
+        'Run choice'
+      );
     },
     createRun: (label: string) => {
       // Identity allocated once, before the transaction; a retry reuses it.
       const newRunId = crypto.randomUUID();
-      void execute(() => ({
-        type: 'combat.createRun',
-        sceneId,
-        runId: newRunId,
-        label,
-        at: now(),
-      })).then(result => {
+      void execute(
+        () => ({
+          type: 'combat.createRun',
+          sceneId,
+          runId: newRunId,
+          label,
+          at: now(),
+        }),
+        'New run'
+      ).then(result => {
         if (result?.status === 'committed') setNewRunOpen(false);
       });
     },
     saveParticipants: (actorIds: string[], hiddenActorIds: string[]) =>
-      void withRun(target => ({
+      void withRun('Participants', target => ({
         type: 'combat.setParticipants',
         runId: target,
         actorIds,
@@ -318,7 +324,7 @@ export function useTableCombatPanelActions(options: {
           setParticipantsOpen(false);
       }),
     setInitiative: (actorId: string, value: number | null) =>
-      void withRun(target => ({
+      void withRun(`${nameOf(actorId)} initiative`, target => ({
         type: 'combat.setInitiative',
         runId: target,
         actorId,
@@ -326,38 +332,40 @@ export function useTableCombatPanelActions(options: {
         at: now(),
       }))(),
     setHidden: (actorId: string, hidden: boolean) =>
-      void withRun(target => ({
-        type: 'combat.setHidden',
-        runId: target,
-        actorId,
-        hidden,
-        at: now(),
-      }))(),
+      void withRun(
+        `${nameOf(actorId)} ${hidden ? 'hidden' : 'shown'}`,
+        target => ({
+          type: 'combat.setHidden',
+          runId: target,
+          actorId,
+          hidden,
+          at: now(),
+        })
+      )(),
     start: () => void start(),
     showAndStart: () => void showAndStart(),
     end: () =>
-      void withRun(target => ({
+      void withRun('End combat', target => ({
         type: 'combat.end',
         runId: target,
         at: now(),
       }))(),
     nextTurn: () =>
-      void withRun(target => ({
+      void withRun('Next turn', target => ({
         type: 'combat.nextTurn',
         runId: target,
         at: now(),
       }))(),
     prevTurn: () =>
-      void withRun(target => ({
+      void withRun('Previous turn', target => ({
         type: 'combat.prevTurn',
         runId: target,
         at: now(),
       }))(),
     deleteArchive: (archiveId: string) =>
-      void execute(() => ({
-        type: 'combat.deleteArchive',
-        archiveId,
-        at: now(),
-      })),
+      void execute(
+        () => ({ type: 'combat.deleteArchive', archiveId, at: now() }),
+        'Archive delete'
+      ),
   };
 }

@@ -188,6 +188,42 @@ async function preparedAndStarted(repository: TableRepository) {
   );
 }
 
+describe('B3: a quick blur then Hide click applies both (PR08 desktop)', () => {
+  it('keeps the Hide click that follows an initiative blur-commit', async () => {
+    const repository = await openFixture();
+    renderPanel(repository);
+    await createRun('Privacy R2');
+    await chooseParticipants(['Goblin', 'Knight']);
+    const input = await screen.findByLabelText('Initiative for Knight');
+    fireEvent.change(input, { target: { value: '14' } });
+    // One pointer gesture: the input blurs (commit) and the switch clicks.
+    act(() => {
+      fireEvent.blur(input);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Hide Goblin from players' })
+      );
+    });
+    await waitFor(() => {
+      const run = readySnapshot(repository).encounters.find(
+        value => value.label === 'Privacy R2'
+      )!;
+      expect(
+        run.participants.find(value => value.actorId === 'goblin')?.hidden
+      ).toBe(true);
+    });
+    const run = readySnapshot(repository).encounters.find(
+      value => value.label === 'Privacy R2'
+    )!;
+    // The blur-committed initiative landed too, in order.
+    expect(
+      run.participants.find(value => value.actorId === 'knight')?.initiative
+    ).toBe(14);
+    expect(
+      screen.getByRole('switch', { name: 'Hide Goblin from players' })
+    ).toBeChecked();
+  });
+});
+
 describe('Table combat panel (D10)', () => {
   it('selects participants, lists bystanders, blocks a missing initiative and accepts 0', async () => {
     const repository = await openFixture();
@@ -268,14 +304,16 @@ describe('Table combat panel (D10)', () => {
     }
   });
 
-  it('refuses a second action while one is saving (one commit, visible refusal)', async () => {
+  it('refuses a second turn step while one is saving (one commit, visible refusal)', async () => {
     const repository = await openFixture();
     await preparedAndStarted(repository);
     const before = revisionOf(repository);
     const next = screen.getByRole('button', { name: /Next/ });
     fireEvent.click(next);
     fireEvent.click(next);
-    expect(screen.getByText('Saving…')).toBeVisible();
+    expect(
+      screen.getByText('Still saving the last change. Try again in a moment.')
+    ).toBeVisible();
     await waitFor(() => expect(revisionOf(repository)).toBe(before + 1));
     await act(async () => new Promise(resolve => setTimeout(resolve, 50)));
     expect(revisionOf(repository)).toBe(before + 1);

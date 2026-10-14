@@ -27,7 +27,8 @@ API routes under `src/app/api/campaign/[code]/table/`:
 |---|---|---|
 | `control` GET / POST | DM | `authorizeTableDm`; POST is a fenced control command |
 | `scenes` GET | DM | `authorizeTableDm` |
-| `authority-challenge` POST, `authority/checkpoint` POST, `authority/initialize-if-empty` POST | DM | `authorizeTableDm` (mutation) + relay same-authority proof |
+| `authority-challenge` POST | DM | `authorizeTableDm` (mutation) + relay same-authority proof |
+| `authority/checkpoint` POST, `authority/initialize-if-empty` POST | DM, live tab only | `authorizeTableDm` (mutation) + the tab's live-control lease: `holderSessionId` and `expectedFence` must match the control record (`authorityAdminContext`, `src/lib/tableServer/authorityAdmin.ts`); otherwise 403 and the relay is never called |
 | `display/capability` POST | DM | `authorizeTableDm` (mutation); rotates the display capability |
 | `display/status` GET | DM | `authorizeTableDm` |
 | `display/descriptor` POST, `display/ack` POST | TV display | display capability + session nonce, same-origin/CSRF |
@@ -96,6 +97,38 @@ scene rooms, player views and the TV cannot connect.
 
 ## Release notes (behaviour changes for existing users)
 
+- **Restore needs the live tab.** "Restore checkpoint" and "Reapply changes"
+  work only in the tab that holds live control; elsewhere they are disabled
+  with "Only the live tab can restore. Go live first." Two tabs of the same
+  DM share one principal, so the server checks the tab's control session and
+  writer fence, not only the DM. The relay's provision Lua re-checks the
+  session when the app sends it (`relay/src/authority-lua.ts`), and the app
+  forwards the tab's own fence so a takeover between the read and the write
+  is refused. Scene-room seeding sends the same lease.
+- **Mini scale is square-grid only, silently.** On a scene whose live grid
+  is not square (hex, none or invalid), the TV shows no calibration UI at
+  all (no Calibrate minis, Check scale or Setup tips, no grid message) and
+  uses the normal view; it reports `uncalibrated`, so the DM sees no
+  mini-scale warning (and no scale line at all for a scene whose record has
+  no square grid). Nothing scale-related shows while a scene is still
+  attaching, before its grid is known. A calibrated TV keeps its saved scale and returns to it
+  on the next square scene (`calibration/session.ts`,
+  `tableDisplayController.ts`). `unsupported` now means only a square grid
+  whose scale is out of range.
+- A TV tab that is not visible while attaching shows "Keep this screen
+  visible to show the map." and attaches as soon as it is visible again,
+  instead of retrying every 15 s. The DM status does not name this case (the
+  ACK protocol has no hidden phase); it keeps its existing wording.
+- Combat value edits (hide, initiative, HP, conditions) queue behind a save
+  in flight instead of being dropped; turn and lifecycle steps still run one
+  at a time. A failed edit is named in the toolbar ("Orc initiative wasn't
+  saved."). A storage or conflict failure offers Retry for that one edit
+  while nothing else is saving and until any other edit saves; a rejection
+  never does. Edits that fail together are listed by name with no Retry, so
+  the DM redoes them. The next action the DM starts clears the list, so
+  nothing old is replayed over newer values. Other notices, such as "Still
+  saving" or the Show + Start outcome, show beside it; a save clears only
+  "Still saving".
 - Legacy shared-state writers are retired: `POST /shared` with
   `initiative`, `initiativeRequest` or `battlemap` answers 426, and any feature
   outside `TABLE_V1_SHARED_FEATURES` answers 400

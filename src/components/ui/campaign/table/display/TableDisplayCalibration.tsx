@@ -8,7 +8,6 @@ import { CalibrationRulerPanel } from './CalibrationRulerPanel';
 import {
   CALIBRATION_NEEDS_VERIFY,
   CALIBRATION_REQUIREMENTS,
-  CALIBRATION_UNSUPPORTED_GRID,
   CALIBRATION_UNSUPPORTED_RANGE,
   CALIBRATION_VERIFIED,
 } from './displayMessages';
@@ -48,6 +47,9 @@ export function TableDisplayCalibration({
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   if (!store || !state) return null;
+  // O8-2: no calibration UI at all on a scene without a square grid, nor
+  // while a scene attaches and its grid is not known yet (review U2).
+  if (view.nonSquare || view.sceneLoading) return null;
 
   const { report, unsupported } = view;
   if (panelOpen)
@@ -84,11 +86,7 @@ export function TableDisplayCalibration({
   const attention = report === 'verify-required' || report === 'unsupported';
   if (!attention && !pointerActive && !helpOpen) return null;
   const message =
-    unsupported === 'grid'
-      ? CALIBRATION_UNSUPPORTED_GRID
-      : unsupported === 'range'
-        ? CALIBRATION_UNSUPPORTED_RANGE
-        : null;
+    unsupported === 'range' ? CALIBRATION_UNSUPPORTED_RANGE : null;
   return (
     <div
       data-testid="table-display-calibration"

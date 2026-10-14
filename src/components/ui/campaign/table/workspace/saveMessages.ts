@@ -102,11 +102,16 @@ export function restoreMessages(kind: RestoreKind) {
       `${changes ? "Changes weren't" : "Checkpoint wasn't"} restored because the scene changed. Check it, then try again.`,
       'failure'
     ),
+    /** PR08 desktop B1: only the live tab restores; nothing was sent. */
+    notLive: say(
+      `This tab isn't live, so it can't restore ${changes ? 'your changes' : 'the checkpoint'}. Go live, then try again.`,
+      'failure'
+    ),
     failed: (reason: string): SaveMessage => {
       const what = changes ? 'your changes' : 'the checkpoint';
       const text =
         reason === 'forbidden'
-          ? `Couldn't restore ${what} because you no longer have live control. Go live again, then try again.`
+          ? `Couldn't restore ${what} because this tab isn't live. Go live, then try again.`
           : reason === 'expired'
             ? `Restoring ${what} took too long. Nothing changed. Try again.`
             : reason === 'invalid'

@@ -477,12 +477,16 @@ describe('calibrated camera (P4, P8)', () => {
     await show(sceneDescriptor('void', 5));
     await goLive();
     expect(cover()).toBeNull();
-    expect(report()).toBe('unsupported');
-    expect(last().calibration.unsupported).toBe('grid');
+    // O8-2: no grid → the normal view, no scale state, nothing to warn about.
+    expect(report()).toBe('uncalibrated');
+    expect(last().calibration).toMatchObject({
+      unsupported: null,
+      nonSquare: true,
+    });
     expect(acks.at(-1)).toMatchObject({
       sceneId: 'void',
       phase: 'loaded',
-      calibration: 'unsupported',
+      calibration: 'uncalibrated',
     });
   });
 
@@ -678,7 +682,7 @@ describe('freeze and invalidation (P5, P6, R3-1, C7-1)', () => {
     start();
     await tick(0);
     await goLive();
-    expect(report()).toBe('unsupported');
+    expect(report()).toBe('uncalibrated');
     const source = connections.at(-1)!.options.store;
     const grid = source.getById('grid') as unknown as {
       data: Record<string, unknown>;
@@ -695,7 +699,7 @@ describe('freeze and invalidation (P5, P6, R3-1, C7-1)', () => {
     hex: async () => {
       await show(sceneDescriptor('cave', 3));
       await goLive();
-      expect(report()).toBe('unsupported');
+      expect(report()).toBe('uncalibrated');
       expect(fitView).toHaveBeenCalledTimes(1);
       expect(zoomLimits(current().vp.camera)).toEqual(DEFAULT_ZOOM_LIMITS);
       store.invalidate();
@@ -751,7 +755,8 @@ describe('freeze and invalidation (P5, P6, R3-1, C7-1)', () => {
     await goLive();
     await show(sceneDescriptor('cave', 3));
     await goLive();
-    expect(report()).toBe('unsupported');
+    expect(report()).toBe('uncalibrated');
+    expect(last().calibration.nonSquare).toBe(true);
     await show(emptyDescriptor(4, true));
     expect(report()).toBe('verified');
     await show(emptyDescriptor(5, false));

@@ -94,7 +94,6 @@ export function TableRunSetup(props: {
               key={view.entityId}
               view={view}
               highlightMissing={props.missingPrompt !== null}
-              disabled={props.busy}
               physical={props.physicalActorIds?.has(view.actorId) === true}
               onInitiative={value => props.onInitiative(view.actorId, value)}
               onHidden={hidden => props.onHidden(view.actorId, hidden)}

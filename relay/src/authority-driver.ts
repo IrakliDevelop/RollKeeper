@@ -258,6 +258,8 @@ export class RedisAuthorityDriver implements AuthorityDriver {
     epoch: string;
     writerFence: number;
     principal: string;
+    /** PR08 B1: when present, the lease must be held by this session. */
+    holderSessionId?: string;
     deadlineAt: number;
     generation: string;
     casToken: string;

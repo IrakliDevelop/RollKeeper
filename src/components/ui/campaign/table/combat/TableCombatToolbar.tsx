@@ -37,6 +37,8 @@ export function TableCombatToolbar(props: {
   canPublish: boolean;
   saving: boolean;
   notice: TableCombatNotice | null;
+  /** Changes that were not saved; shown beside `notice`, never hidden. */
+  unsavedNotice?: TableCombatNotice | null;
   /** The players snapshot's last refresh failed (N2). */
   playersStale: boolean;
   /** Participants broadcast without HP (N1), one line each. */
@@ -136,32 +138,41 @@ export function TableCombatToolbar(props: {
         </p>
       )}
       {(props.saving || props.notice) && (
-        <div className="flex flex-wrap items-center gap-2">
-          <p
-            role="status"
-            aria-live="polite"
-            className={`min-w-0 flex-1 text-xs ${
-              props.notice?.tone === 'error'
-                ? 'text-accent-red-text'
-                : 'text-muted'
-            }`}
-          >
-            {props.notice?.message ?? 'Saving…'}
-          </p>
-          {props.notice?.link && (
-            <Link
-              className="text-accent-blue-text text-xs underline"
-              href={props.notice.link.href}
-            >
-              {props.notice.link.label}
-            </Link>
-          )}
-          {props.notice?.retry && (
-            <Button variant="outline" size="sm" onClick={props.notice.retry}>
-              Retry
-            </Button>
-          )}
-        </div>
+        <NoticeLine notice={props.notice} fallback="Saving…" />
+      )}
+      {props.unsavedNotice && <NoticeLine notice={props.unsavedNotice} />}
+    </div>
+  );
+}
+
+function NoticeLine(props: {
+  notice: TableCombatNotice | null;
+  fallback?: string;
+}) {
+  const { notice } = props;
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <p
+        role="status"
+        aria-live="polite"
+        className={`min-w-0 flex-1 text-xs ${
+          notice?.tone === 'error' ? 'text-accent-red-text' : 'text-muted'
+        }`}
+      >
+        {notice?.message ?? props.fallback}
+      </p>
+      {notice?.link && (
+        <Link
+          className="text-accent-blue-text text-xs underline"
+          href={notice.link.href}
+        >
+          {notice.link.label}
+        </Link>
+      )}
+      {notice?.retry && (
+        <Button variant="outline" size="sm" onClick={notice.retry}>
+          Retry
+        </Button>
       )}
     </div>
   );

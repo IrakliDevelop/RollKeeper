@@ -1,6 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import type { TableControlSession } from '@/lib/table/authorityLifecycle';
 import type { TableCanvasCheckpointV1 } from '@/lib/table/schema';
 
 import { useSceneCheckpointActions } from './useSceneCheckpointActions';
@@ -35,8 +36,18 @@ function heldRestoreFetch() {
 
 afterEach(() => vi.unstubAllGlobals());
 
+/** The page's live control session: this tab holds the lease at fence 7. */
+const liveSession = {
+  holderSessionId: 'session-tab-a',
+  current: () => ({ writerFence: 7 }),
+  isLost: () => false,
+} as unknown as TableControlSession;
+
 describe('useSceneCheckpointActions restore (review S4)', () => {
-  const render = (sceneId: string) =>
+  const render = (
+    sceneId: string,
+    controlSession: TableControlSession | null = liveSession
+  ) =>
     renderHook(
       (props: { sceneId: string }) =>
         useSceneCheckpointActions({
@@ -46,6 +57,7 @@ describe('useSceneCheckpointActions restore (review S4)', () => {
           campaignCode: 'CAMP',
           dmId: 'dm-1',
           sceneId: props.sceneId,
+          controlSession,
         }),
       { initialProps: { sceneId } }
     );
@@ -81,4 +93,50 @@ describe('useSceneCheckpointActions restore (review S4)', () => {
     expect(result.current.saveMessage).toBe(before);
     expect(result.current.recoveryBusy).toBe(false);
   });
+
+  it('sends the live tab session and fence on both restore calls (B1)', async () => {
+    const { fetchMock, release } = heldRestoreFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    const { result } = render('scene-a');
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.restore(checkpoint, 'checkpoint');
+    });
+    release();
+    await act(async () => pending);
+    const bodies = fetchMock.mock.calls.map(
+      call =>
+        JSON.parse(
+          String((call as unknown as [string, RequestInit])[1].body)
+        ) as Record<string, unknown>
+    );
+    expect(bodies).toHaveLength(2);
+    for (const body of bodies)
+      expect(body).toMatchObject({
+        holderSessionId: 'session-tab-a',
+        expectedFence: 7,
+      });
+  });
+
+  it.each([
+    ['no session (another tab is live)', null],
+    [
+      'a lost session',
+      { ...liveSession, isLost: () => true } as unknown as TableControlSession,
+    ],
+  ])(
+    'never calls the server and says this tab is not live with %s (B1)',
+    async (_label, session) => {
+      const fetchMock = vi.fn();
+      vi.stubGlobal('fetch', fetchMock);
+      const { result } = render('scene-a', session);
+      expect(result.current.live).toBe(false);
+      await act(async () => {
+        await result.current.restore(checkpoint, 'checkpoint');
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(result.current.saveMessage).toMatch(/this tab isn't live/iu);
+      expect(result.current.restoredCount).toBe(0);
+    }
+  );
 });

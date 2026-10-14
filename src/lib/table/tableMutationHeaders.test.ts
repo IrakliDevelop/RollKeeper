@@ -75,6 +75,7 @@ describe('Table mutation requests pass the server CSRF validator (A1)', () => {
       campaignCode: 'CAMP',
       dmId: 'dm-1',
       sceneId: 'scene-1',
+      lease: { holderSessionId: 'session-1', expectedFence: 1 },
       checkpoint,
       fetcher,
     });

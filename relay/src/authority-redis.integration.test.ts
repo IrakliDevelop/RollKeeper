@@ -2172,6 +2172,55 @@ return fn_fog_apply_v1(KEYS[1], KEYS[2], copied)
     });
   });
 
+  it('provisions only for the lease-holding session when the app names one (PR08 desktop B1)', async () => {
+    await client.del(keys.meta);
+    const control = JSON.parse(
+      (await client.get(tableControlKey(CAMPAIGN)))!
+    ) as Record<string, unknown>;
+    control.holderPrincipal = 'principal-a';
+    control.holderSessionId = 'session-tab-b';
+    await client.set(tableControlKey(CAMPAIGN), JSON.stringify(control));
+    const driver = new RedisAuthorityDriver(client);
+    const provision = (holderSessionId?: string) =>
+      driver.provision({
+        campaign: CAMPAIGN,
+        sceneId: 'scene-a',
+        room: ROOM,
+        epoch: EPOCH,
+        writerFence: 7,
+        principal: 'principal-a',
+        ...(holderSessionId ? { holderSessionId } : {}),
+        deadlineAt: Date.now() + 5_000,
+        generation: GENERATION,
+        casToken: 'cas-b1',
+        expectedGeneration: null,
+        expectedCasToken: null,
+        state: {
+          elements: [],
+          layers: [],
+          extensions: { fog: { pluginName: 'fog', version: 1, data: null } },
+        } as never,
+      });
+    // Same DM principal, another tab: refused before any write.
+    const before = await snapshot();
+    expect(await provision('session-tab-a')).toEqual({
+      status: 'rejected',
+      reason: 'forbidden',
+    });
+    expect(await snapshot()).toEqual(before);
+    // The live tab provisions.
+    expect(await provision('session-tab-b')).toEqual({
+      status: 'provisioned',
+      generation: GENERATION,
+    });
+    // Older apps that send no session keep the principal + fence check.
+    await client.del(keys.meta);
+    expect(await provision()).toEqual({
+      status: 'provisioned',
+      generation: GENERATION,
+    });
+  });
+
   it('guards initialize-if-empty and whole-generation restore with generation and CAS', async () => {
     await client.del(keys.meta);
     const first = new RedisAuthorityDriver(client);

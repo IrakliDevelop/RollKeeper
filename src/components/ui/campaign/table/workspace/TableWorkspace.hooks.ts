@@ -309,6 +309,15 @@ export function useTableWorkspace(campaignCode: string) {
     descriptor: authority.descriptor,
     canShow: authority.canShow && authority.room.sceneId === mountedSceneId,
     inactive: snapshot === null,
+    // O8-2 (review U3): the scene record's grid decides the DM scale line.
+    isSquareScene: sceneId => {
+      const scene = snapshot?.scenes.find(value => value.sceneId === sceneId);
+      const settings = scene?.map.gridSettings as
+        | { gridType?: unknown }
+        | null
+        | undefined;
+      return scene?.map.gridEnabled === true && settings?.gridType === 'square';
+    },
   };
   const presentation = useTablePresentationPanel(presentationProps);
   const combat = useWorkspaceCombatPublication({
@@ -367,6 +376,7 @@ export function useTableWorkspace(campaignCode: string) {
     campaignCode,
     dmId,
     sceneId: mountedSceneId,
+    controlSession: authority.session,
   });
   // PR08 desktop A1: a restore replaces the room generation and the relay
   // withdraws the current socket, so the canvas always re-mints through a

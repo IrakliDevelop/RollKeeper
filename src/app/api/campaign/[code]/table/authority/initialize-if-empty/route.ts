@@ -31,7 +31,8 @@ export async function POST(
   const context = await authorityAdminContext(
     code,
     body.sceneId,
-    auth.principal.id
+    auth.principal.id,
+    { holderSessionId: body.holderSessionId, expectedFence: body.expectedFence }
   );
   if (!context)
     return NextResponse.json(

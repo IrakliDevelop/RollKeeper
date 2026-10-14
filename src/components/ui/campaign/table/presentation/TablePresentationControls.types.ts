@@ -42,4 +42,6 @@ export interface TablePresentationControlsProps {
   session: TableControlSession | null;
   /** The page session's latest descriptor (null before preparation). */
   descriptor: TableDescriptor | null;
+  /** O8-2: whether a scene has a square grid (no mini-scale line if not). */
+  isSquareScene?: (sceneId: string) => boolean;
 }

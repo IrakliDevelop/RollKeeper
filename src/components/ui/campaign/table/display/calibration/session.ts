@@ -58,11 +58,18 @@ export interface CalibrationStore {
 export const inCalibratedMode = (state: CalibrationPageState): boolean =>
   state.calibratedMode;
 
-/** R3-1 / O7-A1 derivation; `geometry` null = no scene shown (blank/waiting). */
+/**
+ * R3-1 / O7-A1 derivation; `geometry` null = no scene shown (blank/waiting).
+ * O8-2: a scene whose live grid is not square has no scale state at all:
+ * the TV shows the normal view and reports uncalibrated, while calibrated
+ * mode and the session are kept for the next square scene.
+ */
 export function deriveCalibrationReport(
   state: CalibrationPageState,
   geometry: SceneGeometry | null
 ): CalibrationReport {
+  if (geometry?.kind === 'unsupported' && geometry.reason === 'grid')
+    return 'uncalibrated';
   if (!state.calibratedMode) return 'uncalibrated';
   if (!state.session) return 'verify-required';
   if (geometry && geometry.kind !== 'square') return 'unsupported';

@@ -68,7 +68,7 @@ describe('save messages carry their tone at the source (O7-3 W5)', () => {
       const forbidden = messages.failed('forbidden').text;
       const expired = messages.failed('expired').text;
       const invalid = messages.failed('invalid').text;
-      expect(forbidden).toMatch(/live control/u);
+      expect(forbidden).toMatch(/this tab isn't live/u);
       expect(expired).toMatch(/took too long/u);
       expect(invalid).toMatch(/can't be used/u);
       expect(messages.conflict.text).toMatch(/scene changed/u);

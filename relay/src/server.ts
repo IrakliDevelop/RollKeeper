@@ -88,8 +88,8 @@ export async function startRelay(
 ): Promise<RelayHandle> {
   let authorityDriver: RedisAuthorityDriver | null = null;
   let pokeHandler:
-    ((req: http.IncomingMessage, res: http.ServerResponse) => void) | null =
-    null;
+    | ((req: http.IncomingMessage, res: http.ServerResponse) => void)
+    | null = null;
   const server = http.createServer((req, res) => {
     if (req.url === '/healthz') {
       res.writeHead(200, { 'content-type': 'text/plain' });
@@ -139,6 +139,8 @@ export async function startRelay(
               epoch: string;
               writerFence: number;
               principal: string;
+              /** PR08 B1: the live tab's session (absent from older apps). */
+              holderSessionId?: string;
               roomGeneration: string;
               expectedGeneration?: string | null;
               expectedCasToken?: string | null;
@@ -195,6 +197,9 @@ export async function startRelay(
               epoch: body.epoch,
               writerFence: body.writerFence,
               principal: body.principal,
+              ...(typeof body.holderSessionId === 'string'
+                ? { holderSessionId: body.holderSessionId }
+                : {}),
               deadlineAt: Date.now() + 5_000,
               generation: body.generation,
               casToken: body.casToken,

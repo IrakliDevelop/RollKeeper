@@ -87,3 +87,39 @@ describe('publication wording (O7-3)', () => {
     );
   });
 });
+
+describe('combat notices (review X2)', () => {
+  it('shows a one-off notice and "Saving…" beside the unsaved change', () => {
+    const retry = vi.fn();
+    const { rerender } = render(
+      <TableCombatToolbar
+        {...props}
+        playersStale={false}
+        notice={{ tone: 'info', message: 'Still saving the last change.' }}
+        unsavedNotice={{
+          tone: 'error',
+          message: "Orc damage wasn't saved. Saving failed.",
+          retry,
+        }}
+      />
+    );
+    expect(screen.getByText('Still saving the last change.')).toBeVisible();
+    expect(
+      screen.getByText("Orc damage wasn't saved. Saving failed.")
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
+    rerender(
+      <TableCombatToolbar
+        {...props}
+        playersStale={false}
+        saving
+        unsavedNotice={{
+          tone: 'error',
+          message: "These changes weren't saved.",
+        }}
+      />
+    );
+    expect(screen.getByText('Saving…')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull();
+  });
+});
