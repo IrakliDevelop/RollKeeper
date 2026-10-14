@@ -1069,7 +1069,11 @@ export class TableDisplayController {
       nonSquare,
       // A scene is targeted but its camera is not applied yet: attaching,
       // or torn down and waiting to retry (C2). Blank / no scene: false.
-      sceneLoading: !!this.target?.scene && !this.attach?.cameraApplied,
+      // No relay configured: nothing will attach, so nothing is loading (Z5).
+      sceneLoading:
+        !!this.target?.scene &&
+        !!this.options.relayUrl &&
+        !this.attach?.cameraApplied,
     };
   }
 

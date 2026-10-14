@@ -1052,6 +1052,16 @@ describe('O8-2 hex attach failures (PR08 C2)', () => {
       screen.getByRole('button', { name: 'Calibrate minis' })
     ).toBeTruthy();
   });
+  it('with no relay configured a shown scene still offers calibration (review Z5)', async () => {
+    delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
+    await mount();
+    await flush();
+    expect(connections).toHaveLength(0);
+    fireEvent.pointerMove(window);
+    expect(
+      screen.getByRole('button', { name: 'Calibrate minis' })
+    ).toBeTruthy();
+  });
   for (const [name, fail] of failures) {
     it(`no calibration UI while a hex attach is retried after ${name}`, async () => {
       await mount();
