@@ -103,6 +103,12 @@ export interface DisplayCalibrationView {
    * The TV then shows no calibration UI at all and uses the normal view.
    */
   nonSquare: boolean;
+  /**
+   * Review U2: a scene is attaching and its grid is not known yet (camera
+   * not applied). No calibration UI shows until it is, so a non-square
+   * scene never flashes scale controls.
+   */
+  sceneLoading: boolean;
 }
 
 export interface TableDisplayView {
@@ -119,6 +125,7 @@ export const UNCALIBRATED_VIEW: DisplayCalibrationView = {
   report: 'uncalibrated',
   unsupported: null,
   nonSquare: false,
+  sceneLoading: false,
 };
 
 export interface TableDisplayControllerOptions {
@@ -1060,6 +1067,7 @@ export class TableDisplayController {
           ? 'range'
           : null,
       nonSquare,
+      sceneLoading: !!this.attach && !this.attach.cameraApplied,
     };
   }
 
@@ -1071,7 +1079,8 @@ export class TableDisplayController {
     if (
       next.report === previous.report &&
       next.unsupported === previous.unsupported &&
-      next.nonSquare === previous.nonSquare
+      next.nonSquare === previous.nonSquare &&
+      next.sceneLoading === previous.sceneLoading
     )
       return;
     this.emit({});

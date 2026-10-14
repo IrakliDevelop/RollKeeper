@@ -863,6 +863,26 @@ describe('unsupported geometry (P4, C7-2, C7-3)', () => {
     expect(viewport().camera.zoom).toBe(96 / 50);
   });
 
+  it('O8-2 (review U2): no "Check the scale" flash while a hex scene attaches with a cleared session', async () => {
+    await mount();
+    await goLive();
+    await calibrate();
+    await act(async () => {
+      physical.fullscreen = false;
+      document.dispatchEvent(new Event('fullscreenchange'));
+    });
+    expect(state()).toBe('verify-required');
+    expect(screen.getByTestId('table-display-calibration')).toBeTruthy();
+    // Switch to the hex scene: before its camera is applied the grid is
+    // not known yet, so nothing scale-related may show.
+    await show(sceneDescriptor('cave', 3));
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    expect(screen.queryByText('Check the scale')).toBeNull();
+    await goLive();
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    expect(state()).toBe('uncalibrated');
+  });
+
   it('O8-2: an uncalibrated TV on a hex scene offers no Calibrate minis or tips', async () => {
     await mount();
     await goLive();
@@ -971,6 +991,15 @@ describe('testability and resource discipline (P12)', () => {
     trackTimers();
     try {
       render(<TableDisplayShell code={CODE} deps={deps} />);
+      await flush();
+      // The scene's grid is known once it is live (review U2: no
+      // calibration UI while a scene is still attaching).
+      const connection = connections.at(-1)!;
+      await act(async () => {
+        connection.options.onStatus?.('live');
+        connection.options.fog!.manager.loadState(null, { origin: 'remote' });
+        await new Promise(resolve => setTimeout(resolve, 20));
+      });
       await flush();
       fireEvent.pointerMove(window);
       fireEvent.click(

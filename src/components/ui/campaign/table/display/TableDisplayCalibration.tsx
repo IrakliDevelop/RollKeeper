@@ -47,8 +47,9 @@ export function TableDisplayCalibration({
   const [panelOpen, setPanelOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   if (!store || !state) return null;
-  // O8-2: no calibration UI at all on a scene without a square grid.
-  if (view.nonSquare) return null;
+  // O8-2: no calibration UI at all on a scene without a square grid, nor
+  // while a scene attaches and its grid is not known yet (review U2).
+  if (view.nonSquare || view.sceneLoading) return null;
 
   const { report, unsupported } = view;
   if (panelOpen)
