@@ -60,6 +60,7 @@ export function TableHeaderDetails(props: {
     | 'saveTone'
     | 'recoveryBusy'
     | 'saveBusy'
+    | 'live'
     | 'restore'
     | 'saveCheckpoint'
   >;
@@ -164,12 +165,17 @@ export function TableHeaderDetails(props: {
           {checkpoint.saveBusy && (
             <p className="text-muted">Saving checkpoint…</p>
           )}
+          {!checkpoint.live && (draft || saved) && (
+            <p className="text-muted">
+              Only the live tab can restore. Go live first.
+            </p>
+          )}
           <div className="flex flex-wrap gap-2">
             {draft && (
               <Button
                 variant="outline"
                 size="sm"
-                disabled={checkpoint.recoveryBusy}
+                disabled={checkpoint.recoveryBusy || !checkpoint.live}
                 onClick={() => void checkpoint.restore(draft, 'changes')}
               >
                 Reapply changes
@@ -179,7 +185,7 @@ export function TableHeaderDetails(props: {
               <Button
                 variant="outline"
                 size="sm"
-                disabled={checkpoint.recoveryBusy}
+                disabled={checkpoint.recoveryBusy || !checkpoint.live}
                 onClick={() => void checkpoint.restore(saved, 'checkpoint')}
               >
                 Restore checkpoint

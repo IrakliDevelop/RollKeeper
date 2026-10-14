@@ -367,6 +367,7 @@ export function useTableWorkspace(campaignCode: string) {
     campaignCode,
     dmId,
     sceneId: mountedSceneId,
+    controlSession: authority.session,
   });
   // PR08 desktop A1: a restore replaces the room generation and the relay
   // withdraws the current socket, so the canvas always re-mints through a

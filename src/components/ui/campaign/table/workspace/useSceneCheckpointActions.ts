@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { BattleMapConnection } from '@/lib/battlemapSync';
+import type { TableControlSession } from '@/lib/table/authorityLifecycle';
 import {
   restoreAuthorityFork,
   saveSceneCheckpoint,
@@ -32,9 +33,20 @@ export function useSceneCheckpointActions(options: {
   campaignCode: string;
   dmId: string;
   sceneId: string | null;
+  /** The page's live-control session; null when this tab is not live. */
+  controlSession: TableControlSession | null;
 }) {
-  const { repository, adapter, connection, campaignCode, dmId, sceneId } =
-    options;
+  const {
+    repository,
+    adapter,
+    connection,
+    campaignCode,
+    dmId,
+    sceneId,
+    controlSession,
+  } = options;
+  /** PR08 desktop B1: only the tab holding live control may restore. */
+  const live = controlSession !== null && !controlSession.isLost();
   const [save, setSave] = useState<SaveMessage>(SAVE_MESSAGES.loading);
   /** O7-2 HN-1 / O7-3 W8R-7: the tone is fixed where the message is produced. */
   const setSaveMessage = useCallback(
@@ -115,6 +127,10 @@ export function useSceneCheckpointActions(options: {
   ) {
     if (!checkpoint || !sceneId) return;
     const messages = restoreMessages(kind);
+    if (!controlSession || controlSession.isLost()) {
+      post(messages.notLive);
+      return;
+    }
     setRecoveryBusy(true);
     post(messages.busy);
     const result = await restoreAuthorityFork({
@@ -122,6 +138,10 @@ export function useSceneCheckpointActions(options: {
       dmId,
       sceneId,
       checkpoint,
+      lease: {
+        holderSessionId: controlSession.holderSessionId,
+        expectedFence: controlSession.current().writerFence,
+      },
     });
     setRecoveryBusy(false);
     // Another scene was mounted meanwhile: never remount its canvas or show
@@ -172,6 +192,7 @@ export function useSceneCheckpointActions(options: {
     setSaveMessage,
     recoveryBusy,
     restoredCount,
+    live,
     saveBusy,
     saveCheckpoint,
     restore,

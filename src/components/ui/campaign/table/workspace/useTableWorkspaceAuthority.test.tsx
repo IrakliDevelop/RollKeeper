@@ -86,6 +86,12 @@ describe('W3 one control session per workspace (D8)', () => {
     );
     // One prepare per (scene, controlEpoch): revisits use the settled result.
     expect(server.initializes).toHaveLength(3);
+    // PR08 desktop B1: each room seed carries this tab's session and fence.
+    for (const body of server.initializes)
+      expect(body).toMatchObject({
+        holderSessionId: session!.holderSessionId,
+        expectedFence: session!.current().writerFence,
+      });
     expect(
       intervals.mock.calls.filter(([, delay]) => delay === 10_000)
     ).toHaveLength(1);

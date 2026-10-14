@@ -382,6 +382,11 @@ export async function restoreAuthorityFork(options: {
   dmId: string;
   sceneId: string;
   checkpoint: TableCanvasCheckpointV1;
+  /**
+   * PR08 desktop B1: the page's live-control session and its writer fence.
+   * The server restores only for the tab holding the lease.
+   */
+  lease: { holderSessionId: string; expectedFence: number };
   fetcher?: typeof fetch;
 }): Promise<AuthorityRestoreResult> {
   const fetcher = options.fetcher ?? fetch;
@@ -391,7 +396,12 @@ export async function restoreAuthorityFork(options: {
     currentResponse = await fetcher(`${base}/checkpoint`, {
       method: 'POST',
       headers: TABLE_MUTATION_HEADERS,
-      body: JSON.stringify({ dmId: options.dmId, sceneId: options.sceneId }),
+      body: JSON.stringify({
+        dmId: options.dmId,
+        sceneId: options.sceneId,
+        holderSessionId: options.lease.holderSessionId,
+        expectedFence: options.lease.expectedFence,
+      }),
     });
   } catch {
     return { status: 'failed', reason: 'capture' };
@@ -441,6 +451,8 @@ export async function restoreAuthorityFork(options: {
       body: JSON.stringify({
         dmId: options.dmId,
         sceneId: options.sceneId,
+        holderSessionId: options.lease.holderSessionId,
+        expectedFence: options.lease.expectedFence,
         expectedGeneration,
         expectedCasToken,
         state: {

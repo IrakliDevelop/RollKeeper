@@ -78,6 +78,7 @@ function renderHeader(
     conflict?: boolean;
     recoveryBusy?: boolean;
     saveBusy?: boolean;
+    live?: boolean;
     waitSeconds?: number;
     extra?: ReactNode;
     notices?: Parameters<typeof TableWorkspaceHeader>[0]['notices'];
@@ -129,6 +130,7 @@ function renderHeader(
             saveDetail: merged.saveDetail,
             recoveryBusy: merged.recoveryBusy ?? false,
             saveBusy: merged.saveBusy ?? false,
+            live: merged.live ?? true,
             ...actions,
           } as never,
           pendingConflict: merged.conflict ? { fields: ['name'] } : null,
@@ -528,6 +530,37 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
         name: 'Restore checkpoint',
       })
     );
+  });
+
+  it('disables Restore and Reapply with a plain reason while this tab is not live (B1)', () => {
+    renderHeader({ localDraft: true, checkpoint: true, live: false });
+    const content = open();
+    expect(
+      within(content).getByRole('button', { name: 'Restore checkpoint' })
+    ).toBeDisabled();
+    expect(
+      within(content).getByRole('button', { name: 'Reapply changes' })
+    ).toBeDisabled();
+    expect(
+      within(content).getByText('Only the live tab can restore. Go live first.')
+    ).toBeInTheDocument();
+    // Saving a checkpoint still works from any tab.
+    expect(
+      within(content).getByRole('button', { name: 'Save checkpoint' })
+    ).toBeEnabled();
+  });
+
+  it('keeps Restore enabled and shows no hint while this tab is live', () => {
+    renderHeader({ checkpoint: true, live: true });
+    const content = open();
+    expect(
+      within(content).getByRole('button', { name: 'Restore checkpoint' })
+    ).toBeEnabled();
+    expect(
+      within(content).queryByText(
+        'Only the live tab can restore. Go live first.'
+      )
+    ).toBeNull();
   });
 
   it('content stays within 8 px of the viewport edges (HR-5)', () => {

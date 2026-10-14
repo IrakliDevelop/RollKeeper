@@ -793,6 +793,9 @@ export async function prepareTableSceneRoom(
         body: JSON.stringify({
           dmId: options.dmId,
           sceneId: input.sceneId,
+          // PR08 desktop B1: only the lease-holding tab may provision.
+          holderSessionId: session.holderSessionId,
+          expectedFence: session.current().writerFence,
           expectedGeneration: null,
           expectedCasToken: null,
           state: canvasStateToAuthorityState(input.canvasState, options.dmId),

@@ -265,6 +265,7 @@ describe('scene checkpoint persistence', () => {
         campaignCode: 'CAMP',
         dmId: 'dm-1',
         sceneId: 'scene-1',
+        lease: { holderSessionId: 'session-1', expectedFence: 1 },
         checkpoint: retained,
         fetcher,
       }),
@@ -272,6 +273,7 @@ describe('scene checkpoint persistence', () => {
         campaignCode: 'CAMP',
         dmId: 'dm-1',
         sceneId: 'scene-1',
+        lease: { holderSessionId: 'session-1', expectedFence: 1 },
         checkpoint: retained,
         fetcher,
       }),
@@ -307,6 +309,7 @@ describe('restore reasons are truthful (PR08 desktop P3)', () => {
       campaignCode: 'CAMP',
       dmId: 'dm-1',
       sceneId: 'scene-1',
+      lease: { holderSessionId: 'session-1', expectedFence: 1 },
       checkpoint: retained,
       fetcher: vi.fn<typeof fetch>(async input =>
         String(input).endsWith('/checkpoint')
@@ -374,6 +377,7 @@ describe('restore reasons are truthful (PR08 desktop P3)', () => {
         campaignCode: 'CAMP',
         dmId: 'dm-1',
         sceneId: 'scene-1',
+        lease: { holderSessionId: 'session-1', expectedFence: 1 },
         checkpoint: retained,
         fetcher,
       })
@@ -389,6 +393,7 @@ describe('restore reasons are truthful (PR08 desktop P3)', () => {
           campaignCode: 'CAMP',
           dmId: 'dm-1',
           sceneId: 'scene-1',
+          lease: { holderSessionId: 'session-1', expectedFence: 1 },
           checkpoint: retained,
           fetcher: vi.fn<typeof fetch>(
             async () => new Response('down', { status })
