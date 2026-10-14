@@ -837,51 +837,73 @@ describe('input policy (P7, R3-2, C7-3)', () => {
 });
 
 describe('unsupported geometry (P4, C7-2, C7-3)', () => {
-  it('session held on a hex scene: unsupported message, uncalibrated camera and free input', async () => {
+  it('O8-2: session held on a hex scene: no calibration UI, normal view, free input; square returns calibrated', async () => {
     await mount();
     await goLive();
     await calibrate();
     await show(sceneDescriptor('cave', 3));
     await goLive();
-    expect(state()).toBe('unsupported');
+    expect(state()).toBe('uncalibrated');
+    fireEvent.pointerMove(window);
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
     expect(
-      screen.getByTestId('table-display-calibration').textContent
-    ).toContain(
-      'Mini scale needs a square grid on this scene. Showing the normal view.'
-    );
+      screen.queryByRole('button', { name: 'Calibrate minis' })
+    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Check scale' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Setup tips' })).toBeNull();
+    expect(screen.queryByText(/square grid/u)).toBeNull();
     const zoom = viewport().camera.zoom;
     wheel();
     expect(viewport().camera.zoom).not.toBe(zoom);
-    expect(acks.at(-1)!).toMatchObject({ calibration: 'unsupported' });
+    expect(acks.at(-1)!).toMatchObject({ calibration: 'uncalibrated' });
+    // Back on a square scene the saved scale applies again.
+    await show(sceneDescriptor('tavern', 4));
+    await goLive();
+    expect(state()).toBe('verified');
+    expect(viewport().camera.zoom).toBe(96 / 50);
   });
 
-  it('C7-2 (O7-A3): session cleared while a hex scene is shown: Check scale and the unsupported message, frozen input, ACK verify-required', async () => {
+  it('O8-2: an uncalibrated TV on a hex scene offers no Calibrate minis or tips', async () => {
+    await mount();
+    await goLive();
+    await show(sceneDescriptor('cave', 3));
+    await goLive();
+    fireEvent.pointerMove(window);
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Calibrate minis' })
+    ).toBeNull();
+    // The square scene still offers it.
+    await show(sceneDescriptor('tavern', 4));
+    await goLive();
+    fireEvent.pointerMove(window);
+    expect(
+      screen.getByRole('button', { name: 'Calibrate minis' })
+    ).toBeTruthy();
+  });
+
+  it('O8-2: session cleared while a hex scene is shown: still no calibration UI and free input; square then asks to check the scale', async () => {
     await mount();
     await goLive();
     await calibrate();
     await show(sceneDescriptor('cave', 3));
     await goLive();
-    expect(state()).toBe('unsupported');
+    expect(state()).toBe('uncalibrated');
     await act(async () => {
       physical.fullscreen = false;
       document.dispatchEvent(new Event('fullscreenchange'));
     });
-    expect(state()).toBe('verify-required');
-    const status = screen.getByTestId('table-display-calibration');
-    expect(status.textContent).toContain(
-      'Mini scale needs a square grid on this scene. Showing the normal view.'
-    );
-    expect(screen.getByRole('button', { name: 'Check scale' })).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Use normal view' })
-    ).toBeTruthy();
-    const before = camera();
+    expect(state()).toBe('uncalibrated');
+    fireEvent.pointerMove(window);
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    const zoom = viewport().camera.zoom;
     wheel();
-    mouseDrag(50, 50);
-    expect(camera()).toEqual(before);
-    expect(acks.at(-1)!).toMatchObject({
-      calibration: 'verify-required',
-    });
+    expect(viewport().camera.zoom).not.toBe(zoom);
+    expect(acks.at(-1)!).toMatchObject({ calibration: 'uncalibrated' });
+    await show(sceneDescriptor('tavern', 4));
+    await goLive();
+    expect(state()).toBe('verify-required');
+    expect(screen.getByRole('button', { name: 'Check scale' })).toBeTruthy();
   });
 
   it('blank and waiting with no canvas never clear the session by themselves', async () => {

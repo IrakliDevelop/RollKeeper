@@ -388,7 +388,7 @@ describe('PR07 P9 table scale reports (R3-4 wording)', () => {
       tone: 'muted',
     });
     expect(displayCalibrationLine(status('unsupported'))).toEqual({
-      text: "TV says this scene can't use mini scale (it needs a square grid)",
+      text: "TV says this scene's grid can't be matched to minis",
       tone: 'muted',
     });
     for (const quiet of ['verify-required', 'uncalibrated', undefined])

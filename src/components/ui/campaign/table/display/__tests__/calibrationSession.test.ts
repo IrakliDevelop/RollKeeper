@@ -148,18 +148,17 @@ describe('session verification flag (P1, R3-1)', () => {
       now: 10,
     });
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe('verified');
-    // Geometry never clears the session: hex → unsupported, square → verified.
-    expect(deriveCalibrationReport(store.getState(), HEX)).toBe('unsupported');
+    // Geometry never clears the session. O8-2: a non-square scene uses the
+    // normal view and reports uncalibrated; square returns verified.
+    expect(deriveCalibrationReport(store.getState(), HEX)).toBe('uncalibrated');
     expect(deriveCalibrationReport(store.getState(), null)).toBe('verified');
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe('verified');
     store.invalidate();
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe(
       'verify-required'
     );
-    // C7-2: session null on an unsupported scene still reports verify-required.
-    expect(deriveCalibrationReport(store.getState(), HEX)).toBe(
-      'verify-required'
-    );
+    // O8-2: no scale state at all on a non-square scene, session or not.
+    expect(deriveCalibrationReport(store.getState(), HEX)).toBe('uncalibrated');
     const saved = window.localStorage.getItem(CALIBRATION_STORAGE_KEY);
     store.useUncalibrated();
     expect(deriveCalibrationReport(store.getState(), SQUARE)).toBe(

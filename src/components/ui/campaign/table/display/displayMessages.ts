@@ -25,8 +25,6 @@ export const CALIBRATION_REQUIREMENTS =
   "Mini scale works on a second monitor or TV, in full screen, at 100% browser zoom. Check the scale again if you move the window to another screen, change zoom or display settings, or leave full screen. The browser can't spot every change.";
 export const CALIBRATION_NEEDS_VERIFY = 'Check the scale';
 export const CALIBRATION_VERIFIED = 'Scale checked';
-export const CALIBRATION_UNSUPPORTED_GRID =
-  'Mini scale needs a square grid on this scene. Showing the normal view.';
 export const CALIBRATION_UNSUPPORTED_RANGE =
   "This scene's grid can't be matched to minis.";
 export const CALIBRATION_RULER_FIRST =

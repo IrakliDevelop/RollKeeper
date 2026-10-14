@@ -95,8 +95,13 @@ export type DisplayCredentialDenial = 'expired' | 'in-use';
 /** PR07: the scale state this page reports (and the shell renders). */
 export interface DisplayCalibrationView {
   report: CalibrationReport;
-  /** Why calibrated minis are unavailable on the shown scene, if they are. */
-  unsupported: 'grid' | 'range' | null;
+  /** Why calibrated minis are unavailable on the shown square scene. */
+  unsupported: 'range' | null;
+  /**
+   * O8-2: the shown scene's live grid is not square (hex, none, invalid).
+   * The TV then shows no calibration UI at all and uses the normal view.
+   */
+  nonSquare: boolean;
 }
 
 export interface TableDisplayView {
@@ -112,6 +117,7 @@ export interface TableDisplayView {
 export const UNCALIBRATED_VIEW: DisplayCalibrationView = {
   report: 'uncalibrated',
   unsupported: null,
+  nonSquare: false,
 };
 
 export interface TableDisplayControllerOptions {
@@ -969,11 +975,14 @@ export class TableDisplayController {
     }
   }
 
-  /** Geometry of the shown scene (null: none shown, or not preferred). */
+  /**
+   * Geometry of the shown scene (null: none shown). O8-2: read in every
+   * mode, so a non-square scene hides the calibration UI before Calibrate.
+   */
   private liveGeometry(): SceneGeometry | null {
     const state = this.calibrationState();
     const attach = this.attach;
-    if (!state || !inCalibratedMode(state)) return null;
+    if (!state) return null;
     if (!attach?.viewport || !attach.cameraApplied) return null;
     const cssPxPerSquare =
       state.session?.cssPxPerSquare ??
@@ -986,10 +995,18 @@ export class TableDisplayController {
     const state = this.calibrationState();
     if (!state) return UNCALIBRATED_VIEW;
     const geometry = this.liveGeometry();
+    const nonSquare =
+      geometry?.kind === 'unsupported' && geometry.reason === 'grid';
     return {
       report: deriveCalibrationReport(state, geometry),
+      // Range limits matter only for a square scene in calibrated mode.
       unsupported:
-        geometry && geometry.kind === 'unsupported' ? geometry.reason : null,
+        inCalibratedMode(state) &&
+        geometry?.kind === 'unsupported' &&
+        geometry.reason === 'range'
+          ? 'range'
+          : null,
+      nonSquare,
     };
   }
 
@@ -1000,7 +1017,8 @@ export class TableDisplayController {
     const previous = this.view.calibration;
     if (
       next.report === previous.report &&
-      next.unsupported === previous.unsupported
+      next.unsupported === previous.unsupported &&
+      next.nonSquare === previous.nonSquare
     )
       return;
     this.emit({});

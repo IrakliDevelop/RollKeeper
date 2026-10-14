@@ -198,7 +198,8 @@ export function displayCalibrationLine(
     return { text: 'TV says the scale is checked', tone: 'muted' };
   if (status.calibration === 'unsupported')
     return {
-      text: "TV says this scene can't use mini scale (it needs a square grid)",
+      // O8-2: only a square scene reports this (its scale is out of range).
+      text: "TV says this scene's grid can't be matched to minis",
       tone: 'muted',
     };
   return null;
