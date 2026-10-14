@@ -51,11 +51,30 @@ function sceneRunsOf(
 }
 
 /**
+ * Turn and lifecycle steps run one at a time: a second click while one is
+ * saving is refused visibly (a double click must not advance two turns).
+ */
+const ONE_AT_A_TIME = new Set<TableCombatCommandV1['type']>([
+  'combat.start',
+  'combat.end',
+  'combat.nextTurn',
+  'combat.prevTurn',
+  'combat.createRun',
+  'combat.deleteArchive',
+]);
+
+const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
+
+/**
  * Repository-backed scene combat state for the Table route: selected run,
- * read model and ONE serialized command queue. While a command is pending,
- * further user intents are refused with "Saving…" (never queued); background
- * commands (acknowledgements, prunes) wait their turn. A conflict refreshes
- * and offers a deliberate retry of the same intent; nothing auto-replans.
+ * read model and ONE serialized command queue. User intents that set a
+ * value (hide, initiative, HP, conditions, participants, selection) queue
+ * in order behind a pending one, so a quick blur-commit followed by a click
+ * applies both (PR08 desktop B3). Turn and lifecycle steps are refused while
+ * one is saving, with a notice that an earlier success never erases.
+ * Background commands (acknowledgements, prunes) wait their turn. A conflict
+ * refreshes and offers a deliberate retry of the same intent; nothing
+ * auto-replans.
  */
 export function useTableCombat(options: {
   repository: TableRepository;
@@ -109,9 +128,38 @@ export function useTableCombat(options: {
   );
 
   const [saving, setSaving] = useState(false);
-  const [notice, setNotice] = useState<TableCombatNotice | null>(null);
-  /** A user intent is pending: further user intents are refused. */
-  const busy = useRef(false);
+  const [notice, setNoticeState] = useState<TableCombatNotice | null>(null);
+  /** User intents queued or running. */
+  const pending = useRef(0);
+  /** Orders user actions; a success clears only notices from earlier ones. */
+  const sequence = useRef(0);
+  const noticeOwner = useRef(0);
+  const setNotice = useCallback((value: TableCombatNotice | null) => {
+    sequence.current += 1;
+    noticeOwner.current = sequence.current;
+    setNoticeState(value);
+  }, []);
+  const settleNotice = useCallback(
+    (owner: number, value: TableCombatNotice | null) => {
+      // A success never erases a notice raised by a later action.
+      if (value === null && noticeOwner.current > owner) return;
+      noticeOwner.current = Math.max(noticeOwner.current, owner);
+      setNoticeState(value);
+    },
+    []
+  );
+  const begin = useCallback(() => {
+    pending.current += 1;
+    setSaving(true);
+  }, []);
+  const finish = useCallback(() => {
+    pending.current -= 1;
+    if (pending.current === 0) setSaving(false);
+  }, []);
+  const refuse = useCallback(() => {
+    setNotice({ tone: 'info', message: STILL_SAVING });
+    return Promise.resolve(null);
+  }, [setNotice]);
   /** Serializes user intents and background commands (acks, prunes). */
   const queue = useRef<Promise<unknown>>(Promise.resolve());
 
@@ -133,20 +181,19 @@ export function useTableCombat(options: {
 
   const execute = useCallback(
     (intent: TableCombatIntent): Promise<TableCombatResult | null> => {
-      if (busy.current) {
-        setNotice({ tone: 'info', message: 'Saving…' });
-        return Promise.resolve(null);
-      }
-      busy.current = true;
-      setSaving(true);
+      if (pending.current > 0 && ONE_AT_A_TIME.has(intent().type))
+        return refuse();
+      sequence.current += 1;
+      const owner = sequence.current;
+      begin();
       const task = queue.current.then(async () => {
         try {
           const result = await run(intent);
           if (result.status === 'committed' || result.status === 'unchanged') {
-            setNotice(null);
+            settleNotice(owner, null);
           } else {
             if (result.status === 'conflict') await repository.reload();
-            setNotice({
+            settleNotice(owner, {
               tone: 'error',
               message: combatFailureMessage(result),
               // Deliberate retry of the same intent on the newest state.
@@ -164,14 +211,13 @@ export function useTableCombat(options: {
           }
           return result;
         } finally {
-          busy.current = false;
-          setSaving(false);
+          finish();
         }
       });
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, run, options.campaignCode]
+    [repository, run, options.campaignCode, refuse, begin, finish, settleNotice]
   );
 
   /**
@@ -191,12 +237,8 @@ export function useTableCombat(options: {
         { ok: true } | { ok: false; reason: string; uncertain?: boolean }
       >
     ): Promise<TableCombatResult | null> => {
-      if (busy.current) {
-        setNotice({ tone: 'info', message: 'Saving…' });
-        return Promise.resolve(null);
-      }
-      busy.current = true;
-      setSaving(true);
+      if (pending.current > 0) return refuse();
+      begin();
       const task = queue.current.then(async () => {
         try {
           const latest = repository.getCurrent();
@@ -259,14 +301,13 @@ export function useTableCombat(options: {
           }
           return result;
         } finally {
-          busy.current = false;
-          setSaving(false);
+          finish();
         }
       });
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository]
+    [repository, refuse, begin, finish, setNotice]
   );
 
   /** Background commands (acks, prunes, URL selection): queued, not refused. */

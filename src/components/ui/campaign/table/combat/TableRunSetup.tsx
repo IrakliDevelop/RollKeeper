@@ -94,7 +94,9 @@ export function TableRunSetup(props: {
               key={view.entityId}
               view={view}
               highlightMissing={props.missingPrompt !== null}
-              disabled={props.busy}
+              // PR08 desktop B3: value edits queue behind a pending save, so
+              // a blur-commit never disables the switch the DM is clicking.
+              disabled={false}
               physical={props.physicalActorIds?.has(view.actorId) === true}
               onInitiative={value => props.onInitiative(view.actorId, value)}
               onHidden={hidden => props.onHidden(view.actorId, hidden)}
