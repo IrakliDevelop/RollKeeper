@@ -158,3 +158,62 @@ test('narrow headers keep accessible names at 360 px', async ({ page }) => {
     page.getByRole('button', { name: 'Play', exact: true })
   ).toBeVisible();
 });
+
+/**
+ * PR08 D1: the editor top bar in Play mode (DmVttTopBar, scrolls sideways)
+ * keeps the Table link and Setup/Play pinned on screen. The map is added
+ * to the Table first, so the async link reads "Open in Table" as in the
+ * manual run; the relay status chip shows ("Connecting…").
+ */
+async function adoptMapIntoTable(page: Page): Promise<void> {
+  await page.goto(`/dm/campaign/${CODE}/battlemaps`);
+  await page.getByRole('button', { name: `Add ${MAP_NAME} to Table` }).click();
+  await expect(
+    page.getByRole('button', { name: `${MAP_NAME} added` })
+  ).toBeVisible();
+}
+
+/** The control is inside the viewport and is what a tap at its centre hits. */
+async function reachable(page: Page, name: string, role: 'link' | 'button') {
+  const control = page.getByRole(role, { name, exact: true });
+  await expect(control).toBeVisible();
+  return control.evaluate(element => {
+    const box = element.getBoundingClientRect();
+    const hit = document.elementFromPoint(
+      box.left + box.width / 2,
+      box.top + box.height / 2
+    );
+    return {
+      right: box.right,
+      left: box.left,
+      innerWidth: window.innerWidth,
+      hit: hit !== null && (hit === element || element.contains(hit)),
+    };
+  });
+}
+
+for (const theme of ['parchment', 'dark', 'light'])
+  for (const width of [390, 360])
+    test(`editor top bar pins Open in Table and Setup/Play at ${width} px (${theme})`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 720 });
+      await seed(page, theme);
+      await page.addInitScript(
+        ({ key }) => window.localStorage.setItem(key, 'play'),
+        { key: `rollkeeper-battlemap-mode:${MAP_ID}` }
+      );
+      await adoptMapIntoTable(page);
+      await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
+      await expect(page.getByText('Connecting…')).toBeAttached();
+      for (const [name, role] of [
+        ['Open in Table', 'link'],
+        ['Setup', 'button'],
+        ['Play', 'button'],
+      ] as const) {
+        const box = await reachable(page, name, role);
+        expect(box.left, name).toBeGreaterThanOrEqual(0);
+        expect(box.right, name).toBeLessThanOrEqual(box.innerWidth);
+        expect(box.hit, name).toBe(true);
+      }
+    });
