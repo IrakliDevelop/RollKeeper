@@ -109,7 +109,9 @@ scene rooms, player views and the TV cannot connect.
   is not square (hex, none or invalid), the TV shows no calibration UI at
   all (no Calibrate minis, Check scale or Setup tips, no grid message) and
   uses the normal view; it reports `uncalibrated`, so the DM sees no
-  mini-scale warning. A calibrated TV keeps its saved scale and returns to it
+  mini-scale warning (and no scale line at all for a scene whose record has
+  no square grid). Nothing scale-related shows while a scene is still
+  attaching, before its grid is known. A calibrated TV keeps its saved scale and returns to it
   on the next square scene (`calibration/session.ts`,
   `tableDisplayController.ts`). `unsupported` now means only a square grid
   whose scale is out of range.
@@ -119,8 +121,7 @@ scene rooms, player views and the TV cannot connect.
   ACK protocol has no hidden phase); it keeps its existing wording.
 - Combat value edits (hide, initiative, HP, conditions) queue behind a save
   in flight instead of being dropped; turn and lifecycle steps still run one
-  at a time.
-
+  at a time. A later success never clears another edit's error and Retry.
 - Legacy shared-state writers are retired: `POST /shared` with
   `initiative`, `initiativeRequest` or `battlemap` answers 426, and any feature
   outside `TABLE_V1_SHARED_FEATURES` answers 400
