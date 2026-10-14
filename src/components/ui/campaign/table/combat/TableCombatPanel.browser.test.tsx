@@ -156,17 +156,31 @@ describe('Table combat panel: a status line never moves the rows (C1)', () => {
         return { status: 'failed', reason: 'indexeddb-unavailable' };
       }
     );
-    // The failure line (taller, with Retry) appears while the button is down.
-    let shown = false;
+    // The failure line (taller, with Retry) appears while the button is down:
+    // a long press, and timestamps instead of a race with the click promise.
+    let shownAt = Number.POSITIVE_INFINITY;
+    let releasedAt = Number.NEGATIVE_INFINITY;
     const observer = new MutationObserver(() => {
-      if (document.body.textContent?.includes("Goblin initiative wasn't saved"))
-        shown = true;
+      if (
+        shownAt === Number.POSITIVE_INFINITY &&
+        document.body.textContent?.includes("Goblin initiative wasn't saved")
+      )
+        shownAt = performance.now();
     });
-    observer.observe(document.body, { subtree: true, childList: true });
-    const top = await initiativeThenHide(80);
-    observer.disconnect();
+    observer.observe(document.body, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+    const onRelease = () => {
+      releasedAt = performance.now();
+    };
+    document.addEventListener('pointerup', onRelease, true);
+    const top = await initiativeThenHide(150);
     await waitFor(() => expect(goblin(repository).hidden).toBe(true));
-    expect(shown).toBe(true);
+    observer.disconnect();
+    document.removeEventListener('pointerup', onRelease, true);
+    expect(shownAt).toBeLessThan(releasedAt);
     expect(goblin(repository).initiative).toBeNull();
     await waitFor(() =>
       expect(hideSwitch()).toHaveAttribute('aria-checked', 'true')
