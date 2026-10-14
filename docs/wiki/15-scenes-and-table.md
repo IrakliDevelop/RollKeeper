@@ -121,10 +121,12 @@ scene rooms, player views and the TV cannot connect.
   ACK protocol has no hidden phase); it keeps its existing wording.
 - Combat value edits (hide, initiative, HP, conditions) queue behind a save
   in flight instead of being dropped; turn and lifecycle steps still run one
-  at a time. Every edit that fails stays listed as not saved, and the
-  toolbar says how many ("2 changes weren't saved."). One Retry replays them
-  all in order against the current state; only a saved replay leaves the
-  list, so a later edit that saves never hides an earlier failure.
+  at a time. A failed edit is named in the toolbar ("Orc initiative wasn't
+  saved."). A storage or conflict failure offers Retry for that one edit; a
+  rejection does not. Edits that fail together are listed by name with no
+  Retry, so the DM redoes them. The next action the DM starts clears the
+  list, so nothing old is replayed over newer values. Other notices, such as
+  "Still saving" or the Show + Start outcome, show beside it.
 - Legacy shared-state writers are retired: `POST /shared` with
   `initiative`, `initiativeRequest` or `battlemap` answers 426, and any feature
   outside `TABLE_V1_SHARED_FEATURES` answers 400
