@@ -12,6 +12,8 @@ export const DISPLAY_NOTHING_SHOWN =
   'Nothing is being shown on this map right now';
 /** Campaign shell: covered (waiting, blank, switching or recovering). */
 export const DISPLAY_WAITING = 'Waiting for the DM';
+/** PR08 desktop B4: a hidden tab renders nothing, so it cannot show the map. */
+export const DISPLAY_KEEP_VISIBLE = 'Keep this screen visible to show the map.';
 /** No credential at all. */
 export const DISPLAY_OPEN_FROM_DM =
   'To use this screen, press Open display on your DM screen.';

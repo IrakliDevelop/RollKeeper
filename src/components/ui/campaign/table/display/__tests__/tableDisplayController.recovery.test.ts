@@ -9,7 +9,7 @@ import {
   type TableDisplayView,
 } from '../tableDisplayController';
 import { defaultTableDisplayDeps } from '../tableDisplayDeps';
-import { DISPLAY_WAITING } from '../displayMessages';
+import { DISPLAY_KEEP_VISIBLE, DISPLAY_WAITING } from '../displayMessages';
 
 /**
  * Acceptance A3/A2. The viewport double reproduces the core render loop
@@ -257,5 +257,54 @@ describe('local pan survives a reconnect of the same scene (acceptance A2)', () 
     const restored = next.vp.getVisibleRect();
     for (const key of ['x', 'y', 'w', 'h'] as const)
       expect(restored[key]).toBeCloseTo(panned[key], 6);
+  });
+});
+
+describe('a hidden TV tab while attaching (PR08 desktop B4)', () => {
+  let visibility: DocumentVisibilityState = 'visible';
+  beforeEach(() => {
+    visibility = 'visible';
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => visibility,
+    });
+  });
+  afterEach(() => {
+    delete (document as unknown as { visibilityState?: unknown })
+      .visibilityState;
+  });
+  const setVisibility = async (next: DocumentVisibilityState) => {
+    visibility = next;
+    document.dispatchEvent(new Event('visibilitychange'));
+    await tick(0);
+  };
+
+  it('asks to keep the screen visible instead of looping, then ACKs as soon as it is visible', async () => {
+    visibility = 'hidden';
+    start();
+    await tick(0);
+    await live();
+    // A hidden tab renders no frames: never uncovered, never ACKed.
+    expect(cover()).toBe(DISPLAY_KEEP_VISIBLE);
+    await tick(40_000);
+    expect(connections).toHaveLength(1);
+    expect(cover()).toBe(DISPLAY_KEEP_VISIBLE);
+    expect(acks.filter(ack => ack.phase === 'loaded')).toEqual([]);
+
+    await setVisibility('visible');
+    expect(cover()).toBe(DISPLAY_WAITING);
+    await frames(5);
+    expect(cover()).toBeNull();
+    expect(acks.at(-1)).toMatchObject({ sceneId: 'tavern', phase: 'loaded' });
+    expect(connections).toHaveLength(1);
+  });
+
+  it('a visible tab is unchanged: no keep-visible cover', async () => {
+    start();
+    await tick(0);
+    await live();
+    expect(cover()).toBe(DISPLAY_WAITING);
+    await frames(5);
+    expect(cover()).toBeNull();
   });
 });

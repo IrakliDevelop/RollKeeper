@@ -29,6 +29,7 @@ import {
   DISPLAY_IN_USE,
   DISPLAY_NOT_CONFIGURED,
   DISPLAY_NOTHING_SHOWN,
+  DISPLAY_KEEP_VISIBLE,
   DISPLAY_WAITING,
 } from './displayMessages';
 import {
@@ -318,6 +319,8 @@ export class TableDisplayController {
       this.options.calibration?.store.subscribe(() =>
         this.onCalibrationChange()
       ) ?? null;
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', this.onVisibilityChange);
     this.emit({});
     void this.poll();
   }
@@ -325,6 +328,8 @@ export class TableDisplayController {
   stop(): void {
     this.unsubscribeCalibration?.();
     this.unsubscribeCalibration = null;
+    if (typeof document !== 'undefined')
+      document.removeEventListener('visibilitychange', this.onVisibilityChange);
     this.stopped = true;
     if (this.pollTimer) clearTimeout(this.pollTimer);
     this.pollTimer = null;
@@ -642,11 +647,7 @@ export class TableDisplayController {
       gridWait: 'none',
       calibratedDisposers: [],
     };
-    this.readinessTimer = setTimeout(() => {
-      this.readinessTimer = null;
-      if (this.attach?.gen === gen && !this.attach.uncovered)
-        this.failAttach(gen);
-    }, READINESS_TIMEOUT_MS);
+    this.armReadinessTimer(gen);
     this.emit({
       cover: DISPLAY_WAITING,
       canvas: { key: gen, fogPlugin },
@@ -729,12 +730,7 @@ export class TableDisplayController {
       status === 'stopped'
     )
       this.failAttach(gen);
-    else if (!this.readinessTimer)
-      this.readinessTimer = setTimeout(() => {
-        this.readinessTimer = null;
-        if (this.attach?.gen === gen && !this.attach.uncovered)
-          this.failAttach(gen);
-      }, READINESS_TIMEOUT_MS);
+    else if (!this.readinessTimer) this.armReadinessTimer(gen);
   }
 
   private onTokenDenied(gen: number, denial: BattleMapTokenDenial): void {
@@ -743,6 +739,56 @@ export class TableDisplayController {
       return;
     if (denial.status === 403 || denial.status === 409) this.failAttach(gen);
   }
+
+  /**
+   * E10 readiness bound: an attach that never uncovers is retried. B4: a
+   * hidden tab renders no frames, so it is never failed for that; the
+   * bound re-arms when the tab is visible again.
+   */
+  private armReadinessTimer(gen: number): void {
+    if (this.readinessTimer) clearTimeout(this.readinessTimer);
+    this.readinessTimer = setTimeout(() => {
+      this.readinessTimer = null;
+      if (this.attach?.gen !== gen || this.attach.uncovered) return;
+      if (this.tabHidden()) return;
+      this.failAttach(gen);
+    }, READINESS_TIMEOUT_MS);
+  }
+
+  private tabHidden(): boolean {
+    return (
+      typeof document !== 'undefined' && document.visibilityState !== 'visible'
+    );
+  }
+
+  /**
+   * PR08 desktop B4: hidden while attaching → a plain "keep visible" cover;
+   * visible again → render now (the ACK follows the confirming frames) or
+   * retry a failed attach at once, without waiting for the backoff.
+   */
+  private readonly onVisibilityChange = (): void => {
+    if (this.stopped || this.denied) return;
+    const attach = this.attach;
+    if (this.tabHidden()) {
+      if (attach && !attach.uncovered)
+        this.emit({ cover: DISPLAY_KEEP_VISIBLE });
+      return;
+    }
+    if (attach) {
+      if (attach.uncovered) return;
+      this.emit({ cover: DISPLAY_WAITING });
+      if (!this.readinessTimer) this.armReadinessTimer(attach.gen);
+      if (attach.stage === 'awaitFrame') attach.viewport?.requestRender();
+      else if (attach.stage === 'awaitSecondFrame')
+        this.requestConfirmingFrame(attach.gen);
+      else this.defer(() => this.checkReadiness(attach.gen));
+      return;
+    }
+    if (this.retryTimer && this.target?.scene) {
+      this.clearRetry();
+      this.retarget();
+    }
+  };
 
   // ---- readiness (E10) and camera (E11) -----------------------------------
 
@@ -948,6 +994,13 @@ export class TableDisplayController {
         patch.cover === DISPLAY_EXPIRED || patch.cover === DISPLAY_IN_USE;
       if (!credentialCover) return;
     }
+    if (
+      patch.cover === DISPLAY_WAITING &&
+      this.attach &&
+      !this.attach.uncovered &&
+      this.tabHidden()
+    )
+      patch = { ...patch, cover: DISPLAY_KEEP_VISIBLE };
     this.view = {
       ...this.view,
       ...patch,
