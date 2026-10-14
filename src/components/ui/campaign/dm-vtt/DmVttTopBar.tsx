@@ -57,9 +57,9 @@ export function DmVttTopBar({
   // PR05 E12: under Table v1 this opens the persistent campaign display.
   const display = useDisplayLauncher();
   return (
-    <div className="flex min-h-[52px] min-w-0 items-center gap-2 px-2 py-1 sm:gap-3 sm:px-3">
+    <div className="flex min-h-[52px] min-w-0 items-center gap-2 px-1 sm:gap-3 sm:px-2">
       {/* PR08 D1: everything but the Table link and Setup/Play scrolls. */}
-      <div className="scrollbar-thin flex min-w-0 flex-initial items-center justify-start gap-2 overflow-x-auto overscroll-x-contain sm:gap-3">
+      <div className="scrollbar-thin flex min-w-0 flex-initial items-center justify-start gap-2 overflow-x-auto overscroll-x-contain p-1 sm:gap-3">
         <Link
           href={`/dm/campaign/${campaignCode}/battlemaps`}
           className="shrink-0"
