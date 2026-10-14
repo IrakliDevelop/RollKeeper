@@ -154,4 +154,108 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     // The refusal is not erased by the earlier intent's success.
     expect(result.current.notice?.message).toMatch(/try again/iu);
   });
+
+  it('keeps an earlier queued intent error and Retry when a later one commits (review U1)', async () => {
+    const repository = await preparedRun();
+    const { result } = renderHook(() =>
+      useTableCombat({
+        repository,
+        sceneId: SCENE_ID,
+        campaignCode: 'CAMP',
+        requestedRunId: 'run-a',
+      })
+    );
+    await waitFor(() =>
+      expect(result.current.selectedRun?.runId).toBe('run-a')
+    );
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      // A: an unknown participant is rejected.
+      first = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setHidden',
+            runId: 'run-a',
+            actorId: 'nobody',
+            hidden: true,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+      // B: a valid edit queued behind it commits.
+      second = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setHidden',
+            runId: 'run-a',
+            actorId: 'goblin',
+            hidden: true,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(await first).not.toMatchObject({ status: 'committed' });
+    expect(await second).toMatchObject({ status: 'committed' });
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.retry).toBeTypeOf('function');
+  });
+
+  it('a later success still clears a "Still saving" info notice', async () => {
+    const repository = await preparedRun();
+    const { result } = renderHook(() =>
+      useTableCombat({
+        repository,
+        sceneId: SCENE_ID,
+        campaignCode: 'CAMP',
+        requestedRunId: 'run-a',
+      })
+    );
+    await waitFor(() =>
+      expect(result.current.selectedRun?.runId).toBe('run-a')
+    );
+    let first!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setInitiative',
+            runId: 'run-a',
+            actorId: 'orc',
+            value: 9,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+      void result.current.execute(
+        () =>
+          ({
+            type: 'combat.createRun',
+            sceneId: SCENE_ID,
+            runId: 'run-c',
+            label: 'Refused',
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+    });
+    expect(result.current.notice?.tone).toBe('info');
+    let later!: Promise<unknown>;
+    await act(async () => {
+      await first;
+      later = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setHidden',
+            runId: 'run-a',
+            actorId: 'goblin',
+            hidden: true,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+      await later;
+    });
+    expect(result.current.notice).toBeNull();
+  });
 });

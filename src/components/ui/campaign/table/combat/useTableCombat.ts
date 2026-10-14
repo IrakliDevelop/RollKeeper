@@ -134,16 +134,26 @@ export function useTableCombat(options: {
   /** Orders user actions; a success clears only notices from earlier ones. */
   const sequence = useRef(0);
   const noticeOwner = useRef(0);
+  /** Tone of the notice on screen (read synchronously by queued results). */
+  const noticeTone = useRef<TableCombatNotice['tone'] | null>(null);
   const setNotice = useCallback((value: TableCombatNotice | null) => {
     sequence.current += 1;
     noticeOwner.current = sequence.current;
+    noticeTone.current = value?.tone ?? null;
     setNoticeState(value);
   }, []);
   const settleNotice = useCallback(
     (owner: number, value: TableCombatNotice | null) => {
-      // A success never erases a notice raised by a later action.
-      if (value === null && noticeOwner.current > owner) return;
+      if (value === null) {
+        // A success never erases a notice raised by a later action, nor
+        // another action's error and Retry (review U1); it may clear its own
+        // notice or a passing info notice such as "Still saving".
+        if (noticeOwner.current > owner) return;
+        if (noticeTone.current === 'error' && noticeOwner.current !== owner)
+          return;
+      }
       noticeOwner.current = Math.max(noticeOwner.current, owner);
+      noticeTone.current = value?.tone ?? null;
       setNoticeState(value);
     },
     []
