@@ -17,11 +17,12 @@ function parseInitiative(raw: string): number | null | 'invalid' {
 /**
  * One prepared participant: manual initiative (empty = missing, 0 valid),
  * hidden-from-players toggle and status labels. Commits on blur/Enter.
+ * Never disabled while saving: value edits queue behind a pending save, so
+ * a blur-commit cannot disable the switch the DM is clicking (PR08 B3).
  */
 export function TableParticipantRow(props: {
   view: TableCombatParticipantView;
   highlightMissing: boolean;
-  disabled: boolean;
   onInitiative: (value: number | null) => void;
   onHidden: (hidden: boolean) => void;
   /** PR07 P9: the member is a physical mini on the table display. */
@@ -79,7 +80,6 @@ export function TableParticipantRow(props: {
         className={missing ? 'border-accent-amber-border' : undefined}
         placeholder="None"
         value={draft}
-        disabled={props.disabled}
         onChange={event => setDraft(event.target.value)}
         onBlur={commit}
         onKeyDown={event => {
@@ -90,7 +90,6 @@ export function TableParticipantRow(props: {
         size="sm"
         aria-label={`Hide ${view.entity.name} from players`}
         checked={view.hidden}
-        disabled={props.disabled}
         onCheckedChange={props.onHidden}
       />
     </li>
