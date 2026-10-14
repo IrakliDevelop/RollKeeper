@@ -317,7 +317,26 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     expect(result.current.notice).toBeNull();
   });
 
-  it('an edit started after the error commits and clears it; while it saves the toolbar is not stale (review V1)', async () => {
+  const hideIntent = (actor: () => string) =>
+    vi.fn(
+      () =>
+        ({
+          type: 'combat.setHidden',
+          runId: 'run-a',
+          actorId: actor(),
+          hidden: true,
+          at: AT,
+        }) as TableCombatCommandV1
+    );
+  const hiddenOf = (
+    repository: Awaited<ReturnType<typeof preparedRun>>,
+    actorId: string
+  ) =>
+    readySnapshot(repository)
+      .encounters.find(value => value.runId === 'run-a')!
+      .participants.find(p => p.actorId === actorId)?.hidden;
+
+  it('an edit started after the error commits but the unsaved change stays listed', async () => {
     const { result } = await mountHook();
     await act(async () => {
       await result.current.execute(rejected);
@@ -336,13 +355,124 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
           }) as TableCombatCommandV1
       );
     });
-    // A new action supersedes the old error at once ("Saving…" shows).
-    expect(result.current.notice).toBeNull();
     expect(result.current.saving).toBe(true);
     await act(async () => {
       await later;
     });
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.message).toMatch(/^1 change wasn't saved\./);
+    expect(result.current.notice?.retry).toBeTypeOf('function');
+  });
+
+  it('two queued failures then one Retry applies both in order and clears the error (review W1)', async () => {
+    const { repository, result } = await mountHook();
+    let first = 'nobody';
+    let second = 'nobody';
+    const a = hideIntent(() => first);
+    const b = hideIntent(() => second);
+    let pa!: Promise<unknown>;
+    let pb!: Promise<unknown>;
+    act(() => {
+      pa = result.current.execute(a);
+      pb = result.current.execute(b);
+    });
+    await act(async () => {
+      await pa;
+      await pb;
+    });
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.message).toMatch(
+      /^2 changes weren't saved\..*Retry saves them in order\.$/
+    );
+    first = 'goblin';
+    second = 'orc';
+    await act(async () => {
+      result.current.notice!.retry!();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(result.current.saving).toBe(false));
+    expect(hiddenOf(repository, 'goblin')).toBe(true);
+    expect(hiddenOf(repository, 'orc')).toBe(true);
     expect(result.current.notice).toBeNull();
+  });
+
+  it('a refused lifecycle step while the error shows keeps the error and Retry (review W2)', async () => {
+    const { result } = await mountHook();
+    await act(async () => {
+      await result.current.execute(rejected);
+    });
+    let saving!: Promise<unknown>;
+    act(() => {
+      saving = result.current.execute(
+        () =>
+          ({
+            type: 'combat.setInitiative',
+            runId: 'run-a',
+            actorId: 'orc',
+            value: 4,
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+      void result.current.execute(
+        () =>
+          ({
+            type: 'combat.createRun',
+            sceneId: SCENE_ID,
+            runId: 'run-w2',
+            label: 'Refused',
+            at: AT,
+          }) as TableCombatCommandV1
+      );
+    });
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.retry).toBeTypeOf('function');
+    await act(async () => {
+      await saving;
+    });
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.retry).toBeTypeOf('function');
+  });
+
+  it('a Retry that fails again keeps the same count with no duplicate entries', async () => {
+    const { result } = await mountHook();
+    const a = hideIntent(() => 'nobody');
+    const b = hideIntent(() => 'nobody');
+    await act(async () => {
+      await result.current.execute(a);
+      await result.current.execute(b);
+    });
+    expect(result.current.notice?.message).toMatch(/^2 changes/);
+    await act(async () => {
+      result.current.notice!.retry!();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    await waitFor(() => expect(result.current.saving).toBe(false));
+    await waitFor(() =>
+      expect(result.current.notice?.retry).toBeTypeOf('function')
+    );
+    expect(result.current.notice?.tone).toBe('error');
+    expect(result.current.notice?.message).toMatch(/^2 changes/);
+  });
+
+  it('a Retry press replays once: its button hides while the replay runs', async () => {
+    const { repository, result } = await mountHook();
+    let actorId = 'nobody';
+    const a = hideIntent(() => actorId);
+    await act(async () => {
+      await result.current.execute(a);
+    });
+    const calls = a.mock.calls.length;
+    const retry = result.current.notice!.retry!;
+    actorId = 'goblin';
+    act(() => {
+      retry();
+      retry();
+    });
+    expect(result.current.notice?.retry).toBeUndefined();
+    await waitFor(() => expect(result.current.saving).toBe(false));
+    await waitFor(() => expect(result.current.notice).toBeNull());
+    expect(a.mock.calls.length).toBe(calls + 1);
+    expect(hiddenOf(repository, 'goblin')).toBe(true);
   });
 
   it('any success clears a "Still saving" info notice, even one raised later (review V2)', async () => {

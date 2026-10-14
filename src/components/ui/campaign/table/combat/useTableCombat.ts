@@ -35,6 +35,13 @@ export type TableCombatIntent = () => TableCombatCommandV1;
 
 const PLAYER_POLL_MS = 10_000;
 
+/** A user intent that failed and is waiting for Retry. */
+interface FailedIntent {
+  intent: TableCombatIntent;
+  message: string;
+  link?: TableCombatNotice['link'];
+}
+
 function sceneRunsOf(
   snapshot: TableWorkspaceSnapshotV1 | null,
   sceneId: string
@@ -71,9 +78,14 @@ const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
  * value (hide, initiative, HP, conditions, participants, selection) queue
  * in order behind a pending one, so a quick blur-commit followed by a click
  * applies both (PR08 desktop B3). Turn and lifecycle steps are refused while
- * one is saving, with a notice that an earlier success never erases.
- * Background commands (acknowledgements, prunes) wait their turn. A conflict
- * refreshes and offers a deliberate retry of the same intent; nothing
+ * one is saving ("Still saving…", cleared by the next success).
+ *
+ * Failed user intents are kept in order as "not saved" changes. While any
+ * remain, the notice is one error naming how many, with a single Retry that
+ * replays all of them in order through the queue (each re-plans on current
+ * state, so delta edits stay safe). Only a successful replay removes one;
+ * other successes never do. Info and one-off notices never hide that error.
+ * Background commands (acknowledgements, prunes) wait their turn; nothing
  * auto-replans.
  */
 export function useTableCombat(options: {
@@ -128,51 +140,51 @@ export function useTableCombat(options: {
   );
 
   const [saving, setSaving] = useState(false);
-  const [notice, setNoticeState] = useState<TableCombatNotice | null>(null);
+  /** One-off notices (info, Show + Start outcomes); never hides `failed`. */
+  const [transient, setTransient] = useState<TableCombatNotice | null>(null);
+  const transientTone = useRef<TableCombatNotice['tone'] | null>(null);
+  const setNotice = useCallback((value: TableCombatNotice | null) => {
+    transientTone.current = value?.tone ?? null;
+    setTransient(value);
+  }, []);
+  /** Any success clears a passing info notice such as "Still saving". */
+  const clearInfo = useCallback(() => {
+    if (transientTone.current !== 'info') return;
+    transientTone.current = null;
+    setTransient(null);
+  }, []);
+  /** Failed user intents, oldest first (not-yet-saved changes). */
+  const failed = useRef<FailedIntent[]>([]);
+  const [failedVersion, bumpFailed] = useReducer((n: number) => n + 1, 0);
+  /** A Retry replay is running: its button is hidden (single flight). */
+  const replaying = useRef(false);
+  const recordFailure = useCallback(
+    (intent: TableCombatIntent, result: TableCombatResult) => {
+      const entry: FailedIntent = {
+        intent,
+        message: combatFailureMessage(result),
+        link:
+          result.status === 'rejected' && result.reason === 'invalid-reference'
+            ? {
+                href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/battlemaps`,
+                label: 'Export Table',
+              }
+            : undefined,
+      };
+      const index = failed.current.findIndex(item => item.intent === intent);
+      if (index >= 0) failed.current[index] = entry;
+      else failed.current.push(entry);
+      bumpFailed();
+    },
+    [options.campaignCode]
+  );
+  const recordSuccess = useCallback((intent: TableCombatIntent) => {
+    const before = failed.current.length;
+    failed.current = failed.current.filter(item => item.intent !== intent);
+    if (failed.current.length !== before) bumpFailed();
+  }, []);
   /** User intents queued or running. */
   const pending = useRef(0);
-  /** Orders user actions; a success clears only notices from earlier ones. */
-  const sequence = useRef(0);
-  const noticeOwner = useRef(0);
-  /** Tone of the notice on screen (read synchronously by queued results). */
-  const noticeTone = useRef<TableCombatNotice['tone'] | null>(null);
-  /** The last action number allocated when the shown error appeared. */
-  const errorShownAt = useRef(0);
-  const show = useCallback((owner: number, value: TableCombatNotice | null) => {
-    noticeOwner.current = Math.max(noticeOwner.current, owner);
-    noticeTone.current = value?.tone ?? null;
-    if (value?.tone === 'error') errorShownAt.current = sequence.current;
-    setNoticeState(value);
-  }, []);
-  const setNotice = useCallback(
-    (value: TableCombatNotice | null) => {
-      sequence.current += 1;
-      show(sequence.current, value);
-    },
-    [show]
-  );
-  /**
-   * Whether a success (or a newly started action) of `owner` may clear the
-   * notice on screen:
-   * - an info notice ("Still saving") always (review V2);
-   * - an error with its Retry only if the action started after the error
-   *   appeared, so a queued edit started before it keeps it (U1) while a
-   *   Retry or any later edit clears it (review V1);
-   * - any other notice only if it is not from a later action.
-   */
-  const mayClear = useCallback((owner: number): boolean => {
-    if (noticeTone.current === null) return true;
-    if (noticeTone.current === 'info') return true;
-    if (noticeTone.current === 'error') return owner > errorShownAt.current;
-    return noticeOwner.current <= owner;
-  }, []);
-  const settleNotice = useCallback(
-    (owner: number, value: TableCombatNotice | null) => {
-      if (value === null && !mayClear(owner)) return;
-      show(owner, value);
-    },
-    [mayClear, show]
-  );
   const begin = useCallback(() => {
     pending.current += 1;
     setSaving(true);
@@ -204,39 +216,19 @@ export function useTableCombat(options: {
     [repository]
   );
 
-  const execute = useCallback(
-    (intent: TableCombatIntent): Promise<TableCombatResult | null> => {
-      if (pending.current > 0 && ONE_AT_A_TIME.has(intent().type))
-        return refuse();
-      sequence.current += 1;
-      const owner = sequence.current;
-      // A new action supersedes an error shown before it: the toolbar shows
-      // "Saving…" instead of a stale error and Retry (review V1).
-      if (noticeTone.current === 'error' && owner > errorShownAt.current)
-        settleNotice(owner, null);
+  /** Runs one user intent on the queue; failures join `failed`. */
+  const enqueue = useCallback(
+    (intent: TableCombatIntent): Promise<TableCombatResult> => {
       begin();
       const task = queue.current.then(async () => {
         try {
           const result = await run(intent);
           if (result.status === 'committed' || result.status === 'unchanged') {
-            settleNotice(owner, null);
+            recordSuccess(intent);
+            clearInfo();
           } else {
             if (result.status === 'conflict') await repository.reload();
-            settleNotice(owner, {
-              tone: 'error',
-              message: combatFailureMessage(result),
-              // Deliberate retry of the same intent on the newest state.
-              retry: () => void execute(intent),
-              ...(result.status === 'rejected' &&
-              result.reason === 'invalid-reference'
-                ? {
-                    link: {
-                      href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/battlemaps`,
-                      label: 'Export Table',
-                    },
-                  }
-                : {}),
-            });
+            recordFailure(intent, result);
           }
           return result;
         } finally {
@@ -246,8 +238,52 @@ export function useTableCombat(options: {
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, run, options.campaignCode, refuse, begin, finish, settleNotice]
+    [repository, run, begin, finish, recordSuccess, recordFailure, clearInfo]
   );
+
+  const execute = useCallback(
+    (intent: TableCombatIntent): Promise<TableCombatResult | null> => {
+      if (pending.current > 0 && ONE_AT_A_TIME.has(intent().type))
+        return refuse();
+      // A new action supersedes a one-off notice: "Saving…" shows instead.
+      if (transientTone.current !== null) setNotice(null);
+      return enqueue(intent);
+    },
+    [refuse, enqueue, setNotice]
+  );
+
+  /** Retry: replays every failed intent in order (one replay at a time). */
+  const retryFailed = useCallback(() => {
+    if (replaying.current || failed.current.length === 0) return;
+    replaying.current = true;
+    bumpFailed();
+    const replay = failed.current.map(item => enqueue(item.intent));
+    void Promise.allSettled(replay).then(() => {
+      replaying.current = false;
+      bumpFailed();
+    });
+  }, [enqueue]);
+
+  const failedNotice = useMemo((): TableCombatNotice | null => {
+    const items = failed.current;
+    if (items.length === 0) return null;
+    const latest = items[items.length - 1]!;
+    const message =
+      items.length === 1
+        ? `1 change wasn't saved. ${latest.message}`
+        : `${items.length} changes weren't saved. ${latest.message} Retry saves them in order.`;
+    return {
+      tone: 'error',
+      message,
+      ...(replaying.current ? {} : { retry: retryFailed }),
+      ...(items.find(item => item.link)?.link
+        ? { link: items.find(item => item.link)!.link }
+        : {}),
+    };
+    // failedVersion: the list and the replay flag change in place.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [failedVersion, retryFailed]);
+  const notice = failedNotice ?? transient;
 
   /**
    * PR04 P8 / S2 combined Show + Start, inside the same busy/serialized
