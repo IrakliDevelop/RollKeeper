@@ -44,7 +44,7 @@ export function useTableCombatPanelActions(options: {
   controlSession?: TableControlSession | null;
 }) {
   const { combat, sceneId } = options;
-  const { snapshot, model, selectedRun, execute, setNotice } = combat;
+  const { snapshot, model, selectedRun, execute, notify } = combat;
   const runId = selectedRun?.runId ?? null;
   const [newRunOpen, setNewRunOpen] = useState(false);
   const [newRunKey, setNewRunKey] = useState(0);
@@ -166,9 +166,9 @@ export function useTableCombatPanelActions(options: {
             combatDraftLabel(draft, name)
           );
         },
-        notify: message => setNotice({ tone: 'info', message }),
+        notify,
       }),
-    [model, execute, setNotice]
+    [model, execute, notify]
   );
 
   const start = async () => {

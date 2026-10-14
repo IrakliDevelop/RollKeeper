@@ -91,8 +91,9 @@ const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
  * included) clears it, because the DM is now acting on the current state.
  * Intents queued before the failure do not clear it, but once any intent
  * commits after it the entry stays named without Retry (state moved on).
- * One storage or conflict failure with no later commit offers a one-shot
- * Retry of that intent; a rejection never does;
+ * One storage or conflict failure (a thrown write counts) with no later
+ * commit offers a one-shot Retry of that intent while nothing is saving; a
+ * rejection never does;
  * two or more failures are named with no Retry and the DM redoes them. Old
  * intents are never batch-replayed. One-off notices (Still saving, notify,
  * Show + Start outcomes) show alongside the record. Background commands
@@ -153,13 +154,22 @@ export function useTableCombat(options: {
   /** One-off notices (info, Show + Start outcomes), shown beside `unsaved`. */
   const [transient, setTransient] = useState<TableCombatNotice | null>(null);
   const transientTone = useRef<TableCombatNotice['tone'] | null>(null);
+  /** The one-off notice is the "Still saving" refusal (a commit ends it). */
+  const stillSaving = useRef(false);
   const setNotice = useCallback((value: TableCombatNotice | null) => {
     transientTone.current = value?.tone ?? null;
+    stillSaving.current = false;
     setTransient(value);
   }, []);
-  /** Any success clears a passing info notice such as "Still saving". */
-  const clearInfo = useCallback(() => {
-    if (transientTone.current !== 'info') return;
+  /** A refused click explained (e.g. "Not available here"); kept on commit. */
+  const notify = useCallback(
+    (message: string) => setNotice({ tone: 'info', message }),
+    [setNotice]
+  );
+  /** Any success clears the "Still saving" refusal, and only that. */
+  const clearStillSaving = useCallback(() => {
+    if (!stillSaving.current) return;
+    stillSaving.current = false;
     transientTone.current = null;
     setTransient(null);
   }, []);
@@ -202,6 +212,7 @@ export function useTableCombat(options: {
   }, []);
   const refuse = useCallback(() => {
     setNotice({ tone: 'info', message: STILL_SAVING });
+    stillSaving.current = true;
     return Promise.resolve(null);
   }, [setNotice]);
   /** Serializes user intents and background commands (acks, prunes). */
@@ -229,9 +240,12 @@ export function useTableCombat(options: {
       begin();
       const task = queue.current.then(async () => {
         try {
-          const result = await run(intent);
+          // A throw (repository error) is a storage failure, listed too.
+          const result: TableCombatResult = await run(intent).catch(
+            () => ({ status: 'failed', reason: 'transaction-failed' }) as const
+          );
           if (result.status === 'committed' || result.status === 'unchanged') {
-            clearInfo();
+            clearStillSaving();
             markSuperseded();
           } else {
             if (result.status === 'conflict') await repository.reload();
@@ -245,7 +259,15 @@ export function useTableCombat(options: {
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, run, begin, finish, recordFailure, clearInfo, markSuperseded]
+    [
+      repository,
+      run,
+      begin,
+      finish,
+      recordFailure,
+      clearStillSaving,
+      markSuperseded,
+    ]
   );
 
   /** Starts a user intent now, or null when refused (nothing started). */
@@ -296,14 +318,23 @@ export function useTableCombat(options: {
     if (items.length > 1)
       return {
         tone: 'error',
-        message: `These changes weren't saved: ${items.map(item => item.label).join(', ')}. ${reason}`,
+        message: `These changes weren't saved: ${[...new Set(items.map(item => item.label))].join(', ')}. ${reason}`,
         ...link,
       };
     const retry =
-      retryable(latest.result) && !latest.superseded
+      // Y1: never while an earlier intent still saves (it may set the same
+      // field after the failure); the button returns once saving ends.
+      retryable(latest.result) && !latest.superseded && !saving
         ? {
             retry: () => {
-              if (retried.current === latest) return;
+              // Y2: a captured Retry is dead once its entry left the record.
+              if (
+                retried.current === latest ||
+                !unsaved.current.includes(latest) ||
+                latest.superseded ||
+                pending.current > 0
+              )
+                return;
               retried.current = latest;
               if (!startIntent(latest.intent, latest.label))
                 retried.current = null;
@@ -318,7 +349,7 @@ export function useTableCombat(options: {
     };
     // unsavedVersion: the record changes in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [unsavedVersion, startIntent, options.campaignCode]);
+  }, [unsavedVersion, startIntent, options.campaignCode, saving]);
 
   /**
    * PR04 P8 / S2 combined Show + Start, inside the same busy/serialized
@@ -479,6 +510,7 @@ export function useTableCombat(options: {
     notice: transient,
     unsavedNotice,
     setNotice,
+    notify,
     execute,
     background,
     showAndStart,

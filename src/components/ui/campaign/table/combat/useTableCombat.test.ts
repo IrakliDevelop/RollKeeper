@@ -310,6 +310,111 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     expect(result.current.unsavedNotice?.retry).toBeUndefined();
   });
 
+  it('Y1: no Retry is offered while an intent queued before the failure is still saving', async () => {
+    const { repository, result } = await mountHook();
+    const real = repository.mutateWorkspace.bind(repository);
+    let release!: () => void;
+    const held = new Promise<void>(resolve => (release = resolve));
+    vi.spyOn(repository, 'mutateWorkspace')
+      .mockResolvedValueOnce({
+        status: 'failed',
+        reason: 'indexeddb-unavailable',
+      } as never)
+      .mockImplementationOnce(async (...args) => {
+        await held;
+        return real(...args);
+      });
+    let second!: Promise<unknown>;
+    await act(async () => {
+      void result.current.execute(initiative('orc', 12), 'Orc initiative');
+      second = result.current.execute(initiative('orc', 18), 'Orc initiative');
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(result.current.saving).toBe(true);
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Orc initiative wasn't saved\./
+    );
+    expect(result.current.unsavedNotice?.retry).toBeUndefined();
+    await act(async () => {
+      release();
+      await second;
+    });
+    expect(participant(repository, 'orc').initiative).toBe(18);
+  });
+
+  it('Y2: a captured Retry does nothing once its entry left the record', async () => {
+    const { repository, result } = await mountHook('started');
+    const hp = orcHp(repository);
+    const write = failOnce(repository);
+    await act(async () => {
+      await result.current.execute(
+        stat({ kind: 'damage', value: 5 }),
+        'Orc damage'
+      );
+    });
+    const stale = result.current.unsavedNotice!.retry!;
+    await act(async () => {
+      await result.current.execute(
+        stat({ kind: 'setHp', value: hp - 5 }),
+        'Orc HP'
+      );
+    });
+    const writes = write.mock.calls.length;
+    await act(async () => {
+      stale();
+      await new Promise(resolve => setTimeout(resolve, 0));
+    });
+    expect(write.mock.calls.length).toBe(writes);
+    expect(orcHp(repository)).toBe(hp - 5);
+  });
+
+  it('Y3: a write that throws is listed as not saved', async () => {
+    const { repository, result } = await mountHook();
+    vi.spyOn(repository, 'mutateWorkspace').mockRejectedValueOnce(
+      new Error('boom')
+    );
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.execute(hide('goblin'), 'Goblin hidden');
+    });
+    expect(outcome).toMatchObject({ status: 'failed' });
+    expect(result.current.saving).toBe(false);
+    expect(result.current.unsavedNotice?.message).toBe(
+      "Goblin hidden wasn't saved. Saving failed. Nothing was changed."
+    );
+    expect(result.current.unsavedNotice?.retry).toBeTypeOf('function');
+  });
+
+  it('Y4: a commit clears "Still saving" but not a notify message', async () => {
+    const { result } = await mountHook();
+    let first!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(initiative('orc', 6), 'Orc initiative');
+      result.current.notify('Not available here');
+    });
+    await act(async () => {
+      await first;
+    });
+    expect(result.current.notice?.message).toBe('Not available here');
+  });
+
+  it('Y5: repeated labels are named once', async () => {
+    const { result } = await mountHook();
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(hide('nobody'), 'Nobody hidden');
+      second = result.current.execute(hide('nobody'), 'Nobody hidden');
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^These changes weren't saved: Nobody hidden\. /
+    );
+  });
+
   it('X1a: a set fails, a newer set saves, no Retry is left and the newer value stays', async () => {
     const { repository, result } = await mountHook();
     failOnce(repository);
