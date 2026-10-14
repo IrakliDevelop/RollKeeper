@@ -1013,3 +1013,63 @@ describe('testability and resource discipline (P12)', () => {
     }
   });
 });
+
+describe('O8-2 hex attach failures (PR08 C2)', () => {
+  const failures = [
+    [
+      'token 409 (scene authority not initialized)',
+      (connection: { options: ManagedConnectionOptions }) =>
+        connection.options.onTokenDenied?.({
+          status: 409,
+          error: 'Scene authority is not initialized',
+        } as never),
+    ],
+    [
+      'relay status stopped',
+      (connection: { options: ManagedConnectionOptions }) =>
+        connection.options.onStatus?.('stopped'),
+    ],
+  ] as const;
+  const noCalibrationUi = () => {
+    fireEvent.pointerMove(window);
+    expect(screen.queryByTestId('table-display-calibration')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Check scale' })).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: 'Calibrate minis' })
+    ).toBeNull();
+  };
+  it('blank and no-scene states still offer calibration (no regression)', async () => {
+    descriptor = emptyDescriptor(2, true);
+    await mount();
+    await flush();
+    fireEvent.pointerMove(window);
+    expect(
+      screen.getByRole('button', { name: 'Calibrate minis' })
+    ).toBeTruthy();
+    await show(emptyDescriptor(3, false));
+    fireEvent.pointerMove(window);
+    expect(
+      screen.getByRole('button', { name: 'Calibrate minis' })
+    ).toBeTruthy();
+  });
+  for (const [name, fail] of failures) {
+    it(`no calibration UI while a hex attach is retried after ${name}`, async () => {
+      await mount();
+      await goLive();
+      await calibrate();
+      expect(state()).toBe('verified');
+      await show(sceneDescriptor('cave', 3));
+      noCalibrationUi();
+      // The attach fails before its camera is applied; the controller tears
+      // it down and retries after a backoff (no attach meanwhile).
+      await act(async () => {
+        fail(connections.at(-1)!);
+      });
+      await flush();
+      noCalibrationUi();
+      await advance(1_000);
+      await goLive();
+      noCalibrationUi();
+    });
+  }
+});

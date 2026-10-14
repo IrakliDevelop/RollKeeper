@@ -1067,7 +1067,9 @@ export class TableDisplayController {
           ? 'range'
           : null,
       nonSquare,
-      sceneLoading: !!this.attach && !this.attach.cameraApplied,
+      // A scene is targeted but its camera is not applied yet: attaching,
+      // or torn down and waiting to retry (C2). Blank / no scene: false.
+      sceneLoading: !!this.target?.scene && !this.attach?.cameraApplied,
     };
   }
 
