@@ -270,6 +270,46 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     );
   });
 
+  it('a failure followed by a commit of an intent queued before it stays named with no Retry (same field)', async () => {
+    const { repository, result } = await mountHook();
+    failOnce(repository);
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(initiative('orc', 12), 'Orc initiative');
+      second = result.current.execute(initiative('orc', 18), 'Orc initiative');
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(await second).toMatchObject({ status: 'committed' });
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Orc initiative wasn't saved\./
+    );
+    expect(result.current.unsavedNotice?.retry).toBeUndefined();
+    expect(participant(repository, 'orc').initiative).toBe(18);
+  });
+
+  it('a failure followed by a commit on another actor keeps its name but loses Retry', async () => {
+    const { repository, result } = await mountHook();
+    failOnce(repository);
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(initiative('orc', 12), 'Orc initiative');
+      second = result.current.execute(hide('goblin'), 'Goblin hidden');
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Orc initiative wasn't saved\./
+    );
+    expect(result.current.unsavedNotice?.retry).toBeUndefined();
+  });
+
   it('X1a: a set fails, a newer set saves, no Retry is left and the newer value stays', async () => {
     const { repository, result } = await mountHook();
     failOnce(repository);

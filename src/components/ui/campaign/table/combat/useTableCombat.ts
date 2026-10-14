@@ -40,6 +40,8 @@ interface UnsavedChange {
   intent: TableCombatIntent;
   label: string;
   result: TableCombatResult;
+  /** Another intent committed after this failure: a replay may be stale. */
+  superseded?: boolean;
 }
 
 /** Storage and conflict failures may pass on a second try; rejections won't. */
@@ -87,8 +89,10 @@ const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
  * Unsaved record: each user intent carries a short label ("Orc initiative").
  * A failure joins the record; the next action the DM starts (Retry
  * included) clears it, because the DM is now acting on the current state.
- * Intents queued before the failure do not clear it. One storage or conflict
- * failure offers a one-shot Retry of that intent; a rejection never does;
+ * Intents queued before the failure do not clear it, but once any intent
+ * commits after it the entry stays named without Retry (state moved on).
+ * One storage or conflict failure with no later commit offers a one-shot
+ * Retry of that intent; a rejection never does;
  * two or more failures are named with no Retry and the DM redoes them. Old
  * intents are never batch-replayed. One-off notices (Still saving, notify,
  * Show + Start outcomes) show alongside the record. Background commands
@@ -169,6 +173,16 @@ export function useTableCombat(options: {
     unsaved.current = [];
     bumpUnsaved();
   }, []);
+  /** State moved on: listed failures stay named but lose their Retry. */
+  const markSuperseded = useCallback(() => {
+    const live = unsaved.current.filter(item => !item.superseded);
+    if (live.length === 0) return;
+    unsaved.current = unsaved.current.map(item => ({
+      ...item,
+      superseded: true,
+    }));
+    bumpUnsaved();
+  }, []);
   const recordFailure = useCallback(
     (intent: TableCombatIntent, label: string, result: TableCombatResult) => {
       unsaved.current = [...unsaved.current, { intent, label, result }];
@@ -218,6 +232,7 @@ export function useTableCombat(options: {
           const result = await run(intent);
           if (result.status === 'committed' || result.status === 'unchanged') {
             clearInfo();
+            markSuperseded();
           } else {
             if (result.status === 'conflict') await repository.reload();
             recordFailure(intent, label, result);
@@ -230,7 +245,7 @@ export function useTableCombat(options: {
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, run, begin, finish, recordFailure, clearInfo]
+    [repository, run, begin, finish, recordFailure, clearInfo, markSuperseded]
   );
 
   /** Starts a user intent now, or null when refused (nothing started). */
@@ -284,16 +299,17 @@ export function useTableCombat(options: {
         message: `These changes weren't saved: ${items.map(item => item.label).join(', ')}. ${reason}`,
         ...link,
       };
-    const retry = retryable(latest.result)
-      ? {
-          retry: () => {
-            if (retried.current === latest) return;
-            retried.current = latest;
-            if (!startIntent(latest.intent, latest.label))
-              retried.current = null;
-          },
-        }
-      : {};
+    const retry =
+      retryable(latest.result) && !latest.superseded
+        ? {
+            retry: () => {
+              if (retried.current === latest) return;
+              retried.current = latest;
+              if (!startIntent(latest.intent, latest.label))
+                retried.current = null;
+            },
+          }
+        : {};
     return {
       tone: 'error',
       message: `${latest.label} wasn't saved. ${reason}`,
