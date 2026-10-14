@@ -11,6 +11,7 @@ import type { TableRepository } from '@/lib/table/repository';
 import type { CampaignPlayerData } from '@/types/campaign';
 
 import { TableCombatHistoryDialog } from './TableCombatHistoryDialog';
+import { TableCombatStatus } from './TableCombatStatus';
 import { TableCombatToolbar } from './TableCombatToolbar';
 import { TableNewRunDialog } from './TableNewRunDialog';
 import { TableParticipantDialog } from './TableParticipantDialog';
@@ -182,9 +183,6 @@ export function TableCombatPanel(props: {
             }
             playerNotices={panel.playerNotices}
             canPublish={canPublish}
-            saving={combat.saving}
-            notice={combat.notice}
-            unsavedNotice={combat.unsavedNotice}
             onSelect={panel.selectRun}
             onNewRun={panel.openNewRun}
             onHistory={() => panel.setHistoryOpen(true)}
@@ -223,6 +221,13 @@ export function TableCombatPanel(props: {
         // Fits a 390px viewport; header, toolbar and setup scroll as one.
         widthClassName="w-[min(390px,calc(100vw-1rem))]"
         scrollToolbar
+        footer={
+          <TableCombatStatus
+            saving={combat.saving}
+            notice={combat.notice}
+            unsavedNotice={combat.unsavedNotice}
+          />
+        }
       />
       {running && model && (
         <TurnControl

@@ -7,8 +7,6 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Badge } from '@/components/ui/layout/badge';
 import type { TableEncounterRecordV1 } from '@/lib/table/schema';
 
-import type { TableCombatNotice } from './useTableCombat';
-
 const NO_RUN = '__none__';
 
 function runLabel(run: TableEncounterRecordV1, activeRunId: string | null) {
@@ -20,7 +18,8 @@ function runLabel(run: TableEncounterRecordV1, activeRunId: string | null) {
 
 /**
  * Header controls of the Table combat panel: explicit run selection, new
- * run, history, end, publication status, notices and the visible residuals.
+ * run, history, end, publication status and the visible residuals. Save
+ * notices live in `TableCombatStatus` (panel footer), never here (C1).
  */
 export function TableCombatToolbar(props: {
   campaignCode: string;
@@ -35,10 +34,6 @@ export function TableCombatToolbar(props: {
   /** The run publication targets (campaign.activeRunId), possibly elsewhere. */
   publishedRun: { label: string; sameScene: boolean; sceneName: string } | null;
   canPublish: boolean;
-  saving: boolean;
-  notice: TableCombatNotice | null;
-  /** Changes that were not saved; shown beside `notice`, never hidden. */
-  unsavedNotice?: TableCombatNotice | null;
   /** The players snapshot's last refresh failed (N2). */
   playersStale: boolean;
   /** Participants broadcast without HP (N1), one line each. */
@@ -136,43 +131,6 @@ export function TableCombatToolbar(props: {
           Conditions you set here don&apos;t reach players&apos; character
           sheets
         </p>
-      )}
-      {(props.saving || props.notice) && (
-        <NoticeLine notice={props.notice} fallback="Saving…" />
-      )}
-      {props.unsavedNotice && <NoticeLine notice={props.unsavedNotice} />}
-    </div>
-  );
-}
-
-function NoticeLine(props: {
-  notice: TableCombatNotice | null;
-  fallback?: string;
-}) {
-  const { notice } = props;
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <p
-        role="status"
-        aria-live="polite"
-        className={`min-w-0 flex-1 text-xs ${
-          notice?.tone === 'error' ? 'text-accent-red-text' : 'text-muted'
-        }`}
-      >
-        {notice?.message ?? props.fallback}
-      </p>
-      {notice?.link && (
-        <Link
-          className="text-accent-blue-text text-xs underline"
-          href={notice.link.href}
-        >
-          {notice.link.label}
-        </Link>
-      )}
-      {notice?.retry && (
-        <Button variant="outline" size="sm" onClick={notice.retry}>
-          Retry
-        </Button>
       )}
     </div>
   );

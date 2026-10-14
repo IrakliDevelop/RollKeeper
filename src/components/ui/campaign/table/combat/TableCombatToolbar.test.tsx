@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { PublicationStatus } from '@/lib/table/combatPublisher';
 
+import { TableCombatStatus } from './TableCombatStatus';
 import { TableCombatToolbar } from './TableCombatToolbar';
 import { publicationDetail, publicationLabel } from './tableCombatMessages';
 
@@ -18,8 +19,6 @@ const props = {
   publicationLabel: 'Saved locally',
   publishedRun: null,
   canPublish: false,
-  saving: false,
-  notice: null,
   playerNotices: [],
   onSelect: vi.fn(),
   onNewRun: vi.fn(),
@@ -88,13 +87,29 @@ describe('publication wording (O7-3)', () => {
   });
 });
 
-describe('combat notices (review X2)', () => {
+describe('combat save status (review X2, C1)', () => {
+  it('is one live region, mounted before any notice arrives (review Z4)', () => {
+    const { rerender } = render(
+      <TableCombatStatus saving={false} notice={null} unsavedNotice={null} />
+    );
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    rerender(
+      <TableCombatStatus
+        saving
+        notice={null}
+        unsavedNotice={{ tone: 'error', message: "Orc HP wasn't saved." }}
+      />
+    );
+    expect(screen.getAllByRole('status')).toEqual([region]);
+    expect(region).toHaveTextContent("Saving…Orc HP wasn't saved.");
+  });
+
   it('shows a one-off notice and "Saving…" beside the unsaved change', () => {
     const retry = vi.fn();
     const { rerender } = render(
-      <TableCombatToolbar
-        {...props}
-        playersStale={false}
+      <TableCombatStatus
+        saving={false}
         notice={{ tone: 'info', message: 'Still saving the last change.' }}
         unsavedNotice={{
           tone: 'error',
@@ -109,10 +124,9 @@ describe('combat notices (review X2)', () => {
     ).toBeVisible();
     expect(screen.getByRole('button', { name: 'Retry' })).toBeVisible();
     rerender(
-      <TableCombatToolbar
-        {...props}
-        playersStale={false}
+      <TableCombatStatus
         saving
+        notice={null}
         unsavedNotice={{
           tone: 'error',
           message: "These changes weren't saved.",

@@ -7,9 +7,10 @@ does.
 
 ## 1. Vitest — component/unit tests
 
-`vitest.config.ts` defines two **projects**:
+`vitest.config.ts` defines three **projects**:
 
-- **`unit`** — jsdom, `src/**/*.test.{ts,tsx}`, setup at `src/test/setup.ts`.
+- **`unit`** — jsdom, `src/**/*.test.{ts,tsx}` (minus `*.browser.test.tsx`),
+  setup at `src/test/setup.ts`.
   Node is launched with `--no-experimental-webstorage` to stop Node's native
   global `localStorage` from shadowing jsdom's implementation.
   → `npm run test` = `vitest run --project unit`. **This is plain jsdom, no
@@ -17,9 +18,15 @@ does.
 - **`storybook`** — real Chromium via `@vitest/browser-playwright`, driven by
   `.storybook/` config and `.storybook/vitest.setup.ts` (Storybook Component
   Tests).
-  → `npm run test:visual` = `vitest run --project storybook`.
+- **`browser`** — plain component tests in real Chromium,
+  `src/**/*.browser.test.tsx`. Use it when real layout, hit-testing or CDP
+  input matters (jsdom has no layout), e.g. a click that a layout shift
+  could lose. Real IndexedDB persists across tests in the page; delete the
+  databases in `afterEach`.
+  → `npm run test:visual` = `vitest run --project storybook --project
+  browser` (the CI Storybook job runs it).
 
-`npm run test:all` runs both. `npm run test:watch` watches the `unit` project
+`npm run test:all` runs all three. `npm run test:watch` watches the `unit` project
 only. **Correction to a common assumption:** `npm run test` alone does *not*
 touch Storybook or a real browser — only `test:visual` does.
 
