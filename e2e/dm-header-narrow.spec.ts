@@ -3,21 +3,26 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 /**
- * PR08 C3: DM campaign page headers fit a phone (360 to 390 px) in every
- * theme. Synthetic seed: one DM campaign with a long name, no other data.
+ * PR08 C3 / Z1: DM campaign page headers fit a phone (360 to 390 px) in
+ * every theme: no page overflow, and every header control inside the
+ * viewport (a clipped control does not show in `scrollWidth`). Synthetic
+ * seed: one DM campaign and one battle map, both with long names.
  */
 
 const CODE = 'NARROW-E2E';
+const MAP_ID = 'bm-narrow-e2e';
+const NOW = '2000-01-01T00:00:00.000Z';
 const CAMPAIGN = {
   code: CODE,
   name: 'Synthetic Acceptance Campaign With A Long Name',
-  createdAt: '2000-01-01T00:00:00.000Z',
+  createdAt: NOW,
 };
+const MAP_NAME = 'A Very Long Synthetic Battle Map Name For Narrow Screens';
 
 /** Seeds before the app's first script runs, so the storage import sees it. */
 async function seed(page: Page, theme: string): Promise<void> {
   await page.addInitScript(
-    ({ campaign, theme }) => {
+    ({ campaign, theme, mapId, mapName, now }) => {
       if (window.localStorage.getItem('rollkeeper-dm-data')) return;
       window.localStorage.setItem(
         'rollkeeper-dm-data',
@@ -26,41 +31,82 @@ async function seed(page: Page, theme: string): Promise<void> {
           version: 1,
         })
       );
+      window.localStorage.setItem(
+        'rollkeeper-battlemap-data',
+        JSON.stringify({
+          state: {
+            battleMaps: {
+              [campaign.code]: {
+                [mapId]: {
+                  id: mapId,
+                  campaignCode: campaign.code,
+                  name: mapName,
+                  mapImageUrl: '',
+                  mapImageSize: { w: 1200, h: 900 },
+                  canvasState: JSON.stringify({
+                    version: 2,
+                    camera: { position: { x: 0, y: 0 }, zoom: 1 },
+                    elements: [],
+                  }),
+                  dmOnlyElements: {},
+                  gridEnabled: false,
+                  linkedEncounterIds: [],
+                  markers: [],
+                  createdAt: now,
+                  updatedAt: now,
+                },
+              },
+            },
+          },
+          version: 0,
+        })
+      );
       window.localStorage.setItem('rollkeeper-theme', theme);
     },
-    { campaign: CAMPAIGN, theme }
+    { campaign: CAMPAIGN, theme, mapId: MAP_ID, mapName: MAP_NAME, now: NOW }
   );
 }
 
-async function overflow(page: Page) {
+/** Page overflow and the right-most header control's right edge. */
+async function measure(page: Page) {
   return page.evaluate(() => {
     const root = document.documentElement;
-    return { scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
+    const controls = document.querySelectorAll(
+      'header a, header button, header [role="button"], header input'
+    );
+    let rightMost = 0;
+    for (const control of controls) {
+      const box = control.getBoundingClientRect();
+      if (box.width > 0) rightMost = Math.max(rightMost, box.right);
+    }
+    return {
+      scrollWidth: root.scrollWidth,
+      clientWidth: root.clientWidth,
+      innerWidth: window.innerWidth,
+      rightMost,
+      controls: controls.length,
+    };
   });
 }
 
+const heading = (name: string) => (page: Page) =>
+  expect(page.getByRole('heading', { level: 1, name })).toBeVisible();
+
 const ROUTES = [
+  { path: `/dm/campaign/${CODE}/battlemaps`, ready: heading('Battle Maps') },
   {
-    path: `/dm/campaign/${CODE}/battlemaps`,
-    ready: (page: Page) =>
-      page.getByRole('heading', { level: 1, name: 'Battle Maps' }).waitFor(),
+    path: `/dm/campaign/${CODE}/battlemaps/${MAP_ID}`,
+    ready: heading(MAP_NAME),
   },
-  {
-    path: `/dm/campaign/${CODE}/locations`,
-    ready: (page: Page) =>
-      page.getByRole('heading', { level: 1, name: 'Locations' }).waitFor(),
-  },
-  {
-    path: `/dm/campaign/${CODE}/encounters`,
-    ready: (page: Page) =>
-      page.getByRole('heading', { level: 1, name: 'Encounters' }).waitFor(),
-  },
+  { path: `/dm/campaign/${CODE}/locations`, ready: heading('Locations') },
+  { path: `/dm/campaign/${CODE}/encounters`, ready: heading('Encounters') },
   {
     path: `/dm/campaign/${CODE}/table`,
-    ready: (page: Page) =>
-      page
-        .getByText('Loading Table…')
-        .waitFor({ state: 'detached', timeout: 30_000 }),
+    ready: async (page: Page) => {
+      await expect(page.getByRole('main')).toBeVisible();
+      await expect(page.getByText(/Loading (Table|scenes)…/u)).toHaveCount(0);
+    },
+    tableRoute: true,
   },
 ];
 
@@ -68,24 +114,30 @@ for (const theme of ['parchment', 'dark', 'light'])
   for (const width of [390, 360])
     for (const route of ROUTES)
       test(`${route.path} fits ${width} px (${theme})`, async ({ page }) => {
+        // A dark system preference proves the stored light theme wins.
+        await page.emulateMedia({ colorScheme: 'dark' });
         await page.setViewportSize({ width, height: 720 });
         await seed(page, theme);
         await page.goto(route.path, { waitUntil: 'domcontentloaded' });
         await route.ready(page);
-        await page.waitForTimeout(500);
-        if (theme !== 'light')
+        if (theme === 'light')
+          await expect(page.locator('html')).not.toHaveAttribute(
+            'data-theme',
+            /.+/u
+          );
+        else
           await expect(page.locator('html')).toHaveAttribute(
             'data-theme',
             theme
           );
-        const { scrollWidth, clientWidth } = await overflow(page);
-        expect(clientWidth).toBe(width);
-        expect(scrollWidth).toBeLessThanOrEqual(clientWidth);
+        const box = await measure(page);
+        expect(box.clientWidth).toBe(width);
+        expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
+        if (!route.tableRoute) expect(box.controls).toBeGreaterThan(0);
+        expect(box.rightMost).toBeLessThanOrEqual(box.innerWidth);
       });
 
-test('the Battle Maps header keeps accessible names at 360 px', async ({
-  page,
-}) => {
+test('narrow headers keep accessible names at 360 px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 720 });
   await seed(page, 'parchment');
   await page.goto(`/dm/campaign/${CODE}/battlemaps`);
@@ -93,6 +145,16 @@ test('the Battle Maps header keeps accessible names at 360 px', async ({
     page.getByRole('button', { name: 'New Battle Map' })
   ).toBeVisible();
   await expect(
-    page.getByRole('button', { name: `Back to ${CAMPAIGN.name}` })
+    page.getByRole('link', { name: `Back to ${CAMPAIGN.name}` })
+  ).toBeVisible();
+  await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
+  await expect(
+    page.getByRole('link', { name: 'Back to Battle Maps' })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Setup', exact: true })
+  ).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: 'Play', exact: true })
   ).toBeVisible();
 });

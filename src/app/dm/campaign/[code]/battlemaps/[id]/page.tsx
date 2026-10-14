@@ -95,31 +95,41 @@ export default function BattleMapEditorPage() {
       )}
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}/battlemaps`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
+          <div className="flex h-16 items-center justify-between gap-2">
+            {/* C3 / Z1: fits 360 px; the title truncates, controls stay on screen. */}
+            <div className="flex min-w-0 items-center">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                leftIcon={<ArrowLeft size={20} />}
+                className="shrink-0"
+              >
+                <Link
+                  href={`/dm/campaign/${code}/battlemaps`}
+                  aria-label="Back to Battle Maps"
                 >
-                  Battle Maps
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Map className="text-accent-orange-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">
+                  <span className="hidden sm:inline">Battle Maps</span>
+                </Link>
+              </Button>
+              <div className="ml-2 flex min-w-0 items-center sm:ml-6">
+                <Map className="text-accent-orange-text mr-2 h-6 w-6 shrink-0 sm:mr-3" />
+                <h1
+                  className="text-heading truncate text-xl font-bold"
+                  title={battleMap.name}
+                >
                   {battleMap.name}
                 </h1>
               </div>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex shrink-0 items-center gap-1 sm:gap-3">
               {/* PR06 W8: original editor; the Table entry is a link only. */}
-              <TableMapEntryLink campaignCode={code} mapId={id} />
+              <TableMapEntryLink campaignCode={code} mapId={id} compact />
               <div className="border-divider bg-surface-raised flex items-center gap-0.5 rounded-lg border p-0.5">
                 <Button
                   variant="primary"
                   size="lg"
+                  className="max-sm:h-9 max-sm:px-3 max-sm:text-sm"
                   onClick={() => handleModeChange('setup')}
                 >
                   Setup
@@ -127,6 +137,7 @@ export default function BattleMapEditorPage() {
                 <Button
                   variant="ghost"
                   size="lg"
+                  className="max-sm:h-9 max-sm:px-3 max-sm:text-sm"
                   onClick={() => handleModeChange('play')}
                 >
                   Play
