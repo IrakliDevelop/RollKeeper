@@ -32,22 +32,30 @@ export default function CampaignEncountersPage() {
       <header className="border-divider bg-surface-secondary border-b shadow-sm">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
+            {/* C3: fits 360 px; the title truncates, actions never shrink. */}
+            <div className="flex min-w-0 items-center">
+              <Link href={`/dm/campaign/${code}`} className="min-w-0 shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
                   leftIcon={<ArrowLeft size={20} />}
+                  aria-label={`Back to ${campaign?.name ?? 'Campaign'}`}
                 >
-                  {campaign?.name ?? 'Campaign'}
+                  <span className="hidden max-w-48 truncate sm:inline">
+                    {campaign?.name ?? 'Campaign'}
+                  </span>
                 </Button>
               </Link>
-              <div className="ml-6 flex items-center">
-                <Swords className="text-accent-red-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Encounters</h1>
+              <div className="ml-2 flex min-w-0 items-center sm:ml-6">
+                <Swords className="text-accent-red-text mr-2 h-6 w-6 shrink-0 sm:mr-3" />
+                <h1 className="text-heading truncate text-xl font-bold">
+                  Encounters
+                </h1>
               </div>
             </div>
-            <HeaderTrailing showSystemOption />
+            <div className="shrink-0">
+              <HeaderTrailing showSystemOption />
+            </div>
           </div>
         </div>
       </header>
