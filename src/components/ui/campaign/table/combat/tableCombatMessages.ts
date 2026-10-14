@@ -1,5 +1,10 @@
-import type { TableCombatResult } from '@/lib/table/combat';
+import type {
+  TableCombatResult,
+  TableCombatStatChange,
+} from '@/lib/table/combat';
 import type { PublicationStatus } from '@/lib/table/combatPublisher';
+
+import type { TableCombatDraft } from './tableEntityActions';
 
 const REJECTIONS: Record<string, string> = {
   'active-run': 'Another run is active. End it before starting this one.',
@@ -79,4 +84,33 @@ export function publicationDetail(
   return status.reason === 'no-control' || status.reason === 'lease-lost'
     ? undefined
     : status.reason;
+}
+
+const STAT_LABELS: Record<TableCombatStatChange['kind'], string> = {
+  damage: 'damage',
+  heal: 'healing',
+  addTempHp: 'temp HP',
+  setTempHp: 'temp HP',
+  setHp: 'HP',
+  setMaxHp: 'max HP',
+  setArmorClass: 'AC',
+  addCondition: 'conditions',
+  removeCondition: 'conditions',
+  setConditionRounds: 'condition rounds',
+  setReaction: 'reaction',
+};
+
+/** Short label naming a participant edit in "wasn't saved" notices. */
+export function combatDraftLabel(
+  draft: TableCombatDraft,
+  name: string
+): string {
+  switch (draft.type) {
+    case 'combat.applyStat':
+      return `${name} ${STAT_LABELS[draft.change.kind]}`;
+    case 'combat.setHidden':
+      return `${name} ${draft.hidden ? 'hidden' : 'shown'}`;
+    case 'combat.setInitiative':
+      return `${name} initiative`;
+  }
 }

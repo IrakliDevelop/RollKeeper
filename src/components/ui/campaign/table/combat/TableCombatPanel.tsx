@@ -184,6 +184,7 @@ export function TableCombatPanel(props: {
             canPublish={canPublish}
             saving={combat.saving}
             notice={combat.notice}
+            unsavedNotice={combat.unsavedNotice}
             onSelect={panel.selectRun}
             onNewRun={panel.openNewRun}
             onHistory={() => panel.setHistoryOpen(true)}

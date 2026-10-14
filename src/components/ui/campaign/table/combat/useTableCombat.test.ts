@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   runCombatCommand,
   type TableCombatCommandV1,
+  type TableCombatStatChange,
 } from '@/lib/table/combat';
 import { buildCombatReadModel } from '@/lib/table/combatReadModel';
 import {
@@ -16,7 +17,7 @@ import {
 } from '@/lib/table/combat.fixture';
 import { buildSharedInitiative } from '@/utils/buildSharedInitiative';
 
-import { useTableCombat } from './useTableCombat';
+import { useTableCombat, type TableCombatIntent } from './useTableCombat';
 
 beforeEach(() => {
   vi.stubGlobal(
@@ -80,7 +81,8 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
             actorId: 'orc',
             value: 14,
             at: AT,
-          }) as TableCombatCommandV1
+          }) as TableCombatCommandV1,
+        'Orc initiative'
       );
       second = result.current.execute(
         () =>
@@ -90,7 +92,8 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
             actorId: 'goblin',
             hidden: true,
             at: AT,
-          }) as TableCombatCommandV1
+          }) as TableCombatCommandV1,
+        'Goblin hidden'
       );
     });
     await act(async () => {
@@ -143,8 +146,8 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
         at: AT,
       }) as TableCombatCommandV1;
     act(() => {
-      first = result.current.execute(create);
-      second = result.current.execute(create);
+      first = result.current.execute(create, 'New run');
+      second = result.current.execute(create, 'New run');
     });
     // The refusal is visible while the first step saves.
     expect(result.current.notice?.message).toMatch(/try again/iu);
@@ -157,112 +160,33 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     expect(result.current.notice).toBeNull();
   });
 
-  it('keeps an earlier queued intent error and Retry when a later one commits (review U1)', async () => {
+  const mountHook = async (
+    stage: 'prepared' | 'ready' | 'started' = 'prepared'
+  ) => {
     const repository = await preparedRun();
-    const { result } = renderHook(() =>
-      useTableCombat({
-        repository,
-        sceneId: SCENE_ID,
-        campaignCode: 'CAMP',
-        requestedRunId: 'run-a',
-      })
-    );
-    await waitFor(() =>
-      expect(result.current.selectedRun?.runId).toBe('run-a')
-    );
-    let first!: Promise<unknown>;
-    let second!: Promise<unknown>;
-    act(() => {
-      // A: an unknown participant is rejected.
-      first = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setHidden',
-            runId: 'run-a',
-            actorId: 'nobody',
-            hidden: true,
-            at: AT,
-          }) as TableCombatCommandV1
-      );
-      // B: a valid edit queued behind it commits.
-      second = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setHidden',
-            runId: 'run-a',
-            actorId: 'goblin',
-            hidden: true,
-            at: AT,
-          }) as TableCombatCommandV1
-      );
-    });
-    await act(async () => {
-      await first;
-      await second;
-    });
-    expect(await first).not.toMatchObject({ status: 'committed' });
-    expect(await second).toMatchObject({ status: 'committed' });
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.retry).toBeTypeOf('function');
-  });
-
-  it('a later success still clears a "Still saving" info notice', async () => {
-    const repository = await preparedRun();
-    const { result } = renderHook(() =>
-      useTableCombat({
-        repository,
-        sceneId: SCENE_ID,
-        campaignCode: 'CAMP',
-        requestedRunId: 'run-a',
-      })
-    );
-    await waitFor(() =>
-      expect(result.current.selectedRun?.runId).toBe('run-a')
-    );
-    let first!: Promise<unknown>;
-    act(() => {
-      first = result.current.execute(
-        () =>
-          ({
+    if (stage !== 'prepared') {
+      for (const [actorId, value] of [
+        ['goblin', 15],
+        ['orc', 10],
+      ] as const)
+        await runCombatCommand(repository, {
+          expectedRevision: revisionOf(repository),
+          operationId: `init-${actorId}`,
+          command: {
             type: 'combat.setInitiative',
             runId: 'run-a',
-            actorId: 'orc',
-            value: 9,
+            actorId,
+            value,
             at: AT,
-          }) as TableCombatCommandV1
-      );
-      void result.current.execute(
-        () =>
-          ({
-            type: 'combat.createRun',
-            sceneId: SCENE_ID,
-            runId: 'run-c',
-            label: 'Refused',
-            at: AT,
-          }) as TableCombatCommandV1
-      );
-    });
-    expect(result.current.notice?.tone).toBe('info');
-    let later!: Promise<unknown>;
-    await act(async () => {
-      await first;
-      later = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setHidden',
-            runId: 'run-a',
-            actorId: 'goblin',
-            hidden: true,
-            at: AT,
-          }) as TableCombatCommandV1
-      );
-      await later;
-    });
-    expect(result.current.notice).toBeNull();
-  });
-
-  const mountHook = async () => {
-    const repository = await preparedRun();
+          },
+        });
+      if (stage === 'started')
+        await runCombatCommand(repository, {
+          expectedRevision: revisionOf(repository),
+          operationId: 'start',
+          command: { type: 'combat.start', runId: 'run-a', at: AT },
+        });
+    }
     const view = renderHook(() =>
       useTableCombat({
         repository,
@@ -276,228 +200,282 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     );
     return { repository, ...view };
   };
-  const rejected = () =>
-    ({
+  type Repository = Awaited<ReturnType<typeof preparedRun>>;
+  /** The next storage write fails once (a transient, retryable failure). */
+  const failOnce = (repository: Repository) =>
+    vi.spyOn(repository, 'mutateWorkspace').mockResolvedValueOnce({
+      status: 'failed',
+      reason: 'indexeddb-unavailable',
+    } as never);
+  // Pure intents: fixed at click time, like the panel's.
+  const hide =
+    (actorId: string): TableCombatIntent =>
+    () => ({
       type: 'combat.setHidden',
       runId: 'run-a',
-      actorId: 'nobody',
+      actorId,
       hidden: true,
       at: AT,
-    }) as TableCombatCommandV1;
-
-  it('a Retry that commits clears the error and its Retry (review V1)', async () => {
-    const { repository, result } = await mountHook();
-    // The intent targets an unknown participant until the cause is fixed.
-    let actorId = 'nobody';
-    const flaky = () =>
-      ({
-        type: 'combat.setHidden',
-        runId: 'run-a',
-        actorId,
-        hidden: true,
-        at: AT,
-      }) as TableCombatCommandV1;
-    await act(async () => {
-      await result.current.execute(flaky);
     });
-    expect(result.current.notice?.tone).toBe('error');
-    const retry = result.current.notice!.retry!;
-    actorId = 'goblin';
-    await act(async () => {
-      retry();
-      await new Promise(resolve => setTimeout(resolve, 0));
+  const initiative =
+    (actorId: string, value: number): TableCombatIntent =>
+    () => ({
+      type: 'combat.setInitiative',
+      runId: 'run-a',
+      actorId,
+      value,
+      at: AT,
     });
-    await waitFor(() => expect(result.current.saving).toBe(false));
-    const run = readySnapshot(repository).encounters.find(
+  const stat =
+    (change: TableCombatStatChange): TableCombatIntent =>
+    () => ({
+      type: 'combat.applyStat',
+      runId: 'run-a',
+      actorId: 'orc',
+      change,
+      at: AT,
+    });
+  const nextTurn: TableCombatIntent = () => ({
+    type: 'combat.nextTurn',
+    runId: 'run-a',
+    at: AT,
+  });
+  const runOf = (repository: Repository) =>
+    readySnapshot(repository).encounters.find(
       value => value.runId === 'run-a'
     )!;
-    expect(run.participants.find(p => p.actorId === 'goblin')?.hidden).toBe(
-      true
+  const participant = (repository: Repository, actorId: string) =>
+    runOf(repository).participants.find(p => p.actorId === actorId)!;
+  const orcHp = (repository: Repository) =>
+    buildCombatReadModel({
+      snapshot: readySnapshot(repository),
+      runId: 'run-a',
+    })!.participants.find(p => p.actorId === 'orc')!.entity.currentHp;
+
+  it('keeps an earlier failure listed when an intent queued before it commits (review U1)', async () => {
+    const { result } = await mountHook();
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(hide('nobody'), 'Nobody hidden');
+      second = result.current.execute(hide('goblin'), 'Goblin hidden');
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(await second).toMatchObject({ status: 'committed' });
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Nobody hidden wasn't saved\./
     );
-    expect(result.current.notice).toBeNull();
   });
 
-  const hideIntent = (actor: () => string) =>
-    vi.fn(
-      () =>
-        ({
-          type: 'combat.setHidden',
-          runId: 'run-a',
-          actorId: actor(),
-          hidden: true,
-          at: AT,
-        }) as TableCombatCommandV1
-    );
-  const hiddenOf = (
-    repository: Awaited<ReturnType<typeof preparedRun>>,
-    actorId: string
-  ) =>
-    readySnapshot(repository)
-      .encounters.find(value => value.runId === 'run-a')!
-      .participants.find(p => p.actorId === actorId)?.hidden;
-
-  it('an edit started after the error commits but the unsaved change stays listed', async () => {
-    const { result } = await mountHook();
+  it('X1a: a set fails, a newer set saves, no Retry is left and the newer value stays', async () => {
+    const { repository, result } = await mountHook();
+    failOnce(repository);
     await act(async () => {
-      await result.current.execute(rejected);
+      await result.current.execute(initiative('orc', 12), 'Orc initiative');
     });
-    expect(result.current.notice?.tone).toBe('error');
-    let later!: Promise<unknown>;
-    act(() => {
-      later = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setInitiative',
-            runId: 'run-a',
-            actorId: 'orc',
-            value: 11,
-            at: AT,
-          }) as TableCombatCommandV1
+    expect(result.current.unsavedNotice?.message).toBe(
+      "Orc initiative wasn't saved. Table storage is unavailable on this device. Nothing was saved."
+    );
+    expect(result.current.unsavedNotice?.retry).toBeTypeOf('function');
+    await act(async () => {
+      await result.current.execute(initiative('orc', 18), 'Orc initiative');
+    });
+    expect(result.current.unsavedNotice).toBeNull();
+    expect(participant(repository, 'orc').initiative).toBe(18);
+  });
+
+  it('X1b: damage fails, a manual HP set saves, the damage cannot be applied twice', async () => {
+    const { repository, result } = await mountHook('started');
+    const hp = orcHp(repository);
+    failOnce(repository);
+    await act(async () => {
+      await result.current.execute(
+        stat({ kind: 'damage', value: 5 }),
+        'Orc damage'
       );
     });
-    expect(result.current.saving).toBe(true);
+    expect(orcHp(repository)).toBe(hp);
+    expect(result.current.unsavedNotice?.retry).toBeTypeOf('function');
     await act(async () => {
-      await later;
+      await result.current.execute(
+        stat({ kind: 'setHp', value: hp - 5 }),
+        'Orc HP'
+      );
     });
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.message).toMatch(/^1 change wasn't saved\./);
-    expect(result.current.notice?.retry).toBeTypeOf('function');
+    expect(result.current.unsavedNotice).toBeNull();
+    expect(orcHp(repository)).toBe(hp - 5);
   });
 
-  it('two queued failures then one Retry applies both in order and clears the error (review W1)', async () => {
-    const { repository, result } = await mountHook();
-    let first = 'nobody';
-    let second = 'nobody';
-    const a = hideIntent(() => first);
-    const b = hideIntent(() => second);
-    let pa!: Promise<unknown>;
-    let pb!: Promise<unknown>;
-    act(() => {
-      pa = result.current.execute(a);
-      pb = result.current.execute(b);
-    });
+  it('X1c: Next fails, Next again saves, no extra turn can follow', async () => {
+    const { repository, result } = await mountHook('started');
+    const before = runOf(repository);
+    failOnce(repository);
     await act(async () => {
-      await pa;
-      await pb;
+      await result.current.execute(nextTurn, 'Next turn');
     });
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.message).toMatch(
-      /^2 changes weren't saved\..*Retry saves them in order\.$/
-    );
-    first = 'goblin';
-    second = 'orc';
+    expect(result.current.unsavedNotice?.retry).toBeTypeOf('function');
     await act(async () => {
-      result.current.notice!.retry!();
-      await new Promise(resolve => setTimeout(resolve, 0));
+      await result.current.execute(nextTurn, 'Next turn');
     });
-    await waitFor(() => expect(result.current.saving).toBe(false));
-    expect(hiddenOf(repository, 'goblin')).toBe(true);
-    expect(hiddenOf(repository, 'orc')).toBe(true);
-    expect(result.current.notice).toBeNull();
+    expect(result.current.unsavedNotice).toBeNull();
+    const after = runOf(repository);
+    expect(after.currentActorId).not.toBe(before.currentActorId);
+    expect(after.round).toBe(before.round);
   });
 
-  it('a refused lifecycle step while the error shows keeps the error and Retry (review W2)', async () => {
+  it('X2: a rejection offers no Retry and the next action clears it', async () => {
     const { result } = await mountHook();
     await act(async () => {
-      await result.current.execute(rejected);
+      await result.current.execute(nextTurn, 'Next turn');
     });
+    expect(result.current.unsavedNotice).toMatchObject({
+      tone: 'error',
+      message: "Next turn wasn't saved. This run is not running here.",
+    });
+    expect(result.current.unsavedNotice?.retry).toBeUndefined();
+    await act(async () => {
+      await result.current.execute(hide('goblin'), 'Goblin hidden');
+    });
+    expect(result.current.unsavedNotice).toBeNull();
+  });
+
+  it('W1: two failures that piled up while queued are both named, with no Retry', async () => {
+    const { result } = await mountHook();
+    let first!: Promise<unknown>;
+    let second!: Promise<unknown>;
+    act(() => {
+      first = result.current.execute(hide('nobody'), 'Nobody hidden');
+      second = result.current.execute(
+        initiative('ghost', 3),
+        'Ghost initiative'
+      );
+    });
+    await act(async () => {
+      await first;
+      await second;
+    });
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^These changes weren't saved: Nobody hidden, Ghost initiative\. /
+    );
+    expect(result.current.unsavedNotice?.retry).toBeUndefined();
+  });
+
+  it('W2/X2: one-off notices show beside the unsaved change and never replace it', async () => {
+    const { repository, result } = await mountHook('started');
+    failOnce(repository);
+    await act(async () => {
+      await result.current.execute(
+        stat({ kind: 'damage', value: 2 }),
+        'Orc damage'
+      );
+    });
+    act(() => {
+      result.current.setNotice({
+        tone: 'error',
+        message: 'Scene is now shown; combat did not start.',
+      });
+    });
+    expect(result.current.notice?.message).toBe(
+      'Scene is now shown; combat did not start.'
+    );
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Orc damage wasn't saved\./
+    );
     let saving!: Promise<unknown>;
     act(() => {
+      // Queued behind a pending save, a turn step is refused (no start).
       saving = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setInitiative',
-            runId: 'run-a',
-            actorId: 'orc',
-            value: 4,
-            at: AT,
-          }) as TableCombatCommandV1
-      );
-      void result.current.execute(
-        () =>
-          ({
-            type: 'combat.createRun',
-            sceneId: SCENE_ID,
-            runId: 'run-w2',
-            label: 'Refused',
-            at: AT,
-          }) as TableCombatCommandV1
+        stat({ kind: 'setArmorClass', value: 14 }),
+        'Orc AC'
       );
     });
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.retry).toBeTypeOf('function');
+    act(() => {
+      void result.current.execute(nextTurn, 'Next turn');
+    });
+    expect(result.current.notice?.message).toMatch(/Still saving/);
     await act(async () => {
       await saving;
     });
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.retry).toBeTypeOf('function');
+    expect(result.current.notice).toBeNull();
   });
 
-  it('a Retry that fails again keeps the same count with no duplicate entries', async () => {
-    const { result } = await mountHook();
-    const a = hideIntent(() => 'nobody');
-    const b = hideIntent(() => 'nobody');
-    await act(async () => {
-      await result.current.execute(a);
-      await result.current.execute(b);
+  it('Show + Start outcome stays visible while an unsaved change is listed', async () => {
+    const { result } = await mountHook('ready');
+    let combined!: Promise<unknown>;
+    let queued!: Promise<unknown>;
+    act(() => {
+      combined = result.current.showAndStart('run-a', async () => ({
+        ok: false,
+        reason: 'live play is off',
+      }));
+      // A value edit queued behind it fails after the outcome is set.
+      queued = result.current.execute(hide('nobody'), 'Nobody hidden');
     });
-    expect(result.current.notice?.message).toMatch(/^2 changes/);
     await act(async () => {
-      result.current.notice!.retry!();
+      await combined;
+      await queued;
+    });
+    expect(result.current.notice?.message).toBe(
+      "Scene not shown (live play is off), so combat didn't start."
+    );
+    expect(result.current.unsavedNotice?.message).toMatch(
+      /^Nobody hidden wasn't saved\./
+    );
+  });
+
+  it('V1: a Retry that commits clears the unsaved change', async () => {
+    const { repository, result } = await mountHook();
+    failOnce(repository);
+    await act(async () => {
+      await result.current.execute(hide('goblin'), 'Goblin hidden');
+    });
+    await act(async () => {
+      result.current.unsavedNotice!.retry!();
       await new Promise(resolve => setTimeout(resolve, 0));
     });
     await waitFor(() => expect(result.current.saving).toBe(false));
-    await waitFor(() =>
-      expect(result.current.notice?.retry).toBeTypeOf('function')
-    );
-    expect(result.current.notice?.tone).toBe('error');
-    expect(result.current.notice?.message).toMatch(/^2 changes/);
+    expect(participant(repository, 'goblin').hidden).toBe(true);
+    expect(result.current.unsavedNotice).toBeNull();
   });
 
-  it('a Retry press replays once: its button hides while the replay runs', async () => {
-    const { repository, result } = await mountHook();
-    let actorId = 'nobody';
-    const a = hideIntent(() => actorId);
+  it('a double Retry press replays once', async () => {
+    const { repository, result } = await mountHook('started');
+    const hp = orcHp(repository);
+    const write = failOnce(repository);
     await act(async () => {
-      await result.current.execute(a);
+      await result.current.execute(
+        stat({ kind: 'damage', value: 3 }),
+        'Orc damage'
+      );
     });
-    const calls = a.mock.calls.length;
-    const retry = result.current.notice!.retry!;
-    actorId = 'goblin';
+    const retry = result.current.unsavedNotice!.retry!;
     act(() => {
       retry();
       retry();
     });
-    expect(result.current.notice?.retry).toBeUndefined();
     await waitFor(() => expect(result.current.saving).toBe(false));
-    await waitFor(() => expect(result.current.notice).toBeNull());
-    expect(a.mock.calls.length).toBe(calls + 1);
-    expect(hiddenOf(repository, 'goblin')).toBe(true);
+    expect(orcHp(repository)).toBe(hp - 3);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(result.current.unsavedNotice).toBeNull();
   });
 
-  it('any success clears a "Still saving" info notice, even one raised later (review V2)', async () => {
+  it('V2: any success clears a "Still saving" info notice', async () => {
     const { result } = await mountHook();
     let first!: Promise<unknown>;
     act(() => {
-      first = result.current.execute(
-        () =>
-          ({
-            type: 'combat.setInitiative',
-            runId: 'run-a',
-            actorId: 'orc',
-            value: 7,
-            at: AT,
-          }) as TableCombatCommandV1
-      );
+      first = result.current.execute(initiative('orc', 7), 'Orc initiative');
       void result.current.execute(
-        () =>
-          ({
-            type: 'combat.createRun',
-            sceneId: SCENE_ID,
-            runId: 'run-z',
-            label: 'Refused',
-            at: AT,
-          }) as TableCombatCommandV1
+        () => ({
+          type: 'combat.createRun',
+          sceneId: SCENE_ID,
+          runId: 'run-z',
+          label: 'Refused',
+          at: AT,
+        }),
+        'New run'
       );
     });
     expect(result.current.notice?.tone).toBe('info');

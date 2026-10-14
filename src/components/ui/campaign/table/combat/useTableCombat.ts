@@ -35,12 +35,16 @@ export type TableCombatIntent = () => TableCombatCommandV1;
 
 const PLAYER_POLL_MS = 10_000;
 
-/** A user intent that failed and is waiting for Retry. */
-interface FailedIntent {
+/** A user intent that failed with no later action started since. */
+interface UnsavedChange {
   intent: TableCombatIntent;
-  message: string;
-  link?: TableCombatNotice['link'];
+  label: string;
+  result: TableCombatResult;
 }
+
+/** Storage and conflict failures may pass on a second try; rejections won't. */
+const retryable = (result: TableCombatResult) =>
+  result.status === 'failed' || result.status === 'conflict';
 
 function sceneRunsOf(
   snapshot: TableWorkspaceSnapshotV1 | null,
@@ -80,13 +84,15 @@ const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
  * applies both (PR08 desktop B3). Turn and lifecycle steps are refused while
  * one is saving ("Still saving…", cleared by the next success).
  *
- * Failed user intents are kept in order as "not saved" changes. While any
- * remain, the notice is one error naming how many, with a single Retry that
- * replays all of them in order through the queue (each re-plans on current
- * state, so delta edits stay safe). Only a successful replay removes one;
- * other successes never do. Info and one-off notices never hide that error.
- * Background commands (acknowledgements, prunes) wait their turn; nothing
- * auto-replans.
+ * Unsaved record: each user intent carries a short label ("Orc initiative").
+ * A failure joins the record; the next action the DM starts (Retry
+ * included) clears it, because the DM is now acting on the current state.
+ * Intents queued before the failure do not clear it. One storage or conflict
+ * failure offers a one-shot Retry of that intent; a rejection never does;
+ * two or more failures are named with no Retry and the DM redoes them. Old
+ * intents are never batch-replayed. One-off notices (Still saving, notify,
+ * Show + Start outcomes) show alongside the record. Background commands
+ * (acknowledgements, prunes) wait their turn; nothing auto-replans.
  */
 export function useTableCombat(options: {
   repository: TableRepository;
@@ -140,7 +146,7 @@ export function useTableCombat(options: {
   );
 
   const [saving, setSaving] = useState(false);
-  /** One-off notices (info, Show + Start outcomes); never hides `failed`. */
+  /** One-off notices (info, Show + Start outcomes), shown beside `unsaved`. */
   const [transient, setTransient] = useState<TableCombatNotice | null>(null);
   const transientTone = useRef<TableCombatNotice['tone'] | null>(null);
   const setNotice = useCallback((value: TableCombatNotice | null) => {
@@ -153,36 +159,23 @@ export function useTableCombat(options: {
     transientTone.current = null;
     setTransient(null);
   }, []);
-  /** Failed user intents, oldest first (not-yet-saved changes). */
-  const failed = useRef<FailedIntent[]>([]);
-  const [failedVersion, bumpFailed] = useReducer((n: number) => n + 1, 0);
-  /** A Retry replay is running: its button is hidden (single flight). */
-  const replaying = useRef(false);
-  const recordFailure = useCallback(
-    (intent: TableCombatIntent, result: TableCombatResult) => {
-      const entry: FailedIntent = {
-        intent,
-        message: combatFailureMessage(result),
-        link:
-          result.status === 'rejected' && result.reason === 'invalid-reference'
-            ? {
-                href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/battlemaps`,
-                label: 'Export Table',
-              }
-            : undefined,
-      };
-      const index = failed.current.findIndex(item => item.intent === intent);
-      if (index >= 0) failed.current[index] = entry;
-      else failed.current.push(entry);
-      bumpFailed();
-    },
-    [options.campaignCode]
-  );
-  const recordSuccess = useCallback((intent: TableCombatIntent) => {
-    const before = failed.current.length;
-    failed.current = failed.current.filter(item => item.intent !== intent);
-    if (failed.current.length !== before) bumpFailed();
+  /** Failures with no later action started since, oldest first. */
+  const unsaved = useRef<UnsavedChange[]>([]);
+  const [unsavedVersion, bumpUnsaved] = useReducer((n: number) => n + 1, 0);
+  /** Synchronous guard: one Retry press replays once. */
+  const retried = useRef<UnsavedChange | null>(null);
+  const clearUnsaved = useCallback(() => {
+    if (unsaved.current.length === 0) return;
+    unsaved.current = [];
+    bumpUnsaved();
   }, []);
+  const recordFailure = useCallback(
+    (intent: TableCombatIntent, label: string, result: TableCombatResult) => {
+      unsaved.current = [...unsaved.current, { intent, label, result }];
+      bumpUnsaved();
+    },
+    []
+  );
   /** User intents queued or running. */
   const pending = useRef(0);
   const begin = useCallback(() => {
@@ -216,19 +209,18 @@ export function useTableCombat(options: {
     [repository]
   );
 
-  /** Runs one user intent on the queue; failures join `failed`. */
+  /** Runs one user intent on the queue; a failure joins `unsaved`. */
   const enqueue = useCallback(
-    (intent: TableCombatIntent): Promise<TableCombatResult> => {
+    (intent: TableCombatIntent, label: string): Promise<TableCombatResult> => {
       begin();
       const task = queue.current.then(async () => {
         try {
           const result = await run(intent);
           if (result.status === 'committed' || result.status === 'unchanged') {
-            recordSuccess(intent);
             clearInfo();
           } else {
             if (result.status === 'conflict') await repository.reload();
-            recordFailure(intent, result);
+            recordFailure(intent, label, result);
           }
           return result;
         } finally {
@@ -238,52 +230,79 @@ export function useTableCombat(options: {
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, run, begin, finish, recordSuccess, recordFailure, clearInfo]
+    [repository, run, begin, finish, recordFailure, clearInfo]
+  );
+
+  /** Starts a user intent now, or null when refused (nothing started). */
+  const startIntent = useCallback(
+    (
+      intent: TableCombatIntent,
+      label: string
+    ): Promise<TableCombatResult> | null => {
+      if (pending.current > 0 && ONE_AT_A_TIME.has(intent().type)) {
+        void refuse();
+        return null;
+      }
+      // The DM acts on the current state: older failures and their Retry go.
+      clearUnsaved();
+      // A new action supersedes a one-off notice: "Saving…" shows instead.
+      if (transientTone.current !== null) setNotice(null);
+      return enqueue(intent, label);
+    },
+    [refuse, clearUnsaved, enqueue, setNotice]
   );
 
   const execute = useCallback(
-    (intent: TableCombatIntent): Promise<TableCombatResult | null> => {
-      if (pending.current > 0 && ONE_AT_A_TIME.has(intent().type))
-        return refuse();
-      // A new action supersedes a one-off notice: "Saving…" shows instead.
-      if (transientTone.current !== null) setNotice(null);
-      return enqueue(intent);
-    },
-    [refuse, enqueue, setNotice]
+    (
+      intent: TableCombatIntent,
+      label: string
+    ): Promise<TableCombatResult | null> =>
+      startIntent(intent, label) ?? Promise.resolve(null),
+    [startIntent]
   );
 
-  /** Retry: replays every failed intent in order (one replay at a time). */
-  const retryFailed = useCallback(() => {
-    if (replaying.current || failed.current.length === 0) return;
-    replaying.current = true;
-    bumpFailed();
-    const replay = failed.current.map(item => enqueue(item.intent));
-    void Promise.allSettled(replay).then(() => {
-      replaying.current = false;
-      bumpFailed();
-    });
-  }, [enqueue]);
-
-  const failedNotice = useMemo((): TableCombatNotice | null => {
-    const items = failed.current;
+  const unsavedNotice = useMemo((): TableCombatNotice | null => {
+    const items = unsaved.current;
     if (items.length === 0) return null;
     const latest = items[items.length - 1]!;
-    const message =
-      items.length === 1
-        ? `1 change wasn't saved. ${latest.message}`
-        : `${items.length} changes weren't saved. ${latest.message} Retry saves them in order.`;
+    const reason = combatFailureMessage(latest.result);
+    const link = items.some(
+      item =>
+        item.result.status === 'rejected' &&
+        item.result.reason === 'invalid-reference'
+    )
+      ? {
+          link: {
+            href: `/dm/campaign/${encodeURIComponent(options.campaignCode)}/battlemaps`,
+            label: 'Export Table',
+          },
+        }
+      : {};
+    if (items.length > 1)
+      return {
+        tone: 'error',
+        message: `These changes weren't saved: ${items.map(item => item.label).join(', ')}. ${reason}`,
+        ...link,
+      };
+    const retry = retryable(latest.result)
+      ? {
+          retry: () => {
+            if (retried.current === latest) return;
+            retried.current = latest;
+            if (!startIntent(latest.intent, latest.label))
+              retried.current = null;
+          },
+        }
+      : {};
     return {
       tone: 'error',
-      message,
-      ...(replaying.current ? {} : { retry: retryFailed }),
-      ...(items.find(item => item.link)?.link
-        ? { link: items.find(item => item.link)!.link }
-        : {}),
+      message: `${latest.label} wasn't saved. ${reason}`,
+      ...retry,
+      ...link,
     };
-    // failedVersion: the list and the replay flag change in place.
+    // unsavedVersion: the record changes in place.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [failedVersion, retryFailed]);
-  const notice = failedNotice ?? transient;
+  }, [unsavedVersion, startIntent, options.campaignCode]);
 
   /**
    * PR04 P8 / S2 combined Show + Start, inside the same busy/serialized
@@ -303,6 +322,7 @@ export function useTableCombat(options: {
       >
     ): Promise<TableCombatResult | null> => {
       if (pending.current > 0) return refuse();
+      clearUnsaved();
       begin();
       const task = queue.current.then(async () => {
         try {
@@ -372,7 +392,7 @@ export function useTableCombat(options: {
       queue.current = task.catch(() => undefined);
       return task;
     },
-    [repository, refuse, begin, finish, setNotice]
+    [repository, refuse, clearUnsaved, begin, finish, setNotice]
   );
 
   /** Background commands (acks, prunes, URL selection): queued, not refused. */
@@ -440,7 +460,8 @@ export function useTableCombat(options: {
     playerData,
     tick,
     saving,
-    notice,
+    notice: transient,
+    unsavedNotice,
     setNotice,
     execute,
     background,
