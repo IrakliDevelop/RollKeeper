@@ -635,6 +635,7 @@ local now = tonumber(time[1]) * 1000 + math.floor(tonumber(time[2]) / 1000)
 if type(app.deadlineAt) ~= 'number' or app.deadlineAt <= now then return {0,'expired'} end
 if control.epoch ~= app.epoch or control.writerFence ~= app.writerFence
   or control.holderPrincipal ~= app.principal or control.leaseUntil <= now
+  or (app.holderSessionId ~= nil and control.holderSessionId ~= app.holderSessionId)
   or registry.deleted == true or registry.sceneId ~= app.sceneId
   or registry.roomId ~= app.room then return {0,'forbidden'} end
 local current = redis.call('GET', KEYS[3])

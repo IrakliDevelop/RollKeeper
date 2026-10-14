@@ -19,6 +19,8 @@ interface AdminContext {
   room: string;
   epoch: string;
   writerFence: number;
+  /** The live tab's control session; the relay re-checks it on provision. */
+  holderSessionId: string;
   principal: string;
   roomGeneration: string | null;
   casToken: string | null;
@@ -131,12 +133,31 @@ export async function readAuthorityRequest(
   return result;
 }
 
+/**
+ * The admin context for the scene room, only for the tab that holds the
+ * live-control lease (PR08 desktop B1). Two tabs of one DM share the
+ * principal, so the caller's `holderSessionId` and expected writer fence
+ * must both match the control record, as every other control mutation
+ * requires (`atomic.ts`). The returned `writerFence` is the caller's, so the
+ * relay's Lua fence check closes the read/write race.
+ */
 export async function authorityAdminContext(
   campaign: string,
   sceneId: unknown,
-  principal: string
+  principal: string,
+  lease: { holderSessionId: unknown; expectedFence: unknown }
 ): Promise<AdminContext | null> {
   if (typeof sceneId !== 'string') return null;
+  const { holderSessionId, expectedFence } = lease;
+  if (
+    typeof holderSessionId !== 'string' ||
+    holderSessionId.length === 0 ||
+    holderSessionId.length > 128 ||
+    typeof expectedFence !== 'number' ||
+    !Number.isSafeInteger(expectedFence) ||
+    expectedFence < 0
+  )
+    return null;
   const redis = getRawRedis();
   const [controlRaw, registryRaw] = await Promise.all([
     redis.get(tableControlKey(campaign)),
@@ -151,6 +172,8 @@ export async function authorityAdminContext(
     typeof control.leaseUntil !== 'number' ||
     control.leaseUntil <= Date.now() ||
     control.holderPrincipal !== principal ||
+    control.holderSessionId !== holderSessionId ||
+    control.writerFence !== expectedFence ||
     registry?.v !== 1 ||
     registry.sceneId !== sceneId ||
     registry.deleted === true ||
@@ -170,7 +193,8 @@ export async function authorityAdminContext(
     sceneId,
     room: registry.roomId,
     epoch: control.epoch,
-    writerFence: control.writerFence,
+    writerFence: expectedFence,
+    holderSessionId,
     principal,
     roomGeneration:
       meta?.v === 1 && typeof meta.generation === 'string'

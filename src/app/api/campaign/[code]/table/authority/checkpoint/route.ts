@@ -27,12 +27,18 @@ export async function POST(
   const context = await authorityAdminContext(
     code,
     body.sceneId,
-    auth.principal.id
+    auth.principal.id,
+    { holderSessionId: body.holderSessionId, expectedFence: body.expectedFence }
   );
-  if (!context?.roomGeneration)
+  if (!context)
     return NextResponse.json(
       { error: 'Current live control is required' },
       { status: 403 }
+    );
+  if (!context.roomGeneration)
+    return NextResponse.json(
+      { error: 'The live room is not ready' },
+      { status: 409 }
     );
   const response = await captureAuthorityCheckpoint(context);
   if (!response)
