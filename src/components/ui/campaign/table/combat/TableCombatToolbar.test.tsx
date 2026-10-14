@@ -88,6 +88,23 @@ describe('publication wording (O7-3)', () => {
 });
 
 describe('combat save status (review X2, C1)', () => {
+  it('is one live region, mounted before any notice arrives (review Z4)', () => {
+    const { rerender } = render(
+      <TableCombatStatus saving={false} notice={null} unsavedNotice={null} />
+    );
+    const region = screen.getByRole('status');
+    expect(region).toHaveAttribute('aria-live', 'polite');
+    rerender(
+      <TableCombatStatus
+        saving
+        notice={null}
+        unsavedNotice={{ tone: 'error', message: "Orc HP wasn't saved." }}
+      />
+    );
+    expect(screen.getAllByRole('status')).toEqual([region]);
+    expect(region).toHaveTextContent("Saving…Orc HP wasn't saved.");
+  });
+
   it('shows a one-off notice and "Saving…" beside the unsaved change', () => {
     const retry = vi.fn();
     const { rerender } = render(

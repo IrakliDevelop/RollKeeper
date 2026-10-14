@@ -20,7 +20,11 @@ export function TableCombatStatus(props: {
   unsavedNotice: TableCombatNotice | null;
 }) {
   return (
+    // Z4: one always-mounted live region, so a notice inserted later is
+    // announced (a region mounted already filled can be missed).
     <div
+      role="status"
+      aria-live="polite"
       className="border-divider min-h-10 space-y-1 border-t px-3 py-1.5"
       data-testid="table-combat-status"
     >
@@ -40,8 +44,6 @@ function NoticeLine(props: {
   return (
     <div className="flex min-h-7 flex-wrap items-center gap-2">
       <p
-        role="status"
-        aria-live="polite"
         className={`min-w-0 flex-1 text-xs ${
           notice?.tone === 'error' ? 'text-accent-red-text' : 'text-muted'
         }`}
