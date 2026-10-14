@@ -121,7 +121,8 @@ scene rooms, player views and the TV cannot connect.
   ACK protocol has no hidden phase); it keeps its existing wording.
 - Combat value edits (hide, initiative, HP, conditions) queue behind a save
   in flight instead of being dropped; turn and lifecycle steps still run one
-  at a time. A later success never clears another edit's error and Retry.
+  at a time. An edit already queued when another fails keeps that error and
+  Retry visible; a Retry or any edit started afterwards clears it.
 - Legacy shared-state writers are retired: `POST /shared` with
   `initiative`, `initiativeRequest` or `battlemap` answers 426, and any feature
   outside `TABLE_V1_SHARED_FEATURES` answers 400
