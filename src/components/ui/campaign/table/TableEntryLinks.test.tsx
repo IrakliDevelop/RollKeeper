@@ -136,7 +136,7 @@ describe('A6 Table entry points', () => {
       'utf8'
     );
     expect(source).toContain(
-      '<TableMapEntryLink campaignCode={code} mapId={id} />'
+      '<TableMapEntryLink campaignCode={code} mapId={id} compact />'
     );
   });
 });
