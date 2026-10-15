@@ -1020,6 +1020,192 @@ run('two relay authority transport', () => {
     ).toBe(false);
   }, 15_000);
 
+  it('keeps accepting edits after more than 64 accepted operations on one connection (SDK journal, PR08 repair 08)', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 3, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const claims = {
+      v: 1 as const,
+      room: ROOM,
+      // Long enough for 300 paced, confirmed edits.
+      exp: Date.now() + 600_000,
+      campaign: CAMPAIGN,
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-a',
+      epoch: EPOCH,
+      roomGeneration: GENERATION,
+    };
+    const dmToken = signBattleMapToken(
+      { ...claims, userId: 'dm-a', role: 'dm', writerFence: 1 },
+      SECRET
+    );
+    // Both sides go through RollKeeper's wrapper, which releases settled
+    // operations (J1); the raw SDK keeps them until released.
+    const dmStore = new ElementStore();
+    let dmStatus = 'connecting';
+    const dm = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${first.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store: dmStore,
+      clientId: 'dm-a',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        dmId: 'dm-a',
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({ token: dmToken, authority: 1, room: ROOM }),
+      transportFactory: transport,
+      onStatus: next => {
+        dmStatus = next;
+      },
+    });
+    clients.push(dm);
+    // A raw SDK observer reads the confirmed room document.
+    const observer = createManagedAuthorityConnection({
+      scopeId: `${CAMPAIGN}:scene-a:journal-observer`,
+      clientId: 'dm-a',
+      extensions: [createFogAuthorityClientExtension()],
+      resolveUrl: () => ({
+        url: `ws://127.0.0.1:${second.address().port}?room=${ROOM}`,
+        protocols: bearerSubprotocols(dmToken),
+      }),
+      transportFactory: transport,
+    });
+    clients.push(observer);
+    // The player goes through RollKeeper's own wrapper (the app path).
+    const playerStore = new ElementStore();
+    let playerStatus = 'connecting';
+    const playerId = 'journal-player';
+    const player = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${second.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store: playerStore,
+      clientId: playerId,
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId,
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({
+        token: signBattleMapToken(
+          {
+            ...claims,
+            userId: playerId,
+            role: 'player',
+            playerPrincipal: playerId,
+          },
+          SECRET
+        ),
+        authority: 1,
+        room: ROOM,
+      }),
+      transportFactory: transport,
+      onStatus: next => {
+        playerStatus = next;
+      },
+    });
+    clients.push(player);
+    await eventually(
+      () =>
+        dmStatus === 'live' &&
+        playerStatus === 'live' &&
+        observer.getState().status === 'live'
+    );
+    const elementX = (id: string) =>
+      (
+        observer
+          .getState()
+          .document?.elements.find(
+            element => (element as { id: string }).id === id
+          ) as { position?: { x: number } } | undefined
+      )?.position?.x;
+
+    // DM: 150 sequential edits of one element, each waited until accepted.
+    const dmElement = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: 'layer-annotations',
+      }),
+      id: 'journal-dm-element',
+    };
+    dmStore.add(dmElement as never);
+    await eventually(() => elementX('journal-dm-element') === 0);
+    let dmReached = 0;
+    for (let step = 1; step <= 150; step += 1) {
+      dmStore.update('journal-dm-element', { position: { x: step, y: 0 } });
+      try {
+        await eventually(() => elementX('journal-dm-element') === step, 3_000);
+        dmReached = step;
+      } catch {
+        break;
+      }
+    }
+    // Player: 150 moves of its own token through the app wrapper. Players
+    // are rate limited to 10 element writes per second, so pace them.
+    const band = `player-${playerId}`;
+    player.publishLayerUpsert({
+      id: band,
+      name: 'My elements',
+      visible: true,
+      locked: false,
+      order: 500,
+      opacity: 1,
+    });
+    const token = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: band,
+      }),
+      id: 'journal-player-token',
+      tokenKind: 'player',
+      characterId: playerId,
+    };
+    playerStore.add(token as never);
+    await eventually(() => elementX('journal-player-token') === 0);
+    let playerReached = 0;
+    for (let step = 1; step <= 150; step += 1) {
+      await new Promise(resolve => setTimeout(resolve, 110));
+      playerStore.update('journal-player-token', {
+        position: { x: step, y: 0 },
+      });
+      try {
+        await eventually(
+          () => elementX('journal-player-token') === step,
+          3_000
+        );
+        playerReached = step;
+      } catch {
+        break;
+      }
+    }
+    expect({ dmReached, playerReached }).toEqual({
+      dmReached: 150,
+      playerReached: 150,
+    });
+  }, 240_000);
+
   it('restore to a fresh room generation withdraws admitted DM and player sockets; re-minted tokens join the restored state (PR08 desktop A1)', async () => {
     for (const client of clients.splice(0)) client.stop();
     await new Promise(resolve => setTimeout(resolve, 200));
