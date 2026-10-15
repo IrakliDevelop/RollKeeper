@@ -1206,6 +1206,160 @@ run('two relay authority transport', () => {
     });
   }, 240_000);
 
+  it('after 70 offline edits the DM connection is live again: the next edit reaches the room and a checkpoint can be saved (FF1)', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 3, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const dmToken = signBattleMapToken(
+      {
+        v: 1,
+        room: ROOM,
+        exp: Date.now() + 300_000,
+        campaign: CAMPAIGN,
+        resourceKind: 'scene',
+        sceneId: 'scene-a',
+        epoch: EPOCH,
+        roomGeneration: GENERATION,
+        userId: 'dm-a',
+        role: 'dm',
+        writerFence: 1,
+      },
+      SECRET
+    );
+    // A transport that can drop the socket and refuse to reconnect.
+    let offline = false;
+    const sockets: Array<{ close(): void }> = [];
+    const gated = (endpoint: ManagedSyncEndpoint): AuthorityClientTransport => {
+      if (offline)
+        return {
+          start(handlers) {
+            setTimeout(() => handlers.onClose(1006, 'offline'), 10);
+          },
+          trySend: () => false,
+          close() {},
+        };
+      const inner = transport(endpoint);
+      sockets.push(inner);
+      return inner;
+    };
+    const store = new ElementStore();
+    let status = 'connecting';
+    const diagnostics: string[] = [];
+    const dm = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${first.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store,
+      clientId: 'dm-a',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        dmId: 'dm-a',
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({ token: dmToken, authority: 1, room: ROOM }),
+      transportFactory: gated,
+      onStatus: next => {
+        status = next;
+      },
+      onDiagnostic: message => diagnostics.push(message),
+    });
+    clients.push(dm);
+    const observer = createManagedAuthorityConnection({
+      scopeId: `${CAMPAIGN}:scene-a:offline-observer`,
+      clientId: 'dm-a',
+      extensions: [createFogAuthorityClientExtension()],
+      resolveUrl: () => ({
+        url: `ws://127.0.0.1:${second.address().port}?room=${ROOM}`,
+        protocols: bearerSubprotocols(dmToken),
+      }),
+      transportFactory: transport,
+    });
+    clients.push(observer);
+    await eventually(
+      () => status === 'live' && observer.getState().status === 'live'
+    );
+    const roomX = (id: string) =>
+      (
+        observer
+          .getState()
+          .document?.elements.find(
+            element => (element as { id: string }).id === id
+          ) as { position?: { x: number } } | undefined
+      )?.position?.x;
+    const element = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: 'layer-annotations',
+      }),
+      id: 'offline-dm-element',
+    };
+    store.add(element as never);
+    await eventually(() => roomX('offline-dm-element') === 0);
+
+    // Offline: drop the socket and refuse to reconnect; edit 70 times.
+    offline = true;
+    for (const socket of sockets.splice(0)) socket.close();
+    await eventually(() => status !== 'live');
+    for (let step = 1; step <= 70; step += 1)
+      store.update('offline-dm-element', { position: { x: step, y: 0 } });
+    expect(roomX('offline-dm-element')).toBe(0);
+
+    // Back online: the live room wins; offline drafts are released.
+    offline = false;
+    await eventually(() => status === 'live', 30_000);
+    expect(roomX('offline-dm-element')).toBe(0);
+    // The next edit reaches the room.
+    store.update('offline-dm-element', { position: { x: 500, y: 0 } });
+    await eventually(() => roomX('offline-dm-element') === 500);
+    await eventually(() =>
+      diagnostics.includes(
+        'Map edits made while offline were not sent. Use Reapply changes to send them.'
+      )
+    );
+
+    // And a checkpoint can be saved (no blocked barrier). Right after a
+    // reconnect the SDK may still answer `recovery`; a later attempt saves.
+    const outcomes: string[] = [];
+    await eventually(async () => {
+      const barrier = dm.captureBarrier!();
+      if (!barrier) return false;
+      try {
+        const receipts = await dm.waitForAcknowledgements!(barrier, {
+          timeoutMs: 10_000,
+        });
+        expect(receipts.status).toBe('acknowledged');
+        const captured = await dm.requestCheckpoint!({
+          barrier,
+          timeoutMs: 10_000,
+        });
+        outcomes.push(
+          captured.status === 'complete' ? 'complete' : captured.reason
+        );
+        return captured.status === 'complete';
+      } finally {
+        dm.releaseBarrier!(barrier);
+      }
+    }, 30_000);
+    expect(outcomes.at(-1)).toBe('complete');
+    expect(outcomes.filter(outcome => outcome !== 'recovery').length).toBe(1);
+  }, 120_000);
+
   it('restore to a fresh room generation withdraws admitted DM and player sockets; re-minted tokens join the restored state (PR08 desktop A1)', async () => {
     for (const client of clients.splice(0)) client.stop();
     await new Promise(resolve => setTimeout(resolve, 200));
