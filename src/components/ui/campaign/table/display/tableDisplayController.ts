@@ -785,9 +785,11 @@ export class TableDisplayController {
       if (attach.uncovered) return;
       this.emit({ cover: DISPLAY_WAITING });
       if (!this.readinessTimer) this.armReadinessTimer(attach.gen);
+      // 'awaitSecondFrame' always has `uncovered` set (onFrame sets both, and
+      // every path that clears `uncovered` resets the stage to 'idle'), so
+      // it returned above; its own 1 s requestConfirmingFrame loop resumes
+      // once frames render again (CC10).
       if (attach.stage === 'awaitFrame') attach.viewport?.requestRender();
-      else if (attach.stage === 'awaitSecondFrame')
-        this.requestConfirmingFrame(attach.gen);
       else this.defer(() => this.checkReadiness(attach.gen));
       return;
     }

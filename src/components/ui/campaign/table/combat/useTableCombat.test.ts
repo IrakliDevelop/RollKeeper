@@ -571,6 +571,76 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     );
   });
 
+  it('FR5: a throw before Show reports that nothing was sent', async () => {
+    const { repository, result } = await mountHook('ready');
+    vi.spyOn(repository, 'reload').mockRejectedValueOnce(new Error('idb'));
+    const show = vi.fn(async () => ({ ok: true as const }));
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.showAndStart('run-a', show);
+    });
+    expect(outcome).toBeNull();
+    expect(show).not.toHaveBeenCalled();
+    expect(result.current.saving).toBe(false);
+    expect(result.current.notice).toEqual({
+      tone: 'error',
+      message: "Couldn't start combat. Nothing was sent.",
+    });
+  });
+
+  it('FR5: a throw from Show itself is reported as unconfirmed', async () => {
+    const { result } = await mountHook('ready');
+    await act(async () => {
+      await result.current.showAndStart('run-a', async () => {
+        throw new Error('network');
+      });
+    });
+    expect(result.current.notice?.message).toBe(
+      "Couldn't confirm the scene is shown, so combat didn't start. Check what players see."
+    );
+  });
+
+  it('FR5: a throw after a successful Show says the scene is shown and combat did not start', async () => {
+    const { repository, result } = await mountHook('ready');
+    vi.spyOn(repository, 'mutateWorkspace').mockRejectedValueOnce(
+      new Error('idb')
+    );
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.showAndStart('run-a', async () => ({
+        ok: true,
+      }));
+    });
+    expect(outcome).toMatchObject({ status: 'failed' });
+    expect(result.current.saving).toBe(false);
+    expect(result.current.notice).toEqual({
+      tone: 'error',
+      message: 'Scene is now shown; combat did not start: Saving failed.',
+    });
+  });
+
+  it('CC5: a throw after Show while handling a refused start reports the shown scene and a failed result', async () => {
+    const { repository, result } = await mountHook('ready');
+    vi.spyOn(repository, 'mutateWorkspace').mockResolvedValueOnce({
+      status: 'conflict',
+      actualRevision: 99,
+    } as never);
+    const reload = vi.spyOn(repository, 'reload');
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.showAndStart('run-a', async () => {
+        // Show succeeded; the conflict reload after it throws.
+        reload.mockRejectedValueOnce(new Error('idb'));
+        return { ok: true };
+      });
+    });
+    expect(outcome).toEqual({ status: 'failed', reason: 'transaction-failed' });
+    expect(result.current.notice).toEqual({
+      tone: 'error',
+      message: 'Scene is now shown; combat did not start: Saving failed.',
+    });
+  });
+
   it('V1: a Retry that commits clears the unsaved change', async () => {
     const { repository, result } = await mountHook();
     failOnce(repository);

@@ -1071,8 +1071,11 @@ export function useDmBattleMapCanvas({
 
       // Live sync — resolver reads Zustand LIVE via getState() (a captured
       // snapshot would go stale after the first dm-only toggle).
+      // PR08 repair 07: only a Table scene has a live room under Table v1.
+      // The original editor is private (no audience can join), so it opens
+      // no connection and mints no token (it used to retry a 409 forever).
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-      if (relayUrl) {
+      if (relayUrl && tableSceneAdapter) {
         // Re-attach: tear down the OLD connection-scoped handles BEFORE
         // stopping the old connection, so their final frames (awareness
         // `cleared`, measure/path clears) ride the still-live socket —

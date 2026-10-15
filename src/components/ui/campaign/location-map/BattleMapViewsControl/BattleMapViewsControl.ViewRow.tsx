@@ -11,6 +11,8 @@ export const ICON_BUTTON =
 export interface ViewRowProps {
   view: SavedCameraView;
   sharingEnabled: boolean;
+  /** False: no send button (no one else can see this surface). */
+  canSend?: boolean;
   renaming: boolean;
   renameValue: string;
   onRenameValueChange: (value: string) => void;
@@ -27,6 +29,7 @@ export interface ViewRowProps {
 export function ViewRow({
   view,
   sharingEnabled,
+  canSend = true,
   renaming,
   renameValue,
   onRenameValueChange,
@@ -91,15 +94,17 @@ export function ViewRow({
         <MapPin size={14} className="shrink-0" />
         <span className="truncate">{view.name}</span>
       </Button>
-      <Button
-        variant="ghost"
-        aria-label="Send view"
-        onClick={onSend}
-        disabled={!sharingEnabled}
-        className={ICON_BUTTON}
-      >
-        <Send size={16} />
-      </Button>
+      {canSend && (
+        <Button
+          variant="ghost"
+          aria-label="Send view"
+          onClick={onSend}
+          disabled={!sharingEnabled}
+          className={ICON_BUTTON}
+        >
+          <Send size={16} />
+        </Button>
+      )}
       <Button
         variant="ghost"
         aria-label="Rename view"

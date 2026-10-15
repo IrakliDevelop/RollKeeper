@@ -299,6 +299,61 @@ describe('a hidden TV tab while attaching (PR08 desktop B4)', () => {
     expect(connections).toHaveLength(1);
   });
 
+  it('FR6: a failed attach waiting on its retry timer retargets at once when the tab turns visible', async () => {
+    start();
+    await tick(0);
+    await setVisibility('hidden');
+    // The attach fails while hidden; the retry waits on its backoff.
+    connections.at(-1)!.options.onStatus?.('stopped');
+    await tick(0);
+    expect(connections).toHaveLength(1);
+    await setVisibility('visible');
+    // No backoff wait: a new attach starts immediately.
+    expect(connections).toHaveLength(2);
+    await live();
+    await frames(5);
+    expect(cover()).toBeNull();
+    expect(acks.at(-1)).toMatchObject({ sceneId: 'tavern', phase: 'loaded' });
+  });
+
+  it('FR6: hidden between the uncovering frame and the confirming frame, it ACKs only once frames render again', async () => {
+    start();
+    await tick(0);
+    await live();
+    // First frame uncovers (stage awaitSecondFrame); nothing ACKed yet.
+    viewports.at(-1)!.animationFrame();
+    await tick(0);
+    expect(cover()).toBeNull();
+    await setVisibility('hidden');
+    // A hidden tab renders no frames: the confirming frame never arrives.
+    await tick(5_000);
+    expect(acks.filter(ack => ack.phase === 'loaded')).toEqual([]);
+    await setVisibility('visible');
+    await frames(3);
+    expect(acks.at(-1)).toMatchObject({ sceneId: 'tavern', phase: 'loaded' });
+    expect(connections).toHaveLength(1);
+  });
+
+  it('FR6: hidden after attaching but before uncovering shows the keep-visible cover, also on a retried attach', async () => {
+    start();
+    await tick(0);
+    await live();
+    expect(cover()).toBe(DISPLAY_WAITING);
+    await setVisibility('hidden');
+    expect(cover()).toBe(DISPLAY_KEEP_VISIBLE);
+    // The attach fails and is retried after its backoff while still hidden:
+    // the new attach's "waiting" cover is rewritten to "keep visible".
+    connections.at(-1)!.options.onStatus?.('stopped');
+    await tick(1_000);
+    expect(connections).toHaveLength(2);
+    expect(cover()).toBe(DISPLAY_KEEP_VISIBLE);
+    await setVisibility('visible');
+    expect(cover()).toBe(DISPLAY_WAITING);
+    await live();
+    await frames(5);
+    expect(cover()).toBeNull();
+  });
+
   it('a visible tab is unchanged: no keep-visible cover', async () => {
     start();
     await tick(0);

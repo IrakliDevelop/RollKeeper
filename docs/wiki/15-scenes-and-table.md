@@ -121,8 +121,8 @@ scene rooms, player views and the TV cannot connect.
   ACK protocol has no hidden phase); it keeps its existing wording.
 - Combat value edits (hide, initiative, HP, conditions) queue behind a save
   in flight instead of being dropped; turn and lifecycle steps still run one
-  at a time. A failed edit is named in the toolbar ("Orc initiative wasn't
-  saved."). A storage or conflict failure offers Retry for that one edit
+  at a time. A failed edit is named in the panel footer ("Orc initiative
+  wasn't saved."). A storage or conflict failure offers Retry for that one edit
   while nothing else is saving and until any other edit saves; a rejection
   never does. Edits that fail together are listed by name with no Retry, so
   the DM redoes them. The next action the DM starts clears the list, so
@@ -138,7 +138,11 @@ scene rooms, player views and the TV cannot connect.
   always answer 426 (`.../battlemaps/[id]/route.ts`, `.../display-key/route.ts`).
 - The battle-map editor's "Share with players" toggle is disabled; the join
   banner follows Show on a Table scene. Starting combat no longer pushes the
-  linked map live.
+  linked map live. The original editor opens no relay connection (only a
+  Table scene has a live room), so its top bar shows "Private. Players don't
+  see this map." (or, once the map is on the Table, "Private copy. Players
+  see the Table scene, not edits here.") instead of a connection status
+  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`).
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use

@@ -14,6 +14,7 @@ import {
   joinCampaign,
   coordsForElement,
   waitForElementSynced,
+  openTableSceneLive,
 } from './helpers/battlemapRelay';
 import { CURRENCY_VALUES, purseToCopper } from '../src/utils/currency';
 
@@ -68,7 +69,6 @@ const STOCK = 1;
 const BUYER_STARTING_GOLD = 100;
 const BUYER_STARTING_COPPER = BUYER_STARTING_GOLD * CURRENCY_VALUES.gold; // 10000
 
-const mapUrl = (code: string) => `/dm/campaign/${code}/battlemaps/${MAP_ID}`;
 const dashboardUrl = (code: string) => `/dm/campaign/${code}`;
 
 /**
@@ -362,9 +362,13 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
       '/dm',
       '/dm/campaign/warm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmMapPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmMapPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const p of [player1Page, player2Page]) {
       for (const path of [
@@ -372,7 +376,9 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
         '/player/characters/new',
         '/player/campaign/warm/battlemap/warm',
       ]) {
-        await p.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+        await p
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
       }
     }
 
@@ -383,15 +389,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
 
     // ---- DM: connect to the battle map (pushes the seeded token onto the
     //          live relay room) and leave this tab parked here ----
-    await dmMapPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmMapPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmMapPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    await openTableSceneLive(dmMapPage, code, 'Shop E2E Map');
     await waitForElementSynced(dmMapPage, TOKEN_ID);
 
     // ---- DM (admin tab): price the item, list it for sale, open the shop —

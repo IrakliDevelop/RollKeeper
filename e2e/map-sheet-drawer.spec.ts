@@ -14,6 +14,7 @@ import {
   joinCampaign,
   coordsForElement,
   waitForElementSynced,
+  openTableSceneLive,
 } from './helpers/battlemapRelay';
 
 /**
@@ -44,8 +45,6 @@ const DM_ID = 'dm-sheet-drawer-e2e';
 const MAP_ID = 'sheet-drawer-map-e2e';
 const CHARACTER_NAME = 'Drawer Hero';
 const DAMAGE = 3;
-
-const mapUrl = (code: string) => `/dm/campaign/${code}/battlemaps/${MAP_ID}`;
 
 /** Blank battle map seeded straight into the DM's localStorage — same shape
  *  as `marker-loot-locked-claim.spec.ts`'s `seedBattleMap`. */
@@ -138,6 +137,25 @@ async function openPlayerMap(
   });
 }
 
+/** A write round trip from this player has reached the DM: the player's
+ *  own layer (published on entering the live scene room) is in the DM's
+ *  store, so the player's next edits go to the live room. */
+async function waitForPlayerBand(
+  dmPage: Page,
+  characterId: string
+): Promise<void> {
+  await dmPage.waitForFunction(
+    id =>
+      !!(
+        window.__rkStores?.viewport as unknown as {
+          layerManager?: { getLayer: (layerId: string) => unknown };
+        }
+      )?.layerManager?.getLayer(`player-${id}`),
+    characterId,
+    { timeout: 20_000 }
+  );
+}
+
 /** Waits for this player's own stamped token (`tokenKind: 'player'`,
  *  `characterId` — see `PlayerTokenTool`) in the viewport store; returns its
  *  element id. */
@@ -219,37 +237,37 @@ test.describe('player map sheet drawer', () => {
       '/player',
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const path of [
       '/player',
       '/player/characters/new',
       '/player/campaign/warm/battlemap/warm',
     ]) {
-      await playerPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await playerPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
 
     // ---- DM: real campaign + blank battle map, parked on the live relay ----
     await seedDm(dmPage, DM_ID);
     code = await createCampaign(dmPage, DM_ID, CAMPAIGN_NAME);
     await seedBattleMap(dmPage, code);
-    await dmPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // Table v1: the map reaches players as a live, shown Table scene.
+    await openTableSceneLive(dmPage, code, 'Sheet Drawer E2E Map');
 
     // ---- Player: real character, real join, open the map ----
     const characterUrl = await createCharacter(playerPage, CHARACTER_NAME);
     characterId = characterIdFromUrl(characterUrl);
     await joinCampaign(playerPage, code, characterId, CAMPAIGN_NAME);
     await openPlayerMap(playerPage, code, characterId);
+    await waitForPlayerBand(dmPage, characterId);
 
     // ---- Player: place own token via the real Place token tool ----
     // Labelled "Place your token on the map" (hint state) until the
@@ -728,9 +746,13 @@ test.describe('player map party limited view', () => {
       '/player',
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const p of [pageA, pageB]) {
       for (const path of [
@@ -738,7 +760,9 @@ test.describe('player map party limited view', () => {
         '/player/characters/new',
         '/player/campaign/warm/battlemap/warm',
       ]) {
-        await p.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+        await p
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
       }
     }
 
@@ -747,15 +771,8 @@ test.describe('player map party limited view', () => {
     code = await createCampaign(dmPage, PARTY_DM_ID, PARTY_CAMPAIGN_NAME);
     await seedBattleMap(dmPage, code);
     await seedCombatantToken(dmPage, code);
-    await dmPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // Table v1: the map reaches players as a live, shown Table scene.
+    await openTableSceneLive(dmPage, code, 'Sheet Drawer E2E Map');
     await waitForElementSynced(dmPage, COMBATANT_TOKEN_ID);
 
     // ---- Player A: character + join ----
@@ -779,6 +796,7 @@ test.describe('player map party limited view', () => {
 
     // ---- Player B: open the map and place their token ----
     await openPlayerMap(pageB, code, characterIdB);
+    await waitForPlayerBand(dmPage, characterIdB);
     await toolbarButton(pageB, /^Place (token|your token on the map)$/).click();
     const canvasB = pageB.locator('canvas').first();
     const boxB = await canvasB.boundingBox();

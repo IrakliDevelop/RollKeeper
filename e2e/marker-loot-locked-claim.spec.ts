@@ -8,6 +8,7 @@ import {
   waitForStoresReady,
   waitForCharacterLoaded,
 } from './helpers';
+import { openTableSceneLive } from './helpers/battlemapRelay';
 
 /**
  * End-to-end coverage for the whole locked-then-claim loot flow (slice
@@ -17,6 +18,11 @@ import {
  * fully withheld; the DM unlocks; the player's stepper defaults to every
  * remaining unit, takes a partial claim, and the granted item lands on the
  * character sheet's inventory.
+ *
+ * Table v1 (PR08 repair 07): the DM authors markers on the Table stage, not
+ * in the original editor (which has no live room). `openTableSceneLive`
+ * adds the map to the Table, goes live and Shows the scene; the player
+ * still opens the source map URL, and the projection is read per scene.
  *
  * Harness: follows `e2e/map-portals.spec.ts` for marker interaction
  * (`doubleClickMarker`-style live-camera coordinate lookup via
@@ -260,16 +266,18 @@ async function clickMarker(
 async function waitForMarkerProjection(
   page: Page,
   code: string,
-  mapId: string,
+  sceneId: string,
+  playerId: string,
   predicate: (markers: Array<Record<string, unknown>>) => boolean
 ): Promise<void> {
   await expect
     .poll(
       async () => {
         const markers = await page.evaluate(
-          async ({ code, mapId }) => {
+          async ({ code, sceneId, playerId }) => {
+            // Table v1: the player's projection of the shown scene.
             const res = await fetch(
-              `/api/campaign/${code}/battlemaps/${mapId}/markers`
+              `/api/campaign/${code}/battlemaps/${sceneId}/markers?role=player&playerId=${encodeURIComponent(playerId)}`
             );
             if (!res.ok) return [];
             const data = (await res.json()) as {
@@ -277,7 +285,7 @@ async function waitForMarkerProjection(
             };
             return data.markers ?? [];
           },
-          { code, mapId }
+          { code, sceneId, playerId }
         );
         return predicate(markers);
       },
@@ -292,40 +300,15 @@ async function waitForMarkerProjection(
  *  entry's `id` for the locked container — data the player's client cannot
  *  see while locked, but which the app's own claim route requires to
  *  distinguish "locked" from "entry-not-found". */
-async function readDmLootIds(
-  dmPage: Page,
-  code: string,
-  mapId: string
-): Promise<{ markerId: string; entryId: string }> {
-  return dmPage.evaluate(
-    ({ code, mapId }) => {
-      const raw = window.localStorage.getItem('rollkeeper-battlemap-data');
-      if (!raw) throw new Error('No battle map data in localStorage');
-      const parsed = JSON.parse(raw) as {
-        state: {
-          battleMaps: Record<
-            string,
-            Record<
-              string,
-              {
-                markers?: Array<{
-                  id: string;
-                  loot?: Array<{ id: string }>;
-                }>;
-              }
-            >
-          >;
-        };
-      };
-      const map = parsed.state.battleMaps[code]?.[mapId];
-      const marker = map?.markers?.find(m => (m.loot?.length ?? 0) > 0);
-      const entry = marker?.loot?.[0];
-      if (!marker || !entry)
-        throw new Error('No loot marker/entry found in DM battle map data');
-      return { markerId: marker.id, entryId: entry.id };
-    },
-    { code, mapId }
-  );
+function readDmLootIds(scene: {
+  lootLedger: () => Array<{ markerId: string; id: string }>;
+}): {
+  markerId: string;
+  entryId: string;
+} {
+  const entry = scene.lootLedger()[0];
+  if (!entry) throw new Error("No loot entry in the DM's marker publish");
+  return { markerId: entry.markerId, entryId: entry.id };
 }
 
 /** POSTs a claim from the player's own page context — real fetch, real CSRF
@@ -416,15 +399,21 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
       '/dm',
       '/player/characters/new',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const path of [
       '/player',
       '/player/characters/new',
       '/player/campaign/warm/battlemap/warm',
     ]) {
-      await playerPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await playerPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     console.log('[test] routes prewarmed');
 
@@ -436,25 +425,8 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     await seedBattleMap(dmPage, code);
     console.log('[test] battle map seeded');
 
-    await dmPage.goto(`/dm/campaign/${code}/battlemaps/${MAP_ID}`, {
-      waitUntil: 'networkidle',
-    });
-    console.log('[test] dm navigated to battlemap');
-    await expect(dmPage.getByRole('button', { name: 'Marker' })).toBeVisible({
-      timeout: 15_000,
-    });
-    console.log('[test] dm toolbar visible');
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      {
-        timeout: 15_000,
-      }
-    );
-    console.log('[test] dm viewport ready');
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    const scene = await openTableSceneLive(dmPage, code, 'Loot E2E Map');
+    console.log('[test] dm table scene live', scene.sceneId);
     console.log('[test] dm relay live');
 
     // ---- Player: real character, real campaign join, open the map ----
@@ -551,7 +523,8 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     await waitForMarkerProjection(
       playerPage,
       code,
-      MAP_ID,
+      scene.sceneId,
+      characterId,
       markers => markers.length > 0
     );
     console.log('[test] player projection published');
@@ -570,11 +543,11 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     // headline claim ("enforced server-side"). Uses the real marker/entry
     // ids from the DM's own product state (see `readDmLootIds`), since the
     // player's client never receives them while locked.
-    const { markerId, entryId } = await readDmLootIds(dmPage, code, MAP_ID);
+    const { markerId, entryId } = readDmLootIds(scene);
     const claimResult = await claimLootFromPlayer(
       playerPage,
       code,
-      MAP_ID,
+      scene.sceneId,
       characterId,
       markerId,
       entryId
@@ -601,7 +574,8 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     await waitForMarkerProjection(
       playerPage,
       code,
-      MAP_ID,
+      scene.sceneId,
+      characterId,
       markers => markers[0]?.lootLocked !== true
     );
 
@@ -706,15 +680,21 @@ test('DM locks a shared container while the player has it open — the open pane
       '/dm',
       '/player/characters/new',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const path of [
       '/player',
       '/player/characters/new',
       '/player/campaign/warm/battlemap/warm',
     ]) {
-      await playerPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await playerPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
 
     // ---- DM: create the real campaign + a blank battle map ----
@@ -723,20 +703,8 @@ test('DM locks a shared container while the player has it open — the open pane
     console.log('[live-update test] campaign created', code);
     await seedBattleMap(dmPage, code);
 
-    await dmPage.goto(`/dm/campaign/${code}/battlemaps/${MAP_ID}`, {
-      waitUntil: 'networkidle',
-    });
-    await expect(dmPage.getByRole('button', { name: 'Marker' })).toBeVisible({
-      timeout: 15_000,
-    });
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    const scene = await openTableSceneLive(dmPage, code, 'Loot E2E Map');
+    console.log('[test] dm table scene live', scene.sceneId);
 
     // ---- Player: real character, real campaign join, open the map by
     // direct URL — the same thing a real session does when the DM never
@@ -811,7 +779,8 @@ test('DM locks a shared container while the player has it open — the open pane
     await waitForMarkerProjection(
       playerPage,
       code,
-      MAP_ID,
+      scene.sceneId,
+      characterId,
       markers => (markers[0]?.loot as unknown[] | undefined)?.length === 1
     );
     await clickMarker(playerPage, playerElementId);
@@ -846,7 +815,8 @@ test('DM locks a shared container while the player has it open — the open pane
     await waitForMarkerProjection(
       playerPage,
       code,
-      MAP_ID,
+      scene.sceneId,
+      characterId,
       markers => markers[0]?.lootLocked === true
     );
     console.log('[live-update test] server projection confirms locked');

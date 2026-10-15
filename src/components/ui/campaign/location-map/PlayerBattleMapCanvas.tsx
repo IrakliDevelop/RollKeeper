@@ -48,6 +48,7 @@ import { BattleMapExportControl } from './BattleMapExportControl';
 import { PlayerHandTool } from './PlayerHandTool';
 import {
   createManagedBattleMapConnection,
+  type BattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { configureFogView, resolvePlayerFogStyle } from './fog';
@@ -810,6 +811,10 @@ export function PlayerBattleMapCanvas({
     // on later authority notifications (every DM edit) or reconnects.
     let fitted = false;
     const ownLayerId = playerLayerId(characterId);
+    // Set right after creation; status callbacks may run before that.
+    let created: Pick<BattleMapConnection, 'publishLayerUpsert'> | null = null;
+    // `live` repeats on every authority change; publish on entering it only.
+    let wasLive = false;
     const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode,
@@ -835,10 +840,25 @@ export function PlayerBattleMapCanvas({
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
+        const enteredLive = s === 'live' && !wasLive;
+        wasLive = s === 'live';
         const reconnect = reconnectRef.current;
         if (s === 'live') {
           reconnect.delay = 1_000;
           setWithdrawn(false);
+          // Table v1: the attach-time publish rides the unresolved binding,
+          // which the scene resolution retires with its pending work, so
+          // teach every live room this player's band again (the canonical
+          // definition is idempotent). Without it other clients never learn
+          // the band and cannot activate this player's token.
+          const live = enteredLive ? created : null;
+          if (live)
+            publishOwnedLayers(
+              vp,
+              'player',
+              def => live.publishLayerUpsert(canonicalPlayerBand(def)),
+              ownLayerId
+            );
         }
         if (
           s === 'denied' &&
@@ -939,6 +959,7 @@ export function PlayerBattleMapCanvas({
       },
     });
     connectionRef.current = connection;
+    created = connection;
     // Teach the room this player's own layer (the relay only accepts a
     // player's writes to player-<characterId>).
     publishOwnedLayers(

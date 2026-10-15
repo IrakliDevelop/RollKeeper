@@ -84,6 +84,8 @@ export interface DmVttToolbarProps {
   markerAudienceNotice?: string | null;
   /** Kind + colour for the marker tool; threaded to the shared options bar. */
   markerControls?: MarkerToolControls;
+  /** Tool names not offered on this surface (the private editor, CC4). */
+  hiddenTools?: readonly string[];
   measureSharing?: MeasureSharingControl;
   movementControls?: MovementControls;
   exportControl?: ReactNode;
@@ -132,8 +134,8 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
  * The canvas tools structurally mirror
  * `PlayerBattleMapCanvas`'s `PlayerToolbar`, minus the token tool (placed via
  * the roster in Task 8, never through this toolbar) plus a Clear-drawings
- * action. The connection-status chip lives solely in `DmVttTopBar` now (see
- * P7c) — this toolbar no longer duplicates it. */
+ * action. It shows no connection status: the original editor has no live
+ * room under Table v1 (`DmVttTopBar` shows a privacy label instead). */
 export function DmVttToolbar({
   sessionControls,
   onClearDrawings,
@@ -148,6 +150,7 @@ export function DmVttToolbar({
   selectedElementIsMarker,
   markerAudienceNotice,
   markerControls,
+  hiddenTools,
   measureSharing,
   movementControls,
   exportControl,
@@ -213,18 +216,20 @@ export function DmVttToolbar({
         )}
         <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
           <div className="flex shrink-0 items-center gap-1">
-            {DM_TOOLS.map(({ name, label, Icon }) => (
-              <Button
-                key={name}
-                variant={activeTool === name ? 'primary' : 'ghost'}
-                onClick={() => setTool(name)}
-                className="min-h-[44px] min-w-[44px] p-0"
-                title={label}
-                aria-label={label}
-              >
-                <Icon size={16} />
-              </Button>
-            ))}
+            {DM_TOOLS.filter(({ name }) => !hiddenTools?.includes(name)).map(
+              ({ name, label, Icon }) => (
+                <Button
+                  key={name}
+                  variant={activeTool === name ? 'primary' : 'ghost'}
+                  onClick={() => setTool(name)}
+                  className="min-h-[44px] min-w-[44px] p-0"
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon size={16} />
+                </Button>
+              )
+            )}
             {fogControls && (
               <>
                 <Button

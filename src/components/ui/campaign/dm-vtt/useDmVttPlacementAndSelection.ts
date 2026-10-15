@@ -19,13 +19,20 @@ export type StudioTab = 'initiative' | 'selected';
 
 interface UseDmVttPlacementAndSelectionOptions {
   status: BattleMapConnectionStatus;
+  /**
+   * Wait for a live connection before placing (a surface with a live room).
+   * The private original editor has no connection (Table v1): placement is
+   * local and autosaved, so it passes `false`.
+   */
+  liveRequired: boolean;
   linkedEntities: EncounterEntity[];
   getViewport: () => Viewport | null;
   addToast: (toast: Omit<ToastData, 'id'>) => void;
 }
 
 /**
- * Tap-to-arm placement lifecycle (gated on a live connection, spec §7) +
+ * Tap-to-arm placement lifecycle (gated on a live connection when the
+ * surface has one, spec §7) +
  * canvas-selection -> entity mapping for the DM VTT studio.
  *
  * `onPlaced` clears `pendingPlacement` SYNCHRONOUSLY — `TokenPlacementController`
@@ -35,6 +42,7 @@ interface UseDmVttPlacementAndSelectionOptions {
  */
 export function useDmVttPlacementAndSelection({
   status,
+  liveRequired,
   linkedEntities,
   getViewport,
   addToast,
@@ -55,7 +63,7 @@ export function useDmVttPlacementAndSelection({
 
   const armPlacement = useCallback(
     (entity: EncounterEntity) => {
-      if (status !== 'live') {
+      if (liveRequired && status !== 'live') {
         addToast({
           type: 'info',
           title: 'Not connected',
@@ -80,7 +88,7 @@ export function useDmVttPlacementAndSelection({
       if (entity.avatarUrl) void prepareCombatantTokenAvatar(entity).then(arm);
       else arm();
     },
-    [status, addToast, selectEntity]
+    [liveRequired, status, addToast, selectEntity]
   );
 
   const cancelPlacement = useCallback(() => setPendingPlacement(null), []);

@@ -163,7 +163,8 @@ test('narrow headers keep accessible names at 360 px', async ({ page }) => {
  * PR08 D1: the editor top bar in Play mode (DmVttTopBar, scrolls sideways)
  * keeps the Table link and Setup/Play pinned on screen. The map is added
  * to the Table first, so the async link reads "Open in Table" as in the
- * manual run; the relay status chip shows ("Connecting…").
+ * manual run. The original editor has no live room (PR08 repair 07): it
+ * shows a privacy label and never "Connecting…".
  */
 async function adoptMapIntoTable(page: Page): Promise<void> {
   await page.goto(`/dm/campaign/${CODE}/battlemaps`);
@@ -213,7 +214,14 @@ async function editorTopBar(
   if (options.adopted) await adoptMapIntoTable(page);
   await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
   await expectTheme(page, options.theme);
-  await expect(page.getByText('Connecting…')).toBeAttached();
+  await expect(
+    page.getByText(
+      options.adopted
+        ? 'Private copy. Players see the Table scene, not edits here.'
+        : "Private. Players don't see this map."
+    )
+  ).toBeVisible();
+  await expect(page.getByText('Connecting…')).toHaveCount(0);
   const tableLink = options.adopted ? 'Open in Table' : 'Use in Table';
   for (const [name, role] of [
     [tableLink, 'link'],
@@ -252,4 +260,34 @@ test('editor top bar pins Use in Table and Setup/Play at 360 px (not on the Tabl
   page,
 }) => {
   await editorTopBar(page, { width: 360, theme: 'parchment', adopted: false });
+});
+
+test('FR8: Tab walks the editor top bar in order, pinned controls last (390 px)', async ({
+  page,
+}) => {
+  await editorTopBar(page, { width: 390, theme: 'parchment', adopted: true });
+  await page.getByRole('button', { name: 'Back to battle maps' }).focus();
+  const names: string[] = [];
+  for (let step = 0; step < 14 && names.at(-1) !== 'Play'; step += 1) {
+    await page.keyboard.press('Tab');
+    const name = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return '';
+      const labelled =
+        active.getAttribute('aria-label') ??
+        active.querySelector('[aria-label]')?.getAttribute('aria-label');
+      return (labelled ?? active.textContent ?? '').trim();
+    });
+    // A link wrapping a button is two stops with one name (pre-existing).
+    if (names.at(-1) !== name) names.push(name);
+  }
+  expect(names).toEqual([
+    'Hex',
+    'Square',
+    'Off',
+    'Open display',
+    'Open in Table',
+    'Setup',
+    'Play',
+  ]);
 });

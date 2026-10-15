@@ -10,7 +10,6 @@ function renderBar() {
       battleMapId="map-1"
       dmId="dm-1"
       mapName="Map"
-      status="live"
       gridMode="hex"
       onSetGridMode={() => {}}
       mode="play"
@@ -40,5 +39,16 @@ describe('DmVttTopBar Open display (PR05 E12)', () => {
       )
     ).toBeVisible();
     expect(fetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('DmVttTopBar privacy label (PR08 repair 07)', () => {
+  it('says the original map is private instead of a relay status chip', () => {
+    renderBar();
+    expect(
+      screen.getByText("Private. Players don't see this map.")
+    ).toBeVisible();
+    expect(screen.queryByText('Connecting…')).toBeNull();
+    expect(screen.queryByText('Live')).toBeNull();
   });
 });

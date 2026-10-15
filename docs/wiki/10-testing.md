@@ -49,8 +49,22 @@ its own npm script:
 | `test:auth:e2e` | Auth + auth wizard flows |
 | `test:reconnect:nightly` | Cross-tab/single-writer sync repeated 3x, plus a dedicated reconnect drill — nightly, not part of normal CI |
 | `test:checkpoint-matrix:nightly` | Storage checkpoint matrix — nightly |
-| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer ([relay](07-battlemap-fog-fieldnotes.md)-backed) and the DM battle-map creature drawer — nightly only, not part of normal CI |
+| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer and party limited view on a live Table scene ([relay](07-battlemap-fog-fieldnotes.md)-backed), and the DM creature drawer plus roster placement in the private original editor; CI job "Table relay e2e" and nightly |
+| `test:loot:e2e` / `test:shop:e2e` | Marker loot claim and shop purchase across DM and player on a live Table scene; CI job "Table relay e2e" |
 | `test:rollback:drill` | `scripts/run-rollback-drill.mjs` — storage rollback verification |
+
+**Redis isolation (PR08 repair 07).** A developer's `.env` may point
+`UPSTASH_REDIS_REST_*` at a real Upstash database, and Next loads it for any
+key the process does not set. Every Playwright app server is therefore
+started through `withLocalRedis` (`config/playwright/e2eRedis.ts`), which sets
+both keys explicitly: empty (no Redis, the same as CI) for most suites, or
+the local serverless-redis-http on `localhost:8079` for the relay-backed
+loot, shop and sheet-drawer suites. A non-local URL exported in the shell
+fails the run before any server starts, and app servers never reuse an
+already running dev server (`reuseExistingServer: false`), so stop your own
+`npm run dev` first. The relay-backed suites need Redis on 6379 and
+serverless-redis-http on 8079 (`docker compose up -d`, or disposable
+containers) plus `npm ci --prefix relay`.
 
 Real-Redis Table suites (CI job "Relay and Table control Redis suites", see
 [15](15-scenes-and-table.md)):
