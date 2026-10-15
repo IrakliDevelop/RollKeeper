@@ -176,6 +176,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: npm run test:table-control:redis
 
+      # Ids-only shop token update (repair 09) against real Redis; the suite
+      # starts its own disposable container with the runner's Docker.
+      - name: Shop token links Redis suite
+        if: ${{ !cancelled() }}
+        run: npm run test:shop-tokens:redis
+
   table-relay-e2e:
     name: Table relay e2e (loot, shop, drawers)
     runs-on: ubuntu-latest
