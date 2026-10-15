@@ -616,7 +616,29 @@ async function readControl(
  * prepare did — control read, initialize if missing, renew-or-acquire, never
  * a takeover — and returns the page's one control session.
  */
-export async function acquireTableControl(
+/**
+ * PR08 repair 08 GG4: one acquire in flight per (campaign, DM, holder
+ * session). React Strict Mode (dev, e2e) and effect re-runs started two
+ * concurrent acquires with the same expected revision; the second answered
+ * `stale-control` and showed "Couldn't go live" although the first had
+ * taken the lease for this very session.
+ */
+const acquiresInFlight = new Map<string, Promise<TableControlAcquireResult>>();
+
+export function acquireTableControl(
+  options: ControlRequestOptions & { holderSessionId: string }
+): Promise<TableControlAcquireResult> {
+  const key = `${options.campaignCode}\u0000${options.dmId}\u0000${options.holderSessionId}`;
+  const pending = acquiresInFlight.get(key);
+  if (pending) return pending;
+  const attempt = acquireTableControlOnce(options).finally(() => {
+    if (acquiresInFlight.get(key) === attempt) acquiresInFlight.delete(key);
+  });
+  acquiresInFlight.set(key, attempt);
+  return attempt;
+}
+
+async function acquireTableControlOnce(
   options: ControlRequestOptions & { holderSessionId: string }
 ): Promise<TableControlAcquireResult> {
   const fetcher = options.fetcher ?? fetch;
@@ -664,6 +686,14 @@ export async function acquireTableControl(
       holderSessionId: options.holderSessionId,
     });
     if (controlled.response.ok && controlled.current) {
+      current = controlled.current;
+    } else if (
+      // GG4: our own concurrent acquire committed first; the descriptor
+      // already names this holder session with a live lease.
+      controlled.body?.reason === 'stale-control' &&
+      controlled.current?.holderSessionId === options.holderSessionId &&
+      controlled.current.leaseUntil > Date.now()
+    ) {
       current = controlled.current;
     } else if (controlled.body?.reason === 'controller-active') {
       return {

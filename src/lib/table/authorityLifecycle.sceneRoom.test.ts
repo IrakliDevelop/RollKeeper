@@ -275,3 +275,36 @@ describe('A1 session-scoped scene preparation', () => {
     }
   });
 });
+
+describe('Go live acquire race (PR08 repair 08 GG4)', () => {
+  it('two concurrent acquires under one session take one lease and both succeed', async () => {
+    const server = registryServer();
+    server.state.revision = 1;
+    const [first, second] = await Promise.all([
+      acquireTableControl(control(server.fetcher)),
+      acquireTableControl(control(server.fetcher)),
+    ]);
+    expect(first.status).toBe('acquired');
+    expect(second.status).toBe('acquired');
+    expect(types(server, 'acquire')).toHaveLength(1);
+    expect(server.state.holderSessionId).toBe('table-session-1');
+  });
+
+  it('a stale-control answer whose descriptor already holds our live lease counts as acquired', async () => {
+    const server = registryServer();
+    server.state.revision = 1;
+    const fetcher = (async (input, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      if (body?.command?.type === 'acquire') {
+        // Our own earlier acquire committed first (same holder session).
+        server.state.revision += 1;
+        server.state.writerFence += 1;
+        server.state.holderSessionId = 'table-session-1';
+        server.state.leaseUntil = Date.now() + 30_000;
+      }
+      return server.fetcher(input, init);
+    }) as typeof fetch;
+    const result = await acquireTableControl(control(fetcher));
+    expect(result.status).toBe('acquired');
+  });
+});
