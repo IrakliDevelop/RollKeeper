@@ -6,18 +6,18 @@ import { readTableShopEntityIds } from '@/lib/table/shopLinks';
 
 /**
  * The account whose Table this browser opens: the signed-in user, else the
- * guest namespace (the same rule as `useAuthenticatedTableWorkspace`).
+ * guest namespace. LL2: read from the local session (`getSession`, no
+ * network), the same session `useAuthenticatedTableWorkspace` starts from.
  */
-async function currentTableAccount(): Promise<
+export async function currentTableAccount(): Promise<
   TableWorkspaceSelection['account']
 > {
   const client = createSupabaseBrowserClient();
   if (!client) return { kind: 'guest' };
   try {
-    const { data } = await client.auth.getUser();
-    return data.user?.id
-      ? { kind: 'authenticated', accountId: data.user.id }
-      : { kind: 'guest' };
+    const { data } = await client.auth.getSession();
+    const accountId = data.session?.user?.id;
+    return accountId ? { kind: 'authenticated', accountId } : { kind: 'guest' };
   } catch {
     return { kind: 'guest' };
   }

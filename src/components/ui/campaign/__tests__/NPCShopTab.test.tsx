@@ -10,6 +10,7 @@ import {
 } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NPCShopTab } from '@/components/ui/campaign/NPCShopTab';
+import { TABLE_SHOP_READ_TIMEOUT_MS } from '@/components/ui/campaign/NPCShopTab/NPCShopTab.hooks';
 import { mockFetchResponse, resetFetch } from '@/test/mocks/fetch';
 import type { CampaignNPC, NPCInventoryItem } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
@@ -413,7 +414,7 @@ describe('NPCShopTab', () => {
       warn.mockRestore();
     });
 
-    it('repair 09 D2: an open then a quick close are sent in that order', async () => {
+    it('repair 09 LL2: a close is sent at once and the stale open never goes out', async () => {
       let releaseRead!: (ids: string[]) => void;
       loadTableShopEntityIds.mockReturnValue(
         new Promise<string[]>(resolve => {
@@ -425,14 +426,40 @@ describe('NPCShopTab', () => {
       const toggle = screen.getByRole('switch', { name: 'Open for business' });
       fireEvent.click(toggle);
       fireEvent.click(toggle);
-      expect(fetchFn).not.toHaveBeenCalled();
+      // The close does not wait for the open's Table read.
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
       await act(async () => releaseRead(['member-1']));
-      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+      await act(async () => {});
       const opens = (fetchFn as ReturnType<typeof vi.fn>).mock.calls.map(
         call =>
           JSON.parse((call[1] as RequestInit).body as string).npc.shop.open
       );
-      expect(opens).toEqual([true, false]);
+      expect(opens).toEqual([false]);
+    });
+
+    it('repair 09 LL2: a Table read that hangs publishes the encounter ids after the timeout', async () => {
+      vi.useFakeTimers();
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      getEncountersByCampaign.mockReturnValue([
+        { id: 'enc-1', entities: [{ id: 'entity-1', npcSourceId: 'npc-1' }] },
+      ]);
+      loadTableShopEntityIds.mockReturnValue(new Promise<string[]>(() => {}));
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      await vi.advanceTimersByTimeAsync(TABLE_SHOP_READ_TIMEOUT_MS - 1);
+      expect(fetchFn).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      expect(
+        JSON.parse((options as RequestInit).body as string).entityIds
+      ).toEqual(['entity-1']);
+      expect(warn).toHaveBeenCalled();
+      warn.mockRestore();
+      vi.useRealTimers();
     });
 
     it('toggling off tears down via the same publish route with shop.open: false', async () => {

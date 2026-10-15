@@ -19,6 +19,28 @@ import { loadTableShopEntityIds } from './tableShopLinks';
  *  edits into a single request once the DM pauses. */
 const REPUBLISH_DEBOUNCE_MS = 600;
 
+/** LL2: a Table read slower than this publishes without Table tokens. */
+export const TABLE_SHOP_READ_TIMEOUT_MS = 2_500;
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(
+      () => reject(new Error(`Table read took over ${ms} ms`)),
+      ms
+    );
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      (error: unknown) => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
+}
+
 export interface UseShopPublishResult {
   /**
    * Sets the local `shop.open` flag immediately, then publishes (open) or
@@ -85,8 +107,14 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
   npcRef.current = npc;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  /** Sends go out one at a time, in call order (a Table read may be slow). */
+  /**
+   * Requests go out one at a time, in call order. Only the request itself
+   * is chained, never the Table read before it (LL2), so a close is sent at
+   * once even while an earlier open is still reading the Table.
+   */
   const sendChainRef = useRef<Promise<void>>(Promise.resolve());
+  /** Bumped by every send; an open still reading the Table checks it. */
+  const sendSeqRef = useRef(0);
 
   const sendNow = useCallback(
     (nextNpc: CampaignNPC, open: boolean, entityIds: string[]) =>
@@ -108,24 +136,37 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
         nextNpc.campaignCode,
         nextNpc.id
       );
+      const seq = ++sendSeqRef.current;
+      const enqueue = (entityIds: string[]) => {
+        sendChainRef.current = sendChainRef.current.then(() =>
+          sendNow(nextNpc, open, entityIds)
+        );
+      };
+      // A close needs no token ids: send it now.
+      if (!open) {
+        enqueue(encounterIds);
+        return;
+      }
       // Repair 09 (D2): Table tokens carry scene member ids and the NPC link
       // lives on the Table actor, so an open shop also reads the Table. A
-      // failed read never blocks publishing what is known.
-      const tableIds: Promise<string[]> = open
-        ? loadTableShopEntityIds(nextNpc.campaignCode, nextNpc.id).catch(
-            (error: unknown) => {
-              console.warn(
-                '[RollKeeper] Shop: Table tokens could not be read.',
-                error
-              );
-              return [];
-            }
-          )
-        : Promise.resolve([]);
-      sendChainRef.current = sendChainRef.current.then(async () => {
-        const entityIds = mergeShopEntityIds(encounterIds, await tableIds);
-        await sendNow(nextNpc, open, entityIds);
-      });
+      // failed or slow read (LL2) never blocks publishing what is known.
+      void withTimeout(
+        loadTableShopEntityIds(nextNpc.campaignCode, nextNpc.id),
+        TABLE_SHOP_READ_TIMEOUT_MS
+      )
+        .catch((error: unknown) => {
+          console.warn(
+            '[RollKeeper] Shop: Table tokens could not be read.',
+            error
+          );
+          return [] as string[];
+        })
+        .then(tableIds => {
+          // A later send (a close, or a newer publish with the latest
+          // state) already went out: this one is stale.
+          if (seq !== sendSeqRef.current) return;
+          enqueue(mergeShopEntityIds(encounterIds, tableIds));
+        });
     },
     [sendNow]
   );
