@@ -430,6 +430,25 @@ describe('HH2 / HH4 / HH5 offline fork slot edges', () => {
     adapter.dispose();
   });
 
+  it('II3: saves a 2 MiB local draft and keeps it as a 2 MiB offline slot', async () => {
+    const { adapter, stored } = await setup();
+    const big = JSON.stringify({
+      elements: [{ id: 'big' }],
+      blob: 'x'.repeat(2 * 1_048_576),
+    });
+    adapter.updateBattleMap({ canvasState: big });
+    await adapter.flush();
+    expect(adapter.getPendingConflict()).toBeNull();
+    expect((await stored()).localDraft?.state.elements).toEqual([
+      { id: 'big' },
+    ]);
+    await expect(adapter.captureOfflineFork()).resolves.toBe(true);
+    expect((await stored()).offlineFork?.draft.state.elements).toEqual([
+      { id: 'big' },
+    ]);
+    adapter.dispose();
+  });
+
   it('says when the offline version could not be kept', async () => {
     const { repository, adapter } = await setup();
     adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"offline"}]}' });

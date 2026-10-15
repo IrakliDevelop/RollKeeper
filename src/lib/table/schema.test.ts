@@ -544,6 +544,24 @@ describe('HH2 canvas versions use the canvas checkpoint budget', () => {
     ).toEqual({ ok: true });
   });
 
+  it('II3: accepts a single 2 MiB local draft and a single 2 MiB offline slot', () => {
+    const twoMiB = 2 * 1_048_576;
+    expect(
+      validateWorkspaceLimits(snapshot({ localDraft: canvas(twoMiB) }))
+    ).toEqual({ ok: true });
+    expect(
+      validateWorkspaceLimits(
+        snapshot({
+          offlineFork: {
+            savedAt: '2026-10-15T10:01:00.000Z',
+            replacedEarlier: false,
+            draft: canvas(twoMiB),
+          },
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
   it('refuses a local draft or an offline slot over the canvas checkpoint budget', () => {
     const limits = { ...TABLE_LIMITS, maxCanvasCheckpointBytes: 10_000 };
     expect(
