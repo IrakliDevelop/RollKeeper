@@ -372,6 +372,8 @@ export function useTableCombat(options: {
       clearUnsaved();
       begin();
       const task = queue.current.then(async () => {
+        // FR5: a throw is never silent; the copy depends on how far it got.
+        let phase: 'before-show' | 'showing' | 'shown' = 'before-show';
         try {
           const latest = repository.getCurrent();
           if (latest?.status !== 'ready') {
@@ -404,6 +406,7 @@ export function useTableCombat(options: {
             });
             return null;
           }
+          phase = 'showing';
           const shown = await show();
           if (!shown.ok) {
             setNotice({
@@ -414,11 +417,14 @@ export function useTableCombat(options: {
             });
             return null;
           }
-          const result = await runCombatCommand(repository, {
+          phase = 'shown';
+          const result: TableCombatResult = await runCombatCommand(repository, {
             expectedRevision: revision,
             operationId,
             command,
-          });
+          }).catch(
+            () => ({ status: 'failed', reason: 'transaction-failed' }) as const
+          );
           if (result.status === 'committed') {
             setNotice({
               tone: 'success',
@@ -432,6 +438,17 @@ export function useTableCombat(options: {
             });
           }
           return result;
+        } catch {
+          setNotice({
+            tone: 'error',
+            message:
+              phase === 'before-show'
+                ? "Couldn't start combat. Nothing was sent."
+                : phase === 'showing'
+                  ? "Couldn't confirm the scene is shown, so combat didn't start. Check what players see."
+                  : `Scene is now shown; combat did not start: ${combatFailureMessage({ status: 'failed', reason: 'transaction-failed' })}`,
+          });
+          return null;
         } finally {
           finish();
         }
