@@ -241,7 +241,7 @@ export function TableHeaderDetails(props: {
                 disabled={checkpoint.recoveryBusy || !checkpoint.live}
                 onClick={() => void checkpoint.restore(draft, 'changes')}
               >
-                Reapply changes
+                Reapply latest changes
               </Button>
             )}
             {saved && (
@@ -263,6 +263,11 @@ export function TableHeaderDetails(props: {
               Save checkpoint
             </Button>
           </div>
+          {draft && (
+            <p className="text-muted">
+              Reapply latest changes sends the map as this device last saved it.
+            </p>
+          )}
           {offlineFork && (
             <OfflineForkSection fork={offlineFork} checkpoint={checkpoint} />
           )}

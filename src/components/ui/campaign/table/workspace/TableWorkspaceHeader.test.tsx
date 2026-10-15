@@ -231,11 +231,11 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
         ?.startsWith(details().textContent ?? '')
     ).toBe(true);
     expect(
-      screen.queryByRole('button', { name: 'Reapply changes' })
+      screen.queryByRole('button', { name: 'Reapply latest changes' })
     ).toBeNull();
     const content = open();
     expect(
-      within(content).getByRole('button', { name: 'Reapply changes' })
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
     ).toBeInTheDocument();
   });
 
@@ -470,7 +470,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     );
     expect(actions.saveCheckpoint).toHaveBeenCalledTimes(1);
     fireEvent.click(
-      within(content).getByRole('button', { name: 'Reapply changes' })
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
     );
     expect(actions.restore).toHaveBeenCalledTimes(1);
     expect(popover()).not.toBeNull();
@@ -481,7 +481,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     let content = open();
     expect(content).toHaveTextContent('Restoring…');
     expect(
-      within(content).getByRole('button', { name: 'Reapply changes' })
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
     ).toBeDisabled();
     view.update({ localDraft: true, recoveryBusy: false, saveBusy: true });
     content = popover()!;
@@ -495,7 +495,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     renderHeader({ localDraft: true, checkpoint: true });
     const content = open();
     const first = within(content).getByRole('button', {
-      name: 'Reapply changes',
+      name: 'Reapply latest changes',
     });
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: 'Tab', shiftKey: true });
@@ -534,7 +534,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     const view = renderHeader({ localDraft: true, checkpoint: true });
     const content = open();
     expect(document.activeElement).toBe(
-      within(content).getByRole('button', { name: 'Reapply changes' })
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
     );
     view.update({ localDraft: false, checkpoint: true });
     expect(document.activeElement).toBe(
@@ -551,7 +551,7 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
       within(content).getByRole('button', { name: 'Restore checkpoint' })
     ).toBeDisabled();
     expect(
-      within(content).getByRole('button', { name: 'Reapply changes' })
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
     ).toBeDisabled();
     expect(
       within(content).getByText('Only the live tab can restore. Go live first.')
@@ -629,6 +629,24 @@ describe('GG3 offline changes in Details', () => {
     ).toBeEnabled();
     expect(
       within(content).getByText('Only the live tab can restore. Go live first.')
+    ).toBeInTheDocument();
+  });
+});
+
+describe('HH6 the two Reapply actions are told apart', () => {
+  it('explains what Reapply latest changes sends', () => {
+    renderHeader({ localDraft: true, offlineFork: { replacedEarlier: false } });
+    const content = open();
+    expect(
+      within(content).getByRole('button', { name: 'Reapply latest changes' })
+    ).toBeInTheDocument();
+    expect(
+      within(content).getByRole('button', { name: 'Reapply offline changes' })
+    ).toBeInTheDocument();
+    expect(
+      within(content).getByText(
+        'Reapply latest changes sends the map as this device last saved it.'
+      )
     ).toBeInTheDocument();
   });
 });
