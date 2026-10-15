@@ -418,12 +418,32 @@ export function createManagedBattleMapAuthorityConnection(
     }
   };
 
+  /**
+   * J1: the SDK keeps every operation (at most 64) until the app releases
+   * it, so a connection jammed after 64 accepted edits. Accepted and
+   * rejected (already restored above) operations are terminal and released
+   * here; draft, pending and uncertain work stays with the SDK. A pinned
+   * operation (barrier, acknowledgement wait) is refused by the SDK and
+   * retried on the next change or right after `releaseBarrier`.
+   */
+  const releaseSettled = (inner: ManagedAuthorityConnection): void => {
+    for (const operation of inner.getState().operations) {
+      if (operation.status === 'accepted')
+        inner.releaseOperation(operation.clientOperationId);
+      else if (operation.status === 'rejected')
+        inner.releaseOperation(operation.clientOperationId, {
+          discardDraft: true,
+        });
+    }
+  };
+
   const onAuthorityChange = (inner: ManagedAuthorityConnection): void => {
     if (stopped || inner !== connection || retired === inner) return;
     const state = inner.getState();
     if (state.status === 'live') everLive = true;
     options.onStatus?.(state.status);
     restoreRejectedEdits(state);
+    releaseSettled(inner);
     const document = state.document;
     if (!document || document === lastDocument) {
       flushHeld();
@@ -616,7 +636,12 @@ export function createManagedBattleMapAuthorityConnection(
       connection.waitForAcknowledgements(barrier, waitOptions),
     requestCheckpoint: checkpointOptions =>
       connection.requestCheckpoint(checkpointOptions),
-    releaseBarrier: barrier => connection.releaseBarrier(barrier),
+    releaseBarrier: barrier => {
+      const released = connection.releaseBarrier(barrier);
+      // J1: its operations are unpinned now; free the settled ones at once.
+      if (released) releaseSettled(connection);
+      return released;
+    },
   };
 }
 

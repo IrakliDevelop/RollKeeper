@@ -9,17 +9,18 @@ const authority = vi.hoisted(() => {
   let state: { status: string; document: unknown; operations?: unknown[] } = {
     status: 'connecting',
     document: null,
+    operations: [],
   };
   const submit = vi.fn(() => ({ status: 'admitted', clientOperationId: 'op' }));
   return {
     submit,
     reset() {
       listener = null;
-      state = { status: 'connecting', document: null };
+      state = { status: 'connecting', document: null, operations: [] };
       submit.mockClear();
     },
     install(document: unknown) {
-      state = { status: 'live', document };
+      state = { status: 'live', document, operations: [] };
       listener?.();
     },
     installState(next: {
@@ -43,7 +44,8 @@ const authority = vi.hoisted(() => {
       captureBarrier: vi.fn(),
       waitForAcknowledgements: vi.fn(),
       requestCheckpoint: vi.fn(),
-      releaseBarrier: vi.fn(),
+      releaseBarrier: vi.fn(() => true),
+      releaseOperation: vi.fn(() => true),
     },
   };
 });
@@ -606,6 +608,62 @@ describe('A1 element submissions use JSON semantics', () => {
       status: 'admitted',
       clientOperationId: 'op',
     })) as never);
+    connection.stop();
+  });
+
+  it('releases settled operations after each change, never draft, pending or uncertain work, and pinned work only after its barrier (J1)', () => {
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+    });
+    const release = authority.connection.releaseOperation;
+    release.mockClear();
+    const op = (clientOperationId: string, status: string) => ({
+      clientOperationId,
+      status,
+      proposal: { mutation: { kind: 'remove', id: clientOperationId } },
+    });
+    // 'accepted-pinned' is held by a barrier: the SDK refuses to release it.
+    release.mockImplementation(
+      ((id: string) => id !== 'accepted-pinned') as never
+    );
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [
+        op('accepted', 'accepted'),
+        op('accepted-pinned', 'accepted'),
+        op('pending', 'pending'),
+        op('draft', 'draft'),
+        op('uncertain', 'uncertain'),
+        op('rejected', 'rejected'),
+      ],
+    });
+    const calls = () =>
+      (release.mock.calls as unknown as Array<[string, unknown?]>).map(
+        ([id, options]) => [id, options]
+      );
+    expect(calls()).toEqual([
+      ['accepted', undefined],
+      ['accepted-pinned', undefined],
+      ['rejected', { discardDraft: true }],
+    ]);
+    // Releasing the barrier frees the pinned operation at once.
+    release.mockClear();
+    release.mockImplementation((() => true) as never);
+    connection.releaseBarrier?.({} as never);
+    expect(calls()).toEqual(
+      expect.arrayContaining([['accepted-pinned', undefined]])
+    );
+    expect(calls().map(([id]) => id)).not.toContain('pending');
+    expect(calls().map(([id]) => id)).not.toContain('draft');
+    expect(calls().map(([id]) => id)).not.toContain('uncertain');
     connection.stop();
   });
 
