@@ -1226,6 +1226,8 @@ run('two relay authority transport', () => {
       dmStatus: 'live',
       notes: expect.any(Array),
     });
+    // GG5: retries are visible even when the test passes.
+    console.info('150-edit notes', JSON.stringify(notes));
     // At most a handful of steps may need a retry on a slow runner.
     expect(notes.filter(note => note.includes('retry')).length).toBeLessThan(5);
   }, 240_000);
@@ -1348,6 +1350,15 @@ run('two relay authority transport', () => {
     offline = false;
     await eventually(() => status === 'live', 30_000);
     expect(roomX('offline-dm-element')).toBe(0);
+    // GG5: the DM's own map shows the room value again (the live room wins).
+    await eventually(
+      () =>
+        (
+          store.getById('offline-dm-element') as unknown as {
+            position: { x: number };
+          }
+        )?.position.x === 0
+    );
     // The next edit reaches the room.
     store.update('offline-dm-element', { position: { x: 500, y: 0 } });
     await eventually(() => roomX('offline-dm-element') === 500);
