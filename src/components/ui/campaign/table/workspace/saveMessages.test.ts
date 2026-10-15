@@ -25,6 +25,7 @@ const TONES: Record<keyof typeof SAVE_MESSAGES, SaveMessageTone> = {
   saved: 'success',
   savedWithNewerEdit: 'success',
   offlineDiscarded: 'success',
+  offlineAlreadyGone: 'routine',
   offlineDiscardFailed: 'failure',
   conflictDiscarded: 'success',
   conflictRefreshed: 'success',

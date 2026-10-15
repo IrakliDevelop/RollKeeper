@@ -134,7 +134,11 @@ import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
-import { OFFLINE_DISCARDED_DM_MESSAGE } from '@/lib/battlemapAuthority';
+import {
+  DM_REJECTED_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
+} from '@/lib/battlemapAuthority';
 
 /** A minimal stand-in for the registered movement `PathTool` — truthy so
  * `getTool<PathTool>('path')` resolves and the hook's movement-commit and
@@ -245,8 +249,8 @@ function makeTableSceneAdapter(
     refreshPendingConflict: vi.fn(async () => false),
     retryPendingConflict: vi.fn(async () => 'none' as const),
     discardPendingConflict: vi.fn(),
-    captureOfflineFork: vi.fn(),
-    clearOfflineFork: vi.fn(async () => true),
+    captureOfflineFork: vi.fn(async () => true),
+    clearOfflineFork: vi.fn(async () => 'cleared' as const),
     flush: vi.fn(async () => {}),
     dispose: vi.fn(),
   };
@@ -320,15 +324,58 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     );
   });
 
-  it('keeps the offline version in the scene slot when the live room drops offline edits (GG3)', () => {
+  it('keeps the offline version in the scene slot and then points to Details (GG3)', async () => {
     const vp = makeVp();
     const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => result.current.handleReady(vp));
     const options = vi.mocked(createManagedBattleMapConnection).mock
       .calls[0]![0];
     expect(stage.tableSceneAdapter.captureOfflineFork).not.toHaveBeenCalled();
-    act(() => options.onOfflineDraftsReleased?.());
+    await act(async () => options.onOfflineDraftsReleased?.());
     expect(stage.tableSceneAdapter.captureOfflineFork).toHaveBeenCalledTimes(1);
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_DISCARDED_DM_MESSAGE
+    );
+  });
+
+  it('never points to Details when the offline copy could not be kept (HH2)', async () => {
+    vi.mocked(stage.tableSceneAdapter.captureOfflineFork).mockResolvedValue(
+      false
+    );
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    await act(async () => options.onOfflineDraftsReleased?.());
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_NOT_KEPT_DM_MESSAGE
+    );
+  });
+
+  it('shows the same notice again once the dedupe window has passed (GG6)', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    try {
+      const vp = makeVp();
+      const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+      act(() => result.current.handleReady(vp));
+      const options = vi.mocked(createManagedBattleMapConnection).mock
+        .calls[0]![0];
+      act(() => options.onDiagnostic?.(DM_REJECTED_MESSAGE));
+      const first = result.current.liveSyncNotice;
+      now.mockReturnValue(1_000_000 + 2_999);
+      act(() => options.onDiagnostic?.(DM_REJECTED_MESSAGE));
+      expect(result.current.liveSyncNotice).toBe(first);
+      now.mockReturnValue(1_000_000 + 3_000);
+      act(() => options.onDiagnostic?.(DM_REJECTED_MESSAGE));
+      expect(result.current.liveSyncNotice).not.toBe(first);
+      expect(result.current.liveSyncNotice).toEqual({
+        message: DM_REJECTED_MESSAGE,
+        at: 1_003_000,
+      });
+    } finally {
+      now.mockRestore();
+    }
   });
 
   it('exposes live-map sync notices for the Table stage instead of only logging them (FF5)', () => {

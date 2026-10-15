@@ -348,13 +348,176 @@ describe('GG3 offline fork slot', () => {
     const first = (await stored()).offlineFork!;
     adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"second"}]}' });
     adapter.captureOfflineFork();
-    await expect(adapter.clearOfflineFork(first.savedAt)).resolves.toBe(false);
+    await expect(adapter.clearOfflineFork(first.savedAt)).resolves.toBe('gone');
     const second = (await stored()).offlineFork!;
     expect(second.draft.state).toEqual({ elements: [{ id: 'second' }] });
-    await expect(adapter.clearOfflineFork(second.savedAt)).resolves.toBe(true);
+    await expect(adapter.clearOfflineFork(second.savedAt)).resolves.toBe(
+      'cleared'
+    );
     const record = await stored();
     expect(record.offlineFork ?? null).toBeNull();
     expect(record.localDraft?.state).toEqual({ elements: [{ id: 'second' }] });
+    adapter.dispose();
+  });
+});
+
+/** A fogged scene's canvas of realistic size: 40 fog tiles of 128×128 cells. */
+function foggedCanvasState(marker: string): string {
+  let seed = 7;
+  const tile = () => {
+    const bytes = new Uint8Array(128 * 128);
+    for (let index = 0; index < bytes.length; index += 1) {
+      seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+      bytes[index] = seed % 256;
+    }
+    return Buffer.from(bytes).toString('base64');
+  };
+  return JSON.stringify({
+    elements: [{ id: marker }],
+    layers: [],
+    extensions: {
+      fog: {
+        pluginName: 'fog',
+        version: 1,
+        data: {
+          tiles: Array.from({ length: 40 }, (_, index) => ({
+            x: index % 8,
+            y: Math.floor(index / 8),
+            data: tile(),
+          })),
+        },
+      },
+    },
+  });
+}
+
+describe('HH2 / HH4 / HH5 offline fork slot edges', () => {
+  async function setup() {
+    const factory = new IDBFactory();
+    const repository = new TableRepository({ factory, selection });
+    repositories.push(repository);
+    await repository.start();
+    await repository.putSceneForTest(scene(repository.workspaceIdentity), 0);
+    let clock = 0;
+    const adapter = createTableSceneAdapter({
+      repository,
+      sceneId: 'scene-1',
+      campaignCode: 'CAMP',
+      now: () => `2026-10-15T11:0${clock++}:00.000Z`,
+    });
+    const stored = async () => {
+      const loaded = await repository.reload();
+      if (loaded.status !== 'ready') throw new Error('expected ready');
+      return loaded.snapshot.scenes[0]!;
+    };
+    return { factory, repository, adapter, stored };
+  }
+
+  it('keeps a fogged offline version of realistic size and still saves later edits', async () => {
+    const { adapter, stored } = await setup();
+    const offline = foggedCanvasState('offline');
+    expect(offline.length).toBeGreaterThan(800_000);
+    adapter.updateBattleMap({ canvasState: offline });
+    await expect(adapter.captureOfflineFork()).resolves.toBe(true);
+    adapter.updateBattleMap({ canvasState: foggedCanvasState('later') });
+    await adapter.flush();
+    expect(adapter.getPendingConflict()).toBeNull();
+    const record = await stored();
+    expect(record.offlineFork?.draft.state.elements).toEqual([
+      { id: 'offline' },
+    ]);
+    expect(record.localDraft?.state.elements).toEqual([{ id: 'later' }]);
+    adapter.dispose();
+  });
+
+  it('says when the offline version could not be kept', async () => {
+    const { repository, adapter } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"offline"}]}' });
+    await adapter.flush();
+    vi.spyOn(repository, 'mutateWorkspace').mockResolvedValue({
+      status: 'rejected',
+      reason: 'limit-exceeded',
+    } as never);
+    await expect(adapter.captureOfflineFork()).resolves.toBe(false);
+    adapter.dispose();
+  });
+
+  it('retries once after another tab moved the workspace on', async () => {
+    const { factory, adapter, stored } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"offline"}]}' });
+    await adapter.flush();
+    const other = new TableRepository({ factory, selection });
+    repositories.push(other);
+    const loaded = await other.start();
+    if (loaded.status !== 'ready') throw new Error('expected ready');
+    const bumped = await other.mutateWorkspace(
+      loaded.snapshot.campaign?.revision ?? 0,
+      `other-tab:${crypto.randomUUID()}`,
+      {
+        scenes: {
+          put: [
+            {
+              ...loaded.snapshot.scenes[0]!,
+              updatedAt: '2026-10-15T12:00:00.000Z',
+            },
+          ],
+        },
+      }
+    );
+    expect(bumped.status).toBe('committed');
+    await expect(adapter.captureOfflineFork()).resolves.toBe(true);
+    expect((await stored()).offlineFork?.draft.state).toEqual({
+      elements: [{ id: 'offline' }],
+    });
+    adapter.dispose();
+  });
+
+  it('keeps the newest offline edit even when it is still waiting as a conflict', async () => {
+    const { factory, repository, adapter, stored } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"older"}]}' });
+    await adapter.flush();
+    // Another tab moves the workspace on: the next local save conflicts.
+    const other = new TableRepository({ factory, selection });
+    repositories.push(other);
+    const loaded = await other.start();
+    if (loaded.status !== 'ready') throw new Error('expected ready');
+    const bumped = await other.mutateWorkspace(
+      loaded.snapshot.campaign?.revision ?? 0,
+      `other-tab:${crypto.randomUUID()}`,
+      {
+        scenes: {
+          put: [
+            {
+              ...loaded.snapshot.scenes[0]!,
+              updatedAt: '2026-10-15T12:00:00.000Z',
+            },
+          ],
+        },
+      }
+    );
+    expect(bumped.status).toBe('committed');
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"newest"}]}' });
+    await adapter.flush();
+    expect(adapter.getPendingConflict()).not.toBeNull();
+    await repository.reload();
+    await expect(adapter.captureOfflineFork()).resolves.toBe(true);
+    expect((await stored()).offlineFork?.draft.state).toEqual({
+      elements: [{ id: 'newest' }],
+    });
+    adapter.dispose();
+  });
+
+  it('tells a cleared slot from one that was already gone', async () => {
+    const { adapter } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"offline"}]}' });
+    await adapter.captureOfflineFork();
+    const loaded = await (async () => {
+      await adapter.flush();
+      return adapter;
+    })();
+    const savedAt = '2026-10-15T11:01:00.000Z';
+    await expect(loaded.clearOfflineFork(savedAt)).resolves.toBe('cleared');
+    await expect(loaded.clearOfflineFork(savedAt)).resolves.toBe('gone');
     adapter.dispose();
   });
 });

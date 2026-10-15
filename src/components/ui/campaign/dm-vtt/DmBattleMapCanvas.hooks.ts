@@ -32,6 +32,7 @@ import {
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
 } from '@/lib/battlemapAuthority';
 
 import { useBattleMapStore } from '@/store/battleMapStore';
@@ -147,6 +148,7 @@ const LIVE_SYNC_NOTICES = new Set([
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
   DM_REJECTED_MESSAGE,
 ]);
 
@@ -1111,6 +1113,18 @@ export function useDmBattleMapCanvas({
         connectionRef.current?.stop();
         connectionRef.current = null;
         onConnectionReady?.(null);
+        const showLiveMapNotice = (message: string) => {
+          console.warn('[RollKeeper] Live map:', message);
+          if (LIVE_SYNC_NOTICES.has(message))
+            // GG6: one toast per message within a few seconds.
+            setLiveSyncNotice(previous =>
+              previous &&
+              previous.message === message &&
+              Date.now() - previous.at < LIVE_SYNC_NOTICE_DEDUPE_MS
+                ? previous
+                : { message, at: Date.now() }
+            );
+        };
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
@@ -1129,21 +1143,21 @@ export function useDmBattleMapCanvas({
           // GG3: the live room won over this tab's offline edits. The scene
           // keeps the offline version in its own slot for "Reapply offline
           // changes"; later edits and checkpoints leave it alone.
-          onOfflineDraftsReleased: () => tableSceneAdapter.captureOfflineFork(),
-          // PR07 A1 (review 02 N3): a refused live edit is never silent.
-          // Messages are payload-free (no element content or secrets).
-          onDiagnostic: message => {
-            console.warn('[RollKeeper] Live map:', message);
-            if (LIVE_SYNC_NOTICES.has(message))
-              // GG6: one toast per message within a few seconds.
-              setLiveSyncNotice(previous =>
-                previous &&
-                previous.message === message &&
-                Date.now() - previous.at < LIVE_SYNC_NOTICE_DEDUPE_MS
-                  ? previous
-                  : { message, at: Date.now() }
+          // HH2: the toast points to Details only when the copy was kept.
+          onOfflineDraftsReleased: () => {
+            void tableSceneAdapter
+              .captureOfflineFork()
+              .then(kept =>
+                showLiveMapNotice(
+                  kept
+                    ? OFFLINE_DISCARDED_DM_MESSAGE
+                    : OFFLINE_NOT_KEPT_DM_MESSAGE
+                )
               );
           },
+          // PR07 A1 (review 02 N3): a refused live edit is never silent.
+          // Messages are payload-free (no element content or secrets).
+          onDiagnostic: showLiveMapNotice,
           resolveAudience: el =>
             readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):

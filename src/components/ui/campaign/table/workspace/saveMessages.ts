@@ -38,6 +38,11 @@ export const SAVE_MESSAGES = {
   ),
   /** GG3: the offline changes slot was dropped on purpose. */
   offlineDiscarded: say('Offline changes discarded.', 'success'),
+  /** HH4 (c): another tab or an earlier click already emptied the slot. */
+  offlineAlreadyGone: say(
+    'These offline changes were already reapplied or discarded.',
+    'routine'
+  ),
   offlineDiscardFailed: say(
     "Couldn't discard the offline changes. They are still in Details.",
     'failure'

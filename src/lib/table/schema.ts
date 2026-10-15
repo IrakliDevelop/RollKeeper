@@ -1162,7 +1162,14 @@ export function validateWorkspaceLimits(
       ...snapshot.actors,
       ...snapshot.encounters,
       ...snapshot.tombstones,
-      ...snapshot.scenes.map(scene => ({ ...scene, canvasCheckpoint: null })),
+      // HH2: canvas versions (checkpoint, local draft, offline changes slot)
+      // each have the canvas checkpoint budget below, not the metadata one.
+      ...snapshot.scenes.map(scene => ({
+        ...scene,
+        canvasCheckpoint: null,
+        localDraft: null,
+        offlineFork: null,
+      })),
     ];
     if (
       metadataRecords.some(
@@ -1172,11 +1179,17 @@ export function validateWorkspaceLimits(
       return { ok: false, reason: 'metadata-record-bytes' };
     }
     if (
-      snapshot.scenes.some(
-        scene =>
-          scene.canvasCheckpoint !== null &&
-          serializedByteCount(scene.canvasCheckpoint) >
-            limits.maxCanvasCheckpointBytes
+      snapshot.scenes.some(scene =>
+        [
+          scene.canvasCheckpoint,
+          scene.localDraft,
+          scene.offlineFork?.draft,
+        ].some(
+          canvas =>
+            canvas !== null &&
+            canvas !== undefined &&
+            serializedByteCount(canvas) > limits.maxCanvasCheckpointBytes
+        )
       )
     ) {
       return { ok: false, reason: 'canvas-checkpoint-bytes' };

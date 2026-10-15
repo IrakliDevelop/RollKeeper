@@ -937,6 +937,7 @@ describe('A1 element submissions use JSON semantics', () => {
   it('GG3: tells the page when offline drafts were released, never for uncertain-only work', () => {
     const store = new ElementStore();
     const onOfflineDraftsReleased = vi.fn();
+    const onDiagnostic = vi.fn();
     const connection = createManagedBattleMapAuthorityConnection({
       relayUrl: 'wss://relay.example',
       campaignCode: 'CODE',
@@ -946,6 +947,7 @@ describe('A1 element submissions use JSON semantics', () => {
       tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
       mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
       onOfflineDraftsReleased,
+      onDiagnostic,
     });
     const op = (clientOperationId: string, status: string) => ({
       clientOperationId,
@@ -964,6 +966,8 @@ describe('A1 element submissions use JSON semantics', () => {
       operations: [op('offline-1', 'draft'), op('offline-2', 'draft')],
     });
     expect(onOfflineDraftsReleased).toHaveBeenCalledTimes(1);
+    // HH2: the page owns the offline notice when it keeps the copy.
+    expect(onDiagnostic).not.toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
     connection.stop();
   });
 

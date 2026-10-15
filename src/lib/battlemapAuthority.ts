@@ -37,7 +37,8 @@ interface AuthorityOptions {
   /**
    * GG3: drafts made while offline were released because the live room
    * won. The DM page keeps its offline version in the scene's offline
-   * changes slot.
+   * changes slot and shows the notice itself (the offline diagnostic is not
+   * sent when this is set).
    */
   onOfflineDraftsReleased?: () => void;
   onTokenMetadata?: (meta: {
@@ -114,6 +115,9 @@ function canvasElement(element: Record<string, unknown>): CanvasElement {
 /** FF1 / GG3: offline DM edits superseded by the live room (kept in the scene's offline changes slot). */
 export const OFFLINE_DISCARDED_DM_MESSAGE =
   'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.';
+/** HH2: the offline version could not be kept in the scene's slot. */
+export const OFFLINE_NOT_KEPT_DM_MESSAGE =
+  'Map edits made while offline were not sent, and this device could not keep a copy for later. To send them now, open Details and choose Reapply latest changes before you edit again.';
 /** FF1: a player's offline edits superseded by the live room. */
 export const OFFLINE_DISCARDED_PLAYER_MESSAGE =
   "Changes you made while offline weren't saved.";
@@ -590,8 +594,11 @@ export function createManagedBattleMapAuthorityConnection(
     }
     // GG2: only real offline drafts point the DM at Reapply. An uncertain
     // operation may have committed; the live document is what the map shows.
-    if (released.draft > 0) options.onOfflineDraftsReleased?.();
-    if (released.draft > 0)
+    // GG3 / HH2: a page that keeps the offline version owns the notice, so
+    // it can say whether the copy was kept.
+    if (released.draft > 0 && options.onOfflineDraftsReleased)
+      options.onOfflineDraftsReleased();
+    else if (released.draft > 0)
       options.onDiagnostic?.(
         isDm ? OFFLINE_DISCARDED_DM_MESSAGE : OFFLINE_DISCARDED_PLAYER_MESSAGE
       );

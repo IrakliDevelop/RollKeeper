@@ -9,7 +9,10 @@ import {
   saveSceneCheckpoint,
 } from '@/lib/table/checkpoint';
 import type { TableRepository } from '@/lib/table/repository';
-import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import {
+  createTableSceneAdapter,
+  type TableSceneAdapter,
+} from '@/lib/table/sceneAdapter';
 import type {
   TableCanvasCheckpointV1,
   TableOfflineForkV1,
@@ -157,8 +160,11 @@ export function useSceneCheckpointActions(options: {
     setRecoveryBusy(false);
     // Another scene was mounted meanwhile: never remount its canvas or show
     // this scene's result on it.
-    if (mountedSceneRef.current !== sceneId) return false;
-    if (result.status === 'restored') setRestoredCount(value => value + 1);
+    const restored = result.status === 'restored';
+    // HH4 (a): the room was restored even if another scene is now mounted;
+    // the caller still learns it.
+    if (mountedSceneRef.current !== sceneId) return restored;
+    if (restored) setRestoredCount(value => value + 1);
     post(
       result.status === 'restored'
         ? messages.restored
@@ -166,7 +172,7 @@ export function useSceneCheckpointActions(options: {
           ? messages.conflict
           : messages.failed(result.reason)
     );
-    return result.status === 'restored';
+    return restored;
   }
 
   /**
@@ -174,17 +180,37 @@ export function useSceneCheckpointActions(options: {
    * empties the slot. A restore that did not happen keeps the slot.
    */
   async function reapplyOfflineFork(fork: TableOfflineForkV1) {
-    if (await runRestore(fork.draft, 'offline'))
-      await adapter?.clearOfflineFork(fork.savedAt);
+    const restoredScene = sceneId;
+    const sceneAdapter = adapter;
+    if (!(await runRestore(fork.draft, 'offline')) || !restoredScene) return;
+    if (mountedSceneRef.current === restoredScene) {
+      await sceneAdapter?.clearOfflineFork(fork.savedAt);
+      return;
+    }
+    // HH4 (a): that scene's adapter went with the switch; clear through a
+    // short-lived one so the restored slot does not linger.
+    if (!repository) return;
+    const other = createTableSceneAdapter({
+      repository,
+      sceneId: restoredScene,
+      campaignCode,
+    });
+    try {
+      await other.clearOfflineFork(fork.savedAt);
+    } finally {
+      other.dispose();
+    }
   }
 
   /** GG3: drops the offline version; the live room is not touched. */
   async function discardOfflineFork(fork: TableOfflineForkV1) {
-    const cleared = (await adapter?.clearOfflineFork(fork.savedAt)) ?? false;
+    const outcome = (await adapter?.clearOfflineFork(fork.savedAt)) ?? 'failed';
     post(
-      cleared
+      outcome === 'cleared'
         ? SAVE_MESSAGES.offlineDiscarded
-        : SAVE_MESSAGES.offlineDiscardFailed
+        : outcome === 'gone'
+          ? SAVE_MESSAGES.offlineAlreadyGone
+          : SAVE_MESSAGES.offlineDiscardFailed
     );
   }
 
