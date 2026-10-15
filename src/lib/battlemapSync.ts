@@ -195,6 +195,8 @@ export interface ManagedConnectionOptions {
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Receives pre-transport configuration failures for operator UI/logging. */
   onDiagnostic?: (message: string) => void;
+  /** GG3: authority only; offline drafts were released (the live room won). */
+  onOfflineDraftsReleased?: () => void;
   /**
    * PR04 C4-1/P10: a token mint denial (status + server error body), so a
    * surface can tell "Scene is unavailable" from a credential denial. The

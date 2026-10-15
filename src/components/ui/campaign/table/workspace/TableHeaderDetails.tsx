@@ -9,7 +9,10 @@ import {
 import * as Popover from '@radix-ui/react-popover';
 
 import { Button } from '@/components/ui/forms/button';
-import type { TableSceneRecordV1 } from '@/lib/table/schema';
+import type {
+  TableOfflineForkV1,
+  TableSceneRecordV1,
+} from '@/lib/table/schema';
 
 import type { useSceneCheckpointActions } from './useSceneCheckpointActions';
 
@@ -45,6 +48,61 @@ function checkpointLine(scene: TableSceneRecordV1 | undefined): string {
     : 'Saved';
 }
 
+function savedTime(savedAt: string): string {
+  return new Date(savedAt).toLocaleString(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
+/**
+ * GG3: the scene's offline changes slot. It stays until reapplied or
+ * discarded; later edits and checkpoints never touch it.
+ */
+function OfflineForkSection(props: {
+  fork: TableOfflineForkV1;
+  checkpoint: Pick<
+    Checkpoint,
+    'recoveryBusy' | 'live' | 'reapplyOfflineFork' | 'discardOfflineFork'
+  >;
+}) {
+  const { fork, checkpoint } = props;
+  return (
+    <div className="border-divider flex flex-col gap-1 border-t pt-2">
+      <p className="text-heading font-semibold">
+        Offline changes from {savedTime(fork.savedAt)}
+      </p>
+      <p className="text-muted">
+        The live map did not take these edits. Reapply them to send them to
+        players, or discard them.
+      </p>
+      {fork.replacedEarlier && (
+        <p className="text-muted">
+          These replaced earlier offline changes that were not reapplied.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={checkpoint.recoveryBusy || !checkpoint.live}
+          onClick={() => void checkpoint.reapplyOfflineFork(fork)}
+        >
+          Reapply offline changes
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={checkpoint.recoveryBusy}
+          onClick={() => void checkpoint.discardOfflineFork(fork)}
+        >
+          Discard
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 /**
  * O7-2 H3 / HR-5 / HN-2: on-demand diagnostics and recovery actions for the
  * selected scene, at every breakpoint. Only these collapse (FC-1): alerts,
@@ -62,6 +120,8 @@ export function TableHeaderDetails(props: {
     | 'saveBusy'
     | 'live'
     | 'restore'
+    | 'reapplyOfflineFork'
+    | 'discardOfflineFork'
     | 'saveCheckpoint'
   >;
 }) {
@@ -73,8 +133,11 @@ export function TableHeaderDetails(props: {
   const skipReturnFocus = useRef(false);
   const draft = stored?.localDraft;
   const saved = stored?.canvasCheckpoint;
+  const offlineFork = stored?.offlineFork ?? null;
   const attention =
-    (draft ? 1 : 0) + (checkpoint.saveTone === 'failure' ? 1 : 0);
+    (draft ? 1 : 0) +
+    (offlineFork ? 1 : 0) +
+    (checkpoint.saveTone === 'failure' ? 1 : 0);
   const busy = checkpoint.recoveryBusy || checkpoint.saveBusy;
 
   // HN-2: a focused control that unmounts hands focus to the first
@@ -85,7 +148,7 @@ export function TableHeaderDetails(props: {
     if (!open || !content || !previous || previous.isConnected) return;
     lastFocused.current = null;
     (focusables(content)[0] ?? triggerRef.current)?.focus();
-  }, [open, draft, saved, busy]);
+  }, [open, draft, saved, offlineFork, busy]);
 
   const onKeyDown = (event: ReactKeyboardEvent) => {
     if (event.key !== 'Tab') return;
@@ -165,7 +228,7 @@ export function TableHeaderDetails(props: {
           {checkpoint.saveBusy && (
             <p className="text-muted">Saving checkpoint…</p>
           )}
-          {!checkpoint.live && (draft || saved) && (
+          {!checkpoint.live && (draft || saved || offlineFork) && (
             <p className="text-muted">
               Only the live tab can restore. Go live first.
             </p>
@@ -200,6 +263,9 @@ export function TableHeaderDetails(props: {
               Save checkpoint
             </Button>
           </div>
+          {offlineFork && (
+            <OfflineForkSection fork={offlineFork} checkpoint={checkpoint} />
+          )}
         </Popover.Content>
       </Popover.Portal>
     </Popover.Root>

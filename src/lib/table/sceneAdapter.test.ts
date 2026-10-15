@@ -279,3 +279,82 @@ describe('Table movement resolution from scene members (item 10)', () => {
     adapter.dispose();
   });
 });
+
+describe('GG3 offline fork slot', () => {
+  async function setup() {
+    const factory = new IDBFactory();
+    const repository = new TableRepository({ factory, selection });
+    repositories.push(repository);
+    await repository.start();
+    await repository.putSceneForTest(scene(repository.workspaceIdentity), 0);
+    let clock = 0;
+    const adapter = createTableSceneAdapter({
+      repository,
+      sceneId: 'scene-1',
+      campaignCode: 'CAMP',
+      now: () => `2026-10-15T10:0${clock++}:00.000Z`,
+    });
+    const stored = async () => {
+      const loaded = await repository.reload();
+      if (loaded.status !== 'ready') throw new Error('expected ready');
+      return loaded.snapshot.scenes[0]!;
+    };
+    return { repository, adapter, stored };
+  }
+
+  it('captures the offline version into its own slot, and later edits leave it alone', async () => {
+    const { adapter, stored } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"offline"}]}' });
+    adapter.captureOfflineFork();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"live"}]}' });
+    await adapter.flush();
+    const record = await stored();
+    expect(record.localDraft?.state).toEqual({ elements: [{ id: 'live' }] });
+    expect(record.offlineFork).toMatchObject({
+      replacedEarlier: false,
+      draft: { state: { elements: [{ id: 'offline' }] } },
+    });
+    expect(adapter.getBattleMap()).toBeDefined();
+    adapter.dispose();
+  });
+
+  it('keeps one slot: the newest wins and says it replaced an earlier one', async () => {
+    const { adapter, stored } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"first"}]}' });
+    adapter.captureOfflineFork();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"second"}]}' });
+    adapter.captureOfflineFork();
+    await adapter.flush();
+    expect((await stored()).offlineFork).toMatchObject({
+      replacedEarlier: true,
+      draft: { state: { elements: [{ id: 'second' }] } },
+    });
+    adapter.dispose();
+  });
+
+  it('captures nothing when there is no local version', async () => {
+    const { adapter, stored } = await setup();
+    adapter.captureOfflineFork();
+    await adapter.flush();
+    expect((await stored()).offlineFork ?? null).toBeNull();
+    adapter.dispose();
+  });
+
+  it('clears the slot it was asked about, never a newer one', async () => {
+    const { adapter, stored } = await setup();
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"first"}]}' });
+    adapter.captureOfflineFork();
+    await adapter.flush();
+    const first = (await stored()).offlineFork!;
+    adapter.updateBattleMap({ canvasState: '{"elements":[{"id":"second"}]}' });
+    adapter.captureOfflineFork();
+    await expect(adapter.clearOfflineFork(first.savedAt)).resolves.toBe(false);
+    const second = (await stored()).offlineFork!;
+    expect(second.draft.state).toEqual({ elements: [{ id: 'second' }] });
+    await expect(adapter.clearOfflineFork(second.savedAt)).resolves.toBe(true);
+    const record = await stored();
+    expect(record.offlineFork ?? null).toBeNull();
+    expect(record.localDraft?.state).toEqual({ elements: [{ id: 'second' }] });
+    adapter.dispose();
+  });
+});

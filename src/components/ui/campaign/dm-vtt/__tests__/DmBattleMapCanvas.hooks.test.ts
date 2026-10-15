@@ -245,6 +245,8 @@ function makeTableSceneAdapter(
     refreshPendingConflict: vi.fn(async () => false),
     retryPendingConflict: vi.fn(async () => 'none' as const),
     discardPendingConflict: vi.fn(),
+    captureOfflineFork: vi.fn(),
+    clearOfflineFork: vi.fn(async () => true),
     flush: vi.fn(async () => {}),
     dispose: vi.fn(),
   };
@@ -316,6 +318,17 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
         canvasState: '{"elements":[{"id":"moved"}]}',
       })
     );
+  });
+
+  it('keeps the offline version in the scene slot when the live room drops offline edits (GG3)', () => {
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    expect(stage.tableSceneAdapter.captureOfflineFork).not.toHaveBeenCalled();
+    act(() => options.onOfflineDraftsReleased?.());
+    expect(stage.tableSceneAdapter.captureOfflineFork).toHaveBeenCalledTimes(1);
   });
 
   it('exposes live-map sync notices for the Table stage instead of only logging them (FF5)', () => {

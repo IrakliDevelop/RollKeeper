@@ -869,6 +869,39 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
   });
 
+  it('GG3: tells the page when offline drafts were released, never for uncertain-only work', () => {
+    const store = new ElementStore();
+    const onOfflineDraftsReleased = vi.fn();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onOfflineDraftsReleased,
+    });
+    const op = (clientOperationId: string, status: string) => ({
+      clientOperationId,
+      status,
+      proposal: { mutation: { kind: 'remove', id: clientOperationId } },
+    });
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [op('lost', 'uncertain')],
+    });
+    expect(onOfflineDraftsReleased).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [op('offline-1', 'draft'), op('offline-2', 'draft')],
+    });
+    expect(onOfflineDraftsReleased).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
   it('GG2: uncertain-only releases get a neutral notice, never the offline/Reapply one', () => {
     const { connection, onDiagnostic } = dmConnection();
     authority.installState({

@@ -34,6 +34,12 @@ interface AuthorityOptions {
   fog?: { manager: FogManager };
   onStatus?: (status: AuthorityClientStatus) => void;
   onDiagnostic?: (message: string) => void;
+  /**
+   * GG3: drafts made while offline were released because the live room
+   * won. The DM page keeps its offline version in the scene's offline
+   * changes slot.
+   */
+  onOfflineDraftsReleased?: () => void;
   onTokenMetadata?: (meta: {
     fogAppearance?: import('@/types/battlemap').ProjectedFogAppearance;
     fogAppearanceUpdatedAt?: string | null;
@@ -105,9 +111,9 @@ function canvasElement(element: Record<string, unknown>): CanvasElement {
   return canvas as unknown as CanvasElement;
 }
 
-/** FF1: offline DM edits superseded by the live room (localDraft keeps them). */
+/** FF1 / GG3: offline DM edits superseded by the live room (kept in the scene's offline changes slot). */
 export const OFFLINE_DISCARDED_DM_MESSAGE =
-  'Map edits made while offline were not sent. Use Reapply changes to send them.';
+  'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.';
 /** FF1: a player's offline edits superseded by the live room. */
 export const OFFLINE_DISCARDED_PLAYER_MESSAGE =
   "Changes you made while offline weren't saved.";
@@ -512,7 +518,8 @@ export function createManagedBattleMapAuthorityConnection(
    * - once the room is live with its authoritative document applied, the
    *   drafts made while offline and the uncertain operations left by a lost
    *   episode. The live room wins (SYNC-AUTHORITY section 6): the DM's offline
-   *   fork stays in the scene's localDraft and "Reapply changes" re-sends it;
+   *   version is copied into the scene's offline changes slot (GG3,
+   *   `onOfflineDraftsReleased`) and "Reapply offline changes" re-sends it;
    *   a player is told the offline changes were not saved.
    * Pending work is never released. A pinned operation (barrier) is refused
    * by the SDK and retried on the next change or right after
@@ -555,6 +562,7 @@ export function createManagedBattleMapAuthorityConnection(
     }
     // GG2: only real offline drafts point the DM at Reapply. An uncertain
     // operation may have committed; the live document is what the map shows.
+    if (released.draft > 0) options.onOfflineDraftsReleased?.();
     if (released.draft > 0)
       options.onDiagnostic?.(
         isDm ? OFFLINE_DISCARDED_DM_MESSAGE : OFFLINE_DISCARDED_PLAYER_MESSAGE

@@ -10,7 +10,10 @@ import {
 } from '@/lib/table/checkpoint';
 import type { TableRepository } from '@/lib/table/repository';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
-import type { TableCanvasCheckpointV1 } from '@/lib/table/schema';
+import type {
+  TableCanvasCheckpointV1,
+  TableOfflineForkV1,
+} from '@/lib/table/schema';
 
 import {
   checkpointNotSaved,
@@ -124,12 +127,20 @@ export function useSceneCheckpointActions(options: {
   async function restore(
     checkpoint: TableCanvasCheckpointV1 | null | undefined,
     kind: RestoreKind
-  ) {
-    if (!checkpoint || !sceneId) return;
+  ): Promise<void> {
+    await runRestore(checkpoint, kind);
+  }
+
+  /** Resolves true only when the live room took the restored version. */
+  async function runRestore(
+    checkpoint: TableCanvasCheckpointV1 | null | undefined,
+    kind: RestoreKind
+  ): Promise<boolean> {
+    if (!checkpoint || !sceneId) return false;
     const messages = restoreMessages(kind);
     if (!controlSession || controlSession.isLost()) {
       post(messages.notLive);
-      return;
+      return false;
     }
     setRecoveryBusy(true);
     post(messages.busy);
@@ -146,7 +157,7 @@ export function useSceneCheckpointActions(options: {
     setRecoveryBusy(false);
     // Another scene was mounted meanwhile: never remount its canvas or show
     // this scene's result on it.
-    if (mountedSceneRef.current !== sceneId) return;
+    if (mountedSceneRef.current !== sceneId) return false;
     if (result.status === 'restored') setRestoredCount(value => value + 1);
     post(
       result.status === 'restored'
@@ -154,6 +165,26 @@ export function useSceneCheckpointActions(options: {
         : result.status === 'conflict'
           ? messages.conflict
           : messages.failed(result.reason)
+    );
+    return result.status === 'restored';
+  }
+
+  /**
+   * GG3: sends the offline version through the same live-tab restore, then
+   * empties the slot. A restore that did not happen keeps the slot.
+   */
+  async function reapplyOfflineFork(fork: TableOfflineForkV1) {
+    if (await runRestore(fork.draft, 'offline'))
+      await adapter?.clearOfflineFork(fork.savedAt);
+  }
+
+  /** GG3: drops the offline version; the live room is not touched. */
+  async function discardOfflineFork(fork: TableOfflineForkV1) {
+    const cleared = (await adapter?.clearOfflineFork(fork.savedAt)) ?? false;
+    post(
+      cleared
+        ? SAVE_MESSAGES.offlineDiscarded
+        : SAVE_MESSAGES.offlineDiscardFailed
     );
   }
 
@@ -196,6 +227,8 @@ export function useSceneCheckpointActions(options: {
     saveBusy,
     saveCheckpoint,
     restore,
+    reapplyOfflineFork,
+    discardOfflineFork,
     reconcilePendingEdit,
   };
 }

@@ -82,6 +82,18 @@ export interface TableSceneAdapter {
   refreshPendingConflict(): Promise<boolean>;
   retryPendingConflict(): Promise<'committed' | 'conflict' | 'failed' | 'none'>;
   discardPendingConflict(): void;
+  /**
+   * GG3: the live room superseded this tab's offline edits. Copies the
+   * scene's local version into its offline changes slot (newest wins), after
+   * every edit already queued and before any later one.
+   */
+  captureOfflineFork(): void;
+  /**
+   * GG3: removes the offline changes slot once reapplied or discarded. Only
+   * the slot saved at `savedAt` is removed, never a newer one; resolves true
+   * when it was removed.
+   */
+  clearOfflineFork(savedAt: string): Promise<boolean>;
   flush(): Promise<void>;
   dispose(): void;
 }
@@ -228,6 +240,60 @@ export function createTableSceneAdapter(options: {
     });
   };
 
+  /** One scene write on the queue; a conflict reloads and tries once more. */
+  const rewriteScene = async (
+    change: (stored: TableSceneRecordV1) => TableSceneRecordV1 | null
+  ): Promise<boolean> => {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      if (disposed) return false;
+      const current = options.repository.getCurrent();
+      if (current?.status !== 'ready') return false;
+      const stored = current.snapshot.scenes.find(
+        value => value.sceneId === options.sceneId
+      );
+      const candidate = stored ? change(structuredClone(stored)) : null;
+      if (!candidate) return false;
+      const result = await options.repository.mutateWorkspace(
+        current.snapshot.campaign?.revision ?? 0,
+        `scene-offline-fork:${newOperationId()}`,
+        { scenes: { put: [candidate] } }
+      );
+      if (result.status === 'committed') return true;
+      if (result.status !== 'conflict') return false;
+      await options.repository.reload();
+    }
+    return false;
+  };
+
+  const captureOfflineFork = () => {
+    queue = queue.then(async () => {
+      await rewriteScene(stored => {
+        if (!stored.localDraft) return null;
+        return {
+          ...stored,
+          offlineFork: {
+            savedAt: now(),
+            replacedEarlier: Boolean(stored.offlineFork),
+            draft: stored.localDraft,
+          },
+        };
+      });
+    });
+  };
+
+  const clearOfflineFork = (savedAt: string): Promise<boolean> => {
+    const attempt = queue.then(() =>
+      rewriteScene(stored => {
+        if (stored.offlineFork?.savedAt !== savedAt) return null;
+        // The key goes away (not null) so an older build reads the scene again.
+        delete stored.offlineFork;
+        return stored;
+      })
+    );
+    queue = attempt.then(() => undefined);
+    return attempt;
+  };
+
   const updateBattleMap = (updates: Partial<BattleMap>) => {
     if (!scene || disposed) return;
     localEditGeneration += 1;
@@ -364,6 +430,8 @@ export function createTableSceneAdapter(options: {
       hydrate();
       listeners.forEach(listener => listener());
     },
+    captureOfflineFork,
+    clearOfflineFork,
     flush: () => queue,
     dispose: () => {
       disposed = true;

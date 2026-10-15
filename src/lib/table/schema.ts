@@ -60,6 +60,14 @@ export interface TableCanvasCheckpointV1 {
   state: JsonObject;
 }
 
+/** GG3: the single offline changes slot of a scene (newest wins). */
+export interface TableOfflineForkV1 {
+  savedAt: string;
+  /** True when this slot replaced earlier offline changes not reapplied. */
+  replacedEarlier: boolean;
+  draft: TableCanvasCheckpointV1;
+}
+
 /**
  * Explicit control assignment for a scene member (PR02). Absent means the
  * control is derived from the actor (player reference vs DM-managed).
@@ -102,6 +110,13 @@ export interface TableSceneRecordV1 {
   };
   canvasCheckpoint: TableCanvasCheckpointV1 | null;
   localDraft?: TableCanvasCheckpointV1 | null;
+  /**
+   * GG3: the DM's version from an offline episode the live room superseded.
+   * Later edits and checkpoints never touch it; only "Reapply offline
+   * changes" or "Discard" clears it. Builds before this field read a scene
+   * that has it as read-only (accepted: the Table was unreleased).
+   */
+  offlineFork?: TableOfflineForkV1 | null;
   members: TableSceneMemberV1[];
   arrivalPoint: { x: number; y: number } | null;
   createdAt: string;
@@ -505,7 +520,7 @@ export function validateSceneRecord(value: unknown): TableValidation {
         'createdAt',
         'updatedAt',
       ],
-      ['localDraft']
+      ['localDraft', 'offlineFork']
     ) ||
     !isWorkspaceKey(value.workspaceKey) ||
     !isStableId(value.sceneId) ||
@@ -601,6 +616,31 @@ export function validateSceneRecord(value: unknown): TableValidation {
       !isTimestamp(draft.capturedAt) ||
       !isRecord(draft.state) ||
       !isJsonValue(draft.state)
+    ) {
+      return { ok: false, reason: 'invalid-record' };
+    }
+  }
+  if (value.offlineFork !== undefined && value.offlineFork !== null) {
+    const fork = value.offlineFork;
+    if (
+      !isRecord(fork) ||
+      !hasExactKeys(fork, ['savedAt', 'replacedEarlier', 'draft']) ||
+      !isTimestamp(fork.savedAt) ||
+      typeof fork.replacedEarlier !== 'boolean' ||
+      !isRecord(fork.draft) ||
+      !hasExactKeys(fork.draft, [
+        'protocolVersion',
+        'generation',
+        'revision',
+        'capturedAt',
+        'state',
+      ]) ||
+      fork.draft.protocolVersion !== 1 ||
+      !isStableId(fork.draft.generation) ||
+      !isSafeNonNegativeInteger(fork.draft.revision) ||
+      !isTimestamp(fork.draft.capturedAt) ||
+      !isRecord(fork.draft.state) ||
+      !isJsonValue(fork.draft.state)
     ) {
       return { ok: false, reason: 'invalid-record' };
     }

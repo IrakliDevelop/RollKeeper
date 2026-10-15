@@ -140,3 +140,71 @@ describe('useSceneCheckpointActions restore (review S4)', () => {
     }
   );
 });
+
+describe('GG3 offline changes slot actions', () => {
+  const fork = {
+    savedAt: '2026-10-15T10:01:00.000Z',
+    replacedEarlier: false,
+    draft: checkpoint,
+  };
+  const render = (
+    controlSession: TableControlSession | null = liveSession,
+    clearOfflineFork = vi.fn(async () => true)
+  ) => {
+    const adapter = {
+      clearOfflineFork,
+      getBattleMap: () => ({ id: 'scene-a' }),
+    } as never;
+    const hook = renderHook(() =>
+      useSceneCheckpointActions({
+        repository: null,
+        adapter,
+        connection: null,
+        campaignCode: 'CAMP',
+        dmId: 'dm-1',
+        sceneId: 'scene-a',
+        controlSession,
+      })
+    );
+    return { ...hook, clearOfflineFork };
+  };
+
+  it('reapplies the offline version through the live restore and then clears the slot', async () => {
+    const { fetchMock, release } = heldRestoreFetch();
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, clearOfflineFork } = render();
+    let pending!: Promise<void>;
+    act(() => {
+      pending = result.current.reapplyOfflineFork(fork);
+    });
+    release();
+    await act(async () => pending);
+    expect(result.current.restoredCount).toBe(1);
+    expect(result.current.saveMessage).toBe('Offline changes restored.');
+    expect(clearOfflineFork).toHaveBeenCalledWith(fork.savedAt);
+  });
+
+  it('keeps the slot when the restore does not happen (not live)', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, clearOfflineFork } = render(null);
+    await act(async () => {
+      await result.current.reapplyOfflineFork(fork);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(clearOfflineFork).not.toHaveBeenCalled();
+    expect(result.current.saveMessage).toMatch(/this tab isn't live/iu);
+  });
+
+  it('discards the slot without touching the live room', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+    const { result, clearOfflineFork } = render();
+    await act(async () => {
+      await result.current.discardOfflineFork(fork);
+    });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(clearOfflineFork).toHaveBeenCalledWith(fork.savedAt);
+    expect(result.current.saveMessage).toBe('Offline changes discarded.');
+  });
+});

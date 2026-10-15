@@ -74,6 +74,7 @@ function renderHeader(
     saveTone?: SaveMessageTone;
     saveDetail?: string;
     localDraft?: boolean;
+    offlineFork?: { replacedEarlier: boolean };
     checkpoint?: boolean;
     conflict?: boolean;
     recoveryBusy?: boolean;
@@ -86,6 +87,8 @@ function renderHeader(
 ) {
   const actions = {
     restore: vi.fn(async () => {}),
+    reapplyOfflineFork: vi.fn(async () => {}),
+    discardOfflineFork: vi.fn(async () => {}),
     saveCheckpoint: vi.fn(async () => {}),
     reconcilePendingEdit: vi.fn(async () => {}),
   };
@@ -113,6 +116,15 @@ function renderHeader(
           name: 'The Very Long Scene Name Of The Lich King',
           stored: {
             localDraft: merged.localDraft ? { generation: 'g1' } : null,
+            ...(merged.offlineFork
+              ? {
+                  offlineFork: {
+                    savedAt: '2026-10-15T10:01:00.000Z',
+                    replacedEarlier: merged.offlineFork.replacedEarlier,
+                    draft: { generation: 'g0' },
+                  },
+                }
+              : {}),
             canvasCheckpoint: merged.checkpoint
               ? { generation: 'checkpoint-1' }
               : null,
@@ -568,5 +580,55 @@ describe('Details popover (O7-2 H3, HR-5, HN-2)', () => {
     const content = open();
     expect(content.style.maxWidth).toBe('calc(100vw - 16px)');
     expect(content.className).toMatch(/z-50/u);
+  });
+});
+
+describe('GG3 offline changes in Details', () => {
+  it('shows when the offline changes are from, with Reapply and Discard, and counts them', () => {
+    const { actions } = renderHeader({
+      offlineFork: { replacedEarlier: false },
+    });
+    expect(details()).toHaveAccessibleName(
+      'Details (1): 1 item needs attention'
+    );
+    const content = open();
+    expect(
+      within(content).getByText(/^Offline changes from /u)
+    ).toBeInTheDocument();
+    expect(within(content).queryByText(/replaced earlier/iu)).toBeNull();
+    fireEvent.click(
+      within(content).getByRole('button', { name: 'Reapply offline changes' })
+    );
+    expect(actions.reapplyOfflineFork).toHaveBeenCalledWith(
+      expect.objectContaining({ savedAt: '2026-10-15T10:01:00.000Z' })
+    );
+    fireEvent.click(within(content).getByRole('button', { name: 'Discard' }));
+    expect(actions.discardOfflineFork).toHaveBeenCalledWith(
+      expect.objectContaining({ savedAt: '2026-10-15T10:01:00.000Z' })
+    );
+  });
+
+  it('says when newer offline changes replaced earlier ones', () => {
+    renderHeader({ offlineFork: { replacedEarlier: true } });
+    const content = open();
+    expect(
+      within(content).getByText(
+        'These replaced earlier offline changes that were not reapplied.'
+      )
+    ).toBeInTheDocument();
+  });
+
+  it('only the live tab can reapply; Discard still works', () => {
+    renderHeader({ offlineFork: { replacedEarlier: false }, live: false });
+    const content = open();
+    expect(
+      within(content).getByRole('button', { name: 'Reapply offline changes' })
+    ).toBeDisabled();
+    expect(
+      within(content).getByRole('button', { name: 'Discard' })
+    ).toBeEnabled();
+    expect(
+      within(content).getByText('Only the live tab can restore. Go live first.')
+    ).toBeInTheDocument();
   });
 });

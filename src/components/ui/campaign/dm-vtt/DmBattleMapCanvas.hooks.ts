@@ -1126,6 +1126,10 @@ export function useDmBattleMapCanvas({
               : {}),
           },
           seedLocal: !tableSceneAdapter,
+          // GG3: the live room won over this tab's offline edits. The scene
+          // keeps the offline version in its own slot for "Reapply offline
+          // changes"; later edits and checkpoints leave it alone.
+          onOfflineDraftsReleased: () => tableSceneAdapter.captureOfflineFork(),
           // PR07 A1 (review 02 N3): a refused live edit is never silent.
           // Messages are payload-free (no element content or secrets).
           onDiagnostic: message => {
