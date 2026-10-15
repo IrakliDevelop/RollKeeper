@@ -18,7 +18,18 @@ export const TABLE_SHOP_CHECK_DELAY_MS = 1_000;
 const sameIds = (left: readonly string[], right: readonly string[]) =>
   left.length === right.length && left.every(id => right.includes(id));
 
-const idsKey = (ids: readonly string[]) => [...ids].sort().join('\u0000');
+/**
+ * NN1: what was checked, per shop: its versions (`shop.updatedAt`, bumped
+ * by every toggle, and the NPC's `updatedAt`, bumped by edits that a
+ * Shop-tab republish sends) and the sorted ids.
+ */
+const checkKey = (
+  versions: Array<string | undefined>,
+  ids: readonly string[]
+) =>
+  [...versions.map(version => version ?? ''), ...[...ids].sort()].join(
+    '\u0000'
+  );
 
 /**
  * Repair 09 (D2): keeps open shops in step with the Table. When a campaign
@@ -31,8 +42,9 @@ const idsKey = (ids: readonly string[]) => [...ids].sort().join('\u0000');
  *   plus Table ids.
  * - LL1: the update is the ids-only `PATCH`, never the full publish, so it
  *   cannot reseed stock while a sale is waiting to be drained.
- * - LL7: the ids computed for each open shop are remembered after a check;
- *   while they stay the same, no index request is made.
+ * - LL7 / NN1: the ids computed for each open shop are remembered with the
+ *   shop's version after a check; while both stay the same, no index request
+ *   is made. Closing the shop forgets the check.
  */
 export function useTableShopRepublish(options: {
   snapshot: TableWorkspaceSnapshotV1 | null;
@@ -50,19 +62,25 @@ export function useTableShopRepublish(options: {
     const timer = setTimeout(() => {
       const { snapshot, campaignCode, dmId } = latest.current;
       if (!snapshot || !dmId) return;
-      const wanted = (useNPCStore.getState().npcsByCampaign[campaignCode] ?? [])
+      const npcs = useNPCStore.getState().npcsByCampaign[campaignCode] ?? [];
+      // NN1: a shop that is not open forgets its check, so opening it again
+      // always checks the server.
+      for (const npc of npcs)
+        if (npc.shop?.open !== true) checked.current.delete(npc.id);
+      const wanted = npcs
         .filter(npc => npc.shop?.open === true)
-        .map(npc => ({
-          npc,
-          entityIds: mergeShopEntityIds(
+        .map(npc => {
+          const entityIds = mergeShopEntityIds(
             resolveShopEntityIds(campaignCode, npc.id),
             tableShopEntityIds(snapshot, npc.id)
-          ),
-        }))
-        .filter(
-          ({ npc, entityIds }) =>
-            checked.current.get(npc.id) !== idsKey(entityIds)
-        );
+          );
+          return {
+            npc,
+            entityIds,
+            key: checkKey([npc.shop?.updatedAt, npc.updatedAt], entityIds),
+          };
+        })
+        .filter(({ npc, key }) => checked.current.get(npc.id) !== key);
       if (wanted.length === 0) return;
       void (async () => {
         let index: PublicShopIndexEntry[];
@@ -78,7 +96,7 @@ export function useTableShopRepublish(options: {
           console.warn('[RollKeeper] Shop: could not read the shops.', error);
           return;
         }
-        for (const { npc, entityIds } of wanted) {
+        for (const { npc, entityIds, key } of wanted) {
           if (cancelled) return;
           const published = index.find(entry => entry.npcId === npc.id);
           if (!published) continue;
@@ -98,7 +116,7 @@ export function useTableShopRepublish(options: {
               continue;
             }
           }
-          checked.current.set(npc.id, idsKey(entityIds));
+          checked.current.set(npc.id, key);
         }
       })();
     }, TABLE_SHOP_CHECK_DELAY_MS);

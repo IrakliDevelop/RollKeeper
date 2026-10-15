@@ -267,6 +267,43 @@ describe('useTableShopRepublish checks (repair 09 LL6 / LL7)', () => {
     expect(gets(fetchMock)).toBe(2);
   });
 
+  it('checks again after the shop was closed or republished, even with the same ids (NN1)', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops([]);
+    const { rerender } = render();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(1);
+    // Closed and opened again (a full publish elsewhere): same ids, new shop.
+    npcs = [merchant(false)];
+    rerender({ revision: 2, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    npcs = [
+      {
+        ...merchant(true),
+        shop: { open: true, updatedAt: '2026-10-15T09:00:00.000Z' },
+      } as CampaignNPC,
+    ];
+    rerender({ revision: 3, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(2);
+  });
+
+  it('checks again after a full republish that only changed the shop version (NN1)', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops([]);
+    const { rerender } = render();
+    await vi.advanceTimersByTimeAsync(1_000);
+    npcs = [
+      {
+        ...merchant(true),
+        shop: { open: true, updatedAt: '2026-10-15T09:30:00.000Z' },
+      } as CampaignNPC,
+    ];
+    rerender({ revision: 2, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(2);
+  });
+
   it('does nothing after unmount', async () => {
     npcs = [merchant(true)];
     const fetchMock = mockShops([]);
