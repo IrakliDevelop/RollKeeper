@@ -26,7 +26,6 @@ function renderBar() {
       battleMapId="map-1"
       dmId="dm-1"
       mapName="Map"
-      status="live"
       gridMode="hex"
       onSetGridMode={() => {}}
       mode="play"

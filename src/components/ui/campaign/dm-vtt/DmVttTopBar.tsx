@@ -8,8 +8,6 @@ import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDi
 import { TableMapEntryLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 
-import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
-
 export type DmVttMode = 'setup' | 'play';
 export type DmVttGridMode = 'hex' | 'square' | 'off';
 
@@ -18,7 +16,6 @@ interface DmVttTopBarProps {
   battleMapId: string;
   dmId: string;
   mapName: string;
-  status: BattleMapConnectionStatus;
   gridMode: DmVttGridMode;
   onSetGridMode: (mode: DmVttGridMode) => void;
   mode: DmVttMode;
@@ -39,16 +36,15 @@ const MODE_OPTIONS: { key: DmVttMode; label: string }[] = [
 /**
  * Session-controls row for the DM VTT command dock: back link, map name, grid
  * segmented control (mirrors `useDmVttGrid`'s `setGridMode`), TV display
- * launcher (Task 1's `openTvDisplay` helper), a live-status chip (the
- * chip's single home — the Play toolbar no longer duplicates it), and the
- * Setup|Play mode switch (state + persistence owned by the page).
+ * launcher (Task 1's `openTvDisplay` helper), a privacy label (the original
+ * map has no live room under Table v1), and the Setup|Play mode switch
+ * (state + persistence owned by the page).
  */
 export function DmVttTopBar({
   campaignCode,
   battleMapId,
   dmId,
   mapName,
-  status,
   gridMode,
   onSetGridMode,
   mode,
@@ -103,22 +99,11 @@ export function DmVttTopBar({
             {display.message}
           </span>
         )}
-        <span
-          className={`h-2.5 w-2.5 shrink-0 rounded-full sm:h-auto sm:w-auto sm:px-2 sm:py-0.5 sm:text-xs ${
-            status === 'live'
-              ? 'bg-accent-emerald-bg text-accent-emerald-text'
-              : status === 'denied'
-                ? 'bg-accent-red-bg text-accent-red-text'
-                : 'bg-accent-amber-bg text-accent-amber-text'
-          }`}
-        >
-          <span className="sr-only sm:not-sr-only">
-            {status === 'live'
-              ? 'Live'
-              : status === 'denied'
-                ? 'Access denied'
-                : 'Connecting…'}
-          </span>
+        {/* PR08 repair 07: the original editor has no live room under Table
+            v1 (players see maps only through the Table), so a plain privacy
+            label replaces the relay status chip. */}
+        <span className="text-muted shrink-0 text-xs">
+          Private. Players don&apos;t see this map.
         </span>
       </div>
       {/* Pinned at the right edge, never scrolled off (360 px included). */}

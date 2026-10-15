@@ -132,8 +132,8 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
  * The canvas tools structurally mirror
  * `PlayerBattleMapCanvas`'s `PlayerToolbar`, minus the token tool (placed via
  * the roster in Task 8, never through this toolbar) plus a Clear-drawings
- * action. The connection-status chip lives solely in `DmVttTopBar` now (see
- * P7c) — this toolbar no longer duplicates it. */
+ * action. It shows no connection status: the original editor has no live
+ * room under Table v1 (`DmVttTopBar` shows a privacy label instead). */
 export function DmVttToolbar({
   sessionControls,
   onClearDrawings,

@@ -195,11 +195,79 @@ function baseProps() {
   };
 }
 
+/** A Table scene adapter stand-in: only a Table scene opens a live room. */
+function makeTableSceneAdapter(
+  overrides: {
+    updateBattleMap?: TableSceneAdapter['updateBattleMap'];
+    setDmOnly?: TableSceneAdapter['setDmOnly'];
+    markers?: never[];
+    dmOnlyElements?: Record<string, boolean>;
+  } = {}
+): TableSceneAdapter {
+  const dmOnlyElements = overrides.dmOnlyElements ?? {};
+  // Stable snapshots: store subscriptions compare by reference.
+  const markers = overrides.markers ?? [];
+  const battleMap = {
+    id: 'scene-1',
+    campaignCode: 'TEST01',
+    name: 'Adopted',
+    mapImageUrl: '/map.webp',
+    mapImageSize: { w: 100, h: 100 },
+    canvasState: '{"elements":[]}',
+    dmOnlyElements,
+    gridEnabled: false,
+    linkedEncounterIds: [],
+    createdAt: '2026-10-05T00:00:00.000Z',
+    updatedAt: '2026-10-05T00:00:00.000Z',
+    markers: [],
+  };
+  return {
+    sceneId: 'scene-1',
+    sourceMapId: 'map-original',
+    subscribe: vi.fn(() => () => {}),
+    resolveMovement: vi.fn(() => null),
+    getBattleMap: vi.fn(() => battleMap),
+    updateBattleMap: overrides.updateBattleMap ?? vi.fn(),
+    setDmOnly: overrides.setDmOnly ?? vi.fn(),
+    toggleDmOnly: vi.fn(),
+    markerProductState: {
+      subscribe: vi.fn(() => () => {}),
+      getMarkers: () => markers,
+      setMarkers: vi.fn(),
+      getDmOnlyElements: () => dmOnlyElements,
+      setDmOnly: overrides.setDmOnly ?? vi.fn(),
+      setDmOnlyBulk: vi.fn(),
+      isReadable: () => true,
+    },
+    getLocalEditGeneration: () => 0,
+    getPendingConflict: () => null,
+    refreshPendingConflict: vi.fn(async () => false),
+    retryPendingConflict: vi.fn(async () => 'none' as const),
+    discardPendingConflict: vi.fn(),
+    flush: vi.fn(async () => {}),
+    dispose: vi.fn(),
+  };
+}
+
+/** The Table stage: an adopted scene with its adapter (live room). One
+ * props object per test, so re-renders see a stable adapter. */
+let stage: ReturnType<typeof baseProps> & {
+  tableSceneAdapter: TableSceneAdapter;
+};
+function stageProps() {
+  return stage;
+}
+
 describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   const savedRelayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
 
   beforeEach(() => {
     process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = 'wss://relay.test';
+    stage = {
+      ...baseProps(),
+      battleMapId: 'scene-1',
+      tableSceneAdapter: makeTableSceneAdapter(),
+    };
     useBattleMapStore.setState({ battleMaps: {} });
     useDmStore.setState({ campaigns: [] });
     callOrder.length = 0;
@@ -214,9 +282,43 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     }
   });
 
+  it('the original editor opens no relay connection and mints no token (PR08 repair 07)', () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const vp = makeVp();
+    const { result, unmount } = renderHook(() =>
+      useDmBattleMapCanvas(baseProps())
+    );
+    act(() => result.current.handleReady(vp));
+    expect(createManagedBattleMapConnection).not.toHaveBeenCalled();
+    expect(attachFocusBroadcast).not.toHaveBeenCalled();
+    expect(
+      fetchSpy.mock.calls.filter(([url]) => String(url).includes('token'))
+    ).toHaveLength(0);
+    // Moving your own camera still works without a connection.
+    expect(createLocalCameraAnimator).toHaveBeenCalledWith(vp);
+    unmount();
+    fetchSpy.mockRestore();
+  });
+
+  it('the Table stage still opens the scene room with a scene-scoped token request', () => {
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(1);
+    expect(createManagedBattleMapConnection).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tokenRequest: expect.objectContaining({
+          role: 'dm',
+          sceneId: 'scene-1',
+          battleMapId: 'map-original',
+        }),
+      })
+    );
+  });
+
   it('attaches focus broadcast + a local animator once the connection comes up', () => {
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
 
     act(() => {
       result.current.handleReady(vp);
@@ -229,7 +331,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
 
   it('handleGoToCameraView drives the local animator (no remote receiver on DM canvases)', () => {
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => {
       result.current.handleReady(vp);
     });
@@ -244,7 +346,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
 
   it('handleSendCameraView broadcasts with the ping-tool color', () => {
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => {
       result.current.handleReady(vp);
     });
@@ -263,7 +365,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     // animator either": see the no-relay-configured test below, which
     // proves the local animator IS created (and handleGoToCameraView DOES
     // work) once handleReady runs, with no relay URL at all.
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     // handleReady never called — refs are still null.
     expect(() =>
       result.current.handleGoToCameraView({ x: 0, y: 0, w: 1, h: 1 })
@@ -289,45 +391,11 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     const updateBattleMap = vi.fn();
     const setDmOnly = vi.fn();
     const tableMarkers: never[] = [];
-    const tableSceneAdapter: TableSceneAdapter = {
-      sceneId: 'scene-1',
-      sourceMapId: 'map-original',
-      subscribe: vi.fn(() => () => {}),
-      resolveMovement: vi.fn(() => null),
-      getBattleMap: vi.fn(() => ({
-        id: 'scene-1',
-        campaignCode: 'TEST01',
-        name: 'Adopted',
-        mapImageUrl: '/map.webp',
-        mapImageSize: { w: 100, h: 100 },
-        canvasState: '{"elements":[]}',
-        dmOnlyElements: {},
-        gridEnabled: false,
-        linkedEncounterIds: [],
-        createdAt: '2026-10-05T00:00:00.000Z',
-        updatedAt: '2026-10-05T00:00:00.000Z',
-        markers: [],
-      })),
+    const tableSceneAdapter = makeTableSceneAdapter({
       updateBattleMap,
       setDmOnly,
-      toggleDmOnly: vi.fn(),
-      markerProductState: {
-        subscribe: vi.fn(() => () => {}),
-        getMarkers: () => tableMarkers,
-        setMarkers: vi.fn(),
-        getDmOnlyElements: () => ({}),
-        setDmOnly,
-        setDmOnlyBulk: vi.fn(),
-        isReadable: () => true,
-      },
-      getLocalEditGeneration: () => 0,
-      getPendingConflict: () => null,
-      refreshPendingConflict: vi.fn(async () => false),
-      retryPendingConflict: vi.fn(async () => 'none' as const),
-      discardPendingConflict: vi.fn(),
-      flush: vi.fn(async () => {}),
-      dispose: vi.fn(),
-    };
+      markers: tableMarkers,
+    });
     const legacy = useBattleMapStore.getState();
     const updateLegacy = vi.spyOn(legacy, 'updateBattleMap');
     const legacyAudience = vi.spyOn(legacy, 'setDmOnly');
@@ -396,7 +464,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   it('unmount disposes focus broadcast + local animator BEFORE stopping the connection', () => {
     const vp = makeVp();
     const { result, unmount } = renderHook(() =>
-      useDmBattleMapCanvas(baseProps())
+      useDmBattleMapCanvas(stageProps())
     );
     act(() => {
       result.current.handleReady(vp);
@@ -422,27 +490,13 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   });
 
   it('attachPathBroadcast receives OPTION FUNCTIONS that re-read live state — isDmOnlyElement is not a snapshot taken at attach time', () => {
-    useBattleMapStore.setState({
-      battleMaps: {
-        TEST01: {
-          'bm-1': {
-            id: 'bm-1',
-            campaignCode: 'TEST01',
-            name: 'Map',
-            mapImageUrl: '',
-            mapImageSize: { w: 0, h: 0 },
-            canvasState: '',
-            dmOnlyElements: {},
-            gridEnabled: false,
-            linkedEncounterIds: [],
-            createdAt: '2026-01-01T00:00:00.000Z',
-            updatedAt: '2026-01-01T00:00:00.000Z',
-          },
-        },
-      },
-    });
+    const dmOnly: Record<string, boolean> = {};
+    stage = {
+      ...stage,
+      tableSceneAdapter: makeTableSceneAdapter({ dmOnlyElements: dmOnly }),
+    };
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
 
     act(() => {
       result.current.handleReady(vp);
@@ -454,17 +508,17 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     };
     expect(options.isDmOnlyElement('tok-1')).toBe(false);
 
-    useBattleMapStore.getState().toggleDmOnly('TEST01', 'bm-1', 'tok-1');
+    dmOnly['tok-1'] = true;
 
     // Same function reference, called again — the answer changed because it
-    // re-reads the store live, not because a new closure was built.
+    // re-reads the scene live, not because a new closure was built.
     expect(options.isDmOnlyElement('tok-1')).toBe(true);
   });
 
   it('attaches awareness as DM with cursor OFF, players shown, and disposes it BEFORE connection.stop on unmount', () => {
     const vp = makeVp();
     const { result, unmount } = renderHook(() =>
-      useDmBattleMapCanvas(baseProps())
+      useDmBattleMapCanvas(stageProps())
     );
     act(() => result.current.handleReady(vp));
     const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
@@ -484,7 +538,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   });
 
   it('RE-ATTACH: a second handleReady disposes the OLD attachment BEFORE stopping the OLD connection', () => {
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => result.current.handleReady(makeVp()));
     callOrder.length = 0;
     act(() => result.current.handleReady(makeVp()));
@@ -506,7 +560,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
 
   it('announces on every live status and forwards the two switches; re-attach re-applies both', () => {
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => result.current.handleReady(vp));
     const onStatus = vi.mocked(createManagedBattleMapConnection).mock
       .calls[0]![0].onStatus!;
@@ -530,7 +584,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
 
   it('warns (payload-free) on a connection diagnostic such as a refused authority edit (PR07 A1, review 02 N3)', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => result.current.handleReady(makeVp()));
     const onDiagnostic = vi.mocked(createManagedBattleMapConnection).mock
       .calls[0]![0].onDiagnostic;
@@ -547,7 +601,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
 
   it('colorFor reads playerColors LIVE from the DM store', () => {
     const vp = makeVp();
-    const { result } = renderHook(() => useDmBattleMapCanvas(baseProps()));
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
     act(() => result.current.handleReady(vp));
     const [, , options] = vi.mocked(attachAwarenessSync).mock.calls[0]!;
     const peer = {
@@ -576,7 +630,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
       throw new Error('awareness boom');
     });
     const { result, unmount } = renderHook(() =>
-      useDmBattleMapCanvas(baseProps())
+      useDmBattleMapCanvas(stageProps())
     );
     expect(() => {
       act(() => result.current.handleReady(makeVp()));
@@ -605,7 +659,7 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
       throw new Error('measurements boom');
     });
     const { result, unmount } = renderHook(() =>
-      useDmBattleMapCanvas(baseProps())
+      useDmBattleMapCanvas(stageProps())
     );
     expect(() => {
       act(() => result.current.handleReady(makeVp()));

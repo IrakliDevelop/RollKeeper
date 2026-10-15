@@ -138,7 +138,10 @@ scene rooms, player views and the TV cannot connect.
   always answer 426 (`.../battlemaps/[id]/route.ts`, `.../display-key/route.ts`).
 - The battle-map editor's "Share with players" toggle is disabled; the join
   banner follows Show on a Table scene. Starting combat no longer pushes the
-  linked map live.
+  linked map live. The original editor opens no relay connection (only a
+  Table scene has a live room), so its top bar shows "Private. Players don't
+  see this map." instead of a connection status
+  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`).
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use
