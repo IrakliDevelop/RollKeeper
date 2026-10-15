@@ -188,7 +188,9 @@ async function seedScenario(
 
 /** Real Table UI: Add to scene → Campaign NPC → the merchant, then place
  *  the new roster entry on the map. Returns the placed token id. */
-async function addMerchantThroughTable(page: Page): Promise<string> {
+async function addMerchantThroughTable(
+  page: Page
+): Promise<{ tokenId: string; memberId: string }> {
   await page.getByRole('button', { name: 'Add to scene' }).click();
   const dialog = page.getByRole('dialog').filter({ hasText: 'Add to scene' });
   await dialog.getByRole('tab', { name: 'Campaign NPC' }).click();
@@ -212,12 +214,14 @@ async function addMerchantThroughTable(page: Page): Promise<string> {
             .tokenKind === 'combatant' &&
           !!(element as unknown as { sceneMemberId?: string }).sceneMemberId
       );
-      return token?.id ?? null;
+      const memberId = (token as unknown as { sceneMemberId?: string })
+        ?.sceneMemberId;
+      return token && memberId ? { tokenId: token.id, memberId } : null;
     },
     undefined,
     { timeout: 15_000 }
   );
-  return (await handle.jsonValue()) as string;
+  return (await handle.jsonValue()) as { tokenId: string; memberId: string };
 }
 
 async function setStartingGold(
@@ -337,7 +341,7 @@ test('a merchant added through the Table sells to a player and the DM copy recon
     const code = await createCampaign(dmMapPage, DM_ID, campaignName);
     await seedScenario(dmMapPage, code, campaignName, false);
     await openTableSceneLive(dmMapPage, code, MAP_NAME);
-    const tokenId = await addMerchantThroughTable(dmMapPage);
+    const { tokenId, memberId } = await addMerchantThroughTable(dmMapPage);
 
     // DM prices the item and opens the shop from the campaign page.
     await dmAdminPage.goto(dashboardUrl(code), { waitUntil: 'networkidle' });
@@ -355,10 +359,10 @@ test('a merchant added through the Table sells to a player and the DM copy recon
     await forSale.click();
     await dmDialog.getByRole('switch', { name: 'Open for business' }).click();
 
-    // The published shop lists the Table token's member id.
+    // The published shop lists exactly the Table token's member id.
     await expect
       .poll(() => publishedEntityIds(dmAdminPage, code), { timeout: 15_000 })
-      .toHaveLength(1);
+      .toEqual([memberId]);
     await dmAdminPage.keyboard.press('Escape');
 
     // Player taps the Table merchant and buys one.
@@ -466,10 +470,10 @@ test('an open shop picks up a merchant placed on the Table afterwards', async ({
     await dmMapPage.keyboard.press('Escape');
 
     await openTableSceneLive(dmMapPage, code, MAP_NAME);
-    const tokenId = await addMerchantThroughTable(dmMapPage);
+    const { tokenId, memberId } = await addMerchantThroughTable(dmMapPage);
     await expect
       .poll(() => publishedEntityIds(dmMapPage, code), { timeout: 15_000 })
-      .toHaveLength(1);
+      .toEqual([memberId]);
 
     await playerOnMap(playerPage, code, campaignName, tokenId);
     await tap(playerPage, tokenId);
