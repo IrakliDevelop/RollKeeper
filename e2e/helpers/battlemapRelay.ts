@@ -132,6 +132,30 @@ export async function waitForElementSynced(
   );
 }
 
+/**
+ * Next dev compiles API routes on first use. Under CI load a first POST to
+ * a not yet compiled Table route has answered Next's HTML 404 page (CI run
+ * 38678554011: `authority/initialize-if-empty`), which leaves the scene
+ * local-only. Touch every Table route the flow uses first; the answers
+ * (400/403/404 JSON) do not matter, only that each route is compiled.
+ */
+async function prewarmTableRoutes(page: Page, code: string): Promise<void> {
+  const base = `/api/campaign/${code}`;
+  for (const path of [
+    '/table/control',
+    '/table/scenes',
+    '/table/authority/initialize-if-empty',
+    '/table/authority/checkpoint',
+    '/table/authority-challenge',
+    '/table/display/status',
+    '/battlemap-token',
+  ]) {
+    await page.request
+      .post(`${base}${path}`, { data: {}, timeout: 60_000 })
+      .catch(() => undefined);
+  }
+}
+
 /** A live Table scene opened by {@link openTableSceneLive}. */
 export interface LiveTableScene {
   /** The adopted scene id (its relay room and marker projection key). */
@@ -175,6 +199,7 @@ export async function openTableSceneLive(
       })
       .catch(() => undefined);
   });
+  await prewarmTableRoutes(dmPage, code);
   await dmPage.goto(`/dm/campaign/${code}/battlemaps`, {
     waitUntil: 'domcontentloaded',
   });
@@ -183,7 +208,16 @@ export async function openTableSceneLive(
   await expect(
     dmPage.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible({ timeout: 30_000 });
-  await dmPage.getByRole('button', { name: 'Show this scene' }).click();
+  // Show is enabled once the scene room is ready. If its preparation hit a
+  // transient failure ("Live play isn't available right now"), use the
+  // page's own "Try again", as a DM would, until Show is enabled.
+  const show = dmPage.getByRole('button', { name: 'Show this scene' });
+  const retry = dmPage.getByRole('button', { name: 'Try again' }).first();
+  await expect(async () => {
+    if (await retry.isVisible()) await retry.click();
+    await expect(show).toBeEnabled({ timeout: 5_000 });
+  }).toPass({ timeout: 60_000 });
+  await show.click();
   await expect(
     dmPage.getByText("Players' view updated", { exact: true })
   ).toBeVisible({ timeout: 20_000 });
