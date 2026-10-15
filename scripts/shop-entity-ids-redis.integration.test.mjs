@@ -127,3 +127,51 @@ test('a shop without its ledger or projection is not live', () => {
   assert.equal(cas(projection([]), projection(['member-1'])), -1);
   assert.equal(redis('EXISTS', SHOP), '0');
 });
+
+// The shops index's lazy cleanup (`SHOP_INDEX_PRUNE_SCRIPT`): a publish seeds
+// the ledger and adds the id before it writes the projection, so an id with
+// a ledger but no projection yet must stay listed.
+const indexSource = fs.readFileSync(
+  new URL('../src/app/api/campaign/[code]/shops/route.ts', import.meta.url),
+  'utf8'
+);
+const pruneScript = indexSource.match(
+  /export const SHOP_INDEX_PRUNE_SCRIPT = `([\s\S]*?)`;/u
+)?.[1];
+assert.ok(pruneScript, 'SHOP_INDEX_PRUNE_SCRIPT must be exported');
+const INDEX = 'campaign:SYNTH:shops-index';
+
+function prune(...npcIds) {
+  const keys = npcIds.flatMap(id => [
+    `campaign:SYNTH:shop:${id}`,
+    `campaign:SYNTH:shop-ledger:${id}`,
+  ]);
+  return Number(
+    redis(
+      'EVAL',
+      pruneScript,
+      String(keys.length + 1),
+      ...keys,
+      INDEX,
+      ...npcIds
+    )
+  );
+}
+
+test('the index prune keeps a shop mid-publish and drops one that is gone', () => {
+  redis('DEL', INDEX);
+  redis('SADD', INDEX, 'publishing', 'gone', 'live');
+  // Mid-publish: ledger seeded, projection not written yet.
+  redis('SET', 'campaign:SYNTH:shop-ledger:publishing', '[]');
+  redis('DEL', 'campaign:SYNTH:shop:publishing');
+  // Gone: both keys expired or deleted.
+  redis('DEL', 'campaign:SYNTH:shop:gone', 'campaign:SYNTH:shop-ledger:gone');
+  // A projection without its ledger is not removed by the prune either.
+  redis('SET', 'campaign:SYNTH:shop:live', '{}');
+  redis('DEL', 'campaign:SYNTH:shop-ledger:live');
+  assert.equal(prune('publishing', 'gone', 'live'), 1);
+  assert.deepEqual(redis('SMEMBERS', INDEX).split('\n').sort(), [
+    'live',
+    'publishing',
+  ]);
+});

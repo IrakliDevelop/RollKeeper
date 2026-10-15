@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 import { guestDeniedResponse } from '@/lib/guestRouteResponses';
-import { campaignShopKey, campaignShopsIndexKey, getRedis } from '@/lib/redis';
+import {
+  campaignShopKey,
+  campaignShopLedgerKey,
+  campaignShopsIndexKey,
+  getRedis,
+} from '@/lib/redis';
 import { sanitizePublicShop } from '@/lib/shopProjection';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import type { PublicShopIndexEntry } from '@/types/shop';
@@ -38,6 +43,23 @@ import type { PublicShopIndexEntry } from '@/types/shop';
  * campaign member may window-shop), so there is no
  * `requireGuestPlayerBinding` check here either.
  */
+/**
+ * KEYS: for each ARGV[i] its projection key then ledger key, and last the
+ * shops index. Removes an npcId from the index only when both of its keys
+ * are gone (unpublished or expired), never while a publish is in progress.
+ */
+export const SHOP_INDEX_PRUNE_SCRIPT = `
+local index = KEYS[#KEYS]
+local removed = 0
+for i, npcId in ipairs(ARGV) do
+  if redis.call('EXISTS', KEYS[2 * i - 1]) == 0
+    and redis.call('EXISTS', KEYS[2 * i]) == 0 then
+    removed = removed + redis.call('SREM', index, npcId)
+  end
+end
+return removed
+`;
+
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
@@ -91,8 +113,24 @@ export async function GET(
 
     if (staleNpcIds.length > 0) {
       // Best-effort cleanup — never awaited into the response path, and a
-      // failure here can never turn a good response into an error.
-      void redis.srem(indexKey, ...staleNpcIds).catch(() => {});
+      // failure here can never turn a good response into an error. Repair 10
+      // (shop flake): only ids whose projection AND ledger are both gone
+      // are removed. A publish seeds the ledger and adds the id BEFORE it
+      // writes the projection, so a read in that window saw "no
+      // projection" and used to delist a shop that was just going live.
+      void Promise.resolve(
+        redis.eval(
+          SHOP_INDEX_PRUNE_SCRIPT,
+          [
+            ...staleNpcIds.flatMap(npcId => [
+              campaignShopKey(code, npcId),
+              campaignShopLedgerKey(code, npcId),
+            ]),
+            indexKey,
+          ],
+          staleNpcIds
+        )
+      ).catch(() => {});
     }
 
     return NextResponse.json({ shops });
