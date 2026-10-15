@@ -121,8 +121,8 @@ scene rooms, player views and the TV cannot connect.
   ACK protocol has no hidden phase); it keeps its existing wording.
 - Combat value edits (hide, initiative, HP, conditions) queue behind a save
   in flight instead of being dropped; turn and lifecycle steps still run one
-  at a time. A failed edit is named in the toolbar ("Orc initiative wasn't
-  saved."). A storage or conflict failure offers Retry for that one edit
+  at a time. A failed edit is named in the panel footer ("Orc initiative
+  wasn't saved."). A storage or conflict failure offers Retry for that one edit
   while nothing else is saving and until any other edit saves; a rejection
   never does. Edits that fail together are listed by name with no Retry, so
   the DM redoes them. The next action the DM starts clears the list, so
