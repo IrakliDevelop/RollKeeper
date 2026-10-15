@@ -86,17 +86,11 @@ describe('editor fog → authority fog (repair 10 G1)', () => {
     expect(fogValid(converted)).toBe(true);
   });
 
-  it('keeps a tile without data as a data-less record and drops malformed tiles', () => {
+  it('keeps a tile without data as a data-less record', () => {
     const fog = editorFog();
     const [first] = fog.tiles;
     const converted = editorFogToAuthorityFog(
-      {
-        ...fog,
-        tiles: [
-          { x: first!.x, y: first!.y },
-          { x: 'nope', y: 0, data: first!.data },
-        ],
-      },
+      { ...fog, tiles: [{ x: first!.x, y: first!.y }] },
       'dm-1'
     ) as { tiles: unknown[] };
     expect(converted.tiles).toEqual([
@@ -111,11 +105,49 @@ describe('editor fog → authority fog (repair 10 G1)', () => {
     expect(fogValid(converted)).toBe(true);
   });
 
+  it.each([
+    [
+      'a tile with bad coordinates',
+      (tile: { x: number; y: number; data: string }) => [
+        tile,
+        { ...tile, x: 'nope' },
+      ],
+    ],
+    [
+      'two tiles at the same place',
+      (tile: { x: number; y: number; data: string }) => [tile, { ...tile }],
+    ],
+  ])(
+    'OO3: fails closed on %s (returns the input, so the room refuses it)',
+    (_label, tilesOf) => {
+      const fog = editorFog();
+      // On a revealed map a dropped tile would be a concealed area shown.
+      const input = { ...fog, tiles: tilesOf(fog.tiles[0]!) };
+      const converted = editorFogToAuthorityFog(input, 'dm-1');
+      expect(converted).toEqual(input);
+      expect(fogValid(converted)).toBe(false);
+    }
+  );
+
   it('passes null, missing and authority-shaped fog through', () => {
     expect(editorFogToAuthorityFog(null, 'dm-1')).toBeNull();
     expect(editorFogToAuthorityFog(undefined, 'dm-1')).toBeNull();
     const authority = editorFogToAuthorityFog(editorFog(), 'dm-1');
     expect(editorFogToAuthorityFog(authority, 'other')).toEqual(authority);
+  });
+
+  it('OO4: leaves a relay snapshot with other versions and unsorted tiles exactly as it is', () => {
+    const fog = editorFog();
+    const relay = {
+      meta: { version: 4, editor: 'player-x', definition: fog.definition },
+      tiles: [...fog.tiles].reverse().map(tile => ({
+        generation: fog.definition.generation,
+        ...tile,
+        version: 4,
+        editor: 'player-x',
+      })),
+    };
+    expect(editorFogToAuthorityFog(relay, 'dm-1')).toEqual(relay);
   });
 
   it('makes a fogged editor canvas a state the server accepts (the Reapply and Go live 400)', async () => {
