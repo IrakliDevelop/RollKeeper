@@ -170,6 +170,20 @@ async function seedGoblinToken(page: Page, code: string): Promise<void> {
                     conditions: [],
                     color: '#2f6fd0',
                   },
+                  // Unplaced: the roster places it on the private editor.
+                  {
+                    id: 'entity-roster-orc-e2e',
+                    type: 'monster',
+                    name: 'Orc',
+                    initiative: null,
+                    initiativeModifier: 0,
+                    currentHp: 15,
+                    maxHp: 15,
+                    tempHp: 0,
+                    armorClass: 13,
+                    conditions: [],
+                    color: '#b91c1c',
+                  },
                 ],
                 currentTurn: 0,
                 round: 0,
@@ -318,5 +332,30 @@ test.describe('DM creature drawer', () => {
     await expect(
       panel.getByRole('textbox', { name: 'Armor class' })
     ).toHaveValue(String(NEW_AC));
+  });
+
+  test('a roster token is placed on the private editor with no connection (repair 07 CC1)', async () => {
+    await dmPage.keyboard.press('Escape');
+    await dmPage
+      .getByRole('button', { name: /^Orc\b/u })
+      .first()
+      .click();
+    const canvas = dmPage.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('DM canvas has no bounding box');
+    await dmPage.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await dmPage.waitForFunction(
+      () =>
+        window.__rkStores?.viewport?.store
+          .getAll()
+          .some(
+            element =>
+              (element as unknown as { entityId?: string }).entityId ===
+              'entity-roster-orc-e2e'
+          ),
+      undefined,
+      { timeout: 10_000 }
+    );
+    await expect(dmPage.getByText('Not connected')).toHaveCount(0);
   });
 });

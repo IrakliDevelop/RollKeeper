@@ -220,31 +220,32 @@ describe('useDmVttScreen', () => {
     expect(result.current.pendingPlacement).toBeNull();
   });
 
-  it('startDrag is a no-op while offline and fires the not-connected toast', () => {
+  it('the private original editor arms and drags roster tokens with no connection and no "Not connected" toast (PR08 repair 07 CC1)', () => {
     seed();
     const { result } = renderHook(() =>
       useDmVttScreen({ campaignCode: 'ABC', battleMapId: 'bm-1', dmId: 'dm-1' })
     );
     act(() => result.current.onViewportReady(makeFakeViewport({})));
-    // Never call onStatus('live') — status stays at its 'connecting' default.
-
+    // No relay connection exists here, so status stays 'connecting'.
+    const entity = createMockEncounterEntity({
+      id: 'known-1',
+      name: 'Aria',
+      type: 'player',
+    });
+    act(() => result.current.armPlacement(entity));
+    expect(result.current.pendingPlacement?.entityName).toBe('Aria');
+    act(() => result.current.cancelPlacement());
     act(() =>
-      result.current.startDrag(
-        createMockEncounterEntity({
-          id: 'known-1',
-          name: 'Aria',
-          type: 'player',
-        }),
-        { clientX: 100, clientY: 100 } as React.PointerEvent
-      )
+      result.current.startDrag(entity, {
+        clientX: 100,
+        clientY: 100,
+        pointerId: 1,
+        button: 0,
+      } as unknown as React.PointerEvent)
     );
-
-    expect(result.current.drag).toBeNull();
-    expect(
-      result.current.toasts.some(
-        t => t.type === 'info' && t.title === 'Not connected'
-      )
-    ).toBe(true);
+    expect(result.current.toasts.some(t => t.title === 'Not connected')).toBe(
+      false
+    );
   });
 
   it("drag-drop of a different entity clears an armed entity's pending placement and selects the dropped one", () => {
