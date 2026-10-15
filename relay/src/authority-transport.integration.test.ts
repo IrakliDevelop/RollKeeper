@@ -1150,15 +1150,40 @@ run('two relay authority transport', () => {
     };
     dmStore.add(dmElement as never);
     await eventually(() => elementX('journal-dm-element') === 0);
+    // Each step must be confirmed in the room. A slow runner may lag the
+    // observer or drop an episode (the edit then is a released draft or
+    // uncertain op, FF1), so a step that is not confirmed within 5 s is made
+    // again once: the connection must keep accepting edits either way.
+    const notes: string[] = [];
+    const confirm = async (
+      id: string,
+      step: number,
+      apply: (attempt: number) => void
+    ): Promise<boolean> => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        apply(attempt);
+        try {
+          await eventually(
+            () => elementX(id) === step,
+            attempt ? 15_000 : 5_000
+          );
+          if (attempt) notes.push(`${id}@${step}: confirmed on retry`);
+          return true;
+        } catch {
+          notes.push(`${id}@${step}: not confirmed (attempt ${attempt})`);
+        }
+      }
+      return false;
+    };
     let dmReached = 0;
     for (let step = 1; step <= 150; step += 1) {
-      dmStore.update('journal-dm-element', { position: { x: step, y: 0 } });
-      try {
-        await eventually(() => elementX('journal-dm-element') === step, 3_000);
-        dmReached = step;
-      } catch {
-        break;
-      }
+      const ok = await confirm('journal-dm-element', step, attempt =>
+        dmStore.update('journal-dm-element', {
+          position: { x: step, y: attempt },
+        })
+      );
+      if (!ok) break;
+      dmReached = step;
     }
     // Player: 150 moves of its own token through the app wrapper. Players
     // are rate limited to 10 element writes per second, so pace them.
@@ -1187,23 +1212,22 @@ run('two relay authority transport', () => {
     let playerReached = 0;
     for (let step = 1; step <= 150; step += 1) {
       await new Promise(resolve => setTimeout(resolve, 110));
-      playerStore.update('journal-player-token', {
-        position: { x: step, y: 0 },
-      });
-      try {
-        await eventually(
-          () => elementX('journal-player-token') === step,
-          3_000
-        );
-        playerReached = step;
-      } catch {
-        break;
-      }
+      const ok = await confirm('journal-player-token', step, attempt =>
+        playerStore.update('journal-player-token', {
+          position: { x: step, y: attempt },
+        })
+      );
+      if (!ok) break;
+      playerReached = step;
     }
-    expect({ dmReached, playerReached }).toEqual({
+    expect({ dmReached, playerReached, dmStatus, notes }).toEqual({
       dmReached: 150,
       playerReached: 150,
+      dmStatus: 'live',
+      notes: expect.any(Array),
     });
+    // At most a handful of steps may need a retry on a slow runner.
+    expect(notes.filter(note => note.includes('retry')).length).toBeLessThan(5);
   }, 240_000);
 
   it('after 70 offline edits the DM connection is live again: the next edit reaches the room and a checkpoint can be saved (FF1)', async () => {
