@@ -6,6 +6,7 @@ import type {
 import type { BattleMapConnection } from '@/lib/battlemapSync';
 
 import { canvasStateToAuthorityState } from './authorityLifecycle';
+import { authorityFogToEditorFog } from './fogShape';
 import type { TableRepository } from './repository';
 import type {
   JsonObject,
@@ -248,7 +249,10 @@ export function sceneCheckpointToViewportState(
           key,
           {
             version: Number(extension.version),
-            data: structuredClone(extension.data) as JsonObject[string],
+            // Repair 10: the editor fog plugin takes the editor shape.
+            data: (key === 'fog'
+              ? authorityFogToEditorFog(extension.data)
+              : structuredClone(extension.data)) as JsonObject[string],
           },
         ],
       ];

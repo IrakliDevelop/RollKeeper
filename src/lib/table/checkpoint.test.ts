@@ -122,7 +122,8 @@ describe('scene checkpoint persistence', () => {
       extensions: {
         fog: {
           version: 1,
-          data: checkpoint.extensions.fog.data,
+          // Repair 10: the room's fog snapshot in the editor's fog shape.
+          data: { definition: { generation: 'fog-1' }, tiles: [] },
         },
       },
     });
