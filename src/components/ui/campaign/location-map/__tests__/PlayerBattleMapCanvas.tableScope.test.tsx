@@ -5,6 +5,7 @@ import { SelectTool, Viewport, createShape } from '@fieldnotes/core';
 
 import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
 import { PLAYER_BAND_ORDER } from '../layerContract';
+import { HELD_OVERFLOW_MESSAGE } from '@/lib/battlemapAuthority';
 
 /**
  * PR02 R4 client scope on the player surface: with Table v1 required, the
@@ -297,7 +298,7 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     ]);
   });
 
-  it('publishes the own band again once the resolved scene room is live (Table v1)', () => {
+  it('publishes the own band once at attach; the sync layer carries it into the live room (EE1)', () => {
     stubCanvas();
     renderPlayer();
     const vp = makeViewport();
@@ -307,26 +308,22 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
       .mock.calls.at(-1)![0];
     const upserts = connections[0]!.publishLayerUpsert;
     expect(upserts).toHaveBeenCalledTimes(1);
-    // The first publish rides the unresolved binding, which the scene
-    // resolution retires with its pending work; the live room needs it again.
+    // Live and reconnects publish nothing more (no duplicate band write).
     act(() => options.onStatus?.('live'));
-    expect(upserts).toHaveBeenCalledTimes(2);
-    // `live` repeats on every authority change: no publish loop.
-    act(() => options.onStatus?.('live'));
-    expect(upserts).toHaveBeenCalledTimes(2);
-    // A reconnect enters live again and re-teaches the band.
     act(() => options.onStatus?.('connecting'));
     act(() => options.onStatus?.('live'));
-    expect(upserts).toHaveBeenCalledTimes(3);
-    expect(upserts.mock.calls[2]![0]).toEqual(
-      expect.objectContaining({
-        id: 'player-char-a',
-        visible: true,
-        locked: false,
-        opacity: 1,
-        order: PLAYER_BAND_ORDER,
-      })
-    );
+    expect(upserts).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a held-edit overflow or stale-drop diagnostic to the player (EE2)', async () => {
+    stubCanvas();
+    renderPlayer();
+    fireReady(makeViewport());
+    const options = vi
+      .mocked(createManagedBattleMapConnection)
+      .mock.calls.at(-1)![0];
+    act(() => options.onDiagnostic?.(HELD_OVERFLOW_MESSAGE));
+    expect(await screen.findByText(HELD_OVERFLOW_MESSAGE)).toBeTruthy();
   });
 
   it('offers no delete action for a selected control-bearing token', () => {

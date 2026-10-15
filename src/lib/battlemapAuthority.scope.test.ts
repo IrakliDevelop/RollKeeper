@@ -145,23 +145,7 @@ describe('resolved-scene connection scope (R4 client)', () => {
     }));
     const { store, connection, onSceneChange, onDiagnostic } = start(mint);
     const first = fake.instances[0]!;
-    // An SDK draft from before resolution, then edits held while connecting.
-    const sdkMutation = { kind: 'remove', id: 'stale-draft' };
-    first.state = {
-      ...first.state,
-      operations: [
-        {
-          clientOperationId: 'op-draft',
-          status: 'draft',
-          proposal: { mutation: sdkMutation },
-        },
-        {
-          clientOperationId: 'op-done',
-          status: 'accepted',
-          proposal: { mutation: { kind: 'remove', id: 'gone' } },
-        },
-      ],
-    };
+    // Edits held while connecting (the SDK admits nothing before live).
     connection.publishLayerUpsert({
       id: 'player-legacy-a',
       name: 'My elements',
@@ -191,7 +175,6 @@ describe('resolved-scene connection scope (R4 client)', () => {
     };
     resolved.publish();
     expect(resolved.submit.mock.calls.map(([mutation]) => mutation)).toEqual([
-      sdkMutation,
       expect.objectContaining({ kind: 'layer-upsert' }),
       expect.objectContaining({
         kind: 'upsert',
@@ -199,7 +182,7 @@ describe('resolved-scene connection scope (R4 client)', () => {
       }),
     ]);
     resolved.publish();
-    expect(resolved.submit).toHaveBeenCalledTimes(3);
+    expect(resolved.submit).toHaveBeenCalledTimes(2);
     // Nothing was discarded: no scene-change notice, the token stays.
     expect(onSceneChange).not.toHaveBeenCalled();
     expect(onDiagnostic).not.toHaveBeenCalled();

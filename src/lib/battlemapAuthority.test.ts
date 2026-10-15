@@ -1,5 +1,9 @@
 import { cleanup } from '@testing-library/react';
-import { ElementStore, type CanvasElement } from '@fieldnotes/core';
+import {
+  createShape,
+  ElementStore,
+  type CanvasElement,
+} from '@fieldnotes/core';
 import type { AuthorityClientStatus } from '@fieldnotes/sync';
 import { FogManager } from '@fieldnotes/vtt';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,7 +21,11 @@ const authority = vi.hoisted(() => {
     reset() {
       listener = null;
       state = { status: 'connecting', document: null, operations: [] };
-      submit.mockClear();
+      submit.mockReset();
+      submit.mockImplementation(() => ({
+        status: 'admitted',
+        clientOperationId: 'op',
+      }));
     },
     install(document: unknown) {
       state = { status: 'live', document, operations: [] };
@@ -68,6 +76,9 @@ import {
 } from '@/test/realViewport';
 import {
   createManagedBattleMapAuthorityConnection,
+  HELD_EDIT_LIMIT,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
   withoutUndefined,
 } from './battlemapAuthority';
 
@@ -579,7 +590,7 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
   });
 
-  it('sends each held edit once even when submitting notifies synchronously (PR08 DD1)', () => {
+  const dmConnection = (onDiagnostic = vi.fn()) => {
     const store = new ElementStore();
     const connection = createManagedBattleMapAuthorityConnection({
       relayUrl: 'wss://relay.example',
@@ -589,25 +600,177 @@ describe('A1 element submissions use JSON semantics', () => {
       store,
       tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
       mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
     });
-    connection.publishLayerRemove('layer-x');
-    connection.publishLayerRemove('layer-y');
-    const document = { elements: [], layers: [], extensions: {} };
-    // The real SDK notifies subscribers inside submit().
-    authority.submit.mockImplementation((() => {
-      authority.installState({ status: 'live', document, operations: [] });
-      return { status: 'admitted', clientOperationId: 'op' };
+    return { store, connection, onDiagnostic };
+  };
+  const emptyDoc = () => ({ elements: [], layers: [], extensions: {} });
+  const shape = (id: string, x = 0) =>
+    ({
+      ...createShape({ position: { x, y: 0 }, size: { w: 4, h: 4 } }),
+      id,
+    }) as CanvasElement;
+  const sent = () =>
+    (
+      authority.submit.mock.calls as unknown as Array<
+        [{ kind: string; id?: string; element?: { id: string } }]
+      >
+    ).map(([mutation]) => mutation);
+
+  it('EE3: the flush guard keeps order when a nested notify flushes while the first edit waits', () => {
+    const { connection } = dmConnection();
+    connection.publishLayerRemove('a');
+    connection.publishLayerRemove('b');
+    let first = true;
+    const results: string[] = [];
+    authority.submit.mockImplementation(((mutation: { id: string }) => {
+      if (first) {
+        first = false;
+        // The SDK notifies inside submit, then this attempt hits capacity.
+        authority.installState({
+          status: 'live',
+          document: emptyDoc(),
+          operations: [],
+        });
+        results.push(`${mutation.id}:wait`);
+        return { status: 'refused', reason: 'capacity' };
+      }
+      results.push(`${mutation.id}:sent`);
+      return { status: 'admitted', clientOperationId: mutation.id };
     }) as never);
-    authority.install(document);
-    expect(
-      (authority.submit.mock.calls as unknown as Array<[{ id: string }]>).map(
-        ([mutation]) => mutation.id
-      )
-    ).toEqual(['layer-x', 'layer-y']);
+    authority.install(emptyDoc());
+    authority.install(emptyDoc());
+    expect(results).toEqual(['a:wait', 'a:sent', 'b:sent']);
     authority.submit.mockImplementation((() => ({
       status: 'admitted',
       clientOperationId: 'op',
     })) as never);
+    connection.stop();
+  });
+
+  it('EE2: more than 64 held moves of one token become one upsert with the final position', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    store.add(shape('t', 0));
+    for (let x = 1; x <= 100; x += 1)
+      store.update('t', { position: { x, y: 0 } });
+    expect(authority.submit).not.toHaveBeenCalled();
+    authority.install(emptyDoc());
+    expect(sent()).toEqual([
+      expect.objectContaining({
+        kind: 'upsert',
+        element: expect.objectContaining({
+          id: 't',
+          position: { x: 100, y: 0 },
+        }),
+      }),
+    ]);
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    connection.stop();
+  });
+
+  it('EE2: a remove supersedes held writes of the same element', () => {
+    const { store, connection } = dmConnection();
+    store.add(shape('gone'));
+    store.add(shape('kept'));
+    store.remove('gone');
+    authority.install(emptyDoc());
+    expect(sent().map(m => `${m.kind}:${m.element?.id ?? m.id}`)).toEqual([
+      'upsert:kept',
+      'remove:gone',
+    ]);
+    connection.stop();
+  });
+
+  it('EE2: the held queue is capped with a visible notice', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    for (let index = 0; index <= HELD_EDIT_LIMIT; index += 1)
+      store.add(shape(`s-${index}`));
+    expect(onDiagnostic).toHaveBeenCalledWith(HELD_OVERFLOW_MESSAGE);
+    authority.install(emptyDoc());
+    expect(sent()).toHaveLength(HELD_EDIT_LIMIT);
+    connection.stop();
+  });
+
+  it('EE2: capacity after live waits and retries on the next change in the same generation', () => {
+    const { store, connection } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('busy'));
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    expect(sent().map(m => m.element?.id)).toEqual(['busy', 'busy']);
+    connection.stop();
+  });
+
+  it('EE1: a capacity-held edit is not replayed into another generation; it is dropped visibly', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('stale'));
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g2',
+    } as never);
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    expect(onDiagnostic).toHaveBeenCalledWith(HELD_STALE_MESSAGE);
+    connection.stop();
+  });
+
+  it('EE1: after the first live state, offline edits go to the SDK as drafts and are not replayed on reconnect', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [],
+    });
+    store.add(shape('offline-edit'));
+    // Given to the SDK at once (it keeps a generation-tagged draft).
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+    });
+    authority.install(emptyDoc());
+    // No automatic replay by RollKeeper.
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
+  it('EE1: a live DM edit goes straight to the SDK, as before', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    store.add(shape('live-edit'));
+    expect(sent()).toEqual([
+      expect.objectContaining({
+        kind: 'upsert',
+        element: expect.objectContaining({ id: 'live-edit' }),
+      }),
+    ]);
     connection.stop();
   });
 
@@ -667,7 +830,7 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
   });
 
-  it('normalizes layer and fog-meta records; not-ready/stopped stay silent, capacity reports; clear forwards expectedState (review 02 N4)', () => {
+  it('normalizes layer and fog-meta records; stopped stays silent, capacity waits and retries; clear forwards expectedState (review 02 N4, EE2)', () => {
     const fog = new FogManager();
     const onDiagnostic = vi.fn();
     const store = new ElementStore();
@@ -723,9 +886,15 @@ describe('A1 element submissions use JSON semantics', () => {
       reason: 'capacity',
     })) as never);
     connection.publishLayerRemove('layer-z');
-    expect(onDiagnostic).toHaveBeenCalledWith(
-      'A local layer-remove edit was not sent to the live room (capacity)'
-    );
+    // EE2: capacity is transient (J1 releases settled work): it waits.
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    authority.install({ ...documentWithFog(3), casToken: 'cas-token-1' });
+    expect(authority.submit).toHaveBeenLastCalledWith({
+      kind: 'layer-remove',
+      id: 'layer-z',
+      version: expect.any(Number),
+      editor: 'dm-a',
+    });
     store.clear();
     expect(authority.submit).toHaveBeenLastCalledWith(
       { kind: 'clear' },

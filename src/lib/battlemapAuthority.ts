@@ -55,8 +55,10 @@ interface AuthorityOptions {
 export interface BattleMapSceneChange {
   previousSceneId: string;
   sceneId: string;
-  /** Pending local operations dropped with the old room (never replayed). */
+  /** SDK operations dropped with the old room (never replayed). */
   discardedOperationIds: string[];
+  /** Held local edits (not yet given to the SDK) dropped with it (EE6). */
+  discardedHeldEdits?: number;
 }
 
 interface SceneBinding {
@@ -102,6 +104,13 @@ function canvasElement(element: Record<string, unknown>): CanvasElement {
   delete canvas.ownerId;
   return canvas as unknown as CanvasElement;
 }
+
+/** EE2: held edits kept at most (after coalescing). */
+export const HELD_EDIT_LIMIT = 64;
+export const HELD_OVERFLOW_MESSAGE =
+  'Too many map edits are waiting to be sent. The latest one was not kept.';
+export const HELD_STALE_MESSAGE =
+  'The live map changed while edits were waiting. Unsent edits were dropped.';
 
 /** Bridges RollKeeper's existing stores to the released canonical authority client. */
 export function createManagedBattleMapAuthorityConnection(
@@ -205,40 +214,76 @@ export function createManagedBattleMapAuthorityConnection(
   type Mutation = Parameters<ManagedAuthorityConnection['submit']>[0];
   type SubmitOptions = Parameters<ManagedAuthorityConnection['submit']>[1];
   /**
-   * PR08 DD1: local edits made before the room is live (the SDK answers
-   * `not-ready` while connecting) wait here in order instead of being
-   * dropped, and
-   * later edits queue behind them so order is kept. They are admitted once
-   * the room is ready, and carried to the resolved room on the first
-   * resolution (see `rebind`).
+   * PR08 DD1 / EE1 / EE2: the held queue.
+   *
+   * - Before this connection's first live state, the SDK refuses edits
+   *   (`not-ready`), so every local edit is held (generation `null`) and
+   *   admitted in order on the first live state, once. These are edits
+   *   made before the room existed for this client, never an offline fork.
+   * - After the first live state the SDK path is unchanged: edits made
+   *   while offline or recovering become generation-tagged SDK drafts that
+   *   are never replayed automatically (SYNC-AUTHORITY section 6; the
+   *   explicit Reapply path stays). The queue is used then only when the SDK
+   *   answers `capacity` (transient: J1 releases settled operations), tagged
+   *   with the live generation; such an entry is admitted only into that
+   *   same generation and dropped visibly otherwise.
+   * - Entries coalesce (latest upsert per element or layer; a remove
+   *   supersedes earlier writes; order by last write) and the queue is
+   *   capped, with a visible notice when an edit cannot be kept.
    */
-  type Held = { mutation: Mutation; submitOptions?: SubmitOptions };
+  type Held = {
+    mutation: Mutation;
+    submitOptions?: SubmitOptions;
+    /** Null before the first live state; else the live generation. */
+    generation: string | null;
+  };
   let held: Held[] = [];
-  /**
-   * Admits `entry`; false when it must keep waiting. Only a live room admits:
-   * before that the SDK refuses (`not-ready`) or keeps a draft that is not
-   * sent once the room goes live (observed in e2e during `recovering`).
-   */
-  const admit = (entry: Held): boolean => {
-    if (connection.getState().status !== 'live') return false;
+  let firstLiveSeen = false;
+  const heldKey = (mutation: Mutation): string | null => {
+    if (mutation.kind === 'upsert') return `element:${mutation.element.id}`;
+    if (mutation.kind === 'remove') return `element:${mutation.id}`;
+    if (mutation.kind === 'layer-upsert') return `layer:${mutation.layer.id}`;
+    if (mutation.kind === 'layer-remove') return `layer:${mutation.id}`;
+    return null;
+  };
+  const hold = (entry: Held): void => {
+    const key = heldKey(entry.mutation);
+    const kept =
+      key === null ? held : held.filter(item => heldKey(item.mutation) !== key);
+    if (kept.length >= HELD_EDIT_LIMIT) {
+      options.onDiagnostic?.(HELD_OVERFLOW_MESSAGE);
+      held = kept;
+      return;
+    }
+    held = [...kept, entry];
+  };
+  type AdmitOutcome = 'sent' | 'wait' | 'dropped';
+  const admit = (entry: Held): AdmitOutcome => {
+    const state = connection.getState();
+    if (state.status !== 'live') return 'wait';
+    if (entry.generation !== null && entry.generation !== state.generation) {
+      options.onDiagnostic?.(HELD_STALE_MESSAGE);
+      return 'dropped';
+    }
     const normalized = withoutUndefined(entry.mutation);
     const result =
       entry.submitOptions === undefined
         ? connection.submit(normalized)
         : connection.submit(normalized, entry.submitOptions);
-    if (result.status === 'refused' && result.reason === 'not-ready')
-      return false;
     if (
       result.status === 'refused' &&
-      (result.reason === 'invalid' || result.reason === 'capacity')
+      (result.reason === 'not-ready' || result.reason === 'capacity')
     )
+      return 'wait';
+    if (result.status === 'refused' && result.reason === 'invalid')
       options.onDiagnostic?.(
-        `A local ${entry.mutation.kind} edit was not sent to the live room (${result.reason})`
+        `A local ${entry.mutation.kind} edit was not sent to the live room (invalid)`
       );
-    return true;
+    return 'sent';
   };
   // Submitting notifies subscribers synchronously, which re-enters
-  // onAuthorityChange and flushHeld: guard it so each edit is sent once.
+  // onAuthorityChange and flushHeld, and a subscriber may make a new local
+  // edit meanwhile: the guard keeps one flush and queues such edits behind.
   let flushing = false;
   const flushHeld = (): void => {
     if (flushing) return;
@@ -247,7 +292,7 @@ export function createManagedBattleMapAuthorityConnection(
       while (held.length > 0 && !stopped) {
         const [next, ...rest] = held;
         held = rest;
-        if (!admit(next!)) {
+        if (admit(next!) === 'wait') {
           held = [next!, ...held];
           return;
         }
@@ -258,8 +303,27 @@ export function createManagedBattleMapAuthorityConnection(
   };
   /** Every local submission: JSON-normalized, and a refusal is visible. */
   const submit = (mutation: Mutation, submitOptions?: SubmitOptions): void => {
-    const entry = { mutation, submitOptions };
-    if (flushing || held.length > 0 || !admit(entry)) held = [...held, entry];
+    if (!firstLiveSeen) {
+      hold({ mutation, submitOptions, generation: null });
+      return;
+    }
+    const generation = connection.getState().generation;
+    if (flushing || held.length > 0) {
+      hold({ mutation, submitOptions, generation });
+      return;
+    }
+    const normalized = withoutUndefined(mutation);
+    const result =
+      submitOptions === undefined
+        ? connection.submit(normalized)
+        : connection.submit(normalized, submitOptions);
+    if (result.status !== 'refused') return;
+    if (result.reason === 'capacity')
+      hold({ mutation, submitOptions, generation });
+    else if (result.reason === 'invalid')
+      options.onDiagnostic?.(
+        `A local ${mutation.kind} edit was not sent to the live room (invalid)`
+      );
   };
   /** Re-applies held local edits over a freshly loaded remote snapshot. */
   const reapplyHeld = (): void => {
@@ -440,7 +504,10 @@ export function createManagedBattleMapAuthorityConnection(
   const onAuthorityChange = (inner: ManagedAuthorityConnection): void => {
     if (stopped || inner !== connection || retired === inner) return;
     const state = inner.getState();
-    if (state.status === 'live') everLive = true;
+    if (state.status === 'live') {
+      everLive = true;
+      firstLiveSeen = true;
+    }
     options.onStatus?.(state.status);
     restoreRejectedEdits(state);
     releaseSettled(inner);
@@ -531,26 +598,20 @@ export function createManagedBattleMapAuthorityConnection(
       );
     // PR08 DD1: the first resolution of a map-pinned connection (no room
     // yet, never live) is not a scene change. Edits made meanwhile (the
-    // player's band, an early token) were made against no other scene, so
-    // they move to the resolved room in order instead of being dropped.
-    // A later change of scene still discards visibly (never misapplied).
+    // player's band, an early token) were held (the SDK admits nothing
+    // before live), were made against no other scene, and move to the
+    // resolved room in order. A later change of scene discards visibly.
+    // EE5: no SDK work exists before the first live state; any that does
+    // is reported as discarded rather than carried without its options.
     const initial = previous.room === null && !everLive;
-    const carried: Held[] = initial
-      ? [
-          ...unsent.map(operation => ({
-            mutation: operation.proposal.mutation,
-          })),
-          ...held,
-        ]
-      : [];
-    const discardedOperationIds = initial
-      ? []
-      : [
-          ...unsent.map(operation => operation.clientOperationId),
-          ...held.map((_entry, index) => `held-${index}`),
-        ];
+    const carried: Held[] = initial ? held : [];
+    const discardedOperationIds = unsent.map(
+      operation => operation.clientOperationId
+    );
+    const discardedHeldEdits = initial ? 0 : held.length;
     held = [];
-    const visible = everLive || discardedOperationIds.length > 0;
+    const visible =
+      everLive || discardedOperationIds.length > 0 || discardedHeldEdits > 0;
     unsubscribeAuthority();
     connection.stop();
     binding = next;
@@ -572,6 +633,7 @@ export function createManagedBattleMapAuthorityConnection(
         previousSceneId: previous.sceneId,
         sceneId: next.sceneId,
         discardedOperationIds,
+        ...(discardedHeldEdits > 0 ? { discardedHeldEdits } : {}),
       });
     }
     // Either callback may stop this connection (the pages rebuild their
