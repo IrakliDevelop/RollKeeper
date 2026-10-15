@@ -86,6 +86,38 @@ export async function putShop(options: {
   );
 }
 
+/**
+ * Repair 09 (LL1): `PATCH /api/campaign/[code]/shops/[npcId]` updates only
+ * which tokens open a published shop. It never reseeds stock, so it is safe
+ * while a sale is not yet drained into the DM's copy. Rejects with the
+ * route's error text.
+ */
+export async function patchShopEntityIds(options: {
+  dmId: string;
+  campaignCode: string;
+  npcId: string;
+  entityIds: string[];
+}): Promise<void> {
+  const response = await fetch(
+    `/api/campaign/${encodeURIComponent(options.campaignCode)}/shops/${encodeURIComponent(options.npcId)}`,
+    {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        dmId: options.dmId,
+        entityIds: options.entityIds,
+      }),
+    }
+  );
+  if (response.ok) return;
+  const body = (await response.json().catch(() => null)) as {
+    error?: string;
+  } | null;
+  throw new Error(
+    body?.error ?? `Failed to update the shop tokens (${response.status}).`
+  );
+}
+
 /** Encounter ids first, then Table ids; each once, capped like the route. */
 export function mergeShopEntityIds(
   encounterIds: readonly string[],

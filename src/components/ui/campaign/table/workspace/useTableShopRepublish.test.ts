@@ -115,13 +115,12 @@ function mockShops(indexIds: string[] | null) {
 
 const puts = (fetchMock: ReturnType<typeof mockShops>) =>
   fetchMock.mock.calls
-    .filter(([, init]) => init?.method === 'PUT')
+    .filter(([, init]) => init?.method === 'PATCH')
     .map(([url, init]) => ({
       url,
       body: JSON.parse(String(init!.body)) as {
         dmId: string;
         entityIds: string[];
-        npc: CampaignNPC;
       },
     }));
 
@@ -138,7 +137,7 @@ describe('useTableShopRepublish (repair 09 D2)', () => {
     sceneMemberId: 'member-1',
   };
 
-  it('republishes an open shop that does not list a newly added Table member yet', async () => {
+  it('updates only the tokens of an open shop that does not list a newly added Table member yet (LL1)', async () => {
     npcs = [merchant(true)];
     const fetchMock = mockShops([]);
     renderHook(() =>
@@ -214,5 +213,91 @@ describe('useTableShopRepublish (repair 09 D2)', () => {
     rerender({ revision: 2 });
     await vi.advanceTimersByTimeAsync(1_000);
     expect(puts(fetchMock)).toEqual([]);
+  });
+});
+
+describe('useTableShopRepublish checks (repair 09 LL6 / LL7)', () => {
+  const member = {
+    actorId: 'actor-1',
+    tokenIds: [],
+    sceneMemberId: 'member-1',
+  };
+  const gets = (fetchMock: ReturnType<typeof mockShops>) =>
+    fetchMock.mock.calls.filter(([, init]) => !init?.method).length;
+  const render = (dmId: string | null = 'dm-1') =>
+    renderHook(
+      (props: { revision: number; members: (typeof member)[] }) =>
+        useTableShopRepublish({
+          snapshot: snapshotWith(props.members),
+          revision: props.revision,
+          campaignCode: 'CAMP',
+          dmId,
+        }),
+      { initialProps: { revision: 1, members: [member] } }
+    );
+
+  it('a burst of revisions makes one index request', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops(['member-1']);
+    const { rerender } = render();
+    for (let revision = 2; revision <= 6; revision += 1) {
+      await vi.advanceTimersByTimeAsync(200);
+      rerender({ revision, members: [member] });
+    }
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(1);
+  });
+
+  it('skips the index request while the computed ids stay the same', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops([]);
+    const { rerender } = render();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(1);
+    expect(puts(fetchMock)).toHaveLength(1);
+    rerender({ revision: 2, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(1);
+    // A real change checks again.
+    rerender({
+      revision: 3,
+      members: [member, { ...member, sceneMemberId: 'member-2' }],
+    });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(gets(fetchMock)).toBe(2);
+  });
+
+  it('does nothing after unmount', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops([]);
+    const { unmount } = render();
+    await vi.advanceTimersByTimeAsync(500);
+    unmount();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('a failed index request changes nothing and is tried again later', async () => {
+    npcs = [merchant(true)];
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const failing = vi.fn(async () => new Response('down', { status: 503 }));
+    vi.stubGlobal('fetch', failing);
+    const { rerender } = render();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(failing).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalled();
+    const fetchMock = mockShops([]);
+    rerender({ revision: 2, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(puts(fetchMock)).toHaveLength(1);
+    warn.mockRestore();
+  });
+
+  it('does nothing without a DM id', async () => {
+    npcs = [merchant(true)];
+    const fetchMock = mockShops([]);
+    render(null);
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });
