@@ -222,15 +222,27 @@ jobs:
       # Cross-party Table v1 flows: the DM adds the map to the Table, goes
       # live and Shows it; the player joins by the source map URL.
       - name: Marker loot e2e
-        run: npm run test:loot:e2e
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:loot:e2e
 
       - name: Shop purchase e2e
         if: ${{ !cancelled() }}
-        run: npm run test:shop:e2e
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:shop:e2e
 
       - name: Map sheet and creature drawer e2e
         if: ${{ !cancelled() }}
-        run: npm run test:sheet-drawer:e2e
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:sheet-drawer:e2e
 
       - name: Upload Playwright failure artifacts
         if: failure()
