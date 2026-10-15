@@ -332,6 +332,10 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     expect(result.current.liveSyncNotice?.message).toBe(
       OFFLINE_DISCARDED_DM_MESSAGE
     );
+    // GG6: the same notice again within 3 s does not raise a new toast.
+    const first = result.current.liveSyncNotice;
+    act(() => options.onDiagnostic?.(OFFLINE_DISCARDED_DM_MESSAGE));
+    expect(result.current.liveSyncNotice).toBe(first);
   });
 
   it('the original editor opens no relay connection and mints no token (PR08 repair 07)', () => {

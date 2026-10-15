@@ -27,19 +27,13 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import {
+  CONNECTION_DROPPED_MESSAGE,
   DM_REJECTED_MESSAGE,
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
 } from '@/lib/battlemapAuthority';
 
-/** FF5: sync outcomes the DM must see on the Table stage. */
-const LIVE_SYNC_NOTICES = new Set([
-  HELD_OVERFLOW_MESSAGE,
-  HELD_STALE_MESSAGE,
-  OFFLINE_DISCARDED_DM_MESSAGE,
-  DM_REJECTED_MESSAGE,
-]);
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useLocationStore } from '@/store/locationStore';
 import {
@@ -144,6 +138,17 @@ import {
   markerDetailsUrl,
   markerPublishRequest,
 } from '@/components/ui/campaign/table/sideChannelRequests';
+
+/** GG6: identical live-sync notices within this window show once. */
+const LIVE_SYNC_NOTICE_DEDUPE_MS = 3_000;
+/** FF5: sync outcomes the DM must see on the Table stage. */
+const LIVE_SYNC_NOTICES = new Set([
+  CONNECTION_DROPPED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  DM_REJECTED_MESSAGE,
+]);
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -1126,7 +1131,14 @@ export function useDmBattleMapCanvas({
           onDiagnostic: message => {
             console.warn('[RollKeeper] Live map:', message);
             if (LIVE_SYNC_NOTICES.has(message))
-              setLiveSyncNotice({ message, at: Date.now() });
+              // GG6: one toast per message within a few seconds.
+              setLiveSyncNotice(previous =>
+                previous &&
+                previous.message === message &&
+                Date.now() - previous.at < LIVE_SYNC_NOTICE_DEDUPE_MS
+                  ? previous
+                  : { message, at: Date.now() }
+              );
           },
           resolveAudience: el =>
             readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,

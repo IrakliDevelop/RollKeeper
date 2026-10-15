@@ -111,9 +111,12 @@ export const OFFLINE_DISCARDED_DM_MESSAGE =
 /** FF1: a player's offline edits superseded by the live room. */
 export const OFFLINE_DISCARDED_PLAYER_MESSAGE =
   "Changes you made while offline weren't saved.";
-/** FF6: a DM edit the live room refused (released so the journal drains). */
+/** GG2: an edit whose outcome was lost with the connection (may have saved). */
+export const CONNECTION_DROPPED_MESSAGE =
+  'The connection dropped during an edit. The map shows the live room.';
+/** FF6 / GG1: a DM edit the live room refused; the DM's map keeps it. */
 export const DM_REJECTED_MESSAGE =
-  'The live map refused a change. The map shows what was saved.';
+  'The live map refused a change. Players see the saved version.';
 /** EE2: held edits kept at most (after coalescing). */
 export const HELD_EDIT_LIMIT = 64;
 export const HELD_OVERFLOW_MESSAGE =
@@ -449,6 +452,9 @@ export function createManagedBattleMapAuthorityConnection(
   // optimistic local copy would otherwise linger until the next snapshot.
   const restoredRejections = new Set<string>();
   const restoreRejectedEdits = (state: AuthorityClientState): void => {
+    // The DM keeps its local version of a refused edit (its scene's
+    // localDraft holds it too); only players are put back (GG1: the DM is
+    // told the truth instead).
     if (options.tokenRequest.role === 'dm' || !state.document) return;
     const live = new Set<string>();
     const ids = new Set<string>();
@@ -518,51 +524,44 @@ export function createManagedBattleMapAuthorityConnection(
     const state = inner.getState();
     const settledLive = state.status === 'live' && state.document !== null;
     const isDm = options.tokenRequest.role === 'dm';
-    const releases: Array<{ id: string; discard: boolean }> = [];
-    let offline = 0;
-    let dmRejected = 0;
+    const releases: Array<{ id: string; status: string }> = [];
     for (const operation of state.operations) {
       const id = operation.clientOperationId;
-      if (operation.status === 'accepted')
-        releases.push({ id, discard: false });
-      else if (operation.status === 'rejected') {
-        if (isDm) {
-          releases.push({ id, discard: true });
-          dmRejected += 1;
-        } else if (restoredRejections.has(id))
-          releases.push({ id, discard: true });
-      } else if (
-        settledLive &&
-        (operation.status === 'draft' || operation.status === 'uncertain')
-      ) {
-        releases.push({ id, discard: true });
-        offline += 1;
-      }
+      const status = operation.status;
+      if (
+        status === 'accepted' ||
+        // FF6: a player's once restored on screen; the DM's with a notice.
+        (status === 'rejected' && (isDm || restoredRejections.has(id))) ||
+        (settledLive && (status === 'draft' || status === 'uncertain'))
+      )
+        releases.push({ id, status });
     }
     if (releases.length === 0) return;
-    let releasedOffline = 0;
-    let releasedRejected = 0;
+    const released = { draft: 0, uncertain: 0, rejected: 0 };
     releasing = true;
     try {
-      for (const { id, discard } of releases) {
-        const released = discard
-          ? inner.releaseOperation(id, { discardDraft: true })
-          : inner.releaseOperation(id);
-        if (!released) continue;
-        const status = state.operations.find(
-          operation => operation.clientOperationId === id
-        )?.status;
-        if (status === 'draft' || status === 'uncertain') releasedOffline += 1;
-        if (status === 'rejected' && isDm) releasedRejected += 1;
+      for (const { id, status } of releases) {
+        const ok =
+          status === 'accepted'
+            ? inner.releaseOperation(id)
+            : inner.releaseOperation(id, { discardDraft: true });
+        if (!ok) continue;
+        if (status === 'draft') released.draft += 1;
+        else if (status === 'uncertain') released.uncertain += 1;
+        else if (status === 'rejected') released.rejected += 1;
       }
     } finally {
       releasing = false;
     }
-    if (offline > 0 && releasedOffline > 0)
+    // GG2: only real offline drafts point the DM at Reapply. An uncertain
+    // operation may have committed; the live document is what the map shows.
+    if (released.draft > 0)
       options.onDiagnostic?.(
         isDm ? OFFLINE_DISCARDED_DM_MESSAGE : OFFLINE_DISCARDED_PLAYER_MESSAGE
       );
-    if (dmRejected > 0 && releasedRejected > 0)
+    else if (released.uncertain > 0)
+      options.onDiagnostic?.(CONNECTION_DROPPED_MESSAGE);
+    if (isDm && released.rejected > 0)
       options.onDiagnostic?.(DM_REJECTED_MESSAGE);
   };
 

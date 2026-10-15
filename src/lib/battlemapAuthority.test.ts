@@ -91,6 +91,7 @@ import {
   HELD_EDIT_LIMIT,
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
+  CONNECTION_DROPPED_MESSAGE,
   DM_REJECTED_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
   OFFLINE_DISCARDED_PLAYER_MESSAGE,
@@ -865,6 +866,80 @@ describe('A1 element submissions use JSON semantics', () => {
     release.mockImplementation(real as never);
     connection.releaseBarrier?.({} as never);
     expect(calls()).toEqual([['accepted-pinned', undefined]]);
+    connection.stop();
+  });
+
+  it('GG2: uncertain-only releases get a neutral notice, never the offline/Reapply one', () => {
+    const { connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
+    expect(onDiagnostic).toHaveBeenCalledWith(CONNECTION_DROPPED_MESSAGE);
+    expect(onDiagnostic).not.toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
+    connection.stop();
+    const player = playerConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode-2',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    expect(player.onDiagnostic).toHaveBeenCalledWith(
+      CONNECTION_DROPPED_MESSAGE
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      OFFLINE_DISCARDED_PLAYER_MESSAGE
+    );
+    player.connection.stop();
+  });
+
+  it('GG1: a DM edit the room refused stays on the DM map and the notice says players see the saved version', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    const document = {
+      elements: [shape('refused', 1)],
+      layers: [],
+      extensions: {},
+    };
+    authority.install(document);
+    store.update('refused', { position: { x: 9, y: 0 } });
+    authority.installState({
+      status: 'live',
+      document,
+      operations: [
+        {
+          clientOperationId: 'dm-rejected',
+          status: 'rejected',
+          proposal: {
+            mutation: { kind: 'upsert', element: shape('refused', 9) },
+          },
+        },
+      ],
+    });
+    expect(
+      (store.getById('refused') as unknown as { position: { x: number } })
+        .position.x
+    ).toBe(9);
+    expect(authority.connection.releaseOperation).toHaveBeenCalledWith(
+      'dm-rejected',
+      { discardDraft: true }
+    );
+    expect(onDiagnostic).toHaveBeenCalledWith(DM_REJECTED_MESSAGE);
+    expect(DM_REJECTED_MESSAGE).toBe(
+      'The live map refused a change. Players see the saved version.'
+    );
     connection.stop();
   });
 

@@ -51,6 +51,7 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import {
+  CONNECTION_DROPPED_MESSAGE,
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   OFFLINE_DISCARDED_PLAYER_MESSAGE,
@@ -842,7 +843,8 @@ export function PlayerBattleMapCanvas({
         if (
           message === HELD_OVERFLOW_MESSAGE ||
           message === HELD_STALE_MESSAGE ||
-          message === OFFLINE_DISCARDED_PLAYER_MESSAGE
+          message === OFFLINE_DISCARDED_PLAYER_MESSAGE ||
+          message === CONNECTION_DROPPED_MESSAGE
         )
           setSceneNotice(message);
       },
