@@ -37,7 +37,15 @@ export type { DmBattleMapCanvasProps };
  * provider/toolbar composition. See `DmBattleMapCanvas.hooks.ts` for the
  * init/persistence/connection wiring.
  */
+/**
+ * PR08 repair 07 CC4: tools that only matter to other viewers. The original
+ * editor is private (no live room under Table v1), so it hides them.
+ */
+const PRIVATE_EDITOR_HIDDEN_TOOLS: readonly string[] = ['ping', 'laser'];
+
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
+  // Only a Table scene has a live room: sharing and presence need one.
+  const liveRoom = Boolean(props.tableSceneAdapter);
   const {
     children,
     sessionControls,
@@ -191,15 +199,21 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             selectedElementIsMarker={selectedElementIsMarker}
             markerAudienceNotice={markerAudienceNotice}
             markerControls={markerControls}
-            measureSharing={{
-              enabled: measureSharing,
-              onChange: handleSetMeasureSharing,
-            }}
+            hiddenTools={liveRoom ? undefined : PRIVATE_EDITOR_HIDDEN_TOOLS}
+            measureSharing={
+              liveRoom
+                ? { enabled: measureSharing, onChange: handleSetMeasureSharing }
+                : undefined
+            }
             movementControls={{
-              sharing: {
-                enabled: pathSharing,
-                onChange: handleSetPathSharing,
-              },
+              ...(liveRoom
+                ? {
+                    sharing: {
+                      enabled: pathSharing,
+                      onChange: handleSetPathSharing,
+                    },
+                  }
+                : {}),
               dash: {
                 enabled: movementDash,
                 onChange: handleSetMovementDash,
@@ -228,6 +242,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
               <BattleMapViewsControl
                 getViewport={() => viewport}
                 views={battleMap?.cameraViews ?? []}
+                canShare={liveRoom}
                 sharingEnabled={cameraSharing}
                 onSharingChange={setCameraSharing}
                 onSaveView={(view, name) => {
@@ -256,14 +271,16 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
             editMapControl={props.editMapControl}
             sideBySide={props.editMapControl !== undefined ? 'never' : '2xl'}
             presenceControl={
-              <PresenceControl
-                campaignCode={campaignCode}
-                roster={awarenessRoster}
-                cursorSharing={cursorSharing}
-                onCursorSharingChange={handleSetCursorSharing}
-                showPlayerCursors={showPlayerCursors}
-                onShowPlayerCursorsChange={handleSetShowPlayerCursors}
-              />
+              liveRoom ? (
+                <PresenceControl
+                  campaignCode={campaignCode}
+                  roster={awarenessRoster}
+                  cursorSharing={cursorSharing}
+                  onCursorSharingChange={handleSetCursorSharing}
+                  showPlayerCursors={showPlayerCursors}
+                  onShowPlayerCursorsChange={handleSetShowPlayerCursors}
+                />
+              ) : undefined
             }
           />
         )}

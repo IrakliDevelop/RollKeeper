@@ -443,3 +443,61 @@ describe('DmBattleMapCanvas: Table scene side channels (PR04 P7)', () => {
     ).toBeInTheDocument();
   });
 });
+
+describe('DmBattleMapCanvas: sharing controls follow the live room (PR08 repair 07 CC4)', () => {
+  const adapter = {
+    sceneId: 'scene-1',
+    sourceMapId: 'map-original',
+    getBattleMap: () => ({ ...baseBattleMap, id: 'scene-1' }),
+    updateBattleMap: vi.fn(),
+    subscribe: () => () => {},
+  } as never;
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(mockHookState, defaultMarkerHookFields(), {
+      battleMap: baseBattleMap,
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => Response.json({ fogAppearance: 'solid' }))
+    );
+  });
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+  const toolbarProps = () => vi.mocked(DmVttToolbar).mock.calls.at(-1)![0];
+
+  it('the private original editor shows no sharing, presence, ping or laser controls', () => {
+    renderCanvas();
+    const props = toolbarProps();
+    expect(props.measureSharing).toBeUndefined();
+    expect(props.movementControls?.sharing).toBeUndefined();
+    expect(props.movementControls?.dash).toBeDefined();
+    expect(props.presenceControl).toBeUndefined();
+    expect(props.hiddenTools).toEqual(
+      expect.arrayContaining(['ping', 'laser'])
+    );
+    expect(getViewsControlProps().canShare).toBe(false);
+  });
+
+  it('the Table stage keeps every sharing control', () => {
+    render(
+      <DmBattleMapCanvas
+        campaignCode={CAMPAIGN_CODE}
+        battleMapId="scene-1"
+        dmId="dm-1"
+        tableSceneAdapter={adapter}
+        tokenConfigRef={{ current: null }}
+        tokenInfoToggle={{ mode: 'compact', onCycle: vi.fn() }}
+        onExportError={vi.fn()}
+      />
+    );
+    const props = toolbarProps();
+    expect(props.measureSharing).toBeDefined();
+    expect(props.movementControls?.sharing).toBeDefined();
+    expect(props.presenceControl).toBeTruthy();
+    expect(props.hiddenTools ?? []).toEqual([]);
+    expect(getViewsControlProps().canShare).not.toBe(false);
+  });
+});

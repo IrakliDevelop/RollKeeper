@@ -84,6 +84,8 @@ export interface DmVttToolbarProps {
   markerAudienceNotice?: string | null;
   /** Kind + colour for the marker tool; threaded to the shared options bar. */
   markerControls?: MarkerToolControls;
+  /** Tool names not offered on this surface (the private editor, CC4). */
+  hiddenTools?: readonly string[];
   measureSharing?: MeasureSharingControl;
   movementControls?: MovementControls;
   exportControl?: ReactNode;
@@ -148,6 +150,7 @@ export function DmVttToolbar({
   selectedElementIsMarker,
   markerAudienceNotice,
   markerControls,
+  hiddenTools,
   measureSharing,
   movementControls,
   exportControl,
@@ -213,18 +216,20 @@ export function DmVttToolbar({
         )}
         <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
           <div className="flex shrink-0 items-center gap-1">
-            {DM_TOOLS.map(({ name, label, Icon }) => (
-              <Button
-                key={name}
-                variant={activeTool === name ? 'primary' : 'ghost'}
-                onClick={() => setTool(name)}
-                className="min-h-[44px] min-w-[44px] p-0"
-                title={label}
-                aria-label={label}
-              >
-                <Icon size={16} />
-              </Button>
-            ))}
+            {DM_TOOLS.filter(({ name }) => !hiddenTools?.includes(name)).map(
+              ({ name, label, Icon }) => (
+                <Button
+                  key={name}
+                  variant={activeTool === name ? 'primary' : 'ghost'}
+                  onClick={() => setTool(name)}
+                  className="min-h-[44px] min-w-[44px] p-0"
+                  title={label}
+                  aria-label={label}
+                >
+                  <Icon size={16} />
+                </Button>
+              )
+            )}
             {fogControls && (
               <>
                 <Button
