@@ -163,7 +163,8 @@ test('narrow headers keep accessible names at 360 px', async ({ page }) => {
  * PR08 D1: the editor top bar in Play mode (DmVttTopBar, scrolls sideways)
  * keeps the Table link and Setup/Play pinned on screen. The map is added
  * to the Table first, so the async link reads "Open in Table" as in the
- * manual run; the relay status chip shows ("Connecting…").
+ * manual run. The original editor has no live room (PR08 repair 07): it
+ * shows a privacy label and never "Connecting…".
  */
 async function adoptMapIntoTable(page: Page): Promise<void> {
   await page.goto(`/dm/campaign/${CODE}/battlemaps`);
@@ -213,7 +214,10 @@ async function editorTopBar(
   if (options.adopted) await adoptMapIntoTable(page);
   await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
   await expectTheme(page, options.theme);
-  await expect(page.getByText('Connecting…')).toBeAttached();
+  await expect(
+    page.getByText("Private. Players don't see this map.")
+  ).toBeVisible();
+  await expect(page.getByText('Connecting…')).toHaveCount(0);
   const tableLink = options.adopted ? 'Open in Table' : 'Use in Table';
   for (const [name, role] of [
     [tableLink, 'link'],
