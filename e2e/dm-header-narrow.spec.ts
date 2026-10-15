@@ -257,3 +257,33 @@ test('editor top bar pins Use in Table and Setup/Play at 360 px (not on the Tabl
 }) => {
   await editorTopBar(page, { width: 360, theme: 'parchment', adopted: false });
 });
+
+test('FR8: Tab walks the editor top bar in order, pinned controls last (390 px)', async ({
+  page,
+}) => {
+  await editorTopBar(page, { width: 390, theme: 'parchment', adopted: true });
+  await page.getByRole('button', { name: 'Back to battle maps' }).focus();
+  const names: string[] = [];
+  for (let step = 0; step < 14 && names.at(-1) !== 'Play'; step += 1) {
+    await page.keyboard.press('Tab');
+    const name = await page.evaluate(() => {
+      const active = document.activeElement as HTMLElement | null;
+      if (!active) return '';
+      const labelled =
+        active.getAttribute('aria-label') ??
+        active.querySelector('[aria-label]')?.getAttribute('aria-label');
+      return (labelled ?? active.textContent ?? '').trim();
+    });
+    // A link wrapping a button is two stops with one name (pre-existing).
+    if (names.at(-1) !== name) names.push(name);
+  }
+  expect(names).toEqual([
+    'Hex',
+    'Square',
+    'Off',
+    'Open display',
+    'Open in Table',
+    'Setup',
+    'Play',
+  ]);
+});
