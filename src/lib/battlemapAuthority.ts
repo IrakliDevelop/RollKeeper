@@ -811,6 +811,10 @@ export function createManagedBattleMapAuthorityConnection(
     waitForAcknowledgements: (barrier, waitOptions) =>
       connection.waitForAcknowledgements(barrier, waitOptions),
     requestCheckpoint: async checkpointOptions => {
+      // II2: when not live the SDK answers `recovery` at once without
+      // sending anything, so there is nothing to space.
+      if (connection.getState().status !== 'live')
+        return connection.requestCheckpoint(checkpointOptions);
       const wait =
         lastCheckpointRequestAt + CHECKPOINT_REQUEST_SPACING_MS - Date.now();
       if (wait > 0 && !(await waitFor(wait, checkpointOptions?.signal)))

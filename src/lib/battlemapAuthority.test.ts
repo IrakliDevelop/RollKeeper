@@ -919,6 +919,43 @@ describe('A1 element submissions use JSON semantics', () => {
     }
   });
 
+  it('II2: the spacing margin is past the relay limit and only applies while live', async () => {
+    vi.useFakeTimers();
+    try {
+      // The relay closes a request under 10 000 ms after the previous one.
+      expect(CHECKPOINT_REQUEST_SPACING_MS).toBeGreaterThan(10_000);
+      const { connection } = dmConnection();
+      const inner = authority.connection.requestCheckpoint;
+      inner.mockReset();
+      inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+      authority.installState({
+        status: 'recovering',
+        document: null,
+        operations: [],
+      });
+      // Not live: no wait, the SDK answers `recovery` at once as before.
+      await expect(
+        connection.requestCheckpoint!({ timeoutMs: 10_000 })
+      ).resolves.toEqual({ status: 'failed', reason: 'recovery' });
+      expect(inner).toHaveBeenCalledTimes(1);
+      // Live again: the request still waits past 10 000 ms.
+      authority.installState({
+        status: 'live',
+        document: emptyDoc(),
+        operations: [],
+      });
+      const pending = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(inner).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS);
+      await pending;
+      expect(inner).toHaveBeenCalledTimes(2);
+      connection.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('HH1: a checkpoint long after the last request is sent at once', async () => {
     const { connection } = dmConnection();
     const inner = authority.connection.requestCheckpoint;
