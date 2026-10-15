@@ -615,8 +615,29 @@ describe('useTableCombat user intents (PR08 desktop B3)', () => {
     expect(result.current.saving).toBe(false);
     expect(result.current.notice).toEqual({
       tone: 'error',
-      message:
-        'Scene is now shown; combat did not start: Saving failed. Nothing was changed.',
+      message: 'Scene is now shown; combat did not start: Saving failed.',
+    });
+  });
+
+  it('CC5: a throw after Show while handling a refused start reports the shown scene and a failed result', async () => {
+    const { repository, result } = await mountHook('ready');
+    vi.spyOn(repository, 'mutateWorkspace').mockResolvedValueOnce({
+      status: 'conflict',
+      actualRevision: 99,
+    } as never);
+    const reload = vi.spyOn(repository, 'reload');
+    let outcome: unknown;
+    await act(async () => {
+      outcome = await result.current.showAndStart('run-a', async () => {
+        // Show succeeded; the conflict reload after it throws.
+        reload.mockRejectedValueOnce(new Error('idb'));
+        return { ok: true };
+      });
+    });
+    expect(outcome).toEqual({ status: 'failed', reason: 'transaction-failed' });
+    expect(result.current.notice).toEqual({
+      tone: 'error',
+      message: 'Scene is now shown; combat did not start: Saving failed.',
     });
   });
 

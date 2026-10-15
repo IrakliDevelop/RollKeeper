@@ -76,6 +76,18 @@ const ONE_AT_A_TIME = new Set<TableCombatCommandV1['type']>([
   'combat.deleteArchive',
 ]);
 
+/**
+ * After a successful Show, a start that did not commit. The scene did
+ * change, so the storage messages' "Nothing was saved/changed" is dropped.
+ */
+function shownButNotStarted(result: TableCombatResult): string {
+  const reason = combatFailureMessage(result).replace(
+    / Nothing was (saved|changed)\.$/u,
+    ''
+  );
+  return `Scene is now shown; combat did not start: ${reason}`;
+}
+
 const STILL_SAVING = 'Still saving the last change. Try again in a moment.';
 
 /**
@@ -434,19 +446,26 @@ export function useTableCombat(options: {
             if (result.status === 'conflict') await repository.reload();
             setNotice({
               tone: 'error',
-              message: `Scene is now shown; combat did not start: ${combatFailureMessage(result)}`,
+              message: shownButNotStarted(result),
             });
           }
           return result;
         } catch {
+          if (phase === 'shown') {
+            // CC5: the scene is shown; report a failed start consistently.
+            const failed = {
+              status: 'failed',
+              reason: 'transaction-failed',
+            } as const;
+            setNotice({ tone: 'error', message: shownButNotStarted(failed) });
+            return failed;
+          }
           setNotice({
             tone: 'error',
             message:
               phase === 'before-show'
                 ? "Couldn't start combat. Nothing was sent."
-                : phase === 'showing'
-                  ? "Couldn't confirm the scene is shown, so combat didn't start. Check what players see."
-                  : `Scene is now shown; combat did not start: ${combatFailureMessage({ status: 'failed', reason: 'transaction-failed' })}`,
+                : "Couldn't confirm the scene is shown, so combat didn't start. Check what players see.",
           });
           return null;
         } finally {
