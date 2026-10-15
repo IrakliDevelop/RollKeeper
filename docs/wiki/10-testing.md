@@ -49,7 +49,7 @@ its own npm script:
 | `test:auth:e2e` | Auth + auth wizard flows |
 | `test:reconnect:nightly` | Cross-tab/single-writer sync repeated 3x, plus a dedicated reconnect drill — nightly, not part of normal CI |
 | `test:checkpoint-matrix:nightly` | Storage checkpoint matrix — nightly |
-| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer and party limited view on a live Table scene ([relay](07-battlemap-fog-fieldnotes.md)-backed), and the DM creature drawer plus roster placement in the private original editor; CI job "Table relay e2e" and nightly |
+| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer and party limited view on a live Table scene ([relay](07-battlemap-fog-fieldnotes.md)-backed), the DM creature drawer plus roster placement in the private original editor, and the DM's offline changes kept through a later edit and a checkpoint, then reapplied (`e2e/table-offline-changes.spec.ts`); CI job "Table relay e2e" and nightly |
 | `test:loot:e2e` / `test:shop:e2e` | Marker loot claim and shop purchase across DM and player on a live Table scene; CI job "Table relay e2e" |
 | `test:rollback:drill` | `scripts/run-rollback-drill.mjs` — storage rollback verification |
 

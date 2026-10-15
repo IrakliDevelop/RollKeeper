@@ -159,10 +159,21 @@ scene rooms, player views and the TV cannot connect.
     SDK drafts and are never replayed. Once the room is live again and its
     document applied, the live room wins: those drafts (and operations whose
     outcome was lost with the connection) are released. The DM sees "Map
-    edits made while offline were not sent. Use Reapply changes to send
-    them."; "Reapply changes" re-sends the scene's localDraft (which keeps the
-    offline fork until the next edit). A player sees "Changes you made while
+    edits made while offline were not sent. To send them, open Details and
+    choose Reapply offline changes." A player sees "Changes you made while
     offline weren't saved."
+  - The DM's offline version is copied into the scene's offline changes
+    slot (`offlineFork` on the scene record: `savedAt`, `replacedEarlier`,
+    `draft`) when those drafts are released
+    (`onOfflineDraftsReleased` in `src/lib/battlemapAuthority.ts`, then
+    `captureOfflineFork` in `src/lib/table/sceneAdapter.ts`). Later edits and
+    "Save checkpoint" never change or clear it. Details shows "Offline
+    changes from <time>" with "Reapply offline changes" (the live-tab restore
+    used by "Restore checkpoint", from the slot) and "Discard"; either one
+    empties the slot (`clearOfflineFork` removes the key). There is one slot:
+    a newer offline episode replaces it and Details says "These replaced
+    earlier offline changes that were not reapplied." "Reapply changes"
+    still re-sends the scene's localDraft, which follows the latest edits.
   - A send refused for capacity waits and is retried in the same room
     generation only, otherwise dropped with a notice.
   - Accepted operations, rejected ones once restored on screen (players) or
@@ -172,6 +183,15 @@ scene rooms, player views and the TV cannot connect.
     checkpoint barrier is released once the barrier is.
   - The DM's sync notices show as a "Live map" toast on the Table stage.
   - A later change of shown scene discards unsent edits, with a notice.
+- **Offline changes slot and older builds.** The scene record (still
+  `schemaVersion: 1`, database version 1, bundle version 1) gained the
+  optional `offlineFork` field. A build from before it validates scene keys
+  exactly, so while any scene holds offline changes it opens the whole Table
+  read-only ("This Table's data is in a format the app can't edit") and
+  refuses such a bundle on import. Nothing is deleted, and it reads normally
+  again once a newer build reapplies or discards the offline changes
+  (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
+  released build had the Table.
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use
@@ -210,6 +230,7 @@ database on downgrade.
 | Same release, Redis/relay data expired | Registry/room gone; the workspace re-registers the scene (`registerScene`) and provisions the room from local state (`authority/initialize-if-empty`, `src/lib/table/authorityLifecycle.ts`) | From the device that holds the scenes |
 | Local records with a newer `schemaVersion` than this build | Workspace opens read-only (`unknown-schema`); edits refused (`src/lib/table/repository.ts`) | Raw export (`exportRawTableWorkspace`), then upgrade the app |
 | Local records that fail validation | Read-only (`invalid-schema`) | Raw export; bundle from another device |
+| App rolled back to a Table build without the offline changes slot while a scene holds offline changes (`offlineFork`) | That build opens the Table read-only (`invalid-schema`) and refuses bundles that carry the slot; nothing is lost | Open the newer build and reapply or discard the offline changes (Details), or roll forward |
 | IndexedDB created by a newer database version | Open fails, workspace unavailable (`openTableDatabase` strict version/store check) | Upgrade the app |
 | Bundle with `bundleVersion > 1` | Import rejected `future-bundle` | Import with the newer build |
 | App rolled back to a pre-Table build | Table data stays in IndexedDB untouched; tagged Redis keys are ignored and expire by TTL | Redeploy a Table build; data reappears |
