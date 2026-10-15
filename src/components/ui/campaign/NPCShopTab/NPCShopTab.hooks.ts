@@ -7,7 +7,12 @@ import { useNPCStore } from '@/store/npcStore';
 import type { CampaignNPC } from '@/types/encounter';
 import type { ShopSaleLogEntry } from '@/types/shop';
 
-import { resolveShopEntityIds } from './NPCShopTab.utils';
+import {
+  mergeShopEntityIds,
+  putShop,
+  resolveShopEntityIds,
+} from './NPCShopTab.utils';
+import { loadTableShopEntityIds } from './tableShopLinks';
 
 /** A DM typing a price (or editing the description) should not fire one
  *  republish per keystroke — trailing-edge debounce collapses a burst of
@@ -57,7 +62,8 @@ export interface UseShopPublishResult {
  * `PUT /api/campaign/[code]/shops/[npcId]` (VTT merchants Slice 3).
  *
  * `entityIds` are resolved DM-side from `encounterStore` via
- * `resolveShopEntityIds` — never sent by a player, never stored on
+ * `resolveShopEntityIds`, plus (repair 09) the linked Table scene members
+ * via `loadTableShopEntityIds` — never sent by a player, never stored on
  * `CampaignNPC` itself. See that function's doc comment and the route's own
  * for why this resolution has to happen here.
  *
@@ -79,36 +85,49 @@ export function useShopPublish(npc: CampaignNPC): UseShopPublishResult {
   npcRef.current = npc;
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const sendPublish = useCallback(
-    (nextNpc: CampaignNPC, open: boolean) => {
-      const entityIds = resolveShopEntityIds(nextNpc.campaignCode, nextNpc.id);
-      fetch(
-        `/api/campaign/${encodeURIComponent(nextNpc.campaignCode)}/shops/${encodeURIComponent(nextNpc.id)}`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dmId, npc: nextNpc, entityIds }),
-        }
-      )
-        .then(async response => {
-          if (response.ok) return;
-          const body = (await response.json().catch(() => null)) as {
-            error?: string;
-          } | null;
-          throw new Error(
-            body?.error ??
-              `Failed to ${open ? 'publish' : 'close'} the shop (${response.status}).`
-          );
-        })
-        .catch((error: unknown) => {
+  /** Sends go out one at a time, in call order (a Table read may be slow). */
+  const sendChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  const sendNow = useCallback(
+    (nextNpc: CampaignNPC, open: boolean, entityIds: string[]) =>
+      putShop({ dmId, npc: nextNpc, entityIds, open }).catch(
+        (error: unknown) => {
           setPublishError(
             error instanceof Error
               ? error.message
               : `Failed to ${open ? 'publish' : 'close'} the shop.`
           );
-        });
-    },
+        }
+      ),
     [dmId]
+  );
+
+  const sendPublish = useCallback(
+    (nextNpc: CampaignNPC, open: boolean) => {
+      const encounterIds = resolveShopEntityIds(
+        nextNpc.campaignCode,
+        nextNpc.id
+      );
+      // Repair 09 (D2): Table tokens carry scene member ids and the NPC link
+      // lives on the Table actor, so an open shop also reads the Table. A
+      // failed read never blocks publishing what is known.
+      const tableIds: Promise<string[]> = open
+        ? loadTableShopEntityIds(nextNpc.campaignCode, nextNpc.id).catch(
+            (error: unknown) => {
+              console.warn(
+                '[RollKeeper] Shop: Table tokens could not be read.',
+                error
+              );
+              return [];
+            }
+          )
+        : Promise.resolve([]);
+      sendChainRef.current = sendChainRef.current.then(async () => {
+        const entityIds = mergeShopEntityIds(encounterIds, await tableIds);
+        await sendNow(nextNpc, open, entityIds);
+      });
+    },
+    [sendNow]
   );
 
   const cancelPendingRepublish = useCallback(() => {

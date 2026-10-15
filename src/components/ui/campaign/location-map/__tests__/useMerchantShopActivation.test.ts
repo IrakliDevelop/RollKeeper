@@ -6,6 +6,8 @@ import {
   useMerchantShopActivation,
 } from '@/components/ui/campaign/location-map/useMerchantShopActivation';
 
+import { dmTokenFields } from '@/lib/table/roster';
+
 import type { CanvasElement, ElementActivationEvent } from '@fieldnotes/core';
 import type { PublicShop, PublicShopIndexEntry } from '@/types/shop';
 
@@ -113,6 +115,21 @@ describe('useMerchantShopActivation', () => {
       '/api/campaign/CODE/shops/npc-1'
     );
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('repair 09 D2: opens the shop from a Table DM token keyed by its scene member id', async () => {
+    const memberId = '1a6fe74f-7440-4f6a-a303-79cbf99546d5';
+    const shop = { ...OPEN_SHOP, entityIds: [memberId] };
+    mockFetchChain([{ ...INDEX_ENTRY, entityIds: [memberId] }], shop);
+    const { result } = renderHook(() => useMerchantShopActivation('CODE'));
+
+    await act(async () => {
+      await result.current.handleActivate(
+        activateEvent(tokenEl({ type: 'image', ...dmTokenFields(memberId) }))
+      );
+    });
+
+    expect(result.current.openShop).toEqual({ npcId: 'npc-1', shop });
   });
 
   it('does not fetch at all when the tapped element is not a combatant token', async () => {

@@ -34,6 +34,13 @@ vi.mock('@/store/dmStore', () => ({
     selector({ dmId: 'dm-1' }),
 }));
 
+const loadTableShopEntityIds =
+  vi.fn<(campaignCode: string, npcId: string) => Promise<string[]>>();
+vi.mock('@/components/ui/campaign/NPCShopTab/tableShopLinks', () => ({
+  loadTableShopEntityIds: (campaignCode: string, npcId: string) =>
+    loadTableShopEntityIds(campaignCode, npcId),
+}));
+
 vi.mock('@/store/encounterStore', () => ({
   useEncounterStore: { getState: () => ({ getEncountersByCampaign }) },
 }));
@@ -52,6 +59,8 @@ vi.mock('@/components/ui/campaign/location-map/usePlayerDirectory', () => ({
 
 beforeEach(() => {
   resetFetch();
+  loadTableShopEntityIds.mockReset();
+  loadTableShopEntityIds.mockResolvedValue([]);
   getEncountersByCampaign.mockReturnValue([]);
   shopSalesLogByNpc = {};
 });
@@ -352,6 +361,78 @@ describe('NPCShopTab', () => {
       expect(body.dmId).toBe('dm-1');
       expect([...body.entityIds].sort()).toEqual(['entity-1', 'entity-2']);
       expect(body.npc.shop).toEqual(expect.objectContaining({ open: true }));
+    });
+
+    it('repair 09 D2: a Table-only merchant publishes its scene member ids', async () => {
+      loadTableShopEntityIds.mockResolvedValue(['member-1']);
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      expect(loadTableShopEntityIds).toHaveBeenCalledWith('ABCD', 'npc-1');
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.entityIds).toEqual(['member-1']);
+    });
+
+    it('repair 09 D2: merges encounter and Table ids once each', async () => {
+      getEncountersByCampaign.mockReturnValue([
+        { id: 'enc-1', entities: [{ id: 'entity-1', npcSourceId: 'npc-1' }] },
+      ]);
+      loadTableShopEntityIds.mockResolvedValue(['member-1', 'entity-1']);
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.entityIds).toEqual(['entity-1', 'member-1']);
+    });
+
+    it('repair 09 D2: a failed Table read still publishes the encounter ids', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      getEncountersByCampaign.mockReturnValue([
+        { id: 'enc-1', entities: [{ id: 'entity-1', npcSourceId: 'npc-1' }] },
+      ]);
+      loadTableShopEntityIds.mockRejectedValue(new Error('IndexedDB blocked'));
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      fireEvent.click(
+        screen.getByRole('switch', { name: 'Open for business' })
+      );
+      await waitFor(() => expect(fetchFn).toHaveBeenCalled());
+      const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
+      const body = JSON.parse((options as RequestInit).body as string);
+      expect(body.entityIds).toEqual(['entity-1']);
+      expect(warn).toHaveBeenCalled();
+      expect(screen.queryByRole('alert')).toBeNull();
+      warn.mockRestore();
+    });
+
+    it('repair 09 D2: an open then a quick close are sent in that order', async () => {
+      let releaseRead!: (ids: string[]) => void;
+      loadTableShopEntityIds.mockReturnValue(
+        new Promise<string[]>(resolve => {
+          releaseRead = resolve;
+        })
+      );
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      const toggle = screen.getByRole('switch', { name: 'Open for business' });
+      fireEvent.click(toggle);
+      fireEvent.click(toggle);
+      expect(fetchFn).not.toHaveBeenCalled();
+      await act(async () => releaseRead(['member-1']));
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+      const opens = (fetchFn as ReturnType<typeof vi.fn>).mock.calls.map(
+        call =>
+          JSON.parse((call[1] as RequestInit).body as string).npc.shop.open
+      );
+      expect(opens).toEqual([true, false]);
     });
 
     it('toggling off tears down via the same publish route with shop.open: false', async () => {
@@ -807,6 +888,8 @@ describe('NPCShopTab', () => {
       // dialog right after typing must not lose this edit.
       expect(fetchFn).not.toHaveBeenCalled();
       unmount();
+      // Repair 09: the send waits for the (here empty) Table read first.
+      await vi.advanceTimersByTimeAsync(0);
 
       expect(fetchFn).toHaveBeenCalledTimes(1);
       const [, options] = (fetchFn as ReturnType<typeof vi.fn>).mock.calls[0];
