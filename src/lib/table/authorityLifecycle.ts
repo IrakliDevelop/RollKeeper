@@ -612,11 +612,6 @@ async function readControl(
 }
 
 /**
- * PR06 A1(a): acquires (or renews) private live control exactly as the PR03
- * prepare did — control read, initialize if missing, renew-or-acquire, never
- * a takeover — and returns the page's one control session.
- */
-/**
  * PR08 repair 08 GG4: one acquire in flight per (campaign, DM, holder
  * session). React Strict Mode (dev, e2e) and effect re-runs started two
  * concurrent acquires with the same expected revision; the second answered
@@ -625,6 +620,12 @@ async function readControl(
  */
 const acquiresInFlight = new Map<string, Promise<TableControlAcquireResult>>();
 
+/**
+ * PR06 A1(a): acquires (or renews) private live control exactly as the PR03
+ * prepare did — control read, initialize if missing, renew-or-acquire, never
+ * a takeover — and returns the page's one control session. Concurrent calls
+ * for the same session share one attempt (GG4).
+ */
 export function acquireTableControl(
   options: ControlRequestOptions & { holderSessionId: string }
 ): Promise<TableControlAcquireResult> {
@@ -642,17 +643,26 @@ async function acquireTableControlOnce(
   options: ControlRequestOptions & { holderSessionId: string }
 ): Promise<TableControlAcquireResult> {
   const fetcher = options.fetcher ?? fetch;
+  // HH3: like readControl, a hung POST fails after the control timeout, so
+  // the shared in-flight attempt (GG4) cannot pin Go live forever.
   const request = async (command: Record<string, unknown>) => {
-    const response = await fetcher(
-      `${tableBase(options.campaignCode)}/control`,
-      {
-        method: 'POST',
-        headers: TABLE_MUTATION_HEADERS,
-        body: JSON.stringify({ dmId: options.dmId, command }),
-      }
-    );
-    const body = record((await response.json()) as unknown);
-    return { response, body, current: descriptor(body?.current) };
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), CONTROL_TIMEOUT_MS);
+    try {
+      const response = await fetcher(
+        `${tableBase(options.campaignCode)}/control`,
+        {
+          method: 'POST',
+          headers: TABLE_MUTATION_HEADERS,
+          body: JSON.stringify({ dmId: options.dmId, command }),
+          signal: abort.signal,
+        }
+      );
+      const body = record((await response.json()) as unknown);
+      return { response, body, current: descriptor(body?.current) };
+    } finally {
+      clearTimeout(timer);
+    }
   };
   try {
     const read = await readControl(options);

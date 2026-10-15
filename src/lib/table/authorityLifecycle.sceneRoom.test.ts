@@ -308,3 +308,50 @@ describe('Go live acquire race (PR08 repair 08 GG4)', () => {
     expect(result.status).toBe('acquired');
   });
 });
+
+describe('Go live acquire edges (PR08 repair 08 HH3 / HH5)', () => {
+  it('a stale-control answer naming our session with an expired lease is not acquired', async () => {
+    const server = registryServer();
+    server.state.revision = 1;
+    const fetcher = (async (input, init) => {
+      const body = init?.body ? JSON.parse(String(init.body)) : null;
+      if (body?.command?.type === 'acquire') {
+        server.state.revision += 1;
+        server.state.writerFence += 1;
+        server.state.holderSessionId = 'table-session-1';
+        server.state.leaseUntil = Date.now() - 1;
+      }
+      return server.fetcher(input, init);
+    }) as typeof fetch;
+    const result = await acquireTableControl(control(fetcher));
+    expect(result).toMatchObject({ status: 'failed' });
+  });
+
+  it('a hung acquire POST gives up after the control timeout, so Go live can start again', async () => {
+    vi.useFakeTimers();
+    try {
+      const server = registryServer();
+      server.state.revision = 1;
+      let hang = true;
+      const fetcher = (async (input, init) => {
+        const body = init?.body ? JSON.parse(String(init.body)) : null;
+        if (hang && body?.command?.type === 'acquire')
+          return new Promise<Response>((_resolve, reject) => {
+            init?.signal?.addEventListener('abort', () =>
+              reject(new DOMException('aborted', 'AbortError'))
+            );
+          });
+        return server.fetcher(input, init);
+      }) as typeof fetch;
+      const first = acquireTableControl(control(fetcher));
+      await vi.advanceTimersByTimeAsync(5_000);
+      await expect(first).resolves.toMatchObject({ status: 'failed' });
+      hang = false;
+      await expect(
+        acquireTableControl(control(fetcher))
+      ).resolves.toMatchObject({ status: 'acquired' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
