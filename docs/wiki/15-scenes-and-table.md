@@ -208,6 +208,21 @@ scene rooms, player views and the TV cannot connect.
   again once a newer build reapplies or discards the offline changes
   (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
   released build had the Table.
+- **Merchants on Table scenes.** A campaign NPC added through the Table
+  (Add to scene → Campaign NPC) gets a DM token keyed by its scene member id,
+  and the NPC link lives on the Table actor (`profile.sourceKind:
+  'campaign-npc'`), not in the encounter store. Publishing a shop therefore
+  also reads this device's default Table for the campaign
+  (`readTableShopEntityIds` / `tableShopEntityIds`,
+  `src/lib/table/shopLinks.ts`): live members that are not player-controlled
+  and came from that NPC, plus adopted encounter entities whose source names
+  it (their member id and legacy entity id). Reading never creates a Table;
+  a failed read is logged and the encounter ids are still published. While
+  the Table page is open, an open, published shop is updated by itself when
+  its merchant is added, placed or removed (`useTableShopRepublish`). An
+  imported Table opened by explicit selection is not the default one, so the
+  Shop tab on the campaign page does not see it; the Table page still keeps
+  its shops in step.
 - **Canvas budgets.** The local draft and the offline changes slot each count
   against the 20 MiB canvas checkpoint budget, like the saved checkpoint,
   instead of the 1 MiB scene metadata budget (`validateWorkspaceLimits`,
