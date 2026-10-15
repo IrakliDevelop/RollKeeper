@@ -963,6 +963,16 @@ test.describe('a token placed right after opening the shown scene', () => {
         await createCharacter(playerPage, 'Early Placer')
       );
       await joinCampaign(playerPage, code, characterId, CAMPAIGN_NAME);
+      // EE4: hold the player's scene token until the token is placed, so
+      // the placement provably happens before the connection is live.
+      let releaseToken!: () => void;
+      const tokenGate = new Promise<void>(resolve => {
+        releaseToken = resolve;
+      });
+      await playerPage.route('**/battlemap-token', async route => {
+        await tokenGate;
+        await route.continue();
+      });
       await playerPage.goto(
         `/player/campaign/${code}/battlemap/${MAP_ID}?character=${characterId}`,
         { waitUntil: 'domcontentloaded' }
@@ -985,6 +995,11 @@ test.describe('a token placed right after opening the shown scene', () => {
         box.y + box.height * 0.5
       );
       const tokenId = await waitForOwnTokenId(playerPage, characterId);
+      // Placed while not live: no scene token has been answered yet.
+      await expect(playerPage.getByText('Live', { exact: true })).toHaveCount(
+        0
+      );
+      releaseToken();
       await waitForElementSynced(dmPage, tokenId);
       // The player keeps it too (never cleared by the resolution).
       await waitForElementSynced(playerPage, tokenId);
