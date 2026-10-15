@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
-import { withLocalRedis } from './e2eRedis';
+import { E2E_RELAY_HEALTH_URL, E2E_RELAY_URL } from './e2eRelay';
+import { withLocalRedis, withLocalRelayRedis } from './e2eRedis';
 
 /**
  * Same secret-resolution trick as `loot.config.ts` — the relay
@@ -44,7 +45,11 @@ const DEV_COMMAND = process.env.ROLLKEEPER_E2E_DEV_COMMAND ?? 'npm run dev';
 // `playwright.config.ts` deliberately does not start.
 export default defineConfig({
   testDir: '../../e2e',
-  testMatch: ['map-sheet-drawer.spec.ts', 'dm-creature-drawer.spec.ts'],
+  testMatch: [
+    'map-sheet-drawer.spec.ts',
+    'dm-creature-drawer.spec.ts',
+    'table-offline-changes.spec.ts',
+  ],
   outputDir: '../../test-results/sheet-drawer',
   timeout: 60_000,
   retries: 0,
@@ -73,15 +78,18 @@ export default defineConfig({
       // `relay/`, once) — when it's missing, this webServer entry never
       // reaches `/healthz` and Playwright times out opaquely after 60s with
       // no indication the relay's own dependencies were the problem.
-      command: `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} REDIS_URL=redis://localhost:6379 npm run dev`,
+      command: withLocalRelayRedis(
+        `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} npm run dev`
+      ),
       cwd: '../../relay',
-      url: 'http://localhost:8787/healthz',
-      reuseExistingServer: !process.env.CI,
+      url: E2E_RELAY_HEALTH_URL,
+      // DD3: never reuse a relay that may run on a remote Redis.
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: withLocalRedis(
-        `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
+        `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=${E2E_RELAY_URL} ${DEV_COMMAND}`,
         'local'
       ),
       cwd: '../..',

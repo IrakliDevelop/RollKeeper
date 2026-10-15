@@ -18,7 +18,10 @@ import {
 } from '@fieldnotes/vtt/server';
 import { FogManager } from '@fieldnotes/vtt';
 
-import { createManagedBattleMapAuthorityConnection } from '../../src/lib/battlemapAuthority.js';
+import {
+  createManagedBattleMapAuthorityConnection,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+} from '../../src/lib/battlemapAuthority.js';
 
 import {
   authorityRoomKeys,
@@ -1019,6 +1022,443 @@ run('two relay authority transport', () => {
         .document?.elements.some(element => element.id === hidden.id) ?? false
     ).toBe(false);
   }, 15_000);
+
+  it('keeps accepting edits after more than 64 accepted operations on one connection (SDK journal, PR08 repair 08)', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 3, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const claims = {
+      v: 1 as const,
+      room: ROOM,
+      // Long enough for 300 paced, confirmed edits.
+      exp: Date.now() + 600_000,
+      campaign: CAMPAIGN,
+      resourceKind: 'scene' as const,
+      sceneId: 'scene-a',
+      epoch: EPOCH,
+      roomGeneration: GENERATION,
+    };
+    const dmToken = signBattleMapToken(
+      { ...claims, userId: 'dm-a', role: 'dm', writerFence: 1 },
+      SECRET
+    );
+    // Both sides go through RollKeeper's wrapper, which releases settled
+    // operations (J1); the raw SDK keeps them until released.
+    const dmStore = new ElementStore();
+    let dmStatus = 'connecting';
+    const dm = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${first.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store: dmStore,
+      clientId: 'dm-a',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        dmId: 'dm-a',
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({ token: dmToken, authority: 1, room: ROOM }),
+      transportFactory: transport,
+      onStatus: next => {
+        dmStatus = next;
+      },
+    });
+    clients.push(dm);
+    // A raw SDK observer reads the confirmed room document.
+    const observer = createManagedAuthorityConnection({
+      scopeId: `${CAMPAIGN}:scene-a:journal-observer`,
+      clientId: 'dm-a',
+      extensions: [createFogAuthorityClientExtension()],
+      resolveUrl: () => ({
+        url: `ws://127.0.0.1:${second.address().port}?room=${ROOM}`,
+        protocols: bearerSubprotocols(dmToken),
+      }),
+      transportFactory: transport,
+    });
+    clients.push(observer);
+    // The player goes through RollKeeper's own wrapper (the app path).
+    const playerStore = new ElementStore();
+    let playerStatus = 'connecting';
+    const playerId = 'journal-player';
+    const player = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${second.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store: playerStore,
+      clientId: playerId,
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        playerId,
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({
+        token: signBattleMapToken(
+          {
+            ...claims,
+            userId: playerId,
+            role: 'player',
+            playerPrincipal: playerId,
+          },
+          SECRET
+        ),
+        authority: 1,
+        room: ROOM,
+      }),
+      transportFactory: transport,
+      onStatus: next => {
+        playerStatus = next;
+      },
+    });
+    clients.push(player);
+    await eventually(
+      () =>
+        dmStatus === 'live' &&
+        playerStatus === 'live' &&
+        observer.getState().status === 'live'
+    );
+    const elementX = (id: string) =>
+      (
+        observer
+          .getState()
+          .document?.elements.find(
+            element => (element as { id: string }).id === id
+          ) as { position?: { x: number } } | undefined
+      )?.position?.x;
+
+    // DM: 150 sequential edits of one element, each waited until accepted.
+    const dmElement = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: 'layer-annotations',
+      }),
+      id: 'journal-dm-element',
+    };
+    dmStore.add(dmElement as never);
+    await eventually(() => elementX('journal-dm-element') === 0);
+    // Each step must be confirmed in the room. A slow runner may lag the
+    // observer or drop an episode (the edit then is a released draft or
+    // uncertain op, FF1), so a step that is not confirmed within 5 s is made
+    // again once: the connection must keep accepting edits either way.
+    const notes: string[] = [];
+    const confirm = async (
+      id: string,
+      step: number,
+      apply: (attempt: number) => void
+    ): Promise<boolean> => {
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        apply(attempt);
+        try {
+          await eventually(
+            () => elementX(id) === step,
+            attempt ? 15_000 : 5_000
+          );
+          if (attempt) notes.push(`${id}@${step}: confirmed on retry`);
+          return true;
+        } catch {
+          notes.push(`${id}@${step}: not confirmed (attempt ${attempt})`);
+        }
+      }
+      return false;
+    };
+    let dmReached = 0;
+    for (let step = 1; step <= 150; step += 1) {
+      const ok = await confirm('journal-dm-element', step, attempt =>
+        dmStore.update('journal-dm-element', {
+          position: { x: step, y: attempt },
+        })
+      );
+      if (!ok) break;
+      dmReached = step;
+    }
+    // Player: 150 moves of its own token through the app wrapper. Players
+    // are rate limited to 10 element writes per second, so pace them.
+    const band = `player-${playerId}`;
+    player.publishLayerUpsert({
+      id: band,
+      name: 'My elements',
+      visible: true,
+      locked: false,
+      order: 500,
+      opacity: 1,
+    });
+    const token = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: band,
+      }),
+      id: 'journal-player-token',
+      tokenKind: 'player',
+      characterId: playerId,
+    };
+    playerStore.add(token as never);
+    await eventually(() => elementX('journal-player-token') === 0);
+    let playerReached = 0;
+    for (let step = 1; step <= 150; step += 1) {
+      await new Promise(resolve => setTimeout(resolve, 110));
+      const ok = await confirm('journal-player-token', step, attempt =>
+        playerStore.update('journal-player-token', {
+          position: { x: step, y: attempt },
+        })
+      );
+      if (!ok) break;
+      playerReached = step;
+    }
+    // GG5 / II5: the notes print before any assertion, pass or fail.
+    console.info(
+      '150-edit notes',
+      JSON.stringify({ dmReached, playerReached, dmStatus, notes })
+    );
+    expect({ dmReached, playerReached, dmStatus, notes }).toEqual({
+      dmReached: 150,
+      playerReached: 150,
+      dmStatus: 'live',
+      notes: expect.any(Array),
+    });
+    // At most a handful of steps may need a retry on a slow runner.
+    expect(notes.filter(note => note.includes('retry')).length).toBeLessThan(5);
+  }, 240_000);
+
+  it('after 70 offline edits the DM connection is live again: the next edit reaches the room and a checkpoint can be saved (FF1)', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    await new Promise(resolve => setTimeout(resolve, 200));
+    closeEvents.length = 0;
+    await redis.set(
+      tableControlKey(CAMPAIGN),
+      JSON.stringify({
+        v: 1,
+        epoch: EPOCH,
+        writerFence: 1,
+        holderPrincipal: 'legacy:dm-a',
+        leaseUntil: Date.now() + 300_000,
+        presentation: { sceneId: 'scene-a', revision: 3, blanked: false },
+        displayGeneration: 1,
+      })
+    );
+    const dmToken = signBattleMapToken(
+      {
+        v: 1,
+        room: ROOM,
+        exp: Date.now() + 300_000,
+        campaign: CAMPAIGN,
+        resourceKind: 'scene',
+        sceneId: 'scene-a',
+        epoch: EPOCH,
+        roomGeneration: GENERATION,
+        userId: 'dm-a',
+        role: 'dm',
+        writerFence: 1,
+      },
+      SECRET
+    );
+    // A transport that can drop the socket and refuse to reconnect.
+    let offline = false;
+    const sockets: Array<{ close(): void }> = [];
+    const gated = (endpoint: ManagedSyncEndpoint): AuthorityClientTransport => {
+      if (offline)
+        return {
+          start(handlers) {
+            setTimeout(() => handlers.onClose(1006, 'offline'), 10);
+          },
+          trySend: () => false,
+          close() {},
+        };
+      const inner = transport(endpoint);
+      sockets.push(inner);
+      // HH1: resync and checkpoint frames are kept as notes for a failure.
+      const kind = (raw: string) => {
+        try {
+          const frame = JSON.parse(raw) as { kind?: string; reason?: string };
+          return /resync|checkpoint/u.test(frame.kind ?? '')
+            ? `${frame.kind}${frame.reason ? ` ${frame.reason}` : ''}`
+            : null;
+        } catch {
+          return null;
+        }
+      };
+      return {
+        start(handlers) {
+          inner.start({
+            ...handlers,
+            onMessage: raw => {
+              const seen = kind(raw);
+              if (seen) note(`<- ${seen}`);
+              handlers.onMessage(raw);
+            },
+          });
+        },
+        trySend: raw => {
+          const sent = kind(raw);
+          if (sent) note(`-> ${sent}`);
+          return inner.trySend(raw);
+        },
+        close: () => inner.close(),
+      };
+    };
+    const store = new ElementStore();
+    let status = 'connecting';
+    const diagnostics: string[] = [];
+    const notes: string[] = [];
+    const startedAt = Date.now();
+    const note = (text: string) =>
+      notes.push(`${Date.now() - startedAt}ms ${text}`);
+    const dm = createManagedBattleMapAuthorityConnection({
+      relayUrl: `ws://127.0.0.1:${first.address().port}`,
+      campaignCode: CAMPAIGN,
+      battleMapId: 'scene-a',
+      store,
+      clientId: 'dm-a',
+      tokenRequest: {
+        role: 'dm',
+        battleMapId: 'map-a',
+        sceneId: 'scene-a',
+        dmId: 'dm-a',
+      },
+      fog: { manager: new FogManager() },
+      mint: async () => ({ token: dmToken, authority: 1, room: ROOM }),
+      transportFactory: gated,
+      onStatus: next => {
+        if (next !== status) note(`status ${next}`);
+        status = next;
+      },
+      onDiagnostic: message => diagnostics.push(message),
+    });
+    clients.push(dm);
+    const observer = createManagedAuthorityConnection({
+      scopeId: `${CAMPAIGN}:scene-a:offline-observer`,
+      clientId: 'dm-a',
+      extensions: [createFogAuthorityClientExtension()],
+      resolveUrl: () => ({
+        url: `ws://127.0.0.1:${second.address().port}?room=${ROOM}`,
+        protocols: bearerSubprotocols(dmToken),
+      }),
+      transportFactory: transport,
+    });
+    clients.push(observer);
+    await eventually(
+      () => status === 'live' && observer.getState().status === 'live'
+    );
+    const roomX = (id: string) =>
+      (
+        observer
+          .getState()
+          .document?.elements.find(
+            element => (element as { id: string }).id === id
+          ) as { position?: { x: number } } | undefined
+      )?.position?.x;
+    const element = {
+      ...createShape({
+        position: { x: 0, y: 0 },
+        size: { w: 10, h: 10 },
+        shape: 'ellipse',
+        layerId: 'layer-annotations',
+      }),
+      id: 'offline-dm-element',
+    };
+    store.add(element as never);
+    await eventually(() => roomX('offline-dm-element') === 0);
+
+    // Offline: drop the socket and refuse to reconnect; edit 70 times.
+    offline = true;
+    for (const socket of sockets.splice(0)) socket.close();
+    await eventually(() => status !== 'live');
+    for (let step = 1; step <= 70; step += 1)
+      store.update('offline-dm-element', { position: { x: step, y: 0 } });
+    expect(roomX('offline-dm-element')).toBe(0);
+
+    // Back online: the live room wins; offline drafts are released.
+    offline = false;
+    await eventually(() => status === 'live', 30_000);
+    expect(roomX('offline-dm-element')).toBe(0);
+    // GG5: the DM's own map shows the room value again (the live room wins).
+    await eventually(
+      () =>
+        (
+          store.getById('offline-dm-element') as unknown as {
+            position: { x: number };
+          }
+        )?.position.x === 0
+    );
+    // The next edit reaches the room.
+    store.update('offline-dm-element', { position: { x: 500, y: 0 } });
+    await eventually(() => roomX('offline-dm-element') === 500);
+    await eventually(() => diagnostics.includes(OFFLINE_DISCARDED_DM_MESSAGE));
+
+    // And a checkpoint can be saved (no blocked barrier) without the relay
+    // closing the socket for a request that came too soon after the
+    // reconnect's own recovery request (HH1: 1013 "resync required").
+    // Right after a reconnect the SDK may still answer `recovery`.
+    const closesBefore = closeEvents.length;
+    const outcomes: string[] = [];
+    try {
+      await eventually(async () => {
+        const barrier = dm.captureBarrier!();
+        if (!barrier) return false;
+        try {
+          const receipts = await dm.waitForAcknowledgements!(barrier, {
+            timeoutMs: 10_000,
+          });
+          note(`receipts ${receipts.status}`);
+          expect(receipts.status).toBe('acknowledged');
+          const captured = await dm.requestCheckpoint!({
+            barrier,
+            timeoutMs: 10_000,
+          });
+          const outcome =
+            captured.status === 'complete' ? 'complete' : captured.reason;
+          outcomes.push(outcome);
+          note(`checkpoint ${outcome}`);
+          return captured.status === 'complete';
+        } finally {
+          dm.releaseBarrier!(barrier);
+        }
+      }, 30_000);
+      expect(outcomes.at(-1)).toBe('complete');
+      expect(outcomes.filter(outcome => outcome !== 'recovery').length).toBe(1);
+      expect(closeEvents.slice(closesBefore)).toEqual([]);
+    } catch (error) {
+      console.info(
+        '70-offline notes',
+        JSON.stringify({
+          // Run-length, e.g. "recovery x57, complete".
+          outcomes: outcomes
+            .reduce<Array<[string, number]>>((runs, outcome) => {
+              const last = runs.at(-1);
+              if (last?.[0] === outcome) last[1] += 1;
+              else runs.push([outcome, 1]);
+              return runs;
+            }, [])
+            .map(([outcome, count]) =>
+              count > 1 ? `${outcome} x${count}` : outcome
+            )
+            .join(', '),
+          closes: closeEvents,
+          status,
+          notes: notes.filter(item => !/ recovery$/u.test(item)).slice(-40),
+        })
+      );
+      throw error;
+    }
+  }, 120_000);
 
   it('restore to a fresh room generation withdraws admitted DM and player sockets; re-minted tokens join the restored state (PR08 desktop A1)', async () => {
     for (const client of clients.splice(0)) client.stop();

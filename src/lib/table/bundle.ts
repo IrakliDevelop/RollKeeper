@@ -148,7 +148,11 @@ const familyKeys = [
 
 function exportableScene(record: TableSceneRecordV1): TableSceneRecordV1 {
   const copy = structuredClone(record);
-  for (const checkpoint of [copy.canvasCheckpoint, copy.localDraft]) {
+  for (const checkpoint of [
+    copy.canvasCheckpoint,
+    copy.localDraft,
+    copy.offlineFork?.draft,
+  ]) {
     if (!checkpoint) continue;
     // Relay CAS is a transient write capability. The checkpoint document
     // remains fully reloadable/restorable without exporting that credential;

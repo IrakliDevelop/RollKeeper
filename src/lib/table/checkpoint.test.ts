@@ -480,3 +480,47 @@ describe('PR02 checkpoint provenance and roster durability', () => {
     expect(authority.elements).toEqual([party]);
   });
 });
+
+describe('GG3 offline fork slot survives a checkpoint', () => {
+  it('clears the local draft but keeps the offline changes slot', async () => {
+    const factory = new IDBFactory();
+    const repository = new TableRepository({ factory, selection });
+    repositories.push(repository);
+    await repository.start();
+    const draft = {
+      protocolVersion: 1 as const,
+      generation: 'authority-1',
+      revision: 1,
+      capturedAt: '2026-10-15T10:00:00.000Z',
+      state: { elements: [{ id: 'offline' }] },
+    };
+    await repository.putSceneForTest(
+      {
+        ...scene(repository.workspaceIdentity),
+        localDraft: draft,
+        offlineFork: {
+          savedAt: '2026-10-15T10:01:00.000Z',
+          replacedEarlier: false,
+          draft,
+        },
+      },
+      0
+    );
+    const result = await saveSceneCheckpoint({
+      repository,
+      connection: connection(),
+      sceneId: 'scene-1',
+      expectedRevision: 1,
+      operationId: 'checkpoint-gg3',
+    });
+    expect(result).toMatchObject({ status: 'committed', pending: false });
+    const loaded = await repository.reload();
+    if (loaded.status !== 'ready') throw new Error('expected ready');
+    expect(loaded.snapshot.scenes[0]?.localDraft).toBeNull();
+    expect(loaded.snapshot.scenes[0]?.offlineFork).toEqual({
+      savedAt: '2026-10-15T10:01:00.000Z',
+      replacedEarlier: false,
+      draft,
+    });
+  });
+});

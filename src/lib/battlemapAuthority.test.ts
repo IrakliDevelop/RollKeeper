@@ -1,5 +1,9 @@
 import { cleanup } from '@testing-library/react';
-import { ElementStore, type CanvasElement } from '@fieldnotes/core';
+import {
+  createShape,
+  ElementStore,
+  type CanvasElement,
+} from '@fieldnotes/core';
 import type { AuthorityClientStatus } from '@fieldnotes/sync';
 import { FogManager } from '@fieldnotes/vtt';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -9,17 +13,22 @@ const authority = vi.hoisted(() => {
   let state: { status: string; document: unknown; operations?: unknown[] } = {
     status: 'connecting',
     document: null,
+    operations: [],
   };
   const submit = vi.fn(() => ({ status: 'admitted', clientOperationId: 'op' }));
   return {
     submit,
     reset() {
       listener = null;
-      state = { status: 'connecting', document: null };
-      submit.mockClear();
+      state = { status: 'connecting', document: null, operations: [] };
+      submit.mockReset();
+      submit.mockImplementation(() => ({
+        status: 'admitted',
+        clientOperationId: 'op',
+      }));
     },
     install(document: unknown) {
-      state = { status: 'live', document };
+      state = { status: 'live', document, operations: [] };
       listener?.();
     },
     installState(next: {
@@ -43,7 +52,20 @@ const authority = vi.hoisted(() => {
       captureBarrier: vi.fn(),
       waitForAcknowledgements: vi.fn(),
       requestCheckpoint: vi.fn(),
-      releaseBarrier: vi.fn(),
+      releaseBarrier: vi.fn(() => true),
+      // Like the SDK: releasing removes the operation and notifies (FF2).
+      releaseOperation: vi.fn((id: string) => {
+        state = {
+          ...state,
+          operations: (state.operations ?? []).filter(
+            operation =>
+              (operation as { clientOperationId: string }).clientOperationId !==
+              id
+          ),
+        };
+        listener?.();
+        return true;
+      }),
     },
   };
 });
@@ -66,6 +88,14 @@ import {
 } from '@/test/realViewport';
 import {
   createManagedBattleMapAuthorityConnection,
+  HELD_EDIT_LIMIT,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  CONNECTION_DROPPED_MESSAGE,
+  DM_REJECTED_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  CHECKPOINT_REQUEST_SPACING_MS,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
   withoutUndefined,
 } from './battlemapAuthority';
 
@@ -536,7 +566,618 @@ describe('A1 element submissions use JSON semantics', () => {
     expect(withoutUndefined(bare)).toEqual({ a: 1 });
   });
 
-  it('normalizes layer and fog-meta records; not-ready/stopped stay silent, capacity reports; clear forwards expectedState (review 02 N4)', () => {
+  it('holds edits made before the room is live, keeps them on screen over the first snapshot, and admits them in order once live (PR08 DD1)', () => {
+    const store = new ElementStore();
+    const onDiagnostic = vi.fn();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'player', battleMapId: 'scene-a', playerId: 'p' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    // Still connecting: the SDK would refuse (`not-ready`) or strand a draft.
+    const token = {
+      id: 'early',
+      type: 'shape',
+      shape: 'ellipse',
+      position: { x: 1, y: 1 },
+      size: { w: 4, h: 4 },
+      zIndex: 1,
+      locked: false,
+      layerId: 'layer-a',
+    } as unknown as CanvasElement;
+    store.add(token);
+    connection.publishLayerRemove('layer-x');
+    expect(authority.submit).not.toHaveBeenCalled();
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    // The room goes live with a checkpoint that lacks the early token.
+    authority.install({ elements: [], layers: [], extensions: {} });
+    expect(store.getById('early')).toBeDefined();
+    const admitted = (
+      authority.submit.mock.calls as unknown as Array<[{ kind: string }]>
+    ).map(([mutation]) => mutation.kind);
+    expect(admitted).toEqual(['upsert', 'layer-remove']);
+    // Exactly once: a later change does not resend them.
+    authority.install({ elements: [], layers: [], extensions: {} });
+    expect(authority.submit).toHaveBeenCalledTimes(2);
+    connection.stop();
+  });
+
+  const dmConnection = (onDiagnostic = vi.fn()) => {
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    return { store, connection, onDiagnostic };
+  };
+  /** A presentation-resolving (player) connection: holds before first live. */
+  const playerConnection = (onDiagnostic = vi.fn()) => {
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'player-a',
+      store,
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'scene-a',
+        playerId: 'player-a',
+      },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    return { store, connection, onDiagnostic };
+  };
+  const emptyDoc = () => ({ elements: [], layers: [], extensions: {} });
+  const shape = (id: string, x = 0) =>
+    ({
+      ...createShape({ position: { x, y: 0 }, size: { w: 4, h: 4 } }),
+      id,
+    }) as CanvasElement;
+  const sent = () =>
+    (
+      authority.submit.mock.calls as unknown as Array<
+        [{ kind: string; id?: string; element?: { id: string } }]
+      >
+    ).map(([mutation]) => mutation);
+
+  it('EE3: the flush guard keeps order when a nested notify flushes while the first edit waits', () => {
+    const { connection } = playerConnection();
+    connection.publishLayerRemove('a');
+    connection.publishLayerRemove('b');
+    let first = true;
+    const results: string[] = [];
+    authority.submit.mockImplementation(((mutation: { id: string }) => {
+      if (first) {
+        first = false;
+        // The SDK notifies inside submit, then this attempt hits capacity.
+        authority.installState({
+          status: 'live',
+          document: emptyDoc(),
+          operations: [],
+        });
+        results.push(`${mutation.id}:wait`);
+        return { status: 'refused', reason: 'capacity' };
+      }
+      results.push(`${mutation.id}:sent`);
+      return { status: 'admitted', clientOperationId: mutation.id };
+    }) as never);
+    authority.install(emptyDoc());
+    authority.install(emptyDoc());
+    expect(results).toEqual(['a:wait', 'a:sent', 'b:sent']);
+    authority.submit.mockImplementation((() => ({
+      status: 'admitted',
+      clientOperationId: 'op',
+    })) as never);
+    connection.stop();
+  });
+
+  it('EE2: more than 64 held moves of one token become one upsert with the final position', () => {
+    const { store, connection, onDiagnostic } = playerConnection();
+    store.add(shape('t', 0));
+    for (let x = 1; x <= 100; x += 1)
+      store.update('t', { position: { x, y: 0 } });
+    expect(authority.submit).not.toHaveBeenCalled();
+    authority.install(emptyDoc());
+    expect(sent()).toEqual([
+      expect.objectContaining({
+        kind: 'upsert',
+        element: expect.objectContaining({
+          id: 't',
+          position: { x: 100, y: 0 },
+        }),
+      }),
+    ]);
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    connection.stop();
+  });
+
+  it('EE2: a remove supersedes held writes of the same element', () => {
+    const { store, connection } = playerConnection();
+    store.add(shape('gone'));
+    store.add(shape('kept'));
+    store.remove('gone');
+    authority.install(emptyDoc());
+    expect(sent().map(m => `${m.kind}:${m.element?.id ?? m.id}`)).toEqual([
+      'upsert:kept',
+      'remove:gone',
+    ]);
+    connection.stop();
+  });
+
+  it('EE2: the held queue is capped with a visible notice', () => {
+    const { store, connection, onDiagnostic } = playerConnection();
+    for (let index = 0; index <= HELD_EDIT_LIMIT; index += 1)
+      store.add(shape(`s-${index}`));
+    expect(onDiagnostic).toHaveBeenCalledWith(HELD_OVERFLOW_MESSAGE);
+    authority.install(emptyDoc());
+    expect(sent()).toHaveLength(HELD_EDIT_LIMIT);
+    connection.stop();
+  });
+
+  it('EE2: capacity after live waits and retries on the next change in the same generation', () => {
+    const { store, connection } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('busy'));
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    expect(sent().map(m => m.element?.id)).toEqual(['busy', 'busy']);
+    connection.stop();
+  });
+
+  it('EE1: a capacity-held edit is not replayed into another generation; it is dropped visibly', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g1',
+    } as never);
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('stale'));
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+      generation: 'g2',
+    } as never);
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    expect(onDiagnostic).toHaveBeenCalledWith(HELD_STALE_MESSAGE);
+    connection.stop();
+  });
+
+  it('EE1: after the first live state, offline edits go to the SDK as drafts and are not replayed on reconnect', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [],
+    });
+    store.add(shape('offline-edit'));
+    // Given to the SDK at once (it keeps a generation-tagged draft).
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+    });
+    authority.install(emptyDoc());
+    // No automatic replay by RollKeeper.
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
+  it('EE1: a live DM edit goes straight to the SDK, as before', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    store.add(shape('live-edit'));
+    expect(sent()).toEqual([
+      expect.objectContaining({
+        kind: 'upsert',
+        element: expect.objectContaining({ id: 'live-edit' }),
+      }),
+    ]);
+    connection.stop();
+  });
+
+  it('releases settled operations after the document is applied: accepted, DM-rejected (with a notice), offline drafts and uncertain ops (with a notice); never pending; pinned only after its barrier (J1, FF1, FF6)', () => {
+    const onDiagnostic = vi.fn();
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    const release = authority.connection.releaseOperation;
+    const real = release.getMockImplementation()! as unknown as (
+      id: string,
+      options?: unknown
+    ) => boolean;
+    release.mockClear();
+    const op = (clientOperationId: string, status: string) => ({
+      clientOperationId,
+      status,
+      proposal: { mutation: { kind: 'remove', id: clientOperationId } },
+    });
+    // 'accepted-pinned' is held by a barrier: the SDK refuses to release it.
+    release.mockImplementation(((id: string, options?: unknown) =>
+      id === 'accepted-pinned' ? false : real(id, options)) as never);
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [
+        op('accepted', 'accepted'),
+        op('accepted-pinned', 'accepted'),
+        op('pending', 'pending'),
+        op('draft', 'draft'),
+        op('uncertain', 'uncertain'),
+        op('rejected', 'rejected'),
+      ],
+    });
+    const calls = () =>
+      (release.mock.calls as unknown as Array<[string, unknown?]>).map(
+        ([id, options]) => [id, options]
+      );
+    expect(calls()).toEqual([
+      ['accepted', undefined],
+      ['accepted-pinned', undefined],
+      ['draft', { discardDraft: true }],
+      ['uncertain', { discardDraft: true }],
+      ['rejected', { discardDraft: true }],
+    ]);
+    expect(onDiagnostic).toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
+    expect(onDiagnostic).toHaveBeenCalledWith(DM_REJECTED_MESSAGE);
+    // Releasing the barrier frees the pinned operation at once.
+    release.mockClear();
+    release.mockImplementation(real as never);
+    connection.releaseBarrier?.({} as never);
+    expect(calls()).toEqual([['accepted-pinned', undefined]]);
+    connection.stop();
+  });
+
+  it('HH1: a checkpoint request waits past the relay spacing after the reconnect recovery request', async () => {
+    vi.useFakeTimers();
+    try {
+      const { connection } = dmConnection();
+      const inner = authority.connection.requestCheckpoint;
+      inner.mockReset();
+      inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+      // The SDK sends its recovery checkpoint request when it starts recovering.
+      authority.installState({
+        status: 'recovering',
+        document: null,
+        operations: [],
+      });
+      authority.installState({
+        status: 'live',
+        document: emptyDoc(),
+        operations: [],
+      });
+      const pending = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS - 1);
+      expect(inner).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(inner).toHaveBeenCalledTimes(1);
+      // A second request right after waits a full spacing again.
+      const next = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS - 1);
+      expect(inner).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await next;
+      expect(inner).toHaveBeenCalledTimes(2);
+      // An aborted wait never sends.
+      const controller = new AbortController();
+      const aborted = connection.requestCheckpoint!({
+        timeoutMs: 10_000,
+        signal: controller.signal,
+      });
+      controller.abort();
+      await expect(aborted).resolves.toEqual({
+        status: 'failed',
+        reason: 'aborted',
+      });
+      expect(inner).toHaveBeenCalledTimes(2);
+      connection.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('II2: the spacing margin is past the relay limit and only applies while live', async () => {
+    vi.useFakeTimers();
+    try {
+      // The relay closes a request under 10 000 ms after the previous one.
+      expect(CHECKPOINT_REQUEST_SPACING_MS).toBeGreaterThan(10_000);
+      const { connection } = dmConnection();
+      const inner = authority.connection.requestCheckpoint;
+      inner.mockReset();
+      inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+      authority.installState({
+        status: 'recovering',
+        document: null,
+        operations: [],
+      });
+      // Not live: no wait, the SDK answers `recovery` at once as before.
+      await expect(
+        connection.requestCheckpoint!({ timeoutMs: 10_000 })
+      ).resolves.toEqual({ status: 'failed', reason: 'recovery' });
+      expect(inner).toHaveBeenCalledTimes(1);
+      // Live again: the request still waits past 10 000 ms.
+      authority.installState({
+        status: 'live',
+        document: emptyDoc(),
+        operations: [],
+      });
+      const pending = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(inner).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS);
+      await pending;
+      expect(inner).toHaveBeenCalledTimes(2);
+      connection.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('HH1: a checkpoint long after the last request is sent at once', async () => {
+    const { connection } = dmConnection();
+    const inner = authority.connection.requestCheckpoint;
+    inner.mockReset();
+    inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+    });
+    await connection.requestCheckpoint!({ timeoutMs: 10_000 });
+    expect(inner).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
+  it('GG3: tells the page when offline drafts were released, never for uncertain-only work', () => {
+    const store = new ElementStore();
+    const onOfflineDraftsReleased = vi.fn();
+    const onDiagnostic = vi.fn();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onOfflineDraftsReleased,
+      onDiagnostic,
+    });
+    const op = (clientOperationId: string, status: string) => ({
+      clientOperationId,
+      status,
+      proposal: { mutation: { kind: 'remove', id: clientOperationId } },
+    });
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [op('lost', 'uncertain')],
+    });
+    expect(onOfflineDraftsReleased).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [op('offline-1', 'draft'), op('offline-2', 'draft')],
+    });
+    expect(onOfflineDraftsReleased).toHaveBeenCalledTimes(1);
+    // HH2: the page owns the offline notice when it keeps the copy.
+    expect(onDiagnostic).not.toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
+    connection.stop();
+  });
+
+  it('GG2: uncertain-only releases get a neutral notice, never the offline/Reapply one', () => {
+    const { connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
+    expect(onDiagnostic).toHaveBeenCalledWith(CONNECTION_DROPPED_MESSAGE);
+    expect(onDiagnostic).not.toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
+    connection.stop();
+    const player = playerConnection();
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode-2',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    expect(player.onDiagnostic).toHaveBeenCalledWith(
+      CONNECTION_DROPPED_MESSAGE
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      OFFLINE_DISCARDED_PLAYER_MESSAGE
+    );
+    player.connection.stop();
+  });
+
+  it('GG1: a DM edit the room refused stays on the DM map and the notice says players see the saved version', () => {
+    const { store, connection, onDiagnostic } = dmConnection();
+    const document = {
+      elements: [shape('refused', 1)],
+      layers: [],
+      extensions: {},
+    };
+    authority.install(document);
+    store.update('refused', { position: { x: 9, y: 0 } });
+    authority.installState({
+      status: 'live',
+      document,
+      operations: [
+        {
+          clientOperationId: 'dm-rejected',
+          status: 'rejected',
+          proposal: {
+            mutation: { kind: 'upsert', element: shape('refused', 9) },
+          },
+        },
+      ],
+    });
+    expect(
+      (store.getById('refused') as unknown as { position: { x: number } })
+        .position.x
+    ).toBe(9);
+    expect(authority.connection.releaseOperation).toHaveBeenCalledWith(
+      'dm-rejected',
+      { discardDraft: true }
+    );
+    expect(onDiagnostic).toHaveBeenCalledWith(DM_REJECTED_MESSAGE);
+    expect(DM_REJECTED_MESSAGE).toBe(
+      'The live map refused a change. Players see the saved version.'
+    );
+    connection.stop();
+  });
+
+  it('keeps offline drafts while not live and releases them only once live with a document (FF1)', () => {
+    const { connection, onDiagnostic } = playerConnection();
+    const release = authority.connection.releaseOperation;
+    release.mockClear();
+    const draft = {
+      clientOperationId: 'offline-draft',
+      status: 'draft',
+      proposal: { mutation: { kind: 'remove', id: 'x' } },
+    };
+    authority.installState({
+      status: 'recovering',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [draft],
+    });
+    expect(release).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [draft],
+    });
+    expect(release).toHaveBeenCalledWith('offline-draft', {
+      discardDraft: true,
+    });
+    expect(onDiagnostic).toHaveBeenCalledWith(OFFLINE_DISCARDED_PLAYER_MESSAGE);
+    connection.stop();
+  });
+
+  it('releases a player rejection only after it was restored on screen (FF6)', () => {
+    const { connection } = playerConnection();
+    const release = authority.connection.releaseOperation;
+    release.mockClear();
+    // No document yet: the rejection cannot be restored, so it is kept.
+    authority.installState({
+      status: 'connecting',
+      document: null,
+      operations: [
+        {
+          clientOperationId: 'rej',
+          status: 'rejected',
+          proposal: { mutation: { kind: 'remove', id: 'gone' } },
+        },
+      ],
+    });
+    expect(release).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [
+        {
+          clientOperationId: 'rej',
+          status: 'rejected',
+          proposal: { mutation: { kind: 'remove', id: 'gone' } },
+        },
+      ],
+    });
+    expect(release).toHaveBeenCalledWith('rej', { discardDraft: true });
+    connection.stop();
+  });
+
+  it('a DM edit before the first live state is not held (FF4, base behaviour)', () => {
+    const { store, connection } = dmConnection();
+    authority.submit.mockImplementation((() => ({
+      status: 'refused',
+      reason: 'not-ready',
+    })) as never);
+    store.add(shape('early-dm'));
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.submit.mockImplementation((() => ({
+      status: 'admitted',
+      clientOperationId: 'op',
+    })) as never);
+    authority.install(emptyDoc());
+    // Not replayed on live: the scene's localDraft keeps it for Reapply.
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
+  it('after the first live state, an edit while offline is a draft even when capacity edits are held (FF3)', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('busy'));
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [],
+    });
+    store.add(shape('offline'));
+    expect(sent().map(m => m.element?.id)).toEqual(['busy', 'offline']);
+    connection.stop();
+  });
+
+  it('normalizes layer and fog-meta records; stopped stays silent, capacity waits and retries; clear forwards expectedState (review 02 N4, EE2)', () => {
     const fog = new FogManager();
     const onDiagnostic = vi.fn();
     const store = new ElementStore();
@@ -580,22 +1221,27 @@ describe('A1 element submissions use JSON semantics', () => {
     )[0];
     expect(meta.kind).toBe('fog-meta');
     expect(Object.hasOwn(meta.record.definition, 'note')).toBe(false);
-    for (const reason of ['not-ready', 'stopped'])
-      authority.submit.mockImplementationOnce((() => ({
-        status: 'refused',
-        reason,
-      })) as never);
+    // `stopped` stays silent; `not-ready` is held (PR08 DD1, tested below).
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'stopped',
+    })) as never);
     connection.publishLayerRemove('layer-x');
-    connection.publishLayerRemove('layer-y');
     expect(onDiagnostic).not.toHaveBeenCalled();
     authority.submit.mockImplementationOnce((() => ({
       status: 'refused',
       reason: 'capacity',
     })) as never);
     connection.publishLayerRemove('layer-z');
-    expect(onDiagnostic).toHaveBeenCalledWith(
-      'A local layer-remove edit was not sent to the live room (capacity)'
-    );
+    // EE2: capacity is transient (J1 releases settled work): it waits.
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    authority.install({ ...documentWithFog(3), casToken: 'cas-token-1' });
+    expect(authority.submit).toHaveBeenLastCalledWith({
+      kind: 'layer-remove',
+      id: 'layer-z',
+      version: expect.any(Number),
+      editor: 'dm-a',
+    });
     store.clear();
     expect(authority.submit).toHaveBeenLastCalledWith(
       { kind: 'clear' },

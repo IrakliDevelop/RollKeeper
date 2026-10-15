@@ -48,9 +48,14 @@ import { BattleMapExportControl } from './BattleMapExportControl';
 import { PlayerHandTool } from './PlayerHandTool';
 import {
   createManagedBattleMapConnection,
-  type BattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import {
+  CONNECTION_DROPPED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
+} from '@/lib/battlemapAuthority';
 import { configureFogView, resolvePlayerFogStyle } from './fog';
 import {
   applyFogAppearanceMetadata,
@@ -812,9 +817,6 @@ export function PlayerBattleMapCanvas({
     let fitted = false;
     const ownLayerId = playerLayerId(characterId);
     // Set right after creation; status callbacks may run before that.
-    let created: Pick<BattleMapConnection, 'publishLayerUpsert'> | null = null;
-    // `live` repeats on every authority change; publish on entering it only.
-    let wasLive = false;
     const connection = createManagedBattleMapConnection({
       relayUrl,
       campaignCode,
@@ -836,29 +838,23 @@ export function PlayerBattleMapCanvas({
       onDiagnostic: message => {
         if (message.startsWith('Live map identity is invalid'))
           reconnectRef.current.identityInvalid = true;
+        // EE2: an edit that could not be kept, or held edits dropped after
+        // the live map changed, is never silent.
+        if (
+          message === HELD_OVERFLOW_MESSAGE ||
+          message === HELD_STALE_MESSAGE ||
+          message === OFFLINE_DISCARDED_PLAYER_MESSAGE ||
+          message === CONNECTION_DROPPED_MESSAGE
+        )
+          setSceneNotice(message);
       },
       onStatus: s => {
         setStatus(s);
         onStatusProp?.(s);
-        const enteredLive = s === 'live' && !wasLive;
-        wasLive = s === 'live';
         const reconnect = reconnectRef.current;
         if (s === 'live') {
           reconnect.delay = 1_000;
           setWithdrawn(false);
-          // Table v1: the attach-time publish rides the unresolved binding,
-          // which the scene resolution retires with its pending work, so
-          // teach every live room this player's band again (the canonical
-          // definition is idempotent). Without it other clients never learn
-          // the band and cannot activate this player's token.
-          const live = enteredLive ? created : null;
-          if (live)
-            publishOwnedLayers(
-              vp,
-              'player',
-              def => live.publishLayerUpsert(canonicalPlayerBand(def)),
-              ownLayerId
-            );
         }
         if (
           s === 'denied' &&
@@ -926,7 +922,9 @@ export function PlayerBattleMapCanvas({
         setResolvedSceneId(sceneId);
       },
       onSceneChange: change => {
-        const count = change.discardedOperationIds.length;
+        const count =
+          change.discardedOperationIds.length +
+          (change.discardedHeldEdits ?? 0);
         setSceneNotice(
           `The presented scene changed${
             count > 0
@@ -959,7 +957,6 @@ export function PlayerBattleMapCanvas({
       },
     });
     connectionRef.current = connection;
-    created = connection;
     // Teach the room this player's own layer (the relay only accepts a
     // player's writes to player-<characterId>).
     publishOwnedLayers(

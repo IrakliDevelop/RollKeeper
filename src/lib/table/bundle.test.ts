@@ -415,6 +415,41 @@ describe('PR02 additive fields through bundles (R3)', () => {
     });
   });
 
+  it('GG3: round-trips the offline changes slot without its CAS token', async () => {
+    const draft = {
+      protocolVersion: 1 as const,
+      generation: 'generation-1',
+      revision: 2,
+      capturedAt: '2026-10-15T10:00:00.000Z',
+      state: { elements: [{ id: 'offline' }], casToken: 'must-not-export' },
+    };
+    let raw = '';
+    const { target } = await roundTrip(async repository => {
+      await repository.mutateWorkspace(0, 'seed', {
+        scenes: {
+          put: [
+            {
+              ...scene(repository.workspaceIdentity),
+              offlineFork: {
+                savedAt: '2026-10-15T10:01:00.000Z',
+                replacedEarlier: true,
+                draft,
+              },
+            },
+          ],
+        },
+      });
+      raw = await exportTableBundle(repository);
+    });
+    expect(raw).not.toContain('must-not-export');
+    expect(JSON.parse(raw)).toMatchObject({ bundleVersion: 1 });
+    expect(target.scenes[0]?.offlineFork).toEqual({
+      savedAt: '2026-10-15T10:01:00.000Z',
+      replacedEarlier: true,
+      draft: { ...draft, state: { elements: [{ id: 'offline' }] } },
+    });
+  });
+
   it('keeps every PR02 field unstripped through export and import', async () => {
     const { target } = await roundTrip(async repository => {
       const base = scene(repository.workspaceIdentity);

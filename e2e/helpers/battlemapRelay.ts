@@ -205,6 +205,7 @@ export async function openTableSceneLive(
   });
   await dmPage.getByRole('button', { name: `Add ${mapName} to Table` }).click();
   await dmPage.getByRole('button', { name: 'Open scene' }).click();
+  // GG4 fixed the Go live acquire race in the product, so no retry here.
   await expect(
     dmPage.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
   ).toBeVisible({ timeout: 30_000 });

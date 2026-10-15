@@ -97,8 +97,8 @@ scene rooms, player views and the TV cannot connect.
 
 ## Release notes (behaviour changes for existing users)
 
-- **Restore needs the live tab.** "Restore checkpoint" and "Reapply changes"
-  work only in the tab that holds live control; elsewhere they are disabled
+- **Restore needs the live tab.** "Restore checkpoint", "Reapply latest
+  changes" and "Reapply offline changes" work only in the tab that holds live control; elsewhere they are disabled
   with "Only the live tab can restore. Go live first." Two tabs of the same
   DM share one principal, so the server checks the tab's control session and
   writer fence, not only the DM. The relay's provision Lua re-checks the
@@ -142,7 +142,80 @@ scene rooms, player views and the TV cannot connect.
   Table scene has a live room), so its top bar shows "Private. Players don't
   see this map." (or, once the map is on the Table, "Private copy. Players
   see the Table scene, not edits here.") instead of a connection status
-  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`).
+  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`). It hides
+  the controls that only work through a live room (measure, move and camera
+  sharing, send view, viewers and cursor sharing, ping); the laser pointer
+  stays because it draws locally.
+- Authority connections (DM Table stage, players, display, fog;
+  `src/lib/battlemapAuthority.ts`):
+  - A player's (or display's) edits made before its connection is first
+    live, for example a token placed right after opening the shown scene or
+    the player's own layer, are held, coalesced per element or layer, and
+    sent once, in order, when the room is first live. The queue is capped;
+    an edit that cannot be kept shows a notice. The DM's connection does not
+    hold: before live the SDK refuses edits and the scene's localDraft keeps
+    them.
+  - After the first live state, edits made while offline or reconnecting are
+    SDK drafts and are never replayed. Once the room is live again and its
+    document applied, the live room wins: those drafts (and operations whose
+    outcome was lost with the connection) are released. The DM sees "Map
+    edits made while offline were not sent. To send them, open Details and
+    choose Reapply offline changes." If the copy could not be kept, the DM
+    instead sees "Map edits made while offline were not sent, and this
+    device could not keep a copy for later. To send them now, open Details
+    and choose Reapply latest changes before you edit again." A player sees
+    "Changes you made while offline weren't saved."
+  - The DM's offline version is copied into the scene's offline changes
+    slot (`offlineFork` on the scene record: `savedAt`, `replacedEarlier`,
+    `draft`) when those drafts are released
+    (`onOfflineDraftsReleased` in `src/lib/battlemapAuthority.ts`, then
+    `captureOfflineFork` in `src/lib/table/sceneAdapter.ts`). Later edits and
+    "Save checkpoint" never change or clear it. Details shows "Offline
+    changes from <time>" with "Reapply offline changes" (the live-tab restore
+    used by "Restore checkpoint", from the slot) and "Discard"; either one
+    empties the slot (`clearOfflineFork` removes the key). There is one slot:
+    a newer offline episode replaces it and Details says "These replaced
+    earlier offline changes that were not reapplied." "Reapply latest
+    changes" (renamed from "Reapply changes", with the hint "Reapply latest
+    changes sends the map as this device last saved it.") still re-sends the
+    scene's localDraft, which follows the latest edits. If the offline edits
+    are still waiting locally as a conflict, the slot keeps them (the newest
+    version the DM saw). A Reapply that finishes after another scene was
+    opened still empties the restored scene's slot. A Discard that finds the
+    slot already gone (another tab) says "These offline changes were already
+    reapplied or discarded."
+  - Checkpoint saves wait 10.5 s after the previous checkpoint request,
+    including the one the SDK sends when it reconnects. The SDK spaces
+    requests 10 s apart by its own send time while the relay closes a socket
+    (1013) for a request that arrives under 10 s after the last one, so a
+    save right after a reconnect used to drop the connection now and then
+    (`CHECKPOINT_REQUEST_SPACING_MS`, `src/lib/battlemapAuthority.ts`).
+  - A send refused for capacity waits and is retried in the same room
+    generation only, otherwise dropped with a notice.
+  - Accepted operations, rejected ones once restored on screen (players) or
+    with a notice (DM), and the offline work above are released from the SDK
+    journal, so a connection does not fill its 64-operation journal and
+    checkpoints are not blocked by leftover drafts. Work pinned by a
+    checkpoint barrier is released once the barrier is.
+  - The DM's sync notices show as a "Live map" toast on the Table stage.
+  - A later change of shown scene discards unsent edits, with a notice.
+- **Offline changes slot and older builds.** The scene record (still
+  `schemaVersion: 1`, database version 1, bundle version 1) gained the
+  optional `offlineFork` field. A build from before it validates scene keys
+  exactly, so while any scene holds offline changes it opens the whole Table
+  read-only ("This Table's data is in a format the app can't edit") and
+  refuses such a bundle on import. Nothing is deleted, and it reads normally
+  again once a newer build reapplies or discards the offline changes
+  (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
+  released build had the Table.
+- **Canvas budgets.** The local draft and the offline changes slot each count
+  against the 20 MiB canvas checkpoint budget, like the saved checkpoint,
+  instead of the 1 MiB scene metadata budget (`validateWorkspaceLimits`,
+  `src/lib/table/schema.ts`). A fogged scene can now keep a large draft and
+  an offline copy side by side. A build from before this change still counts
+  the local draft as metadata, so it opens a Table read-only while a scene's
+  local draft is over 1 MiB (it never wrote one that large); saving a
+  checkpoint clears the draft.
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use
@@ -181,6 +254,8 @@ database on downgrade.
 | Same release, Redis/relay data expired | Registry/room gone; the workspace re-registers the scene (`registerScene`) and provisions the room from local state (`authority/initialize-if-empty`, `src/lib/table/authorityLifecycle.ts`) | From the device that holds the scenes |
 | Local records with a newer `schemaVersion` than this build | Workspace opens read-only (`unknown-schema`); edits refused (`src/lib/table/repository.ts`) | Raw export (`exportRawTableWorkspace`), then upgrade the app |
 | Local records that fail validation | Read-only (`invalid-schema`) | Raw export; bundle from another device |
+| App rolled back to a Table build without the offline changes slot while a scene holds offline changes (`offlineFork`) | That build opens the Table read-only (`invalid-schema`) and refuses bundles that carry the slot; nothing is lost | Open the newer build and reapply or discard the offline changes (Details), or roll forward |
+| App rolled back to a build that counts the local draft as scene metadata while a scene's local draft is over 1 MiB | That build opens the Table read-only (`invalid-schema`); nothing is lost | Open the newer build and save a checkpoint (clears the draft), or roll forward |
 | IndexedDB created by a newer database version | Open fails, workspace unavailable (`openTableDatabase` strict version/store check) | Upgrade the app |
 | Bundle with `bundleVersion > 1` | Import rejected `future-bundle` | Import with the newer build |
 | App rolled back to a pre-Table build | Table data stays in IndexedDB untouched; tagged Redis keys are ignored and expire by TTL | Redeploy a Table build; data reappears |

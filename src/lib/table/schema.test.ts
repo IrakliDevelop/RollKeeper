@@ -400,3 +400,184 @@ describe('PR02 additive roster schema', () => {
     }
   });
 });
+
+describe('GG3 offline fork slot on the v1 scene record', () => {
+  const draft = {
+    protocolVersion: 1,
+    generation: 'authority-1',
+    revision: 3,
+    capturedAt: '2026-10-15T10:00:00.000Z',
+    state: { elements: [{ id: 'offline-token' }] },
+  };
+  const scene = (extra: Record<string, unknown>) => ({
+    schemaVersion: 1,
+    workspaceKey: actor().workspaceKey,
+    sceneId: 'scene-1',
+    originalMapId: null,
+    map: {
+      name: 'Tavern',
+      mapImageUrl: '/tavern.webp',
+      mapImageSize: { w: 10, h: 10 },
+      gridEnabled: false,
+      gridSettings: null,
+      markers: [],
+      dmOnlyElements: {},
+    },
+    canvasCheckpoint: null,
+    members: [],
+    arrivalPoint: null,
+    createdAt: '2026-10-05T00:00:00.000Z',
+    updatedAt: '2026-10-05T00:00:00.000Z',
+    ...extra,
+  });
+
+  it('accepts a scene without the slot, with a null slot and with a filled slot', () => {
+    expect(validateSceneRecord(scene({}))).toEqual({ ok: true });
+    expect(validateSceneRecord(scene({ offlineFork: null }))).toEqual({
+      ok: true,
+    });
+    expect(
+      validateSceneRecord(
+        scene({
+          offlineFork: {
+            savedAt: '2026-10-15T10:01:00.000Z',
+            replacedEarlier: false,
+            draft,
+          },
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it.each([
+    ['a non-object slot', 'later'],
+    [
+      'a missing draft',
+      { savedAt: '2026-10-15T10:01:00.000Z', replacedEarlier: false },
+    ],
+    ['a bad time', { savedAt: 'yesterday', replacedEarlier: false, draft }],
+    [
+      'a non-boolean note',
+      { savedAt: '2026-10-15T10:01:00.000Z', replacedEarlier: 'no', draft },
+    ],
+    [
+      'an unknown key',
+      {
+        savedAt: '2026-10-15T10:01:00.000Z',
+        replacedEarlier: false,
+        draft,
+        extra: 1,
+      },
+    ],
+    [
+      'a malformed draft',
+      {
+        savedAt: '2026-10-15T10:01:00.000Z',
+        replacedEarlier: false,
+        draft: { ...draft, state: [] },
+      },
+    ],
+  ])('rejects %s', (_label, offlineFork) => {
+    expect(validateSceneRecord(scene({ offlineFork }))).toMatchObject({
+      ok: false,
+    });
+  });
+});
+
+describe('HH2 canvas versions use the canvas checkpoint budget', () => {
+  const workspaceKey = actor().workspaceKey;
+  const canvas = (bytes: number) => ({
+    protocolVersion: 1 as const,
+    generation: 'authority-1',
+    revision: 1,
+    capturedAt: '2026-10-15T10:00:00.000Z',
+    state: { elements: [], blob: 'x'.repeat(bytes) },
+  });
+  const snapshot = (
+    extra: Partial<import('./schema').TableSceneRecordV1>
+  ): TableWorkspaceSnapshotV1 => ({
+    workspaceKey,
+    campaign: null,
+    scenes: [
+      {
+        schemaVersion: 1,
+        workspaceKey,
+        sceneId: 'scene-1',
+        originalMapId: null,
+        map: {
+          name: 'Fogged keep',
+          mapImageUrl: '',
+          mapImageSize: { w: 1, h: 1 },
+          gridEnabled: false,
+          gridSettings: null,
+          markers: [],
+          dmOnlyElements: {},
+        },
+        canvasCheckpoint: null,
+        members: [],
+        arrivalPoint: null,
+        createdAt: '2026-10-05T00:00:00.000Z',
+        updatedAt: '2026-10-05T00:00:00.000Z',
+        ...extra,
+      },
+    ],
+    actors: [],
+    encounters: [],
+    logs: [],
+    sources: [],
+    tombstones: [],
+  });
+
+  it('allows a local draft and an offline slot that together pass the metadata budget', () => {
+    const near = TABLE_LIMITS.maxMetadataRecordBytes - 4_096;
+    expect(
+      validateWorkspaceLimits(
+        snapshot({
+          localDraft: canvas(near),
+          offlineFork: {
+            savedAt: '2026-10-15T10:01:00.000Z',
+            replacedEarlier: false,
+            draft: canvas(near),
+          },
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it('II3: accepts a single 2 MiB local draft and a single 2 MiB offline slot', () => {
+    const twoMiB = 2 * 1_048_576;
+    expect(
+      validateWorkspaceLimits(snapshot({ localDraft: canvas(twoMiB) }))
+    ).toEqual({ ok: true });
+    expect(
+      validateWorkspaceLimits(
+        snapshot({
+          offlineFork: {
+            savedAt: '2026-10-15T10:01:00.000Z',
+            replacedEarlier: false,
+            draft: canvas(twoMiB),
+          },
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it('refuses a local draft or an offline slot over the canvas checkpoint budget', () => {
+    const limits = { ...TABLE_LIMITS, maxCanvasCheckpointBytes: 10_000 };
+    expect(
+      validateWorkspaceLimits(snapshot({ localDraft: canvas(20_000) }), limits)
+    ).toMatchObject({ ok: false, reason: 'canvas-checkpoint-bytes' });
+    expect(
+      validateWorkspaceLimits(
+        snapshot({
+          offlineFork: {
+            savedAt: '2026-10-15T10:01:00.000Z',
+            replacedEarlier: false,
+            draft: canvas(20_000),
+          },
+        }),
+        limits
+      )
+    ).toMatchObject({ ok: false, reason: 'canvas-checkpoint-bytes' });
+  });
+});

@@ -26,6 +26,15 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import {
+  CONNECTION_DROPPED_MESSAGE,
+  DM_REJECTED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
+} from '@/lib/battlemapAuthority';
+
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useLocationStore } from '@/store/locationStore';
 import {
@@ -131,6 +140,18 @@ import {
   markerPublishRequest,
 } from '@/components/ui/campaign/table/sideChannelRequests';
 
+/** GG6: identical live-sync notices within this window show once. */
+const LIVE_SYNC_NOTICE_DEDUPE_MS = 3_000;
+/** FF5: sync outcomes the DM must see on the Table stage. */
+const LIVE_SYNC_NOTICES = new Set([
+  CONNECTION_DROPPED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
+  DM_REJECTED_MESSAGE,
+]);
+
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
   battleMapId: string;
@@ -209,6 +230,8 @@ export interface DmBattleMapCanvasState {
   markerAudienceNotice: string | null;
   /** Table only: the last marker publication was refused (C4-2). */
   markerShareNotice?: string | null;
+  /** FF5: the latest live-map sync notice the DM must see. */
+  liveSyncNotice?: { message: string; at: number } | null;
   markerPanelOpen: boolean;
   markerPanelState: MarkerPanelState;
   markerPanelIsDmOnly: boolean;
@@ -272,6 +295,11 @@ export function useDmBattleMapCanvas({
     if (viewport) exposeStoreForE2E('viewport', viewport);
   }, [viewport]);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
+  /** FF5: a live-map sync notice the DM must see (shown as a toast). */
+  const [liveSyncNotice, setLiveSyncNotice] = useState<{
+    message: string;
+    at: number;
+  } | null>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
   const connectionRef = useRef<
     import('@/lib/battlemapSync').BattleMapConnection | null
@@ -1085,6 +1113,18 @@ export function useDmBattleMapCanvas({
         connectionRef.current?.stop();
         connectionRef.current = null;
         onConnectionReady?.(null);
+        const showLiveMapNotice = (message: string) => {
+          console.warn('[RollKeeper] Live map:', message);
+          if (LIVE_SYNC_NOTICES.has(message))
+            // GG6: one toast per message within a few seconds.
+            setLiveSyncNotice(previous =>
+              previous &&
+              previous.message === message &&
+              Date.now() - previous.at < LIVE_SYNC_NOTICE_DEDUPE_MS
+                ? previous
+                : { message, at: Date.now() }
+            );
+        };
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
@@ -1100,10 +1140,24 @@ export function useDmBattleMapCanvas({
               : {}),
           },
           seedLocal: !tableSceneAdapter,
+          // GG3: the live room won over this tab's offline edits. The scene
+          // keeps the offline version in its own slot for "Reapply offline
+          // changes"; later edits and checkpoints leave it alone.
+          // HH2: the toast points to Details only when the copy was kept.
+          onOfflineDraftsReleased: () => {
+            void tableSceneAdapter
+              .captureOfflineFork()
+              .then(kept =>
+                showLiveMapNotice(
+                  kept
+                    ? OFFLINE_DISCARDED_DM_MESSAGE
+                    : OFFLINE_NOT_KEPT_DM_MESSAGE
+                )
+              );
+          },
           // PR07 A1 (review 02 N3): a refused live edit is never silent.
           // Messages are payload-free (no element content or secrets).
-          onDiagnostic: message =>
-            console.warn('[RollKeeper] Live map:', message),
+          onDiagnostic: showLiveMapNotice,
           resolveAudience: el =>
             readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):
@@ -1378,6 +1432,7 @@ export function useDmBattleMapCanvas({
   ]);
 
   return {
+    liveSyncNotice,
     viewport,
     status,
     battleMap,

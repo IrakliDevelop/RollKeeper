@@ -516,9 +516,11 @@ test('guarded recovery UI retains the offline draft and only one simultaneous AP
   // O7-2 H3: recovery actions live in the Details popover.
   for (const page of [left, right])
     await page.getByRole('button', { name: /^Details/u }).click();
-  const leftRestore = left.getByRole('button', { name: 'Reapply changes' });
+  const leftRestore = left.getByRole('button', {
+    name: 'Reapply latest changes',
+  });
   const rightRestore = right.getByRole('button', {
-    name: 'Reapply changes',
+    name: 'Reapply latest changes',
   });
   await expect(leftRestore).toBeVisible();
   await expect(rightRestore).toBeVisible();

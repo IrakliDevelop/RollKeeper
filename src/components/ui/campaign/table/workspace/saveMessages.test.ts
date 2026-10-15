@@ -24,6 +24,9 @@ const TONES: Record<keyof typeof SAVE_MESSAGES, SaveMessageTone> = {
   saving: 'progress',
   saved: 'success',
   savedWithNewerEdit: 'success',
+  offlineDiscarded: 'success',
+  offlineAlreadyGone: 'routine',
+  offlineDiscardFailed: 'failure',
   conflictDiscarded: 'success',
   conflictRefreshed: 'success',
   conflictRefreshFailed: 'failure',
@@ -49,7 +52,7 @@ describe('save messages carry their tone at the source (O7-3 W5)', () => {
     expect(message.text.length).toBeGreaterThan(0);
   });
 
-  it.each(['changes', 'checkpoint'] as const)(
+  it.each(['changes', 'offline', 'checkpoint'] as const)(
     'restore messages for %s are tagged',
     kind => {
       const messages = restoreMessages(kind);
@@ -61,7 +64,7 @@ describe('save messages carry their tone at the source (O7-3 W5)', () => {
     }
   );
 
-  it.each(['changes', 'checkpoint'] as const)(
+  it.each(['changes', 'offline', 'checkpoint'] as const)(
     'restore failures say why in plain words (%s)',
     kind => {
       const messages = restoreMessages(kind);

@@ -36,6 +36,17 @@ export const SAVE_MESSAGES = {
     "Checkpoint saved. Your most recent change isn't in it yet.",
     'success'
   ),
+  /** GG3: the offline changes slot was dropped on purpose. */
+  offlineDiscarded: say('Offline changes discarded.', 'success'),
+  /** HH4 (c): another tab or an earlier click already emptied the slot. */
+  offlineAlreadyGone: say(
+    'These offline changes were already reapplied or discarded.',
+    'routine'
+  ),
+  offlineDiscardFailed: say(
+    "Couldn't discard the offline changes. They are still in Details.",
+    'failure'
+  ),
   conflictDiscarded: say(
     'Your edit was discarded. The newer version is unchanged.',
     'success'
@@ -85,30 +96,48 @@ export function checkpointNotSaved(
 }
 
 /** What can be restored from Details. */
-export type RestoreKind = 'changes' | 'checkpoint';
+export type RestoreKind = 'changes' | 'offline' | 'checkpoint';
+
+const RESTORE_WORDS: Record<
+  RestoreKind,
+  { what: string; busy: string; done: string; notDone: string }
+> = {
+  changes: {
+    what: 'your changes',
+    busy: 'Restoring your changes…',
+    done: 'Changes restored.',
+    notDone: "Changes weren't",
+  },
+  offline: {
+    what: 'your offline changes',
+    busy: 'Restoring your offline changes…',
+    done: 'Offline changes restored.',
+    notDone: "Offline changes weren't",
+  },
+  checkpoint: {
+    what: 'the checkpoint',
+    busy: 'Restoring the checkpoint…',
+    done: 'Checkpoint restored.',
+    notDone: "Checkpoint wasn't",
+  },
+};
 
 export function restoreMessages(kind: RestoreKind) {
-  const changes = kind === 'changes';
+  const words = RESTORE_WORDS[kind];
+  const what = words.what;
   return {
-    busy: say(
-      changes ? 'Restoring your changes…' : 'Restoring the checkpoint…',
-      'progress'
-    ),
-    restored: say(
-      changes ? 'Changes restored.' : 'Checkpoint restored.',
-      'success'
-    ),
+    busy: say(words.busy, 'progress'),
+    restored: say(words.done, 'success'),
     conflict: say(
-      `${changes ? "Changes weren't" : "Checkpoint wasn't"} restored because the scene changed. Check it, then try again.`,
+      `${words.notDone} restored because the scene changed. Check it, then try again.`,
       'failure'
     ),
     /** PR08 desktop B1: only the live tab restores; nothing was sent. */
     notLive: say(
-      `This tab isn't live, so it can't restore ${changes ? 'your changes' : 'the checkpoint'}. Go live, then try again.`,
+      `This tab isn't live, so it can't restore ${what}. Go live, then try again.`,
       'failure'
     ),
     failed: (reason: string): SaveMessage => {
-      const what = changes ? 'your changes' : 'the checkpoint';
       const text =
         reason === 'forbidden'
           ? `Couldn't restore ${what} because this tab isn't live. Go live, then try again.`

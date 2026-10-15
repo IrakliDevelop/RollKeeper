@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
-import { withLocalRedis } from './e2eRedis';
+import { withLocalRedis, withLocalRelayRedis } from './e2eRedis';
 
 /**
  * The relay (`relay/`) and the Next app must mint/verify tokens with the
@@ -72,10 +72,13 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} REDIS_URL=redis://localhost:6379 npm run dev`,
+      command: withLocalRelayRedis(
+        `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} npm run dev`
+      ),
       cwd: '../../relay',
       url: 'http://localhost:8787/healthz',
-      reuseExistingServer: !process.env.CI,
+      // DD3: never reuse a relay that may run on a remote Redis.
+      reuseExistingServer: false,
       timeout: 60_000,
     },
     {
