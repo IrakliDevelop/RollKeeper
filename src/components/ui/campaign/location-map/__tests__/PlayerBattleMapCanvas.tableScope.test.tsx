@@ -297,6 +297,38 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     ]);
   });
 
+  it('publishes the own band again once the resolved scene room is live (Table v1)', () => {
+    stubCanvas();
+    renderPlayer();
+    const vp = makeViewport();
+    fireReady(vp);
+    const options = vi
+      .mocked(createManagedBattleMapConnection)
+      .mock.calls.at(-1)![0];
+    const upserts = connections[0]!.publishLayerUpsert;
+    expect(upserts).toHaveBeenCalledTimes(1);
+    // The first publish rides the unresolved binding, which the scene
+    // resolution retires with its pending work; the live room needs it again.
+    act(() => options.onStatus?.('live'));
+    expect(upserts).toHaveBeenCalledTimes(2);
+    // `live` repeats on every authority change: no publish loop.
+    act(() => options.onStatus?.('live'));
+    expect(upserts).toHaveBeenCalledTimes(2);
+    // A reconnect enters live again and re-teaches the band.
+    act(() => options.onStatus?.('connecting'));
+    act(() => options.onStatus?.('live'));
+    expect(upserts).toHaveBeenCalledTimes(3);
+    expect(upserts.mock.calls[2]![0]).toEqual(
+      expect.objectContaining({
+        id: 'player-char-a',
+        visible: true,
+        locked: false,
+        opacity: 1,
+        order: PLAYER_BAND_ORDER,
+      })
+    );
+  });
+
   it('offers no delete action for a selected control-bearing token', () => {
     stubCanvas();
     renderPlayer();
