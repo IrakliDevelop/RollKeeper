@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 
 import type { Page } from '@playwright/test';
 
+import { E2E_RELAY_PORT } from '../config/playwright/e2eRelay';
 import {
   createCampaign,
   openTableSceneLive,
@@ -175,19 +176,21 @@ test('offline edits kept through a later edit and a checkpoint, then reapplied',
     // The relay WebSocket is the live connection. "Offline" closes it and
     // sends every reconnect to a closed port until we come back; HTTP stays
     // up (browser offline emulation does not drop an open WebSocket).
-    await page.addInitScript(() => {
+    await page.addInitScript(relayPort => {
       const Native = window.WebSocket;
       const state = { offline: false, sockets: [] as WebSocket[] };
       (window as unknown as { __gg3Relay: typeof state }).__gg3Relay = state;
       class RelaySocket extends Native {
         constructor(url: string | URL, protocols?: string | string[]) {
-          const relay = /:8787(?:[/?]|$)/u.test(String(url));
+          const relay = new RegExp(`:${relayPort}(?:[/?]|$)`, 'u').test(
+            String(url)
+          );
           super(relay && state.offline ? 'ws://127.0.0.1:9/' : url, protocols);
           if (relay) state.sockets.push(this);
         }
       }
       window.WebSocket = RelaySocket;
-    });
+    }, E2E_RELAY_PORT);
     for (const path of ['/player', '/dm', '/dm/campaign/warm/table']) {
       await page
         .goto(path, { waitUntil: 'load', timeout: 60_000 })

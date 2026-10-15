@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
 
+import { E2E_RELAY_HEALTH_URL, E2E_RELAY_URL } from './e2eRelay';
 import { withLocalRedis, withLocalRelayRedis } from './e2eRedis';
 
 /**
@@ -81,14 +82,14 @@ export default defineConfig({
         `env BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} npm run dev`
       ),
       cwd: '../../relay',
-      url: 'http://localhost:8787/healthz',
+      url: E2E_RELAY_HEALTH_URL,
       // DD3: never reuse a relay that may run on a remote Redis.
       reuseExistingServer: false,
       timeout: 60_000,
     },
     {
       command: withLocalRedis(
-        `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=ws://localhost:8787 ${DEV_COMMAND}`,
+        `env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false BATTLEMAP_RELAY_SECRET=${RELAY_SECRET} NEXT_PUBLIC_BATTLEMAP_RELAY_URL=${E2E_RELAY_URL} ${DEV_COMMAND}`,
         'local'
       ),
       cwd: '../..',
