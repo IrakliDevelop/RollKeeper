@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e',
   testMatch: ['fog-of-war.spec.ts', 'fog-preset-library.spec.ts'],
@@ -18,8 +20,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command:
+    command: withLocalRedis(
       'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_BATTLEMAP_RELAY_URL= npm run dev',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://localhost:3000/player',
     reuseExistingServer: false,
