@@ -10,7 +10,11 @@ interface FakeInstance {
   state: {
     status: string;
     document: unknown;
-    operations: Array<{ clientOperationId: string; status: string }>;
+    operations: Array<{
+      clientOperationId: string;
+      status: string;
+      proposal?: { mutation: unknown };
+    }>;
   };
   listeners: Set<() => void>;
   submit: ReturnType<typeof vi.fn>;
@@ -130,6 +134,77 @@ describe('resolved-scene connection scope (R4 client)', () => {
     expect(mint).toHaveBeenCalledTimes(1);
     expect(onSceneResolved).toHaveBeenLastCalledWith('scene-x');
     expect(onSceneChange).not.toHaveBeenCalled();
+  });
+
+  it('carries edits queued before the first resolution into the resolved room, in order and once (DD1)', async () => {
+    const mint = vi.fn(async () => ({
+      token: 'token-x',
+      authority: 1,
+      room: ROOM_X,
+      sceneId: 'scene-x',
+    }));
+    const { store, connection, onSceneChange, onDiagnostic } = start(mint);
+    const first = fake.instances[0]!;
+    // An SDK draft from before resolution, then edits held while connecting.
+    const sdkMutation = { kind: 'remove', id: 'stale-draft' };
+    first.state = {
+      ...first.state,
+      operations: [
+        {
+          clientOperationId: 'op-draft',
+          status: 'draft',
+          proposal: { mutation: sdkMutation },
+        },
+        {
+          clientOperationId: 'op-done',
+          status: 'accepted',
+          proposal: { mutation: { kind: 'remove', id: 'gone' } },
+        },
+      ],
+    };
+    connection.publishLayerUpsert({
+      id: 'player-legacy-a',
+      name: 'My elements',
+      visible: true,
+      locked: false,
+      order: 500,
+      opacity: 1,
+    });
+    const token = {
+      ...createShape({ position: { x: 1, y: 1 }, size: { w: 5, h: 5 } }),
+      id: 'early-token',
+    };
+    store.add(token);
+    expect(first.submit).not.toHaveBeenCalled();
+
+    await expect(first.options.resolveUrl()).resolves.toBeNull();
+    await Promise.resolve();
+
+    const resolved = fake.instances[1]!;
+    expect(resolved.options.scopeId).toBe(`CODE:scene:scene-x:room:${ROOM_X}`);
+    // Not live yet: nothing is sent.
+    expect(resolved.submit).not.toHaveBeenCalled();
+    resolved.state = {
+      status: 'live',
+      document: emptyDocument(),
+      operations: [],
+    };
+    resolved.publish();
+    expect(resolved.submit.mock.calls.map(([mutation]) => mutation)).toEqual([
+      sdkMutation,
+      expect.objectContaining({ kind: 'layer-upsert' }),
+      expect.objectContaining({
+        kind: 'upsert',
+        element: expect.objectContaining({ id: 'early-token' }),
+      }),
+    ]);
+    resolved.publish();
+    expect(resolved.submit).toHaveBeenCalledTimes(3);
+    // Nothing was discarded: no scene-change notice, the token stays.
+    expect(onSceneChange).not.toHaveBeenCalled();
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    expect(store.getById('early-token')).toBeDefined();
+    expect(first.submit).not.toHaveBeenCalled();
   });
 
   it('tears down on an M to X switch, discards pending work visibly and never replays it', async () => {

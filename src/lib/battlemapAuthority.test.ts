@@ -536,6 +536,79 @@ describe('A1 element submissions use JSON semantics', () => {
     expect(withoutUndefined(bare)).toEqual({ a: 1 });
   });
 
+  it('holds edits made before the room is live, keeps them on screen over the first snapshot, and admits them in order once live (PR08 DD1)', () => {
+    const store = new ElementStore();
+    const onDiagnostic = vi.fn();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    // Still connecting: the SDK would refuse (`not-ready`) or strand a draft.
+    const token = {
+      id: 'early',
+      type: 'shape',
+      shape: 'ellipse',
+      position: { x: 1, y: 1 },
+      size: { w: 4, h: 4 },
+      zIndex: 1,
+      locked: false,
+      layerId: 'layer-a',
+    } as unknown as CanvasElement;
+    store.add(token);
+    connection.publishLayerRemove('layer-x');
+    expect(authority.submit).not.toHaveBeenCalled();
+    expect(onDiagnostic).not.toHaveBeenCalled();
+    // The room goes live with a checkpoint that lacks the early token.
+    authority.install({ elements: [], layers: [], extensions: {} });
+    expect(store.getById('early')).toBeDefined();
+    const admitted = (
+      authority.submit.mock.calls as unknown as Array<[{ kind: string }]>
+    ).map(([mutation]) => mutation.kind);
+    expect(admitted).toEqual(['upsert', 'layer-remove']);
+    // Exactly once: a later change does not resend them.
+    authority.install({ elements: [], layers: [], extensions: {} });
+    expect(authority.submit).toHaveBeenCalledTimes(2);
+    connection.stop();
+  });
+
+  it('sends each held edit once even when submitting notifies synchronously (PR08 DD1)', () => {
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'dm-a',
+      store,
+      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+    });
+    connection.publishLayerRemove('layer-x');
+    connection.publishLayerRemove('layer-y');
+    const document = { elements: [], layers: [], extensions: {} };
+    // The real SDK notifies subscribers inside submit().
+    authority.submit.mockImplementation((() => {
+      authority.installState({ status: 'live', document, operations: [] });
+      return { status: 'admitted', clientOperationId: 'op' };
+    }) as never);
+    authority.install(document);
+    expect(
+      (authority.submit.mock.calls as unknown as Array<[{ id: string }]>).map(
+        ([mutation]) => mutation.id
+      )
+    ).toEqual(['layer-x', 'layer-y']);
+    authority.submit.mockImplementation((() => ({
+      status: 'admitted',
+      clientOperationId: 'op',
+    })) as never);
+    connection.stop();
+  });
+
   it('normalizes layer and fog-meta records; not-ready/stopped stay silent, capacity reports; clear forwards expectedState (review 02 N4)', () => {
     const fog = new FogManager();
     const onDiagnostic = vi.fn();
@@ -580,13 +653,12 @@ describe('A1 element submissions use JSON semantics', () => {
     )[0];
     expect(meta.kind).toBe('fog-meta');
     expect(Object.hasOwn(meta.record.definition, 'note')).toBe(false);
-    for (const reason of ['not-ready', 'stopped'])
-      authority.submit.mockImplementationOnce((() => ({
-        status: 'refused',
-        reason,
-      })) as never);
+    // `stopped` stays silent; `not-ready` is held (PR08 DD1, tested below).
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'stopped',
+    })) as never);
     connection.publishLayerRemove('layer-x');
-    connection.publishLayerRemove('layer-y');
     expect(onDiagnostic).not.toHaveBeenCalled();
     authority.submit.mockImplementationOnce((() => ({
       status: 'refused',

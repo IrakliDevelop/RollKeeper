@@ -846,11 +846,13 @@ export function PlayerBattleMapCanvas({
         if (s === 'live') {
           reconnect.delay = 1_000;
           setWithdrawn(false);
-          // Table v1: the attach-time publish rides the unresolved binding,
-          // which the scene resolution retires with its pending work, so
-          // teach every live room this player's band again (the canonical
-          // definition is idempotent). Without it other clients never learn
-          // the band and cannot activate this player's token.
+          // Table v1: the attach-time publish now reaches the resolved room
+          // (battlemapAuthority holds and carries it, DD1). Entering live
+          // again still re-teaches the band: a room re-provisioned while
+          // this tab stays connected (a DM restore seeds the DM's state,
+          // without player bands) would otherwise lose it, and other
+          // clients could not activate this player's token. The canonical
+          // definition is idempotent; one write per live transition.
           const live = enteredLive ? created : null;
           if (live)
             publishOwnedLayers(
