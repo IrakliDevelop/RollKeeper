@@ -1281,11 +1281,43 @@ run('two relay authority transport', () => {
         };
       const inner = transport(endpoint);
       sockets.push(inner);
-      return inner;
+      // HH1: resync and checkpoint frames are kept as notes for a failure.
+      const kind = (raw: string) => {
+        try {
+          const frame = JSON.parse(raw) as { kind?: string; reason?: string };
+          return /resync|checkpoint/u.test(frame.kind ?? '')
+            ? `${frame.kind}${frame.reason ? ` ${frame.reason}` : ''}`
+            : null;
+        } catch {
+          return null;
+        }
+      };
+      return {
+        start(handlers) {
+          inner.start({
+            ...handlers,
+            onMessage: raw => {
+              const seen = kind(raw);
+              if (seen) note(`<- ${seen}`);
+              handlers.onMessage(raw);
+            },
+          });
+        },
+        trySend: raw => {
+          const sent = kind(raw);
+          if (sent) note(`-> ${sent}`);
+          return inner.trySend(raw);
+        },
+        close: () => inner.close(),
+      };
     };
     const store = new ElementStore();
     let status = 'connecting';
     const diagnostics: string[] = [];
+    const notes: string[] = [];
+    const startedAt = Date.now();
+    const note = (text: string) =>
+      notes.push(`${Date.now() - startedAt}ms ${text}`);
     const dm = createManagedBattleMapAuthorityConnection({
       relayUrl: `ws://127.0.0.1:${first.address().port}`,
       campaignCode: CAMPAIGN,
@@ -1302,6 +1334,7 @@ run('two relay authority transport', () => {
       mint: async () => ({ token: dmToken, authority: 1, room: ROOM }),
       transportFactory: gated,
       onStatus: next => {
+        if (next !== status) note(`status ${next}`);
         status = next;
       },
       onDiagnostic: message => diagnostics.push(message),
@@ -1367,31 +1400,61 @@ run('two relay authority transport', () => {
     await eventually(() => roomX('offline-dm-element') === 500);
     await eventually(() => diagnostics.includes(OFFLINE_DISCARDED_DM_MESSAGE));
 
-    // And a checkpoint can be saved (no blocked barrier). Right after a
-    // reconnect the SDK may still answer `recovery`; a later attempt saves.
+    // And a checkpoint can be saved (no blocked barrier) without the relay
+    // closing the socket for a request that came too soon after the
+    // reconnect's own recovery request (HH1: 1013 "resync required").
+    // Right after a reconnect the SDK may still answer `recovery`.
+    const closesBefore = closeEvents.length;
     const outcomes: string[] = [];
-    await eventually(async () => {
-      const barrier = dm.captureBarrier!();
-      if (!barrier) return false;
-      try {
-        const receipts = await dm.waitForAcknowledgements!(barrier, {
-          timeoutMs: 10_000,
-        });
-        expect(receipts.status).toBe('acknowledged');
-        const captured = await dm.requestCheckpoint!({
-          barrier,
-          timeoutMs: 10_000,
-        });
-        outcomes.push(
-          captured.status === 'complete' ? 'complete' : captured.reason
-        );
-        return captured.status === 'complete';
-      } finally {
-        dm.releaseBarrier!(barrier);
-      }
-    }, 30_000);
-    expect(outcomes.at(-1)).toBe('complete');
-    expect(outcomes.filter(outcome => outcome !== 'recovery').length).toBe(1);
+    try {
+      await eventually(async () => {
+        const barrier = dm.captureBarrier!();
+        if (!barrier) return false;
+        try {
+          const receipts = await dm.waitForAcknowledgements!(barrier, {
+            timeoutMs: 10_000,
+          });
+          note(`receipts ${receipts.status}`);
+          expect(receipts.status).toBe('acknowledged');
+          const captured = await dm.requestCheckpoint!({
+            barrier,
+            timeoutMs: 10_000,
+          });
+          const outcome =
+            captured.status === 'complete' ? 'complete' : captured.reason;
+          outcomes.push(outcome);
+          note(`checkpoint ${outcome}`);
+          return captured.status === 'complete';
+        } finally {
+          dm.releaseBarrier!(barrier);
+        }
+      }, 30_000);
+      expect(outcomes.at(-1)).toBe('complete');
+      expect(outcomes.filter(outcome => outcome !== 'recovery').length).toBe(1);
+      expect(closeEvents.slice(closesBefore)).toEqual([]);
+    } catch (error) {
+      console.info(
+        '70-offline notes',
+        JSON.stringify({
+          // Run-length, e.g. "recovery x57, complete".
+          outcomes: outcomes
+            .reduce<Array<[string, number]>>((runs, outcome) => {
+              const last = runs.at(-1);
+              if (last?.[0] === outcome) last[1] += 1;
+              else runs.push([outcome, 1]);
+              return runs;
+            }, [])
+            .map(([outcome, count]) =>
+              count > 1 ? `${outcome} x${count}` : outcome
+            )
+            .join(', '),
+          closes: closeEvents,
+          status,
+          notes: notes.filter(item => !/ recovery$/u.test(item)).slice(-40),
+        })
+      );
+      throw error;
+    }
   }, 120_000);
 
   it('restore to a fresh room generation withdraws admitted DM and player sockets; re-minted tokens join the restored state (PR08 desktop A1)', async () => {

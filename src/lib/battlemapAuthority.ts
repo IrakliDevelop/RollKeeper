@@ -123,6 +123,31 @@ export const CONNECTION_DROPPED_MESSAGE =
 /** FF6 / GG1: a DM edit the live room refused; the DM's map keeps it. */
 export const DM_REJECTED_MESSAGE =
   'The live map refused a change. Players see the saved version.';
+/**
+ * HH1: the SDK spaces checkpoint requests 10 s apart by its own send time,
+ * and the relay closes the socket (1013) when a request arrives less than
+ * 10 s after the previous one. Network jitter can put the two clocks on
+ * either side of that boundary, so a requested checkpoint waits a little
+ * longer than the SDK would.
+ */
+export const CHECKPOINT_REQUEST_SPACING_MS = 10_500;
+
+/** Resolves false when the signal aborts before `ms` elapse. */
+function waitFor(ms: number, signal?: AbortSignal): Promise<boolean> {
+  if (signal?.aborted) return Promise.resolve(false);
+  return new Promise(resolve => {
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve(true);
+    }, ms);
+    const onAbort = () => {
+      clearTimeout(timer);
+      resolve(false);
+    };
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
+}
+
 /** EE2: held edits kept at most (after coalescing). */
 export const HELD_EDIT_LIMIT = 64;
 export const HELD_OVERFLOW_MESSAGE =
@@ -527,6 +552,9 @@ export function createManagedBattleMapAuthorityConnection(
    * ids are collected first and nested changes are skipped (FF2).
    */
   let releasing = false;
+  /** HH1: when this tab last caused a checkpoint request (ms epoch). */
+  let lastCheckpointRequestAt = Number.NEGATIVE_INFINITY;
+  let lastStatus: string | null = null;
   const releaseSettled = (inner: ManagedAuthorityConnection): void => {
     const state = inner.getState();
     const settledLive = state.status === 'live' && state.document !== null;
@@ -577,6 +605,10 @@ export function createManagedBattleMapAuthorityConnection(
     if (releasing || stopped || inner !== connection || retired === inner)
       return;
     const state = inner.getState();
+    // HH1: entering recovery, the SDK sends its own checkpoint request.
+    if (state.status === 'recovering' && lastStatus !== 'recovering')
+      lastCheckpointRequestAt = Date.now();
+    lastStatus = state.status;
     if (state.status === 'live') {
       everLive = true;
       firstLiveSeen = true;
@@ -771,8 +803,14 @@ export function createManagedBattleMapAuthorityConnection(
     captureBarrier: () => connection.captureBarrier(),
     waitForAcknowledgements: (barrier, waitOptions) =>
       connection.waitForAcknowledgements(barrier, waitOptions),
-    requestCheckpoint: checkpointOptions =>
-      connection.requestCheckpoint(checkpointOptions),
+    requestCheckpoint: async checkpointOptions => {
+      const wait =
+        lastCheckpointRequestAt + CHECKPOINT_REQUEST_SPACING_MS - Date.now();
+      if (wait > 0 && !(await waitFor(wait, checkpointOptions?.signal)))
+        return { status: 'failed', reason: 'aborted' };
+      lastCheckpointRequestAt = Date.now();
+      return connection.requestCheckpoint(checkpointOptions);
+    },
     releaseBarrier: barrier => {
       const released = connection.releaseBarrier(barrier);
       // J1: its operations are unpinned now; free the settled ones at once.

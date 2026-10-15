@@ -94,6 +94,7 @@ import {
   CONNECTION_DROPPED_MESSAGE,
   DM_REJECTED_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
+  CHECKPOINT_REQUEST_SPACING_MS,
   OFFLINE_DISCARDED_PLAYER_MESSAGE,
   withoutUndefined,
 } from './battlemapAuthority';
@@ -866,6 +867,70 @@ describe('A1 element submissions use JSON semantics', () => {
     release.mockImplementation(real as never);
     connection.releaseBarrier?.({} as never);
     expect(calls()).toEqual([['accepted-pinned', undefined]]);
+    connection.stop();
+  });
+
+  it('HH1: a checkpoint request waits past the relay spacing after the reconnect recovery request', async () => {
+    vi.useFakeTimers();
+    try {
+      const { connection } = dmConnection();
+      const inner = authority.connection.requestCheckpoint;
+      inner.mockReset();
+      inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+      // The SDK sends its recovery checkpoint request when it starts recovering.
+      authority.installState({
+        status: 'recovering',
+        document: null,
+        operations: [],
+      });
+      authority.installState({
+        status: 'live',
+        document: emptyDoc(),
+        operations: [],
+      });
+      const pending = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS - 1);
+      expect(inner).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await pending;
+      expect(inner).toHaveBeenCalledTimes(1);
+      // A second request right after waits a full spacing again.
+      const next = connection.requestCheckpoint!({ timeoutMs: 10_000 });
+      await vi.advanceTimersByTimeAsync(CHECKPOINT_REQUEST_SPACING_MS - 1);
+      expect(inner).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(1);
+      await next;
+      expect(inner).toHaveBeenCalledTimes(2);
+      // An aborted wait never sends.
+      const controller = new AbortController();
+      const aborted = connection.requestCheckpoint!({
+        timeoutMs: 10_000,
+        signal: controller.signal,
+      });
+      controller.abort();
+      await expect(aborted).resolves.toEqual({
+        status: 'failed',
+        reason: 'aborted',
+      });
+      expect(inner).toHaveBeenCalledTimes(2);
+      connection.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('HH1: a checkpoint long after the last request is sent at once', async () => {
+    const { connection } = dmConnection();
+    const inner = authority.connection.requestCheckpoint;
+    inner.mockReset();
+    inner.mockResolvedValue({ status: 'failed', reason: 'recovery' });
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [],
+    });
+    await connection.requestCheckpoint!({ timeoutMs: 10_000 });
+    expect(inner).toHaveBeenCalledTimes(1);
     connection.stop();
   });
 
