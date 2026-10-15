@@ -62,7 +62,11 @@ the local serverless-redis-http on `localhost:8079` for the relay-backed
 loot, shop and sheet-drawer suites. A non-local URL exported in the shell
 fails the run before any server starts, and app servers never reuse an
 already running dev server (`reuseExistingServer: false`), so stop your own
-`npm run dev` first. The relay-backed suites need Redis on 6379 and
+`npm run dev` first. The relay dev server is started the same way
+(`withLocalRelayRedis`): `REDIS_URL` is set to `redis://localhost:6379` on
+its command (which wins over `relay/.env`, loaded with
+`--env-file-if-exists`), a non-local `REDIS_URL` in the shell fails the run,
+and a running relay is never reused. The relay-backed suites need Redis on 6379 and
 serverless-redis-http on 8079 (`docker compose up -d`, or disposable
 containers) plus `npm ci --prefix relay`.
 
