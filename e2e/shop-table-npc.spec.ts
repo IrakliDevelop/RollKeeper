@@ -470,10 +470,18 @@ test('an open shop picks up a merchant placed on the Table afterwards', async ({
     await dmMapPage.keyboard.press('Escape');
 
     await openTableSceneLive(dmMapPage, code, MAP_NAME);
+    // OO5: wait for the Table's own token update (the ids-only PATCH) rather
+    // than for time to pass.
+    const tokensUpdated = dmMapPage.waitForResponse(
+      response =>
+        response.request().method() === 'PATCH' &&
+        new URL(response.url()).pathname ===
+          `/api/campaign/${code}/shops/${NPC_ID}`,
+      { timeout: 30_000 }
+    );
     const { tokenId, memberId } = await addMerchantThroughTable(dmMapPage);
-    await expect
-      .poll(() => publishedEntityIds(dmMapPage, code), { timeout: 15_000 })
-      .toEqual([memberId]);
+    expect((await tokensUpdated).status()).toBe(200);
+    expect(await publishedEntityIds(dmMapPage, code)).toEqual([memberId]);
 
     await playerOnMap(playerPage, code, campaignName, tokenId);
     await tap(playerPage, tokenId);
