@@ -200,6 +200,12 @@ async function addMerchantThroughTable(
   await page
     .getByRole('button', { name: new RegExp(`${MERCHANT_NAME}.*Not on map`) })
     .click();
+  // Placement is armed only after the roster has bound the token (an async
+  // write): a click before the prompt shows lands on an unarmed map.
+  // (The banner reads without a full stop; the toast says the same with one.)
+  await expect(
+    page.getByText(`Click the map to place ${MERCHANT_NAME}`, { exact: true })
+  ).toBeVisible({ timeout: 15_000 });
   const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('DM canvas has no bounding box');
@@ -470,10 +476,18 @@ test('an open shop picks up a merchant placed on the Table afterwards', async ({
     await dmMapPage.keyboard.press('Escape');
 
     await openTableSceneLive(dmMapPage, code, MAP_NAME);
+    // OO5: wait for the Table's own token update (the ids-only PATCH) rather
+    // than for time to pass.
+    const tokensUpdated = dmMapPage.waitForResponse(
+      response =>
+        response.request().method() === 'PATCH' &&
+        new URL(response.url()).pathname ===
+          `/api/campaign/${code}/shops/${NPC_ID}`,
+      { timeout: 30_000 }
+    );
     const { tokenId, memberId } = await addMerchantThroughTable(dmMapPage);
-    await expect
-      .poll(() => publishedEntityIds(dmMapPage, code), { timeout: 15_000 })
-      .toEqual([memberId]);
+    expect((await tokensUpdated).status()).toBe(200);
+    expect(await publishedEntityIds(dmMapPage, code)).toEqual([memberId]);
 
     await playerOnMap(playerPage, code, campaignName, tokenId);
     await tap(playerPage, tokenId);

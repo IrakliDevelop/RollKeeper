@@ -1,4 +1,5 @@
 import type { JsonObject } from './schema';
+import { editorFogToAuthorityFog } from './fogShape';
 import type { SharedInitiativeState } from '@/types/sharedState';
 import { TABLE_MUTATION_HEADERS } from './tableRequestHeaders';
 
@@ -237,9 +238,11 @@ export function canvasStateToAuthorityState(
           Number.isSafeInteger(canvasFog.version)
             ? canvasFog.version
             : 1,
-        data: Object.hasOwn(canvasFog ?? {}, 'data')
-          ? (structuredClone(canvasFog?.data) as JsonObject[string])
-          : null,
+        // Repair 10 (G1): the room takes the authority fog shape.
+        data: editorFogToAuthorityFog(
+          canvasFog?.data,
+          editor
+        ) as JsonObject[string],
       },
     },
   };

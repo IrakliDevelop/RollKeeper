@@ -226,7 +226,9 @@ describe('adopt to live authority checkpoint integration', () => {
       extensions: {
         fog: {
           version: 1,
-          data: { meta: { version: 2, editor: 'dm-1' }, tiles: [] },
+          // Repair 10: reloaded in the editor's fog shape; a room fog
+          // record without a definition is no fog.
+          data: null,
         },
       },
     });

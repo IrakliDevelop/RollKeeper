@@ -208,6 +208,28 @@ scene rooms, player views and the TV cannot connect.
   again once a newer build reapplies or discards the offline changes
   (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
   released build had the Table.
+- **Fog has two shapes.** The editor (the scene's local draft, the offline
+  changes slot, a battle map before it joins the Table) keeps fog as
+  `{ definition, tiles: [{ x, y, data }] }`; the live room and saved
+  checkpoints keep it as `{ meta: { version, editor, definition }, tiles:
+  [{ generation, x, y, version, editor, data? }] }` sorted by x then y.
+  `src/lib/table/fogShape.ts` converts both ways: going live
+  (`initialize-if-empty` from `prepareTableSceneRoom`) and Reapply
+  (`restoreAuthorityFork`) send the room shape, and opening a scene from a
+  saved checkpoint (`sceneCheckpointToViewportState`) gives the editor its
+  shape. Before repair 10 a fogged map could not go live, Reapply on a
+  fogged scene failed with "the saved copy can't be used", and a scene
+  opened from a fogged checkpoint lost its canvas.
+  - Provisioned fog records carry version 1 and the DM id as editor. A
+    client numbers its fog edits from the highest version in the first
+    snapshot it applies (so from 2). A DM fog edit stamped before that
+    snapshot would tie with the provisioned record and be refused as a
+    conflict, but the DM's connection refuses edits before it is first
+    live (they stay in the local draft), so this does not happen in
+    practice.
+  - A malformed or repeated editor fog tile is not dropped: the fog goes
+    to the room unconverted and is refused, because dropping a tile on a
+    revealed map would show a concealed area.
 - **Merchants on Table scenes.** A campaign NPC added through the Table
   (Add to scene → Campaign NPC) gets a DM token keyed by its scene member id,
   and the NPC link lives on the Table actor (`profile.sourceKind:
