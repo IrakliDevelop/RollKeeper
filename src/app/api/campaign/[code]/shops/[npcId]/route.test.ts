@@ -60,7 +60,7 @@ import {
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
 } from '@/lib/shopPurchases';
 
-import { GET, PUT } from './route';
+import { GET, PATCH, PUT, SHOP_ENTITY_IDS_CAS_SCRIPT } from './route';
 
 const params = { params: Promise.resolve({ code: 'ABC', npcId: 'npc-1' }) };
 
@@ -531,5 +531,126 @@ describe('shop read route — live stock overlay', () => {
     expect(serialized).not.toContain(secretMechanicalText);
     expect(serialized).not.toContain('"item"');
     expect(body.shop.items[0]).not.toHaveProperty('item');
+  });
+});
+
+function patchRequest(body: unknown) {
+  return new NextRequest('http://localhost/api', {
+    method: 'PATCH',
+    body: JSON.stringify(body),
+  });
+}
+
+describe('shop token links route (PATCH, repair 09 LL1)', () => {
+  // A player bought 2 of 5 since the last publish: the projection and ledger
+  // both say 3 left, while the DM's local NPC still says 5.
+  const soldDown = JSON.stringify(
+    makePublicShop({
+      items: [{ ...makePublicShop().items[0], remainingQuantity: 3 }],
+    })
+  );
+
+  it('rewrites only entityIds, atomically, and never reseeds stock', async () => {
+    rawRedis.get.mockResolvedValue(soldDown);
+    rawRedis.eval.mockResolvedValue(1);
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1', 'entity-1'] }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(rawRedis.get).toHaveBeenCalledWith('shop:ABC:npc-1');
+    expect(rawRedis.eval).toHaveBeenCalledTimes(1);
+    const [script, keys, args] = rawRedis.eval.mock.calls[0]!;
+    expect(script).toBe(SHOP_ENTITY_IDS_CAS_SCRIPT);
+    expect(keys).toEqual(['shop:ABC:npc-1', 'shop-ledger:ABC:npc-1']);
+    expect(args[0]).toBe(soldDown);
+    const next = JSON.parse(args[1] as string);
+    expect(next.entityIds).toEqual(['member-1', 'entity-1']);
+    // Stock (and everything else) is exactly what was published.
+    expect({ ...next, entityIds: undefined }).toEqual({
+      ...JSON.parse(soldDown),
+      entityIds: undefined,
+    });
+    expect(seedShopLedger).not.toHaveBeenCalled();
+    expect(redis.set).not.toHaveBeenCalled();
+    expect(redis.del).not.toHaveBeenCalled();
+  });
+
+  it('retries when the projection changed underneath (another publish)', async () => {
+    rawRedis.get.mockResolvedValue(soldDown);
+    rawRedis.eval.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(200);
+    expect(rawRedis.get).toHaveBeenCalledTimes(2);
+    expect(rawRedis.eval).toHaveBeenCalledTimes(2);
+  });
+
+  it('answers 409 after three lost compare-and-set races (NN2)', async () => {
+    rawRedis.get.mockResolvedValue(soldDown);
+    rawRedis.eval.mockResolvedValue(0);
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(409);
+    expect(rawRedis.eval).toHaveBeenCalledTimes(3);
+  });
+
+  it('answers 404, not 500, for a stored projection that is not JSON (NN3)', async () => {
+    rawRedis.get.mockResolvedValue('{not json');
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(404);
+    expect(rawRedis.eval).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['no projection', null, 1],
+    ['a projection whose ledger is gone', soldDown, -1],
+  ])('answers 404 for %s', async (_label, raw, evalResult) => {
+    rawRedis.get.mockResolvedValue(raw);
+    rawRedis.eval.mockResolvedValue(evalResult);
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(404);
+    expect(seedShopLedger).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-DM and a hybrid guest', async () => {
+    verifyDmAuthority.mockResolvedValue('mismatch');
+    expect(
+      (await PATCH(patchRequest({ dmId: 'x', entityIds: [] }), params)).status
+    ).toBe(403);
+    rejectHybridGuestPrivilegeEscalation.mockReturnValue(
+      NextResponse.json({ error: 'no' }, { status: 403 })
+    );
+    expect(
+      (await PATCH(patchRequest({ dmId: 'dm-1', entityIds: [] }), params))
+        .status
+    ).toBe(403);
+    expect(rawRedis.eval).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a missing dmId', { entityIds: [] }],
+    ['non-string ids', { dmId: 'dm-1', entityIds: [1] }],
+    [
+      'more than 50 ids',
+      {
+        dmId: 'dm-1',
+        entityIds: Array.from({ length: 51 }, (_, i) => `e${i}`),
+      },
+    ],
+  ])('rejects %s', async (_label, body) => {
+    const response = await PATCH(patchRequest(body), params);
+    expect(response.status).toBe(400);
+    expect(rawRedis.eval).not.toHaveBeenCalled();
   });
 });

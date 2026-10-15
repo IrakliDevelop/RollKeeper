@@ -46,7 +46,7 @@ const DEV_COMMAND = process.env.ROLLKEEPER_E2E_DEV_COMMAND ?? 'npm run dev';
 // `playwright.config.ts` deliberately does not start.
 export default defineConfig({
   testDir: '../../e2e',
-  testMatch: ['shop-purchase-reconciliation.spec.ts'],
+  testMatch: ['shop-purchase-reconciliation.spec.ts', 'shop-table-npc.spec.ts'],
   outputDir: '../../test-results/shop',
   timeout: 60_000,
   retries: 0,

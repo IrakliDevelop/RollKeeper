@@ -27,6 +27,7 @@ import { isUsableView } from '../display/tableDisplayController';
 import { useTablePresentationPanel } from '../presentation';
 import type { TablePresentationControlsProps } from '../presentation/TablePresentationControls.types';
 import { useAuthenticatedTableWorkspace } from '../useAuthenticatedTableWorkspace';
+import { useTableShopRepublish } from './useTableShopRepublish';
 import {
   parseTableWorkspaceQuery,
   tableWorkspaceHref,
@@ -107,6 +108,8 @@ export function useTableWorkspace(campaignCode: string) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [snapshot, revision]
   );
+  // Repair 09 (D2): open shops follow the merchants placed on the Table.
+  useTableShopRepublish({ snapshot, revision, campaignCode, dmId });
   const requestedScene = query.scene
     ? scenes.find(scene => scene.sceneId === query.scene)
     : undefined;

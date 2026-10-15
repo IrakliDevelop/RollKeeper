@@ -208,6 +208,29 @@ scene rooms, player views and the TV cannot connect.
   again once a newer build reapplies or discards the offline changes
   (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
   released build had the Table.
+- **Merchants on Table scenes.** A campaign NPC added through the Table
+  (Add to scene → Campaign NPC) gets a DM token keyed by its scene member id,
+  and the NPC link lives on the Table actor (`profile.sourceKind:
+  'campaign-npc'`), not in the encounter store. Publishing a shop therefore
+  also reads this device's default Table for the campaign
+  (`readTableShopEntityIds` / `tableShopEntityIds`,
+  `src/lib/table/shopLinks.ts`): live members that are not player-controlled
+  and came from that NPC, plus adopted encounter entities whose source names
+  it (their member id and legacy entity id). Reading never creates a Table;
+  a failed read, or one slower than 2.5 s, is logged and the encounter ids
+  are still published; a close never waits for a read. The account is the
+  local Supabase session (else guest). While the Table page is open, an
+  open, published shop gets its token list updated by itself when its
+  merchant is added, placed or removed (`useTableShopRepublish`). That
+  update is the ids-only `PATCH /api/campaign/[code]/shops/[npcId]`
+  (DM-only, at most 50 ids, compare-and-set on the published projection),
+  which never reseeds stock, so a sale the DM's copy has not drained yet is
+  never undone. The hook remembers the ids it last saw per shop and skips
+  the shop index request while they are unchanged.
+  The campaign-page Shop tab publishes from the default Table, and the
+  Table page from the Table it has open (an imported Table opened with
+  `?tableWorkspace=` is not the default). If the DM uses both with
+  different Tables, the most recent publish or update wins.
 - **Canvas budgets.** The local draft and the offline changes slot each count
   against the 20 MiB canvas checkpoint budget, like the saved checkpoint,
   instead of the 1 MiB scene metadata budget (`validateWorkspaceLimits`,

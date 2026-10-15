@@ -314,3 +314,119 @@ export async function PUT(
     );
   }
 }
+
+/**
+ * Compare-and-set of the published projection, keyed on the exact stored
+ * text: KEYS[1] projection, KEYS[2] ledger, ARGV[1] the projection text the
+ * caller read, ARGV[2] its replacement. Returns -1 when the shop is not
+ * live (projection or ledger gone), 0 when the projection changed since it
+ * was read, 1 when written. The ledger is only checked, never written, and
+ * the projection keeps its TTL.
+ */
+export const SHOP_ENTITY_IDS_CAS_SCRIPT = `
+local current = redis.call('GET', KEYS[1])
+if not current then return -1 end
+if redis.call('EXISTS', KEYS[2]) == 0 then return -1 end
+if current ~= ARGV[1] then return 0 end
+redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL')
+return 1
+`;
+
+const ENTITY_IDS_CAS_ATTEMPTS = 3;
+
+/**
+ * Repair 09 (LL1): the DM updates only which tokens open a published shop
+ * (`entityIds`), for example when a merchant is placed on or removed from a
+ * Table scene. Unlike `PUT`, it never reseeds the ledger, so a sale not yet
+ * drained into the DM's copy can never be undone (no stock restore, no
+ * oversell). Same DM-only auth and the same `entityIds` bounds as `PUT`.
+ *
+ * The projection text is read with the raw client and replaced with a
+ * compare-and-set script, so a concurrent full publish is never overwritten
+ * with stale fields; a lost race reads again (a few times). A shop that is
+ * not live answers 404 and nothing is written.
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ code: string; npcId: string }> }
+) {
+  const guestDenied = rejectHybridGuestPrivilegeEscalation(request);
+  if (guestDenied) return guestDenied;
+
+  const { code, npcId } = await params;
+  try {
+    const body = (await request.json().catch(() => null)) as Record<
+      string,
+      unknown
+    > | null;
+    if (!body || typeof body.dmId !== 'string') {
+      return NextResponse.json({ error: 'dmId is required' }, { status: 400 });
+    }
+    const entityIds = body.entityIds;
+    if (
+      !Array.isArray(entityIds) ||
+      entityIds.length > MAX_ENTITY_IDS ||
+      !entityIds.every(id => typeof id === 'string')
+    ) {
+      return NextResponse.json(
+        { error: 'entityIds must be an array of strings' },
+        { status: 400 }
+      );
+    }
+
+    const redis = getRedis();
+    const dmAuth = await verifyDmAuthority(redis, code, body.dmId);
+    if (dmAuth !== 'ok') {
+      return NextResponse.json(
+        { error: 'dmId is not authorized for this campaign' },
+        { status: 403 }
+      );
+    }
+
+    const shopKey = campaignShopKey(code, npcId);
+    const ledgerKey = campaignShopLedgerKey(code, npcId);
+    const raw = getRawRedis();
+    const notLive = () =>
+      NextResponse.json({ error: 'shop is not published' }, { status: 404 });
+
+    for (let attempt = 0; attempt < ENTITY_IDS_CAS_ATTEMPTS; attempt += 1) {
+      const current = await raw.get<string>(shopKey);
+      if (!current) return notLive();
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(current) as unknown;
+      } catch {
+        // NN3: an unreadable projection is no live shop, not a server error.
+        return notLive();
+      }
+      const projection = sanitizePublicShop(parsed);
+      if (!projection) return notLive();
+      const next = { ...projection, entityIds: entityIds as string[] };
+      if (!sanitizePublicShop(next)) {
+        return NextResponse.json(
+          { error: 'entityIds must be an array of strings' },
+          { status: 400 }
+        );
+      }
+      const result = Number(
+        await raw.eval(
+          SHOP_ENTITY_IDS_CAS_SCRIPT,
+          [shopKey, ledgerKey],
+          [current, JSON.stringify(next)]
+        )
+      );
+      if (result === 1) return NextResponse.json({ success: true });
+      if (result === -1) return notLive();
+    }
+    return NextResponse.json(
+      { error: 'The shop changed while updating. Try again.' },
+      { status: 409 }
+    );
+  } catch (error) {
+    console.error('Failed to update shop tokens:', error);
+    return NextResponse.json(
+      { error: 'Failed to update shop tokens' },
+      { status: 500 }
+    );
+  }
+}
