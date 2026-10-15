@@ -437,6 +437,34 @@ describe('NPCShopTab', () => {
       expect(opens).toEqual([false]);
     });
 
+    it('repair 09 NN2: open, close, open ends with the last open sent', async () => {
+      const reads: Array<(ids: string[]) => void> = [];
+      loadTableShopEntityIds.mockImplementation(
+        () =>
+          new Promise<string[]>(resolve => {
+            reads.push(resolve);
+          })
+      );
+      const fetchFn = mockFetchResponse(200, { success: true, shop: {} });
+      render(<Harness initial={makeNpc()} />);
+      const toggle = screen.getByRole('switch', { name: 'Open for business' });
+      fireEvent.click(toggle);
+      fireEvent.click(toggle);
+      fireEvent.click(toggle);
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(1));
+      expect(reads).toHaveLength(2);
+      // The first open's read finishes last of all: it stays stale.
+      await act(async () => reads[1]!(['member-1']));
+      await act(async () => reads[0]!(['member-1']));
+      await waitFor(() => expect(fetchFn).toHaveBeenCalledTimes(2));
+      await act(async () => {});
+      const bodies = (fetchFn as ReturnType<typeof vi.fn>).mock.calls.map(
+        call => JSON.parse((call[1] as RequestInit).body as string)
+      );
+      expect(bodies.map(body => body.npc.shop.open)).toEqual([false, true]);
+      expect(bodies[1].entityIds).toEqual(['member-1']);
+    });
+
     it('repair 09 LL2: a Table read that hangs publishes the encounter ids after the timeout', async () => {
       vi.useFakeTimers();
       const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
