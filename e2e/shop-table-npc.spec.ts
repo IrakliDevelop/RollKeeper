@@ -200,6 +200,12 @@ async function addMerchantThroughTable(
   await page
     .getByRole('button', { name: new RegExp(`${MERCHANT_NAME}.*Not on map`) })
     .click();
+  // Placement is armed only after the roster has bound the token (an async
+  // write): a click before the prompt shows lands on an unarmed map.
+  // (The banner reads without a full stop; the toast says the same with one.)
+  await expect(
+    page.getByText(`Click the map to place ${MERCHANT_NAME}`, { exact: true })
+  ).toBeVisible({ timeout: 15_000 });
   const canvas = page.locator('canvas').first();
   const box = await canvas.boundingBox();
   if (!box) throw new Error('DM canvas has no bounding box');
