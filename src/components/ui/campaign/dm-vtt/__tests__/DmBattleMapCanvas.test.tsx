@@ -468,16 +468,15 @@ describe('DmBattleMapCanvas: sharing controls follow the live room (PR08 repair 
   });
   const toolbarProps = () => vi.mocked(DmVttToolbar).mock.calls.at(-1)![0];
 
-  it('the private original editor shows no sharing, presence, ping or laser controls', () => {
+  it('the private original editor shows no sharing, presence or ping controls, and keeps the local laser', () => {
     renderCanvas();
     const props = toolbarProps();
     expect(props.measureSharing).toBeUndefined();
     expect(props.movementControls?.sharing).toBeUndefined();
     expect(props.movementControls?.dash).toBeDefined();
     expect(props.presenceControl).toBeUndefined();
-    expect(props.hiddenTools).toEqual(
-      expect.arrayContaining(['ping', 'laser'])
-    );
+    // DD4: the laser draws its own trail locally, so it stays.
+    expect(props.hiddenTools).toEqual(['ping']);
     expect(getViewsControlProps().canShare).toBe(false);
   });
 

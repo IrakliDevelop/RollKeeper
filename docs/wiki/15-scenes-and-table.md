@@ -142,7 +142,15 @@ scene rooms, player views and the TV cannot connect.
   Table scene has a live room), so its top bar shows "Private. Players don't
   see this map." (or, once the map is on the Table, "Private copy. Players
   see the Table scene, not edits here.") instead of a connection status
-  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`).
+  (`src/components/ui/campaign/dm-vtt/DmBattleMapCanvas.hooks.ts`). It hides
+  the controls that only work through a live room (measure, move and camera
+  sharing, send view, viewers and cursor sharing, ping); the laser pointer
+  stays because it draws locally.
+- A player's edits made before their map connection is live (for example a
+  token placed right after opening the shown scene, or the player's own
+  layer) are held in order and sent once the resolved scene room is live
+  (`src/lib/battlemapAuthority.ts`). Only a later change of shown scene
+  discards unsent edits, with a notice.
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
   (`src/components/ui/campaign/table/display/displayCredentialStore.ts`). Use

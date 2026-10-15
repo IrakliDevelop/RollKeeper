@@ -38,10 +38,12 @@ export type { DmBattleMapCanvasProps };
  * init/persistence/connection wiring.
  */
 /**
- * PR08 repair 07 CC4: tools that only matter to other viewers. The original
- * editor is private (no live room under Table v1), so it hides them.
+ * PR08 repair 07 CC4 / repair 08 DD4: tools that only work through a live
+ * room. The original editor is private (no room under Table v1), so it
+ * hides ping (its input and overlay are attached only with a room). The
+ * laser stays: it draws its own trail locally, useful when screen sharing.
  */
-const PRIVATE_EDITOR_HIDDEN_TOOLS: readonly string[] = ['ping', 'laser'];
+const PRIVATE_EDITOR_HIDDEN_TOOLS: readonly string[] = ['ping'];
 
 export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   // Only a Table scene has a live room: sharing and presence need one.
