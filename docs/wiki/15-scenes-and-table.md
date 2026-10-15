@@ -208,6 +208,18 @@ scene rooms, player views and the TV cannot connect.
   again once a newer build reapplies or discards the offline changes
   (`src/lib/table/offlineFork.olderReader.test.ts`). Accepted because no
   released build had the Table.
+- **Fog has two shapes.** The editor (the scene's local draft, the offline
+  changes slot, a battle map before it joins the Table) keeps fog as
+  `{ definition, tiles: [{ x, y, data }] }`; the live room and saved
+  checkpoints keep it as `{ meta: { version, editor, definition }, tiles:
+  [{ generation, x, y, version, editor, data? }] }` sorted by x then y.
+  `src/lib/table/fogShape.ts` converts both ways: going live
+  (`initialize-if-empty` from `prepareTableSceneRoom`) and Reapply
+  (`restoreAuthorityFork`) send the room shape, and opening a scene from a
+  saved checkpoint (`sceneCheckpointToViewportState`) gives the editor its
+  shape. Before repair 10 a fogged map could not go live, Reapply on a
+  fogged scene failed with "the saved copy can't be used", and a scene
+  opened from a fogged checkpoint lost its canvas.
 - **Merchants on Table scenes.** A campaign NPC added through the Table
   (Add to scene → Campaign NPC) gets a DM token keyed by its scene member id,
   and the NPC link lives on the Table actor (`profile.sourceKind:
