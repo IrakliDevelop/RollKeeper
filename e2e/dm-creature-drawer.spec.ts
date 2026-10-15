@@ -24,8 +24,8 @@ import {
  * Harness: `e2e/map-sheet-drawer.spec.ts`'s DM-side setup and
  * `config/playwright/sheet-drawer.config.ts`'s webServer wiring (relay +
  * dev server). This spec is DM-only (no player context, no relay
- * round-trip needed for the seeded token), but shares the config so the
- * nightly `sheet-drawer-e2e` job covers both in one run.
+ * round-trip needed for the seeded token), but shares the config so one
+ * `sheet-drawer` run covers both.
  */
 
 const CAMPAIGN_NAME = 'Creature Drawer E2E Campaign';
@@ -228,7 +228,9 @@ test.describe('DM creature drawer', () => {
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
 
     await seedDm(dmPage, DM_ID);
@@ -241,9 +243,11 @@ test.describe('DM creature drawer', () => {
       undefined,
       { timeout: 15_000 }
     );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // The creature drawer lives in the original editor, which is private
+    // under Table v1 (no relay room): the seeded token loads locally.
+    await expect(
+      dmPage.getByText("Private. Players don't see this map.")
+    ).toBeVisible({ timeout: 20_000 });
     await waitForElementSynced(dmPage, TOKEN_ID);
   });
 

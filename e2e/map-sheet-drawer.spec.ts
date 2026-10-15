@@ -14,6 +14,7 @@ import {
   joinCampaign,
   coordsForElement,
   waitForElementSynced,
+  openTableSceneLive,
 } from './helpers/battlemapRelay';
 
 /**
@@ -44,8 +45,6 @@ const DM_ID = 'dm-sheet-drawer-e2e';
 const MAP_ID = 'sheet-drawer-map-e2e';
 const CHARACTER_NAME = 'Drawer Hero';
 const DAMAGE = 3;
-
-const mapUrl = (code: string) => `/dm/campaign/${code}/battlemaps/${MAP_ID}`;
 
 /** Blank battle map seeded straight into the DM's localStorage — same shape
  *  as `marker-loot-locked-claim.spec.ts`'s `seedBattleMap`. */
@@ -219,31 +218,30 @@ test.describe('player map sheet drawer', () => {
       '/player',
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const path of [
       '/player',
       '/player/characters/new',
       '/player/campaign/warm/battlemap/warm',
     ]) {
-      await playerPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await playerPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
 
     // ---- DM: real campaign + blank battle map, parked on the live relay ----
     await seedDm(dmPage, DM_ID);
     code = await createCampaign(dmPage, DM_ID, CAMPAIGN_NAME);
     await seedBattleMap(dmPage, code);
-    await dmPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // Table v1: the map reaches players as a live, shown Table scene.
+    await openTableSceneLive(dmPage, code, 'Sheet Drawer E2E Map');
 
     // ---- Player: real character, real join, open the map ----
     const characterUrl = await createCharacter(playerPage, CHARACTER_NAME);
@@ -728,9 +726,13 @@ test.describe('player map party limited view', () => {
       '/player',
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
+      '/dm/campaign/warm/battlemaps',
+      '/dm/campaign/warm/table',
       '/player/characters/new',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
     for (const p of [pageA, pageB]) {
       for (const path of [
@@ -738,7 +740,9 @@ test.describe('player map party limited view', () => {
         '/player/characters/new',
         '/player/campaign/warm/battlemap/warm',
       ]) {
-        await p.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+        await p
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
       }
     }
 
@@ -747,15 +751,8 @@ test.describe('player map party limited view', () => {
     code = await createCampaign(dmPage, PARTY_DM_ID, PARTY_CAMPAIGN_NAME);
     await seedBattleMap(dmPage, code);
     await seedCombatantToken(dmPage, code);
-    await dmPage.goto(mapUrl(code), { waitUntil: 'networkidle' });
-    await dmPage.waitForFunction(
-      () => !!window.__rkStores?.viewport,
-      undefined,
-      { timeout: 15_000 }
-    );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // Table v1: the map reaches players as a live, shown Table scene.
+    await openTableSceneLive(dmPage, code, 'Sheet Drawer E2E Map');
     await waitForElementSynced(dmPage, COMBATANT_TOKEN_ID);
 
     // ---- Player A: character + join ----
