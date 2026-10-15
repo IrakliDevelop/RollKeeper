@@ -1,3 +1,4 @@
+import { expect } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 /**
@@ -129,4 +130,70 @@ export async function waitForElementSynced(
     elementId,
     { timeout: 20_000 }
   );
+}
+
+/** A live Table scene opened by {@link openTableSceneLive}. */
+export interface LiveTableScene {
+  /** The adopted scene id (its relay room and marker projection key). */
+  sceneId: string;
+  /** The loot ledger of the DM's latest marker publish (`PUT …/markers`). */
+  lootLedger: () => Array<{ markerId: string; id: string }>;
+}
+
+/**
+ * Table v1 flow (PR08 repair 07): the original editor has no live room, so
+ * a cross-party map is a Table scene. Adds the battle map to the Table from
+ * the Battle Maps page, opens the scene, waits until this tab is live,
+ * Shows it, and waits for the DM's scene token. Players keep joining by the
+ * source map URL; the server resolves it to the shown scene.
+ */
+export async function openTableSceneLive(
+  dmPage: Page,
+  code: string,
+  mapName: string
+): Promise<LiveTableScene> {
+  let sceneId = '';
+  let ledger: Array<{ markerId: string; id: string }> = [];
+  dmPage.on('request', request => {
+    if (
+      request.method() !== 'PUT' ||
+      !/\/markers$/u.test(new URL(request.url()).pathname)
+    )
+      return;
+    const body = request.postDataJSON() as {
+      loot?: Array<{ markerId: string; id: string }>;
+    } | null;
+    if (Array.isArray(body?.loot)) ledger = body.loot;
+  });
+  dmPage.on('response', response => {
+    if (!/battlemap-token/u.test(response.url()) || response.status() !== 200)
+      return;
+    void response
+      .json()
+      .then((body: { sceneId?: string }) => {
+        if (body.sceneId) sceneId = body.sceneId;
+      })
+      .catch(() => undefined);
+  });
+  await dmPage.goto(`/dm/campaign/${code}/battlemaps`, {
+    waitUntil: 'domcontentloaded',
+  });
+  await dmPage.getByRole('button', { name: `Add ${mapName} to Table` }).click();
+  await dmPage.getByRole('button', { name: 'Open scene' }).click();
+  await expect(
+    dmPage.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible({ timeout: 30_000 });
+  await dmPage.getByRole('button', { name: 'Show this scene' }).click();
+  await expect(
+    dmPage.getByText("Players' view updated", { exact: true })
+  ).toBeVisible({ timeout: 20_000 });
+  await expect(dmPage.getByRole('button', { name: 'Marker' })).toBeVisible({
+    timeout: 15_000,
+  });
+  await dmPage.waitForFunction(() => !!window.__rkStores?.viewport, undefined, {
+    timeout: 15_000,
+  });
+  // The Table stage shows no relay chip: wait for its scene token instead.
+  await expect.poll(() => sceneId, { timeout: 20_000 }).not.toBe('');
+  return { sceneId, lootLedger: () => ledger };
 }
