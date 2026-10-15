@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 
-import type { Page } from '@playwright/test';
+import type { Browser, Page } from '@playwright/test';
+import { FogManager } from '@fieldnotes/vtt';
 
 import { E2E_RELAY_PORT } from '../config/playwright/e2eRelay';
 import {
@@ -33,10 +34,32 @@ const START_X = 100;
 const OFFLINE_X = 400;
 const LATER_X = 250;
 
-async function seedBattleMap(page: Page, code: string): Promise<void> {
+/**
+ * Repair 10: fog the editor exports for a covered map with one revealed
+ * area (the shape a battle map keeps before it is added to the Table).
+ */
+function editorFog(): unknown {
+  const manager = new FogManager();
+  manager.initialize({
+    bounds: { x: 0, y: 0, w: 1200, h: 900 },
+    base: 'covered',
+    cellSize: 10,
+  });
+  manager.applyRegion(
+    { kind: 'rectangle', from: { x: 60, y: 60 }, to: { x: 700, y: 500 } },
+    'reveal'
+  );
+  return JSON.parse(JSON.stringify(manager.getState()));
+}
+
+async function seedBattleMap(
+  page: Page,
+  code: string,
+  fog: unknown = null
+): Promise<void> {
   const now = new Date().toISOString();
   await page.evaluate(
-    ({ code, mapId, mapName, boxId, x, now, dmId, campaignName }) => {
+    ({ code, mapId, mapName, boxId, x, now, dmId, campaignName, fog }) => {
       window.localStorage.setItem(
         'rollkeeper-dm-data',
         JSON.stringify({
@@ -96,6 +119,9 @@ async function seedBattleMap(page: Page, code: string): Promise<void> {
                       },
                     ],
                     activeLayerId: 'layer-annotations',
+                    ...(fog
+                      ? { extensions: { fog: { version: 1, data: fog } } }
+                      : {}),
                   }),
                   dmOnlyElements: {},
                   gridEnabled: false,
@@ -120,6 +146,7 @@ async function seedBattleMap(page: Page, code: string): Promise<void> {
       now,
       dmId: DM_ID,
       campaignName: CAMPAIGN_NAME,
+      fog,
     }
   );
 }
@@ -160,14 +187,30 @@ function connectionLabel(page: Page) {
   return page.getByTestId('table-header-details').locator('dd').first();
 }
 
+/** The DM canvas has fog (a fog definition) loaded. */
+async function dmFogEnabled(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const json = (
+      window.__rkStores?.viewport as unknown as
+        | { exportJSON?: () => string }
+        | undefined
+    )?.exportJSON?.();
+    if (!json) return false;
+    const parsed = JSON.parse(json) as {
+      extensions?: { fog?: { data?: { definition?: unknown } | null } };
+    };
+    return Boolean(parsed.extensions?.fog?.data?.definition);
+  });
+}
+
 function details(page: Page) {
   return page.getByRole('button', { name: /^Details/u });
 }
 
-test('offline edits kept through a later edit and a checkpoint, then reapplied', async ({
-  browser,
-}) => {
-  test.setTimeout(180_000);
+async function offlineChangesFlow(
+  browser: Browser,
+  fog: 'none' | 'after-live' | 'seeded'
+): Promise<void> {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
   });
@@ -199,10 +242,21 @@ test('offline edits kept through a later edit and a checkpoint, then reapplied',
 
     await seedDm(page, DM_ID);
     const code = await createCampaign(page, DM_ID, CAMPAIGN_NAME);
-    await seedBattleMap(page, code);
+    await seedBattleMap(page, code, fog === 'seeded' ? editorFog() : null);
+    // Repair 10: a pre-fogged map used to stay "not ready" here forever
+    // (its fog was sent to the room in the editor shape and refused).
     await openTableSceneLive(page, code, MAP_NAME);
     await waitForElementSynced(page, BOX_ID);
     expect(await boxX(page)).toBe(START_X);
+    if (fog === 'after-live') {
+      // Repair 10 (G1): with fog on, Reapply used to fail with "the saved
+      // copy can't be used".
+      await page.getByRole('button', { name: 'Fog of war' }).click();
+      await page.getByRole('button', { name: 'Enable covered fog' }).click();
+      await expect
+        .poll(() => dmFogEnabled(page), { timeout: 10_000 })
+        .toBe(true);
+    }
 
     // 1. Drop the live connection and edit while it is down.
     await setRelayOffline(page, true);
@@ -245,7 +299,30 @@ test('offline edits kept through a later edit and a checkpoint, then reapplied',
     await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
     if (!(await panel.isVisible())) await details(page).click();
     await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
+    // The fog came back with the reapplied version.
+    if (fog !== 'none') expect(await dmFogEnabled(page)).toBe(true);
   } finally {
     await context.close();
   }
+}
+
+test('offline edits kept through a later edit and a checkpoint, then reapplied', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  await offlineChangesFlow(browser, 'none');
+});
+
+test('with fog turned on after going live, offline edits are reapplied (repair 10)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  await offlineChangesFlow(browser, 'after-live');
+});
+
+test('a battle map fogged before it joined the Table goes live, shows and reapplies (repair 10)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  await offlineChangesFlow(browser, 'seeded');
 });
