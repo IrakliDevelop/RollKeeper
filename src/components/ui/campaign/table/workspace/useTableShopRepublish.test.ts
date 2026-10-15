@@ -7,11 +7,16 @@ import type { CampaignNPC } from '@/types/encounter';
 import { useTableShopRepublish } from './useTableShopRepublish';
 
 let npcs: CampaignNPC[] = [];
-vi.mock('@/store/npcStore', () => ({
-  useNPCStore: {
-    getState: () => ({ npcsByCampaign: { CAMP: npcs } }),
-  },
-}));
+vi.mock('@/store/npcStore', () => {
+  const state = () => ({ npcsByCampaign: { CAMP: npcs } });
+  return {
+    useNPCStore: Object.assign(
+      (selector: (value: ReturnType<typeof state>) => unknown) =>
+        selector(state()),
+      { getState: state }
+    ),
+  };
+});
 vi.mock('@/store/encounterStore', () => ({
   useEncounterStore: {
     getState: () => ({ getEncountersByCampaign: () => [] }),
@@ -302,6 +307,24 @@ describe('useTableShopRepublish checks (repair 09 LL6 / LL7)', () => {
     rerender({ revision: 2, members: [member] });
     await vi.advanceTimersByTimeAsync(1_000);
     expect(gets(fetchMock)).toBe(2);
+  });
+
+  it('OO5: checks once the NPC store has loaded, even with no new Table revision', async () => {
+    // The merchant was placed (last Table revision) before the NPC store
+    // finished loading from storage.
+    npcs = [];
+    const fetchMock = mockShops([]);
+    const { rerender } = render();
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(fetchMock).not.toHaveBeenCalled();
+    npcs = [merchant(true)];
+    rerender({ revision: 1, members: [member] });
+    await vi.advanceTimersByTimeAsync(1_000);
+    expect(puts(fetchMock)).toEqual([
+      expect.objectContaining({
+        body: { dmId: 'dm-1', entityIds: ['member-1'] },
+      }),
+    ]);
   });
 
   it('does nothing after unmount', async () => {

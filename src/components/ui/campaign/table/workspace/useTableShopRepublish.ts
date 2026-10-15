@@ -54,6 +54,14 @@ export function useTableShopRepublish(options: {
 }): void {
   const latest = useRef(options);
   latest.current = options;
+  // OO5: also check when the open shops change, which includes the NPC store
+  // finishing loading from storage after the Table placed a merchant.
+  const openShops = useNPCStore(state =>
+    (state.npcsByCampaign[options.campaignCode] ?? [])
+      .filter(npc => npc.shop?.open === true)
+      .map(npc => `${npc.id}:${npc.shop?.updatedAt ?? ''}:${npc.updatedAt}`)
+      .join('|')
+  );
   /** npcId → ids (sorted key) the server was last seen or set to carry. */
   const checked = useRef(new Map<string, string>());
 
@@ -124,5 +132,5 @@ export function useTableShopRepublish(options: {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [options.revision, options.campaignCode, options.dmId]);
+  }, [options.revision, options.campaignCode, options.dmId, openShops]);
 }
