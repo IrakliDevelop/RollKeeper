@@ -105,6 +105,15 @@ function canvasElement(element: Record<string, unknown>): CanvasElement {
   return canvas as unknown as CanvasElement;
 }
 
+/** FF1: offline DM edits superseded by the live room (localDraft keeps them). */
+export const OFFLINE_DISCARDED_DM_MESSAGE =
+  'Map edits made while offline were not sent. Use Reapply changes to send them.';
+/** FF1: a player's offline edits superseded by the live room. */
+export const OFFLINE_DISCARDED_PLAYER_MESSAGE =
+  "Changes you made while offline weren't saved.";
+/** FF6: a DM edit the live room refused (released so the journal drains). */
+export const DM_REJECTED_MESSAGE =
+  'The live map refused a change. The map shows what was saved.';
 /** EE2: held edits kept at most (after coalescing). */
 export const HELD_EDIT_LIMIT = 64;
 export const HELD_OVERFLOW_MESSAGE =
@@ -303,13 +312,19 @@ export function createManagedBattleMapAuthorityConnection(
   };
   /** Every local submission: JSON-normalized, and a refusal is visible. */
   const submit = (mutation: Mutation, submitOptions?: SubmitOptions): void => {
-    if (!firstLiveSeen) {
+    // FF4: only a presentation-resolving (player/display) connection holds
+    // before its first live state (DD1); the DM keeps the base behaviour
+    // (`not-ready` before live; the scene's localDraft keeps the edit).
+    if (!firstLiveSeen && resolvesPresentation) {
       hold({ mutation, submitOptions, generation: null });
       return;
     }
-    const generation = connection.getState().generation;
-    if (flushing || held.length > 0) {
-      hold({ mutation, submitOptions, generation });
+    const state = connection.getState();
+    // FF3: after the first live state, an edit made while not live is an
+    // SDK draft (never auto-replayed), even if capacity entries are held.
+    const offline = firstLiveSeen && state.status !== 'live';
+    if (!offline && (flushing || held.length > 0)) {
+      hold({ mutation, submitOptions, generation: state.generation });
       return;
     }
     const normalized = withoutUndefined(mutation);
@@ -318,11 +333,11 @@ export function createManagedBattleMapAuthorityConnection(
         ? connection.submit(normalized)
         : connection.submit(normalized, submitOptions);
     if (result.status !== 'refused') return;
-    if (result.reason === 'capacity')
-      hold({ mutation, submitOptions, generation });
-    else if (result.reason === 'invalid')
+    if (result.reason === 'capacity' && !offline)
+      hold({ mutation, submitOptions, generation: state.generation });
+    else if (result.reason === 'invalid' || result.reason === 'capacity')
       options.onDiagnostic?.(
-        `A local ${mutation.kind} edit was not sent to the live room (invalid)`
+        `A local ${mutation.kind} edit was not sent to the live room (${result.reason})`
       );
   };
   /** Re-applies held local edits over a freshly loaded remote snapshot. */
@@ -483,26 +498,77 @@ export function createManagedBattleMapAuthorityConnection(
   };
 
   /**
-   * J1: the SDK keeps every operation (at most 64) until the app releases
-   * it, so a connection jammed after 64 accepted edits. Accepted and
-   * rejected (already restored above) operations are terminal and released
-   * here; draft, pending and uncertain work stays with the SDK. A pinned
-   * operation (barrier, acknowledgement wait) is refused by the SDK and
-   * retried on the next change or right after `releaseBarrier`.
+   * J1 / FF1: the SDK keeps every operation (at most 64) until the app
+   * releases it. After each change, terminal work is released:
+   * - accepted operations;
+   * - rejected operations once restored on screen (players), or with a
+   *   notice for the DM, whose rejections are not restored (FF6);
+   * - once the room is live with its authoritative document applied, the
+   *   drafts made while offline and the uncertain operations left by a lost
+   *   episode. The live room wins (SYNC-AUTHORITY section 6): the DM's offline
+   *   fork stays in the scene's localDraft and "Reapply changes" re-sends it;
+   *   a player is told the offline changes were not saved.
+   * Pending work is never released. A pinned operation (barrier) is refused
+   * by the SDK and retried on the next change or right after
+   * `releaseBarrier`. Releasing notifies subscribers synchronously, so the
+   * ids are collected first and nested changes are skipped (FF2).
    */
+  let releasing = false;
   const releaseSettled = (inner: ManagedAuthorityConnection): void => {
-    for (const operation of inner.getState().operations) {
+    const state = inner.getState();
+    const settledLive = state.status === 'live' && state.document !== null;
+    const isDm = options.tokenRequest.role === 'dm';
+    const releases: Array<{ id: string; discard: boolean }> = [];
+    let offline = 0;
+    let dmRejected = 0;
+    for (const operation of state.operations) {
+      const id = operation.clientOperationId;
       if (operation.status === 'accepted')
-        inner.releaseOperation(operation.clientOperationId);
-      else if (operation.status === 'rejected')
-        inner.releaseOperation(operation.clientOperationId, {
-          discardDraft: true,
-        });
+        releases.push({ id, discard: false });
+      else if (operation.status === 'rejected') {
+        if (isDm) {
+          releases.push({ id, discard: true });
+          dmRejected += 1;
+        } else if (restoredRejections.has(id))
+          releases.push({ id, discard: true });
+      } else if (
+        settledLive &&
+        (operation.status === 'draft' || operation.status === 'uncertain')
+      ) {
+        releases.push({ id, discard: true });
+        offline += 1;
+      }
     }
+    if (releases.length === 0) return;
+    let releasedOffline = 0;
+    let releasedRejected = 0;
+    releasing = true;
+    try {
+      for (const { id, discard } of releases) {
+        const released = discard
+          ? inner.releaseOperation(id, { discardDraft: true })
+          : inner.releaseOperation(id);
+        if (!released) continue;
+        const status = state.operations.find(
+          operation => operation.clientOperationId === id
+        )?.status;
+        if (status === 'draft' || status === 'uncertain') releasedOffline += 1;
+        if (status === 'rejected' && isDm) releasedRejected += 1;
+      }
+    } finally {
+      releasing = false;
+    }
+    if (offline > 0 && releasedOffline > 0)
+      options.onDiagnostic?.(
+        isDm ? OFFLINE_DISCARDED_DM_MESSAGE : OFFLINE_DISCARDED_PLAYER_MESSAGE
+      );
+    if (dmRejected > 0 && releasedRejected > 0)
+      options.onDiagnostic?.(DM_REJECTED_MESSAGE);
   };
 
   const onAuthorityChange = (inner: ManagedAuthorityConnection): void => {
-    if (stopped || inner !== connection || retired === inner) return;
+    if (releasing || stopped || inner !== connection || retired === inner)
+      return;
     const state = inner.getState();
     if (state.status === 'live') {
       everLive = true;
@@ -510,9 +576,9 @@ export function createManagedBattleMapAuthorityConnection(
     }
     options.onStatus?.(state.status);
     restoreRejectedEdits(state);
-    releaseSettled(inner);
     const document = state.document;
     if (!document || document === lastDocument) {
+      releaseSettled(inner);
       flushHeld();
       return;
     }
@@ -578,7 +644,9 @@ export function createManagedBattleMapAuthorityConnection(
     } finally {
       applyingRemote = false;
     }
-    // Admit edits held until the room went live (no-op while not live).
+    // After the authoritative document is applied: release settled and
+    // superseded offline work (J1, FF1), then admit held edits.
+    releaseSettled(inner);
     flushHeld();
   };
   let unsubscribeAuthority = connection.subscribe(() =>

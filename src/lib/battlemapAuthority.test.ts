@@ -53,7 +53,19 @@ const authority = vi.hoisted(() => {
       waitForAcknowledgements: vi.fn(),
       requestCheckpoint: vi.fn(),
       releaseBarrier: vi.fn(() => true),
-      releaseOperation: vi.fn(() => true),
+      // Like the SDK: releasing removes the operation and notifies (FF2).
+      releaseOperation: vi.fn((id: string) => {
+        state = {
+          ...state,
+          operations: (state.operations ?? []).filter(
+            operation =>
+              (operation as { clientOperationId: string }).clientOperationId !==
+              id
+          ),
+        };
+        listener?.();
+        return true;
+      }),
     },
   };
 });
@@ -79,6 +91,9 @@ import {
   HELD_EDIT_LIMIT,
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
+  DM_REJECTED_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
   withoutUndefined,
 } from './battlemapAuthority';
 
@@ -558,7 +573,7 @@ describe('A1 element submissions use JSON semantics', () => {
       battleMapId: 'scene-a',
       clientId: 'dm-a',
       store,
-      tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
+      tokenRequest: { role: 'player', battleMapId: 'scene-a', playerId: 'p' },
       mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
       onDiagnostic,
     });
@@ -604,6 +619,25 @@ describe('A1 element submissions use JSON semantics', () => {
     });
     return { store, connection, onDiagnostic };
   };
+  /** A presentation-resolving (player) connection: holds before first live. */
+  const playerConnection = (onDiagnostic = vi.fn()) => {
+    const store = new ElementStore();
+    const connection = createManagedBattleMapAuthorityConnection({
+      relayUrl: 'wss://relay.example',
+      campaignCode: 'CODE',
+      battleMapId: 'scene-a',
+      clientId: 'player-a',
+      store,
+      tokenRequest: {
+        role: 'player',
+        battleMapId: 'scene-a',
+        playerId: 'player-a',
+      },
+      mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
+    });
+    return { store, connection, onDiagnostic };
+  };
   const emptyDoc = () => ({ elements: [], layers: [], extensions: {} });
   const shape = (id: string, x = 0) =>
     ({
@@ -618,7 +652,7 @@ describe('A1 element submissions use JSON semantics', () => {
     ).map(([mutation]) => mutation);
 
   it('EE3: the flush guard keeps order when a nested notify flushes while the first edit waits', () => {
-    const { connection } = dmConnection();
+    const { connection } = playerConnection();
     connection.publishLayerRemove('a');
     connection.publishLayerRemove('b');
     let first = true;
@@ -649,7 +683,7 @@ describe('A1 element submissions use JSON semantics', () => {
   });
 
   it('EE2: more than 64 held moves of one token become one upsert with the final position', () => {
-    const { store, connection, onDiagnostic } = dmConnection();
+    const { store, connection, onDiagnostic } = playerConnection();
     store.add(shape('t', 0));
     for (let x = 1; x <= 100; x += 1)
       store.update('t', { position: { x, y: 0 } });
@@ -669,7 +703,7 @@ describe('A1 element submissions use JSON semantics', () => {
   });
 
   it('EE2: a remove supersedes held writes of the same element', () => {
-    const { store, connection } = dmConnection();
+    const { store, connection } = playerConnection();
     store.add(shape('gone'));
     store.add(shape('kept'));
     store.remove('gone');
@@ -682,7 +716,7 @@ describe('A1 element submissions use JSON semantics', () => {
   });
 
   it('EE2: the held queue is capped with a visible notice', () => {
-    const { store, connection, onDiagnostic } = dmConnection();
+    const { store, connection, onDiagnostic } = playerConnection();
     for (let index = 0; index <= HELD_EDIT_LIMIT; index += 1)
       store.add(shape(`s-${index}`));
     expect(onDiagnostic).toHaveBeenCalledWith(HELD_OVERFLOW_MESSAGE);
@@ -774,7 +808,8 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
   });
 
-  it('releases settled operations after each change, never draft, pending or uncertain work, and pinned work only after its barrier (J1)', () => {
+  it('releases settled operations after the document is applied: accepted, DM-rejected (with a notice), offline drafts and uncertain ops (with a notice); never pending; pinned only after its barrier (J1, FF1, FF6)', () => {
+    const onDiagnostic = vi.fn();
     const store = new ElementStore();
     const connection = createManagedBattleMapAuthorityConnection({
       relayUrl: 'wss://relay.example',
@@ -784,8 +819,13 @@ describe('A1 element submissions use JSON semantics', () => {
       store,
       tokenRequest: { role: 'dm', battleMapId: 'map-a', sceneId: 'scene-a' },
       mint: async () => ({ token: 'token', authority: 1, room: 'room-a' }),
+      onDiagnostic,
     });
     const release = authority.connection.releaseOperation;
+    const real = release.getMockImplementation()! as unknown as (
+      id: string,
+      options?: unknown
+    ) => boolean;
     release.mockClear();
     const op = (clientOperationId: string, status: string) => ({
       clientOperationId,
@@ -793,9 +833,8 @@ describe('A1 element submissions use JSON semantics', () => {
       proposal: { mutation: { kind: 'remove', id: clientOperationId } },
     });
     // 'accepted-pinned' is held by a barrier: the SDK refuses to release it.
-    release.mockImplementation(
-      ((id: string) => id !== 'accepted-pinned') as never
-    );
+    release.mockImplementation(((id: string, options?: unknown) =>
+      id === 'accepted-pinned' ? false : real(id, options)) as never);
     authority.installState({
       status: 'live',
       document: { elements: [], layers: [], extensions: {} },
@@ -815,18 +854,112 @@ describe('A1 element submissions use JSON semantics', () => {
     expect(calls()).toEqual([
       ['accepted', undefined],
       ['accepted-pinned', undefined],
+      ['draft', { discardDraft: true }],
+      ['uncertain', { discardDraft: true }],
       ['rejected', { discardDraft: true }],
     ]);
+    expect(onDiagnostic).toHaveBeenCalledWith(OFFLINE_DISCARDED_DM_MESSAGE);
+    expect(onDiagnostic).toHaveBeenCalledWith(DM_REJECTED_MESSAGE);
     // Releasing the barrier frees the pinned operation at once.
     release.mockClear();
-    release.mockImplementation((() => true) as never);
+    release.mockImplementation(real as never);
     connection.releaseBarrier?.({} as never);
-    expect(calls()).toEqual(
-      expect.arrayContaining([['accepted-pinned', undefined]])
-    );
-    expect(calls().map(([id]) => id)).not.toContain('pending');
-    expect(calls().map(([id]) => id)).not.toContain('draft');
-    expect(calls().map(([id]) => id)).not.toContain('uncertain');
+    expect(calls()).toEqual([['accepted-pinned', undefined]]);
+    connection.stop();
+  });
+
+  it('keeps offline drafts while not live and releases them only once live with a document (FF1)', () => {
+    const { connection, onDiagnostic } = playerConnection();
+    const release = authority.connection.releaseOperation;
+    release.mockClear();
+    const draft = {
+      clientOperationId: 'offline-draft',
+      status: 'draft',
+      proposal: { mutation: { kind: 'remove', id: 'x' } },
+    };
+    authority.installState({
+      status: 'recovering',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [draft],
+    });
+    expect(release).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [draft],
+    });
+    expect(release).toHaveBeenCalledWith('offline-draft', {
+      discardDraft: true,
+    });
+    expect(onDiagnostic).toHaveBeenCalledWith(OFFLINE_DISCARDED_PLAYER_MESSAGE);
+    connection.stop();
+  });
+
+  it('releases a player rejection only after it was restored on screen (FF6)', () => {
+    const { connection } = playerConnection();
+    const release = authority.connection.releaseOperation;
+    release.mockClear();
+    // No document yet: the rejection cannot be restored, so it is kept.
+    authority.installState({
+      status: 'connecting',
+      document: null,
+      operations: [
+        {
+          clientOperationId: 'rej',
+          status: 'rejected',
+          proposal: { mutation: { kind: 'remove', id: 'gone' } },
+        },
+      ],
+    });
+    expect(release).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'live',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [
+        {
+          clientOperationId: 'rej',
+          status: 'rejected',
+          proposal: { mutation: { kind: 'remove', id: 'gone' } },
+        },
+      ],
+    });
+    expect(release).toHaveBeenCalledWith('rej', { discardDraft: true });
+    connection.stop();
+  });
+
+  it('a DM edit before the first live state is not held (FF4, base behaviour)', () => {
+    const { store, connection } = dmConnection();
+    authority.submit.mockImplementation((() => ({
+      status: 'refused',
+      reason: 'not-ready',
+    })) as never);
+    store.add(shape('early-dm'));
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    authority.submit.mockImplementation((() => ({
+      status: 'admitted',
+      clientOperationId: 'op',
+    })) as never);
+    authority.install(emptyDoc());
+    // Not replayed on live: the scene's localDraft keeps it for Reapply.
+    expect(authority.submit).toHaveBeenCalledTimes(1);
+    connection.stop();
+  });
+
+  it('after the first live state, an edit while offline is a draft even when capacity edits are held (FF3)', () => {
+    const { store, connection } = dmConnection();
+    authority.install(emptyDoc());
+    authority.submit.mockImplementationOnce((() => ({
+      status: 'refused',
+      reason: 'capacity',
+    })) as never);
+    store.add(shape('busy'));
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [],
+    });
+    store.add(shape('offline'));
+    expect(sent().map(m => m.element?.id)).toEqual(['busy', 'offline']);
     connection.stop();
   });
 

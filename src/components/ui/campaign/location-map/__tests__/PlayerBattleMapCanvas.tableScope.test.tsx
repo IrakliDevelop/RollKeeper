@@ -5,7 +5,10 @@ import { SelectTool, Viewport, createShape } from '@fieldnotes/core';
 
 import { PlayerBattleMapCanvas } from '../PlayerBattleMapCanvas';
 import { PLAYER_BAND_ORDER } from '../layerContract';
-import { HELD_OVERFLOW_MESSAGE } from '@/lib/battlemapAuthority';
+import {
+  HELD_OVERFLOW_MESSAGE,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
+} from '@/lib/battlemapAuthority';
 
 /**
  * PR02 R4 client scope on the player surface: with Table v1 required, the
@@ -324,6 +327,11 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
       .mock.calls.at(-1)![0];
     act(() => options.onDiagnostic?.(HELD_OVERFLOW_MESSAGE));
     expect(await screen.findByText(HELD_OVERFLOW_MESSAGE)).toBeTruthy();
+    // FF1: offline changes superseded by the live room are announced.
+    act(() => options.onDiagnostic?.(OFFLINE_DISCARDED_PLAYER_MESSAGE));
+    expect(
+      await screen.findByText(OFFLINE_DISCARDED_PLAYER_MESSAGE)
+    ).toBeTruthy();
   });
 
   it('offers no delete action for a selected control-bearing token', () => {

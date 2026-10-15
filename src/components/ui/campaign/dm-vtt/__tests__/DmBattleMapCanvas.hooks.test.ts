@@ -134,6 +134,7 @@ import { createManagedBattleMapConnection } from '@/lib/battlemapSync';
 import { useDmStore } from '@/store/dmStore';
 import { useDmBattleMapCanvas } from '../DmBattleMapCanvas.hooks';
 import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import { OFFLINE_DISCARDED_DM_MESSAGE } from '@/lib/battlemapAuthority';
 
 /** A minimal stand-in for the registered movement `PathTool` — truthy so
  * `getTool<PathTool>('path')` resolves and the hook's movement-commit and
@@ -280,6 +281,57 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     } else {
       delete process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
     }
+  });
+
+  it('saves a Table stage edit made while offline to the scene (its localDraft keeps the fork for Reapply, FF1)', () => {
+    const updateBattleMap = vi.fn();
+    stage = {
+      ...stage,
+      tableSceneAdapter: makeTableSceneAdapter({ updateBattleMap }),
+    };
+    const vp = makeVp();
+    const listeners = new Map<
+      string,
+      Array<(data: unknown, meta?: { origin?: string }) => void>
+    >();
+    vi.mocked(vp.store.on).mockImplementation((event, listener) => {
+      const key = String(event);
+      listeners.set(key, [...(listeners.get(key) ?? []), listener as never]);
+      return vi.fn();
+    });
+    vi.mocked(vp.exportJSON).mockReturnValue('{"elements":[{"id":"moved"}]}');
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    act(() => options.onStatus?.('offline'));
+    updateBattleMap.mockClear();
+    act(() => {
+      listeners
+        .get('update')
+        ?.forEach(listener => listener({}, { origin: 'local' }));
+    });
+    expect(updateBattleMap).toHaveBeenCalledWith(
+      expect.objectContaining({
+        canvasState: '{"elements":[{"id":"moved"}]}',
+      })
+    );
+  });
+
+  it('exposes live-map sync notices for the Table stage instead of only logging them (FF5)', () => {
+    const vp = makeVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    act(() => options.onDiagnostic?.(OFFLINE_DISCARDED_DM_MESSAGE));
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_DISCARDED_DM_MESSAGE
+    );
+    act(() => options.onDiagnostic?.('Live map: some other detail'));
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_DISCARDED_DM_MESSAGE
+    );
   });
 
   it('the original editor opens no relay connection and mints no token (PR08 repair 07)', () => {

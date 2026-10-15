@@ -53,6 +53,7 @@ import {
 import {
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_PLAYER_MESSAGE,
 } from '@/lib/battlemapAuthority';
 import { configureFogView, resolvePlayerFogStyle } from './fog';
 import {
@@ -838,7 +839,11 @@ export function PlayerBattleMapCanvas({
           reconnectRef.current.identityInvalid = true;
         // EE2: an edit that could not be kept, or held edits dropped after
         // the live map changed, is never silent.
-        if (message === HELD_OVERFLOW_MESSAGE || message === HELD_STALE_MESSAGE)
+        if (
+          message === HELD_OVERFLOW_MESSAGE ||
+          message === HELD_STALE_MESSAGE ||
+          message === OFFLINE_DISCARDED_PLAYER_MESSAGE
+        )
           setSceneNotice(message);
       },
       onStatus: s => {

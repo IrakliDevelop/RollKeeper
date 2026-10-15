@@ -86,6 +86,7 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
     selectedElementIsMarker,
     markerAudienceNotice,
     markerShareNotice,
+    liveSyncNotice,
     markerPanelOpen,
     markerPanelState,
     markerPanelIsDmOnly,
@@ -131,6 +132,17 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
       });
     },
   });
+
+  // FF5: a live-map sync outcome (offline edits not sent, an edit the room
+  // refused or could not keep) is shown, never console-only.
+  useEffect(() => {
+    if (!liveSyncNotice) return;
+    addToast({
+      type: 'error',
+      title: 'Live map',
+      message: liveSyncNotice.message,
+    });
+  }, [liveSyncNotice, addToast]);
 
   // C4-2: a refused Table marker publication is surfaced, never silent.
   useEffect(() => {
