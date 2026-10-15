@@ -148,19 +148,29 @@ scene rooms, player views and the TV cannot connect.
   stays because it draws locally.
 - Authority connections (DM Table stage, players, display, fog;
   `src/lib/battlemapAuthority.ts`):
-  - Edits made before a connection's first live state (for example a token a
-    player places right after opening the shown scene, or the player's own
-    layer) are held, coalesced per element or layer, and sent once, in order,
-    when the room is first live. The queue is capped; an edit that cannot be
-    kept shows a notice to the player.
-  - After the first live state, edits made while offline or reconnecting stay
-    SDK drafts and are never replayed automatically; "Reapply changes" is the
-    explicit path. A send refused for capacity waits and is retried in the
-    same room generation only, otherwise dropped with a notice.
-  - Settled (accepted or rejected) operations are released from the SDK
-    journal after every change, so a connection never fills its 64-operation
-    journal. Work pinned by a checkpoint barrier is released once the barrier
-    is.
+  - A player's (or display's) edits made before its connection is first
+    live, for example a token placed right after opening the shown scene or
+    the player's own layer, are held, coalesced per element or layer, and
+    sent once, in order, when the room is first live. The queue is capped;
+    an edit that cannot be kept shows a notice. The DM's connection does not
+    hold: before live the SDK refuses edits and the scene's localDraft keeps
+    them.
+  - After the first live state, edits made while offline or reconnecting are
+    SDK drafts and are never replayed. Once the room is live again and its
+    document applied, the live room wins: those drafts (and operations whose
+    outcome was lost with the connection) are released. The DM sees "Map
+    edits made while offline were not sent. Use Reapply changes to send
+    them."; "Reapply changes" re-sends the scene's localDraft (which keeps the
+    offline fork until the next edit). A player sees "Changes you made while
+    offline weren't saved."
+  - A send refused for capacity waits and is retried in the same room
+    generation only, otherwise dropped with a notice.
+  - Accepted operations, rejected ones once restored on screen (players) or
+    with a notice (DM), and the offline work above are released from the SDK
+    journal, so a connection does not fill its 64-operation journal and
+    checkpoints are not blocked by leftover drafts. Work pinned by a
+    checkpoint barrier is released once the barrier is.
+  - The DM's sync notices show as a "Live map" toast on the Table stage.
   - A later change of shown scene discards unsent edits, with a notice.
 - Old map-pinned TV links (`?dk=<uuid>`) show "expired" without any request:
   the key is consumed and scrubbed like a capability and fails verification
