@@ -137,6 +137,25 @@ async function openPlayerMap(
   });
 }
 
+/** A write round trip from this player has reached the DM: the player's
+ *  own layer (published on entering the live scene room) is in the DM's
+ *  store, so the player's next edits go to the live room. */
+async function waitForPlayerBand(
+  dmPage: Page,
+  characterId: string
+): Promise<void> {
+  await dmPage.waitForFunction(
+    id =>
+      !!(
+        window.__rkStores?.viewport as unknown as {
+          layerManager?: { getLayer: (layerId: string) => unknown };
+        }
+      )?.layerManager?.getLayer(`player-${id}`),
+    characterId,
+    { timeout: 20_000 }
+  );
+}
+
 /** Waits for this player's own stamped token (`tokenKind: 'player'`,
  *  `characterId` — see `PlayerTokenTool`) in the viewport store; returns its
  *  element id. */
@@ -248,6 +267,7 @@ test.describe('player map sheet drawer', () => {
     characterId = characterIdFromUrl(characterUrl);
     await joinCampaign(playerPage, code, characterId, CAMPAIGN_NAME);
     await openPlayerMap(playerPage, code, characterId);
+    await waitForPlayerBand(dmPage, characterId);
 
     // ---- Player: place own token via the real Place token tool ----
     // Labelled "Place your token on the map" (hint state) until the
@@ -776,6 +796,7 @@ test.describe('player map party limited view', () => {
 
     // ---- Player B: open the map and place their token ----
     await openPlayerMap(pageB, code, characterIdB);
+    await waitForPlayerBand(dmPage, characterIdB);
     await toolbarButton(pageB, /^Place (token|your token on the map)$/).click();
     const canvasB = pageB.locator('canvas').first();
     const boxB = await canvasB.boundingBox();
