@@ -337,7 +337,7 @@ test.describe('DM creature drawer', () => {
   test('a roster token is placed on the private editor with no connection (repair 07 CC1)', async () => {
     await dmPage.keyboard.press('Escape');
     await dmPage
-      .getByRole('button', { name: /^Orc\b/u })
+      .getByRole('button', { name: /\bOrc\b.*place/u })
       .first()
       .click();
     const canvas = dmPage.locator('canvas').first();
