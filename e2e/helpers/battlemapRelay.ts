@@ -205,16 +205,10 @@ export async function openTableSceneLive(
   });
   await dmPage.getByRole('button', { name: `Add ${mapName} to Table` }).click();
   await dmPage.getByRole('button', { name: 'Open scene' }).click();
-  // Going live races the page's own control writes; a lost race shows
-  // "Couldn't go live" with the page's "Go live" button, which a DM uses.
-  const livePill = dmPage
-    .getByTestId('table-live-pill')
-    .filter({ hasText: /^You're live$/u });
-  const goLive = dmPage.getByRole('button', { name: 'Go live', exact: true });
-  await expect(async () => {
-    if (await goLive.isVisible()) await goLive.click();
-    await expect(livePill).toBeVisible({ timeout: 5_000 });
-  }).toPass({ timeout: 60_000 });
+  // GG4 fixed the Go live acquire race in the product, so no retry here.
+  await expect(
+    dmPage.getByTestId('table-live-pill').filter({ hasText: /^You're live$/u })
+  ).toBeVisible({ timeout: 30_000 });
   // Show is enabled once the scene room is ready. If its preparation hit a
   // transient failure ("Live play isn't available right now"), use the
   // page's own "Try again", as a DM would, until Show is enabled.
