@@ -920,3 +920,77 @@ test.describe('player map party limited view', () => {
     });
   });
 });
+
+/**
+ * PR08 repair 08 DD1: a player who places a token right after opening the
+ * shown scene must not lose it. The player's map connection opens on the
+ * source map and resolves to the shown scene; work queued before that
+ * resolution used to be dropped. No `waitForPlayerBand` and no "Live" wait
+ * here on purpose: the token is placed as soon as the tool can be used.
+ */
+test.describe('a token placed right after opening the shown scene', () => {
+  test('reaches the DM (no edit lost at scene resolution)', async ({
+    browser,
+  }) => {
+    const dmContext = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+    });
+    const playerContext = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+    });
+    try {
+      const dmPage = await dmContext.newPage();
+      const playerPage = await playerContext.newPage();
+      for (const path of ['/player', '/dm', '/dm/campaign/warm/table']) {
+        await dmPage
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
+      }
+      for (const path of [
+        '/player/characters/new',
+        '/player/campaign/warm/battlemap/warm',
+      ]) {
+        await playerPage
+          .goto(path, { waitUntil: 'load', timeout: 60_000 })
+          .catch(() => {});
+      }
+      await seedDm(dmPage, DM_ID);
+      const code = await createCampaign(dmPage, DM_ID, CAMPAIGN_NAME);
+      await seedBattleMap(dmPage, code);
+      await openTableSceneLive(dmPage, code, 'Sheet Drawer E2E Map');
+
+      const characterId = characterIdFromUrl(
+        await createCharacter(playerPage, 'Early Placer')
+      );
+      await joinCampaign(playerPage, code, characterId, CAMPAIGN_NAME);
+      await playerPage.goto(
+        `/player/campaign/${code}/battlemap/${MAP_ID}?character=${characterId}`,
+        { waitUntil: 'domcontentloaded' }
+      );
+      // Only what the tool itself needs: a canvas and the character.
+      await playerPage.waitForFunction(
+        () => !!window.__rkStores?.viewport,
+        undefined,
+        { timeout: 30_000 }
+      );
+      await waitForCharacterLoaded(playerPage, characterId);
+      await toolbarButton(
+        playerPage,
+        /^Place (token|your token on the map)$/
+      ).click();
+      const box = await playerPage.locator('canvas').first().boundingBox();
+      if (!box) throw new Error('Player canvas has no bounding box');
+      await playerPage.mouse.click(
+        box.x + box.width * 0.45,
+        box.y + box.height * 0.5
+      );
+      const tokenId = await waitForOwnTokenId(playerPage, characterId);
+      await waitForElementSynced(dmPage, tokenId);
+      // The player keeps it too (never cleared by the resolution).
+      await waitForElementSynced(playerPage, tokenId);
+    } finally {
+      await dmContext.close();
+      await playerContext.close();
+    }
+  });
+});
