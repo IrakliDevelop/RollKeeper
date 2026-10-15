@@ -15,6 +15,7 @@ export default defineConfig({
     '**/map-sheet-drawer.spec.ts',
     '**/dm-creature-drawer.spec.ts',
     '**/table-offline-changes.spec.ts',
+    '**/shop-table-npc.spec.ts',
   ],
   outputDir: 'test-results',
   timeout: 60_000,
