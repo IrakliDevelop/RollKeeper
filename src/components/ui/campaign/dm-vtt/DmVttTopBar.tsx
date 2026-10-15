@@ -5,7 +5,10 @@ import { ArrowLeft, Monitor } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
-import { TableMapEntryLink } from '@/components/ui/campaign/table/TableEntryLinks';
+import {
+  TableMapEntryLinkView,
+  useTableMapEntry,
+} from '@/components/ui/campaign/table/TableEntryLinks';
 import { openTvDisplay } from '@/lib/openTvDisplay';
 
 export type DmVttMode = 'setup' | 'play';
@@ -52,6 +55,8 @@ export function DmVttTopBar({
 }: DmVttTopBarProps) {
   // PR05 E12: under Table v1 this opens the persistent campaign display.
   const display = useDisplayLauncher();
+  // One lookup feeds both the Table link and the privacy label (CC3).
+  const tableEntry = useTableMapEntry(campaignCode, battleMapId);
   return (
     <div className="flex min-h-[52px] min-w-0 items-center gap-2 px-1 sm:gap-3 sm:px-2">
       {/* PR08 D1: everything but the Table link and Setup/Play scrolls. */}
@@ -103,17 +108,15 @@ export function DmVttTopBar({
             v1 (players see maps only through the Table), so a plain privacy
             label replaces the relay status chip. */}
         <span className="text-muted shrink-0 text-xs">
-          Private. Players don&apos;t see this map.
+          {tableEntry?.kind === 'open'
+            ? 'Private copy. Players see the Table scene, not edits here.'
+            : "Private. Players don't see this map."}
         </span>
       </div>
       {/* Pinned at the right edge, never scrolled off (360 px included). */}
       <div className="flex shrink-0 items-center gap-1 sm:gap-2">
         {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
-        <TableMapEntryLink
-          campaignCode={campaignCode}
-          mapId={battleMapId}
-          compact
-        />
+        <TableMapEntryLinkView target={tableEntry} compact />
         <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
           {MODE_OPTIONS.map(({ key, label }) => (
             <Button

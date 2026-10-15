@@ -89,3 +89,35 @@ describe('Play mode Table entry (FU-8)', () => {
     }
   );
 });
+
+describe('privacy label by Table state (PR08 repair 07 CC3)', () => {
+  it('a map on the Table says it is a private copy and players see the scene', async () => {
+    lookup.scene = {
+      sceneId: 'scene-9',
+      localWorkspaceId: 'fork-1',
+      defaultWorkspace: true,
+    };
+    renderBar();
+    expect(
+      await screen.findByText(
+        'Private copy. Players see the Table scene, not edits here.'
+      )
+    ).toBeVisible();
+    expect(
+      screen.queryByText("Private. Players don't see this map.")
+    ).toBeNull();
+  });
+
+  it('a map not on the Table says players do not see it', async () => {
+    renderBar();
+    await screen.findByRole('link', { name: /Use in Table/u });
+    expect(
+      screen.getByText("Private. Players don't see this map.")
+    ).toBeVisible();
+    expect(
+      screen.queryByText(
+        'Private copy. Players see the Table scene, not edits here.'
+      )
+    ).toBeNull();
+  });
+});

@@ -215,7 +215,11 @@ async function editorTopBar(
   await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
   await expectTheme(page, options.theme);
   await expect(
-    page.getByText("Private. Players don't see this map.")
+    page.getByText(
+      options.adopted
+        ? 'Private copy. Players see the Table scene, not edits here.'
+        : "Private. Players don't see this map."
+    )
   ).toBeVisible();
   await expect(page.getByText('Connecting…')).toHaveCount(0);
   const tableLink = options.adopted ? 'Open in Table' : 'Use in Table';
