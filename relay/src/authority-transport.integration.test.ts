@@ -1223,14 +1223,17 @@ run('two relay authority transport', () => {
       if (!ok) break;
       playerReached = step;
     }
+    // GG5 / II5: the notes print before any assertion, pass or fail.
+    console.info(
+      '150-edit notes',
+      JSON.stringify({ dmReached, playerReached, dmStatus, notes })
+    );
     expect({ dmReached, playerReached, dmStatus, notes }).toEqual({
       dmReached: 150,
       playerReached: 150,
       dmStatus: 'live',
       notes: expect.any(Array),
     });
-    // GG5: retries are visible even when the test passes.
-    console.info('150-edit notes', JSON.stringify(notes));
     // At most a handful of steps may need a retry on a slow runner.
     expect(notes.filter(note => note.includes('retry')).length).toBeLessThan(5);
   }, 240_000);
