@@ -192,7 +192,8 @@ jobs:
           --health-retries 10
       # The app's Upstash client talks REST; the configs point it at :8079.
       srh:
-        image: hiett/serverless-redis-http:latest
+        # Pinned (CC9): the digest of 'latest' (0.0.10) when verified.
+        image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
         ports:
           - 8079:80
         env:

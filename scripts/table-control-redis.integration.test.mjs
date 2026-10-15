@@ -6,6 +6,10 @@ import { registerHooks } from 'node:module';
 import test from 'node:test';
 import { promisify } from 'node:util';
 
+/** Pinned serverless-redis-http (CC9): the digest of 'latest' when verified. */
+const SRH_IMAGE =
+  'hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150';
+
 // PR04: run real TypeScript service code (Node type stripping). Resolve the
 // app's `@/` alias and extensionless relative imports to `src/**.ts`.
 const SRC = new URL('../src/', import.meta.url);
@@ -958,7 +962,7 @@ test('PR04 real REST: registry() and resource resolution through @upstash/redis'
       'SRH_TOKEN=synthetic_rest_token',
       '-e',
       `SRH_CONNECTION_STRING=redis://${redisName}:6379`,
-      'hiett/serverless-redis-http:latest',
+      SRH_IMAGE,
     ],
     { stdio: 'ignore' }
   );
@@ -1319,7 +1323,7 @@ async function startRestRedis(t, label) {
       'SRH_TOKEN=synthetic_rest_token',
       '-e',
       `SRH_CONNECTION_STRING=redis://${redisName}:6379`,
-      'hiett/serverless-redis-http:latest',
+      SRH_IMAGE,
     ],
     { stdio: 'ignore' }
   );
