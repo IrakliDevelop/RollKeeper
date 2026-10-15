@@ -18,7 +18,10 @@ import {
 } from '@fieldnotes/vtt/server';
 import { FogManager } from '@fieldnotes/vtt';
 
-import { createManagedBattleMapAuthorityConnection } from '../../src/lib/battlemapAuthority.js';
+import {
+  createManagedBattleMapAuthorityConnection,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+} from '../../src/lib/battlemapAuthority.js';
 
 import {
   authorityRoomKeys,
@@ -1362,11 +1365,7 @@ run('two relay authority transport', () => {
     // The next edit reaches the room.
     store.update('offline-dm-element', { position: { x: 500, y: 0 } });
     await eventually(() => roomX('offline-dm-element') === 500);
-    await eventually(() =>
-      diagnostics.includes(
-        'Map edits made while offline were not sent. Use Reapply changes to send them.'
-      )
-    );
+    await eventually(() => diagnostics.includes(OFFLINE_DISCARDED_DM_MESSAGE));
 
     // And a checkpoint can be saved (no blocked barrier). Right after a
     // reconnect the SDK may still answer `recovery`; a later attempt saves.
