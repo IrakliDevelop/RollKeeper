@@ -14,6 +14,7 @@ export default defineConfig({
     '**/shop-purchase-reconciliation.spec.ts',
     '**/map-sheet-drawer.spec.ts',
     '**/dm-creature-drawer.spec.ts',
+    '**/table-offline-changes.spec.ts',
   ],
   outputDir: 'test-results',
   timeout: 60_000,
