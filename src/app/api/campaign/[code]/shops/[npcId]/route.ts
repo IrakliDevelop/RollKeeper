@@ -392,7 +392,14 @@ export async function PATCH(
     for (let attempt = 0; attempt < ENTITY_IDS_CAS_ATTEMPTS; attempt += 1) {
       const current = await raw.get<string>(shopKey);
       if (!current) return notLive();
-      const projection = sanitizePublicShop(JSON.parse(current) as unknown);
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(current) as unknown;
+      } catch {
+        // NN3: an unreadable projection is no live shop, not a server error.
+        return notLive();
+      }
+      const projection = sanitizePublicShop(parsed);
       if (!projection) return notLive();
       const next = { ...projection, entityIds: entityIds as string[] };
       if (!sanitizePublicShop(next)) {

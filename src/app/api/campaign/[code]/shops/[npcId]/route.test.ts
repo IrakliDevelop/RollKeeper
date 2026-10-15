@@ -588,6 +588,27 @@ describe('shop token links route (PATCH, repair 09 LL1)', () => {
     expect(rawRedis.eval).toHaveBeenCalledTimes(2);
   });
 
+  it('answers 409 after three lost compare-and-set races (NN2)', async () => {
+    rawRedis.get.mockResolvedValue(soldDown);
+    rawRedis.eval.mockResolvedValue(0);
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(409);
+    expect(rawRedis.eval).toHaveBeenCalledTimes(3);
+  });
+
+  it('answers 404, not 500, for a stored projection that is not JSON (NN3)', async () => {
+    rawRedis.get.mockResolvedValue('{not json');
+    const response = await PATCH(
+      patchRequest({ dmId: 'dm-1', entityIds: ['member-1'] }),
+      params
+    );
+    expect(response.status).toBe(404);
+    expect(rawRedis.eval).not.toHaveBeenCalled();
+  });
+
   it.each([
     ['no projection', null, 1],
     ['a projection whose ledger is gone', soldDown, -1],
