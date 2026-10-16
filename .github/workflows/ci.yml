@@ -298,6 +298,67 @@ jobs:
       - name: Verify deterministic reset and replay
         run: npm run test:db:replay
 
+      # `supabase gen types --local` runs the postgres-meta image on demand
+      # as `public.ecr.aws/supabase/<image>:<tag>` and fails outright when
+      # anonymous ECR Public pulls from shared runner IPs are throttled
+      # ("toomanyrequests: Data limit exceeded"). The image is restored from
+      # the Actions cache, or pulled with retries (ECR Public, then the same
+      # image on GHCR and Docker Hub, the mirrors the CLI itself falls back to
+      # for other images) and tagged with the name the CLI runs.
+      - name: Resolve the postgres-meta image the Supabase CLI runs
+        id: pgmeta
+        run: |
+          set -euo pipefail
+          # The tag comes from the installed CLI's own pinned service images
+          # (its embedded "FROM supabase/postgres-meta:<tag> AS pgmeta").
+          bin="$(dirname "$(node -p "require.resolve('@supabase/cli-linux-x64/package.json')")")/bin/supabase"
+          tags="$(grep -aoE 'FROM supabase/postgres-meta:v[0-9][0-9A-Za-z._-]*' "$bin" | sed 's/^FROM supabase\/postgres-meta://' | sort -u)"
+          if [ "$(printf '%s\n' "$tags" | grep -c .)" != "1" ]; then
+            echo "::error::Expected exactly one postgres-meta tag in the Supabase CLI ($bin), found: '${tags}'"
+            exit 1
+          fi
+          echo "tag=${tags}" >> "$GITHUB_OUTPUT"
+          echo "image=public.ecr.aws/supabase/postgres-meta:${tags}" >> "$GITHUB_OUTPUT"
+          echo "Supabase CLI runs public.ecr.aws/supabase/postgres-meta:${tags}"
+
+      - name: Restore the postgres-meta image from cache
+        id: pgmeta-cache
+        uses: actions/cache@v4
+        with:
+          path: /tmp/postgres-meta-image.tar
+          key: supabase-postgres-meta-${{ steps.pgmeta.outputs.tag }}
+
+      - name: Load or pull the postgres-meta image
+        env:
+          IMAGE: ${{ steps.pgmeta.outputs.image }}
+          TAG: ${{ steps.pgmeta.outputs.tag }}
+          CACHE_HIT: ${{ steps.pgmeta-cache.outputs.cache-hit }}
+        run: |
+          set -euo pipefail
+          archive=/tmp/postgres-meta-image.tar
+          if [ "$CACHE_HIT" = "true" ] && docker load -i "$archive"; then
+            docker image inspect "$IMAGE" >/dev/null && exit 0
+            echo "::warning::Cached archive did not contain $IMAGE; pulling"
+          fi
+          delay=15
+          for attempt in 1 2 3 4 5; do
+            for source in "$IMAGE" "ghcr.io/supabase/postgres-meta:${TAG}" "supabase/postgres-meta:${TAG}"; do
+              if docker pull --quiet "$source"; then
+                [ "$source" = "$IMAGE" ] || docker tag "$source" "$IMAGE"
+                docker save -o "$archive" "$IMAGE"
+                echo "Pulled $source (attempt $attempt)"
+                exit 0
+              fi
+            done
+            if [ "$attempt" -lt 5 ]; then
+              echo "Pull attempt $attempt failed; retrying in ${delay}s"
+              sleep "$delay"
+              delay=$((delay * 2))
+            fi
+          done
+          echo "::error::Could not pull postgres-meta ${TAG} from ECR Public, GHCR or Docker Hub"
+          exit 1
+
       - name: Verify generated database types
         run: npm run db:types:check
 
