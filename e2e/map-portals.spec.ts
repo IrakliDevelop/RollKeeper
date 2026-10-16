@@ -682,7 +682,7 @@ test.describe('map-portals', () => {
   //   PublicMarkerDetail (portal?: never). Unit tests in
   //   PlayerBattleMapCanvas.portalIsolation.test.tsx verify this.
   //
-  // - TV/Display surface: the display page uses gesture: null which disables
-  //   marker activation entirely. Unit tests in
-  //   page.markerActivation.test.tsx cover the gesture: null contract.
+  // - TV/Display surface: TableDisplayShell registers markers with
+  //   gesture: null, which disables marker activation entirely. The unit
+  //   test in TableDisplayShell.test.tsx covers the gesture: null contract.
 });

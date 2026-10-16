@@ -170,6 +170,8 @@ export interface SharedInitiativeState {
   // Whether non-player conditions/concentration are being shared.
   enemyConditionsMode: EnemyConditionsDisplay;
   updatedAt: string; // ISO timestamp
+  /** Server lease deadline in Table v1. Readers clear an expired projection. */
+  expiresAt?: number;
 }
 
 // Player → DM request to advance past their own turn

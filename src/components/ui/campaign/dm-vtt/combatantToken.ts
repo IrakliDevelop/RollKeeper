@@ -64,6 +64,17 @@ export interface DmTokenConfig {
   color: string;
   /** Footprint in cells (Large=2 …); absent = 1. */
   tokenSize?: TokenCellSize;
+  /**
+   * Table scenes only: the token id already bound to the scene member in
+   * the repository, so placement, reload and retries keep one identity.
+   */
+  tokenId?: string;
+  /**
+   * Table scenes only: identity keys that replace the default combatant
+   * keys (e.g. a DM-placed party token's player kind, characterId, player
+   * band and sceneMemberId). Absent = legacy combatant stamping.
+   */
+  fields?: Record<string, unknown>;
   /** Fired once after placement (tool has handed back to select). */
   onPlaced: () => void;
 }
@@ -119,11 +130,15 @@ export function stampCombatantToken(
         zIndex: COMBATANT_TOKEN_ZINDEX,
       });
 
-  const token: CanvasElement & CombatantTokenKeys = {
-    ...base,
+  const identity = config.fields ?? {
     entityId: config.entityId,
     tokenKind: COMBATANT_TOKEN_KIND,
   };
+  const token = {
+    ...base,
+    ...(config.tokenId ? { id: config.tokenId } : {}),
+    ...identity,
+  } as CanvasElement;
   ctx.store.add(token);
   ctx.requestRender();
   return token;

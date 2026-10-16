@@ -29,6 +29,11 @@ export interface BattleMapViewsControlProps {
   onSend: (view: CameraView, audience: FocusAudience) => void;
   sharingEnabled: boolean;
   onSharingChange: (enabled: boolean) => void;
+  /**
+   * False on a surface no one else can see (the private editor, PR08 repair
+   * 07 CC4): saved views stay, every send control is hidden. Default true.
+   */
+  canShare?: boolean;
 }
 
 /**
@@ -48,6 +53,7 @@ export function BattleMapViewsControl({
   onSend,
   sharingEnabled,
   onSharingChange,
+  canShare = true,
 }: BattleMapViewsControlProps) {
   const [audience, setAudience] = useState<FocusAudience>('all');
   const {
@@ -176,6 +182,7 @@ export function BattleMapViewsControl({
                       key={v.id}
                       view={v}
                       sharingEnabled={sharingEnabled}
+                      canSend={canShare}
                       renaming={renamingId === v.id}
                       renameValue={renameValue}
                       onRenameValueChange={setRenameValue}
@@ -193,49 +200,53 @@ export function BattleMapViewsControl({
               </>
             )}
 
-            <div className="border-divider my-2 border-t" />
+            {canShare && (
+              <>
+                <div className="border-divider my-2 border-t" />
 
-            <Switch
-              checked={sharingEnabled}
-              onCheckedChange={onSharingChange}
-              aria-label="Move players' cameras"
-              label="Move players' cameras"
-              description="Turn this on when you want to move other players' cameras. It's off by default."
-            />
+                <Switch
+                  checked={sharingEnabled}
+                  onCheckedChange={onSharingChange}
+                  aria-label="Move players' cameras"
+                  label="Move players' cameras"
+                  description="Turn this on when you want to move other players' cameras. It's off by default."
+                />
 
-            <RadioGroupField
-              label="Send to"
-              value={audience}
-              onValueChange={value => setAudience(value as FocusAudience)}
-              disabled={!sharingEnabled}
-              wrapperClassName="mt-2"
-            >
-              <RadioGroupItem
-                value="all"
-                label="All"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-              <RadioGroupItem
-                value="players"
-                label="Players"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-              <RadioGroupItem
-                value="display"
-                label="Display"
-                wrapperClassName="min-h-[44px] items-center"
-              />
-            </RadioGroupField>
+                <RadioGroupField
+                  label="Send to"
+                  value={audience}
+                  onValueChange={value => setAudience(value as FocusAudience)}
+                  disabled={!sharingEnabled}
+                  wrapperClassName="mt-2"
+                >
+                  <RadioGroupItem
+                    value="all"
+                    label="All"
+                    wrapperClassName="min-h-[44px] items-center"
+                  />
+                  <RadioGroupItem
+                    value="players"
+                    label="Players"
+                    wrapperClassName="min-h-[44px] items-center"
+                  />
+                  <RadioGroupItem
+                    value="display"
+                    label="Display"
+                    wrapperClassName="min-h-[44px] items-center"
+                  />
+                </RadioGroupField>
 
-            <Button
-              variant="primary"
-              onClick={handleBringToMyView}
-              disabled={!sharingEnabled}
-              className="mt-2 flex h-11 w-full items-center justify-center gap-2 text-sm"
-            >
-              <MapPin size={16} />
-              Bring them to my view
-            </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleBringToMyView}
+                  disabled={!sharingEnabled}
+                  className="mt-2 flex h-11 w-full items-center justify-center gap-2 text-sm"
+                >
+                  <MapPin size={16} />
+                  Bring them to my view
+                </Button>
+              </>
+            )}
           </div>,
           document.body
         )}

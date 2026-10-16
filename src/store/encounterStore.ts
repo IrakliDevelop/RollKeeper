@@ -28,6 +28,14 @@ import {
   getEntryAbilityConfig,
 } from '@/utils/statBlockAbilities';
 import { parseRechargeFromName } from '@/utils/encounterConverter';
+import {
+  absorbDamage,
+  applyTurnStart,
+  clampHp,
+  getSortedEntities,
+  healHp,
+  stackTempHp,
+} from '@/utils/combatMechanics';
 import { normalizeCombatConfig } from '@/utils/customConditions';
 import { buildNpcLibraryPatch } from '@/utils/npcLibrarySync';
 import { queueNpcLibrarySync } from '@/store/npcLibrarySyncQueue';
@@ -317,83 +325,6 @@ function updateEncounterById(
   updater: (enc: Encounter) => Encounter
 ): Encounter[] {
   return encounters.map(enc => (enc.id === encounterId ? updater(enc) : enc));
-}
-
-// Sort entities by initiative (descending), with lair actions losing ties
-function getSortedEntities(entities: EncounterEntity[]): EncounterEntity[] {
-  // First pass: standard initiative sort
-  const sorted = [...entities].sort((a, b) => {
-    const aInit = a.initiative ?? -Infinity;
-    const bInit = b.initiative ?? -Infinity;
-    if (aInit !== bInit) return bInit - aInit;
-    // Lair actions lose ties
-    if (a.type === 'lair' && b.type !== 'lair') return 1;
-    if (b.type === 'lair' && a.type !== 'lair') return -1;
-    // Summons sort after their owner (non-summons first at same initiative)
-    if (a.summonOwnerId && !b.summonOwnerId) return 1;
-    if (b.summonOwnerId && !a.summonOwnerId) return -1;
-    // Ties: preserve current order
-    return 0;
-  });
-
-  // Second pass: move summons directly after their owner
-  const result: EncounterEntity[] = [];
-  const summonsByOwner = new Map<string, EncounterEntity[]>();
-
-  // Group summons by owner
-  for (const e of sorted) {
-    if (e.summonOwnerId) {
-      const list = summonsByOwner.get(e.summonOwnerId) ?? [];
-      list.push(e);
-      summonsByOwner.set(e.summonOwnerId, list);
-    }
-  }
-
-  // Build result: each non-summon entity followed by its summons
-  for (const e of sorted) {
-    if (e.summonOwnerId) continue; // handled below their owner
-    result.push(e);
-    const ownerKey = e.playerCharacterId;
-    if (ownerKey && summonsByOwner.has(ownerKey)) {
-      result.push(...summonsByOwner.get(ownerKey)!);
-      summonsByOwner.delete(ownerKey);
-    }
-  }
-
-  // Append any orphaned summons (owner not in encounter)
-  for (const summons of summonsByOwner.values()) {
-    result.push(...summons);
-  }
-
-  return result;
-}
-
-function applyTurnStart(
-  entities: EncounterEntity[],
-  incomingTurn: number
-): EncounterEntity[] {
-  return entities.map((e, i) => {
-    if (i !== incomingTurn) return e;
-    let next = e;
-    if (next.hasUsedReaction) next = { ...next, hasUsedReaction: false };
-    if (next.legendaryActions && next.legendaryActions.usedActions > 0) {
-      next = {
-        ...next,
-        legendaryActions: { ...next.legendaryActions, usedActions: 0 },
-      };
-    }
-    if (next.conditions.some(c => typeof c.rounds === 'number')) {
-      next = {
-        ...next,
-        conditions: next.conditions
-          .map(c =>
-            typeof c.rounds === 'number' ? { ...c, rounds: c.rounds - 1 } : c
-          )
-          .filter(c => !(typeof c.rounds === 'number' && c.rounds <= 0)),
-      };
-    }
-    return next;
-  });
 }
 
 /**
@@ -895,23 +826,13 @@ export const useEncounterStore = create<EncounterStoreState>()(
             encounterId,
             entityId,
             e => {
-              let remaining = amount;
-              let tempHp = e.tempHp;
-              let currentHp = e.currentHp;
-
               // Temp HP absorbs damage first
-              if (tempHp > 0) {
-                if (remaining <= tempHp) {
-                  tempHp -= remaining;
-                  remaining = 0;
-                } else {
-                  remaining -= tempHp;
-                  tempHp = 0;
-                }
-              }
-
-              const prevHp = currentHp;
-              currentHp = Math.max(0, currentHp - remaining);
+              const { currentHp, tempHp, remaining } = absorbDamage(
+                e.currentHp,
+                e.tempHp,
+                amount
+              );
+              const prevHp = e.currentHp;
 
               // Init death saves for persistent NPC/custom-monster creatures.
               let deathSaves = e.deathSaves;
@@ -951,7 +872,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             encounterId,
             entityId,
             e => {
-              const newHp = Math.min(e.maxHp, e.currentHp + amount);
+              const newHp = healHp(e.currentHp, e.maxHp, amount);
               // Clear death saves when a persistent creature is healed from 0.
               const deathSaves =
                 e.currentHp <= 0 &&
@@ -977,7 +898,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             entityId,
             e => ({
               ...e,
-              currentHp: Math.max(0, Math.min(max ?? e.maxHp, current)),
+              currentHp: clampHp(current, max ?? e.maxHp),
               ...(max !== undefined ? { maxHp: max } : {}),
             })
           ),
@@ -998,7 +919,7 @@ export const useEncounterStore = create<EncounterStoreState>()(
             e => ({
               ...e,
               // Temp HP doesn't stack — take the higher value
-              tempHp: Math.max(e.tempHp, amount),
+              tempHp: stackTempHp(e.tempHp, amount),
             })
           ),
         }));

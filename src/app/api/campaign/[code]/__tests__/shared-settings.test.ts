@@ -18,7 +18,6 @@ vi.mock('@/lib/redis', () => ({
   SLIDING_TTL_SECONDS: 100,
 }));
 vi.mock('@/lib/dmAuth', () => ({ verifyDmAuthority: async () => 'ok' }));
-vi.mock('@/lib/relayPoke', () => ({ sendInitiativePoke: async () => {} }));
 
 import { GET } from '@/app/api/campaign/[code]/shared/route';
 

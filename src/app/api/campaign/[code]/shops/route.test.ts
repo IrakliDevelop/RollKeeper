@@ -14,6 +14,7 @@ const { redis, authorizeHybridGuestRoute, sanitizePublicShop } = vi.hoisted(
       redis: {
         smembers: vi.fn(),
         srem: vi.fn(),
+        eval: vi.fn(),
         pipeline: vi.fn(() => ({
           get: (key: string) => {
             pipelineGetKeys.push(key);
@@ -34,6 +35,8 @@ const { redis, authorizeHybridGuestRoute, sanitizePublicShop } = vi.hoisted(
 vi.mock('@/lib/redis', () => ({
   getRedis: () => redis,
   campaignShopKey: (code: string, npcId: string) => `shop:${code}:${npcId}`,
+  campaignShopLedgerKey: (code: string, npcId: string) =>
+    `shop-ledger:${code}:${npcId}`,
   campaignShopsIndexKey: (code: string) => `shops-index:${code}`,
 }));
 vi.mock('@/lib/supabase/guestSessionServer', () => ({
@@ -41,7 +44,7 @@ vi.mock('@/lib/supabase/guestSessionServer', () => ({
 }));
 vi.mock('@/lib/shopProjection', () => ({ sanitizePublicShop }));
 
-import { GET } from './route';
+import { GET, SHOP_INDEX_PRUNE_SCRIPT } from './route';
 
 const params = { params: Promise.resolve({ code: 'ABC' }) };
 
@@ -64,6 +67,7 @@ beforeEach(() => {
   redis.__pipelineGetKeys.length = 0;
   authorizeHybridGuestRoute.mockResolvedValue({ mode: 'legacy' });
   redis.srem.mockResolvedValue(0);
+  redis.eval.mockResolvedValue(0);
   // Default: sanitizePublicShop is an identity pass-through unless a test
   // overrides it to simulate a corrupted/stale stored value.
   sanitizePublicShop.mockImplementation(value => value);
@@ -139,7 +143,16 @@ describe('shop index route — listing open shops', () => {
     expect(body.shops).toEqual([
       { npcId: 'npc-1', merchantName: 'Old Tam', entityIds: ['entity-1'] },
     ]);
-    expect(redis.srem).toHaveBeenCalledWith('shops-index:ABC', 'npc-stale');
+    // Repair 10 flake: never a blind SREM. A shop mid-publish (ledger seeded,
+    // projection not written yet) looks stale here and used to be delisted
+    // for good; the prune script removes an id only when its projection AND
+    // ledger are both gone.
+    expect(redis.srem).not.toHaveBeenCalled();
+    expect(redis.eval).toHaveBeenCalledWith(
+      SHOP_INDEX_PRUNE_SCRIPT,
+      ['shop:ABC:npc-stale', 'shop-ledger:ABC:npc-stale', 'shops-index:ABC'],
+      ['npc-stale']
+    );
   });
 
   it('drops an entry that fails sanitizePublicShop (well-formed JSON, invalid shape)', async () => {
@@ -152,13 +165,18 @@ describe('shop index route — listing open shops', () => {
     const response = await GET(getRequest(), params);
     const body = await response.json();
     expect(body.shops).toEqual([]);
-    expect(redis.srem).toHaveBeenCalledWith('shops-index:ABC', 'npc-1');
+    expect(redis.srem).not.toHaveBeenCalled();
+    expect(redis.eval).toHaveBeenCalledWith(
+      SHOP_INDEX_PRUNE_SCRIPT,
+      ['shop:ABC:npc-1', 'shop-ledger:ABC:npc-1', 'shops-index:ABC'],
+      ['npc-1']
+    );
   });
 
   it('a srem cleanup failure never turns a good response into an error', async () => {
     redis.smembers.mockResolvedValue(['npc-1', 'npc-stale']);
     redis.__pipelineExec.mockResolvedValue([JSON.stringify(makeShop()), null]);
-    redis.srem.mockRejectedValue(new Error('redis outage'));
+    redis.eval.mockRejectedValue(new Error('redis outage'));
 
     const response = await GET(getRequest(), params);
     expect(response.status).toBe(200);

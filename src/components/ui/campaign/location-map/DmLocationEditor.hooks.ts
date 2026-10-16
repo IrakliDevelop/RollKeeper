@@ -34,8 +34,8 @@ import {
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
 import { openTvDisplay } from '@/lib/openTvDisplay';
+import type { OpenTableDisplayResult } from '@/lib/openTableDisplay';
 import { uploadAsset } from '@/utils/uploadAsset';
-import { useShareWithPlayers } from './useShareWithPlayers';
 import {
   ensureCanonicalLayers,
   migrateCanvasToContract,
@@ -130,6 +130,7 @@ import {
   installVttGridController,
   setViewportFogStyle,
 } from '@/lib/fieldnotesVtt';
+import { assetProxyUrl as proxyUrl } from '@/utils/assetProxyUrl';
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
  *  selector call that would defeat Zustand's referential equality check. */
@@ -144,17 +145,6 @@ const FIT_CAMERA_MAX_ZOOM = 1;
 /** Camera pan after fit (offsets map from UI chrome, e.g. toolbar). */
 const FIT_CAMERA_PAN_OFFSET_X = 100;
 const FIT_CAMERA_PAN_OFFSET_Y = 0;
-
-/**
- * Route an S3 URL through our own proxy to avoid CORS canvas tainting.
- * Non-S3 URLs (e.g. blob: or data:) are returned as-is.
- */
-function proxyUrl(url: string): string {
-  if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
-    return `/api/assets/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
-}
 
 /** Upload to S3 via /api/assets/upload; base64 data-URL fallback when S3 is
  *  not configured. Returns the canonical (non-proxied) src to store. */
@@ -223,10 +213,6 @@ export interface DmLocationEditorState {
   /** Actionable publication failure shown beside the editor controls. */
   syncError: string | null;
 
-  // Share with players (battlemap mode only)
-  sharedWithPlayers: boolean;
-  handleToggleShareWithPlayers: () => void;
-
   // Handlers
   handleReady: (vp: Viewport) => void;
   handlePickImage: () => void;
@@ -239,7 +225,7 @@ export interface DmLocationEditorState {
   handleMapImageFileSelect: (
     e: React.ChangeEvent<HTMLInputElement>
   ) => Promise<void>;
-  handleOpenTvDisplay: () => Promise<void>;
+  handleOpenTvDisplay: () => Promise<OpenTableDisplayResult | void>;
   handleFitToMap: () => void;
 
   // Arrange maps (battlemap mode only)
@@ -630,10 +616,6 @@ export function useDmLocationEditor(
   const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
   const [hasUnsyncedChanges, setHasUnsyncedChanges] = useState(true);
   const [syncError, setSyncError] = useState<string | null>(null);
-
-  // Share with players (battlemap mode only) — hydrated from server truth
-  const { sharedWithPlayers, handleToggleShareWithPlayers } =
-    useShareWithPlayers(campaignCode, dmId, location, mode === 'battlemap');
 
   // Build tools once. Battle-map setup also supports FieldNotes' stroke eraser.
   const tools = useMemo<Tool[]>(() => {
@@ -1881,9 +1863,11 @@ export function useDmLocationEditor(
     [fogControls, getVp]
   );
 
+  // PR05 E12: this opens the campaign display; the toolbar shows a failure
+  // message from the returned result.
   const handleOpenTvDisplay = useCallback(
-    () => openTvDisplay(campaignCode, location.id, dmId),
-    [campaignCode, dmId, location.id]
+    () => openTvDisplay(campaignCode, dmId),
+    [campaignCode, dmId]
   );
 
   const handleFitToMap = useCallback(() => {
@@ -1941,8 +1925,6 @@ export function useDmLocationEditor(
     lastSyncedAt,
     syncStatus,
     syncError,
-    sharedWithPlayers,
-    handleToggleShareWithPlayers,
     imageUploading,
     setImageUploading,
     handleReady,

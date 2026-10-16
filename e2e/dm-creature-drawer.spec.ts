@@ -24,8 +24,8 @@ import {
  * Harness: `e2e/map-sheet-drawer.spec.ts`'s DM-side setup and
  * `config/playwright/sheet-drawer.config.ts`'s webServer wiring (relay +
  * dev server). This spec is DM-only (no player context, no relay
- * round-trip needed for the seeded token), but shares the config so the
- * nightly `sheet-drawer-e2e` job covers both in one run.
+ * round-trip needed for the seeded token), but shares the config so one
+ * `sheet-drawer` run covers both.
  */
 
 const CAMPAIGN_NAME = 'Creature Drawer E2E Campaign';
@@ -170,6 +170,20 @@ async function seedGoblinToken(page: Page, code: string): Promise<void> {
                     conditions: [],
                     color: '#2f6fd0',
                   },
+                  // Unplaced: the roster places it on the private editor.
+                  {
+                    id: 'entity-roster-orc-e2e',
+                    type: 'monster',
+                    name: 'Orc',
+                    initiative: null,
+                    initiativeModifier: 0,
+                    currentHp: 15,
+                    maxHp: 15,
+                    tempHp: 0,
+                    armorClass: 13,
+                    conditions: [],
+                    color: '#b91c1c',
+                  },
                 ],
                 currentTurn: 0,
                 round: 0,
@@ -228,7 +242,9 @@ test.describe('DM creature drawer', () => {
       '/dm',
       '/dm/campaign/warm/battlemaps/warm',
     ]) {
-      await dmPage.goto(path, { waitUntil: 'networkidle' }).catch(() => {});
+      await dmPage
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
     }
 
     await seedDm(dmPage, DM_ID);
@@ -241,9 +257,11 @@ test.describe('DM creature drawer', () => {
       undefined,
       { timeout: 15_000 }
     );
-    await expect(dmPage.getByText('Live', { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    // The creature drawer lives in the original editor, which is private
+    // under Table v1 (no relay room): the seeded token loads locally.
+    await expect(
+      dmPage.getByText("Private. Players don't see this map.")
+    ).toBeVisible({ timeout: 20_000 });
     await waitForElementSynced(dmPage, TOKEN_ID);
   });
 
@@ -314,5 +332,30 @@ test.describe('DM creature drawer', () => {
     await expect(
       panel.getByRole('textbox', { name: 'Armor class' })
     ).toHaveValue(String(NEW_AC));
+  });
+
+  test('a roster token is placed on the private editor with no connection (repair 07 CC1)', async () => {
+    await dmPage.keyboard.press('Escape');
+    await dmPage
+      .getByRole('button', { name: /\bOrc\b.*place/u })
+      .first()
+      .click();
+    const canvas = dmPage.locator('canvas').first();
+    const box = await canvas.boundingBox();
+    if (!box) throw new Error('DM canvas has no bounding box');
+    await dmPage.mouse.click(box.x + box.width * 0.3, box.y + box.height * 0.3);
+    await dmPage.waitForFunction(
+      () =>
+        window.__rkStores?.viewport?.store
+          .getAll()
+          .some(
+            element =>
+              (element as unknown as { entityId?: string }).entityId ===
+              'entity-roster-orc-e2e'
+          ),
+      undefined,
+      { timeout: 10_000 }
+    );
+    await expect(dmPage.getByText('Not connected')).toHaveCount(0);
   });
 });

@@ -17,7 +17,7 @@
  * editing markers must work with no relay URL configured.
  */
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo, useRef, useSyncExternalStore } from 'react';
 
 import type { CanvasElement, ElementStore } from '@fieldnotes/core';
 
@@ -67,6 +67,18 @@ export interface UseMarkerWritesArgs {
    * itself — the surface decides.
    */
   reemitAudience?: boolean;
+  /** Table scenes inject their isolated product-state adapter here. */
+  productState?: MarkerProductStateAdapter;
+}
+
+export interface MarkerProductStateAdapter {
+  subscribe(listener: () => void): () => void;
+  getMarkers(): readonly MarkerDetail[];
+  setMarkers(next: MarkerDetail[]): void;
+  getDmOnlyElements(): Readonly<Record<string, boolean>>;
+  setDmOnly(elementId: string, dmOnly: boolean): void;
+  setDmOnlyBulk(updates: Readonly<Record<string, boolean>>): void;
+  isReadable(): boolean;
 }
 
 export interface MarkerWrites {
@@ -154,8 +166,10 @@ const NO_CANVAS_STORE: MarkerElementStoreLike = {
 function mapExists(
   mode: 'battlemap' | 'location',
   campaignCode: string,
-  mapId: string
+  mapId: string,
+  productState?: MarkerProductStateAdapter
 ): boolean {
+  if (productState) return productState.isReadable();
   if (mode === 'battlemap') {
     return (
       useBattleMapStore.getState().getBattleMap(campaignCode, mapId) !==
@@ -187,11 +201,27 @@ function makeDeps(
   mapId: string,
   viewport: MarkerWritesViewport | null,
   removalTracker: MarkerRemovalTracker,
-  reemitAudience: boolean
+  reemitAudience: boolean,
+  productState?: MarkerProductStateAdapter
 ): MarkerWriteDeps {
   const store: MarkerElementStoreLike = viewport?.store ?? NO_CANVAS_STORE;
   const transaction = <T>(operation: () => T): T =>
     viewport ? viewport.transaction(operation) : operation();
+
+  if (productState) {
+    return {
+      store,
+      transaction,
+      reemitAudience,
+      removalTracker,
+      getMarkers: productState.getMarkers,
+      setMarkers: productState.setMarkers,
+      getDmOnlyElements: productState.getDmOnlyElements,
+      isMapReadable: productState.isReadable,
+      setDmOnly: productState.setDmOnly,
+      setDmOnlyBulk: productState.setDmOnlyBulk,
+    };
+  }
 
   if (mode === 'battlemap') {
     const readMap = () =>
@@ -257,7 +287,7 @@ function makeDeps(
 }
 
 export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
-  const { mode, campaignCode, mapId, getViewport } = args;
+  const { mode, campaignCode, mapId, getViewport, productState } = args;
   // Battlemap surfaces always run a relay; a location surface re-emits only
   // when its owner says live sync is configured (see UseMarkerWritesArgs).
   const reemitAudience = args.reemitAudience ?? mode === 'battlemap';
@@ -271,9 +301,15 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
   const locationMarkers = useLocationStore(
     state => state.locations[campaignCode]?.[mapId]?.markers
   );
-  const markers =
-    (mode === 'battlemap' ? battleMapMarkers : locationMarkers) ??
-    EMPTY_MARKERS;
+  const tableMarkers = useSyncExternalStore(
+    productState?.subscribe ?? (() => () => {}),
+    productState?.getMarkers ?? (() => EMPTY_MARKERS),
+    productState?.getMarkers ?? (() => EMPTY_MARKERS)
+  );
+  const markers = productState?.getMarkers
+    ? tableMarkers
+    : ((mode === 'battlemap' ? battleMapMarkers : locationMarkers) ??
+      EMPTY_MARKERS);
 
   // Session memory of marker removals, shared by `noteMarkerRemoval` and
   // `guardLocalMarkerAdd`. Held in a ref, not `useMemo`: it is real session
@@ -299,10 +335,11 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
         mapId,
         viewport,
         trackerRef.current.tracker,
-        reemitAudience
+        reemitAudience,
+        productState
       );
     },
-    [mode, campaignCode, mapId, reemitAudience]
+    [mode, campaignCode, mapId, reemitAudience, productState]
   );
 
   const createMarker = useCallback(
@@ -314,10 +351,10 @@ export function useMarkerWrites(args: UseMarkerWritesArgs): MarkerWrites {
       // `setDmOnly`/`setMarkers` would no-op and the DM-only mark could never
       // land. Checked here so nothing is attempted, rather than relying on
       // `insertMarkerRecord`'s throw after a detail write already happened.
-      if (!mapExists(mode, campaignCode, mapId)) return null;
+      if (!mapExists(mode, campaignCode, mapId, productState)) return null;
       return createMarkerWrite(depsFor(viewport), input);
     },
-    [getViewport, depsFor, mode, campaignCode, mapId]
+    [getViewport, depsFor, mode, campaignCode, mapId, productState]
   );
 
   const deleteMarker = useCallback(

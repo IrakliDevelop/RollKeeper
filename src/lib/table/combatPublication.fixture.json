@@ -1,0 +1,29 @@
+{
+  "runId": "run-a",
+  "initiative": {
+    "encounterId": "run-a",
+    "isActive": true,
+    "round": 1,
+    "currentEntityId": "m-goblin",
+    "turnOrder": [
+      {
+        "entityId": "m-goblin",
+        "displayName": "Goblin",
+        "type": "monster",
+        "disposition": "enemy"
+      },
+      {
+        "entityId": "m-pc1",
+        "displayName": "Bran",
+        "type": "player",
+        "playerCharacterId": "char-bran",
+        "isDead": false,
+        "currentHp": 9,
+        "maxHp": 30
+      }
+    ],
+    "enemyHpMode": "off",
+    "enemyConditionsMode": "off",
+    "updatedAt": "fixture"
+  }
+}

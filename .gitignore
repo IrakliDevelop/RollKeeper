@@ -102,3 +102,7 @@ temp/
 *storybook.log
 storybook-static
 .superpowers/
+
+# Vitest browser failure artifacts
+__screenshots__/
+.vitest-attachments/
