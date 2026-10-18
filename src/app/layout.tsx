@@ -3,6 +3,7 @@ import localFont from 'next/font/local';
 import './globals.css';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
+import { MotionProvider } from './MotionProvider';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
 
 // Felt and Brass type: Vollkorn for headings, Barlow for body and UI,
@@ -124,9 +125,11 @@ export default function RootLayout({
       </head>
       <body className="antialiased" suppressHydrationWarning={true}>
         <ThemeProviderWrapper>
-          <PersistenceBootstrap>
-            <ErrorBoundary>{children}</ErrorBoundary>
-          </PersistenceBootstrap>
+          <MotionProvider>
+            <PersistenceBootstrap>
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </PersistenceBootstrap>
+          </MotionProvider>
         </ThemeProviderWrapper>
       </body>
     </html>
