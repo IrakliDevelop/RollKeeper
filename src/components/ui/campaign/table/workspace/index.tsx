@@ -34,6 +34,10 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   /** The scene whose canvas is on screen (gate applies to new scenes only). */
   const shownScene = useRef<string | null>(null);
   const [playersCache] = useState(createTablePlayersCache);
+  const [details, setDetails] = useState<{
+    sceneId: string | null;
+    open: boolean;
+  }>({ sceneId: null, open: false });
   const { authority, switcher, mountedScene, repository, current, checkpoint } =
     workspace;
 
@@ -118,6 +122,12 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       presentationProps={workspace.presentationProps}
       presentation={workspace.presentation}
       notices={notices}
+      details={{
+        open:
+          details.sceneId === (mountedScene?.sceneId ?? null) && details.open,
+        onOpenChange: open =>
+          setDetails({ sceneId: mountedScene?.sceneId ?? null, open }),
+      }}
       extra={
         workspace.query.prepareEncounter ? (
           <TablePrepareEncounter
