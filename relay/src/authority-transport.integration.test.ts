@@ -1024,6 +1024,26 @@ run('two relay authority transport', () => {
   }, 15_000);
 
   it('keeps accepting edits after more than 64 accepted operations on one connection (SDK journal, PR08 repair 08)', async () => {
+    // II5 repair 13: measured from the start of the test. Steps stop at
+    // 190 s and every wait below notes a timeout instead of throwing, so the
+    // notes line always prints inside the 240 s budget.
+    const startedAt = Date.now();
+    const stopAt = startedAt + 190_000;
+    const elapsed = () => `${Math.round((Date.now() - startedAt) / 1_000)} s`;
+    const notes: string[] = [];
+    const reach = async (
+      label: string,
+      predicate: () => boolean | Promise<boolean>,
+      timeoutMs?: number
+    ): Promise<boolean> => {
+      try {
+        await eventually(predicate, timeoutMs);
+        return true;
+      } catch {
+        notes.push(`${label}: timed out at ${elapsed()}`);
+        return false;
+      }
+    };
     for (const client of clients.splice(0)) client.stop();
     await new Promise(resolve => setTimeout(resolve, 200));
     closeEvents.length = 0;
@@ -1133,7 +1153,8 @@ run('two relay authority transport', () => {
       },
     });
     clients.push(player);
-    await eventually(
+    const ready = await reach(
+      'all live',
       () =>
         dmStatus === 'live' &&
         playerStatus === 'live' &&
@@ -1166,17 +1187,16 @@ run('two relay authority transport', () => {
       id: 'journal-dm-element',
     };
     dmStore.add(dmElement as never);
-    await eventually(() => elementX('journal-dm-element') === 0);
+    const dmAdded =
+      ready &&
+      (await reach(
+        'dm element added',
+        () => elementX('journal-dm-element') === 0
+      ));
     // Each step must be confirmed in the room. A slow runner may lag the
     // observer or drop an episode (the edit then is a released draft or
     // uncertain op, FF1), so a step that is not confirmed within 5 s is made
     // again once: the connection must keep accepting edits either way.
-    const notes: string[] = [];
-    const startedAt = Date.now();
-    // II5 repair 13: stop making steps before the test timeout, so the
-    // notes below always print with how far each side got.
-    const stopAt = startedAt + 200_000;
-    const elapsed = () => `${Math.round((Date.now() - startedAt) / 1_000)} s`;
     const confirm = async (
       id: string,
       step: number,
@@ -1202,7 +1222,7 @@ run('two relay authority transport', () => {
         console.info(`150-edit progress ${side} ${reached} at ${elapsed()}`);
     };
     let dmReached = 0;
-    for (let step = 1; step <= 150; step += 1) {
+    for (let step = 1; dmAdded && step <= 150; step += 1) {
       if (Date.now() >= stopAt) {
         notes.push(`stopped before dm step ${step} at ${elapsed()}`);
         break;
@@ -1217,8 +1237,9 @@ run('two relay authority transport', () => {
       progress('dm', step);
     }
     // Player: 150 moves of its own token through the app wrapper. Players
-    // are rate limited to 10 element writes per second, so each write
-    // starts at least 110 ms after the previous one.
+    // are rate limited to 10 element writes per second (a 1 s window on
+    // the relay's commit time), so each write starts at least 140 ms after
+    // the previous one: 40 ms of margin per write for commit jitter.
     const band = `player-${playerId}`;
     player.publishLayerUpsert({
       id: band,
@@ -1240,18 +1261,21 @@ run('two relay authority transport', () => {
       characterId: playerId,
     };
     playerStore.add(token as never);
-    await eventually(
-      () => elementX('journal-player-token', playerObserver) === 0
-    );
+    const tokenAdded =
+      ready &&
+      (await reach(
+        'player token added',
+        () => elementX('journal-player-token', playerObserver) === 0
+      ));
     let lastWriteAt = Date.now();
     const paced = async (write: () => void) => {
-      const wait = lastWriteAt + 110 - Date.now();
+      const wait = lastWriteAt + 140 - Date.now();
       if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
       lastWriteAt = Date.now();
       write();
     };
     let playerReached = 0;
-    for (let step = 1; step <= 150; step += 1) {
+    for (let step = 1; tokenAdded && step <= 150; step += 1) {
       if (Date.now() >= stopAt) {
         notes.push(`stopped before player step ${step} at ${elapsed()}`);
         break;
@@ -1271,20 +1295,18 @@ run('two relay authority transport', () => {
       progress('player', step);
     }
     // Both relays end with both sides' last edit (cross-relay delivery).
-    let crossRelay = true;
-    try {
-      await eventually(
-        () =>
-          [dmObserver, playerObserver].every(
-            observer =>
-              elementX('journal-dm-element', observer) === dmReached &&
-              elementX('journal-player-token', observer) === playerReached
-          ),
-        10_000
-      );
-    } catch {
-      crossRelay = false;
-    }
+    // Worst case: 190 s + a step and its retry (20 s) + the token wait
+    // (5 s) + this check (10 s) = 225 s, inside the 240 s budget.
+    const crossRelay = await reach(
+      'cross-relay delivery',
+      () =>
+        [dmObserver, playerObserver].every(
+          observer =>
+            elementX('journal-dm-element', observer) === dmReached &&
+            elementX('journal-player-token', observer) === playerReached
+        ),
+      10_000
+    );
     // GG5 / II5: the notes print before any assertion, pass or fail.
     console.info(
       '150-edit notes',
