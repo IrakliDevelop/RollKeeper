@@ -276,14 +276,14 @@ function details(page: Page) {
   return page.getByRole('button', { name: /^Details/u });
 }
 
-/** Open the current header instance and prove its panel accepted the click. */
+/**
+ * One click must open Details: no retry, so a header remount that drops the
+ * open state (the FR4-3 regression) fails here instead of being re-clicked.
+ */
 async function openDetails(page: Page) {
   const panel = page.getByTestId('table-header-details');
-  await expect(async () => {
-    if (await panel.isVisible()) return;
-    await details(page).click();
-    await expect(panel).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 30_000 });
+  await details(page).click();
+  await expect(panel).toBeVisible();
   return panel;
 }
 
