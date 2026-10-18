@@ -356,8 +356,8 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
     dm.fog.applyRegion(
       {
         kind: 'rectangle',
-        from: { x: 1700, y: 1400 },
-        to: { x: 1720, y: 1420 },
+        from: { x: 1700, y: 1300 },
+        to: { x: 1720, y: 1320 },
       },
       'reveal'
     );
