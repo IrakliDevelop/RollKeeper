@@ -35,6 +35,7 @@ const authority = vi.hoisted(() => {
       status: string;
       document: unknown;
       operations: unknown[];
+      generation?: string | null;
     }) {
       state = next;
       listener?.();
@@ -92,6 +93,7 @@ import {
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   CONNECTION_DROPPED_MESSAGE,
+  ROOM_RESTORED_PLAYER_MESSAGE,
   DM_REJECTED_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
   CHECKPOINT_REQUEST_SPACING_MS,
@@ -1043,6 +1045,49 @@ describe('A1 element submissions use JSON semantics', () => {
       OFFLINE_DISCARDED_PLAYER_MESSAGE
     );
     player.connection.stop();
+  });
+
+  it('QA4: work lost because the DM restored the room (a new generation) says so instead of blaming the connection', () => {
+    const player = playerConnection();
+    authority.installState({
+      status: 'live',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    expect(player.onDiagnostic).toHaveBeenCalledWith(
+      ROOM_RESTORED_PLAYER_MESSAGE
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      CONNECTION_DROPPED_MESSAGE
+    );
+    player.connection.stop();
+
+    // The DM restored it themselves ("Checkpoint restored."): no notice.
+    const { connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'live',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'dm-drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
+    expect(onDiagnostic).not.toHaveBeenCalledWith(CONNECTION_DROPPED_MESSAGE);
+    expect(onDiagnostic).not.toHaveBeenCalledWith(ROOM_RESTORED_PLAYER_MESSAGE);
+    connection.stop();
   });
 
   it('GG1: a DM edit the room refused stays on the DM map and the notice says players see the saved version', () => {
