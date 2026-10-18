@@ -367,10 +367,10 @@ export function useTableCombat(options: {
    * PR04 P8 / S2 combined Show + Start, inside the same busy/serialized
    * guard (Q10: no other combat command, background included, runs from this
    * tab meanwhile). (1) plan `combat.start` against the current snapshot and
-   * capture its revision R — a refusal sends nothing; (2) re-read the
-   * repository right before Show — a changed revision aborts, nothing sent;
-   * (3) Show — not published → combat does not start; (4) commit start at R
-   * with a fresh operation id — a refusal leaves the scene shown (no rollback
+   * capture its revision R, a refusal sends nothing; (2) re-read the
+   * repository right before Show, a changed revision aborts, nothing sent;
+   * (3) Show, not published → combat does not start; (4) commit start at R
+   * with a fresh operation id, a refusal leaves the scene shown (no rollback
    * of a revealed scene). Both halves are reported in one result.
    */
   const showAndStart = useCallback(

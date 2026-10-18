@@ -39,7 +39,7 @@ export interface TablePlayersCache {
   get(campaignCode: string): ReadySnapshot | null;
   set(campaignCode: string, snapshot: ReadySnapshot): void;
   /**
-   * Acceptance A4: one shared read per campaign at a time — concurrent
+   * Acceptance A4: one shared read per campaign at a time, concurrent
    * consumers (scene roster, combat panel, StrictMode re-runs) share it.
    */
   load(
@@ -80,7 +80,7 @@ export function useTablePlayersCache(): TablePlayersCache | null {
 
 /**
  * FU-4: the shared workspace read for other readers on the Table canvas
- * (e.g. the presence directory) — a fresh snapshot is reused unless forced,
+ * (e.g. the presence directory), a fresh snapshot is reused unless forced,
  * otherwise the one in-flight workspace read is joined.
  */
 export function loadSharedPlayers(
@@ -186,7 +186,7 @@ export function useTablePlayersSnapshot(
   /**
    * Acceptance A1: read the server now (one shared in-flight read, aborted
    * on unmount), update the workspace cache, and resolve with the fresh
-   * players — or null when the route is unavailable.
+   * players, or null when the route is unavailable.
    */
   reload: () => Promise<TableCampaignPlayer[] | null>;
 } {
@@ -218,7 +218,7 @@ export function useTablePlayersSnapshot(
     const previous = lastTrigger.current;
     lastTrigger.current = { attempt, refreshKey };
     // A4: only an explicit refresh/poll/refreshKey change forces a read; a
-    // (re)mount — including StrictMode's effect re-run — reuses a fresh
+    // (re)mount, including StrictMode's effect re-run, reuses a fresh
     // workspace snapshot.
     const forced =
       previous !== null &&

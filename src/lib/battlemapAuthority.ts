@@ -177,7 +177,7 @@ export function createManagedBattleMapAuthorityConnection(
 
   const denyFogSequence = (): void => {
     options.onDiagnostic?.(
-      'Fog version reached the safe integer ceiling; reconnect editing is denied'
+      'Fog reached its edit limit, so live editing is off. Reload the page.'
     );
     options.onStatus?.('denied');
   };
@@ -790,7 +790,7 @@ export function createManagedBattleMapAuthorityConnection(
         applyingRemote = false;
       }
       options.onDiagnostic?.(
-        'The presented scene changed. Unsent map edits were discarded.'
+        'The DM changed the scene. Unsent map edits were discarded.'
       );
       options.onSceneChange?.({
         previousSceneId: previous.sceneId,

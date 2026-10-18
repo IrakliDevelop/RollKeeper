@@ -3,7 +3,7 @@
  * keys only: control, the display session binding, the display ACK record
  * and the scene registry. None is the control command script and none
  * writes the operation ledger: a secret-bearing result is never replayed.
- * Secrets never reach Redis — only SHA-256 hex digests travel in ARGV.
+ * Secrets never reach Redis, only SHA-256 hex digests travel in ARGV.
  *
  * Generations are integers below 1e14, so cjson's 14 significant digits
  * keep them exact through every re-encode (M1).

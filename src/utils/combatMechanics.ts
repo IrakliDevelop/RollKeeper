@@ -130,7 +130,7 @@ export function clampHp(current: number, max: number): number {
   return Math.max(0, Math.min(max, current));
 }
 
-/** Temp HP doesn't stack — take the higher value. */
+/** Temp HP doesn't stack; take the higher value. */
 export function stackTempHp(existing: number, amount: number): number {
   return Math.max(existing, amount);
 }

@@ -6,7 +6,7 @@ import { getVttGridController } from '@/lib/fieldnotesVtt';
 /**
  * PR07 P4 / C7-1: calibrated-minis geometry. Scale is C / U where C is the
  * verified CSS px per square and U the scene's square-grid cell size read
- * live from the synced `vtt:grid` element — never a fallback cell unit,
+ * live from the synced `vtt:grid` element, never a fallback cell unit,
  * the scene record copy or hex spacing.
  */
 

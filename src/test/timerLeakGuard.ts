@@ -2,7 +2,7 @@ import { expect } from 'vitest';
 
 /**
  * CI leak guard: every interval, and every timeout of 5 s or longer, created
- * by a test must be cleared once the test's trees are unmounted — a live
+ * by a test must be cleared once the test's trees are unmounted, a live
  * one fires after this file's jsdom is gone and crashes React in a later
  * file of the same worker.
  */

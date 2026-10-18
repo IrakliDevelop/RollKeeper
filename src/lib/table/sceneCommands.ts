@@ -62,7 +62,7 @@ function isSceneId(value: unknown): value is string {
   );
 }
 
-/** Scene names: 1–200 Unicode characters, not only whitespace. */
+/** Scene names: 1 to 200 Unicode characters, not only whitespace. */
 export function isSceneName(value: unknown): value is string {
   return (
     typeof value === 'string' &&

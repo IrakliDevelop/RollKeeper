@@ -253,7 +253,7 @@ describe('managed authority fog sequencing', () => {
     expect(authority.submit).not.toHaveBeenCalled();
     expect(statuses).toContain('denied');
     expect(diagnostic).toHaveBeenCalledWith(
-      expect.stringMatching(/fog version.*safe integer/i)
+      expect.stringMatching(/fog reached its edit limit/i)
     );
     connection.stop();
   });

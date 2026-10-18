@@ -333,7 +333,7 @@ describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2
     await connectFresh();
     expect(cover()).toBeNull();
     expect(screen.getByRole('status')).toHaveTextContent(
-      /presented scene changed/i
+      /DM changed the scene/i
     );
     for (const instance of fake.instances.slice(0, -1))
       expect(instance.stop).toHaveBeenCalled();
@@ -353,7 +353,7 @@ describe('PlayerBattleMapCanvas: recovery after a relay authority withdrawal (A2
     await connectFresh();
     expect(mints).toBeGreaterThan(before);
     expect(cover()).toBeNull();
-    expect(screen.queryByText(/presented scene changed/i)).toBeNull();
+    expect(screen.queryByText(/DM changed the scene/i)).toBeNull();
   });
 
   it('shows the neutral cover (never "Access denied") while the scene is unavailable', async () => {

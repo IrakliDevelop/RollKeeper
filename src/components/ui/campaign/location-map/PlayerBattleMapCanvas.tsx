@@ -211,7 +211,7 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
 
 /**
  * This receive site's role for `attachFocusReceiver`. Pulled out to a named,
- * directly-assertable constant — swapping this literal for the display role
+ * directly-assertable constant, swapping this literal for the display role
  * would otherwise pass type-check, lint, and every test while making a DM's
  * "send to the TV" move every player's camera instead. See
  * PlayerBattleMapCanvas.focusOptions.test.ts.
@@ -339,14 +339,14 @@ export function PlayerBattleMapCanvas({
   const fogPlugin = useMemo(() => createRollKeeperFogPlugin(), []);
   // R4 (Table v1): this route opens the source map URL; the server resolves
   // the presented scene. PR04 P7: side channels (marker details, loot, shop,
-  // fog appearance) are addressed by the RESOLVED scene id — never the
-  // source map id — and stay neutral until the token resolves one.
+  // fog appearance) are addressed by the RESOLVED scene id, never the
+  // source map id, and stay neutral until the token resolves one.
   const [resolvedSceneId, setResolvedSceneId] = useState<string | null>(null);
   const sideChannelId = resolvedSceneId;
   const sideChannelsEnabled = sideChannelId !== null;
   const sideChannelIdRef = useRef(sideChannelId);
   sideChannelIdRef.current = sideChannelId;
-  // P10: the token 403 body decides the cover — "Scene is unavailable" is
+  // P10: the token 403 body decides the cover, "Scene is unavailable" is
   // neutral; any other credential denial is "Access denied".
   const [tokenDenial, setTokenDenial] = useState<
     'scene-unavailable' | 'credential' | null
@@ -487,7 +487,7 @@ export function PlayerBattleMapCanvas({
       if (sideChannelIdRef.current !== sideChannelId) return;
       if (!response.ok) {
         // Table v1: 404 (not presented/blanked/deleted) is a neutral empty
-        // state — never the previous scene's details.
+        // state, never the previous scene's details.
         setPublishedMarkers(EMPTY_PUBLIC_MARKERS);
         return;
       }
@@ -813,7 +813,7 @@ export function PlayerBattleMapCanvas({
     connectionRef.current = null;
     if (fitFrameRef.current !== null) cancelAnimationFrame(fitFrameRef.current);
     fitFrameRef.current = null;
-    // PR05 E11: fit on the first `live` of this canvas only — never again
+    // PR05 E11: fit on the first `live` of this canvas only, never again
     // on later authority notifications (every DM edit) or reconnects.
     let fitted = false;
     const ownLayerId = playerLayerId(characterId);
@@ -918,7 +918,7 @@ export function PlayerBattleMapCanvas({
         )
           setSceneNotice(
             notice =>
-              notice ?? 'The presented scene changed. The map was reloaded.'
+              notice ?? 'The DM changed the scene. The map was reloaded.'
           );
         reconnect.lastResolved = sceneId;
         setResolvedSceneId(sceneId);
@@ -928,11 +928,11 @@ export function PlayerBattleMapCanvas({
           change.discardedOperationIds.length +
           (change.discardedHeldEdits ?? 0);
         setSceneNotice(
-          `The presented scene changed${
+          `The DM changed the scene.${
             count > 0
-              ? ` — ${count} unsent edit${count === 1 ? ' was' : 's were'} discarded`
+              ? ` ${count} unsent edit${count === 1 ? ' was' : 's were'} discarded.`
               : ''
-          }. The map was reloaded.`
+          } The map was reloaded.`
         );
         setResolvedSceneId(null);
         laserCleanupRef.current?.();

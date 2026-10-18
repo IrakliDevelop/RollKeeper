@@ -16,7 +16,7 @@ import { DISPLAY_KEEP_VISIBLE, DISPLAY_WAITING } from '../displayMessages';
  * exactly: `requestRender()` only sets `needsRender`; each animation frame
  * runs `if (needsRender) { render(); needsRender = false }`, and
  * `render()` calls the `afterAll` hooks. A `requestRender()` made from
- * inside an `afterAll` hook is therefore cleared by the same frame — as
+ * inside an `afterAll` hook is therefore cleared by the same frame, as
  * in @fieldnotes/core 0.86 `RenderLoop`.
  */
 

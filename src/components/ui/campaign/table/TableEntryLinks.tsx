@@ -100,7 +100,7 @@ export function useTableMapEntry(
 export function TableMapEntryLink(props: {
   campaignCode: string;
   mapId: string;
-  /** R4-5: Play-mode bar — icon below `lg`, text from `lg` (as Open display). */
+  /** R4-5: Play-mode bar, icon below `lg`, text from `lg` (as Open display). */
   compact?: boolean;
 }) {
   const target = useTableMapEntry(props.campaignCode, props.mapId);

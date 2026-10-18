@@ -29,7 +29,7 @@ import {
 
 /**
  * Checkpoint, restore and pending-conflict actions of the selected scene
- * (moved unchanged from the PR01–PR05 Table page; per scene, so the status
+ * (moved unchanged from the PR01 to PR05 Table page; per scene, so the status
  * line resets when another scene is mounted).
  */
 export function useSceneCheckpointActions(options: {

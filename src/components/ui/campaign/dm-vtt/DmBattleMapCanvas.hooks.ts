@@ -770,7 +770,7 @@ export function useDmBattleMapCanvas({
     if (!tableSceneAdapter || !hasLootMarker) return;
     let inFlight: AbortController | null = null;
     let disposed = false;
-    // A6: keep polling while the tab is hidden — a DM often has the Table
+    // A6: keep polling while the tab is hidden, a DM often has the Table
     // tab in the background while players claim; the browser already
     // throttles background timers. A hung read is aborted after 5 s.
     const tick = () => {

@@ -119,7 +119,7 @@ export function useTableRosterState(options: {
     const scene = latest.snapshot.scenes.find(item => item.sceneId === sceneId);
     if (!scene) return;
     ensuring.current = true;
-    // Allocated here, once, before the transaction — never during render.
+    // Allocated here, once, before the transaction, never during render.
     const assignments = scene.members
       .filter(member => member.sceneMemberId === undefined)
       .map(member => ({

@@ -75,9 +75,9 @@ describe('Battle maps list delete (PR04 P9)', () => {
 
   it('Table v1: a refusal is explained in words and keeps the local map', async () => {
     for (const [status, text] of [
-      [404, 'Not deleted — this map is used by a Table scene.'],
-      [403, 'Not deleted — only the campaign DM can delete battle maps.'],
-      [503, 'Not deleted — live storage is unavailable. Try again shortly.'],
+      [404, 'Not deleted: a Table scene uses this map.'],
+      [403, 'Not deleted: only the campaign DM can delete battle maps.'],
+      [503, 'Not deleted: live storage is unavailable. Try again shortly.'],
     ] as const) {
       fetchFn.mockResolvedValue(Response.json({}, { status }));
       await clickDelete();

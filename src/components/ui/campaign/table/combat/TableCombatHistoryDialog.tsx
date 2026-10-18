@@ -70,8 +70,8 @@ export function TableCombatHistoryDialog(props: {
         <DialogHeader>
           <DialogTitle>Combat history</DialogTitle>
           <DialogDescription>
-            Scene fights saved on this device, independent of the encounter
-            library.
+            Fights from Table scenes, saved on this device. Separate from the
+            encounter library.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="space-y-3">

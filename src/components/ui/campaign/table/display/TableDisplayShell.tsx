@@ -78,7 +78,7 @@ const INITIAL_VIEW: TableDisplayView = {
 };
 
 /**
- * PR05 E8–E11: the persistent campaign table display. The credential is
+ * PR05 E8 to E11: the persistent campaign table display. The credential is
  * bootstrapped from the fragment (or this tab's sessionStorage) before any
  * request; the controller then follows what the DM presents, covered until
  * each scene is rendered, with a camera that only explicit local moves

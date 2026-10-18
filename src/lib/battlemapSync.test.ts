@@ -296,7 +296,7 @@ describe('createManagedBattleMapConnection', () => {
     expect(transportUrls).toEqual([]);
     expect(statuses).toContain('denied');
     expect(diagnostic).toHaveBeenCalledWith(
-      expect.stringMatching(/authority.*location|location.*authority/i)
+      expect.stringMatching(/location can.t open live/i)
     );
     conn.stop();
   });

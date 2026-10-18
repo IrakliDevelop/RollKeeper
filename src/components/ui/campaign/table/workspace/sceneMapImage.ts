@@ -163,7 +163,7 @@ export const ENSURE_LOCAL_WAIT_MS = 5_000;
 
 /**
  * C6-1: runs `ensureSceneMapImage` from a React effect AFTER the canvas has
- * applied its initial state — once the relay status `live` committed (the
+ * applied its initial state, once the relay status `live` committed (the
  * authority handler loads the snapshot synchronously right after reporting
  * it), or after the local load when no relay is configured, the room
  * refused us, the relay is offline, or it is still not live after a bounded

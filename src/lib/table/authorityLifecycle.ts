@@ -96,8 +96,8 @@ export type PresentationIntent =
   | { type: 'deletePresented'; expectedSceneId: string };
 
 /**
- * Q1: a committed presentation result — including a ledger duplicate,
- * historical or not — is "published" only if the CURRENT descriptor shows
+ * Q1: a committed presentation result, including a ledger duplicate,
+ * historical or not, is "published" only if the CURRENT descriptor shows
  * the command's intended effect; otherwise the audience has since changed.
  * The `historical` flag alone never decides.
  */
@@ -625,8 +625,8 @@ const acquiresInFlight = new Map<string, Promise<TableControlAcquireResult>>();
 
 /**
  * PR06 A1(a): acquires (or renews) private live control exactly as the PR03
- * prepare did — control read, initialize if missing, renew-or-acquire, never
- * a takeover — and returns the page's one control session. Concurrent calls
+ * prepare did, control read, initialize if missing, renew-or-acquire, never
+ * a takeover, and returns the page's one control session. Concurrent calls
  * for the same session share one attempt (GG4).
  */
 export function acquireTableControl(

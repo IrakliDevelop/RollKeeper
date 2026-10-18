@@ -101,7 +101,8 @@ export function useTableControl(campaignCode: string, dmId: string) {
     async (makeCommand: (control: TableDescriptor | null) => TableCommand) => {
       if (pendingCount.current >= 8) {
         authorityGeneration.current += 1;
-        const message = 'Too many pending control requests; not broadcasting';
+        const message =
+          'Too many requests waiting. Initiative not shared with players.';
         setStatus('error');
         setError(message);
         throw new Error(message);
@@ -116,7 +117,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
           if (authority !== authorityGeneration.current)
             throw new Error('Control response superseded');
           if (!navigator.onLine)
-            throw new Error('Disconnected; remote initiative may be stale');
+            throw new Error('Disconnected. Players may see old initiative.');
           const command = makeCommand(currentRef.current);
           const { response, data: result } =
             await fetchBoundedJson<TableResult>(
@@ -250,7 +251,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
     const handleOffline = () => {
       authorityGeneration.current += 1;
       setStatus('not-broadcasting');
-      setError('Disconnected; remote initiative may be stale');
+      setError('Disconnected. Players may see old initiative.');
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
@@ -269,9 +270,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
         ) {
           authorityGeneration.current += 1;
           setStatus('not-broadcasting');
-          setError(
-            'Live control lease expired; remote initiative may be stale'
-          );
+          setError('Live control expired. Players may see old initiative.');
         }
       },
       Math.max(0, current.leaseUntil - Date.now()) + 1

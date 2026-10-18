@@ -28,7 +28,7 @@ export interface TableCombatParticipantView {
   /** Public identity: the run scene member's `sceneMemberId` (R2-1). */
   entityId: string;
   kind: 'editable' | 'player-reference' | 'adopted-pc';
-  /** Verified player identity (actor identity, not token control — C3-4). */
+  /** Verified player identity (actor identity, not token control, C3-4). */
   verifiedLegacyPlayerId: string | null;
   playerControlled: boolean;
   identityUnresolved: boolean;

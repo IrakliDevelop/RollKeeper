@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import type { TableSceneRecordV1 } from '@/lib/table/schema';
 
 export const SCENES_PANEL_ID = 'table-scenes-panel';
-/** FU-6: stable id — the toggle remounts with the scene's header. */
+/** FU-6: stable id, the toggle remounts with the scene's header. */
 export const SCENES_TOGGLE_ID = 'table-scenes-toggle';
 
 /** Header toggle for the private Scenes panel (W5/W12). */

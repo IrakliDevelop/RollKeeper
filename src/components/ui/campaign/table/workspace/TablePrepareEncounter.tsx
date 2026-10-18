@@ -21,8 +21,8 @@ const LABEL_MAX = 200;
 
 /**
  * PR06 W7 "Prepare on map" (A3 copy semantics): with `?prepareEncounter=`
- * the workspace asks the DM to choose or create a scene, then — only after
- * an explicit confirmation — copies the library encounter's creatures into
+ * the workspace asks the DM to choose or create a scene, then, only after
+ * an explicit confirmation, copies the library encounter's creatures into
  * that scene as a new inactive run and selects it. An existing copy in the
  * scene is offered first; another copy is explicit. The library encounter
  * is only read. Without the parameter nothing here renders (peaceful scene).
