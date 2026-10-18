@@ -645,4 +645,53 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
       )
     ).resolves.toMatchObject({ status: 'committed' });
   });
+  it('orders negative tile coordinates numerically too', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    const fogManager = new FogManager({ idFactory: () => 'fog-negative' });
+    fogManager.initialize({
+      bounds: { x: -512, y: 0, w: 1024, h: 256 },
+      base: 'covered',
+      cellSize: 1,
+    });
+    for (const x of [-300, -150, 100])
+      fogManager.applyRegion(
+        {
+          kind: 'rectangle',
+          from: { x, y: 10 },
+          to: { x: x + 20, y: 30 },
+        },
+        'reveal'
+      );
+    const fog = editorFogToAuthorityFog(fogManager.getState(), 'dm-a');
+    const current = JSON.parse((await redis.get(keys.meta))!) as {
+      generation: string;
+      casToken: string;
+    };
+    const generation = 'a33e4567-e89b-42d3-a456-426614174000';
+    const provision = await admin('/authority-admin/provision', {
+      generation,
+      casToken: 'f'.repeat(64),
+      expectedGeneration: current.generation,
+      expectedCasToken: current.casToken,
+      state: {
+        elements: [],
+        layers: [],
+        extensions: { fog: { pluginName: 'fog', version: 1, data: fog } },
+      },
+    });
+    expect(provision.status).toBe(200);
+    // String order would be "-2,0", "-3,0", "0,0".
+    const driver = new RedisAuthorityDriver(redisAdapter(redis));
+    const capture = await driver.checkpoint(
+      readContext(generation),
+      readOptions()
+    );
+    expect(positions(capture.state.extensions.fog.data?.tiles)).toEqual([
+      '-3,0',
+      '-2,0',
+      '0,0',
+    ]);
+    await sdkAccepts(capture.state, 'negative');
+    await capture.release();
+  });
 });
