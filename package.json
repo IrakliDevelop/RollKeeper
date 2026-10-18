@@ -55,7 +55,7 @@
     "test:watch": "vitest --project unit",
     "test:visual": "vitest run --project storybook",
     "test:all": "vitest run",
-    "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs scripts/spawn-next-dev.test.mjs scripts/design-css.test.mjs scripts/design-token-refs.test.mjs scripts/design-ratchet.test.mjs scripts/design-contrast.test.mjs scripts/design-fonts.test.mjs",
+    "test:ci-tools": "node --test scripts/quality-ratchet.test.mjs scripts/spawn-next-dev.test.mjs scripts/design-css.test.mjs scripts/design-token-refs.test.mjs scripts/design-ratchet.test.mjs scripts/design-contrast.test.mjs scripts/design-fonts.test.mjs scripts/changed-copy.test.mjs",
     "test:db:integration": "node --test scripts/supabase-integration.test.mjs",
     "test:db:backup-restore": "node --test scripts/backup-restore-drill.test.mjs",
     "test:guest:http": "node --test scripts/guest-http.integration.test.mjs",
@@ -83,7 +83,8 @@
     "type-check": "tsc --noEmit",
     "prepare": "husky",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "copy:changed": "node scripts/changed-copy.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.922.0",
