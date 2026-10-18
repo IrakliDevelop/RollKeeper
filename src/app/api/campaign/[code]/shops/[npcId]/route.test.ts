@@ -60,7 +60,9 @@ import {
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
 } from '@/lib/shopPurchases';
 
-import { GET, PATCH, PUT, SHOP_ENTITY_IDS_CAS_SCRIPT } from './route';
+import { SHOP_ENTITY_IDS_CAS_SCRIPT } from '@/lib/shopRedisScripts';
+
+import { GET, PATCH, PUT } from './route';
 
 const params = { params: Promise.resolve({ code: 'ABC', npcId: 'npc-1' }) };
 

@@ -8,6 +8,7 @@ import {
   getRedis,
 } from '@/lib/redis';
 import { sanitizePublicShop } from '@/lib/shopProjection';
+import { SHOP_INDEX_PRUNE_SCRIPT } from '@/lib/shopRedisScripts';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import type { PublicShopIndexEntry } from '@/types/shop';
 
@@ -33,33 +34,16 @@ import type { PublicShopIndexEntry } from '@/types/shop';
  * `PUT` (`sadd` on open, `srem` on close) with its own sliding TTL — never
  * part of `refreshCampaignTTL`, matching every other shop key. A member
  * whose own `campaignShopKey` no longer resolves to a valid `PublicShop`
- * (expired independently, or corrupted) is dropped from the RESPONSE and
- * lazily `srem`'d from the index itself (best-effort, never blocking the
- * response) — the same self-healing-by-omission the singular shop `GET`
- * already applies to a missing ledger.
+ * (expired independently, or corrupted) is dropped from the RESPONSE. It is
+ * removed from the index itself only when its projection AND its ledger are
+ * both gone (`SHOP_INDEX_PRUNE_SCRIPT`, best-effort, never blocking the
+ * response), so a shop whose publish is still in progress stays listed.
  *
  * Auth: same `'shared:read'` guest scope the singular shop `GET` already
  * uses — this is equally non-player-scoped public campaign state (any
  * campaign member may window-shop), so there is no
  * `requireGuestPlayerBinding` check here either.
  */
-/**
- * KEYS: for each ARGV[i] its projection key then ledger key, and last the
- * shops index. Removes an npcId from the index only when both of its keys
- * are gone (unpublished or expired), never while a publish is in progress.
- */
-export const SHOP_INDEX_PRUNE_SCRIPT = `
-local index = KEYS[#KEYS]
-local removed = 0
-for i, npcId in ipairs(ARGV) do
-  if redis.call('EXISTS', KEYS[2 * i - 1]) == 0
-    and redis.call('EXISTS', KEYS[2 * i]) == 0 then
-    removed = removed + redis.call('SREM', index, npcId)
-  end
-end
-return removed
-`;
-
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ code: string }> }
