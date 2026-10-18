@@ -26,6 +26,7 @@ import {
   seedShopLedger,
   SHOP_LEDGER_SEED_TOO_LARGE_ERROR,
 } from '@/lib/shopPurchases';
+import { SHOP_ENTITY_IDS_CAS_SCRIPT } from '@/lib/shopRedisScripts';
 import { authorizeHybridGuestRoute } from '@/lib/supabase/guestSessionServer';
 import type { CampaignNPC } from '@/types/encounter';
 
@@ -314,23 +315,6 @@ export async function PUT(
     );
   }
 }
-
-/**
- * Compare-and-set of the published projection, keyed on the exact stored
- * text: KEYS[1] projection, KEYS[2] ledger, ARGV[1] the projection text the
- * caller read, ARGV[2] its replacement. Returns -1 when the shop is not
- * live (projection or ledger gone), 0 when the projection changed since it
- * was read, 1 when written. The ledger is only checked, never written, and
- * the projection keeps its TTL.
- */
-export const SHOP_ENTITY_IDS_CAS_SCRIPT = `
-local current = redis.call('GET', KEYS[1])
-if not current then return -1 end
-if redis.call('EXISTS', KEYS[2]) == 0 then return -1 end
-if current ~= ARGV[1] then return 0 end
-redis.call('SET', KEYS[1], ARGV[2], 'KEEPTTL')
-return 1
-`;
 
 const ENTITY_IDS_CAS_ATTEMPTS = 3;
 

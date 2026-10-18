@@ -44,7 +44,9 @@ vi.mock('@/lib/supabase/guestSessionServer', () => ({
 }));
 vi.mock('@/lib/shopProjection', () => ({ sanitizePublicShop }));
 
-import { GET, SHOP_INDEX_PRUNE_SCRIPT } from './route';
+import { SHOP_INDEX_PRUNE_SCRIPT } from '@/lib/shopRedisScripts';
+
+import { GET } from './route';
 
 const params = { params: Promise.resolve({ code: 'ABC' }) };
 

@@ -332,6 +332,16 @@ describe('GG3 offline fork slot', () => {
     adapter.dispose();
   });
 
+  it('remembers edits made before the scene room was first live until they are taken once (FR4-3)', async () => {
+    const { adapter } = await setup();
+    expect(adapter.takeEditsBeforeLive()).toBe(false);
+    adapter.markEditsBeforeLive();
+    adapter.markEditsBeforeLive();
+    expect(adapter.takeEditsBeforeLive()).toBe(true);
+    expect(adapter.takeEditsBeforeLive()).toBe(false);
+    adapter.dispose();
+  });
+
   it('captures nothing when there is no local version', async () => {
     const { adapter, stored } = await setup();
     adapter.captureOfflineFork();

@@ -8,6 +8,7 @@ import { PLAYER_BAND_ORDER } from '../layerContract';
 import {
   HELD_OVERFLOW_MESSAGE,
   OFFLINE_DISCARDED_PLAYER_MESSAGE,
+  ROOM_RESTORED_PLAYER_MESSAGE,
 } from '@/lib/battlemapAuthority';
 
 /**
@@ -332,6 +333,9 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     expect(
       await screen.findByText(OFFLINE_DISCARDED_PLAYER_MESSAGE)
     ).toBeTruthy();
+    // QA4: a DM restore is named as such.
+    act(() => options.onDiagnostic?.(ROOM_RESTORED_PLAYER_MESSAGE));
+    expect(await screen.findByText(ROOM_RESTORED_PLAYER_MESSAGE)).toBeTruthy();
   });
 
   it('offers no delete action for a selected control-bearing token', () => {

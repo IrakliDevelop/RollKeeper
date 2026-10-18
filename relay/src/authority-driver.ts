@@ -192,6 +192,71 @@ function rejection(value: unknown): AuthorityCommitResult {
   };
 }
 
+/**
+ * Repair 11: the fog library (`@fieldnotes/vtt/redis`) reads stored fog
+ * records back only in its own exact JSON encoding (fixed key order, string
+ * escaping of `\\` and `"` only) and refuses the next fog edit otherwise.
+ * `cjson.encode` in the provision script used Lua table order and escaped
+ * `/`, so every DM fog edit on a room provisioned with fog (go live with a
+ * fogged map, restore, reapply) was refused as invalid. Encode them here the
+ * way the library does. The values were already checked by
+ * `validatesAuthorityState`.
+ */
+type ProvisionFogRecords = {
+  meta: string;
+  tiles: Array<{ field: string; value: string }>;
+} | null;
+
+function provisionFogRecords(state: AuthorityState): ProvisionFogRecords {
+  const data = state.extensions.fog?.data as
+    | {
+        meta: {
+          version: number;
+          editor: string;
+          definition?: {
+            generation: string;
+            bounds: { x: number; y: number; w: number; h: number };
+            cellSize: number;
+            base: string;
+          };
+        };
+        tiles: Array<{
+          generation: string;
+          x: number;
+          y: number;
+          version: number;
+          editor: string;
+          data?: string;
+        }>;
+      }
+    | null
+    | undefined;
+  if (!data) return null;
+  const json = JSON.stringify;
+  const { meta } = data;
+  const definition = meta.definition;
+  const encodedMeta =
+    `{"version":${json(meta.version)},"editor":${json(meta.editor)}` +
+    (definition
+      ? `,"definition":{"version":1,"generation":${json(definition.generation)}` +
+        `,"bounds":{"x":${json(definition.bounds.x)},"y":${json(definition.bounds.y)}` +
+        `,"w":${json(definition.bounds.w)},"h":${json(definition.bounds.h)}}` +
+        `,"cellSize":${json(definition.cellSize)},"tileCells":128,"base":${json(definition.base)}}`
+      : '') +
+    '}';
+  return {
+    meta: encodedMeta,
+    tiles: data.tiles.map(tile => ({
+      field: `${json(tile.x)},${json(tile.y)}`,
+      value:
+        `{"generation":${json(tile.generation)},"x":${json(tile.x)},"y":${json(tile.y)}` +
+        `,"version":${json(tile.version)},"editor":${json(tile.editor)}` +
+        (tile.data === undefined ? '' : `,"data":${json(tile.data)}`) +
+        '}',
+    })),
+  };
+}
+
 function decodeJson<T>(value: unknown): T {
   return JSON.parse(textValue(value)) as T;
 }
@@ -301,6 +366,7 @@ export class RedisAuthorityDriver implements AuthorityDriver {
         arguments: [
           JSON.stringify({
             ...input,
+            fogRecords: provisionFogRecords(input.state),
             stateShape: {
               elementsArray: true,
               layersArray: true,

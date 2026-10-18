@@ -49,6 +49,7 @@ export default defineConfig({
     'map-sheet-drawer.spec.ts',
     'dm-creature-drawer.spec.ts',
     'table-offline-changes.spec.ts',
+    'table-fog-order.spec.ts',
   ],
   outputDir: '../../test-results/sheet-drawer',
   timeout: 60_000,

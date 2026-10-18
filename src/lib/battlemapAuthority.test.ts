@@ -35,6 +35,7 @@ const authority = vi.hoisted(() => {
       status: string;
       document: unknown;
       operations: unknown[];
+      generation?: string | null;
     }) {
       state = next;
       listener?.();
@@ -92,6 +93,7 @@ import {
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   CONNECTION_DROPPED_MESSAGE,
+  ROOM_RESTORED_PLAYER_MESSAGE,
   DM_REJECTED_MESSAGE,
   OFFLINE_DISCARDED_DM_MESSAGE,
   CHECKPOINT_REQUEST_SPACING_MS,
@@ -837,6 +839,12 @@ describe('A1 element submissions use JSON semantics', () => {
     // 'accepted-pinned' is held by a barrier: the SDK refuses to release it.
     release.mockImplementation(((id: string, options?: unknown) =>
       id === 'accepted-pinned' ? false : real(id, options)) as never);
+    // QA4: the drafts and uncertain work were seen while not live.
+    authority.installState({
+      status: 'offline',
+      document: { elements: [], layers: [], extensions: {} },
+      operations: [op('draft', 'draft'), op('uncertain', 'uncertain')],
+    });
     authority.installState({
       status: 'live',
       document: { elements: [], layers: [], extensions: {} },
@@ -992,11 +1000,21 @@ describe('A1 element submissions use JSON semantics', () => {
       proposal: { mutation: { kind: 'remove', id: clientOperationId } },
     });
     authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [op('lost', 'uncertain')],
+    });
+    authority.installState({
       status: 'live',
       document: emptyDoc(),
       operations: [op('lost', 'uncertain')],
     });
     expect(onOfflineDraftsReleased).not.toHaveBeenCalled();
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [op('offline-1', 'draft'), op('offline-2', 'draft')],
+    });
     authority.installState({
       status: 'live',
       document: emptyDoc(),
@@ -1010,6 +1028,17 @@ describe('A1 element submissions use JSON semantics', () => {
 
   it('GG2: uncertain-only releases get a neutral notice, never the offline/Reapply one', () => {
     const { connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
     authority.installState({
       status: 'live',
       document: emptyDoc(),
@@ -1026,6 +1055,17 @@ describe('A1 element submissions use JSON semantics', () => {
     connection.stop();
     const player = playerConnection();
     authority.installState({
+      status: 'offline',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'lost-episode-2',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    authority.installState({
       status: 'live',
       document: emptyDoc(),
       operations: [
@@ -1041,6 +1081,119 @@ describe('A1 element submissions use JSON semantics', () => {
     );
     expect(player.onDiagnostic).not.toHaveBeenCalledWith(
       OFFLINE_DISCARDED_PLAYER_MESSAGE
+    );
+    player.connection.stop();
+  });
+
+  it('QA4: work lost because the DM restored the room (a new generation) says so instead of blaming the connection', () => {
+    const player = playerConnection();
+    authority.installState({
+      status: 'offline',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+        // The restore closed the socket (1013); moves made meanwhile were
+        // drafts of the replaced room.
+        {
+          clientOperationId: 'drag-after-close',
+          status: 'draft',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    authority.installState({
+      status: 'live',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+        // The restore closed the socket (1013); moves made meanwhile were
+        // drafts of the replaced room.
+        {
+          clientOperationId: 'drag-after-close',
+          status: 'draft',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    expect(player.onDiagnostic).toHaveBeenCalledWith(
+      ROOM_RESTORED_PLAYER_MESSAGE
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      CONNECTION_DROPPED_MESSAGE
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      OFFLINE_DISCARDED_PLAYER_MESSAGE
+    );
+    player.connection.stop();
+
+    // The DM restored it themselves ("Checkpoint restored."): no notice.
+    const { connection, onDiagnostic } = dmConnection();
+    authority.installState({
+      status: 'offline',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'dm-drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
+    authority.installState({
+      status: 'live',
+      generation: 'generation-restored',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'dm-drag-during-restore',
+          status: 'uncertain',
+          generation: 'generation-before',
+          proposal: { mutation: { kind: 'remove', id: 'x' } },
+        },
+      ],
+    });
+    expect(onDiagnostic).not.toHaveBeenCalledWith(CONNECTION_DROPPED_MESSAGE);
+    expect(onDiagnostic).not.toHaveBeenCalledWith(ROOM_RESTORED_PLAYER_MESSAGE);
+    connection.stop();
+  });
+
+  it('QA4: work reported uncertain while the socket is closing (status still live) is not released or blamed on the connection', () => {
+    const player = playerConnection();
+    // A DM restore withdraws the socket (4403): the SDK reports the
+    // in-flight drag as uncertain while still "live", then goes denied.
+    authority.installState({
+      status: 'live',
+      document: emptyDoc(),
+      operations: [
+        {
+          clientOperationId: 'drag-at-close',
+          status: 'uncertain',
+          proposal: { mutation: { kind: 'remove', id: 'y' } },
+        },
+      ],
+    });
+    expect(authority.connection.releaseOperation).not.toHaveBeenCalledWith(
+      'drag-at-close',
+      expect.anything()
+    );
+    expect(player.onDiagnostic).not.toHaveBeenCalledWith(
+      CONNECTION_DROPPED_MESSAGE
     );
     player.connection.stop();
   });

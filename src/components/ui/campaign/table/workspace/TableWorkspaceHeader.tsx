@@ -78,7 +78,11 @@ export function TableWorkspaceHeader(props: {
           </Button>
         </Link>
         {props.leading}
-        <p className="text-heading min-w-0 text-sm font-semibold break-words">
+        {/* QA3: a long name takes at most two lines at 360 px. */}
+        <p
+          className="text-heading line-clamp-2 min-w-0 text-sm font-semibold break-words"
+          title={scene?.name ?? 'Table'}
+        >
           {scene?.name ?? 'Table'}
         </p>
         <Badge variant="neutral" size="sm">

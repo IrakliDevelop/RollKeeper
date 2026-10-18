@@ -52,6 +52,7 @@ import {
 } from '@/lib/battlemapSync';
 import {
   CONNECTION_DROPPED_MESSAGE,
+  ROOM_RESTORED_PLAYER_MESSAGE,
   HELD_OVERFLOW_MESSAGE,
   HELD_STALE_MESSAGE,
   OFFLINE_DISCARDED_PLAYER_MESSAGE,
@@ -844,7 +845,8 @@ export function PlayerBattleMapCanvas({
           message === HELD_OVERFLOW_MESSAGE ||
           message === HELD_STALE_MESSAGE ||
           message === OFFLINE_DISCARDED_PLAYER_MESSAGE ||
-          message === CONNECTION_DROPPED_MESSAGE
+          message === CONNECTION_DROPPED_MESSAGE ||
+          message === ROOM_RESTORED_PLAYER_MESSAGE
         )
           setSceneNotice(message);
       },

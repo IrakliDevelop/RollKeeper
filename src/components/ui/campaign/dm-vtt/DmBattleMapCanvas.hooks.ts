@@ -301,6 +301,11 @@ export function useDmBattleMapCanvas({
     at: number;
   } | null>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
+  /**
+   * FR4-3: local edits are tracked against the current connection: armed
+   * once it exists, and "before live" until it is first live.
+   */
+  const editsBeforeLiveRef = useRef({ armed: false, liveSeen: false });
   const connectionRef = useRef<
     import('@/lib/battlemapSync').BattleMapConnection | null
   >(null);
@@ -971,8 +976,17 @@ export function useDmBattleMapCanvas({
       // Remote-origin ops (relayed from another client) must not thrash
       // zustand/localStorage on every incoming drag frame (mirrors the
       // DmLocationEditor battlemap-mode save path).
+      // FR4-3: a Table stage edit saved before its connection was first
+      // live never reached the room (the SDK refuses it until then).
+      editsBeforeLiveRef.current = { armed: false, liveSeen: false };
+      const noteLocalEdit = () => {
+        const tracking = editsBeforeLiveRef.current;
+        if (tableSceneAdapter && tracking.armed && !tracking.liveSeen)
+          tableSceneAdapter.markEditsBeforeLive();
+      };
       const saveOnLocalOps = (_data: unknown, meta?: { origin?: string }) => {
         if (meta?.origin !== undefined && meta.origin !== 'local') return;
+        noteLocalEdit();
         updateBattleMap({
           canvasState: vp.exportJSON(),
           updatedAt: new Date().toISOString(),
@@ -986,6 +1000,7 @@ export function useDmBattleMapCanvas({
       fogPersistenceCleanupRef.current = attachFogPersistence(
         fogManager,
         () => {
+          noteLocalEdit();
           updateBattleMap({
             canvasState: vp.exportJSON(),
             updatedAt: new Date().toISOString(),
@@ -1125,6 +1140,20 @@ export function useDmBattleMapCanvas({
                 : { message, at: Date.now() }
             );
         };
+        // GG3 / HH2 / FR4-3: keep the version the live room did not take in
+        // the scene's offline changes slot; the toast points to Details only
+        // when the copy was kept.
+        const keepOfflineVersion = () => {
+          void tableSceneAdapter
+            .captureOfflineFork()
+            .then(kept =>
+              showLiveMapNotice(
+                kept
+                  ? OFFLINE_DISCARDED_DM_MESSAGE
+                  : OFFLINE_NOT_KEPT_DM_MESSAGE
+              )
+            );
+        };
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
@@ -1144,17 +1173,7 @@ export function useDmBattleMapCanvas({
           // keeps the offline version in its own slot for "Reapply offline
           // changes"; later edits and checkpoints leave it alone.
           // HH2: the toast points to Details only when the copy was kept.
-          onOfflineDraftsReleased: () => {
-            void tableSceneAdapter
-              .captureOfflineFork()
-              .then(kept =>
-                showLiveMapNotice(
-                  kept
-                    ? OFFLINE_DISCARDED_DM_MESSAGE
-                    : OFFLINE_NOT_KEPT_DM_MESSAGE
-                )
-              );
-          },
+          onOfflineDraftsReleased: keepOfflineVersion,
           // PR07 A1 (review 02 N3): a refused live edit is never silent.
           // Messages are payload-free (no element content or secrets).
           onDiagnostic: showLiveMapNotice,
@@ -1173,6 +1192,15 @@ export function useDmBattleMapCanvas({
             preserveLocalWhenRemoteMissing: true,
           },
           onStatus: s => {
+            // FR4-3: edits saved before this connection was first live (the
+            // relay was unreachable at load, or the room was not ready yet)
+            // are replaced by the live room; keep them like offline edits.
+            // The capture reads the scene's stored local version, which the
+            // live document (remote origin) never overwrites.
+            if (s === 'live' && !editsBeforeLiveRef.current.liveSeen) {
+              editsBeforeLiveRef.current.liveSeen = true;
+              if (tableSceneAdapter.takeEditsBeforeLive()) keepOfflineVersion();
+            }
             setStatus(s);
             onStatusProp?.(s);
             // Managed sendPresence drops while not live, so the attach-time
@@ -1186,6 +1214,7 @@ export function useDmBattleMapCanvas({
           },
         });
         connectionRef.current = connection;
+        editsBeforeLiveRef.current.armed = true;
         onConnectionReady?.(connection);
         // Teach peers and late joiners the custom layers persisted in this
         // canvas (created before layer sync, or on another device). Ledger

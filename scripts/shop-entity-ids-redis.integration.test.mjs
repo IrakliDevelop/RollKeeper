@@ -15,11 +15,9 @@ const CONTAINER = `rollkeeper-shop-tokens-${randomUUID().slice(0, 8)}`;
 const SHOP = 'campaign:SYNTH:shop:npc-1';
 const LEDGER = 'campaign:SYNTH:shop-ledger:npc-1';
 
+// Repair 11 (FR4-1): both scripts live in `src/lib/shopRedisScripts.ts`.
 const source = fs.readFileSync(
-  new URL(
-    '../src/app/api/campaign/[code]/shops/[npcId]/route.ts',
-    import.meta.url
-  ),
+  new URL('../src/lib/shopRedisScripts.ts', import.meta.url),
   'utf8'
 );
 const script = source.match(
@@ -131,11 +129,7 @@ test('a shop without its ledger or projection is not live', () => {
 // The shops index's lazy cleanup (`SHOP_INDEX_PRUNE_SCRIPT`): a publish seeds
 // the ledger and adds the id before it writes the projection, so an id with
 // a ledger but no projection yet must stay listed.
-const indexSource = fs.readFileSync(
-  new URL('../src/app/api/campaign/[code]/shops/route.ts', import.meta.url),
-  'utf8'
-);
-const pruneScript = indexSource.match(
+const pruneScript = source.match(
   /export const SHOP_INDEX_PRUNE_SCRIPT = `([\s\S]*?)`;/u
 )?.[1];
 assert.ok(pruneScript, 'SHOP_INDEX_PRUNE_SCRIPT must be exported');

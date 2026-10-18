@@ -49,7 +49,7 @@ its own npm script:
 | `test:auth:e2e` | Auth + auth wizard flows |
 | `test:reconnect:nightly` | Cross-tab/single-writer sync repeated 3x, plus a dedicated reconnect drill — nightly, not part of normal CI |
 | `test:checkpoint-matrix:nightly` | Storage checkpoint matrix — nightly |
-| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer and party limited view on a live Table scene ([relay](07-battlemap-fog-fieldnotes.md)-backed), the DM creature drawer plus roster placement in the private original editor, and the DM's offline changes kept through a later edit and a checkpoint, then reapplied, also on fogged scenes and on a map fogged before it joined the Table (`e2e/table-offline-changes.spec.ts`); CI job "Table relay e2e" and nightly |
+| `test:sheet-drawer:e2e` | Player battle-map character-sheet drawer and party limited view on a live Table scene ([relay](07-battlemap-fog-fieldnotes.md)-backed), the DM creature drawer plus roster placement in the private original editor, and the DM's offline changes kept through a later edit and a checkpoint, then reapplied, also on fogged scenes, on a map fogged before it joined the Table and after a reload with the relay down (`e2e/table-offline-changes.spec.ts`), and a map fogged past tile column 10 that a new player joins and that checkpoints and restores (`e2e/table-fog-order.spec.ts`); CI job "Table relay e2e" and nightly |
 | `test:loot:e2e` / `test:shop:e2e` | Marker loot claim and shop purchase across DM and player on a live Table scene, including a merchant added through the Table roster (`e2e/shop-table-npc.spec.ts`); CI job "Table relay e2e" |
 | `test:rollback:drill` | `scripts/run-rollback-drill.mjs` — storage rollback verification |
 
@@ -77,6 +77,7 @@ Real-Redis Table suites (CI job "Relay and Table control Redis suites", see
 |---|---|
 | `test:relay:redis` | Relay authority, fog CAS and transport suites; needs `REDIS_TEST_URL` pointing at **Redis 7 or newer** (fails fast otherwise, never skips) |
 | `test:table-control:redis` | Table control Lua against disposable Redis and serverless-redis-http containers it starts itself (needs Docker) |
+| `test:shop-tokens:redis` | The shop Redis scripts (`src/lib/shopRedisScripts.ts`: ids-only token compare-and-set and the shops index prune) against a disposable Redis container it starts itself (needs Docker) |
 
 Nightly/drill suites are **not** expected to run on every PR — they exist for
 scheduled verification of the storage-migration and sync subsystems
