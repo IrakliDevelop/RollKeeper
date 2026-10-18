@@ -1,4 +1,9 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
+
+/* Dark mode follows the app's theme toggle (<html data-theme="dark">),
+   not the operating system setting. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 /* ============================================================
    SEMANTIC DESIGN TOKENS
@@ -142,6 +147,15 @@
   --input-placeholder: #6b7280; /* gray-500 */
   --input-border: #cbd5e1; /* slate-300 — matches divider for consistency */
   --input-border-focus: #10b981; /* emerald-500 */
+}
+
+/* Popover/menu/drawer layer. Resolved per theme scope, including nested
+   [data-theme] wrappers. Until Phase 1a gives it felt/paper values it reuses
+   each theme's hover surface, so it is visible on raised surfaces in light,
+   dark and parchment alike. */
+:root,
+[data-theme] {
+  --surface-elevated: var(--surface-hover);
 }
 
 [data-theme='dark'] {
@@ -428,6 +442,7 @@
   --color-surface-raised: var(--surface-raised);
   --color-surface-inset: var(--surface-inset);
   --color-surface-hover: var(--surface-hover);
+  --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
 
   /* Text */
@@ -547,6 +562,17 @@
   }
   50% {
     box-shadow: 0 0 8px 4px var(--accent-red-border-strong, #ef4444);
+  }
+}
+
+@keyframes popover-in {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.96) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
   }
 }
 
@@ -913,4 +939,24 @@ form select {
 
 .animate-rk-otp-shake {
   animation: rk-otp-shake 420ms ease-in-out;
+}
+
+/* Respect the OS "reduce motion" setting for every CSS animation and
+   transition. A near-zero duration (not "none") still fires animationend, so
+   Radix can unmount closing dialogs, selects and tooltips. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  /* Spinners are status, not decoration: keep them turning (slowly). */
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
 }

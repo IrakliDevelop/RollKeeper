@@ -31,4 +31,19 @@ sibling of `forms/`/`layout/`/etc.
 Theme is `data-theme="dark"` on `<html>`, set pre-hydration from `localStorage`
 key `rollkeeper-theme`, toggled via `useTheme`. **Always use semantic tokens**
 (`bg-surface`, `text-heading`, `border-divider`, `text-accent-{color}-text`,
-etc.) — never raw Tailwind color classes. Full token list is in `CLAUDE.md`.
+etc.) — never raw Tailwind color classes. Full token list is in `AGENTS.md` (which `CLAUDE.md` imports).
+
+## Design ratchet
+
+`npm run design:ci` (run in CI) counts retired visual patterns per file:
+gradients, hover scale, large shadows, backdrop blur, hue-named accents, raw
+Tailwind hues, uppercase labels, `Sparkles`, and `type="number"`. A file's count
+may only go down. After removing patterns, run `npm run design:baseline` to lock
+in the lower counts.
+
+These patterns are being retired by the Felt and Brass redesign: decoration
+should encode meaning, colour comes from role tokens rather than hue names, and
+numbers use the in-place number field instead of native number inputs. The exact
+pattern list and regexes live in `PATTERNS` in `scripts/design-ratchet.mjs`.
+`src/utils/hpColor.ts` is allow-listed for raw hue classes (its raw fills are
+intentional).

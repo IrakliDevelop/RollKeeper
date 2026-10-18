@@ -29,6 +29,9 @@ jobs:
       - name: Lint warning ratchet
         run: npm run lint:ci
 
+      - name: Design ratchet
+        run: npm run design:ci
+
       - name: Type check
         run: npm run type-check
 
