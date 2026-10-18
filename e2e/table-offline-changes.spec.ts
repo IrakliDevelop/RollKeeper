@@ -420,9 +420,18 @@ test('edits made while the relay is down at page load are kept and reapplied onc
     await waitForElementSynced(page, BOX_ID);
     expect(await boxX(page)).toBe(START_X);
 
-    // 1. Reload the Table with the relay unreachable from this page.
+    // 1. Reload the Table with the relay unreachable from this page. Live
+    // control is HTTP, so this tab can still hold it (Go live if asked).
     await setRelayOffline(page, true);
     await page.reload({ waitUntil: 'domcontentloaded' });
+    const goLive = page.getByRole('button', { name: 'Go live' });
+    const livePill = page
+      .getByTestId('table-live-pill')
+      .filter({ hasText: /^You're live$/u });
+    await expect(async () => {
+      if (await goLive.isVisible()) await goLive.click();
+      await expect(livePill).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 60_000 });
     await page.waitForFunction(
       id => !!window.__rkStores?.viewport?.store.getById(id),
       BOX_ID,
@@ -439,15 +448,11 @@ test('edits made while the relay is down at page load are kept and reapplied onc
     // 2. The relay is reachable again: the live room wins, and the toast
     // points at Details (it used to revert silently).
     await setRelayOffline(page, false);
-    const goLive = page.getByRole('button', { name: 'Go live' });
-    await expect(async () => {
-      if (await goLive.isVisible()) await goLive.click();
-      await expect(
-        page.getByText(
-          'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
-        )
-      ).toBeVisible({ timeout: 5_000 });
-    }).toPass({ timeout: 90_000 });
+    await expect(
+      page.getByText(
+        'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
+      )
+    ).toBeVisible({ timeout: 60_000 });
     await expect.poll(() => boxX(page), { timeout: 20_000 }).toBe(START_X);
 
     // 3. Reapply: the live map shows the edit made while the relay was down.
