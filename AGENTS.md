@@ -168,14 +168,19 @@ The app supports light and dark themes via a `data-theme="dark"` attribute on `<
 **Always use semantic CSS custom-property tokens — never raw Tailwind color classes like `bg-gray-800` or `text-white`.** The tokens automatically resolve to the correct value for each theme:
 
 ```
-Backgrounds:  bg-surface, bg-surface-raised, bg-surface-secondary, bg-surface-elevated
-Text:         text-heading, text-body, text-muted, text-faint
-Borders:      border-divider
-Accents:      text-accent-{color}-text, bg-accent-{color}-bg, border-accent-{color}-border
-              (colors: red, blue, purple, amber, emerald, orange)
+Backgrounds:  bg-surface, bg-surface-secondary, bg-surface-raised, bg-surface-elevated, bg-surface-inset
+Text:         text-heading, text-body, text-muted (text-faint is decorative/disabled only)
+Borders:      border-divider, border-divider-strong, border-input-border
+Roles:        text-{role}-text, bg-{role}-fill, border-{role}-border, bg-{role}-bg,
+              text-on-brass, text-on-blood
+              brass = primary action/focus/proficiency, blood = harm/destructive,
+              verdigris = healing/success, lapis = magic, ember = conditions/warnings,
+              frost = temporary HP
+Deprecated:   text-accent-{hue}-*, bg-accent-{hue}-*, --gradient-* (bridged to roles;
+              existing uses only, never add new ones)
 ```
 
-When building or reviewing UI, verify it looks correct in both themes. If hardcoded colors appear, replace them with the appropriate semantic token.
+When building or reviewing UI, verify it looks correct in both themes. `npm run design:contrast` (CI) fails if any role or neutral pairing drops below WCAG AA. If hardcoded colors appear, replace them with the appropriate semantic token.
 
 ### Design system — always use existing components
 

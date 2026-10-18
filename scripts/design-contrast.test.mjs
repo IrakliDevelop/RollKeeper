@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
+import { readGlobalsCss } from './lib/design-source.mjs';
+
 import {
   checkContrast,
   contrastRatio,
@@ -90,4 +92,8 @@ test('reports each pairing below its minimum', () => {
     formatFailures(failures),
     /light: grey on page 4\.48:1 \(needs 4\.5:1\)/
   );
+});
+
+test('the shipped felt and paper palettes pass WCAG AA', async () => {
+  assert.deepEqual(checkContrast(await readGlobalsCss()), []);
 });
