@@ -39,7 +39,7 @@ export const COPY_PROPS = new Set([
 
 // Calls whose string arguments are shown to the user.
 const COPY_CALLS =
-  /^(?:toast(?:\.\w+)?|addToast|(?:window\.)?(?:alert|confirm|prompt)|set\w*(?:Error|Message|Notice|Status))$/;
+  /^(?:toast(?:\.\w+)?|addToast|(?:window\.)?(?:alert|confirm|prompt)|set\w*(?:Error|Message|Notice|Status|Title|Label|Text|Description|Hint))$/;
 const COPY_OBJECT_KEYS = new Set([
   'title',
   'description',
@@ -57,7 +57,26 @@ const COPY_OBJECT_KEYS = new Set([
   'subtitle',
   'hint',
   'error',
+  'text',
+  'body',
+  'content',
+  'detail',
+  'note',
+  'reason',
+  'caption',
+  'summary',
+  'cta',
 ]);
+
+// JSX attributes whose values are never shown as text.
+const NON_COPY_ATTRIBUTE =
+  /^(?:className|class|key|id|htmlFor|type|role|href|src|style|data-.*|on[A-Z].*)$/;
+// Calls whose string arguments are class names, developer messages or module paths.
+const NON_COPY_CALL =
+  /^(?:cn|clsx|cva|twMerge|classNames|console\.\w+|require|(?:describe|it|test|expect)(?:\.\w+)*)$/;
+const DEVELOPER_ERRORS = new Set(['Error', 'TypeError', 'RangeError']);
+const TWO_WORDS = /\p{L}+[^\p{L}]+\p{L}+/u;
+const CLASS_TOKEN = /^[!-]?[a-z0-9@*][a-z0-9:_\-\[\]\/.%()#,'"=>&~+]*$/;
 
 // Added line numbers per file from `git diff --unified=0` output.
 export function parseAddedLines(diff) {
@@ -130,10 +149,18 @@ function receiver(node) {
   return current;
 }
 
-// Determine if a const variable name indicates copy (SCREAMING_SNAKE_CASE or *Label/Text/Title/Message suffix)
+const COPY_NAME_WORDS =
+  'label|message|title|text|description|hint|placeholder|heading';
+
+// A variable name that holds copy: SCREAMING_SNAKE_CASE, or a copy word as the
+// whole name or its last part, in any case (message, errorMessage, error_message).
 function isConstCopyName(name) {
   return (
-    /^[A-Z][A-Z0-9_]*$/.test(name) || /(?:Label|Text|Title|Message)$/.test(name)
+    /^[A-Z][A-Z0-9_]*$/.test(name) ||
+    new RegExp(`(?:^|_)(?:${COPY_NAME_WORDS})$`, 'i').test(name) ||
+    /(?:Label|Message|Title|Text|Description|Hint|Placeholder|Heading)$/.test(
+      name
+    )
   );
 }
 
@@ -147,8 +174,39 @@ function isCopyPropName(name) {
   );
 }
 
-function copyKind(node) {
-  if (ts.isJsxText(node)) return 'jsx-text';
+// Object keys, defaults and props share one rule.
+function isCopyKeyName(name) {
+  return COPY_OBJECT_KEYS.has(name) || isCopyPropName(name);
+}
+
+// The plain text of an identifier, string-literal or numeric property name.
+function nameText(name) {
+  if (!name) return null;
+  if (
+    ts.isIdentifier(name) ||
+    ts.isStringLiteral(name) ||
+    ts.isNumericLiteral(name) ||
+    ts.isPrivateIdentifier(name)
+  ) {
+    return name.text;
+  }
+  return null;
+}
+
+function isStyleElement(element) {
+  return (
+    ts.isJsxElement(element) &&
+    element.openingElement.tagName.getText() === 'style'
+  );
+}
+
+// JSX text, unless it is the CSS inside a <style> element.
+function jsxTextKind(node) {
+  return isStyleElement(node.parent) ? null : 'jsx-text';
+}
+
+function classified(node) {
+  if (ts.isJsxText(node)) return jsxTextKind(node);
   if (!isTextLike(node)) return null;
   const target = receiver(node);
   if (!target) return null;
@@ -164,19 +222,21 @@ function copyKind(node) {
     if (ts.isJsxAttribute(owner)) {
       return isCopyPropName(owner.name.getText()) ? 'prop' : null;
     }
-    if (ts.isJsxElement(owner) || ts.isJsxFragment(owner)) return 'jsx-text';
+    if (ts.isJsxElement(owner) || ts.isJsxFragment(owner)) {
+      return isStyleElement(owner) ? null : 'jsx-text';
+    }
     return null;
   }
 
-  // Function call (toast, addToast, setError, etc.)
+  // Function call (toast, addToast, setError, setTitle, etc.)
   if (ts.isCallExpression(target)) {
     return COPY_CALLS.test(target.expression.getText()) ? 'message' : null;
   }
 
   // Property assignment in object literal (check key)
   if (ts.isPropertyAssignment(target)) {
-    const keyName = target.name.getText();
-    if (!COPY_OBJECT_KEYS.has(keyName)) return null;
+    if (target.name === node) return null;
+    if (!isCopyKeyName(nameText(target.name))) return null;
 
     // Could be in a toast/addToast call or standalone config
     let parent = target.parent;
@@ -195,6 +255,14 @@ function copyKind(node) {
     return 'object';
   }
 
+  // Default values: function F({ title = '…' }) and f(placeholder = '…')
+  if (ts.isBindingElement(target) || ts.isParameter(target)) {
+    if (target.initializer === undefined) return null;
+    const names = [nameText(target.name)];
+    if (ts.isBindingElement(target)) names.push(nameText(target.propertyName));
+    return names.some(name => name && isCopyKeyName(name)) ? 'prop' : null;
+  }
+
   // Variable initializer (const with copy name)
   if (ts.isVariableDeclaration(target)) {
     const varName = target.name.getText();
@@ -202,6 +270,83 @@ function copyKind(node) {
   }
 
   return null;
+}
+
+function calleeName(call) {
+  if (call.expression.kind === ts.SyntaxKind.ImportKeyword) return 'import';
+  return call.expression.getText();
+}
+
+// True when a string sits where it can only be code: a class list, a developer
+// message, a module path, a property key, a type or CSS.
+function isCodeContext(node) {
+  const parent = node.parent;
+  if (
+    (ts.isPropertyAssignment(parent) ||
+      ts.isPropertyDeclaration(parent) ||
+      ts.isPropertySignature(parent) ||
+      ts.isMethodDeclaration(parent) ||
+      ts.isEnumMember(parent) ||
+      ts.isBindingElement(parent)) &&
+    (parent.name === node || parent.propertyName === node)
+  ) {
+    return true;
+  }
+  if (
+    ts.isElementAccessExpression(parent) &&
+    parent.argumentExpression === node
+  ) {
+    return true;
+  }
+  if (ts.isExpressionStatement(parent)) return true; // 'use client' directives
+  for (let current = parent; current; current = current.parent) {
+    if (ts.isTypeNode(current)) return true;
+    if (
+      ts.isImportDeclaration(current) ||
+      ts.isExportDeclaration(current) ||
+      ts.isExternalModuleReference(current)
+    ) {
+      return true;
+    }
+    if (
+      ts.isJsxAttribute(current) &&
+      NON_COPY_ATTRIBUTE.test(current.name.getText())
+    ) {
+      return true;
+    }
+    if (isStyleElement(current)) return true;
+    if (ts.isCallExpression(current)) {
+      const callee = calleeName(current);
+      if (callee === 'import' || NON_COPY_CALL.test(callee)) return true;
+    }
+    if (
+      ts.isNewExpression(current) &&
+      DEVELOPER_ERRORS.has(current.expression.getText())
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Tailwind class lists and CSS: every token looks like a class and at least one
+// has the -, :, [ or / that prose rarely does. Template holes count as a letter.
+function isClassLike(text) {
+  const tokens = text.replaceAll('{…}', 'x').split(' ');
+  return (
+    tokens.every(token => CLASS_TOKEN.test(token)) &&
+    tokens.some(token => /[-:[/]/.test(token))
+  );
+}
+
+function copyKind(node, sourceFile) {
+  const kind = classified(node);
+  if (kind || !isTextLike(node)) return kind;
+  const text = textOf(node, sourceFile).replace(/\s+/g, ' ').trim();
+  if (!TWO_WORDS.test(text) || isClassLike(text) || isCodeContext(node)) {
+    return null;
+  }
+  return 'other';
 }
 
 // Every user-visible string in a source file, with its 1-based line and endLine.
@@ -215,7 +360,7 @@ export function extractCopy(fileName, sourceText) {
   );
   const found = [];
   const visit = node => {
-    const kind = copyKind(node);
+    const kind = copyKind(node, sourceFile);
     if (kind) {
       const text = textOf(node, sourceFile)?.replace(/\s+/g, ' ').trim();
       if (text && /\p{L}/u.test(text)) {

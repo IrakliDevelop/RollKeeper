@@ -205,8 +205,8 @@ const saveLabel = 'Save character';
     'SCREAMING_SNAKE_CASE constant should be extracted'
   );
   assert.ok(
-    !texts.includes('/api/spells'),
-    'non-screaming constant should be ignored'
+    !entries.some(e => e.text === '/api/spells' && e.kind === 'const'),
+    'a non-copy name is not a const (the path may still show up as other)'
   );
   assert.ok(
     texts.includes('No results'),
@@ -264,4 +264,124 @@ test('parses diff headers with spaces and strips trailing tabs', () => {
   const added = parseAddedLines(diff);
   assert.ok(added.has('src/my file.tsx'), 'should parse path with spaces');
   assert.deepEqual([...added.get('src/my file.tsx')], [5]);
+});
+
+const kindOf = (entries, text) => entries.find(e => e.text === text)?.kind;
+
+test('prose strings with no copy-shaped receiver are reported as other', () => {
+  const source = `
+const tagline = 'Multiple characters in one place';
+const errors = ['Something got eaten by a mimic', 'Try again'];
+function expired() {
+  return 'Session expired, sign in again';
+}
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.ok(
+    ['const', 'other'].includes(
+      kindOf(entries, 'Multiple characters in one place')
+    ),
+    'tagline should be reported'
+  );
+  assert.equal(kindOf(entries, 'Something got eaten by a mimic'), 'other');
+  assert.equal(kindOf(entries, 'Session expired, sign in again'), 'other');
+});
+
+test('the other catch-all skips classes, developer messages, modules, types and CSS', () => {
+  const source = `'use client';
+import x from 'some module';
+export { y } from 'other module';
+type T = 'long rest' | 'short rest';
+function f(active: boolean) {
+  const classes = cn('flex items-center', active && 'bg-surface');
+  const merged = clsx('px-2 py-1', { 'text-heading font-bold': active });
+  console.warn('cache miss for key');
+  if (!active) throw new Error('Unexpected state here');
+  const lazy = import('lazy module');
+  const map = { 'some key here': 1 };
+  return (
+    <div className="flex gap-2" data-state="is open" onClick={() => go('to the page')}>
+      <style jsx>{\`.a { color: red; }\`}</style>
+      <style>{'.b { color: blue; }'}</style>
+    </div>
+  );
+}
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.deepEqual(
+    entries.map(({ kind, text }) => [kind, text]),
+    []
+  );
+});
+
+test('class-like strings outside class helpers are skipped', () => {
+  const source = `
+const base = 'rounded-md border border-divider px-3';
+const grid = \`grid-cols-\${n} gap-2\`;
+const tw = 'hover:bg-surface-raised w-[44px] md:flex';
+`;
+  assert.deepEqual(extractCopy('src/test.tsx', source), []);
+});
+
+test('copy-named object keys are recognized', () => {
+  const source = `
+const a = { text: 'Multiple characters in one place' };
+const b = { 'aria-label': 'Close panel' };
+const c = { statusLabel: 'Saving' };
+const d = { caption: 'Hit points' };
+toast({ body: 'Rest finished' });
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.equal(kindOf(entries, 'Multiple characters in one place'), 'object');
+  assert.equal(kindOf(entries, 'Close panel'), 'object');
+  assert.equal(kindOf(entries, 'Saving'), 'object');
+  assert.equal(kindOf(entries, 'Hit points'), 'object');
+  assert.equal(kindOf(entries, 'Rest finished'), 'message');
+  assert.ok(
+    !entries.some(e => e.text === 'aria-label'),
+    'a string-literal key is not itself copy'
+  );
+});
+
+test('copy-named parameter and binding defaults are props', () => {
+  const source = `
+function F({ title = 'Critical failure', variant = 'ghost' }) {}
+function G(placeholder = 'Search spells') {}
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.equal(kindOf(entries, 'Critical failure'), 'prop');
+  assert.equal(kindOf(entries, 'Search spells'), 'prop');
+  assert.ok(!entries.some(e => e.text === 'ghost'));
+});
+
+test('copy-named variables match case-insensitively', () => {
+  const source = `
+let message = 'Type the six digits';
+const emptyTitle = 'Nothing';
+var Hint = 'Tap';
+const error_message = 'Broken';
+const context = 'ctx';
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.equal(kindOf(entries, 'Type the six digits'), 'const');
+  assert.equal(kindOf(entries, 'Nothing'), 'const');
+  assert.equal(kindOf(entries, 'Tap'), 'const');
+  assert.equal(kindOf(entries, 'Broken'), 'const');
+  assert.ok(!entries.some(e => e.text === 'ctx'));
+});
+
+test('title, label, text, description and hint setters are copy calls', () => {
+  const source = `
+setTitle('New campaign');
+setDialogLabel('Rename');
+setHelpText('Pick one');
+setDescription('Short');
+setHint('Tap');
+setCount('3');
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  for (const text of ['New campaign', 'Rename', 'Pick one', 'Short', 'Tap']) {
+    assert.equal(kindOf(entries, text), 'message', text);
+  }
+  assert.ok(!entries.some(e => e.text === '3'));
 });
