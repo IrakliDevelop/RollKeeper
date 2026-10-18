@@ -199,7 +199,7 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
                   disabled={tab.disabled}
                   className={`relative flex min-w-0 shrink-0 items-center gap-1.5 rounded-t-lg px-4 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                     isActive
-                      ? 'bg-surface-raised text-heading z-10 -mb-px border-t-2 border-r border-l border-t-blue-500 border-r-[var(--color-border-divider)] border-l-[var(--color-border-divider)] shadow-sm'
+                      ? 'bg-surface-raised text-heading border-r-divider border-l-divider z-10 -mb-px border-t-2 border-r border-l border-t-blue-500 shadow-sm'
                       : tab.disabled
                         ? 'text-faint cursor-not-allowed opacity-50'
                         : 'bg-surface-secondary text-muted hover:bg-surface-hover hover:text-body border border-transparent'

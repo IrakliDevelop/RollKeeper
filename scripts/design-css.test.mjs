@@ -72,3 +72,13 @@ test('reduced motion shortens every animation and transition', async () => {
   assert.match(block, /animation-duration:\s*0\.01ms\s*!important/);
   assert.match(block, /transition-duration:\s*0\.01ms\s*!important/);
 });
+
+test('surface-elevated resolves through the theme-aware hover token', async () => {
+  const output = await buildCss(['bg-surface-elevated']);
+  assert.match(output, /--surface-elevated:\s*var\(--surface-hover\)/);
+  assert.match(
+    ruleFor(output, '.bg-surface-elevated'),
+    // @theme inline writes the underlying variable straight into the utility.
+    /background-color:\s*var\(--surface-elevated\)/
+  );
+});

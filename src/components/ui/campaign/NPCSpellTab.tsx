@@ -795,7 +795,7 @@ export function NPCSpellTab({
 
                       {/* Spell rows */}
                       {!isCollapsed && spells.length > 0 && (
-                        <div className="divide-y divide-[var(--border-divider)]">
+                        <div className="divide-divider divide-y">
                           {spells.map(spell => (
                             <SpellRow
                               key={spell.id}

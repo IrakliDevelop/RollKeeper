@@ -188,7 +188,7 @@ export function DmCloudWorkspaceControls({
                 .map(workspace => (
                   <div
                     key={workspace.localId}
-                    className="bg-surface-subtle rounded-lg px-3 py-2"
+                    className="bg-surface-secondary rounded-lg px-3 py-2"
                   >
                     <p className="text-heading text-sm font-medium">
                       {workspace.name}

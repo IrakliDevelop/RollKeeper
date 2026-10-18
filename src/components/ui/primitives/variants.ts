@@ -138,7 +138,7 @@ export const badgeVariants = cva(
           'bg-accent-red-bg text-accent-red-text border border-accent-red-border',
         warning:
           'bg-accent-amber-bg text-accent-amber-text border border-accent-amber-border',
-        info: 'bg-[--accent-blue-bg] text-[--accent-blue-text] border border-[--accent-blue-border]',
+        info: 'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
         neutral: 'bg-surface-secondary text-heading border border-divider',
         outline: 'bg-transparent text-heading border border-divider-strong',
       },

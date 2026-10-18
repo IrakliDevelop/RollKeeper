@@ -26,6 +26,10 @@
   --surface-raised: #ffffff; /* pure white — cards float above off-white bg */
   --surface-inset: #e2e8f0; /* slate-200 — deeper recessed areas */
   --surface-hover: #e2e8f0; /* slate-200 — more visible hover feedback */
+  /* Popover/menu/drawer layer. Until Phase 1a gives it felt/paper values it
+     reuses each theme's hover surface, so it is visible on raised surfaces
+     in light, dark and parchment alike. */
+  --surface-elevated: var(--surface-hover);
   --surface-overlay: rgba(0, 0, 0, 0.5);
 
   /* --- Text --- */
@@ -433,6 +437,7 @@
   --color-surface-raised: var(--surface-raised);
   --color-surface-inset: var(--surface-inset);
   --color-surface-hover: var(--surface-hover);
+  --color-surface-elevated: var(--surface-elevated);
   --color-surface-overlay: var(--surface-overlay);
 
   /* Text */
