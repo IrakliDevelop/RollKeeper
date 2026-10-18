@@ -135,6 +135,13 @@ describe('Table presentation controls (PR04 P4)', () => {
     expect(status()).toHaveAttribute('aria-live', 'polite');
   });
 
+  it('clamps the audience line to two lines and keeps it whole as its tooltip (QA3)', async () => {
+    renderControls({});
+    const audience = await screen.findByText('Players see: Tavern');
+    expect(audience).toHaveClass('line-clamp-2');
+    expect(audience).toHaveAttribute('title', 'Players see: Tavern');
+  });
+
   it('labels the shown scene as live, blank as covered and nothing shown', async () => {
     const { rerender } = renderControls({
       current: descriptor('scene-forest'),

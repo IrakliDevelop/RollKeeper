@@ -239,6 +239,16 @@ describe('FC-1 invariants in the compact header (O7-2 H4)', () => {
     ).toBeInTheDocument();
   });
 
+  it('clamps a long scene name to two lines and keeps the full name as its tooltip (QA3)', () => {
+    renderHeader();
+    const title = screen.getByText('The Very Long Scene Name Of The Lich King');
+    expect(title).toHaveClass('line-clamp-2');
+    expect(title).toHaveAttribute(
+      'title',
+      'The Very Long Scene Name Of The Lich King'
+    );
+  });
+
   it('shows "Details (1)" for a local draft to reapply, with an accessible name saying so', () => {
     renderHeader({ localDraft: true });
     expect(details()).toHaveAccessibleName(
