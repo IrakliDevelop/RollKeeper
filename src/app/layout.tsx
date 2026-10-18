@@ -14,6 +14,7 @@ const vollkorn = localFont({
   variable: '--font-vollkorn',
   weight: '400 900',
   display: 'swap',
+  adjustFontFallback: 'Times New Roman',
 });
 
 const barlow = localFont({

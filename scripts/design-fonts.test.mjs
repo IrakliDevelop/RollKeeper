@@ -39,6 +39,13 @@ test('the root layout loads every shipped font file', async () => {
   }
 });
 
+test('Vollkorn falls back to serif metrics while it loads', async () => {
+  const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
+  const vollkorn = layout.match(/const vollkorn = localFont\(\{[\s\S]*?\}\);/);
+  assert.ok(vollkorn, 'layout declares vollkorn with localFont');
+  assert.match(vollkorn[0], /adjustFontFallback: 'Times New Roman'/);
+});
+
 test('font variables are set on <html>, where :root tokens can read them', async () => {
   const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
   assert.match(layout, /<html[^>]*className=\{FONT_VARIABLES\}/);
