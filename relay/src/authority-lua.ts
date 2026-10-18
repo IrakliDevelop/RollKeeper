@@ -198,11 +198,30 @@ local function sorted_hash_values(key)
   end
   return values
 end
+-- QA1: fog tiles are hash fields named 'x,y'. A string sort puts '11,1'
+-- before '2,1'; the fog extension (and its own plan/apply library) orders
+-- tiles numerically by x, then y, and refuses any other order. Sort the
+-- decoded tiles, so rooms written before this fix read correctly too.
+local function fog_tile_before(left, right)
+  if left.x ~= right.x then return left.x < right.x end
+  return left.y < right.y
+end
+local function sorted_fog_tiles(key)
+  local tiles = sorted_hash_values(key)
+  if not tiles then return nil end
+  for _, tile in ipairs(tiles) do
+    if type(tile) ~= 'table' or type(tile.x) ~= 'number' or type(tile.y) ~= 'number' then
+      return nil
+    end
+  end
+  table.sort(tiles, fog_tile_before)
+  return tiles
+end
 local function fog_state()
   local fogMetaRaw = redis.call('HGET', fogMetaKey, 'current')
   if fogMetaRaw then
     local fogOk, fogMeta = pcall(cjson.decode, fogMetaRaw)
-    local tiles = sorted_hash_values(fogTilesKey)
+    local tiles = sorted_fog_tiles(fogTilesKey)
     if not fogOk or not tiles then return nil end
     return {meta=fogMeta, tiles=tiles}
   elseif redis.call('HLEN', fogTilesKey) ~= 0 then return nil end
@@ -573,6 +592,17 @@ local function values(key)
 end
 local elements, layers, tiles = values(KEYS[2]), values(KEYS[3]), values(KEYS[5])
 if not elements or not layers or not tiles then return {0, 'invalid'} end
+-- QA1: tiles in the fog extension's numeric order (x, then y), not the
+-- string order of their 'x,y' hash fields.
+for _, tile in ipairs(tiles) do
+  if type(tile) ~= 'table' or type(tile.x) ~= 'number' or type(tile.y) ~= 'number' then
+    return {0, 'invalid'}
+  end
+end
+table.sort(tiles, function(left, right)
+  if left.x ~= right.x then return left.x < right.x end
+  return left.y < right.y
+end)
 local fog = cjson.null
 local fogRaw = redis.call('HGET', KEYS[4], 'current')
 if fogRaw then
