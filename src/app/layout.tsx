@@ -5,43 +5,63 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
 
-const geistSans = localFont({
-  src: './fonts/geist-latin.woff2',
-  variable: '--font-geist-sans',
-  weight: '100 900',
+// Felt and Brass type: Vollkorn for headings, Barlow for body and UI,
+// Barlow Condensed for display numerals. Self-hosted latin subsets from
+// Fontsource 5.3.0 (SIL OFL 1.1, see ./fonts/README.md).
+const vollkorn = localFont({
+  src: './fonts/vollkorn-latin-wght-normal.woff2',
+  variable: '--font-vollkorn',
+  weight: '400 900',
   display: 'swap',
 });
 
-const geistMono = localFont({
-  src: './fonts/geist-mono-latin.woff2',
-  variable: '--font-geist-mono',
-  weight: '100 900',
-  display: 'swap',
-});
-
-const cinzelDecorative = localFont({
+const barlow = localFont({
   src: [
-    { path: './fonts/cinzel-decorative-400-latin.woff2', weight: '400' },
-    { path: './fonts/cinzel-decorative-700-latin.woff2', weight: '700' },
-    { path: './fonts/cinzel-decorative-900-latin.woff2', weight: '900' },
+    {
+      path: './fonts/barlow-latin-400-normal.woff2',
+      weight: '400',
+      style: 'normal',
+    },
+    {
+      path: './fonts/barlow-latin-400-italic.woff2',
+      weight: '400',
+      style: 'italic',
+    },
+    {
+      path: './fonts/barlow-latin-500-normal.woff2',
+      weight: '500',
+      style: 'normal',
+    },
+    {
+      path: './fonts/barlow-latin-600-normal.woff2',
+      weight: '600',
+      style: 'normal',
+    },
   ],
-  variable: '--font-cinzel-decorative',
+  variable: '--font-barlow',
   display: 'swap',
 });
 
-const bricolage = localFont({
-  src: './fonts/bricolage-grotesque-latin.woff2',
-  variable: '--font-bricolage',
-  weight: '600 800',
+const barlowCondensed = localFont({
+  src: [
+    {
+      path: './fonts/barlow-condensed-latin-600-normal.woff2',
+      weight: '600',
+      style: 'normal',
+    },
+    {
+      path: './fonts/barlow-condensed-latin-700-normal.woff2',
+      weight: '700',
+      style: 'normal',
+    },
+  ],
+  variable: '--font-barlow-condensed',
   display: 'swap',
 });
 
-const hanken = localFont({
-  src: './fonts/hanken-grotesk-latin.woff2',
-  variable: '--font-hanken',
-  weight: '400 800',
-  display: 'swap',
-});
+// The font variables live on <html> so the theme tokens declared on :root
+// (--font-body-family and friends) can resolve them.
+const FONT_VARIABLES = `${vollkorn.variable} ${barlow.variable} ${barlowCondensed.variable}`;
 
 export const metadata: Metadata = {
   title: 'Rollkeeper',
@@ -95,17 +115,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={FONT_VARIABLES} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script
           dangerouslySetInnerHTML={{ __html: characterPersistenceScript }}
         />
       </head>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} ${cinzelDecorative.variable} ${bricolage.variable} ${hanken.variable} antialiased`}
-        suppressHydrationWarning={true}
-      >
+      <body className="antialiased" suppressHydrationWarning={true}>
         <ThemeProviderWrapper>
           <PersistenceBootstrap>
             <ErrorBoundary>{children}</ErrorBoundary>

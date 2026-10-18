@@ -248,11 +248,6 @@
   color-scheme: light;
   --surface-elevated: var(--surface-hover);
 
-  /* --- Font families --- */
-  --font-body-family: var(--font-hanken), 'Hanken Grotesk', sans-serif;
-  --font-display-family:
-    var(--font-bricolage), 'Bricolage Grotesque', sans-serif;
-
   /* --- Core backgrounds --- */
   --background: #f4f2ed;
   --foreground: #221f1a;
@@ -529,10 +524,10 @@
   --color-input-border-focus: var(--input-border-focus);
 
   /* Fonts */
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-cinzel: var(--font-cinzel-decorative);
+  --font-sans: var(--font-body-family);
+  --font-heading: var(--font-heading-family);
   --font-display: var(--font-display-family);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
 /* ============================================================
