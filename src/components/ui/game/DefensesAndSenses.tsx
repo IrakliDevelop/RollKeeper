@@ -165,7 +165,7 @@ function TagSelector({
               <button
                 key={opt}
                 onClick={() => handleAdd(opt)}
-                className="text-body bg-surface hover:bg-surface-raised rounded-md border border-transparent px-2 py-1 text-xs transition-colors hover:border-(--border-divider)"
+                className="text-body bg-surface hover:bg-surface-raised hover:border-divider rounded-md border border-transparent px-2 py-1 text-xs transition-colors"
               >
                 {opt}
               </button>
@@ -300,7 +300,7 @@ function SensesSection() {
                 </div>
               </div>
               {expandedId === sense.id && getDescription(sense.name) && (
-                <p className="text-muted mt-2 border-t border-(--border-divider) pt-2 text-xs leading-relaxed">
+                <p className="text-muted border-divider mt-2 border-t pt-2 text-xs leading-relaxed">
                   {getDescription(sense.name)}
                 </p>
               )}

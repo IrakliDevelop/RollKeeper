@@ -319,7 +319,7 @@ export function TableEditMapControl(props: {
             // Acceptance A2: portalled and fixed so no toolbar strip or dock
             // overflow box can clip it.
             style={{ top: position.top, left: position.left }}
-            className="border-divider bg-surface-raised pointer-events-auto fixed z-50 flex w-[min(18rem,calc(100vw-1rem))] flex-col gap-2 rounded-lg border p-3 shadow-lg"
+            className="border-divider bg-surface-raised pointer-events-auto fixed z-50 flex w-[min(18rem,calc(100vw-1rem))] flex-col gap-2 rounded-lg border p-3 shadow-md"
           >
             {props.presentedHere && (
               <p className="text-accent-amber-text text-xs" role="status">

@@ -741,6 +741,9 @@ test('encounter-free scene roster persists party and manual PC members across re
   await page.getByRole('button', { name: 'Add to scene' }).click();
   await dialog.getByRole('tab', { name: 'Party' }).click();
   await dialog.getByRole('button', { name: /Aria/ }).click();
+  // The dialog closes on "unchanged"; its exit animation keeps its copy of
+  // the notice mounted briefly, so wait for it before reading the panel's.
+  await expect(dialog).toBeHidden();
   // The page now has several live regions (control, publication): target the
   // roster notice itself.
   await expect(

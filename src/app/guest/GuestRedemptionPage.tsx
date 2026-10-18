@@ -129,7 +129,7 @@ export function GuestRedemptionPage() {
             </p>
           )}
           {session && (
-            <div className="bg-surface-subtle space-y-2 rounded-lg p-4">
+            <div className="bg-surface-secondary space-y-2 rounded-lg p-4">
               <p className="text-heading font-semibold">
                 Campaign {session.displayCode}
               </p>

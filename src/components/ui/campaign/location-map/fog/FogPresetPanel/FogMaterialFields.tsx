@@ -27,7 +27,7 @@ export function ColorField({
   return (
     <label className="text-heading flex min-h-[44px] items-center justify-between gap-3 text-sm font-medium">
       {label}
-      <span className="border-divider bg-surface-muted relative h-10 w-16 overflow-hidden rounded-lg border shadow-sm">
+      <span className="border-divider bg-surface-inset relative h-10 w-16 overflow-hidden rounded-lg border shadow-sm">
         <input
           type="color"
           aria-label={label}
@@ -170,7 +170,7 @@ export function FogProceduralFields({
               value={draft.detail}
               min={b.detail.min}
               max={b.detail.max}
-              className="border-divider bg-surface-muted text-heading h-10 w-full rounded-lg border px-3"
+              className="border-divider bg-surface-inset text-heading h-10 w-full rounded-lg border px-3"
               onChange={value => {
                 if (
                   value !== undefined &&
@@ -188,7 +188,7 @@ export function FogProceduralFields({
               value={draft.seed}
               min={b.seed.min}
               max={b.seed.max}
-              className="border-divider bg-surface-muted text-heading h-10 w-full rounded-lg border px-3"
+              className="border-divider bg-surface-inset text-heading h-10 w-full rounded-lg border px-3"
               onChange={value => {
                 if (
                   value !== undefined &&

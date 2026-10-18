@@ -189,7 +189,7 @@ export function DmGuestInvitationControls({
             {sessions.map(session => (
               <div
                 key={session.sessionId}
-                className="bg-surface-subtle flex flex-wrap items-center justify-between gap-3 rounded-lg p-3"
+                className="bg-surface-secondary flex flex-wrap items-center justify-between gap-3 rounded-lg p-3"
               >
                 <p className="text-body text-sm">
                   {session.legacyPlayerId ?? 'Unbound guest'} ·{' '}

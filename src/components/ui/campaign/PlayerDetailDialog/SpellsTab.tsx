@@ -329,7 +329,7 @@ export function SpellsTab({ char }: SpellsTabProps) {
               </div>
 
               {!isCollapsed && levelSpells.length > 0 && (
-                <div className="divide-y divide-[var(--border-divider)]">
+                <div className="divide-divider divide-y">
                   {levelSpells.map(spell => (
                     <PlayerSpellRow
                       key={spell.id}
