@@ -543,6 +543,12 @@ export class RedisAuthorityDriver implements AuthorityDriver {
     await capture.release();
     if (capture.position.generation !== after.generation)
       return { status: 'gap', head: capture.position };
+    // II5 repair 13: the history is read after the head, so it can already
+    // hold later commits. A reader at the head gets an empty page; anything
+    // after the head waits for the next read (the SDK closes a reader whose
+    // page runs past its head).
+    if (after.revision === capture.position.revision)
+      return { status: 'ok', head: capture.position, records: [] };
     const auth = authFrom(context)!;
     const ref = roomRef(context, auth);
     const raw = await this.redis.eval(
