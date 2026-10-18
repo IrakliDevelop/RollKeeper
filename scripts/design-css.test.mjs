@@ -45,3 +45,30 @@ test('popover-in keyframes ship with the stylesheet', async () => {
   assert.match(output, /@keyframes popover-in/);
   assert.match(output, /animation:\s*popover-in 150ms ease-out/);
 });
+
+test('enter and exit animation utilities are generated', async () => {
+  const output = await buildCss([
+    'animate-in',
+    'animate-out',
+    'fade-in-0',
+    'zoom-in-95',
+    'slide-in-from-top-[48%]',
+  ]);
+  for (const selector of [
+    '.animate-in',
+    '.animate-out',
+    '.fade-in-0',
+    '.zoom-in-95',
+  ]) {
+    assert.ok(output.includes(selector), `missing ${selector}`);
+  }
+});
+
+test('reduced motion shortens every animation and transition', async () => {
+  const output = await buildCss([]);
+  const start = output.indexOf('prefers-reduced-motion: reduce');
+  assert.notEqual(start, -1, 'expected a prefers-reduced-motion block');
+  const block = output.slice(start, start + 600);
+  assert.match(block, /animation-duration:\s*0\.01ms\s*!important/);
+  assert.match(block, /transition-duration:\s*0\.01ms\s*!important/);
+});

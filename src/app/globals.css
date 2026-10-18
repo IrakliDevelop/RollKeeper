@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* Dark mode follows the app's theme toggle (<html data-theme="dark">),
    not the operating system setting. */
@@ -928,4 +929,18 @@ form select {
 
 .animate-rk-otp-shake {
   animation: rk-otp-shake 420ms ease-in-out;
+}
+
+/* Respect the OS "reduce motion" setting for every CSS animation and
+   transition. A near-zero duration (not "none") still fires animationend, so
+   Radix can unmount closing dialogs, selects and tooltips. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
