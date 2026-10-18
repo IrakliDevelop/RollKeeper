@@ -663,16 +663,17 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
         'reveal'
       );
     const fog = editorFogToAuthorityFog(fogManager.getState(), 'dm-a');
-    const current = JSON.parse((await redis.get(keys.meta))!) as {
-      generation: string;
-      casToken: string;
-    };
+    // Replaces whatever room the earlier tests left (or starts one).
+    const stored = await redis.get(keys.meta);
+    const current = stored
+      ? (JSON.parse(stored) as { generation: string; casToken: string })
+      : null;
     const generation = 'a33e4567-e89b-42d3-a456-426614174000';
     const provision = await admin('/authority-admin/provision', {
       generation,
       casToken: 'f'.repeat(64),
-      expectedGeneration: current.generation,
-      expectedCasToken: current.casToken,
+      expectedGeneration: current?.generation ?? null,
+      expectedCasToken: current?.casToken ?? null,
       state: {
         elements: [],
         layers: [],
