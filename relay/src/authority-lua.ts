@@ -704,9 +704,32 @@ for _, layer in ipairs(state.layers) do
   layerIds[layer.id] = true
 end
 local fog = state.extensions.fog.data
+local fogRecords = app.fogRecords
 if fog ~= cjson.null then
   if not exact_keys(fog, {'meta','tiles'}) or type(fog.meta) ~= 'table'
     or not dense_array(fog.tiles) or #fog.tiles > 256 then return {0,'invalid'} end
+  -- Repair 11: the records are stored exactly as the fog library encodes
+  -- them (the driver builds them from this state); each must decode to the
+  -- matching tile of the state.
+  if type(fogRecords) ~= 'table' or type(fogRecords.meta) ~= 'string'
+    or not dense_array(fogRecords.tiles) or #fogRecords.tiles ~= #fog.tiles then
+    return {0,'invalid'}
+  end
+  local metaOk, decodedMeta = pcall(cjson.decode, fogRecords.meta)
+  if not metaOk or type(decodedMeta) ~= 'table' or decodedMeta.version ~= fog.meta.version
+    or decodedMeta.editor ~= fog.meta.editor then return {0,'invalid'} end
+  for index, record in ipairs(fogRecords.tiles) do
+    local tile = fog.tiles[index]
+    if type(record) ~= 'table' or type(record.field) ~= 'string' or type(record.value) ~= 'string'
+      or type(tile) ~= 'table' then return {0,'invalid'} end
+    local tileOk, decodedTile = pcall(cjson.decode, record.value)
+    if not tileOk or type(decodedTile) ~= 'table' or decodedTile.x ~= tile.x
+      or decodedTile.y ~= tile.y or decodedTile.version ~= tile.version
+      or decodedTile.editor ~= tile.editor or decodedTile.generation ~= tile.generation
+      or decodedTile.data ~= tile.data then return {0,'invalid'} end
+  end
+elseif fogRecords ~= nil and fogRecords ~= cjson.null then
+  return {0,'invalid'}
 end
 -- All guards and serialization precede the first write. Generation
 -- replacement also retires every replay, receipt, history and publication
@@ -719,8 +742,8 @@ for _, element in ipairs(state.elements) do
 end
 for _, layer in ipairs(state.layers) do redis.call('HSET',KEYS[6],layer.id,cjson.encode(layer)) end
 if fog ~= cjson.null then
-  redis.call('HSET',KEYS[7],'current',cjson.encode(fog.meta))
-  for _, tile in ipairs(fog.tiles) do redis.call('HSET',KEYS[8],tostring(tile.x)..','..tostring(tile.y),cjson.encode(tile)) end
+  redis.call('HSET',KEYS[7],'current',fogRecords.meta)
+  for _, record in ipairs(fogRecords.tiles) do redis.call('HSET',KEYS[8],record.field,record.value) end
 end
 redis.call('SET',KEYS[3],cjson.encode({v=1,generation=app.generation,revision=0,casToken=app.casToken}))
 -- Review B3: the provisioned room starts its sliding lifetime on every room
