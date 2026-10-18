@@ -176,6 +176,32 @@ async function boxX(page: Page): Promise<number | null> {
   );
 }
 
+/**
+ * The relay WebSocket is the live connection. "Offline" closes it and sends
+ * every reconnect to a closed port until we come back; HTTP stays up
+ * (browser offline emulation does not drop an open WebSocket).
+ */
+async function installRelaySwitch(page: Page): Promise<void> {
+  await page.addInitScript(relayPort => {
+    const Native = window.WebSocket;
+    const state = {
+      offline: window.sessionStorage.getItem('__gg3RelayOffline') === '1',
+      sockets: [] as WebSocket[],
+    };
+    (window as unknown as { __gg3Relay: typeof state }).__gg3Relay = state;
+    class RelaySocket extends Native {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        const relay = new RegExp(`:${relayPort}(?:[/?]|$)`, 'u').test(
+          String(url)
+        );
+        super(relay && state.offline ? 'ws://127.0.0.1:9/' : url, protocols);
+        if (relay) state.sockets.push(this);
+      }
+    }
+    window.WebSocket = RelaySocket;
+  }, E2E_RELAY_PORT);
+}
+
 async function setRelayOffline(page: Page, offline: boolean): Promise<void> {
   await page.evaluate(offline => {
     const state = (
@@ -184,6 +210,8 @@ async function setRelayOffline(page: Page, offline: boolean): Promise<void> {
       }
     ).__gg3Relay;
     state.offline = offline;
+    // FR4-3: survives a reload, so the page can load with the relay down.
+    window.sessionStorage.setItem('__gg3RelayOffline', offline ? '1' : '0');
     if (offline) for (const socket of state.sockets.splice(0)) socket.close();
   }, offline);
 }
@@ -257,24 +285,7 @@ async function offlineChangesFlow(
   });
   try {
     const page = await context.newPage();
-    // The relay WebSocket is the live connection. "Offline" closes it and
-    // sends every reconnect to a closed port until we come back; HTTP stays
-    // up (browser offline emulation does not drop an open WebSocket).
-    await page.addInitScript(relayPort => {
-      const Native = window.WebSocket;
-      const state = { offline: false, sockets: [] as WebSocket[] };
-      (window as unknown as { __gg3Relay: typeof state }).__gg3Relay = state;
-      class RelaySocket extends Native {
-        constructor(url: string | URL, protocols?: string | string[]) {
-          const relay = new RegExp(`:${relayPort}(?:[/?]|$)`, 'u').test(
-            String(url)
-          );
-          super(relay && state.offline ? 'ws://127.0.0.1:9/' : url, protocols);
-          if (relay) state.sockets.push(this);
-        }
-      }
-      window.WebSocket = RelaySocket;
-    }, E2E_RELAY_PORT);
+    await installRelaySwitch(page);
     for (const path of ['/player', '/dm', '/dm/campaign/warm/table']) {
       await page
         .goto(path, { waitUntil: 'load', timeout: 60_000 })
@@ -379,4 +390,80 @@ test('a battle map fogged before it joined the Table goes live, shows and reappl
 }) => {
   test.setTimeout(180_000);
   await offlineChangesFlow(browser, 'seeded');
+});
+
+/**
+ * FR4-3 / QA2: the relay is unreachable when the DM (re)loads the Table, so
+ * this tab never had the live room. Its edits stay on the device; once the
+ * room is reachable the live version is shown, and the edits are kept in
+ * the offline changes slot with the same notice, ready to reapply.
+ */
+test('edits made while the relay is down at page load are kept and reapplied once it is back (FR4-3)', async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const context = await browser.newContext({
+    viewport: { width: 1440, height: 1000 },
+  });
+  try {
+    const page = await context.newPage();
+    await installRelaySwitch(page);
+    for (const path of ['/player', '/dm', '/dm/campaign/warm/table']) {
+      await page
+        .goto(path, { waitUntil: 'load', timeout: 60_000 })
+        .catch(() => {});
+    }
+    await seedDm(page, DM_ID);
+    const code = await createCampaign(page, DM_ID, CAMPAIGN_NAME);
+    await seedBattleMap(page, code);
+    await openTableSceneLive(page, code, MAP_NAME);
+    await waitForElementSynced(page, BOX_ID);
+    expect(await boxX(page)).toBe(START_X);
+
+    // 1. Reload the Table with the relay unreachable from this page.
+    await setRelayOffline(page, true);
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await page.waitForFunction(
+      id => !!window.__rkStores?.viewport?.store.getById(id),
+      BOX_ID,
+      { timeout: 30_000 }
+    );
+    await details(page).click();
+    await expect(connectionLabel(page)).not.toHaveText('Connected', {
+      timeout: 30_000,
+    });
+    await page.keyboard.press('Escape');
+    await moveBox(page, OFFLINE_X);
+    expect(await boxX(page)).toBe(OFFLINE_X);
+
+    // 2. The relay is reachable again: the live room wins, and the toast
+    // points at Details (it used to revert silently).
+    await setRelayOffline(page, false);
+    const goLive = page.getByRole('button', { name: 'Go live' });
+    await expect(async () => {
+      if (await goLive.isVisible()) await goLive.click();
+      await expect(
+        page.getByText(
+          'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
+        )
+      ).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout: 90_000 });
+    await expect.poll(() => boxX(page), { timeout: 20_000 }).toBe(START_X);
+
+    // 3. Reapply: the live map shows the edit made while the relay was down.
+    await details(page).click();
+    const panel = page.getByTestId('table-header-details');
+    await expect(panel.getByText(/^Offline changes from /u)).toBeVisible();
+    await panel
+      .getByRole('button', { name: 'Reapply offline changes' })
+      .click();
+    await expect(page.getByText('Offline changes restored.')).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
+    if (!(await panel.isVisible())) await details(page).click();
+    await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
+  } finally {
+    await context.close();
+  }
 });

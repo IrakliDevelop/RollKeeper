@@ -250,6 +250,8 @@ function makeTableSceneAdapter(
     retryPendingConflict: vi.fn(async () => 'none' as const),
     discardPendingConflict: vi.fn(),
     captureOfflineFork: vi.fn(async () => true),
+    markEditsBeforeLive: vi.fn(),
+    takeEditsBeforeLive: vi.fn(() => false),
     clearOfflineFork: vi.fn(async () => 'cleared' as const),
     flush: vi.fn(async () => {}),
     dispose: vi.fn(),
@@ -335,6 +337,79 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
     expect(stage.tableSceneAdapter.captureOfflineFork).toHaveBeenCalledTimes(1);
     expect(result.current.liveSyncNotice?.message).toBe(
       OFFLINE_DISCARDED_DM_MESSAGE
+    );
+  });
+
+  /** Captures the store listeners the hook registers on the viewport. */
+  function listenedVp() {
+    const vp = makeVp();
+    const listeners = new Map<
+      string,
+      Array<(data: unknown, meta?: { origin?: string }) => void>
+    >();
+    vi.mocked(vp.store.on).mockImplementation((event, listener) => {
+      const key = String(event);
+      listeners.set(key, [...(listeners.get(key) ?? []), listener as never]);
+      return vi.fn();
+    });
+    const localEdit = () =>
+      listeners
+        .get('update')
+        ?.forEach(listener => listener({}, { origin: 'local' }));
+    return { vp, localEdit };
+  }
+
+  it('marks a Table stage edit made before the room was first live, then keeps it in the slot and points to Details once live (FR4-3)', async () => {
+    const adapter = stage.tableSceneAdapter;
+    vi.mocked(adapter.takeEditsBeforeLive).mockReturnValue(true);
+    const { vp, localEdit } = listenedVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    act(() => options.onStatus?.('offline'));
+    act(() => localEdit());
+    expect(adapter.markEditsBeforeLive).toHaveBeenCalled();
+    expect(adapter.captureOfflineFork).not.toHaveBeenCalled();
+    await act(async () => options.onStatus?.('live'));
+    expect(adapter.takeEditsBeforeLive).toHaveBeenCalledTimes(1);
+    expect(adapter.captureOfflineFork).toHaveBeenCalledTimes(1);
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_DISCARDED_DM_MESSAGE
+    );
+    // Later live transitions of the same connection never capture again.
+    await act(async () => options.onStatus?.('recovering'));
+    await act(async () => options.onStatus?.('live'));
+    expect(adapter.takeEditsBeforeLive).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not mark edits made after the room was first live (offline edits are SDK drafts, GG3) and captures nothing without earlier edits (FR4-3)', async () => {
+    const adapter = stage.tableSceneAdapter;
+    const { vp, localEdit } = listenedVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    await act(async () => options.onStatus?.('live'));
+    expect(adapter.captureOfflineFork).not.toHaveBeenCalled();
+    act(() => options.onStatus?.('offline'));
+    act(() => localEdit());
+    expect(adapter.markEditsBeforeLive).not.toHaveBeenCalled();
+    expect(result.current.liveSyncNotice).toBeNull();
+  });
+
+  it('says the copy could not be kept when the slot write fails for edits made before live (FR4-3, HH2)', async () => {
+    const adapter = stage.tableSceneAdapter;
+    vi.mocked(adapter.takeEditsBeforeLive).mockReturnValue(true);
+    vi.mocked(adapter.captureOfflineFork).mockResolvedValue(false);
+    const { vp } = listenedVp();
+    const { result } = renderHook(() => useDmBattleMapCanvas(stageProps()));
+    act(() => result.current.handleReady(vp));
+    const options = vi.mocked(createManagedBattleMapConnection).mock
+      .calls[0]![0];
+    await act(async () => options.onStatus?.('live'));
+    expect(result.current.liveSyncNotice?.message).toBe(
+      OFFLINE_NOT_KEPT_DM_MESSAGE
     );
   });
 
