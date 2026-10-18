@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { createClient } from 'redis';
 import WebSocket from 'ws';
 import { ElementStore } from '@fieldnotes/core';
@@ -9,7 +10,10 @@ import {
 } from '@fieldnotes/sync';
 import type { AuthorityReadContext } from '@fieldnotes/sync-server';
 import { RedisHubFanout, type RedisHashClient } from '@fieldnotes/sync-redis';
-import { createFogAuthorityServerExtension } from '@fieldnotes/vtt/server';
+import {
+  createFogAuthorityServerExtension,
+  prepareFogAuthorityIntent,
+} from '@fieldnotes/vtt/server';
 import { FogManager } from '@fieldnotes/vtt';
 
 import { createManagedBattleMapAuthorityConnection } from '../../src/lib/battlemapAuthority.js';
@@ -488,6 +492,40 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
       );
     });
     expect(positions(restoredPlayer.fog.getState()?.tiles)).toEqual(afterEdit);
+
+    // 7. The DM keeps editing fog on the restored (provisioned) room: the
+    // relay stored its fog records in the encoding the fog library accepts.
+    restoredDm.fog.applyRegion(
+      {
+        kind: 'rectangle',
+        from: { x: 1850, y: 1450 },
+        to: { x: 1870, y: 1470 },
+      },
+      'reveal'
+    );
+    const restoredBarrier = restoredDm.client.captureBarrier!();
+    expect(restoredBarrier).not.toBeNull();
+    try {
+      expect(
+        await restoredDm.client.waitForAcknowledgements!(restoredBarrier!, {
+          timeoutMs: 5_000,
+        })
+      ).toMatchObject({ status: 'acknowledged', rejectedIds: [] });
+    } finally {
+      restoredDm.client.releaseBarrier!(restoredBarrier!);
+    }
+    await eventually(
+      () => restoredPlayer.fog.getState()?.tiles.length === 6,
+      5_000
+    ).catch(async () => {
+      throw new Error(
+        await describeFailure({ player: restoredPlayer.status() })
+      );
+    });
+    expect(positions(restoredPlayer.fog.getState()?.tiles)).toEqual([
+      ...afterEdit,
+      '14,11',
+    ]);
   }, 60_000);
 
   it('reads a room whose tiles were stored in string order by an older relay without any migration', async () => {
@@ -496,7 +534,7 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
     // written before the fix can look like); values are untouched.
     const stored = await redis.hGetAll(keys.fogTiles);
     const fields = Object.keys(stored).sort();
-    expect(fields).toEqual(['1,1', '1,10', '11,1', '13,10', '2,1']);
+    expect(fields).toEqual(['1,1', '1,10', '11,1', '13,10', '14,11', '2,1']);
     await redis.del(keys.fogTiles);
     for (const field of fields)
       await redis.hSet(keys.fogTiles, field, stored[field]!);
@@ -512,15 +550,99 @@ run('fog tiles at column or row 10 and above (QA1)', () => {
       '2,1',
       '11,1',
       '13,10',
+      '14,11',
     ]);
     await capture.release();
     const player = connect('player', 'player-c', RESTORED_GENERATION);
     await eventually(
       () =>
-        player.status() === 'live' && player.fog.getState()?.tiles.length === 5,
+        player.status() === 'live' && player.fog.getState()?.tiles.length === 6,
       10_000
     ).catch(async () => {
       throw new Error(await describeFailure({ player: player.status() }));
     });
   }, 20_000);
+  it('stores provisioned fog in the fog library encoding, so the next DM fog edit commits after a restore', async () => {
+    for (const client of clients.splice(0)) client.stop();
+    const seeded = revealedFog().getState()!;
+    const fog = editorFogToAuthorityFog(seeded, 'dm-a') as {
+      meta: { definition: { generation: string } };
+      tiles: Array<{ x: number; y: number; data?: string }>;
+    };
+    // Whatever generation the room is at now (each test restores over it).
+    const current = JSON.parse((await redis.get(keys.meta))!) as {
+      generation: string;
+      casToken: string;
+    };
+    const generation = 'e23e4567-e89b-42d3-a456-426614174000';
+    const restore = await admin('/authority-admin/provision', {
+      generation,
+      casToken: 'e'.repeat(64),
+      expectedGeneration: current.generation,
+      expectedCasToken: current.casToken,
+      state: {
+        elements: [],
+        layers: [],
+        extensions: { fog: { pluginName: 'fog', version: 1, data: fog } },
+      },
+    });
+    expect(restore.status).toBe(200);
+    const definition = fog.meta.definition as unknown as {
+      generation: string;
+      bounds: { x: number; y: number; w: number; h: number };
+      cellSize: number;
+      base: string;
+    };
+    expect(await redis.hGet(keys.fogMeta, 'current')).toBe(
+      `{"version":1,"editor":"dm-a","definition":{"version":1,"generation":"${definition.generation}","bounds":{"x":0,"y":0,"w":2048,"h":1536},"cellSize":1,"tileCells":128,"base":"covered"}}`
+    );
+    const first = fog.tiles[0]!;
+    expect(await redis.hGet(keys.fogTiles, '1,1')).toBe(
+      `{"generation":"${definition.generation}","x":1,"y":1,"version":1,"editor":"dm-a","data":"${first.data}"}`
+    );
+
+    const mutation = {
+      kind: 'fog-patch' as const,
+      generation: definition.generation,
+      tiles: [
+        {
+          generation: definition.generation,
+          x: 11,
+          y: 1,
+          version: 2,
+          editor: 'dm-a',
+        },
+      ],
+    };
+    const operationId = 'fog-order-after-restore';
+    const driver = new RedisAuthorityDriver(redisAdapter(redis));
+    await expect(
+      driver.commit(
+        {
+          ...readContext(generation),
+          roomGeneration: generation,
+          clientOperationId: operationId,
+          operationDigest: createHash('sha256')
+            .update(operationId)
+            .digest('hex'),
+        },
+        {
+          proposal: {
+            protocol: 'authority:1',
+            kind: 'propose',
+            generation,
+            clientOperationId: operationId,
+            mutation,
+          },
+          intent: {
+            schema: 1,
+            kind: 'extension',
+            key: 'fog',
+            version: 1,
+            payload: prepareFogAuthorityIntent(mutation),
+          },
+        } as Parameters<RedisAuthorityDriver['commit']>[1]
+      )
+    ).resolves.toMatchObject({ status: 'committed' });
+  });
 });
