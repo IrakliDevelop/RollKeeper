@@ -77,6 +77,7 @@ Real-Redis Table suites (CI job "Relay and Table control Redis suites", see
 |---|---|
 | `test:relay:redis` | Relay authority, fog CAS and transport suites; needs `REDIS_TEST_URL` pointing at **Redis 7 or newer** (fails fast otherwise, never skips) |
 | `test:table-control:redis` | Table control Lua against disposable Redis and serverless-redis-http containers it starts itself (needs Docker) |
+| `test:shop-tokens:redis` | The shop Redis scripts (`src/lib/shopRedisScripts.ts`: ids-only token compare-and-set and the shops index prune) against a disposable Redis container it starts itself (needs Docker) |
 
 Nightly/drill suites are **not** expected to run on every PR — they exist for
 scheduled verification of the storage-migration and sync subsystems

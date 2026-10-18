@@ -154,7 +154,16 @@ scene rooms, player views and the TV cannot connect.
     sent once, in order, when the room is first live. The queue is capped;
     an edit that cannot be kept shows a notice. The DM's connection does not
     hold: before live the SDK refuses edits and the scene's localDraft keeps
-    them.
+    them. When the Table stage's connection is first live, edits saved
+    before that (the relay was unreachable when the page loaded, or the
+    scene's room was not ready yet, as after "Try again") are treated like
+    offline edits: the live room wins, the local version goes to the offline
+    changes slot and the same notice points to Details (repair 11, FR4-3;
+    `markEditsBeforeLive` / `takeEditsBeforeLive` in
+    `src/lib/table/sceneAdapter.ts`). The mark lives in memory for the
+    scene's selection, so it survives a canvas remount but not a page
+    reload or a scene switch. Going live still seeds a new room from the
+    saved checkpoint, not from the local draft.
   - After the first live state, edits made while offline or reconnecting are
     SDK drafts and are never replayed. Once the room is live again and its
     document applied, the live room wins: those drafts (and operations whose
@@ -164,7 +173,13 @@ scene rooms, player views and the TV cannot connect.
     instead sees "Map edits made while offline were not sent, and this
     device could not keep a copy for later. To send them now, open Details
     and choose Reapply latest changes before you edit again." A player sees
-    "Changes you made while offline weren't saved."
+    "Changes you made while offline weren't saved." Only work seen while the
+    connection was not live is released this way: when a socket closes, the
+    SDK reports in-flight work as uncertain while still "live", and that is
+    left alone. Work from an earlier room generation (the DM restored a
+    checkpoint or reapplied changes meanwhile) tells a player "The DM
+    restored the map. Your last change may not have been kept." and tells
+    the DM nothing (repair 11, QA4).
   - The DM's offline version is copied into the scene's offline changes
     slot (`offlineFork` on the scene record: `savedAt`, `replacedEarlier`,
     `draft`) when those drafts are released
@@ -184,8 +199,9 @@ scene rooms, player views and the TV cannot connect.
     opened still empties the restored scene's slot. A Discard that finds the
     slot already gone (another tab) says "These offline changes were already
     reapplied or discarded."
-  - Checkpoint saves wait 10.5 s after the previous checkpoint request,
-    including the one the SDK sends when it reconnects. The SDK spaces
+  - While live, checkpoint saves wait 10.5 s after the previous checkpoint
+    request, including the one the SDK sends when it reconnects. A save
+    while not live fails at once, without waiting. The SDK spaces
     requests 10 s apart by its own send time while the relay closes a socket
     (1013) for a request that arrives under 10 s after the last one, so a
     save right after a reconnect used to drop the connection now and then
@@ -230,6 +246,19 @@ scene rooms, player views and the TV cannot connect.
   - A malformed or repeated editor fog tile is not dropped: the fog goes
     to the room unconverted and is refused, because dropping a tile on a
     revealed map would show a concealed area.
+  - The relay stores fog tiles in a Redis hash keyed `x,y` and reads them
+    back sorted by x, then y, as numbers (repair 11, QA1). It used to sort
+    the keys as strings ("11,1" before "2,1"); the fog extension refuses
+    any other order, so once a revealed tile reached column or row 10 every
+    new connection closed with 1013 "resync required" and checkpoints
+    failed. Rooms stored before the fix read correctly without migration.
+  - The relay stores provisioned fog (go live, Restore, Reapply) in the
+    fog library's own JSON encoding (`provisionFogRecords` in
+    `relay/src/authority-driver.ts`). It used to store it with Lua
+    `cjson.encode`, and the library refused every later DM fog edit on such
+    a room as invalid. A room provisioned with fog by an older relay keeps
+    refusing DM fog edits until it is provisioned again (Restore or Reapply)
+    or expires.
 - **Merchants on Table scenes.** A campaign NPC added through the Table
   (Add to scene → Campaign NPC) gets a DM token keyed by its scene member id,
   and the NPC link lives on the Table actor (`profile.sourceKind:
@@ -247,8 +276,9 @@ scene rooms, player views and the TV cannot connect.
   update is the ids-only `PATCH /api/campaign/[code]/shops/[npcId]`
   (DM-only, at most 50 ids, compare-and-set on the published projection),
   which never reseeds stock, so a sale the DM's copy has not drained yet is
-  never undone. The hook remembers the ids it last saw per shop and skips
-  the shop index request while they are unchanged.
+  never undone. The hook remembers, per shop, the ids it last sent together
+  with the shop's and the NPC's `updatedAt`, skips the request while all of
+  them are unchanged, and forgets a shop once it closes.
   The campaign-page Shop tab publishes from the default Table, and the
   Table page from the Table it has open (an imported Table opened with
   `?tableWorkspace=` is not the default). If the DM uses both with
