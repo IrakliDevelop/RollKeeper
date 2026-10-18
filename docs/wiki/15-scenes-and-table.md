@@ -83,8 +83,8 @@ scene rooms, player views and the TV cannot connect.
    the TV.
 2. Then deploy the app. A new app build talks only the v1 protocol.
 3. Already-open relay sockets are not closed by the app deploy. When an old
-   browser tab needs a new token, `battlemap-token` answers 426 "Client
-   upgrade required", which asks the user to refresh the browser
+   browser tab needs a new token, `battlemap-token` answers 426 "Refresh the
+   page to update the app."
    (`src/app/api/campaign/[code]/battlemap-token/route.ts`):
    - any scene request (a present `sceneId`, or any request that is not a
      no-scene `kind: 'location'` claim) must negotiate
