@@ -31,6 +31,7 @@ import { parseRechargeFromName } from '@/utils/encounterConverter';
 import { normalizeCombatConfig } from '@/utils/customConditions';
 import { buildNpcLibraryPatch } from '@/utils/npcLibrarySync';
 import { queueNpcLibrarySync } from '@/store/npcLibrarySyncQueue';
+import { getDeathSavesAfterDamage } from '@/utils/hpCalculations';
 import type { CampaignNPC, NpcResource } from '@/types/encounter';
 
 function generateId(): string {
@@ -913,29 +914,16 @@ export const useEncounterStore = create<EncounterStoreState>()(
               const prevHp = currentHp;
               currentHp = Math.max(0, currentHp - remaining);
 
-              // Init death saves for persistent NPC/custom-monster creatures.
-              let deathSaves = e.deathSaves;
-              if (
-                currentHp <= 0 &&
-                prevHp > 0 &&
-                (e.type === 'npc' || e.npcSourceId)
-              ) {
-                const excessDamage = remaining - prevHp;
-                if (excessDamage >= e.maxHp) {
-                  // Massive damage = instant death
-                  deathSaves = {
-                    successes: 0,
-                    failures: 3,
-                    isStabilized: false,
-                  };
-                } else {
-                  deathSaves = {
-                    successes: 0,
-                    failures: 0,
-                    isStabilized: false,
-                  };
-                }
-              }
+              // Death saves only apply to persistent NPC/custom-monster creatures.
+              const deathSaves =
+                e.type === 'npc' || e.npcSourceId
+                  ? getDeathSavesAfterDamage(
+                      e.deathSaves,
+                      prevHp,
+                      remaining,
+                      e.maxHp
+                    )
+                  : e.deathSaves;
 
               return { ...e, currentHp, tempHp, deathSaves };
             }

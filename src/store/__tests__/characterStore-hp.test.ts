@@ -54,6 +54,22 @@ describe('characterStore — HP management', () => {
       expect(useCharacterStore.getState().character.hitPoints.current).toBe(0);
     });
 
+    it('adds a death save failure when damaged at 0 HP', () => {
+      resetStore({
+        hitPoints: {
+          current: 0,
+          max: 44,
+          temporary: 0,
+          calculationMode: 'auto' as const,
+          deathSaves: { successes: 1, failures: 0, isStabilized: false },
+        },
+      });
+      useCharacterStore.getState().applyDamageToCharacter(3);
+      expect(
+        useCharacterStore.getState().character.hitPoints.deathSaves
+      ).toEqual({ successes: 1, failures: 1, isStabilized: false });
+    });
+
     it('marks unsaved changes', () => {
       useCharacterStore.getState().applyDamageToCharacter(10);
       expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
