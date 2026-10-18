@@ -1,11 +1,16 @@
 import assert from 'node:assert/strict';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import test from 'node:test';
 
 import {
   collectCounts,
   compareToBaseline,
   formatReport,
+  MISSING_BASELINE_HINT,
   PATTERNS,
+  runRatchet,
 } from './design-ratchet.mjs';
 
 const count = (text, file = 'src/a.tsx') =>
@@ -77,4 +82,70 @@ test('a clean comparison produces an OK report', () => {
     formatReport({ regressions: [], improvements: [] }),
     /Design ratchet: OK/
   );
+});
+
+const fakeFiles = async () => [{ path: 'src/a.tsx', text: 'uppercase' }];
+
+async function withTempBaseline(contents, run) {
+  const dir = await mkdtemp(path.join(tmpdir(), 'design-ratchet-'));
+  const file = path.join(dir, 'baseline.json');
+  if (contents !== undefined) await writeFile(file, contents);
+  try {
+    return await run(file);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+test('a missing baseline fails the check with a one-line hint', async () => {
+  await withTempBaseline(undefined, async file => {
+    const result = await runRatchet({ file, readFiles: fakeFiles });
+    assert.equal(result.exitCode, 1);
+    assert.equal(result.stderr, MISSING_BASELINE_HINT);
+    assert.equal(result.stderr.split('\n').length, 1);
+    assert.equal(result.stdout, '');
+  });
+});
+
+test('the first baseline is created without --force', async () => {
+  await withTempBaseline(undefined, async file => {
+    const result = await runRatchet({
+      mode: 'update',
+      file,
+      readFiles: fakeFiles,
+    });
+    assert.equal(result.exitCode, 0);
+    assert.match(result.stdout, /created/);
+    assert.deepEqual(JSON.parse(await readFile(file, 'utf8')), {
+      uppercase: { 'src/a.tsx': 1 },
+    });
+  });
+});
+
+test('raising an existing baseline still needs --force', async () => {
+  await withTempBaseline('{}\n', async file => {
+    const refused = await runRatchet({
+      mode: 'update',
+      file,
+      readFiles: fakeFiles,
+    });
+    assert.equal(refused.exitCode, 1);
+    assert.match(refused.stderr, /Refusing to raise the baseline/);
+    const forced = await runRatchet({
+      mode: 'update',
+      flags: ['--force'],
+      file,
+      readFiles: fakeFiles,
+    });
+    assert.equal(forced.exitCode, 0);
+  });
+});
+
+test('a malformed baseline is an error, not an empty baseline', async () => {
+  await withTempBaseline('{ not json', async file => {
+    await assert.rejects(
+      runRatchet({ file, readFiles: fakeFiles }),
+      SyntaxError
+    );
+  });
 });

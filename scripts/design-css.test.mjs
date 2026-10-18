@@ -93,3 +93,21 @@ test('surface-elevated resolves through the theme-aware hover token', async () =
     /background-color:\s*var\(--surface-elevated\)/
   );
 });
+
+test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/postcss', async () => {
+  const read = async file =>
+    JSON.parse(await readFile(path.join(repositoryRoot, file), 'utf8'));
+  const pkg = await read('package.json');
+  const lock = await read('package-lock.json');
+  assert.equal(
+    pkg.devDependencies['@tailwindcss/node'],
+    pkg.devDependencies['@tailwindcss/postcss']
+  );
+  assert.equal(
+    lock.packages[''].devDependencies['@tailwindcss/node'],
+    pkg.devDependencies['@tailwindcss/node']
+  );
+  const version = name => lock.packages[`node_modules/${name}`]?.version;
+  assert.ok(version('@tailwindcss/node'), 'lockfile has @tailwindcss/node');
+  assert.equal(version('@tailwindcss/node'), version('@tailwindcss/postcss'));
+});
