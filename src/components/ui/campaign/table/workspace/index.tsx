@@ -27,7 +27,7 @@ const NOT_BOUND =
  * PR06 unified Table workspace (W1 to W4): one page per campaign, one control
  * session, one presentation/display poll and one combat publisher; the
  * selected scene's canvas, roster and combat panel are keyed by scene.
- * Selecting a scene is private preparation only, nothing here presents.
+ * Selecting a scene is private preparation only; nothing here presents.
  */
 export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   const workspace = useTableWorkspace(campaignCode);
@@ -144,7 +144,7 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   );
 
   // C3-7 initial gate; R3-F6 per-scene "Registering scene…" gate (canvas
-  // only, presentation and display controls stay mounted in the header).
+  // only; presentation and display controls stay mounted in the header).
   // A canvas already on screen stays mounted while an explicit acquire
   // registers; it re-mints once afterwards (C6-2).
   const gate = !authority.firstOutcome

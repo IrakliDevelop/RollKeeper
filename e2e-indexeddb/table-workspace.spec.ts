@@ -4,7 +4,7 @@ import { guardTableContext } from './tableContext';
 
 /**
  * PR06 unified Table workspace on the real canvas (dev server, IndexedDB,
- * scripted control API, no relay in this config): the old per-scene URL
+ * scripted control API; no relay in this config): the old per-scene URL
  * redirects; scenes are created/added and browsed privately; ≥10 switches
  * use ONE control session (one acquire, one register per scene) with a
  * single display-status poll; the map image is placed exactly once;

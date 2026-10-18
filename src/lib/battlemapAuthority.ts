@@ -177,7 +177,7 @@ export function createManagedBattleMapAuthorityConnection(
 
   const denyFogSequence = (): void => {
     options.onDiagnostic?.(
-      'Fog reached its edit limit, so live editing is off. Reload the page.'
+      'Fog reached its edit limit, so live editing is off for this map.'
     );
     options.onStatus?.('denied');
   };

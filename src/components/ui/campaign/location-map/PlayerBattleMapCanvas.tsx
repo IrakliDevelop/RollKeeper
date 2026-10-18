@@ -211,7 +211,7 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
 
 /**
  * This receive site's role for `attachFocusReceiver`. Pulled out to a named,
- * directly-assertable constant, swapping this literal for the display role
+ * directly-assertable constant; swapping this literal for the display role
  * would otherwise pass type-check, lint, and every test while making a DM's
  * "send to the TV" move every player's camera instead. See
  * PlayerBattleMapCanvas.focusOptions.test.ts.
@@ -346,7 +346,7 @@ export function PlayerBattleMapCanvas({
   const sideChannelsEnabled = sideChannelId !== null;
   const sideChannelIdRef = useRef(sideChannelId);
   sideChannelIdRef.current = sideChannelId;
-  // P10: the token 403 body decides the cover, "Scene is unavailable" is
+  // P10: the token 403 body decides the cover: "Scene is unavailable" is
   // neutral; any other credential denial is "Access denied".
   const [tokenDenial, setTokenDenial] = useState<
     'scene-unavailable' | 'credential' | null

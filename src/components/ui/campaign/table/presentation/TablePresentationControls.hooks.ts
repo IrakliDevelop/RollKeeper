@@ -134,7 +134,7 @@ export function useTablePresentation(props: TablePresentationControlsProps) {
 
   // Holder: fetch the registry label of another presented scene, and keep
   // retrying on each descriptor change (every renew, ~10 s) until it is
-  // known, a single aborted or failed read never leaves "another scene".
+  // known; a single aborted or failed read never leaves "another scene".
   const labelKnown = presentedId !== null && labels[presentedId] !== undefined;
   const revision = descriptor?.revision ?? null;
   useEffect(() => {

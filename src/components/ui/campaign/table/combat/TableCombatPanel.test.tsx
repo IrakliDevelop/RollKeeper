@@ -740,7 +740,7 @@ describe('Combined Show + Start (PR04 P8, S2)', () => {
       screen.getByRole('button', { name: 'Show scene and start combat' })
     );
     expect(
-      await screen.findByText('The scene just changed. Check it and try again.')
+      await screen.findByText('The scene changed. Check it and try again.')
     ).toBeVisible();
     expect(session.show).not.toHaveBeenCalled();
     expect(runOf(repository).isActive).toBe(false);

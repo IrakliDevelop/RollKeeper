@@ -85,7 +85,7 @@ export interface UseShopPublishResult {
  *
  * `entityIds` are resolved DM-side from `encounterStore` via
  * `resolveShopEntityIds`, plus (repair 09) the linked Table scene members
- * via `loadTableShopEntityIds`, never sent by a player, never stored on
+ * via `loadTableShopEntityIds`; never sent by a player, never stored on
  * `CampaignNPC` itself. See that function's doc comment and the route's own
  * for why this resolution has to happen here.
  *

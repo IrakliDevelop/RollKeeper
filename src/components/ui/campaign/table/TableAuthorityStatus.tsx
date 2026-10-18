@@ -71,7 +71,7 @@ export function TableLivePill({ state }: { state: TableAuthorityState }) {
 
 /**
  * O7-2 H2: the live-control banner (R2-3): truthful status text with its
- * actions inline, an explicit, non-forcing "Go live" that
+ * actions inline: an explicit, non-forcing "Go live" that
  * waits for an observed foreign lease (countdown in the label) and "Work
  * offline". There is no takeover control. Lost is an alert; offline and
  * failed are polite status.

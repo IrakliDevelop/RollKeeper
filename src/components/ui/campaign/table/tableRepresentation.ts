@@ -13,7 +13,7 @@ import type { TableRosterCanvas } from './useTableRosterState';
 /**
  * PR07 P9/P10 (R3-3): per-member table representation on the DM canvas.
  * Tokens of physical members carry `tableRepresentation: 'physical'` so the
- * table display's projection omits them (table output only, the relay
+ * table display's projection omits them (table output only; the relay
  * projection, players, roster, initiative, HP and fog are unchanged). The
  * field is not secret and grants nothing.
  */
@@ -87,7 +87,7 @@ export function representationPatches(
 }
 
 /**
- * P10: this tab may retag tokens only as the live holder, the canvas relay
+ * P10: this tab may retag tokens only as the live holder; the canvas relay
  * is live and the page's control session is held (not lost).
  */
 export function isLiveHolder(

@@ -13,7 +13,7 @@ export function TablePublicationControls({ control, combatActive }: Props) {
     control.status === 'broadcasting'
       ? 'Initiative shared with players'
       : control.status === 'controlling'
-        ? "You're live. Initiative not shared yet"
+        ? "You're live. No initiative shared"
         : combatActive
           ? 'Started here, not shared with players'
           : 'Not shared with players';

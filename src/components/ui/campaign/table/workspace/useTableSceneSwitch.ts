@@ -23,7 +23,7 @@ export function switchNoticeText(notice: TableSwitchNotice): string {
 
 /**
  * PR06 W4 / R3-F4 / C6-4: the one scene-switch machine. Every change of the
- * requested scene, click, push, Back/Forward, canonicalization, goes
+ * requested scene (click, push, Back/Forward, canonicalization) goes
  * through it: (1) freeze canvas input; (2) flush until the adapter's local
  * edit generation is stable after a flush (bounded); (3) a pending conflict
  * or unstable generation keeps the mounted scene and reverts the URL with a

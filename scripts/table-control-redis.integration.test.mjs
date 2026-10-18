@@ -1883,7 +1883,7 @@ test('PR05 display capability: rotation, binding, ACK tuple, status and precisio
 
 /**
  * PR06 A1: one workspace session registers scenes through its own queue
- * against the real control Lua, no second acquire per scene, idempotent
+ * against the real control Lua: no second acquire per scene, idempotent
  * re-preparation, identity conflicts and registry-full are not ownership
  * loss, and ownership loss still is.
  */

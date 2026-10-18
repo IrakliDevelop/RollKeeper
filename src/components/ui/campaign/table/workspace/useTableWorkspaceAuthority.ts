@@ -33,7 +33,7 @@ export interface TableSceneRoomState {
   /**
    * `registering`: A1b in flight (the canvas waits, Show disabled);
    * `ready`: registered and seeded; `local`: not holding control or A1b
-   * refused/failed, the canvas mounts locally (R3-F6).
+   * refused/failed; the canvas mounts locally (R3-F6).
    */
   status: 'idle' | 'registering' | 'ready' | 'local';
   message: string | null;
@@ -177,7 +177,7 @@ export function useTableWorkspaceAuthority(options: {
     const input = latestScene.current;
     if (!holding || !session || !input || roomKey === null) return;
     if (started.current.has(roomKey)) return;
-    // A3: a transient failure is not final, selecting the scene again
+    // A3: a transient failure is not final; selecting the scene again
     // (or Retry) runs A1b again on the same session; refusals stay cached.
     if (transient(results.current.get(roomKey))) {
       results.current.delete(roomKey);

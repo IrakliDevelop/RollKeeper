@@ -57,7 +57,7 @@ const SCALE_HINT = 'If you change the grid, check the scale on the TV again.';
 /**
  * W10 "Edit map" tool group (A4 subset): set/replace the map image, grid
  * on/off/type/size/colour/opacity and fit to map. A tool choice on the one
- * Table canvas, no Setup/Play state, no presentation effect. Every write
+ * Table canvas: no Setup/Play state, no presentation effect. Every write
  * goes through the scene adapter (and the canvas' own op path), never the
  * legacy battle-map store.
  */

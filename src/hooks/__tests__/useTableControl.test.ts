@@ -251,7 +251,7 @@ describe('useTableControl', () => {
     expect(result.current.status).toBe('controlling');
     act(() => vi.advanceTimersByTime(1001));
     expect(result.current.status).toBe('not-broadcasting');
-    expect(result.current.error).toContain('Live control expired');
+    expect(result.current.error).toContain("You're no longer live");
   });
 
   it('invalidates visible authority when the request queue is saturated', async () => {
@@ -315,7 +315,7 @@ describe('useTableControl', () => {
           runId: 'newest',
           initiative: {},
         })
-      ).rejects.toThrow('Initiative not shared with players');
+      ).rejects.toThrow('Too many requests waiting');
     });
     expect(result.current.status).toBe('error');
     expect(result.current.error).toContain('Too many requests waiting');

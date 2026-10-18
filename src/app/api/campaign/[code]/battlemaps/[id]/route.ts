@@ -95,7 +95,7 @@ export async function POST() {
  * PR04 P6/Q9: a battle map DELETE needs full DM mutation
  * authority, answers 404 for any registry scene id (scenes leave only
  * through the control service), and otherwise removes only the legacy
- * map-keyed records of that id, never a tagged key, the registry or a
+ * map-keyed records of that id; never a tagged key, the registry or a
  * reserved projection.
  */
 export async function DELETE(

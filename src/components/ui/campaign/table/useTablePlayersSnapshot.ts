@@ -39,7 +39,7 @@ export interface TablePlayersCache {
   get(campaignCode: string): ReadySnapshot | null;
   set(campaignCode: string, snapshot: ReadySnapshot): void;
   /**
-   * Acceptance A4: one shared read per campaign at a time, concurrent
+   * Acceptance A4: one shared read per campaign at a time; concurrent
    * consumers (scene roster, combat panel, StrictMode re-runs) share it.
    */
   load(
@@ -80,7 +80,7 @@ export function useTablePlayersCache(): TablePlayersCache | null {
 
 /**
  * FU-4: the shared workspace read for other readers on the Table canvas
- * (e.g. the presence directory), a fresh snapshot is reused unless forced,
+ * (e.g. the presence directory); a fresh snapshot is reused unless forced,
  * otherwise the one in-flight workspace read is joined.
  */
 export function loadSharedPlayers(
