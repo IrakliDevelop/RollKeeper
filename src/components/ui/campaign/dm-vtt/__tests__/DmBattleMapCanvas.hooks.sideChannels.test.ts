@@ -169,6 +169,8 @@ function tableAdapter(markers: MarkerDetail[]) {
       setDmOnlyBulk: vi.fn(),
       isReadable: () => true,
     },
+    markEditsBeforeLive: vi.fn(),
+    takeEditsBeforeLive: vi.fn(() => false),
   } as unknown as TableSceneAdapter;
   return { adapter, setMarkers, current: () => current };
 }

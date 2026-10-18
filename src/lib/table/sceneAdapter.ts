@@ -91,6 +91,19 @@ export interface TableSceneAdapter {
    */
   captureOfflineFork(): Promise<boolean>;
   /**
+   * FR4-3: the canvas saved a local edit while its live connection had not
+   * yet been live (relay unreachable at load, or the room not ready yet).
+   * The live room never saw it. Kept in memory for the scene selection, so
+   * it survives a canvas remount (for example after "Try again").
+   */
+  markEditsBeforeLive(): void;
+  /**
+   * FR4-3: whether edits were marked since the last call; clears the mark.
+   * The canvas asks once its connection is first live and, when true, keeps
+   * the local version in the offline changes slot.
+   */
+  takeEditsBeforeLive(): boolean;
+  /**
    * GG3: removes the offline changes slot once reapplied or discarded. Only
    * the slot saved at `savedAt` is removed, never a newer one. Resolves
    * `gone` when that slot was no longer there (already reapplied or
@@ -132,6 +145,7 @@ export function createTableSceneAdapter(options: {
   let queue = Promise.resolve();
   let disposed = false;
   let localEditGeneration = 0;
+  let editsBeforeLive = false;
   type SceneEditIntent = {
     operationId: string;
     updates: Partial<BattleMap>;
@@ -451,6 +465,14 @@ export function createTableSceneAdapter(options: {
       listeners.forEach(listener => listener());
     },
     captureOfflineFork,
+    markEditsBeforeLive: () => {
+      editsBeforeLive = true;
+    },
+    takeEditsBeforeLive: () => {
+      const marked = editsBeforeLive;
+      editsBeforeLive = false;
+      return marked;
+    },
     clearOfflineFork,
     flush: () => queue,
     dispose: () => {
