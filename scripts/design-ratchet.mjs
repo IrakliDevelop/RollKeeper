@@ -1,6 +1,5 @@
-// Per-file ratchet for legacy visual patterns the Felt and Brass design
-// system retires (docs/superpowers/specs/2026-10-18-felt-and-brass-design-system-design.md).
-// Counts may only go down, file by file.
+// Per-file ratchet for legacy visual patterns retired by the Felt and Brass
+// design system. Counts may only go down, file by file.
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
