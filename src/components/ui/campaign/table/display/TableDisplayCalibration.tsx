@@ -91,7 +91,7 @@ export function TableDisplayCalibration({
     <div
       data-testid="table-display-calibration"
       role="status"
-      className="bg-surface-raised text-body border-divider fixed top-4 right-4 z-[110] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2 rounded-lg border p-3 text-sm shadow-lg"
+      className="bg-surface-raised text-body border-divider fixed top-4 right-4 z-[110] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-2 rounded-lg border p-3 text-sm shadow-md"
     >
       {report === 'verify-required' && (
         <p className="text-accent-amber-text font-semibold">

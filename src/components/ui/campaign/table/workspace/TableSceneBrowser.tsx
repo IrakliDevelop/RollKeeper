@@ -97,7 +97,7 @@ export function TableSceneBrowser(props: {
           close();
         }
       }}
-      className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,4rem)] bottom-2 left-2 z-40 flex w-[min(20rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border shadow-xl"
+      className="bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,4rem)] bottom-2 left-2 z-40 flex w-[min(20rem,calc(100vw-1rem))] flex-col overflow-hidden rounded-xl border shadow-md"
     >
       <div className="border-divider flex items-center justify-between gap-2 border-b px-3 py-2">
         <h2 className="text-heading text-sm font-semibold">Scenes</h2>

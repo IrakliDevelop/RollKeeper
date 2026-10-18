@@ -118,7 +118,7 @@ export function CalibrationRulerPanel({
         aria-label="Ruler calibration"
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        className="bg-surface-raised text-body border-divider fixed top-4 right-4 z-[120] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-3 rounded-lg border p-4 text-sm shadow-lg outline-none"
+        className="bg-surface-raised text-body border-divider fixed top-4 right-4 z-[120] flex w-[min(360px,calc(100vw-2rem))] flex-col gap-3 rounded-lg border p-4 text-sm shadow-md outline-none"
       >
         <h2 className="text-heading text-base font-semibold">
           Calibrate minis

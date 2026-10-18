@@ -92,7 +92,7 @@ export function TableArrivalPicker(props: {
         );
       }}
     >
-      <p className="bg-surface-raised text-heading border-divider absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border px-3 py-2 text-sm shadow-lg">
+      <p className="bg-surface-raised text-heading border-divider absolute bottom-24 left-1/2 -translate-x-1/2 rounded-lg border px-3 py-2 text-sm shadow-md">
         Click the map to set the party arrival point (Escape cancels)
       </p>
     </div>

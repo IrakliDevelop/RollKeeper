@@ -81,7 +81,7 @@ export function OpenSceneRunLink(props: {
         <ul
           id={listId}
           aria-label="Scene runs of this encounter"
-          className="border-divider bg-surface-raised z-20 mt-1 flex flex-col gap-1 rounded-lg border p-1 shadow-lg"
+          className="border-divider bg-surface-raised z-20 mt-1 flex flex-col gap-1 rounded-lg border p-1 shadow-md"
         >
           {links.map((item, index) => (
             <li key={`${item.localWorkspaceId}:${item.runId}`}>
