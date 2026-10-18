@@ -5,6 +5,7 @@
 ## Verification
 
 - [ ] Automated checks appropriate to the change passed.
+- [ ] Copy review (`rollkeeper-copy`) passed, or this PR changes no user-visible text.
 - [ ] Final manual browser acceptance used the applicable Codex
       (`.agents/skills/...`) or Claude (`.claude/skills/...`) RollKeeper skill,
       isolated local origins, and deterministic fake data.

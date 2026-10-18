@@ -114,6 +114,27 @@ Chromium via Storybook Component Tests), Playwright (general e2e plus several
 purpose-specific configs), and Node's built-in test runner for Supabase/DB
 integration tests. `npm run test` only runs the jsdom `unit` project.
 
+## Copy review gate
+
+Every PR that adds or changes user-visible text (headings, buttons, labels,
+empty states, toasts, errors, confirmations, placeholders, aria-labels,
+tooltips) gets a copy review after automated checks pass and before the
+manual browser gate. The rubric is the `rollkeeper-copy` skill: plain,
+specific, table-side wording in the game's own terms, with no generic
+LLM-style copy ("X, not Y" slogans, "everything you need", "seamlessly",
+hype or fantasy filler).
+
+- **Claude Code** — dispatch the `rollkeeper-copy-reviewer` subagent
+  (`.claude/agents/rollkeeper-copy-reviewer.md`) with the PR's base branch.
+- **Codex and other agents** — follow "Reviewing a branch" in
+  `.agents/skills/rollkeeper-copy/SKILL.md`.
+
+`npm run copy:changed -- --base <base>` lists the strings to review. Fix every
+new string the review flags before opening the PR. Rewording an existing
+string is a visible change and needs the owner's approval. Record the verdict
+in the PR. A PR that changes no user-visible text marks the gate not
+applicable.
+
 ## Manual browser acceptance gate
 
 For PRs that affect browser-visible UI, navigation, authentication, local
