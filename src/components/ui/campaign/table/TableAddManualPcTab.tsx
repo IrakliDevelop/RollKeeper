@@ -4,6 +4,7 @@ import { useId, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 
 import { manualPcStats } from './tableRosterModel';
 
@@ -20,20 +21,18 @@ export function TableAddManualPcTab({
 }) {
   const id = useId();
   const [name, setName] = useState('');
-  const [maxHp, setMaxHp] = useState('10');
-  const [armorClass, setArmorClass] = useState('10');
-  const hp = Number.parseInt(maxHp, 10);
-  const ac = Number.parseInt(armorClass, 10);
+  const [hp, setHp] = useState<number | undefined>(10);
+  const [ac, setAc] = useState<number | undefined>(10);
   const valid =
     name.trim().length > 0 &&
-    Number.isFinite(hp) &&
+    hp !== undefined &&
     hp > 0 &&
-    Number.isFinite(ac) &&
+    ac !== undefined &&
     ac >= 0;
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (!valid) return;
+    if (!valid || hp === undefined || ac === undefined) return;
     onAdd(manualPcStats({ name, maxHp: hp, armorClass: ac }));
   };
 
@@ -49,23 +48,21 @@ export function TableAddManualPcTab({
         onChange={event => setName(event.target.value)}
       />
       <div className="grid grid-cols-2 gap-3">
-        <Input
+        <NumberInput
           id={`${id}-hp`}
           label="Max HP"
-          type="number"
-          inputMode="numeric"
           min={1}
-          value={maxHp}
-          onChange={event => setMaxHp(event.target.value)}
+          allowEmpty
+          value={hp}
+          onChange={setHp}
         />
-        <Input
+        <NumberInput
           id={`${id}-ac`}
           label="Armor class"
-          type="number"
-          inputMode="numeric"
           min={0}
-          value={armorClass}
-          onChange={event => setArmorClass(event.target.value)}
+          allowEmpty
+          value={ac}
+          onChange={setAc}
         />
       </div>
       <Button type="submit" variant="primary" disabled={!valid || disabled}>

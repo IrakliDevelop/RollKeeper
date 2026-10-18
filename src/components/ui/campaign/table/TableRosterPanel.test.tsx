@@ -457,6 +457,28 @@ describe('TableRosterPanel', () => {
     );
   });
 
+  it('keeps Add PC disabled while a number field is empty', async () => {
+    const repository = await repositoryWith();
+    renderPanel(repository, fakeCanvas());
+    const dialog = await openAddDialog();
+    fireEvent.click(within(dialog).getByRole('tab', { name: 'Manual PC' }));
+    fireEvent.change(within(dialog).getByLabelText('Name'), {
+      target: { value: 'Nyx' },
+    });
+    const maxHp = within(dialog).getByLabelText('Max HP');
+    expect(maxHp).toHaveAttribute('type', 'text');
+    expect(maxHp).toHaveAttribute('inputmode', 'numeric');
+    fireEvent.change(maxHp, { target: { value: 'abc' } });
+    expect(maxHp).toHaveValue('10');
+    fireEvent.change(maxHp, { target: { value: '' } });
+    const addPc = within(dialog).getByRole('button', { name: 'Add PC' });
+    expect(addPc).toBeDisabled();
+    fireEvent.change(maxHp, { target: { value: '0' } });
+    fireEvent.blur(maxHp);
+    expect(maxHp).toHaveValue('1');
+    expect(addPc).toBeEnabled();
+  });
+
   it('commits the binding before arming a party token placement', async () => {
     const repository = await repositoryWith(
       [

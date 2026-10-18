@@ -400,6 +400,16 @@ describe('ruler calibration panel (P3)', () => {
     expect(square.style.width).toBe('97px');
     fireEvent.keyDown(panel, { key: 'ArrowLeft' });
     expect(square.style.width).toBe('96px');
+    const squareMm = screen.getByLabelText('Square size (mm)');
+    expect(squareMm).toHaveAttribute('inputmode', 'decimal');
+    fireEvent.change(squareMm, { target: { value: '' } });
+    expect(
+      screen.getByText('Enter a size from 5 to 100 mm')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Confirm' })).toBeDisabled();
+    fireEvent.change(squareMm, { target: { value: '250' } });
+    fireEvent.blur(squareMm);
+    expect(squareMm).toHaveValue('100');
     fireEvent.change(screen.getByLabelText('Square size (mm)'), {
       target: { value: '30' },
     });

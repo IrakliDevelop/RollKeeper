@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 
 import {
   CALIBRATION_RULER_FIRST,
@@ -71,10 +71,9 @@ export function CalibrationRulerPanel({
   onCancel,
 }: CalibrationRulerPanelProps) {
   const [cssPx, setCssPx] = useState(initialCssPxPerSquare);
-  const [squareMm, setSquareMm] = useState(String(initialSquareMm));
+  const [mm, setMm] = useState<number | undefined>(initialSquareMm);
   const panelRef = useRef<HTMLElement>(null);
-  const mm = Number(squareMm);
-  const mmValid = squareMm.trim() !== '' && isValidSquareMm(mm);
+  const mmValid = isValidSquareMm(mm);
 
   useEffect(() => {
     panelRef.current?.focus({ preventScroll: true });
@@ -129,19 +128,18 @@ export function CalibrationRulerPanel({
             {calibrationSavedNote(new Date(saved.savedAt).toLocaleDateString())}
           </p>
         )}
-        <p>{calibrationInstruction(mmValid ? String(mm) : squareMm)}</p>
-        <Input
+        <p>{calibrationInstruction(mm === undefined ? '' : String(mm))}</p>
+        <NumberInput
           id="table-calibration-square-mm"
           label="Square size (mm)"
-          type="number"
-          inputMode="decimal"
+          integer={false}
+          allowEmpty
           min={5}
           max={100}
-          step={0.1}
           size="sm"
-          value={squareMm}
+          value={mm}
           error={mmValid ? undefined : 'Enter a size from 5 to 100 mm'}
-          onChange={event => setSquareMm(event.target.value)}
+          onChange={setMm}
         />
         <div className="flex flex-col gap-2">
           <p className="text-heading font-medium" aria-live="polite">
@@ -174,7 +172,9 @@ export function CalibrationRulerPanel({
             size="sm"
             variant="primary"
             disabled={!mmValid}
-            onClick={() => onConfirm(cssPx, mm)}
+            onClick={() => {
+              if (mmValid) onConfirm(cssPx, mm);
+            }}
           >
             Confirm
           </Button>

@@ -3,7 +3,7 @@
 import { useId, useState, type FormEvent } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
-import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import type { TableActorLiveStatsV1 } from '@/lib/table/schema';
 
 const FIELDS: { key: keyof TableActorLiveStatsV1; label: string }[] = [
@@ -24,11 +24,13 @@ export function TableMemberStatsForm({
   onSave: (next: TableActorLiveStatsV1) => void;
 }) {
   const id = useId();
-  const [draft, setDraft] = useState<Record<string, string>>(() =>
-    Object.fromEntries(FIELDS.map(({ key }) => [key, String(stats[key])]))
+  const [draft, setDraft] = useState<Record<string, number | undefined>>(() =>
+    Object.fromEntries(FIELDS.map(({ key }) => [key, stats[key] as number]))
   );
-  const parsed = FIELDS.map(({ key }) => Number(draft[key]));
-  const valid = parsed.every(value => Number.isFinite(value));
+  const parsed = FIELDS.map(({ key }) => draft[key]);
+  const valid = parsed.every(
+    value => value !== undefined && Number.isFinite(value)
+  );
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -44,15 +46,14 @@ export function TableMemberStatsForm({
     <form className="space-y-3" onSubmit={handleSubmit}>
       <div className="grid grid-cols-2 gap-3">
         {FIELDS.map(({ key, label }) => (
-          <Input
+          <NumberInput
             key={key}
             id={`${id}-${key}`}
             label={label}
-            type="number"
-            inputMode="numeric"
+            allowEmpty
             value={draft[key]}
-            onChange={event =>
-              setDraft(current => ({ ...current, [key]: event.target.value }))
+            onChange={value =>
+              setDraft(current => ({ ...current, [key]: value }))
             }
           />
         ))}
