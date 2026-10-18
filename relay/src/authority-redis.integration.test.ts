@@ -452,6 +452,56 @@ end
     expect(await client.hLen(keys.evidence)).toBe(2);
   });
 
+  it('a commit between the head capture and the history read never puts records past the head in a page (II5 repair 13)', async () => {
+    const committer = new RedisAuthorityDriver(client);
+    const first = await committer.commit(context(), upsert());
+    if (first.status !== 'committed') throw new Error('expected a commit');
+    // The SDK requires a page whose records include the head to end at the
+    // head; a page that runs past it closes the reader with 1013.
+    let raced = false;
+    const racing = new Proxy(client, {
+      get(target, key) {
+        // The reader's first Redis call captures the head; commit right
+        // after it, before the history read.
+        if (key === 'eval' || key === 'evalSha')
+          return async (...args: unknown[]) => {
+            const result = await (
+              Reflect.get(target, key, target) as (
+                ...input: unknown[]
+              ) => Promise<unknown>
+            ).apply(target, args);
+            if (!raced) {
+              raced = true;
+              const second = await committer.commit(
+                context({
+                  clientOperationId: 'operation-b',
+                  operationDigest: operationDigest('operation-b'),
+                }),
+                upsert('element-b', 'operation-b')
+              );
+              expect(second.status).toBe('committed');
+            }
+            return result;
+          };
+        const value = Reflect.get(target, key, target) as unknown;
+        return typeof value === 'function' ? value.bind(target) : value;
+      },
+    });
+    const reader = new RedisAuthorityDriver(racing);
+    const page = await reader.readAfter(
+      context() as AuthorityReadContext,
+      first.position,
+      { entries: 8, bytes: 64 * 1024 },
+      {
+        deadlineAt: Date.now() + 5_000,
+        signal: new AbortController().signal,
+      }
+    );
+    expect(raced).toBe(true);
+    expect(page).toEqual({ status: 'ok', head: first.position, records: [] });
+    expect(await client.lLen(keys.history)).toBe(2);
+  });
+
   it('returns SDK-valid checkpoint fog data when metadata exists with zero tiles', async () => {
     await client.hSet(
       keys.fogMeta,
