@@ -40,6 +40,13 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
   }>({ sceneId: null, open: false });
   const { authority, switcher, mountedScene, repository, current, checkpoint } =
     workspace;
+  const detailsScene = mountedScene?.sceneId ?? null;
+  // Details survives canvas re-mints within a scene, but a scene change
+  // (including a programmatic one with no dismiss event) always closes it,
+  // so returning to a scene never reopens the panel by itself.
+  if (details.sceneId !== detailsScene) {
+    setDetails({ sceneId: detailsScene, open: false });
+  }
 
   useShownScene(workspace, shownScene);
 
@@ -123,10 +130,8 @@ export function TableWorkspace({ campaignCode }: { campaignCode: string }) {
       presentation={workspace.presentation}
       notices={notices}
       details={{
-        open:
-          details.sceneId === (mountedScene?.sceneId ?? null) && details.open,
-        onOpenChange: open =>
-          setDetails({ sceneId: mountedScene?.sceneId ?? null, open }),
+        open: details.sceneId === detailsScene && details.open,
+        onOpenChange: open => setDetails({ sceneId: detailsScene, open }),
       }}
       extra={
         workspace.query.prepareEncounter ? (

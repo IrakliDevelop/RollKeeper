@@ -749,6 +749,28 @@ describe('W3/W4 lifecycle (D8)', () => {
     expect(collapsed(screen.getByText('Saved on this device'))).toBe(false);
   });
 
+  it('closes Details on a programmatic scene switch and never reopens it on return', async () => {
+    nav.reset('scene=scene-tavern');
+    render(<TableWorkspace campaignCode="CAMP" />);
+    await settled('scene-tavern');
+    stubPopoverLayout();
+    fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
+    expect(
+      await screen.findByTestId('table-header-details')
+    ).toBeInTheDocument();
+    // A route change switches scenes without any Radix dismiss event.
+    await navigate('scene=scene-forest');
+    await settled('scene-forest');
+    expect(screen.queryByTestId('table-header-details')).toBeNull();
+    await navigate('scene=scene-tavern');
+    await settled('scene-tavern');
+    expect(screen.queryByTestId('table-header-details')).toBeNull();
+    expect(screen.getByRole('button', { name: /^Details/u })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+  });
+
   it('keeps the scene, the conflict and the URL on Back (popstate)', async () => {
     nav.reset('scene=scene-tavern');
     render(<TableWorkspace campaignCode="CAMP" />);
