@@ -124,6 +124,12 @@ export const OFFLINE_DISCARDED_PLAYER_MESSAGE =
 /** GG2: an edit whose outcome was lost with the connection (may have saved). */
 export const CONNECTION_DROPPED_MESSAGE =
   'The connection dropped during an edit. The map shows the live room.';
+/**
+ * QA4: an edit whose outcome was lost because the DM restored the room (a
+ * new room generation), not because the connection dropped.
+ */
+export const ROOM_RESTORED_PLAYER_MESSAGE =
+  'The DM restored the map. Your last change may not have been kept.';
 /** FF6 / GG1: a DM edit the live room refused; the DM's map keeps it. */
 export const DM_REJECTED_MESSAGE =
   'The live map refused a change. Players see the saved version.';
@@ -559,24 +565,60 @@ export function createManagedBattleMapAuthorityConnection(
   /** HH1: when this tab last caused a checkpoint request (ms epoch). */
   let lastCheckpointRequestAt = Number.NEGATIVE_INFINITY;
   let lastStatus: string | null = null;
+  /**
+   * QA4: drafts and uncertain operations seen while the connection was not
+   * live. Only those are released once it is live again. When a socket
+   * closes, the SDK first reports the in-flight work as uncertain while the
+   * status still reads `live` (then `denied` or `offline`); releasing it
+   * there blamed the connection for a DM restore (4403) before the page
+   * even reconnected.
+   */
+  const parked = new Set<string>();
   const releaseSettled = (inner: ManagedAuthorityConnection): void => {
     const state = inner.getState();
     const settledLive = state.status === 'live' && state.document !== null;
     const isDm = options.tokenRequest.role === 'dm';
+    const live = new Set<string>();
+    for (const operation of state.operations) {
+      live.add(operation.clientOperationId);
+      if (
+        state.status !== 'live' &&
+        (operation.status === 'draft' || operation.status === 'uncertain')
+      )
+        parked.add(operation.clientOperationId);
+    }
+    for (const id of parked) if (!live.has(id)) parked.delete(id);
     const releases: Array<{ id: string; status: string }> = [];
+    // QA4: work from an earlier room generation was superseded because the
+    // DM restored (replaced) the room, not lost with the connection or kept
+    // offline. A player is told so; the DM restored it themselves. The DM's
+    // offline drafts still go to the offline changes slot (GG3).
     for (const operation of state.operations) {
       const id = operation.clientOperationId;
       const status = operation.status;
+      const offlineWork =
+        settledLive &&
+        parked.has(id) &&
+        (status === 'draft' || status === 'uncertain');
+      if (
+        offlineWork &&
+        state.generation !== null &&
+        operation.generation !== state.generation &&
+        (status === 'uncertain' || !isDm)
+      ) {
+        releases.push({ id, status: 'replaced' });
+        continue;
+      }
       if (
         status === 'accepted' ||
         // FF6: a player's once restored on screen; the DM's with a notice.
         (status === 'rejected' && (isDm || restoredRejections.has(id))) ||
-        (settledLive && (status === 'draft' || status === 'uncertain'))
+        offlineWork
       )
         releases.push({ id, status });
     }
     if (releases.length === 0) return;
-    const released = { draft: 0, uncertain: 0, rejected: 0 };
+    const released = { draft: 0, uncertain: 0, rejected: 0, replaced: 0 };
     releasing = true;
     try {
       for (const { id, status } of releases) {
@@ -585,9 +627,11 @@ export function createManagedBattleMapAuthorityConnection(
             ? inner.releaseOperation(id)
             : inner.releaseOperation(id, { discardDraft: true });
         if (!ok) continue;
+        parked.delete(id);
         if (status === 'draft') released.draft += 1;
         else if (status === 'uncertain') released.uncertain += 1;
         else if (status === 'rejected') released.rejected += 1;
+        else if (status === 'replaced') released.replaced += 1;
       }
     } finally {
       releasing = false;
@@ -596,7 +640,10 @@ export function createManagedBattleMapAuthorityConnection(
     // operation may have committed; the live document is what the map shows.
     // GG3 / HH2: a page that keeps the offline version owns the notice, so
     // it can say whether the copy was kept.
-    if (released.draft > 0 && options.onOfflineDraftsReleased)
+    // QA4: a player whose work the DM's restore replaced is told that first.
+    if (released.replaced > 0 && !isDm)
+      options.onDiagnostic?.(ROOM_RESTORED_PLAYER_MESSAGE);
+    else if (released.draft > 0 && options.onOfflineDraftsReleased)
       options.onOfflineDraftsReleased();
     else if (released.draft > 0)
       options.onDiagnostic?.(
@@ -604,6 +651,8 @@ export function createManagedBattleMapAuthorityConnection(
       );
     else if (released.uncertain > 0)
       options.onDiagnostic?.(CONNECTION_DROPPED_MESSAGE);
+    // A DM's replaced work needs no notice: they restored the room
+    // themselves and were told so ("Checkpoint restored.").
     if (isDm && released.rejected > 0)
       options.onDiagnostic?.(DM_REJECTED_MESSAGE);
   };
