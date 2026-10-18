@@ -140,7 +140,7 @@ may mark this gate not applicable, but the final report must state why.
 
 ## Character sheet layout
 
-The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
+The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `bookmark-tabs-tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
 
 **Top-level tabs:**
 | Tab | Key content |
@@ -200,10 +200,12 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
 
 // Design tokens
-import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
+import { colors, spacing, typography, shadows, borderRadius } from '@/components/ui/primitives';
 ```
 
 Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.
+
+**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, and `type="number"` — and fails if any file's count rises. Existing `accent-*` tokens may be reused where a file already uses them, but don't add new uses; see `docs/wiki/09-design-system-ui.md`.
 
 ### Naming conventions
 

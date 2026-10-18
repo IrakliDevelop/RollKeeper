@@ -165,7 +165,7 @@ export function NPCSpellListEditor({
                 {LEVEL_NAMES[level] ?? `Level ${level}`}{' '}
                 <span className="text-muted">({byLevel[level].length})</span>
               </div>
-              <div className="divide-y divide-[var(--border-divider)]">
+              <div className="divide-divider divide-y">
                 {byLevel[level].map(spell => (
                   <SpellEditRow
                     key={spell.id}

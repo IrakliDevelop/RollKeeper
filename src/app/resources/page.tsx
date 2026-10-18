@@ -24,7 +24,6 @@ interface ResourceItem {
   icon: React.ComponentType<{ size?: number; className?: string }>;
   accentBg: string;
   accentText: string;
-  accentBorder: string;
   iconContainerClass: string;
   available: boolean;
   comingSoon?: boolean;
@@ -39,7 +38,6 @@ const resourceItems: ResourceItem[] = [
     icon: Book,
     accentBg: 'bg-accent-purple-bg',
     accentText: 'text-accent-purple-text',
-    accentBorder: 'border-accent-purple-border',
     iconContainerClass: 'bg-accent-purple-bg-strong text-accent-purple-text',
     available: true,
   },
@@ -51,7 +49,6 @@ const resourceItems: ResourceItem[] = [
     icon: Users,
     accentBg: 'bg-accent-emerald-bg',
     accentText: 'text-accent-emerald-text',
-    accentBorder: 'border-accent-emerald-border',
     iconContainerClass: 'bg-accent-emerald-bg-strong text-accent-emerald-text',
     available: true,
   },
@@ -62,7 +59,6 @@ const resourceItems: ResourceItem[] = [
     icon: Scroll,
     accentBg: 'bg-accent-amber-bg',
     accentText: 'text-accent-amber-text',
-    accentBorder: 'border-accent-amber-border',
     iconContainerClass: 'bg-accent-amber-bg-strong text-accent-amber-text',
     available: true,
   },
@@ -74,7 +70,6 @@ const resourceItems: ResourceItem[] = [
     icon: Skull,
     accentBg: 'bg-accent-red-bg',
     accentText: 'text-accent-red-text',
-    accentBorder: 'border-accent-red-border',
     iconContainerClass: 'bg-accent-red-bg-strong text-accent-red-text',
     available: true,
   },
@@ -182,7 +177,7 @@ export default function ResourcesPage() {
                 <Card
                   variant="bordered"
                   padding="lg"
-                  className={`h-full transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-lg group-hover:${item.accentBorder} group-focus-within:-translate-y-1 group-focus-within:shadow-lg`}
+                  className={`h-full transition-all duration-300 group-focus-within:-translate-y-1 group-focus-within:shadow-lg group-hover:-translate-y-1 group-hover:shadow-lg`}
                 >
                   <CardContent className="p-0">
                     <div className="mb-4 flex items-center justify-between">

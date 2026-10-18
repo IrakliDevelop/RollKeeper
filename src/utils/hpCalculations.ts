@@ -48,64 +48,66 @@ export function getClassHitDie(
 }
 
 /**
+ * Death save state after `hpDamage` (damage left once temp HP is spent) hits
+ * a creature that had `prevHp` current HP, following D&D 5e rules:
+ * 1. Dropping from above 0 to 0 HP starts fresh death saves
+ * 2. Damage remaining after reaching 0 HP >= max HP is instant death (massive damage)
+ * 3. Damage taken while already at 0 HP adds one death save failure; a
+ *    stabilized creature stops being stable and restarts its saves
+ *
+ * Critical hits at 0 HP (two failures) aren't modeled: damage is a plain number.
+ */
+export function getDeathSavesAfterDamage(
+  deathSaves: DeathSavingThrows | undefined,
+  prevHp: number,
+  hpDamage: number,
+  maxHp: number
+): DeathSavingThrows | undefined {
+  if (hpDamage <= 0 || prevHp - hpDamage > 0) return deathSaves;
+
+  const excessDamage = hpDamage - Math.max(prevHp, 0);
+  if (excessDamage >= maxHp) {
+    return { successes: 0, failures: 3, isStabilized: false };
+  }
+
+  if (prevHp > 0) {
+    return { successes: 0, failures: 0, isStabilized: false };
+  }
+
+  // Counts reset on becoming stable, so a stabilized creature restarts from zero.
+  const base =
+    !deathSaves || deathSaves.isStabilized
+      ? { successes: 0, failures: 0 }
+      : deathSaves;
+  return {
+    successes: base.successes,
+    failures: Math.min(base.failures + 1, 3),
+    isStabilized: false,
+  };
+}
+
+/**
  * Apply damage following D&D 5e rules:
  * 1. Damage hits temporary HP first
  * 2. Excess damage carries over to current HP
- * 3. If current HP reaches 0, trigger death saves
- * 4. If excess damage after reaching 0 HP >= max HP, instant death (massive damage)
+ * 3. Death saves update per getDeathSavesAfterDamage
  */
 export function applyDamage(hitPoints: HitPoints, damage: number): HitPoints {
   if (damage <= 0) return hitPoints;
 
-  let remainingDamage = damage;
-  let newTempHP = hitPoints.temporary;
-  let newCurrentHP = hitPoints.current;
-  let deathSaves = hitPoints.deathSaves;
-
-  // First, damage temporary HP
-  if (newTempHP > 0) {
-    const tempDamage = Math.min(remainingDamage, newTempHP);
-    newTempHP -= tempDamage;
-    remainingDamage -= tempDamage;
-  }
-
-  // Then damage current HP
-  if (remainingDamage > 0) {
-    // Calculate how much damage it takes to reach 0 HP
-    const damageToZero = Math.min(remainingDamage, newCurrentHP);
-    newCurrentHP -= damageToZero;
-
-    // If we hit 0 HP or below
-    if (newCurrentHP <= 0) {
-      newCurrentHP = 0;
-
-      // Calculate excess damage after reaching 0 HP (massive damage calculation)
-      const excessDamage = remainingDamage - damageToZero;
-
-      // Check for massive damage (excess damage >= max HP)
-      if (excessDamage >= hitPoints.max) {
-        // Instant death from massive damage
-        deathSaves = {
-          successes: 0,
-          failures: 3,
-          isStabilized: false,
-        };
-      } else if (!deathSaves) {
-        // Start death saving throws (unconscious but not dead)
-        deathSaves = {
-          successes: 0,
-          failures: 0,
-          isStabilized: false,
-        };
-      }
-    }
-  }
+  const tempDamage = Math.min(damage, Math.max(hitPoints.temporary, 0));
+  const hpDamage = damage - tempDamage;
 
   return {
     ...hitPoints,
-    current: newCurrentHP,
-    temporary: newTempHP,
-    deathSaves,
+    current: Math.max(0, hitPoints.current - hpDamage),
+    temporary: hitPoints.temporary - tempDamage,
+    deathSaves: getDeathSavesAfterDamage(
+      hitPoints.deathSaves,
+      hitPoints.current,
+      hpDamage,
+      hitPoints.max
+    ),
   };
 }
 

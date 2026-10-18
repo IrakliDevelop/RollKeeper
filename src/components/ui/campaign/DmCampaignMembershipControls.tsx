@@ -370,7 +370,7 @@ export function DmCampaignMembershipControls({ workspaces }: Props) {
           <section
             key={label}
             aria-label={label}
-            className="bg-surface-subtle rounded-lg p-3"
+            className="bg-surface-secondary rounded-lg p-3"
           >
             <h3 className="text-heading text-sm font-semibold">
               {label} ({entries.length})

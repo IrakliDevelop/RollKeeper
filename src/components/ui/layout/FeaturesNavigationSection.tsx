@@ -11,7 +11,6 @@ interface NavigationItem {
   href: string;
   icon: React.ComponentType<{ size?: number; className?: string }>;
   gradient: string;
-  hoverGradient: string;
   available: boolean;
   comingSoon?: boolean;
 }
@@ -23,7 +22,6 @@ const navigationItems: NavigationItem[] = [
     href: '/spellbook',
     icon: Book,
     gradient: 'from-purple-600 via-violet-600 to-indigo-600',
-    hoverGradient: 'from-purple-700 via-violet-700 to-indigo-700',
     available: true,
   },
   {
@@ -32,7 +30,6 @@ const navigationItems: NavigationItem[] = [
     href: '/classes',
     icon: Users,
     gradient: 'from-amber-600 via-orange-600 to-red-600',
-    hoverGradient: 'from-amber-700 via-orange-700 to-red-700',
     available: true,
   },
   {
@@ -41,7 +38,6 @@ const navigationItems: NavigationItem[] = [
     href: '/feats',
     icon: Scroll,
     gradient: 'from-emerald-600 via-teal-600 to-cyan-600',
-    hoverGradient: 'from-emerald-700 via-teal-700 to-cyan-700',
     available: false,
     comingSoon: true,
   },
@@ -51,7 +47,6 @@ const navigationItems: NavigationItem[] = [
     href: '/bestiary',
     icon: Skull,
     gradient: 'from-red-600 via-rose-600 to-pink-600',
-    hoverGradient: 'from-red-700 via-rose-700 to-pink-700',
     available: true,
     comingSoon: false,
   },
@@ -176,7 +171,7 @@ export default function FeaturesNavigationSection() {
                       >
                         <div className="mb-3 flex items-center gap-3">
                           <div
-                            className={`bg-gradient-to-br ${item.gradient} group-hover:bg-gradient-to-br group-hover:${item.hoverGradient} rounded-lg p-2 shadow-md transition-all`}
+                            className={`bg-gradient-to-br ${item.gradient} rounded-lg p-2 shadow-md transition-all`}
                           >
                             <IconComponent className="h-5 w-5 text-white" />
                           </div>

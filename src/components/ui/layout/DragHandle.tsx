@@ -25,7 +25,7 @@ export default function DragHandle({
 
   return (
     <div
-      className={`cursor-grab active:cursor-grabbing hover:${color.replace('gray-400', 'gray-600')} flex items-center justify-center transition-colors duration-200 ${className} `}
+      className={`flex cursor-grab items-center justify-center transition-colors duration-200 active:cursor-grabbing ${className}`}
       title="Drag to reorder"
     >
       <GripVertical
