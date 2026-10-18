@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, cleanup } from '@testing-library/react';
 import type { Viewport } from '@fieldnotes/core';
 import { useBattleMapStore } from '@/store/battleMapStore';
 
@@ -284,6 +284,9 @@ describe('useDmBattleMapCanvas — focus lifecycle ownership', () => {
   });
 
   afterEach(() => {
+    // Unmount each hook so its marker-publish timer and fetch never settle
+    // after the test environment is gone.
+    cleanup();
     if (savedRelayUrl !== undefined) {
       process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL = savedRelayUrl;
     } else {
