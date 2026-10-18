@@ -1078,18 +1078,25 @@ run('two relay authority transport', () => {
       },
     });
     clients.push(dm);
-    // A raw SDK observer reads the confirmed room document.
-    const observer = createManagedAuthorityConnection({
-      scopeId: `${CAMPAIGN}:scene-a:journal-observer`,
-      clientId: 'dm-a',
-      extensions: [createFogAuthorityClientExtension()],
-      resolveUrl: () => ({
-        url: `ws://127.0.0.1:${second.address().port}?room=${ROOM}`,
-        protocols: bearerSubprotocols(dmToken),
-      }),
-      transportFactory: transport,
-    });
-    clients.push(observer);
+    // Each step is confirmed in the room's committed elements in Redis.
+    // Other connections (even on the same relay) receive a commit through
+    // the SDK publisher, which after an idle cycle wakes up to 1 s later
+    // (II5 repair 13), so waiting on them made every step about 1 s. Raw
+    // SDK observers, one on each relay, check delivery once at the end.
+    const observe = (relay: RelayHandle, name: string) =>
+      createManagedAuthorityConnection({
+        scopeId: `${CAMPAIGN}:scene-a:${name}`,
+        clientId: 'dm-a',
+        extensions: [createFogAuthorityClientExtension()],
+        resolveUrl: () => ({
+          url: `ws://127.0.0.1:${relay.address().port}?room=${ROOM}`,
+          protocols: bearerSubprotocols(dmToken),
+        }),
+        transportFactory: transport,
+      });
+    const dmObserver = observe(first, 'journal-observer-dm');
+    const playerObserver = observe(second, 'journal-observer-player');
+    clients.push(dmObserver, playerObserver);
     // The player goes through RollKeeper's own wrapper (the app path).
     const playerStore = new ElementStore();
     let playerStatus = 'connecting';
@@ -1130,9 +1137,10 @@ run('two relay authority transport', () => {
       () =>
         dmStatus === 'live' &&
         playerStatus === 'live' &&
-        observer.getState().status === 'live'
+        dmObserver.getState().status === 'live' &&
+        playerObserver.getState().status === 'live'
     );
-    const elementX = (id: string) =>
+    const elementX = (id: string, observer = dmObserver) =>
       (
         observer
           .getState()
@@ -1140,6 +1148,12 @@ run('two relay authority transport', () => {
             element => (element as { id: string }).id === id
           ) as { position?: { x: number } } | undefined
       )?.position?.x;
+    const committedX = async (id: string) => {
+      const raw = await redis.hGet(keys.elements, id);
+      return raw
+        ? (JSON.parse(raw) as { position?: { x: number } }).position?.x
+        : undefined;
+    };
 
     // DM: 150 sequential edits of one element, each waited until accepted.
     const dmElement = {
@@ -1158,6 +1172,11 @@ run('two relay authority transport', () => {
     // uncertain op, FF1), so a step that is not confirmed within 5 s is made
     // again once: the connection must keep accepting edits either way.
     const notes: string[] = [];
+    const startedAt = Date.now();
+    // II5 repair 13: stop making steps before the test timeout, so the
+    // notes below always print with how far each side got.
+    const stopAt = startedAt + 200_000;
+    const elapsed = () => `${Math.round((Date.now() - startedAt) / 1_000)} s`;
     const confirm = async (
       id: string,
       step: number,
@@ -1167,7 +1186,7 @@ run('two relay authority transport', () => {
         apply(attempt);
         try {
           await eventually(
-            () => elementX(id) === step,
+            async () => (await committedX(id)) === step,
             attempt ? 15_000 : 5_000
           );
           if (attempt) notes.push(`${id}@${step}: confirmed on retry`);
@@ -1178,8 +1197,16 @@ run('two relay authority transport', () => {
       }
       return false;
     };
+    const progress = (side: string, reached: number) => {
+      if (reached % 50 === 0)
+        console.info(`150-edit progress ${side} ${reached} at ${elapsed()}`);
+    };
     let dmReached = 0;
     for (let step = 1; step <= 150; step += 1) {
+      if (Date.now() >= stopAt) {
+        notes.push(`stopped before dm step ${step} at ${elapsed()}`);
+        break;
+      }
       const ok = await confirm('journal-dm-element', step, attempt =>
         dmStore.update('journal-dm-element', {
           position: { x: step, y: attempt },
@@ -1187,9 +1214,11 @@ run('two relay authority transport', () => {
       );
       if (!ok) break;
       dmReached = step;
+      progress('dm', step);
     }
     // Player: 150 moves of its own token through the app wrapper. Players
-    // are rate limited to 10 element writes per second, so pace them.
+    // are rate limited to 10 element writes per second, so each write
+    // starts at least 110 ms after the previous one.
     const band = `player-${playerId}`;
     player.publishLayerUpsert({
       id: band,
@@ -1211,27 +1240,68 @@ run('two relay authority transport', () => {
       characterId: playerId,
     };
     playerStore.add(token as never);
-    await eventually(() => elementX('journal-player-token') === 0);
+    await eventually(
+      () => elementX('journal-player-token', playerObserver) === 0
+    );
+    let lastWriteAt = Date.now();
+    const paced = async (write: () => void) => {
+      const wait = lastWriteAt + 110 - Date.now();
+      if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+      lastWriteAt = Date.now();
+      write();
+    };
     let playerReached = 0;
     for (let step = 1; step <= 150; step += 1) {
-      await new Promise(resolve => setTimeout(resolve, 110));
-      const ok = await confirm('journal-player-token', step, attempt =>
-        playerStore.update('journal-player-token', {
-          position: { x: step, y: attempt },
-        })
-      );
+      if (Date.now() >= stopAt) {
+        notes.push(`stopped before player step ${step} at ${elapsed()}`);
+        break;
+      }
+      // The pause is part of apply, so a retry is paced as well.
+      let write: Promise<void> = Promise.resolve();
+      const ok = await confirm('journal-player-token', step, attempt => {
+        write = paced(() =>
+          playerStore.update('journal-player-token', {
+            position: { x: step, y: attempt },
+          })
+        );
+      });
+      await write;
       if (!ok) break;
       playerReached = step;
+      progress('player', step);
+    }
+    // Both relays end with both sides' last edit (cross-relay delivery).
+    let crossRelay = true;
+    try {
+      await eventually(
+        () =>
+          [dmObserver, playerObserver].every(
+            observer =>
+              elementX('journal-dm-element', observer) === dmReached &&
+              elementX('journal-player-token', observer) === playerReached
+          ),
+        10_000
+      );
+    } catch {
+      crossRelay = false;
     }
     // GG5 / II5: the notes print before any assertion, pass or fail.
     console.info(
       '150-edit notes',
-      JSON.stringify({ dmReached, playerReached, dmStatus, notes })
+      JSON.stringify({
+        dmReached,
+        playerReached,
+        dmStatus,
+        crossRelay,
+        elapsed: elapsed(),
+        notes,
+      })
     );
-    expect({ dmReached, playerReached, dmStatus, notes }).toEqual({
+    expect({ dmReached, playerReached, dmStatus, crossRelay, notes }).toEqual({
       dmReached: 150,
       playerReached: 150,
       dmStatus: 'live',
+      crossRelay: true,
       notes: expect.any(Array),
     });
     // At most a handful of steps may need a retry on a slow runner.
