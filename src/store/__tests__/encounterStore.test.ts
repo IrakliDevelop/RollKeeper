@@ -8,7 +8,11 @@ import { useNPCStore } from '@/store/npcStore';
 import { createMockEncounterEntity } from '@/test/helpers';
 import { ensureStatBlockEntryIds } from '@/utils/statBlockAbilities';
 import { buildNpcEntity } from '@/components/ui/encounter/combat-screen/AddCombatantDialog/buildEntity';
-import type { NpcResource, MonsterStatBlock } from '@/types/encounter';
+import type {
+  EncounterEntity,
+  NpcResource,
+  MonsterStatBlock,
+} from '@/types/encounter';
 
 function resetStore() {
   useEncounterStore.setState({
@@ -473,6 +477,79 @@ describe('encounterStore', () => {
       ).toMatchObject({
         currentHp: 0,
         deathSaves: { successes: 0, failures: 0 },
+      });
+    });
+
+    describe('death saves for persistent creatures at 0 HP', () => {
+      const damageAtZero = (
+        overrides: Partial<EncounterEntity>,
+        amount: number
+      ) => {
+        const encId = useEncounterStore.getState().createEncounter('Battle');
+        const entityId = useEncounterStore.getState().addEntity(
+          encId,
+          createMockEncounterEntity({
+            type: 'npc',
+            currentHp: 0,
+            maxHp: 20,
+            tempHp: 0,
+            ...overrides,
+          })
+        );
+        useEncounterStore.getState().damageEntity(encId, entityId, amount);
+        return useEncounterStore.getState().getEncounter(encId)!.entities[0];
+      };
+
+      it('adds one death save failure', () => {
+        const entity = damageAtZero(
+          {
+            deathSaves: { successes: 1, failures: 1, isStabilized: false },
+          },
+          5
+        );
+        expect(entity.deathSaves).toEqual({
+          successes: 1,
+          failures: 2,
+          isStabilized: false,
+        });
+      });
+
+      it('a stabilized creature restarts death saves with one failure', () => {
+        const entity = damageAtZero(
+          { deathSaves: { successes: 3, failures: 2, isStabilized: true } },
+          2
+        );
+        expect(entity.deathSaves).toEqual({
+          successes: 0,
+          failures: 1,
+          isStabilized: false,
+        });
+      });
+
+      it('massive damage (>= max HP) kills outright', () => {
+        const entity = damageAtZero(
+          {
+            deathSaves: { successes: 2, failures: 0, isStabilized: false },
+          },
+          20
+        );
+        expect(entity.deathSaves?.failures).toBe(3);
+      });
+
+      it('no failure when temp HP absorbs all damage', () => {
+        const entity = damageAtZero(
+          {
+            tempHp: 10,
+            deathSaves: { successes: 0, failures: 1, isStabilized: false },
+          },
+          5
+        );
+        expect(entity.deathSaves?.failures).toBe(1);
+      });
+
+      it('does not track death saves for plain monsters', () => {
+        const entity = damageAtZero({ type: 'monster' }, 5);
+        expect(entity.deathSaves).toBeUndefined();
       });
     });
   });

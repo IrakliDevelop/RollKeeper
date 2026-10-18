@@ -197,16 +197,86 @@ describe('applyDamage', () => {
     expect(result.deathSaves?.failures).toBe(0); // not massive damage (excess=10 < max=44)
   });
 
-  it('preserves existing death saves when taking damage at 0 HP', () => {
+  it('adds one death save failure when taking damage at 0 HP', () => {
     const hp = makeHP({
       current: 0,
       max: 44,
       deathSaves: { successes: 1, failures: 1, isStabilized: false },
     });
     const result = applyDamage(hp, 5);
-    // Already at 0, deathSaves already present — should be preserved
+    expect(result.current).toBe(0);
     expect(result.deathSaves?.successes).toBe(1);
+    expect(result.deathSaves?.failures).toBe(2);
+  });
+
+  it('third failure from damage at 0 HP kills', () => {
+    const hp = makeHP({
+      current: 0,
+      max: 44,
+      deathSaves: { successes: 0, failures: 2, isStabilized: false },
+    });
+    const result = applyDamage(hp, 1);
+    expect(result.deathSaves?.failures).toBe(3);
+    expect(isDead(result)).toBe(true);
+  });
+
+  it('does not exceed 3 failures when already dead', () => {
+    const hp = makeHP({
+      current: 0,
+      max: 44,
+      deathSaves: { successes: 0, failures: 3, isStabilized: false },
+    });
+    expect(applyDamage(hp, 5).deathSaves?.failures).toBe(3);
+  });
+
+  it('starts death saves with one failure at 0 HP when none were tracked', () => {
+    const hp = makeHP({ current: 0, max: 44 });
+    const result = applyDamage(hp, 5);
+    expect(result.deathSaves).toEqual({
+      successes: 0,
+      failures: 1,
+      isStabilized: false,
+    });
+  });
+
+  it('damage to a stabilized creature restarts death saves with one failure', () => {
+    const hp = makeHP({
+      current: 0,
+      max: 44,
+      // Counts reset on becoming stable (PHB), so prior failures don't carry over
+      deathSaves: { successes: 3, failures: 2, isStabilized: true },
+    });
+    const result = applyDamage(hp, 2);
+    expect(result.deathSaves).toEqual({
+      successes: 0,
+      failures: 1,
+      isStabilized: false,
+    });
+    expect(isStabilized(result)).toBe(false);
+    expect(isDying(result)).toBe(true);
+  });
+
+  it('no failure at 0 HP when temporary HP absorbs all damage', () => {
+    const hp = makeHP({
+      current: 0,
+      max: 44,
+      temporary: 10,
+      deathSaves: { successes: 1, failures: 1, isStabilized: false },
+    });
+    const result = applyDamage(hp, 5);
+    expect(result.temporary).toBe(5);
     expect(result.deathSaves?.failures).toBe(1);
+  });
+
+  it('massive damage at 0 HP (damage >= max HP) kills outright', () => {
+    const hp = makeHP({
+      current: 0,
+      max: 44,
+      deathSaves: { successes: 2, failures: 0, isStabilized: false },
+    });
+    const result = applyDamage(hp, 44);
+    expect(result.deathSaves?.failures).toBe(3);
+    expect(isDead(result)).toBe(true);
   });
 
   it('massive damage: instant death when excess damage >= max HP', () => {
