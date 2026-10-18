@@ -84,6 +84,81 @@ test('flags variant prefixes glued to an interpolation', () => {
   ]);
 });
 
+test('checks variables referenced with a fallback value', () => {
+  const problems = findTokenProblems(
+    file(
+      `<div className="top-[var(--panel-top,8rem)] bg-[var(--surface, #fff)]" />`
+    ),
+    css
+  );
+  assert.deepEqual(problems, [
+    {
+      file: 'src/example.tsx',
+      kind: 'unknown-css-variable',
+      detail: '--panel-top',
+    },
+  ]);
+});
+
+test('variables our code sets at runtime count as defined', () => {
+  const files = [
+    {
+      path: 'src/Toolbar.tsx',
+      text: `root.style.setProperty('--panel-top', '4rem');`,
+    },
+    {
+      path: 'src/Panel.tsx',
+      text: `<div className="top-[var(--panel-top,8rem)]" />`,
+    },
+  ];
+  assert.deepEqual(findTokenProblems(files, css), []);
+});
+
+test('flags every kind of variant glued to an interpolation', () => {
+  const variants = [
+    'first:',
+    'placeholder:',
+    'max-md:',
+    'data-[state=open]:',
+    'group-data-[side=left]:',
+    'peer-checked:',
+    'aria-selected:',
+    'pointer-coarse:',
+    'motion-safe:',
+  ];
+  const problems = findTokenProblems(
+    file(variants.map(variant => `\`${variant}\${a}\``).join('\n')),
+    css
+  );
+  assert.deepEqual(
+    problems.map(problem => problem.detail),
+    variants.map(variant => `${variant}\${`)
+  );
+});
+
+test('does not mistake template keys for variants', () => {
+  assert.deepEqual(
+    findTokenProblems(
+      file('const key = `campaign:${code}`; const url = `https:${host}`;'),
+      css
+    ),
+    []
+  );
+});
+
+test('flags unknown role utilities', () => {
+  assert.deepEqual(
+    findTokenProblems(file(`<div className="text-brass-txt" />`), css),
+    [
+      {
+        file: 'src/example.tsx',
+        kind: 'unknown-utility-token',
+        detail: 'brass-txt',
+      },
+    ]
+  );
+});
+
 test('the repository has no token reference problems', async () => {
   const [files, globals] = await Promise.all([
     readSourceFiles(),
