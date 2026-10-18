@@ -237,7 +237,7 @@ describe('PR05 capability rotation route (E3, M1, M2)', () => {
     const missing = await send(capabilityPOST, built);
     expect(missing.status).toBe(409);
     expect(missing.body).toEqual({
-      error: 'Live table is not initialized — open a Table scene first',
+      error: "The live Table isn't set up yet. Open a Table scene first.",
     });
   });
 });

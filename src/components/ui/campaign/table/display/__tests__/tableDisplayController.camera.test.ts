@@ -14,7 +14,7 @@ import { DISPLAY_WAITING } from '../displayMessages';
 /**
  * Acceptance A1: the real @fieldnotes/core camera helpers
  * (`captureCameraView` / `applyCameraView`, which assert a positive view)
- * behind a viewport double whose canvas size can be 0 — as a destroyed
+ * behind a viewport double whose canvas size can be 0, as a destroyed
  * (StrictMode-remounted) or not-yet-laid-out canvas reports. The display
  * must never remember or apply a degenerate view, never throw from
  * readiness, and never stay stuck: it stays covered and retries.

@@ -4,7 +4,7 @@ import { guardTableContext } from './tableContext';
 
 /**
  * PR06 unified Table workspace on the real canvas (dev server, IndexedDB,
- * scripted control API — no relay in this config): the old per-scene URL
+ * scripted control API; no relay in this config): the old per-scene URL
  * redirects; scenes are created/added and browsed privately; ≥10 switches
  * use ONE control session (one acquire, one register per scene) with a
  * single display-status poll; the map image is placed exactly once;
@@ -334,7 +334,7 @@ test('workspace: one session across 10+ private switches, redirect, history and 
     .poll(async () => (await canvasCensus(page)).mapImages.length)
     .toBe(1);
 
-  // The PR01–PR05 per-scene URL redirects into the workspace.
+  // The PR01 to PR05 per-scene URL redirects into the workspace.
   await page.goto(
     `/dm/campaign/${CAMPAIGN.code}/table/${forestId}?run=missing-run`
   );

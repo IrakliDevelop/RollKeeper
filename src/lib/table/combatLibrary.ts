@@ -49,7 +49,7 @@ export async function findSceneRunsForEncounter(options: {
 
 /**
  * Every adopted scene run of the campaign keyed by source encounter id, in
- * ONE read (F7) — the encounter library shares this per list.
+ * ONE read (F7); the encounter library shares this per list.
  */
 /**
  * Opens the Table database read-only ONLY when it already exists (never

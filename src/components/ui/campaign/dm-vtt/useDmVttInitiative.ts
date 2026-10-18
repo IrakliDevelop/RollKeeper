@@ -77,8 +77,8 @@ export function useDmVttInitiative({
     if (control.status === 'checking') return followed;
     const publication =
       control.status === 'broadcasting'
-        ? 'Broadcasting initiative'
-        : `Not broadcasting${control.error ? `: ${control.error}` : ''}`;
+        ? 'Initiative shared with players'
+        : `Not shared with players${control.error ? `: ${control.error}` : ''}`;
     return followed ? `${followed} · ${publication}` : publication;
   }, [encounter, started, control.status, control.error]);
 

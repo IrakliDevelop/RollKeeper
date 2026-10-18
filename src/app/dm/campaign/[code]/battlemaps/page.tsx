@@ -26,12 +26,12 @@ import { battleMapDeleteRequest } from '@/components/ui/campaign/table/sideChann
 
 /** PR04 P9: a battle map delete refusal in words (never a bare status). */
 function tableDeleteRefusal(status: number): string {
-  if (status === 404) return 'Not deleted — this map is used by a Table scene.';
+  if (status === 404) return 'Not deleted: a Table scene uses this map.';
   if (status === 403)
-    return 'Not deleted — only the campaign DM can delete battle maps.';
+    return 'Not deleted: only the campaign DM can delete battle maps.';
   if (status === 503)
-    return 'Not deleted — live storage is unavailable. Try again shortly.';
-  return 'Not deleted — the battle map could not be removed. Try again.';
+    return 'Not deleted: live storage is unavailable. Try again shortly.';
+  return 'The battle map was not deleted. Try again.';
 }
 
 export default function CampaignBattleMapsPage() {

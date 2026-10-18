@@ -10,7 +10,7 @@ import { isSceneImageUrl } from './sceneCommands';
  * PR06 W6: client-side admission of a scene map image. The upload route also
  * allows SVG and video, so the Table refuses them here; an image must decode
  * with a positive natural size within the limit. Uploads go through the
- * existing `uploadAsset`; any failure or a non-https result is an error —
+ * existing `uploadAsset`; any failure or a non-https result is an error,
  * never a `data:` fallback.
  */
 export const SCENE_IMAGE_TYPES: readonly string[] = [

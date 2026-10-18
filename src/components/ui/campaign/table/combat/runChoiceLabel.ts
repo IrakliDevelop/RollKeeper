@@ -14,7 +14,7 @@ interface RunChoice {
 }
 
 /**
- * FU-7 / FC-8: distinguishable run choices — scene name, run label,
+ * FU-7 / FC-8: distinguishable run choices: scene name, run label,
  * creation date and short time, plus "copy n" only when labels collide
  * within one (localWorkspaceId, sceneId) group; n counts the runs sharing
  * that label, ordered by createdAt then runId. Returned in the input order.

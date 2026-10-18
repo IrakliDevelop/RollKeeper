@@ -4,7 +4,7 @@
  * monitor listens to every enumerated signal plus a 1 s poll (no event
  * exists for window moves) and reports the first mismatch once. Size-only
  * changes are not part of the snapshot, so a stable-origin resize is a no-op.
- * Browsers cannot detect every output change — the UI says so.
+ * Browsers cannot detect every output change; the UI says so.
  */
 
 export interface EnvironmentSnapshot {

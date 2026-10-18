@@ -26,7 +26,7 @@ export function useDmInitiativeSync({
     async (state: SharedInitiativeState) => {
       if (status === 'checking') throw new Error('Checking live control');
       if (status !== 'controlling' && status !== 'broadcasting')
-        throw new Error(error ?? 'Not broadcasting');
+        throw new Error(error ?? 'Not shared with players');
       return publish(
         state.isActive ? 'publishInitiative' : 'endInitiative',
         state.isActive
@@ -41,7 +41,7 @@ export function useDmInitiativeSync({
     async (data: InitiativeRollRequest | null) => {
       if (status === 'checking') throw new Error('Checking live control');
       if (status !== 'controlling' && status !== 'broadcasting')
-        throw new Error(error ?? 'Not broadcasting');
+        throw new Error(error ?? 'Not shared with players');
       return publish('publishInitiativeRequest', { request: data });
     },
     [status, error, publish]

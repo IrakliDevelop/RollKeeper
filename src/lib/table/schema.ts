@@ -204,7 +204,7 @@ export interface TableEncounterRecordV1 {
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
-  /** PR03: DM-facing run label (1–200 Unicode characters). */
+  /** PR03: DM-facing run label (1 to 200 Unicode characters). */
   label?: string;
   /**
    * PR03: integer combat generation (absent ≡ 0). `runGeneration` keeps its
@@ -873,7 +873,7 @@ export function validateEncounterRecord(value: unknown): TableValidation {
   return { ok: true };
 }
 
-/** Run labels are 1–200 Unicode characters (code points). */
+/** Run labels are 1 to 200 Unicode characters (code points). */
 export function isRunLabel(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const length = [...value].length;

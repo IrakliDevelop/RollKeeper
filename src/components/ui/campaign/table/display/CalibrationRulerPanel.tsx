@@ -21,7 +21,7 @@ import {
 
 /**
  * O7-A4: a fixed (not theme-flipping) high-contrast double ring drawn inside
- * the C box — dark border plus a light inset ring — so the measured outer
+ * the C box (dark border plus a light inset ring) so the measured outer
  * edge stays exactly C CSS px on light and dark maps.
  */
 const REFERENCE_RING = {
@@ -57,7 +57,7 @@ export interface CalibrationRulerPanelProps {
 
 /**
  * PR07 P3: the ruler panel. The reference square is exactly C CSS px (the
- * border is inside the box) at the canvas centre, in an overlay — the
+ * border is inside the box) at the canvas centre, in an overlay; the
  * canvas camera never changes before Confirm. Compact (≤ 360 px) and
  * dismissible; arrows adjust only while the panel has focus.
  */

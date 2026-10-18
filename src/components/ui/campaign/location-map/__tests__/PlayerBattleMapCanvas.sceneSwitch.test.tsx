@@ -270,7 +270,7 @@ describe('PlayerBattleMapCanvas: real presentation switch (R4)', () => {
       await fake.instances[1]!.resolveUrl();
       await flush();
     });
-    expect(screen.getByRole('status')).toHaveTextContent(/scene changed/i);
+    expect(screen.getByRole('status')).toHaveTextContent(/changed the scene/i);
     const before = fake.instances.length;
     fireReady(makeViewport());
     await act(async () => {

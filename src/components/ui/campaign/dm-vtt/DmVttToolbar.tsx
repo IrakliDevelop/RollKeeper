@@ -296,7 +296,7 @@ export function DmVttToolbar({
                 className="min-h-[44px] px-2"
                 // A marker's audience moves every sibling pin sharing its ref,
                 // and sharing one also publishes its kind, label and colour
-                // (spec §7.4) — both stated on the control that does it.
+                // (spec §7.4); both stated on the control that does it.
                 title={
                   selectedElementIsMarker
                     ? markerAudienceToggleTitle(selectedElementIsDmOnly)

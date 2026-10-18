@@ -990,7 +990,7 @@ run('two relay authority transport', () => {
     );
     // S4: closed within the next relay poll (50 ms here) + the 1 s
     // control-read bound; 150 ms covers this harness (the Redis SET round
-    // trip and the 20 ms `eventually` tick). Typically 20–90 ms.
+    // trip and the 20 ms `eventually` tick). Typically 20 to 90 ms.
     const bound = 50 + 1_000 + 150;
     await eventually(
       () => closeEvents.some(event => event.code === 4403),

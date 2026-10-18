@@ -41,7 +41,7 @@ function bounded(value: string | null | undefined): string | null {
 
 const encoder = new TextEncoder();
 
-/** A local workspace / scene id: 1–255 UTF-8 bytes, no control characters. */
+/** A local workspace / scene id: 1 to 255 UTF-8 bytes, no control characters. */
 function isRouteId(value: string): boolean {
   return (
     value.length > 0 &&
@@ -51,7 +51,7 @@ function isRouteId(value: string): boolean {
 }
 
 /**
- * R3-F12 / review F2: an explicit workspace selection is never dropped —
+ * R3-F12 / review F2: an explicit workspace selection is never dropped:
  * a present but unusable value becomes the refusal marker, so the client
  * shows "not bound" instead of opening the default workspace.
  */
@@ -97,7 +97,7 @@ function first(value: string | string[] | undefined): string | null {
 /**
  * W8 row 1 / R3-F12 / C6-5: the old `table/<sceneId>` URL maps to
  * `?scene=<sceneId>` keeping `run` and `tableWorkspace` raw. An oversized
- * workspace selection becomes the marker the client refuses — it never
+ * workspace selection becomes the marker the client refuses; it never
  * falls back to the default workspace. Unknown parameters are dropped.
  */
 export function legacyTableRedirectHref(

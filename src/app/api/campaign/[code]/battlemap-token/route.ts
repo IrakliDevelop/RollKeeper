@@ -133,7 +133,7 @@ export async function POST(
     if (process.env.BATTLEMAP_FOG_PROTOCOL_REQUIRED === 'true') {
       if (!protocols || typeof protocols !== 'object' || protocols.fog !== 1) {
         return NextResponse.json(
-          { error: 'Client upgrade required — please refresh your browser' },
+          { error: 'Refresh the page to update the app.' },
           { status: 426 }
         );
       }
@@ -146,7 +146,7 @@ export async function POST(
         protocols.authority !== 1)
     ) {
       return NextResponse.json(
-        { error: 'Client upgrade required — please refresh your browser' },
+        { error: 'Refresh the page to update the app.' },
         { status: 426 }
       );
     }

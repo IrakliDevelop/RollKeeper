@@ -361,7 +361,7 @@ export function createManagedBattleMapConnection(
       if (result.authority === 1) {
         legacyAccessDenied = true;
         opts.onDiagnostic?.(
-          'A location request returned scene authority and was denied.'
+          "This location can't open live here. Reopen it from the campaign."
         );
         opts.onStatus?.('denied');
         return null;

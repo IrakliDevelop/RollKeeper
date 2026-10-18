@@ -44,7 +44,7 @@ export async function POST(request: NextRequest, { params }: Context) {
   const result = await rotateDisplayCapability(rawRedis, code);
   if (result.status === 'not-initialized')
     return reply(
-      { error: 'Live table is not initialized — open a Table scene first' },
+      { error: "The live Table isn't set up yet. Open a Table scene first." },
       409
     );
   if (result.status !== 'rotated')

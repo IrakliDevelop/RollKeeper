@@ -43,7 +43,7 @@ export function fieldLabels(fields: readonly string[]): string {
 }
 
 /**
- * O7-2 H1/H4/HR-1: the slim banner rows of the Table header — authority,
+ * O7-2 H1/H4/HR-1: the slim banner rows of the Table header: authority,
  * workspace notices, workspace flows (`extra`), the save/scene message and
  * the pending-conflict alert. Text first, its actions inline, wrapping on
  * narrow screens. FC-1: none of these ever collapses or moves into Details.

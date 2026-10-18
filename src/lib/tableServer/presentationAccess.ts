@@ -131,7 +131,7 @@ export async function verifyTableCredential(
     if (session.authorized && session.role === credential.role)
       return { ok: true, role: credential.role };
     // PR05 E4: an unbound display session is 409 `stale` (re-poll), and a
-    // failed authority read 503 — never a credential 403.
+    // failed authority read 503, never a credential 403.
     if (
       credential.role === 'display' &&
       !session.authorized &&

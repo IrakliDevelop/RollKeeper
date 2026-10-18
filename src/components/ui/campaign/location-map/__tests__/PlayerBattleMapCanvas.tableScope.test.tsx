@@ -268,7 +268,7 @@ describe('PlayerBattleMapCanvas: Table v1 resolved scene scope', () => {
     );
     expect(first.stop).toHaveBeenCalled();
     expect(screen.getByRole('status')).toHaveTextContent(
-      /scene changed.*1 unsent edit/i
+      /changed the scene.*1 unsent edit/i
     );
     fireReady(makeViewport());
     expect(createManagedBattleMapConnection).toHaveBeenCalledTimes(2);

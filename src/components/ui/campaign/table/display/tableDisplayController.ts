@@ -282,7 +282,7 @@ function abortable<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
- * PR05 E9–E11: the campaign display. Polls the descriptor serially (one
+ * PR05 E9 to E11: the campaign display. Polls the descriptor serially (one
  * request in flight, 2 s after the previous settles, 5 s abort), follows the
  * visible target with a cover-first attach per scene (fresh canvas, store
  * and fog plugin each time), uncovers only after E10 readiness and sends

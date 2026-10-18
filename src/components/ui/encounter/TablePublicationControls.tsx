@@ -11,19 +11,19 @@ export function TablePublicationControls({ control, combatActive }: Props) {
     !!control.current && control.current.leaseUntil > Date.now();
   const message =
     control.status === 'broadcasting'
-      ? 'Broadcasting initiative'
+      ? 'Initiative shared with players'
       : control.status === 'controlling'
-        ? 'Live control held · publication pending'
+        ? "You're live. No initiative shared"
         : combatActive
-          ? 'Started locally · not broadcasting'
-          : 'Not broadcasting';
+          ? 'Started here, not shared with players'
+          : 'Not shared with players';
   return (
     <div
       className="border-divider bg-surface-secondary text-body flex flex-wrap items-center gap-2 border-b px-4 py-2 text-sm"
       role="status"
     >
       <span>
-        {control.status === 'checking' ? 'Checking live control…' : message}
+        {control.status === 'checking' ? "Checking if you're live…" : message}
       </span>
       {control.error && (
         <span className="text-accent-red-text">{control.error}</span>
@@ -33,7 +33,7 @@ export function TablePublicationControls({ control, combatActive }: Props) {
           variant="secondary"
           onClick={() => void control.initialize().catch(() => {})}
         >
-          Initialize live control
+          Set up live play
         </Button>
       )}
       {control.current && control.status !== 'broadcasting' && (
@@ -45,12 +45,12 @@ export function TablePublicationControls({ control, combatActive }: Props) {
             )
           }
         >
-          {activeLease ? 'Take over broadcast' : 'Acquire broadcast'}
+          {activeLease ? 'Take over and go live' : 'Go live'}
         </Button>
       )}
       {control.status === 'error' && (
         <Button variant="ghost" onClick={() => void control.refresh()}>
-          Refresh control
+          Check again
         </Button>
       )}
     </div>

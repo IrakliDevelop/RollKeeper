@@ -210,7 +210,7 @@ export function useTableCombatPanelActions(options: {
         return { ok: false, reason: "you're no longer live" };
       case 'unconfirmed':
       case 'failed':
-        // N1: a sent Show whose outcome is uncertain may have committed —
+        // N1: a sent Show whose outcome is uncertain may have committed;
         // never claim "not shown"; combat still does not start.
         return presentationMayHaveCommitted(outcome)
           ? { ok: false, reason: 'not-confirmed', uncertain: true }

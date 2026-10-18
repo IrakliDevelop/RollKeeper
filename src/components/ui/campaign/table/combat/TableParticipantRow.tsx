@@ -60,7 +60,7 @@ export function TableParticipantRow(props: {
           )}
           {view.identityUnresolved && (
             <Badge variant="warning" size="sm">
-              identity unresolved
+              player not found
             </Badge>
           )}
           {props.physical && (

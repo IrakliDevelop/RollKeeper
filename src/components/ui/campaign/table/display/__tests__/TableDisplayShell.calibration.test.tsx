@@ -25,7 +25,7 @@ import { resetCalibrationStores } from '../calibration/session';
 import { CALIBRATION_STORAGE_KEY } from '../calibration/settings';
 
 /**
- * PR07 P3, P5–P7, P12, R3-1/R3-2/R3-5, C7-2/C7-3 through the real shell:
+ * PR07 P3, P5 to P7, P12, R3-1/R3-2/R3-5, C7-2/C7-3 through the real shell:
  * `FieldNotesCanvas` is replaced by a host that mounts a REAL core Viewport
  * (real InputHandler, HandTool, camera, grid controller) into the canvas
  * container, so the capture-phase guards meet core's own listeners.

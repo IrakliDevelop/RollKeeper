@@ -60,8 +60,8 @@ export function HeaderControls({
           }`}
           title={
             entity.isHidden
-              ? 'Name hidden from players — click to reveal'
-              : 'Name visible to players — click to hide'
+              ? 'Name hidden from players. Click to reveal.'
+              : 'Name visible to players. Click to hide.'
           }
         >
           {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -119,8 +119,8 @@ export function HeaderControls({
         }`}
         title={
           entity.isHidden
-            ? 'Name hidden from players — click to reveal'
-            : 'Name visible to players — click to hide'
+            ? 'Name hidden from players. Click to reveal.'
+            : 'Name visible to players. Click to hide.'
         }
       >
         {entity.isHidden ? <EyeOff size={14} /> : <Eye size={14} />}
@@ -170,8 +170,8 @@ export function HeaderControls({
           }`}
           title={
             entity.playerAlias
-              ? `Players see: "${entity.playerAlias}" — click to edit`
-              : 'Set alias players see — click to edit'
+              ? `Players see: "${entity.playerAlias}". Click to edit.`
+              : 'Set the alias players see. Click to edit.'
           }
         >
           <Pencil size={13} />

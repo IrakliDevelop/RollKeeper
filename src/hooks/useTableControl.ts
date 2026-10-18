@@ -25,7 +25,7 @@ async function fetchBoundedJson<T>(
     new Promise<{ response: Response; data: T }>((_, reject) => {
       deadline = setTimeout(() => {
         abort.abort();
-        reject(new Error('Control request timed out'));
+        reject(new Error('Live check timed out. Try again.'));
       }, 5000);
     }),
   ]).finally(() => {
@@ -57,7 +57,9 @@ export function useTableControl(campaignCode: string, dmId: string) {
       `/api/campaign/${encodeURIComponent(campaignCode)}/table/control?dmId=${encodeURIComponent(dmId)}`
     );
     if (!response.ok)
-      throw new Error(`Control refresh failed (${response.status})`);
+      throw new Error(
+        `Couldn't check if you're live (${response.status}). Try again.`
+      );
     if (generation !== contextGeneration.current)
       throw new Error('Control context changed');
     updateCurrent(payload.current);
@@ -83,7 +85,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
       } catch (failure) {
         if (!cancelled && generation === contextGeneration.current) {
           setError(
-            failure instanceof Error ? failure.message : 'Control unavailable'
+            failure instanceof Error ? failure.message : 'Live play unavailable'
           );
           setStatus('error');
         }
@@ -101,7 +103,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
     async (makeCommand: (control: TableDescriptor | null) => TableCommand) => {
       if (pendingCount.current >= 8) {
         authorityGeneration.current += 1;
-        const message = 'Too many pending control requests; not broadcasting';
+        const message = 'Too many requests waiting. Try again in a moment.';
         setStatus('error');
         setError(message);
         throw new Error(message);
@@ -116,7 +118,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
           if (authority !== authorityGeneration.current)
             throw new Error('Control response superseded');
           if (!navigator.onLine)
-            throw new Error('Disconnected; remote initiative may be stale');
+            throw new Error('Disconnected. Players may see old initiative.');
           const command = makeCommand(currentRef.current);
           const { response, data: result } =
             await fetchBoundedJson<TableResult>(
@@ -137,11 +139,14 @@ export function useTableControl(campaignCode: string, dmId: string) {
           if (result.current) updateCurrent(result.current);
           if (!response.ok || result.status !== 'committed') {
             throw new Error(
-              result.reason ?? `Control failed (${response.status})`
+              result.reason ??
+                `Live play request failed (${response.status}). Try again.`
             );
           }
           if (result.historical && command.type === 'publishInitiative') {
-            throw new Error('Historical publication is not current');
+            throw new Error(
+              'That initiative update is out of date. Nothing was shared.'
+            );
           }
           setError(null);
           if (command.type === 'acquire' || command.type === 'takeover') {
@@ -168,7 +173,9 @@ export function useTableControl(campaignCode: string, dmId: string) {
             authorityGeneration.current += 1;
             setStatus('error');
             setError(
-              failure instanceof Error ? failure.message : 'Control unavailable'
+              failure instanceof Error
+                ? failure.message
+                : 'Live play unavailable'
             );
           }
           throw failure;
@@ -193,7 +200,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
   const leaseCommand = useCallback(
     (type: 'acquire' | 'renew' | 'takeover') =>
       send(control => {
-        if (!control) throw new Error('Initialize control first');
+        if (!control) throw new Error('Set up live play first.');
         return {
           type,
           operationId: crypto.randomUUID(),
@@ -217,7 +224,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
           control.holderSessionId !== sessionId.current ||
           control.leaseUntil <= Date.now()
         ) {
-          throw new Error('Table lease is not held by this session');
+          throw new Error("You're not live in this tab. Go live first.");
         }
         return {
           type,
@@ -250,7 +257,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
     const handleOffline = () => {
       authorityGeneration.current += 1;
       setStatus('not-broadcasting');
-      setError('Disconnected; remote initiative may be stale');
+      setError('Disconnected. Players may see old initiative.');
     };
     window.addEventListener('offline', handleOffline);
     return () => window.removeEventListener('offline', handleOffline);
@@ -269,9 +276,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
         ) {
           authorityGeneration.current += 1;
           setStatus('not-broadcasting');
-          setError(
-            'Live control lease expired; remote initiative may be stale'
-          );
+          setError("You're no longer live. Players may see old initiative.");
         }
       },
       Math.max(0, current.leaseUntil - Date.now()) + 1
@@ -290,7 +295,7 @@ export function useTableControl(campaignCode: string, dmId: string) {
       if (generation !== contextGeneration.current) return;
       setStatus('error');
       setError(
-        failure instanceof Error ? failure.message : 'Control unavailable'
+        failure instanceof Error ? failure.message : 'Live play unavailable'
       );
     }
   }, [refresh]);

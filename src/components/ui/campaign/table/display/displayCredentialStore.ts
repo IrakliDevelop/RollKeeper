@@ -123,7 +123,7 @@ function fromStorage(env: DisplayEnvironment, code: string): DisplayBootstrap {
     : { status: 'missing' };
 }
 
-/** `/table-display/<code>#k=<capability>` bootstrap (E8.1–E8.3). */
+/** `/table-display/<code>#k=<capability>` bootstrap (E8.1 to E8.3). */
 export function bootstrapCampaignDisplay(
   code: string,
   env: DisplayEnvironment = browserDisplayEnvironment()

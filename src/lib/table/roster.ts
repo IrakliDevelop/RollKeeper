@@ -166,7 +166,7 @@ export interface TableRosterEntry {
   verifiedLegacyPlayerId: string | null;
   /**
    * Persisted identity claim (explicit control, party reference or verified
-   * adopted PC) used only for exact alias matching and movement lookup —
+   * adopted PC) used only for exact alias matching and movement lookup,
    * never as an authorization signal.
    */
   identityLegacyPlayerId: string | null;

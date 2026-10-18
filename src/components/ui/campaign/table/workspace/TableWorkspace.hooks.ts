@@ -69,7 +69,7 @@ export function liveScenesOf(
 }
 
 /**
- * All workspace-level state of the unified Table (W1–W4): query-driven
+ * All workspace-level state of the unified Table (W1 to W4): query-driven
  * selection, the repository, the one control session, the scene switch
  * machine, camera memory, presentation (one display-status poll) and the
  * one combat publisher. Nothing here is keyed by scene.
@@ -88,7 +88,7 @@ export function useTableWorkspace(campaignCode: string) {
     localWorkspaceId: selectedWorkspaceId,
   });
   // An explicit workspace selection that does not open or is bound to
-  // another campaign is refused — never the default workspace (R3-F12).
+  // another campaign is refused, never the default workspace (R3-F12).
   const routeRejected = Boolean(
     selectedWorkspaceId &&
       (opened.error ||
@@ -219,7 +219,7 @@ export function useTableWorkspace(campaignCode: string) {
   });
 
   // After an explicit acquire the canvas reconnects through a fresh mount
-  // (re-mints its token) when it is not live — once A1b settled (C6-2).
+  // (re-mints its token) when it is not live, once A1b settled (C6-2).
   const relayStatus =
     relay.sceneId === mountedSceneId ? relay.status : 'connecting';
   const relayLive = relayStatus === 'live';

@@ -259,7 +259,7 @@ export async function POST(
       feature === 'battlemap'
     ) {
       return NextResponse.json(
-        { error: 'Table v1 control is required for this feature' },
+        { error: 'Refresh the page to update the app.' },
         { status: 426 }
       );
     }
@@ -308,7 +308,7 @@ export async function POST(
       }
     }
 
-    // Every accepted feature requires a real object — a null would crash the
+    // Every accepted feature requires a real object; a null would crash the
     // feature branches that destructure data. undefined is always missing.
     if (!feature || data === undefined || data === null) {
       return NextResponse.json(
