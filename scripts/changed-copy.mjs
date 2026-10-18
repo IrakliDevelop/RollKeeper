@@ -183,12 +183,15 @@ function copyKind(node) {
     if (!ts.isObjectLiteralExpression(parent)) return null;
     parent = parent.parent;
 
-    // In a call expression - keep as message kind
-    if (ts.isCallExpression(parent)) {
-      return COPY_CALLS.test(parent.expression.getText()) ? 'message' : null;
+    // In a call expression that matches COPY_CALLS - kind is 'message'
+    if (
+      ts.isCallExpression(parent) &&
+      COPY_CALLS.test(parent.expression.getText())
+    ) {
+      return 'message';
     }
 
-    // Standalone object literal - kind is 'object'
+    // Otherwise (standalone config or non-copy call) - kind is 'object'
     return 'object';
   }
 
@@ -276,7 +279,7 @@ async function main() {
   let mergeBase;
   try {
     mergeBase = git('merge-base', 'HEAD', base).trim();
-  } catch (err) {
+  } catch {
     console.error(
       `copy:changed: unknown base "${base}". Pass --base <branch the PR targets>.`
     );

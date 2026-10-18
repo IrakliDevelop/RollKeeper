@@ -106,19 +106,23 @@ function onSave() {
 }
 `;
   const entries = extractCopy('src/test.tsx', source);
-  const texts = entries.map(e => e.text);
-  assert.ok(
-    texts.includes('Long rest taken'),
-    'addToast title should be extracted'
+  const toastTitle = entries.find(e => e.text === 'Long rest taken');
+  const toastMessage = entries.find(e => e.text === 'Hit points restored');
+  const errorMsg = entries.find(e => e.text === 'Complete the check');
+  assert.ok(toastTitle, 'addToast title should be extracted');
+  assert.equal(
+    toastTitle?.kind,
+    'message',
+    'addToast title should be kind message'
   );
-  assert.ok(
-    texts.includes('Hit points restored'),
-    'addToast message should be extracted'
+  assert.ok(toastMessage, 'addToast message should be extracted');
+  assert.equal(
+    toastMessage?.kind,
+    'message',
+    'addToast message should be kind message'
   );
-  assert.ok(
-    texts.includes('Complete the check'),
-    'setError should be extracted'
-  );
+  assert.ok(errorMsg, 'setError should be extracted');
+  assert.equal(errorMsg?.kind, 'message', 'setError should be kind message');
 });
 
 test('copy-keyed object literals are recognized anywhere', () => {
@@ -126,11 +130,40 @@ test('copy-keyed object literals are recognized anywhere', () => {
 const config = { id: 'actions', label: 'Actions', variant: 'default' };
 const item = { key: 'key', title: 'New Item', type: 'button' };
 const ignored = { icon: 'check', className: 'mb-4' };
+tabs.push({ id: 'a', label: 'Pushed label' });
+registerTab({ title: 'Registered title' });
 `;
   const entries = extractCopy('src/test.tsx', source);
+  const actionLabel = entries.find(e => e.text === 'Actions');
+  const newItem = entries.find(e => e.text === 'New Item');
+  const pushedLabel = entries.find(e => e.text === 'Pushed label');
+  const registeredTitle = entries.find(e => e.text === 'Registered title');
+
+  assert.ok(actionLabel, 'label in config should be extracted');
+  assert.equal(
+    actionLabel?.kind,
+    'object',
+    'config label should be kind object'
+  );
+  assert.ok(newItem, 'title in config should be extracted');
+  assert.equal(newItem?.kind, 'object', 'config title should be kind object');
+  assert.ok(pushedLabel, 'label in non-copy-call argument should be extracted');
+  assert.equal(
+    pushedLabel?.kind,
+    'object',
+    'tabs.push label should be kind object'
+  );
+  assert.ok(
+    registeredTitle,
+    'title in non-copy-call argument should be extracted'
+  );
+  assert.equal(
+    registeredTitle?.kind,
+    'object',
+    'registerTab title should be kind object'
+  );
+
   const texts = entries.map(e => e.text);
-  assert.ok(texts.includes('Actions'), 'label in config should be extracted');
-  assert.ok(texts.includes('New Item'), 'title in config should be extracted');
   assert.ok(!texts.includes('button'), 'type should be ignored');
   assert.ok(!texts.includes('check'), 'icon should be ignored');
   assert.ok(!texts.includes('mb-4'), 'className should be ignored');
@@ -199,19 +232,25 @@ test('type wrappers (as, satisfies, !) are unwrapped', () => {
   );
 });
 
-test('multi-line strings report when any line is added', () => {
+test('multi-line strings report when any line is added', async () => {
   const source = `<div>
     <p>
       This is a paragraph spanning
       multiple lines in the JSX
     </p>
   </div>`;
-  const entries = extractCopy('src/test.tsx', source);
-  // Verify that endLine is tracked and entries are found
-  const hasEntries = entries.length > 0;
-  const hasEndLine = entries.some(e => e.endLine !== undefined);
-  assert.ok(hasEntries, 'should extract JSX text strings');
-  assert.ok(hasEndLine, 'should track endLine for multi-line strings');
+  // JSX text spans lines 3-4, only line 4 (middle) is added
+  const added = new Map([['src/test.tsx', new Set([4])]]);
+  const entries = await changedCopy(added, async () => source);
+  assert.ok(
+    entries.length > 0,
+    'should report string when middle line is added'
+  );
+  const paragraphEntry = entries[0];
+  assert.ok(
+    paragraphEntry.text.includes('paragraph spanning'),
+    'should include text from multi-line entry'
+  );
 });
 
 test('parses diff headers with spaces and strips trailing tabs', () => {
