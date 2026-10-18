@@ -73,6 +73,17 @@ test('reduced motion shortens every animation and transition', async () => {
   assert.match(block, /transition-duration:\s*0\.01ms\s*!important/);
 });
 
+test('reduced motion keeps spinners turning', async () => {
+  const output = await buildCss(['animate-spin']);
+  const start = output.indexOf('prefers-reduced-motion: reduce');
+  assert.notEqual(start, -1, 'expected a prefers-reduced-motion block');
+  const block = output.slice(start);
+  assert.match(
+    block,
+    /\.animate-spin\s*\{[^}]*animation-iteration-count:\s*infinite\s*!important/
+  );
+});
+
 test('surface-elevated resolves through the theme-aware hover token', async () => {
   const output = await buildCss(['bg-surface-elevated']);
   assert.match(output, /--surface-elevated:\s*var\(--surface-hover\)/);

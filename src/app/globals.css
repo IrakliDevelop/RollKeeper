@@ -26,10 +26,6 @@
   --surface-raised: #ffffff; /* pure white — cards float above off-white bg */
   --surface-inset: #e2e8f0; /* slate-200 — deeper recessed areas */
   --surface-hover: #e2e8f0; /* slate-200 — more visible hover feedback */
-  /* Popover/menu/drawer layer. Until Phase 1a gives it felt/paper values it
-     reuses each theme's hover surface, so it is visible on raised surfaces
-     in light, dark and parchment alike. */
-  --surface-elevated: var(--surface-hover);
   --surface-overlay: rgba(0, 0, 0, 0.5);
 
   /* --- Text --- */
@@ -151,6 +147,15 @@
   --input-placeholder: #6b7280; /* gray-500 */
   --input-border: #cbd5e1; /* slate-300 — matches divider for consistency */
   --input-border-focus: #10b981; /* emerald-500 */
+}
+
+/* Popover/menu/drawer layer. Resolved per theme scope, including nested
+   [data-theme] wrappers. Until Phase 1a gives it felt/paper values it reuses
+   each theme's hover surface, so it is visible on raised surfaces in light,
+   dark and parchment alike. */
+:root,
+[data-theme] {
+  --surface-elevated: var(--surface-hover);
 }
 
 [data-theme='dark'] {
@@ -947,5 +952,11 @@ form select {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  /* Spinners are status, not decoration: keep them turning (slowly). */
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
   }
 }

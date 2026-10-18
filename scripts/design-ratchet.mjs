@@ -34,7 +34,7 @@ export const PATTERNS = [
   },
   {
     id: 'large-shadow',
-    description: 'shadow-lg/xl/2xl outside overlays',
+    description: 'shadow-lg/xl/2xl',
     regex: new RegExp(`${VARIANTS}shadow-(?:lg|xl|2xl)(?![\\w-])`, 'g'),
   },
   {
@@ -68,12 +68,12 @@ export const PATTERNS = [
   },
   {
     id: 'number-input',
-    description: 'type="number" inputs (use NumberInput/InPlaceField)',
+    description: 'type="number" inputs (use NumberInput)',
     regex: /type=(?:"number"|'number'|\{\s*['"]number['"]\s*\})/g,
   },
 ];
 
-// Files whose matches are intentional (documented in the spec).
+// Files whose matches are intentional (hpColor.ts's raw fills are deliberate).
 export const ALLOWLIST = {
   'raw-hue': ['src/utils/hpColor.ts'],
 };
@@ -125,7 +125,7 @@ export function formatReport({ regressions, improvements }) {
   } else {
     lines.push(
       'Design ratchet: legacy visual patterns increased. Use the Felt and Brass',
-      'roles and primitives instead (see docs/DESIGN_SYSTEM.md).'
+      'roles and primitives instead (see docs/wiki/09-design-system-ui.md, "Design ratchet").'
     );
     for (const { pattern, file, was, now } of regressions) {
       lines.push(`  ${pattern}: ${file} ${was} -> ${now}`);

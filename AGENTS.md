@@ -205,6 +205,8 @@ import { colors, spacing, typography, shadows, borderRadius } from '@/components
 
 Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.
 
+**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, and `type="number"` — and fails if any file's count rises. Existing `accent-*` tokens may be reused where a file already uses them, but don't add new uses; see `docs/wiki/09-design-system-ui.md`.
+
 ### Naming conventions
 
 - **Components**: PascalCase — `PlayerCard`, `DiceRoller`
