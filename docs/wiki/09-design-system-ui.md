@@ -32,3 +32,12 @@ Theme is `data-theme="dark"` on `<html>`, set pre-hydration from `localStorage`
 key `rollkeeper-theme`, toggled via `useTheme`. **Always use semantic tokens**
 (`bg-surface`, `text-heading`, `border-divider`, `text-accent-{color}-text`,
 etc.) — never raw Tailwind color classes. Full token list is in `CLAUDE.md`.
+
+## Design ratchet
+
+`npm run design:ci` (run in CI) counts retired visual patterns per file:
+gradients, hover scale, large shadows, backdrop blur, hue-named accents, raw
+Tailwind hues, uppercase labels, `Sparkles`, and `type="number"`. A file's count
+may only go down. After removing patterns, run `npm run design:baseline` to lock
+in the lower counts. Background: `docs/superpowers/specs/2026-10-18-felt-and-brass-design-system-design.md`
+(local working spec).

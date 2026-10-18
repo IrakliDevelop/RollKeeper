@@ -140,7 +140,7 @@ may mark this gate not applicable, but the final report must state why.
 
 ## Character sheet layout
 
-The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
+The character page (`/player/characters/[characterId]`) uses `TabbedCharacterSheet` → `BookmarkTabs` (persisted via `localStorage` key `bookmark-tabs-tabbed-layout-active-tab`). The tab structure lives in `src/components/ui/character/tabbedSheetConfig.tsx`.
 
 **Top-level tabs:**
 | Tab | Key content |
@@ -200,7 +200,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
 
 // Design tokens
-import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
+import { colors, spacing, typography, shadows, borderRadius } from '@/components/ui/primitives';
 ```
 
 Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.
