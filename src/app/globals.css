@@ -75,6 +75,10 @@
   --bridge-blood-bg-strong: #ead6d3;
   --bridge-lapis-bg-strong: #d9dee8;
   --bridge-ember-bg-strong: #e7dccf;
+  --bridge-verdigris-border: #acc5ba;
+  --bridge-blood-border: #d6b0aa;
+  --bridge-lapis-border: #b4bfd3;
+  --bridge-ember-border: #d0baa3;
 }
 /* Tokens defined in terms of other tokens. Declared on every theme scope so
    they re-resolve inside nested [data-theme] wrappers (Storybook, previews).
@@ -99,70 +103,70 @@
   /* emerald -> verdigris */
   --accent-emerald-bg: var(--verdigris-bg);
   --accent-emerald-bg-strong: var(--bridge-verdigris-bg-strong);
-  --accent-emerald-border: var(--verdigris-border);
+  --accent-emerald-border: var(--bridge-verdigris-border);
   --accent-emerald-border-strong: var(--verdigris-border);
   --accent-emerald-text: var(--verdigris-text);
   --accent-emerald-text-muted: var(--verdigris-text);
   /* green -> verdigris */
   --accent-green-bg: var(--verdigris-bg);
   --accent-green-bg-strong: var(--bridge-verdigris-bg-strong);
-  --accent-green-border: var(--verdigris-border);
+  --accent-green-border: var(--bridge-verdigris-border);
   --accent-green-border-strong: var(--verdigris-border);
   --accent-green-text: var(--verdigris-text);
   --accent-green-text-muted: var(--verdigris-text);
   /* red -> blood */
   --accent-red-bg: var(--blood-bg);
   --accent-red-bg-strong: var(--bridge-blood-bg-strong);
-  --accent-red-border: var(--blood-border);
+  --accent-red-border: var(--bridge-blood-border);
   --accent-red-border-strong: var(--blood-border);
   --accent-red-text: var(--blood-text);
   --accent-red-text-muted: var(--blood-text);
   /* purple -> lapis */
   --accent-purple-bg: var(--lapis-bg);
   --accent-purple-bg-strong: var(--bridge-lapis-bg-strong);
-  --accent-purple-border: var(--lapis-border);
+  --accent-purple-border: var(--bridge-lapis-border);
   --accent-purple-border-strong: var(--lapis-border);
   --accent-purple-text: var(--lapis-text);
   --accent-purple-text-muted: var(--lapis-text);
   /* violet -> lapis */
   --accent-violet-bg: var(--lapis-bg);
   --accent-violet-bg-strong: var(--bridge-lapis-bg-strong);
-  --accent-violet-border: var(--lapis-border);
+  --accent-violet-border: var(--bridge-lapis-border);
   --accent-violet-border-strong: var(--lapis-border);
   --accent-violet-text: var(--lapis-text);
   --accent-violet-text-muted: var(--lapis-text);
   /* indigo -> lapis */
   --accent-indigo-bg: var(--lapis-bg);
   --accent-indigo-bg-strong: var(--bridge-lapis-bg-strong);
-  --accent-indigo-border: var(--lapis-border);
+  --accent-indigo-border: var(--bridge-lapis-border);
   --accent-indigo-border-strong: var(--lapis-border);
   --accent-indigo-text: var(--lapis-text);
   --accent-indigo-text-muted: var(--lapis-text);
   /* blue -> lapis */
   --accent-blue-bg: var(--lapis-bg);
   --accent-blue-bg-strong: var(--bridge-lapis-bg-strong);
-  --accent-blue-border: var(--lapis-border);
+  --accent-blue-border: var(--bridge-lapis-border);
   --accent-blue-border-strong: var(--lapis-border);
   --accent-blue-text: var(--lapis-text);
   --accent-blue-text-muted: var(--lapis-text);
   /* amber -> ember */
   --accent-amber-bg: var(--ember-bg);
   --accent-amber-bg-strong: var(--bridge-ember-bg-strong);
-  --accent-amber-border: var(--ember-border);
+  --accent-amber-border: var(--bridge-ember-border);
   --accent-amber-border-strong: var(--ember-border);
   --accent-amber-text: var(--ember-text);
   --accent-amber-text-muted: var(--ember-text);
   /* yellow -> ember */
   --accent-yellow-bg: var(--ember-bg);
   --accent-yellow-bg-strong: var(--bridge-ember-bg-strong);
-  --accent-yellow-border: var(--ember-border);
+  --accent-yellow-border: var(--bridge-ember-border);
   --accent-yellow-border-strong: var(--ember-border);
   --accent-yellow-text: var(--ember-text);
   --accent-yellow-text-muted: var(--ember-text);
   /* orange -> ember */
   --accent-orange-bg: var(--ember-bg);
   --accent-orange-bg-strong: var(--bridge-ember-bg-strong);
-  --accent-orange-border: var(--ember-border);
+  --accent-orange-border: var(--bridge-ember-border);
   --accent-orange-border-strong: var(--ember-border);
   --accent-orange-text: var(--ember-text);
   --accent-orange-text-muted: var(--ember-text);
@@ -243,6 +247,10 @@
   --bridge-blood-bg-strong: #38241e;
   --bridge-lapis-bg-strong: #2e383f;
   --bridge-ember-bg-strong: #3d3524;
+  --bridge-verdigris-border: #36554b;
+  --bridge-blood-border: #543029;
+  --bridge-lapis-border: #43515e;
+  --bridge-ember-border: #5c4c33;
 }
 [data-theme='parchment'] {
   color-scheme: light;

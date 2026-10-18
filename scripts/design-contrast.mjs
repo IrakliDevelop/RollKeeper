@@ -36,6 +36,12 @@ function pairs() {
   }
   for (const text of ['heading', 'body']) add(text, 'surface-hover', TEXT);
   for (const role of ROLES) add(`${role}-text`, `${role}-bg`, TEXT);
+  // Deprecated accent bridge: bg-accent-*-bg-strong behind role text.
+  for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
+    add(`${role}-text`, `bridge-${role}-bg-strong`, TEXT);
+  }
+  // bg-accent-*-text text-inverse badges and buttons.
+  for (const role of ROLES) add('inverse', `${role}-text`, TEXT);
   add('on-brass', 'brass-fill', TEXT);
   add('on-blood', 'blood-fill', TEXT);
   add('input-text', 'input-bg', TEXT);

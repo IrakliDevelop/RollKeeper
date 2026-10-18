@@ -132,7 +132,10 @@ test('every deprecated accent token points at its role', async () => {
   for (const [hue, role] of Object.entries(BRIDGE)) {
     assert.equal(shared[`--accent-${hue}-text`], `var(--${role}-text)`);
     assert.equal(shared[`--accent-${hue}-text-muted`], `var(--${role}-text)`);
-    assert.equal(shared[`--accent-${hue}-border`], `var(--${role}-border)`);
+    assert.equal(
+      shared[`--accent-${hue}-border`],
+      `var(--bridge-${role}-border)`
+    );
     assert.equal(
       shared[`--accent-${hue}-border-strong`],
       `var(--${role}-border)`
@@ -142,6 +145,20 @@ test('every deprecated accent token points at its role', async () => {
       shared[`--accent-${hue}-bg-strong`],
       `var(--bridge-${role}-bg-strong)`
     );
+  }
+});
+
+test('paper and felt each declare the softer bridge border literals', async () => {
+  const css = await readGlobalsCss();
+  for (const selector of [':root', "[data-theme='dark']"]) {
+    const block = readBlock(css, selector);
+    for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
+      assert.match(
+        block[`--bridge-${role}-border`] ?? '',
+        /^#[0-9a-f]{6}$/,
+        `${selector} should declare --bridge-${role}-border as a hex literal`
+      );
+    }
   }
 });
 

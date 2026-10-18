@@ -4,6 +4,7 @@ import test from 'node:test';
 import { readGlobalsCss } from './lib/design-source.mjs';
 
 import {
+  PAIRS,
   checkContrast,
   contrastRatio,
   formatFailures,
@@ -96,4 +97,31 @@ test('reports each pairing below its minimum', () => {
 
 test('the shipped felt and paper palettes pass WCAG AA', async () => {
   assert.deepEqual(checkContrast(await readGlobalsCss()), []);
+});
+
+test('checks bridged accent backgrounds and inverse text on role text', () => {
+  const has = (foreground, background, min) =>
+    PAIRS.some(
+      pair =>
+        pair.foreground === foreground &&
+        pair.background === background &&
+        pair.min === min
+    );
+  for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
+    assert.ok(
+      has(`${role}-text`, `bridge-${role}-bg-strong`, 4.5),
+      `${role}-text on bridge-${role}-bg-strong`
+    );
+  }
+  for (const role of [
+    'brass',
+    'blood',
+    'verdigris',
+    'lapis',
+    'ember',
+    'frost',
+  ]) {
+    assert.ok(has('inverse', `${role}-text`, 4.5), `inverse on ${role}-text`);
+  }
+  assert.equal(PAIRS.length, 137);
 });
