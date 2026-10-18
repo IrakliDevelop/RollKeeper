@@ -276,14 +276,16 @@ function details(page: Page) {
   return page.getByRole('button', { name: /^Details/u });
 }
 
-/** Open the current header instance and prove its panel accepted the click. */
+/**
+ * One click must open Details: no retry, so a header remount that drops the
+ * open state (the FR4-3 regression) fails here instead of being re-clicked.
+ */
 async function openDetails(page: Page) {
   const panel = page.getByTestId('table-header-details');
-  await expect(async () => {
-    if (await panel.isVisible()) return;
-    await details(page).click();
-    await expect(panel).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 30_000 });
+  // A click on an already-open trigger would close it: start from closed.
+  await expect(details(page)).toHaveAttribute('aria-expanded', 'false');
+  await details(page).click();
+  await expect(panel).toBeVisible();
   return panel;
 }
 
@@ -358,7 +360,8 @@ async function offlineChangesFlow(
     await expect(page.getByText(/^Checkpoint saved\./u).first()).toBeVisible({
       timeout: 30_000,
     });
-    await openDetails(page);
+    // Saving from the panel leaves it open.
+    await expect(panel).toBeVisible();
     await expect(panel.getByText(/^Offline changes from /u)).toBeVisible();
 
     // 4. Reapply: the live map shows the offline version again.
@@ -369,7 +372,8 @@ async function offlineChangesFlow(
       timeout: 30_000,
     });
     await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
-    await openDetails(page);
+    // Reapplying from the panel leaves it open.
+    await expect(panel).toBeVisible();
     await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
     // OO2: the fog came back exactly with the reapplied version.
     if (fog !== 'none')
@@ -475,7 +479,8 @@ test('edits made while the relay is down at page load are kept and reapplied onc
       timeout: 30_000,
     });
     await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
-    await openDetails(page);
+    // Reapplying from the panel leaves it open.
+    await expect(panel).toBeVisible();
     await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
   } finally {
     await context.close();
