@@ -43,6 +43,7 @@ export function TableWorkspaceHeader(props: {
   presentationProps: TablePresentationControlsProps;
   presentation: TablePresentationPanel;
   notices: TableHeaderNotice[];
+  details?: { open: boolean; onOpenChange: (open: boolean) => void };
   /** Workspace-level flows shown in the header (W7 prepare banner). */
   extra?: ReactNode;
   scene?: {
@@ -94,6 +95,8 @@ export function TableWorkspaceHeader(props: {
             relayStatus={scene.relayStatus}
             stored={scene.stored}
             checkpoint={scene.checkpoint}
+            open={props.details?.open}
+            onOpenChange={props.details?.onOpenChange}
           />
         )}
       </div>

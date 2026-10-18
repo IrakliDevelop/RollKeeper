@@ -112,6 +112,9 @@ function OfflineForkSection(props: {
 export function TableHeaderDetails(props: {
   relayStatus: string;
   stored: TableSceneRecordV1 | undefined;
+  /** Hoisted by the workspace so a canvas re-mint cannot erase a click. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
   checkpoint: Pick<
     Checkpoint,
     | 'saveMessage'
@@ -126,7 +129,12 @@ export function TableHeaderDetails(props: {
   >;
 }) {
   const { stored, checkpoint } = props;
-  const [open, setOpen] = useState(false);
+  const [localOpen, setLocalOpen] = useState(false);
+  const open = props.open ?? localOpen;
+  const setOpen = (next: boolean) => {
+    if (props.open === undefined) setLocalOpen(next);
+    props.onOpenChange?.(next);
+  };
   const triggerRef = useRef<HTMLButtonElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
   const lastFocused = useRef<HTMLElement | null>(null);

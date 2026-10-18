@@ -1024,6 +1024,14 @@ describe('W3/W4 lifecycle (D8)', () => {
   });
 
   it('mounts locally while another session holds control and remounts once after an explicit acquire', async () => {
+    let finishRegistration!: () => void;
+    const registrationGate = new Promise<void>(resolve => {
+      finishRegistration = resolve;
+    });
+    server = registryServer({
+      gate: kind => (kind === 'registerScene' ? registrationGate : undefined),
+    });
+    server.state.revision = 1;
     server.other('acquire', 'other-session');
     // The foreign lease is about to expire (the Acquire countdown).
     server.state.leaseUntil = Date.now() + 1_200;
@@ -1046,7 +1054,15 @@ describe('W3/W4 lifecycle (D8)', () => {
     await waitFor(() =>
       expect(screen.getByText("You're live")).toBeInTheDocument()
     );
+    stubPopoverLayout();
+    fireEvent.click(screen.getByRole('button', { name: /^Details/u }));
+    expect(
+      await screen.findByTestId('table-header-details')
+    ).toBeInTheDocument();
+    finishRegistration();
     await waitFor(() => expect(mocks.canvasMounts).toBe(mounts + 1));
+    // C6-2 remints the canvas, not the DM's just-opened workspace controls.
+    expect(screen.getByTestId('table-header-details')).toBeInTheDocument();
     await act(async () => {
       await new Promise(resolve => setTimeout(resolve, 50));
     });
