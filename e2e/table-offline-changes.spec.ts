@@ -276,6 +276,17 @@ function details(page: Page) {
   return page.getByRole('button', { name: /^Details/u });
 }
 
+/** Open the current header instance and prove its panel accepted the click. */
+async function openDetails(page: Page) {
+  const panel = page.getByTestId('table-header-details');
+  await expect(async () => {
+    if (await panel.isVisible()) return;
+    await details(page).click();
+    await expect(panel).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 30_000 });
+  return panel;
+}
+
 async function offlineChangesFlow(
   browser: Browser,
   fog: 'none' | 'after-live' | 'seeded'
@@ -322,7 +333,7 @@ async function offlineChangesFlow(
 
     // 1. Drop the live connection and edit while it is down.
     await setRelayOffline(page, true);
-    await details(page).click();
+    await openDetails(page);
     await expect(connectionLabel(page)).not.toHaveText('Connected', {
       timeout: 30_000,
     });
@@ -341,14 +352,13 @@ async function offlineChangesFlow(
 
     // 3. A later edit and a checkpoint leave the offline changes alone.
     await moveBox(page, LATER_X);
-    await details(page).click();
-    const panel = page.getByTestId('table-header-details');
+    const panel = await openDetails(page);
     await expect(panel.getByText(/^Offline changes from /u)).toBeVisible();
     await panel.getByRole('button', { name: 'Save checkpoint' }).click();
     await expect(page.getByText(/^Checkpoint saved\./u).first()).toBeVisible({
       timeout: 30_000,
     });
-    if (!(await panel.isVisible())) await details(page).click();
+    await openDetails(page);
     await expect(panel.getByText(/^Offline changes from /u)).toBeVisible();
 
     // 4. Reapply: the live map shows the offline version again.
@@ -359,7 +369,7 @@ async function offlineChangesFlow(
       timeout: 30_000,
     });
     await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
-    if (!(await panel.isVisible())) await details(page).click();
+    await openDetails(page);
     await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
     // OO2: the fog came back exactly with the reapplied version.
     if (fog !== 'none')
@@ -437,7 +447,7 @@ test('edits made while the relay is down at page load are kept and reapplied onc
       BOX_ID,
       { timeout: 30_000 }
     );
-    await details(page).click();
+    await openDetails(page);
     await expect(connectionLabel(page)).not.toHaveText('Connected', {
       timeout: 30_000,
     });
@@ -456,8 +466,7 @@ test('edits made while the relay is down at page load are kept and reapplied onc
     await expect.poll(() => boxX(page), { timeout: 20_000 }).toBe(START_X);
 
     // 3. Reapply: the live map shows the edit made while the relay was down.
-    await details(page).click();
-    const panel = page.getByTestId('table-header-details');
+    const panel = await openDetails(page);
     await expect(panel.getByText(/^Offline changes from /u)).toBeVisible();
     await panel
       .getByRole('button', { name: 'Reapply offline changes' })
@@ -466,7 +475,7 @@ test('edits made while the relay is down at page load are kept and reapplied onc
       timeout: 30_000,
     });
     await expect.poll(() => boxX(page), { timeout: 30_000 }).toBe(OFFLINE_X);
-    if (!(await panel.isVisible())) await details(page).click();
+    await openDetails(page);
     await expect(panel.getByText(/^Offline changes from /u)).toHaveCount(0);
   } finally {
     await context.close();
