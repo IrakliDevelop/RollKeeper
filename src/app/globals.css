@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Dark mode follows the app's theme toggle (<html data-theme="dark">),
+   not the operating system setting. */
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
 /* ============================================================
    SEMANTIC DESIGN TOKENS
    All theme-aware colors are defined here as CSS custom properties.
@@ -547,6 +551,17 @@
   }
   50% {
     box-shadow: 0 0 8px 4px var(--accent-red-border-strong, #ef4444);
+  }
+}
+
+@keyframes popover-in {
+  0% {
+    opacity: 0;
+    transform: scaleY(0.96) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scaleY(1) translateY(0);
   }
 }
 
