@@ -138,7 +138,10 @@ export function TablePresentationView(
       >
         {/* The display line shares the audience row when it fits (390 px). */}
         <div className="flex min-w-0 flex-wrap items-baseline gap-x-2">
-          <p className="text-heading min-w-0 font-medium break-words">
+          <p
+            className="text-heading line-clamp-2 min-w-0 font-medium break-words"
+            title={lines.audience}
+          >
             {lines.audience}
           </p>
           {displayLine && (
