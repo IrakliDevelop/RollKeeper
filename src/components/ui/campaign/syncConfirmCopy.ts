@@ -105,9 +105,11 @@ export const syncConfirm = {
   loadFromAccount(family: SyncFamily, count?: number): ConfirmDialogOptions {
     const what =
       family.count && count !== undefined ? family.count(count) : named(family);
+    // "Load 1 NPC… It replaces…": a single loaded document reads singular.
+    const several = family.plural && count !== 1;
     return {
       title: `Load ${what} from your account?`,
-      message: `${pronoun(family)} ${family.plural ? 'replace' : 'replaces'} the ${family.noun} on this browser. Work that hasn't been backed up stops this.`,
+      message: `${several ? 'They replace' : 'It replaces'} the ${family.noun} on this browser. Work that hasn't been backed up stops this.`,
       confirmLabel: 'Load from account',
       tone: 'danger',
     };

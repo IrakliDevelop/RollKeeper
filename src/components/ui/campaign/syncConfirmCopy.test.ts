@@ -39,6 +39,12 @@ describe('syncConfirm copy', () => {
     });
   });
 
+  it('uses "It" when loading a single document of a plural type', () => {
+    expect(syncConfirm.loadFromAccount(SYNC_FAMILIES.npcs, 1).message).toBe(
+      "It replaces the NPCs on this browser. Work that hasn't been backed up stops this."
+    );
+  });
+
   it('shortens fingerprints to a 12-character reference', () => {
     expect(
       syncConfirm.switchStorage(SYNC_FAMILIES.magicItems, 'abcdef0123456789')
