@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { expect, within } from 'storybook/test';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { Textarea } from './textarea';
 
 /**
@@ -61,4 +62,20 @@ export const States: Story = {
 export const StatesDark: Story = {
   render: () => <TextareaStates />,
   globals: { theme: 'dark' },
+};
+
+export const CoarsePointer: Story = {
+  render: () => <Textarea label="Session notes" />,
+  play: async ({ canvasElement }) => {
+    const notes = within(canvasElement).getByLabelText('Session notes');
+    const height = () => notes.getBoundingClientRect().height;
+
+    await expect(height()).toBeGreaterThanOrEqual(80);
+    const restore = emulateCoarsePointer();
+    try {
+      await expect(height()).toBeGreaterThanOrEqual(80);
+    } finally {
+      restore();
+    }
+  },
 };

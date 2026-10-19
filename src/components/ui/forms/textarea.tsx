@@ -128,7 +128,7 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         <textarea
           className={cn(
             inputVariants({ variant: textareaVariant }),
-            'min-h-[80px] resize-none',
+            'min-h-[80px] resize-none pointer-coarse:min-h-[80px]',
             !autoResize && 'resize-y',
             autoResize && 'overflow-hidden',
             // Size-specific padding
