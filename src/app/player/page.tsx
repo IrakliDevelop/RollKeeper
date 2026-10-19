@@ -121,13 +121,13 @@ export default function PlayerDashboardPage() {
     setActiveCharacter(character.id);
   };
 
-  const characterName = (characterId: string) =>
+  const characterNameFor = (characterId: string) =>
     characters.find(character => character.id === characterId)?.name ??
     'this character';
 
   const handleArchiveCharacter = async (characterId: string) => {
     const confirmed = await confirmDialog({
-      title: `Archive ${characterName(characterId)}?`,
+      title: `Archive ${characterNameFor(characterId)}?`,
       message: 'You can restore it from your archived characters.',
       confirmLabel: 'Archive character',
     });
@@ -136,7 +136,7 @@ export default function PlayerDashboardPage() {
 
   const handleDeleteCharacter = async (characterId: string) => {
     const confirmed = await confirmDialog({
-      title: `Delete ${characterName(characterId)}?`,
+      title: `Delete ${characterNameFor(characterId)}?`,
       message: "This can't be undone.",
       confirmLabel: 'Delete character',
       tone: 'danger',
