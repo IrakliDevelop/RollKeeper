@@ -109,8 +109,8 @@ const DYNAMIC_VARIANT = new RegExp(
     `|(?:aria|data|has|supports|not|in|nth|min|max)-(?:[a-z0-9+-]*${ARBITRARY}|[a-z0-9+-]+)`,
     // container queries: @md:, @max-lg:, @min-[400px]:
     `|@(?:min-|max-)?(?:[23]?xs|sm|md|lg|xl|[2-7]xl|${ARBITRARY})(?:/[\\w-]+)?`,
-    // child selectors: *: and **:
-    '|\\*{1,2}',
+    // child selectors: *: and **: at a class start, not Markdown bold
+    '|(?<=^|[\\s\'"`])\\*{1,2}',
     // arbitrary variants: [&:hover]:, [&>svg]:, [@media(min-width:640px)]:
     '|\\[[&@](?:[^\\[\\]]|\\[[^\\]]*\\])*\\]',
     '):\\$\\{',

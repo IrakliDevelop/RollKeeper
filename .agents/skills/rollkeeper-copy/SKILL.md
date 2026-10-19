@@ -117,10 +117,10 @@ a review: report findings, don't silently rewrite.
    - `const`: SCREAMING_SNAKE constants, and variables named `message`,
      `title`, `label`, `text`, `hint`, … or ending in one (`errorMessage`,
      `emptyTitle`);
-   - `error`: the message of `new Error(…)` in components, hooks, pages and
-     stores. Many reach the screen through `error.message`; judge the ones a
-     player or DM can see. Errors in `src/lib`, `src/app/api` and `src/test`
-     are developer messages and are not listed;
+   - `error`: a message of two or more words passed to `new Error(…)` anywhere
+     in `src` except `src/lib`, `src/app/api` and `src/test`. Many reach the
+     screen through `error.message`; judge the ones a player or DM can see.
+     Errors in those three folders are developer messages and are not listed;
    - `other`: the catch-all. Any other string of two or more words, unless it
      is a class list, CSS, a module path, an id or URL path, a type, a
      property key or a `console` message, or sits inside `className`, `key`,

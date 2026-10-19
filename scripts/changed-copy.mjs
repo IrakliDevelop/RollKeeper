@@ -349,7 +349,7 @@ function isClassEvidence(token) {
   const bare = token.replace(/^[!-]/, '');
   if (/[[\]]/.test(bare)) return true; // arbitrary value or variant
   if (/\/\d/.test(bare)) return true; // w-1/2, bg-black/50
-  if (/^[a-z0-9@*_-]+:[^\s:]/.test(bare)) return true; // hover:x, md:flex
+  if (/^(?=[^:]*[a-z*])[a-z0-9@*_-]+:[^\s:]/.test(bare)) return true; // hover:x, md:flex, not 10:30
   if (/^[a-z-]+[(=]/.test(bare)) return true; // CSS functions, attr="x"
   const [root, ...rest] = bare.split('-');
   return rest.length > 0 && UTILITY_ROOTS.has(root);
@@ -392,7 +392,13 @@ function copyKind(node, sourceFile) {
   const kind = classified(node);
   if (kind || !isTextLike(node)) return kind;
   const text = textOf(node, sourceFile).replace(/\s+/g, ' ').trim();
-  if (TWO_WORDS.test(text) && isErrorMessage(node, sourceFile)) return 'error';
+  if (
+    TWO_WORDS.test(text) &&
+    !IDENTIFIER_LIKE.test(text.replaceAll('{…}', 'x')) &&
+    isErrorMessage(node, sourceFile)
+  ) {
+    return 'error';
+  }
   if (!TWO_WORDS.test(text) || isClassLike(text) || isCodeContext(node)) {
     return null;
   }

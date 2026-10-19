@@ -245,6 +245,20 @@ test('an undefined token is still flagged behind any variant', () => {
   );
 });
 
+test('does not mistake Markdown bold before a template hole for a child variant', () => {
+  for (const snippet of [
+    '`**Damage**:${x}`',
+    '`**${name}**:${x}`',
+    '`***:${x}`',
+  ]) {
+    assert.deepEqual(
+      findTokenProblems(file(`const a = ${snippet};`), css),
+      [],
+      snippet
+    );
+  }
+});
+
 test('does not mistake more template keys for variants', () => {
   assert.deepEqual(
     findTokenProblems(

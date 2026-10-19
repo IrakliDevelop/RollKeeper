@@ -474,9 +474,37 @@ throw new Error(ok ? 'Upload failed' : 'Download failed');
   );
 });
 
+test('identifier-like new Error messages are not listed as copy', () => {
+  const entries = extractCopy(
+    'src/components/Sync.tsx',
+    `
+throw new Error('recovery-unavailable');
+throw new Error('Could not save the character');
+`
+  );
+  assert.deepEqual(
+    entries.map(e => [e.kind, e.text]),
+    [['error', 'Could not save the character']]
+  );
+});
+
+test('times and ratios are not Tailwind variant evidence', () => {
+  const source = `
+const a = 'starts at 10:30 sharp';
+const b = 'aspect 3:2 portrait';
+const c = 'md:flex 2xl:grid hover:bg-surface';
+`;
+  const texts = extractCopy('src/test.tsx', source).map(e => e.text);
+  assert.deepEqual(texts, ['starts at 10:30 sharp', 'aspect 3:2 portrait']);
+});
+
 test('new Error messages in lib, api and test code stay developer messages', () => {
   const source = `throw new Error('Sign in to the owner account first.');`;
-  for (const file of ['src/lib/sync.ts', 'src/app/api/x/route.ts']) {
+  for (const file of [
+    'src/lib/sync.ts',
+    'src/app/api/x/route.ts',
+    'src/test/setup.ts',
+  ]) {
     assert.deepEqual(extractCopy(file, source), [], file);
   }
 });
