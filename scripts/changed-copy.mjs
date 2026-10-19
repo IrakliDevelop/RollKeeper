@@ -70,7 +70,7 @@ const COPY_OBJECT_KEYS = new Set([
 
 // JSX attributes whose values are never shown as text.
 const NON_COPY_ATTRIBUTE =
-  /^(?:className|class|key|id|htmlFor|type|role|href|src|style|data-.*|on[A-Z].*)$/;
+  /^(?:className|class|key|id|htmlFor|type|role|href|src|style|data-.*)$/;
 // Calls whose string arguments are class names, developer messages or module paths.
 const NON_COPY_CALL =
   /^(?:cn|clsx|cva|twMerge|classNames|console\.\w+|require|(?:describe|it|test|expect)(?:\.\w+)*)$/;
@@ -329,13 +329,62 @@ function isCodeContext(node) {
   return false;
 }
 
+// Tailwind utilities whose names contain a hyphen or colon: "items-center" and
+// "bg-surface" are class evidence, "level-up" and "note:" are prose.
+const UTILITY_ROOTS = new Set(
+  (
+    'accent align animate aspect auto backdrop basis bg blur border bottom break brightness ' +
+    'caret col columns content contrast cursor decoration delay divide drop duration ease end ' +
+    'fill flex font from gap gradient grayscale grid grow h hue indent inset invert items ' +
+    'justify leading left line list m mb me min max mix ml mr ms mt mx my object opacity order ' +
+    'origin outline overflow overscroll p pb pe pl place pointer pr ps pt px py right ring ' +
+    'rotate rounded row saturate scale scroll select self sepia shadow shrink size skew snap ' +
+    'space sr start stroke table text to top touch tracking transition translate underline ' +
+    'via w whitespace will z'
+  ).split(' ')
+);
+
+// Evidence that a token is a Tailwind class and not a hyphenated word.
+function isClassEvidence(token) {
+  const bare = token.replace(/^[!-]/, '');
+  if (/[[\]]/.test(bare)) return true; // arbitrary value or variant
+  if (/\/\d/.test(bare)) return true; // w-1/2, bg-black/50
+  if (/^[a-z0-9@*_-]+:[^\s:]/.test(bare)) return true; // hover:x, md:flex
+  if (/^[a-z-]+[(=]/.test(bare)) return true; // CSS functions, attr="x"
+  const [root, ...rest] = bare.split('-');
+  return rest.length > 0 && UTILITY_ROOTS.has(root);
+}
+
+// One token with no space: a lowercase id, enum value, file name or MIME type,
+// or a URL path or colour (/api/x, #fff).
+const IDENTIFIER_LIKE = /^(?:[a-z0-9@.][a-z0-9_\-:./,+]*|[/#]\S*)$/;
+
 // Tailwind class lists and CSS: every token looks like a class and at least one
-// has the -, :, [ or / that prose rarely does. Template holes count as a letter.
+// is unmistakably Tailwind. Template holes count as a letter. Lowercase
+// kebab/snake strings with no space are ids and enum values, not prose.
 function isClassLike(text) {
-  const tokens = text.replaceAll('{…}', 'x').split(' ');
+  const plain = text.replaceAll('{…}', 'x');
+  if (IDENTIFIER_LIKE.test(plain)) return true;
+  const tokens = plain.split(' ');
   return (
     tokens.every(token => CLASS_TOKEN.test(token)) &&
-    tokens.some(token => /[-:[/]/.test(token))
+    tokens.some(isClassEvidence)
+  );
+}
+
+// Storage, sync and server layers throw developer messages; the UI layers
+// (components, hooks, pages, stores) often show `error.message` as written.
+const DEVELOPER_ERROR_FILE = /^src\/(?:lib|app\/api|test)\//;
+
+// The message of `new Error('…')` in a UI-facing file. Listed as its own kind
+// because only some of these reach the screen: the reviewer decides.
+function isErrorMessage(node, sourceFile) {
+  if (DEVELOPER_ERROR_FILE.test(sourceFile.fileName)) return false;
+  const target = receiver(node);
+  return Boolean(
+    target &&
+      ts.isNewExpression(target) &&
+      DEVELOPER_ERRORS.has(target.expression.getText())
   );
 }
 
@@ -343,6 +392,7 @@ function copyKind(node, sourceFile) {
   const kind = classified(node);
   if (kind || !isTextLike(node)) return kind;
   const text = textOf(node, sourceFile).replace(/\s+/g, ' ').trim();
+  if (TWO_WORDS.test(text) && isErrorMessage(node, sourceFile)) return 'error';
   if (!TWO_WORDS.test(text) || isClassLike(text) || isCodeContext(node)) {
     return null;
   }
