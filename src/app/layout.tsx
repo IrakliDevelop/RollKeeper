@@ -6,6 +6,7 @@ import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 import { MotionProvider } from './MotionProvider';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
 import { StorageBlockedBanner } from '@/components/ui/feedback/StorageBlockedBanner';
+import { ConfirmDialogHost } from '@/components/ui/feedback/confirm-dialog';
 import { storageFallbackScript } from '@/lib/browserStorage';
 import { themeScript } from './themeScript';
 
@@ -116,6 +117,9 @@ export default function RootLayout({
             <PersistenceBootstrap>
               <ErrorBoundary>{children}</ErrorBoundary>
             </PersistenceBootstrap>
+            {/* Outside PersistenceBootstrap, which renders nothing until
+                storage is ready, because its providers open dialogs too. */}
+            <ConfirmDialogHost />
           </MotionProvider>
         </ThemeProviderWrapper>
       </body>

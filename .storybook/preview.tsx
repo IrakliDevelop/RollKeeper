@@ -2,6 +2,7 @@ import type { Preview, Decorator } from '@storybook/nextjs-vite';
 import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';
 import { MotionProvider } from '../src/app/MotionProvider';
+import { ConfirmDialogHost } from '../src/components/ui/feedback/confirm-dialog';
 
 type StoryTheme = 'light' | 'dark';
 
@@ -61,6 +62,7 @@ const withTheme: Decorator = (Story, context) => {
       <ThemeWrapper theme={theme} scoped={context.viewMode === 'docs'}>
         <Story />
       </ThemeWrapper>
+      <ConfirmDialogHost />
     </MotionProvider>
   );
 };

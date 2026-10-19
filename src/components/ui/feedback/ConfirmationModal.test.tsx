@@ -1,4 +1,11 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
@@ -17,7 +24,7 @@ describe('ConfirmationModal', () => {
       />
     );
 
-    expect(screen.getByRole('dialog')).toHaveAccessibleDescription(
+    expect(screen.getByRole('alertdialog')).toHaveAccessibleDescription(
       'The library copy will be deleted.'
     );
   });
@@ -60,5 +67,37 @@ describe('ConfirmationModal', () => {
       'data-variant',
       'primary'
     );
+  });
+
+  it('returns focus to the button that opened it', async () => {
+    function ResetButton() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setOpen(true)}>
+            Reset character
+          </button>
+          <ConfirmationModal
+            isOpen={open}
+            onClose={() => setOpen(false)}
+            onConfirm={vi.fn()}
+            title="Reset Character"
+            message="This action cannot be undone."
+            confirmText="Reset Character"
+            cancelText="Keep Character"
+          />
+        </>
+      );
+    }
+    render(<ResetButton />);
+    const trigger = screen.getByRole('button', { name: 'Reset character' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Keep Character' })
+    );
+
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
