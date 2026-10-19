@@ -21,8 +21,27 @@ export interface CardProps
 }
 
 const Card = React.forwardRef<HTMLDivElement, CardProps>(
-  ({ className, variant, padding, interactive, onClick, ...props }, ref) => {
+  (
+    { className, variant, padding, interactive, onClick, onKeyDown, ...props },
+    ref
+  ) => {
     const isInteractive = interactive || !!onClick;
+
+    // role="button" needs Enter and Space too. Only the card itself: a key
+    // pressed on a button nested inside the card belongs to that button.
+    const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+      onKeyDown?.(event);
+      if (
+        !isInteractive ||
+        event.defaultPrevented ||
+        event.target !== event.currentTarget ||
+        (event.key !== 'Enter' && event.key !== ' ')
+      ) {
+        return;
+      }
+      event.preventDefault();
+      event.currentTarget.click();
+    };
 
     return (
       <div
@@ -35,6 +54,7 @@ const Card = React.forwardRef<HTMLDivElement, CardProps>(
           className
         )}
         onClick={onClick}
+        onKeyDown={isInteractive || onKeyDown ? handleKeyDown : undefined}
         role={isInteractive ? 'button' : undefined}
         tabIndex={isInteractive ? 0 : undefined}
         {...props}

@@ -105,19 +105,26 @@ export const inputVariants = cva(
 export type InputVariants = VariantProps<typeof inputVariants>;
 
 /**
- * Card variants - used by Card and card-like containers
+ * Card variants - used by Card and card-like containers.
+ *
+ * Felt and Brass: a card is a discrete object (a character, monster, spell,
+ * item or campaign) on surface-raised with a 1px divider and a 6px radius,
+ * never a shadow. bordered is a deprecated alias of default. interactive
+ * swaps the hover shadow for an input-border edge.
  */
+const DEFAULT_CARD = 'border border-divider';
+
 export const cardVariants = cva(
   // Base styles
-  'rounded-lg bg-surface-raised transition-all duration-200',
+  'rounded-md bg-surface-raised transition-colors duration-120 ease-out',
   {
     variants: {
       variant: {
-        default: 'border border-divider',
-        bordered: 'border-2 border-divider-strong',
-        elevated: 'border border-divider shadow-md',
+        default: DEFAULT_CARD,
+        /** @deprecated Use `default`. */
+        bordered: DEFAULT_CARD,
         interactive:
-          'border-2 border-divider hover:border-divider-strong hover:shadow-md cursor-pointer',
+          'border border-divider cursor-pointer hover:border-input-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         ghost: 'border-0',
       },
       padding: {

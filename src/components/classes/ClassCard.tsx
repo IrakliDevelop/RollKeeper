@@ -34,7 +34,7 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
         <Card
           variant="bordered"
           padding="md"
-          className="transition-all group-hover:shadow-md"
+          className="group-hover:border-input-border"
         >
           <CardContent className="p-0">
             <div className="flex items-start justify-between">
@@ -159,7 +159,7 @@ export default function ClassCard({ classData, displayMode }: ClassCardProps) {
       <Card
         variant="bordered"
         padding="md"
-        className="h-full transition-all group-hover:shadow-md"
+        className="group-hover:border-input-border h-full"
       >
         <CardContent className="p-0">
           <div className="mb-4 flex items-start justify-between">
