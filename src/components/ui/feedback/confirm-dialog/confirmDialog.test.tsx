@@ -143,6 +143,35 @@ describe('confirm dialog', () => {
     await waitFor(() => expect(trigger).toHaveFocus());
   });
 
+  it('returns focus to the opener when a second dialog opens right after the first', async () => {
+    render(
+      <>
+        <button
+          type="button"
+          onClick={() =>
+            void confirmDialog(DELETE_SPELL).then(confirmed => {
+              if (confirmed) {
+                return alertDialog({ title: 'Fireball deleted' });
+              }
+            })
+          }
+        >
+          Delete Fireball
+        </button>
+        <ConfirmDialogHost />
+      </>
+    );
+    const trigger = screen.getByRole('button', { name: 'Delete Fireball' });
+    trigger.focus();
+    fireEvent.click(trigger);
+
+    await clickConfirmDialogButton('Delete spell');
+    await screen.findByRole('alertdialog', { name: 'Fireball deleted' });
+    await clickConfirmDialogButton('Close');
+
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
   it('ignores clicks outside the dialog', async () => {
     render(<ConfirmDialogHost />);
     void confirmDialog(DELETE_SPELL);

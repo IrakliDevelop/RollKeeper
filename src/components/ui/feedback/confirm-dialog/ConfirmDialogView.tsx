@@ -90,8 +90,13 @@ export function ConfirmDialogView({
 
   const handleCloseAutoFocus = (event: Event) => {
     event.preventDefault();
-    const target = returnFocusTo ?? openerRef.current;
-    if (target instanceof HTMLElement && target.isConnected) target.focus();
+    // The opener may have unmounted (a closed menu item), so fall back to
+    // the element focused when this dialog opened.
+    const target = [returnFocusTo, openerRef.current].find(
+      (candidate): candidate is HTMLElement =>
+        candidate instanceof HTMLElement && candidate.isConnected
+    );
+    target?.focus();
   };
 
   return (

@@ -55,6 +55,22 @@ type Listener = () => void;
 let queue: QueueEntry[] = [];
 let nextId = 1;
 let hostCount = 0;
+/**
+ * Where the most recently resolved dialog was going to return focus. A
+ * dialog opened while that one is still animating out would otherwise
+ * capture the closing dialog's own button as its opener.
+ */
+let lastReturnFocus: Element | null = null;
+/** True until the end of the tick in which a dialog was resolved. */
+let resolvedThisTick = false;
+
+function rememberReturnFocus(element: Element | null) {
+  lastReturnFocus = element;
+  resolvedThisTick = true;
+  setTimeout(() => {
+    resolvedThisTick = false;
+  }, 0);
+}
 const listeners = new Set<Listener>();
 
 function emit() {
@@ -67,6 +83,17 @@ function cancelledResult(request: DialogRequest): DialogResult {
   return false;
 }
 
+function captureOpener(): Element | null {
+  if (typeof document === 'undefined') return null;
+  const active = document.activeElement;
+  // Chained dialogs: the closing dialog's button, or the page body once that
+  // button is gone, is not an opener.
+  const leftBehind =
+    active?.closest('[data-confirm-dialog]') ||
+    (resolvedThisTick && (!active || active === document.body));
+  return leftBehind ? lastReturnFocus : active;
+}
+
 function enqueue(request: DialogRequest): Promise<DialogResult> {
   if (hostCount === 0) {
     // A missing host must never read as consent: cancel, and say why.
@@ -75,9 +102,7 @@ function enqueue(request: DialogRequest): Promise<DialogResult> {
     );
     return Promise.resolve(cancelledResult(request));
   }
-  const returnFocus =
-    queue[0]?.returnFocus ??
-    (typeof document === 'undefined' ? null : document.activeElement);
+  const returnFocus = queue[0]?.returnFocus ?? captureOpener();
   return new Promise(resolve => {
     queue = [...queue, { request, resolve, returnFocus }];
     emit();
@@ -129,6 +154,7 @@ export function resolveCurrentDialog(id: number, result: DialogResult) {
   const [head, ...rest] = queue;
   if (!head || head.request.id !== id) return;
   queue = rest;
+  rememberReturnFocus(head.returnFocus);
   head.resolve(result);
   emit();
 }
@@ -138,6 +164,7 @@ export function cancelAllDialogs() {
   if (queue.length === 0) return;
   const pending = queue;
   queue = [];
+  rememberReturnFocus(pending[0].returnFocus);
   for (const entry of pending) entry.resolve(cancelledResult(entry.request));
   emit();
 }
