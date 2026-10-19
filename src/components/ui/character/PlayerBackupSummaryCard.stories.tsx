@@ -61,8 +61,3 @@ export const OngoingDark: Story = {
   args: { view: createPlayerBackupDashboardFixture('ongoing-complete') },
   globals: { theme: 'dark' },
 };
-
-export const OngoingParchment: Story = {
-  args: { view: createPlayerBackupDashboardFixture('ongoing-complete') },
-  globals: { theme: 'parchment' },
-};

@@ -75,17 +75,7 @@ export const ChooseCharactersDark: Story = {
   globals: { theme: 'dark' },
 };
 
-export const ChooseCharactersParchment: Story = {
-  args: { view: createPlayerBackupWizardFixture('choose-characters') },
-  globals: { theme: 'parchment' },
-};
-
 export const ResultProtectedDark: Story = {
   args: { view: createPlayerBackupWizardFixture('result-protected') },
   globals: { theme: 'dark' },
-};
-
-export const ResultProtectedParchment: Story = {
-  args: { view: createPlayerBackupWizardFixture('result-protected') },
-  globals: { theme: 'parchment' },
 };

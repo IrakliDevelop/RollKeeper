@@ -84,7 +84,8 @@ test('native controls follow the theme through color-scheme', async () => {
       .match(/color-scheme:\s*(\w+)/)?.[1];
   assert.equal(scheme(':root'), 'light');
   assert.equal(scheme("[data-theme='dark']"), 'dark');
-  assert.equal(scheme("[data-theme='parchment']"), 'light');
+  const declarations = stripComments(css).match(/(?<![\w-])color-scheme:/g);
+  assert.equal(declarations.length, 2, 'only paper and felt set color-scheme');
 });
 
 test('role utilities are generated from the role tokens', async () => {
@@ -182,14 +183,56 @@ test('gradient endpoints are flattened to surfaces', async () => {
   assert.equal(shared['--gradient-purple-from'], 'var(--lapis-bg)');
 });
 
-test('parchment keeps its own palette until it is retired in 1b', async () => {
-  const parchment = readBlock(
-    await readGlobalsCss(),
-    "[data-theme='parchment']"
+test('parchment is retired: paper and felt are the only theme blocks', async () => {
+  const css = stripComments(await readGlobalsCss());
+  const themed = new Set(
+    [...css.matchAll(/\[data-theme=['"]?([\w-]+)['"]?\]/g)].map(
+      match => match[1]
+    )
   );
-  assert.equal(parchment['--accent-emerald-text'], '#0c6344');
-  assert.equal(parchment['--input-bg'], '#fcfbf8');
-  assert.equal(parchment['--surface-elevated'], 'var(--surface-hover)');
+  assert.deepEqual([...themed], ['dark']);
+  assert.doesNotMatch(css, /parchment/i);
+});
+
+test('no theme block redeclares a shared token', async () => {
+  // Shared tokens are declared once on `:root, [data-theme]` so they
+  // re-resolve in nested theme wrappers. A literal in a theme block would
+  // either be dead (paper sits before the shared block) or win over it
+  // (felt sits after), splitting the themes.
+  const css = await readGlobalsCss();
+  const shared = Object.keys(readBlock(css, ':root,\n[data-theme]'));
+  for (const name of ['--background', '--foreground', '--ring', '--input-bg']) {
+    assert.ok(
+      shared.includes(name),
+      `${name} must be declared on :root, [data-theme]`
+    );
+  }
+  for (const selector of [':root', "[data-theme='dark']"]) {
+    const block = readBlock(css, selector);
+    assert.deepEqual(
+      shared.filter(name => name in block),
+      [],
+      `${selector} redeclares shared tokens`
+    );
+  }
+});
+
+test('Storybook takes its theme colours from the tokens', async () => {
+  const preview = await readFile(
+    path.join(repositoryRoot, '.storybook/preview.tsx'),
+    'utf8'
+  );
+  assert.doesNotMatch(preview, /#[0-9a-f]{3,8}\b/i);
+  assert.doesNotMatch(preview, /parchment/i);
+  assert.doesNotMatch(preview, /document\.body\.style/);
+  assert.match(preview, /var\(--background\)/);
+
+  // `ruleFor` finds the first substring match ("body-family" in the theme
+  // tokens), so read the `body` rule from the source instead.
+  const css = stripComments(await readGlobalsCss());
+  const body = css.match(/(^|\n)body\s*\{([^}]*)\}/)?.[2] ?? '';
+  assert.match(body, /background:\s*var\(--background\)/);
+  assert.match(body, /color:\s*var\(--foreground\)/);
 });
 
 test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/postcss', async () => {
