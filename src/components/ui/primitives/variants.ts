@@ -138,27 +138,27 @@ export const cardVariants = cva(
 export type CardVariants = VariantProps<typeof cardVariants>;
 
 /**
- * Badge variants - used by Badge and badge-like labels
+ * Badge variants - used by Badge and badge-like labels.
+ *
+ * Felt and Brass: a 1px outline in the role colour with no fill. info,
+ * secondary and outline render as neutral.
  */
+const NEUTRAL_BADGE = 'border-input-border text-heading';
+
 export const badgeVariants = cva(
   // Base styles
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'inline-flex items-center gap-1 rounded-[3px] border px-2.5 py-0.5 text-xs font-semibold transition-colors',
   {
     variants: {
       variant: {
-        primary:
-          'bg-accent-emerald-bg text-accent-emerald-text border border-accent-emerald-border',
-        secondary:
-          'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        success:
-          'bg-accent-green-bg text-accent-green-text border border-accent-green-border',
-        danger:
-          'bg-accent-red-bg text-accent-red-text border border-accent-red-border',
-        warning:
-          'bg-accent-amber-bg text-accent-amber-text border border-accent-amber-border',
-        info: 'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        neutral: 'bg-surface-secondary text-heading border border-divider',
-        outline: 'bg-transparent text-heading border border-divider-strong',
+        primary: 'border-brass-border text-brass-text',
+        success: 'border-verdigris-border text-verdigris-text',
+        warning: 'border-ember-border text-ember-text',
+        danger: 'border-blood-border text-blood-text',
+        neutral: NEUTRAL_BADGE,
+        secondary: NEUTRAL_BADGE,
+        info: NEUTRAL_BADGE,
+        outline: NEUTRAL_BADGE,
       },
       size: {
         sm: 'text-xs px-2 py-0.5',
@@ -167,7 +167,7 @@ export const badgeVariants = cva(
       },
     },
     defaultVariants: {
-      variant: 'primary',
+      variant: 'neutral',
       size: 'md',
     },
   }

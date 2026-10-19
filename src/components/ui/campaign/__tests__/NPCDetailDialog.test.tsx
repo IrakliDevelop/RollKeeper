@@ -131,7 +131,7 @@ describe('NPCDetailDialog — Shop tab wiring', () => {
       expect(screen.queryByText('Open')).toBeNull();
     });
 
-    it('shows an emerald Open badge beside the merchant name when the shop is open', () => {
+    it('shows a primary Open badge beside the merchant name when the shop is open', () => {
       const npc = makeNpc({
         shop: { open: true, updatedAt: '2026-01-01T00:00:00.000Z' },
       });
@@ -140,7 +140,7 @@ describe('NPCDetailDialog — Shop tab wiring', () => {
 
       const badge = screen.getByText('Open');
       expect(badge).toBeInTheDocument();
-      expect(badge).toHaveClass('bg-accent-emerald-bg');
+      expect(badge).toHaveAttribute('data-variant', 'primary');
     });
   });
 });
