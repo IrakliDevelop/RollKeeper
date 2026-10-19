@@ -95,7 +95,8 @@ export function ConditionIconPicker({
                 return (
                   <Button
                     key={name}
-                    variant={name === value ? 'secondary' : 'ghost'}
+                    variant="ghost"
+                    selected={name === value}
                     size="sm"
                     type="button"
                     aria-label={name}

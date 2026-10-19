@@ -211,7 +211,8 @@ const SpellCard: React.FC<{
           </Button>
           <Button
             onClick={onTogglePrepared}
-            variant={isSpellPrepared(spell) ? 'success' : 'outline'}
+            variant="outline"
+            selected={isSpellPrepared(spell)}
             size="xs"
             disabled={spell.isAlwaysPrepared}
             title={
@@ -392,7 +393,8 @@ const SpellCard: React.FC<{
 
           <Button
             onClick={onTogglePrepared}
-            variant={isSpellPrepared(spell) ? 'success' : 'outline'}
+            variant="outline"
+            selected={isSpellPrepared(spell)}
             size="sm"
             disabled={spell.isAlwaysPrepared}
             title={

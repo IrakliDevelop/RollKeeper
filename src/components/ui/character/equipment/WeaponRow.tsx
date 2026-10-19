@@ -235,7 +235,8 @@ export function WeaponRow({
             )}
             <Button
               onClick={() => onToggleEquip(weapon.id, !weapon.isEquipped)}
-              variant={weapon.isEquipped ? 'success' : 'outline'}
+              variant="outline"
+              selected={weapon.isEquipped}
               size="sm"
             >
               <Swords size={14} className="mr-1" />

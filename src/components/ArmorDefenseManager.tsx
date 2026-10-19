@@ -645,7 +645,8 @@ function ArmorCard({
           </div>
           <Button
             onClick={onToggleEquip}
-            variant={equipped ? 'success' : 'outline'}
+            variant="outline"
+            selected={equipped}
             size="sm"
             className={
               equipped ? '' : 'hover:border-green-300 hover:bg-green-50'

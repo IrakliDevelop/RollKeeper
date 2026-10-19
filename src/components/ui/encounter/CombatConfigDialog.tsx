@@ -181,7 +181,8 @@ export function CombatConfigDialog({
             {CONFIG_SECTIONS.map(item => (
               <Button
                 key={item.key}
-                variant={section === item.key ? 'secondary' : 'ghost'}
+                variant="ghost"
+                selected={section === item.key}
                 size="sm"
                 type="button"
                 aria-pressed={section === item.key}

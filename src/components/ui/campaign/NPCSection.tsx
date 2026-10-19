@@ -295,9 +295,8 @@ export function NPCSection({
             </span>
             <div className="bg-surface-raised border-divider inline-flex rounded-md border p-1">
               <Button
-                variant={
-                  spellSlotDisplayMode === 'inline' ? 'secondary' : 'ghost'
-                }
+                variant="ghost"
+                selected={spellSlotDisplayMode === 'inline'}
                 size="xs"
                 onClick={() =>
                   setDmDashboardUi(campaignCode, {
@@ -309,9 +308,8 @@ export function NPCSection({
                 Inline
               </Button>
               <Button
-                variant={
-                  spellSlotDisplayMode === 'tracker' ? 'secondary' : 'ghost'
-                }
+                variant="ghost"
+                selected={spellSlotDisplayMode === 'tracker'}
                 size="xs"
                 onClick={() =>
                   setDmDashboardUi(campaignCode, {

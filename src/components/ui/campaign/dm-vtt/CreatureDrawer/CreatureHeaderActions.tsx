@@ -38,7 +38,8 @@ export function CreatureHeaderActions({
       <div className="flex items-center gap-1">
         {!isLair && (
           <Button
-            variant={editing ? 'warning' : 'outline'}
+            variant="outline"
+            selected={editing}
             size="sm"
             onClick={onToggleEditing}
             aria-pressed={editing}

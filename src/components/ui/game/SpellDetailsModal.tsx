@@ -99,7 +99,8 @@ export default function SpellDetailsModal({
                 {onToggleFavorite && (
                   <Button
                     onClick={onToggleFavorite}
-                    variant={isFavorite ? 'warning' : 'ghost'}
+                    variant="ghost"
+                    selected={isFavorite}
                     size="sm"
                     leftIcon={
                       <Star

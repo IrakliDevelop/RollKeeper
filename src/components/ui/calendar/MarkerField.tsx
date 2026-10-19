@@ -36,7 +36,8 @@ export function MarkerField({
       <div className="flex items-center gap-3">
         <div className="flex gap-1">
           <Button
-            variant={mode === 'dot' ? 'secondary' : 'ghost'}
+            variant="ghost"
+            selected={mode === 'dot'}
             size="sm"
             aria-pressed={mode === 'dot'}
             onClick={() => onModeChange('dot')}
@@ -44,7 +45,8 @@ export function MarkerField({
             Dot
           </Button>
           <Button
-            variant={mode === 'emoji' ? 'secondary' : 'ghost'}
+            variant="ghost"
+            selected={mode === 'emoji'}
             size="sm"
             aria-pressed={mode === 'emoji'}
             onClick={() => onModeChange('emoji')}

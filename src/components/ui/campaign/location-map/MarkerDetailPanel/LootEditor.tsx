@@ -206,7 +206,8 @@ export function LootEditor({
           className="border-divider bg-surface flex gap-1 rounded-md border p-1"
         >
           <Button
-            variant={access === 'locked' ? 'warning' : 'ghost'}
+            variant="ghost"
+            selected={access === 'locked'}
             size="sm"
             className="flex-1"
             aria-pressed={access === 'locked'}
@@ -216,7 +217,8 @@ export function LootEditor({
             Locked
           </Button>
           <Button
-            variant={access === 'open' ? 'success' : 'ghost'}
+            variant="ghost"
+            selected={access === 'open'}
             size="sm"
             className="flex-1"
             aria-pressed={access === 'open'}

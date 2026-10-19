@@ -72,7 +72,8 @@ export function RailActiveControls({
           </div>
         )}
         <Button
-          variant={hidePlayerHp ? 'warning' : 'ghost'}
+          variant="ghost"
+          selected={hidePlayerHp}
           size="sm"
           onClick={onToggleHidePlayerHp}
           leftIcon={hidePlayerHp ? <EyeOff size={14} /> : <Eye size={14} />}
