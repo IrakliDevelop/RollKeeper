@@ -154,7 +154,7 @@ export function CharacterStorageMigrationControls() {
       const prepare = await confirmDialog({
         title: 'Prepare this browser for the new storage?',
         message:
-          'Your recovery file is downloaded. Characters stay in the current storage until you confirm the switch.',
+          'Your recovery download has started. Characters stay in the current storage until you confirm the switch.',
         confirmLabel: 'Prepare browser',
       });
       if (!prepare) {

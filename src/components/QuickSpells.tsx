@@ -35,6 +35,7 @@ import { d20Notation } from '@/utils/sheetRoll';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
+import { castCostAlertTitle } from '@/utils/spellCastCost';
 
 const NO_SPELLCASTING_ABILITY = {
   title: "Can't cast spells",
@@ -629,7 +630,7 @@ export function QuickSpells({
     });
     if (!cast) {
       void alertDialog({
-        title: 'Not enough of the linked item to cast this spell',
+        title: castCostAlertTitle(selectedSpell, character.inventoryItems),
       });
       return;
     }

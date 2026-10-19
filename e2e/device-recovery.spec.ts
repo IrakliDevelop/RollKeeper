@@ -58,8 +58,8 @@ test('stages a full-device bundle inactive and preserves collisions during expli
   ).toBeVisible();
   await page.getByRole('button', { name: 'Restore selected entries' }).click();
   await page
-    .getByRole('dialog', { name: 'Restore the selected values?' })
-    .getByRole('button', { name: 'Restore values' })
+    .getByRole('dialog', { name: 'Restore the selected entries?' })
+    .getByRole('button', { name: 'Restore entries' })
     .click();
   await expect(page.getByText(/Restored 1;/)).toBeVisible();
 

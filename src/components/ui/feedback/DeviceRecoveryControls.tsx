@@ -115,10 +115,10 @@ export function DeviceRecoveryControls() {
   const handleRestore = async () => {
     if (!generation || !activated || selectedKeys.size === 0) return;
     const confirmed = await confirmDialog({
-      title: 'Restore the selected values?',
+      title: 'Restore the selected entries?',
       message:
-        'Only missing values are filled in. Existing values and conflicts are left as they are.',
-      confirmLabel: 'Restore values',
+        'Only entries missing from this browser are restored. Existing entries and conflicts are left as they are.',
+      confirmLabel: 'Restore entries',
     });
     if (!confirmed) return;
     const result = restoreRecoveryEntries(

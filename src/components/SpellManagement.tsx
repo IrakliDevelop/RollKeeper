@@ -70,6 +70,7 @@ import {
   alertDialog,
   confirmDialog,
 } from '@/components/ui/feedback/confirm-dialog';
+import { castCostAlertTitle } from '@/utils/spellCastCost';
 
 interface SpellFilters {
   searchQuery: string;
@@ -920,7 +921,7 @@ export const SpellManagement: React.FC = () => {
     if (!selectedSpell) return;
     if (!consumeInventoryCost(selectedSpell.inventoryCost)) {
       void alertDialog({
-        title: 'Not enough of the linked item to cast this spell',
+        title: castCostAlertTitle(selectedSpell, character.inventoryItems),
       });
       return;
     }
