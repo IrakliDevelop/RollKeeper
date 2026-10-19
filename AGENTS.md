@@ -232,6 +232,7 @@ import { Autocomplete } from '@/components/ui/forms/Autocomplete';
 // Layout
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section'; // heading + rule; Card is only for discrete objects
 
 // Feedback / overlays
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';

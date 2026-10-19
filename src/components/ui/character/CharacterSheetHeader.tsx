@@ -188,7 +188,7 @@ export default function CharacterSheetHeader({
                     placeholder="Character Name"
                     value={characterName}
                     onChange={e => onUpdateName(e.target.value)}
-                    className="text-text-primary placeholder-text-tertiary w-full border-none bg-transparent text-3xl font-bold outline-none"
+                    className="text-text-primary placeholder-text-tertiary w-full border-none bg-transparent text-3xl font-bold"
                     size="lg"
                   />
                 ) : (

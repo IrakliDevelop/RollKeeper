@@ -74,20 +74,26 @@ export const buttonVariants = cva(
 export type ButtonVariants = VariantProps<typeof buttonVariants>;
 
 /**
- * Input field variants - used by Input, Textarea, and Select
+ * Input field variants - used by Input, Textarea, Select trigger and
+ * Autocomplete.
+ *
+ * Felt and Brass: surface-inset well, 1px input-border, 4px radius, and a
+ * 2px brass focus outline with a transparent gap (a ring offset would paint
+ * white on felt). error is a blood border; success is a deprecated alias of
+ * default. Coarse pointers get a 44px minimum height.
  */
+const DEFAULT_INPUT = 'border-input-border';
+
 export const inputVariants = cva(
   // Base styles
-  'flex w-full rounded-lg border-2 bg-input-bg px-3 py-2 text-input-text placeholder:text-input-placeholder transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-50',
+  'flex w-full rounded-sm border bg-input-bg px-3 py-2 text-input-text placeholder:text-input-placeholder transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11',
   {
     variants: {
       variant: {
-        default:
-          'border-input-border focus-visible:border-input-border-focus focus-visible:ring-emerald-500 dark:focus-visible:ring-emerald-400',
-        error:
-          'border-red-300 focus-visible:border-red-500 focus-visible:ring-red-500 dark:border-red-700 dark:focus-visible:border-red-500',
-        success:
-          'border-green-300 focus-visible:border-green-500 focus-visible:ring-green-500 dark:border-green-700 dark:focus-visible:border-green-500',
+        default: DEFAULT_INPUT,
+        error: 'border-blood-border',
+        /** @deprecated Use `default`. */
+        success: DEFAULT_INPUT,
       },
       size: {
         sm: 'h-9 text-sm',
@@ -105,19 +111,26 @@ export const inputVariants = cva(
 export type InputVariants = VariantProps<typeof inputVariants>;
 
 /**
- * Card variants - used by Card and card-like containers
+ * Card variants - used by Card and card-like containers.
+ *
+ * Felt and Brass: a card is a discrete object (a character, monster, spell,
+ * item or campaign) on surface-raised with a 1px divider and a 6px radius,
+ * never a shadow. bordered is a deprecated alias of default. interactive
+ * swaps the hover shadow for an input-border edge.
  */
+const DEFAULT_CARD = 'border border-divider';
+
 export const cardVariants = cva(
   // Base styles
-  'rounded-lg bg-surface-raised transition-all duration-200',
+  'rounded-md bg-surface-raised transition-colors duration-120 ease-out',
   {
     variants: {
       variant: {
-        default: 'border border-divider',
-        bordered: 'border-2 border-divider-strong',
-        elevated: 'border border-divider shadow-md',
+        default: DEFAULT_CARD,
+        /** @deprecated Use `default`. */
+        bordered: DEFAULT_CARD,
         interactive:
-          'border-2 border-divider hover:border-divider-strong hover:shadow-md cursor-pointer',
+          'border border-divider cursor-pointer hover:border-input-border focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
         ghost: 'border-0',
       },
       padding: {
@@ -184,7 +197,7 @@ export const labelVariants = cva(
     variants: {
       variant: {
         default: '',
-        required: "after:content-['*'] after:text-red-500 after:ml-1",
+        required: "after:content-['*'] after:text-blood-text after:ml-1",
         optional:
           "after:content-['(optional)'] after:text-muted after:ml-1 after:font-normal",
       },
@@ -210,9 +223,9 @@ export const helperTextVariants = cva('text-sm transition-colors', {
   variants: {
     variant: {
       default: 'text-body',
-      error: 'text-red-600 dark:text-red-400',
-      success: 'text-green-600 dark:text-green-400',
-      warning: 'text-amber-600 dark:text-amber-400',
+      error: 'text-blood-text',
+      success: 'text-verdigris-text',
+      warning: 'text-ember-text',
     },
   },
   defaultVariants: {

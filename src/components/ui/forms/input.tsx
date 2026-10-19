@@ -66,24 +66,36 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       wrapperClassName,
       disabled,
       value,
+      id,
+      'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
       ...props
     },
     ref
   ) => {
+    const generatedId = React.useId();
+    const inputId = id ?? generatedId;
+    const messageId = `${inputId}-message`;
+    const message = error || helperText;
     const hasValue = value !== undefined && value !== '' && value !== null;
     const showClearButton = clearable && hasValue && !disabled;
     const inputVariant = error ? 'error' : variant;
+    const isInvalid = ariaInvalid ?? (inputVariant === 'error' || undefined);
+    const describedBy =
+      [ariaDescribedBy, message ? messageId : undefined]
+        .filter(Boolean)
+        .join(' ') || undefined;
 
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
           <label
             className="text-heading mb-1.5 block text-sm font-medium"
-            htmlFor={props.id}
+            htmlFor={inputId}
           >
             {label}
             {props.required && (
-              <span className="ml-1 text-red-500" aria-label="required">
+              <span className="text-blood-text ml-1" aria-label="required">
                 *
               </span>
             )}
@@ -106,8 +118,11 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
               className
             )}
             ref={ref}
+            id={inputId}
             disabled={disabled}
             value={value}
+            aria-invalid={isInvalid}
+            aria-describedby={describedBy}
             {...props}
           />
 
@@ -130,14 +145,15 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
 
-        {(error || helperText) && (
+        {message && (
           <p
+            id={messageId}
             className={cn(
               'mt-1.5 text-sm',
-              error ? 'text-red-600 dark:text-red-400' : 'text-body'
+              error ? 'text-blood-text' : 'text-body'
             )}
           >
-            {error || helperText}
+            {message}
           </p>
         )}
       </div>

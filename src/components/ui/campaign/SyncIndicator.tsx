@@ -134,7 +134,7 @@ export function SyncIndicator({
 
           <div className="border-divider space-y-3 border-t pt-3">
             {/* Auto-sync toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pointer-coarse:min-h-11">
               <div className="flex items-center gap-2">
                 {autoSync ? (
                   <Wifi size={14} className="text-green-500" />
@@ -169,7 +169,7 @@ export function SyncIndicator({
             )}
 
             {/* Share HP with party toggle */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between pointer-coarse:min-h-11">
               <div className="flex items-center gap-2">
                 <Heart
                   size={14}
@@ -188,7 +188,7 @@ export function SyncIndicator({
 
             {/* Share sheet with party toggle */}
             <div
-              className="flex items-center justify-between"
+              className="flex items-center justify-between pointer-coarse:min-h-11"
               title="Let party members open a limited view of this character on the battle map"
             >
               <div className="flex items-center gap-2">

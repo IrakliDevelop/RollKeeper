@@ -50,6 +50,8 @@ function pairs() {
   // bg-accent-*-text text-inverse badges and buttons.
   for (const role of ROLES) add('inverse', `${role}-text`, TEXT);
   add('on-brass', 'brass-fill', TEXT);
+  // Switch thumb on the unchecked track.
+  add('on-brass', 'input-border', NON_TEXT);
   add('on-blood', 'blood-fill', TEXT);
   add('input-text', 'input-bg', TEXT);
   add('input-placeholder', 'input-bg', TEXT);

@@ -8,6 +8,8 @@ export {
   CardDescription,
   CardContent,
 } from './card';
+export { Section } from './section';
+export type { SectionProps, SectionHeadingLevel } from './section';
 export { default as DragDropList } from './DragDropList';
 export { default as DragHandle } from './DragHandle';
 export { default as ExperimentalFeaturesSection } from './ExperimentalFeaturesSection';

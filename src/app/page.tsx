@@ -507,10 +507,7 @@ export default function LandingPage() {
                   whileHover={{ y: -6, transition: { duration: 0.25 } }}
                   className="h-full"
                 >
-                  <Card
-                    className="relative h-full overflow-hidden border-none p-6 sm:p-8"
-                    variant="elevated"
-                  >
+                  <Card className="relative h-full overflow-hidden border-none p-6 sm:p-8">
                     <div
                       className={`pointer-events-none absolute inset-0 bg-linear-to-br ${feature.gradient} opacity-0 transition-opacity duration-300 group-hover:opacity-100`}
                     />

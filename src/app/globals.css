@@ -254,6 +254,23 @@
   --bridge-ember-border: #5c4c33;
 }
 
+/* Type scale (Felt and Brass). Sizes only; the type-* utilities below add
+   family, line height and weight. Not under --text-*, which would clash
+   with the text-heading colour utility. */
+:root {
+  --type-title-size: 1.75rem;
+  --type-heading-size: 1.375rem;
+  --type-subheading-size: 1.125rem;
+  --type-label-heading-size: 1rem;
+  --type-body-size: 0.9375rem;
+  --type-ui-size: 0.875rem;
+  --type-small-size: 0.8125rem;
+  --type-caption-size: 0.75rem;
+  --type-num-xl-size: 2.125rem;
+  --type-num-lg-size: 1.625rem;
+  --type-num-md-size: 1.25rem;
+}
+
 /* ============================================================
    TAILWIND v4 THEME REGISTRATION
    Register CSS variables so Tailwind generates utility classes.
@@ -434,6 +451,101 @@
   animation: condition-pulse 2s ease-in-out infinite;
 }
 
+/* Type scale: one class sets family, size, line height and weight. The
+   num-* steps go through Tailwind's numeric variables, so adding
+   tabular-nums or slashed-zero next to them composes instead of fighting. */
+@utility type-title {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-title-size);
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+@utility type-heading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-heading-size);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+@utility type-subheading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-subheading-size);
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+@utility type-label-heading {
+  font-family: var(--font-heading-family);
+  font-size: var(--type-label-heading-size);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+@utility type-body {
+  font-family: var(--font-body-family);
+  font-size: var(--type-body-size);
+  line-height: 1.55;
+  font-weight: 400;
+}
+
+@utility type-ui {
+  font-family: var(--font-body-family);
+  font-size: var(--type-ui-size);
+  line-height: 1.4;
+  font-weight: 500;
+}
+
+@utility type-small {
+  font-family: var(--font-body-family);
+  font-size: var(--type-small-size);
+  line-height: 1.45;
+  font-weight: 400;
+}
+
+@utility type-caption {
+  font-family: var(--font-body-family);
+  font-size: var(--type-caption-size);
+  line-height: 1.4;
+  font-weight: 400;
+}
+
+@utility type-num-xl {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-xl-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
+}
+
+@utility type-num-lg {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-lg-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
+}
+
+@utility type-num-md {
+  font-family: var(--font-display-family);
+  font-size: var(--type-num-md-size);
+  line-height: 1;
+  font-weight: 600;
+  --tw-numeric-figure: lining-nums;
+  --tw-numeric-spacing: tabular-nums;
+  font-variant-numeric: var(--tw-ordinal,) var(--tw-slashed-zero,)
+    var(--tw-numeric-figure,) var(--tw-numeric-spacing,)
+    var(--tw-numeric-fraction,);
+}
+
 /* ============================================================
    BASE STYLES
    ============================================================ */
@@ -457,13 +569,76 @@ button {
   select {
     color: var(--input-text);
     background-color: var(--input-bg);
-    border-radius: 0.5rem; /* rounded-lg default for all inputs */
+  }
+
+  /* Controls take the 4px radius; checkboxes, radios, sliders and pickers
+     keep their own shape. */
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color']
+  ),
+  textarea,
+  select {
+    border-radius: 0.25rem;
   }
 
   input::placeholder,
   textarea::placeholder {
     color: var(--input-placeholder);
     opacity: 1;
+  }
+
+  /* Touch: a field without a size utility is at least 16px, so iOS Safari
+     doesn't zoom in on focus. 1em is the inherited size. */
+  @media (pointer: coarse) {
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='file'],
+      [type='color'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [type='hidden']
+    ),
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+/* Touch: the small text steps resolve to 16px inside text fields, so
+   text-xs, text-sm and the small type-* steps stop iOS Safari zooming on
+   focus while larger sizes (ability scores, HP) keep theirs. The variables
+   are set on the field itself, which beats the value inherited from :root
+   in any layer. */
+@media (pointer: coarse) {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='image'],
+    [type='hidden']
+  ),
+  textarea,
+  select {
+    --text-xs: 1rem;
+    --text-sm: 1rem;
+    --type-body-size: 1rem;
+    --type-ui-size: 1rem;
+    --type-small-size: 1rem;
+    --type-caption-size: 1rem;
   }
 }
 

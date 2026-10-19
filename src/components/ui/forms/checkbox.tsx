@@ -43,7 +43,8 @@ export interface CheckboxProps
    */
   size?: 'sm' | 'md' | 'lg';
   /**
-   * Color variant.
+   * @deprecated Every variant is brass when checked. Kept so call sites
+   * compile.
    */
   variant?: 'default' | 'primary' | 'success' | 'danger' | 'warning';
   /**
@@ -73,37 +74,17 @@ const sizeClasses = {
   },
 };
 
+// Felt and Brass: brass fill with an on-brass mark when checked, an
+// input-border outline when not. The variants are deprecated aliases.
+const BRASS_BOX =
+  'border-input-border data-[state=checked]:border-brass-fill data-[state=checked]:bg-brass-fill data-[state=indeterminate]:border-brass-fill data-[state=indeterminate]:bg-brass-fill';
+
 const variantClasses = {
-  default: {
-    unchecked: 'border-divider-strong bg-surface-raised',
-    checked: 'border-gray-500 bg-gray-500',
-    hover: 'hover:border-gray-500',
-    checkIcon: 'text-white',
-  },
-  primary: {
-    unchecked: 'border-divider-strong bg-surface-raised',
-    checked: 'border-emerald-600 bg-emerald-600',
-    hover: 'hover:border-emerald-500',
-    checkIcon: 'text-white',
-  },
-  success: {
-    unchecked: 'border-divider-strong bg-surface-raised',
-    checked: 'border-green-600 bg-green-600',
-    hover: 'hover:border-green-500',
-    checkIcon: 'text-white',
-  },
-  danger: {
-    unchecked: 'border-divider-strong bg-surface-raised',
-    checked: 'border-red-600 bg-red-600',
-    hover: 'hover:border-red-500',
-    checkIcon: 'text-white',
-  },
-  warning: {
-    unchecked: 'border-divider-strong bg-surface-raised',
-    checked: 'border-amber-600 bg-amber-600',
-    hover: 'hover:border-amber-500',
-    checkIcon: 'text-white',
-  },
+  default: BRASS_BOX,
+  primary: BRASS_BOX,
+  success: BRASS_BOX,
+  danger: BRASS_BOX,
+  warning: BRASS_BOX,
 };
 
 const Checkbox = React.forwardRef<
@@ -122,10 +103,17 @@ const Checkbox = React.forwardRef<
       size = 'md',
       variant = 'primary',
       wrapperClassName,
+      'aria-labelledby': ariaLabelledBy,
+      'aria-describedby': ariaDescribedBy,
       ...props
     },
     ref
   ) => {
+    // The label and description are spans beside the Radix button, not a
+    // <label>, so name and describe the button by id.
+    const textId = React.useId();
+    const labelId = label ? `${textId}-label` : undefined;
+    const descriptionId = description ? `${textId}-description` : undefined;
     const sizeStyle = sizeClasses[size];
     const variantStyle = variantClasses[variant];
     const isCheckedOrIndeterminate =
@@ -135,6 +123,13 @@ const Checkbox = React.forwardRef<
       <div
         className={cn(
           'group flex items-start',
+          // On touch a labelled row is at least 44px and keeps the box's 44px
+          // hit area inside it, so stacked rows don't overlap: a one-line row
+          // centres the box, a described row pads its top instead so the box
+          // stays beside the label.
+          (label || description || icon) && 'pointer-coarse:min-h-11',
+          (label || icon) && !description && 'pointer-coarse:items-center',
+          description && 'pointer-coarse:pt-3',
           sizeStyle.gap,
           disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
           wrapperClassName
@@ -153,29 +148,25 @@ const Checkbox = React.forwardRef<
           ref={ref}
           className={cn(
             sizeStyle.checkbox,
-            'relative flex shrink-0 items-center justify-center overflow-hidden rounded border-2 transition-all duration-200',
-            'focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:outline-none',
-            isCheckedOrIndeterminate
-              ? variantStyle.checked
-              : variantStyle.unchecked,
-            !disabled && variantStyle.hover,
-            !disabled && 'group-hover:shadow-md',
+            'relative flex shrink-0 items-center justify-center rounded-sm border bg-transparent transition-colors duration-120 ease-out',
+            'focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2',
+            // 44px hit area on touch, same visual size.
+            'after:absolute after:top-1/2 after:left-1/2 after:-translate-1/2 pointer-coarse:after:size-11',
+            variantStyle,
             className
           )}
           checked={checked}
           onCheckedChange={onCheckedChange}
           disabled={disabled}
+          aria-labelledby={
+            ariaLabelledBy ?? (props['aria-label'] ? undefined : labelId)
+          }
+          aria-describedby={
+            [ariaDescribedBy, descriptionId].filter(Boolean).join(' ') ||
+            undefined
+          }
           {...props}
         >
-          {/* Background glow effect */}
-          {isCheckedOrIndeterminate && (
-            <motion.div
-              initial={{ scale: 0, opacity: 0 }}
-              animate={{ scale: 1, opacity: 0.3 }}
-              className="absolute inset-0 rounded bg-white"
-            />
-          )}
-
           {/* Check/Indeterminate Icon */}
           <AnimatePresence mode="wait">
             {isCheckedOrIndeterminate && (
@@ -186,11 +177,7 @@ const Checkbox = React.forwardRef<
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0 }}
                   transition={{ duration: 0.15, ease: 'easeOut' }}
-                  className={cn(
-                    sizeStyle.icon,
-                    variantStyle.checkIcon,
-                    'relative z-10'
-                  )}
+                  className={cn(sizeStyle.icon, 'text-on-brass')}
                 >
                   {checked === 'indeterminate' ? (
                     <Minus className={sizeStyle.icon} strokeWidth={3} />
@@ -212,7 +199,7 @@ const Checkbox = React.forwardRef<
                   <span
                     className={cn(
                       'text-muted flex-shrink-0 transition-colors',
-                      !disabled && checked && 'text-emerald-500'
+                      !disabled && checked && 'text-brass-text'
                     )}
                   >
                     {icon}
@@ -220,6 +207,7 @@ const Checkbox = React.forwardRef<
                 )}
                 {label && (
                   <span
+                    id={labelId}
                     className={cn(
                       sizeStyle.text,
                       'text-heading font-medium transition-colors',
@@ -233,6 +221,7 @@ const Checkbox = React.forwardRef<
             )}
             {description && (
               <p
+                id={descriptionId}
                 className={cn(
                   'text-body mt-1 text-xs transition-colors',
                   !disabled && 'group-hover:text-muted'
