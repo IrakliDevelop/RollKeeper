@@ -10,7 +10,7 @@ directory layout and where things deviate from the documented pattern.
 | Dir | Contents |
 |---|---|
 | `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
-| `layout/` | `card`, `badge`, `Tabs`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
+| `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `Tabs`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
 | `feedback/` | `dialog` (Radix-based, `dialog-new` internally), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`. Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
 | `primitives/` | `design-tokens.ts`, `animations.ts`, `variants.ts`, `Tooltip.tsx` — the actual token source `CLAUDE.md` refers to |
 | `game/` | Core D&D mechanics widgets: dice roller, conditions manager, currency, equipment, inventory (with `conditions/`, `equipment/`, `inventory/` subfolders) |
@@ -40,6 +40,37 @@ hue-named `accent-*` tokens and `--gradient-*` variables are deprecated
 aliases that point at the nearest role until the Phase 3 sweeps remove them.
 `npm run design:contrast` checks every role and neutral pairing against WCAG
 AA in both themes.
+
+## Type scale
+
+Text sizes come from composite `type-*` utilities in `globals.css`: `type-title`,
+`type-heading`, `type-subheading`, `type-label-heading` (Vollkorn),
+`type-body`, `type-ui`, `type-small`, `type-caption` (Barlow) and
+`type-num-xl`/`-lg`/`-md` (Barlow Condensed, lining tabular figures). Each one
+sets family, size, line height and weight; the sizes are `--type-*-size`
+variables. They are not under `--text-*`, which would clash with the
+`text-heading` colour. `cn()` knows the group: a later `type-*` replaces an
+earlier one (and any earlier size, weight or family), while a later `text-lg`
+or `font-semibold` only overrides that property.
+
+## Touch rules for fields
+
+On a coarse pointer (`@media (pointer: coarse)`), text fields must render at
+16px or more, or iOS Safari zooms in on focus. `globals.css` does this without
+touching large numbers: inside text-like `input`, `textarea` and `select`
+elements it redefines `--text-xs`, `--text-sm` and the small `--type-*-size`
+variables as `1rem`, and a base rule sets `font-size: max(16px, 1em)` on fields
+without a size utility. A field with `text-2xl` keeps 24px. Arbitrary sizes such
+as `text-[13px]` are not covered, so don't put them on inputs. `Input` and the
+`Select` trigger also reach 44px tall; `Checkbox`, `Switch` and `RadioGroupItem`
+keep their size and grow a 44px hit area instead;
+with a label, their row is at least 44px and holds the hit area (a one-line
+row centres the control, a described row pads its top), so stacked rows' hit
+areas don't overlap.
+
+Storybook can't switch to a coarse pointer, so stories call
+`emulateCoarsePointer()` (`src/test/storybook/`) to copy the coarse rules in and
+read computed styles.
 
 ## Design ratchet
 
