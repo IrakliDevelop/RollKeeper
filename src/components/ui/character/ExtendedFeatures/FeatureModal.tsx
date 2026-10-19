@@ -23,6 +23,7 @@ import {
   DialogTitle,
   DialogBody,
 } from '@/components/ui/feedback/dialog';
+import { Button } from '@/components/ui/forms/button';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 
 interface FeatureModalProps {
@@ -165,13 +166,13 @@ export default function FeatureModal({
                     <Edit3 className="h-4 w-4" />
                     Edit
                   </button>
-                  <button
+                  <Button
+                    variant="danger"
                     onClick={() => setShowDeleteConfirm(true)}
-                    className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted focus:ring-accent-red-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                    leftIcon={<Trash2 className="h-4 w-4" />}
                   >
-                    <Trash2 className="h-4 w-4" />
                     Delete
-                  </button>
+                  </Button>
                 </div>
               )}
 
@@ -536,19 +537,19 @@ export default function FeatureModal({
                       features and special traits sections.
                     </p>
                     <div className="flex gap-3">
-                      <button
+                      <Button
+                        variant="danger-solid"
                         onClick={handleDelete}
-                        className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted focus:ring-accent-red-border-strong flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
+                        leftIcon={<Trash2 className="h-4 w-4" />}
                       >
-                        <Trash2 className="h-4 w-4" />
                         Delete Feature
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="outline"
                         onClick={() => setShowDeleteConfirm(false)}
-                        className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover focus:ring-border-secondary rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors focus:ring-2 focus:ring-offset-2 focus:outline-none"
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>

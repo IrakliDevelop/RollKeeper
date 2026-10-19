@@ -281,9 +281,11 @@ describe('FogPresetManager', () => {
     expect(confirm).toHaveTextContent(
       'Maps already using this preset keep their current appearance.'
     );
-    fireEvent.click(
-      within(confirm).getByRole('button', { name: 'Delete preset' })
-    );
+    const deleteButton = within(confirm).getByRole('button', {
+      name: 'Delete preset',
+    });
+    expect(deleteButton).toHaveAttribute('data-variant', 'danger-solid');
+    fireEvent.click(deleteButton);
     expect(c.confirmDelete).toHaveBeenCalled();
   });
 

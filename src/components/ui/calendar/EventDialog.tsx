@@ -211,7 +211,7 @@ export function EventDialog({
         <DialogFooter>
           {isEdit && onDelete && (
             <Button
-              variant="danger"
+              variant={confirmDelete ? 'danger-solid' : 'danger'}
               size="sm"
               leftIcon={<Trash2 size={14} />}
               onClick={handleDelete}

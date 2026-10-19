@@ -39,7 +39,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
     onClose();
   };
 
-  const confirmVariant = type === 'danger' ? 'danger' : 'primary';
+  const confirmVariant = type === 'danger' ? 'danger-solid' : 'primary';
 
   const iconContainerClass =
     type === 'danger'

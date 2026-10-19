@@ -111,7 +111,7 @@ export function ViewRow({
       {deleteArmed ? (
         <>
           <Button
-            variant="danger"
+            variant="danger-solid"
             aria-label="Confirm delete"
             onClick={onDeleteClick}
             className={ICON_BUTTON}

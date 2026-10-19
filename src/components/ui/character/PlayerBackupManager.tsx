@@ -174,7 +174,7 @@ export function PlayerBackupManager({
               {COPY.chrome.close}
             </Button>
             <Button
-              variant="danger"
+              variant="danger-solid"
               onClick={() => {
                 if (!pendingRemove) return;
                 actions.onRemoveOnlineCopy(pendingRemove.id);

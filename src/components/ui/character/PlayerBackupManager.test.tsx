@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -50,6 +50,11 @@ describe('PlayerBackupManager', () => {
     expect(
       screen.getByText(/The character in this browser will stay/)
     ).toBeInTheDocument();
+    const confirmRemove = within(screen.getByRole('dialog')).getByRole(
+      'button',
+      { name: COPY.management.remove }
+    );
+    expect(confirmRemove).toHaveAttribute('data-variant', 'danger-solid');
     expectPlayerBackupVocabulary(container);
   });
 });
