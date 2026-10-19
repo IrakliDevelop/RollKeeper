@@ -21,6 +21,10 @@ import { createMockEncounter } from '@/test/helpers';
 import { DEFAULT_COMBAT_CONFIG } from '@/types/encounter';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+import {
+  clickConfirmDialogButton,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 vi.mock('@/hooks/useOfficialConditions', () => ({
   useOfficialConditions: () => ({ conditions: [], loading: false }),
@@ -143,11 +147,13 @@ describe('CreatureDrawer parity — header', () => {
   });
 
   it('removes from combat after the confirm', async () => {
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
     const { actions, user } = renderDrawer();
     await user.click(
       screen.getByRole('button', { name: 'Remove from combat' })
     );
+    expect(actions.onRemove).not.toHaveBeenCalled();
+    await clickConfirmDialogButton('Remove from combat');
     expect(actions.onRemove).toHaveBeenCalledWith(ID);
   });
 

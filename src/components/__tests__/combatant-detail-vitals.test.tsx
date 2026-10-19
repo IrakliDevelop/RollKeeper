@@ -6,6 +6,11 @@ import { DetailVitals } from '@/components/ui/encounter/combat-screen/detail/Det
 import { DetailHeader } from '@/components/ui/encounter/combat-screen/detail/DetailHeader';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 afterEach(cleanup);
 
@@ -231,32 +236,34 @@ describe('DetailHeader', () => {
     });
   });
 
-  it('Remove button calls window.confirm and invokes onRemove when confirmed', async () => {
+  it('Remove button asks first and invokes onRemove when confirmed', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(true);
+    renderConfirmDialogHost();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
     await user.click(
       screen.getByRole('button', { name: /remove from combat/i })
     );
-    expect(window.confirm).toHaveBeenCalled();
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      `Remove ${npcEntity.name} from combat?`
+    );
+    expect(actions.onRemove).not.toHaveBeenCalled();
+    await clickConfirmDialogButton('Remove from combat');
     expect(actions.onRemove).toHaveBeenCalledWith('npc-1');
-    vi.restoreAllMocks();
   });
 
-  it('Remove button calls window.confirm but does NOT call onRemove when cancelled', async () => {
+  it('Remove button does NOT call onRemove when cancelled', async () => {
     const actions = makeActions();
     const user = userEvent.setup();
-    vi.spyOn(window, 'confirm').mockReturnValueOnce(false);
+    renderConfirmDialogHost();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
     await user.click(
       screen.getByRole('button', { name: /remove from combat/i })
     );
-    expect(window.confirm).toHaveBeenCalled();
+    await clickConfirmDialogButton('Cancel');
     expect(actions.onRemove).not.toHaveBeenCalled();
-    vi.restoreAllMocks();
   });
 
   it('non-player: Rename button swaps name for an input, commits on Enter', async () => {

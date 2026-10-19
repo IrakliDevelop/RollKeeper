@@ -125,6 +125,7 @@ import type {
   MarkerDetail,
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -1148,17 +1149,26 @@ export function useDmBattleMapCanvas({
     };
   }, []);
 
-  const handleClearDrawings = useCallback(() => {
+  const handleClearDrawings = useCallback(async () => {
     if (!viewport) return;
-    const ids = viewport.store
-      .snapshot()
-      .filter(el => DRAWING_TYPES.has(el.type))
-      .map(el => el.id);
-    if (ids.length === 0) return;
-    if (!window.confirm('Clear all drawings (pencil, arrows, templates)?')) {
-      return;
-    }
-    viewport.removeElements(ids);
+    const drawingIds = () =>
+      viewport.store
+        .snapshot()
+        .filter(el => DRAWING_TYPES.has(el.type))
+        .map(el => el.id);
+    if (drawingIds().length === 0) return;
+    const confirmed = await confirmDialog({
+      title: 'Clear all drawings?',
+      message:
+        'Pencil lines, arrows and templates are removed from the map for everyone.',
+      confirmLabel: 'Clear drawings',
+      tone: 'danger',
+    });
+    // The map can sync or unmount while the dialog is open: clear what is
+    // on it now, and only if it is still the same map.
+    if (!confirmed || viewportRef.current !== viewport) return;
+    const ids = drawingIds();
+    if (ids.length > 0) viewport.removeElements(ids);
   }, [viewport]);
 
   const handleToggleHiddenPlacement = useCallback(() => {

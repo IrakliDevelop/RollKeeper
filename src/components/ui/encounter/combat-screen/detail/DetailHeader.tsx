@@ -6,6 +6,7 @@ import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 import { HeaderControls } from './HeaderControls';
 import { HeaderStatLine } from './HeaderStatLine';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export interface DetailSectionProps {
   entity: EncounterEntity;
@@ -70,10 +71,13 @@ export function DetailHeader({
   const npcSourceId = entity.npcSourceId;
   const onViewNPC = actions.onViewNPC;
 
-  const handleRemove = () => {
-    if (window.confirm(`Remove ${entity.name} from combat?`)) {
-      actions.onRemove(entity.id);
-    }
+  const handleRemove = async () => {
+    const confirmed = await confirmDialog({
+      title: `Remove ${entity.name} from combat?`,
+      confirmLabel: 'Remove from combat',
+      tone: 'danger',
+    });
+    if (confirmed) actions.onRemove(entity.id);
   };
 
   const commitName = () => {
