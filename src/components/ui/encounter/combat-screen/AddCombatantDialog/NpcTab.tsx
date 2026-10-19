@@ -32,11 +32,13 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
   const [playerAlias, setPlayerAlias] = useState('');
   const [disposition, setDisposition] = useState<PlayerDisposition>('enemy');
 
-  const { getNPCsForCampaign, createNPC, deleteNPC } = useNPCStore();
-  const storedNpcs = useMemo(
-    () => (campaignCode ? getNPCsForCampaign(campaignCode) : []),
-    [campaignCode, getNPCsForCampaign]
+  const { createNPC, deleteNPC } = useNPCStore();
+  // Subscribe to the campaign's list itself so deletes and new NPCs show up
+  // while the tab is open. No `?? []` here: a fresh array would re-render forever.
+  const campaignNpcs = useNPCStore(state =>
+    campaignCode ? state.npcsByCampaign[campaignCode] : undefined
   );
+  const storedNpcs = useMemo(() => campaignNpcs ?? [], [campaignNpcs]);
   const allNpcs = useMemo(
     () =>
       [
