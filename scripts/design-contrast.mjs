@@ -51,10 +51,15 @@ function pairs() {
 
 export const PAIRS = pairs();
 
-// The theme blocks that define each palette, in cascade order.
+// The theme blocks that define each palette, in cascade order. Paper also
+// applies to a nested [data-theme='light'] wrapper inside a felt page.
+export const PAPER_SELECTOR = ":root,\n[data-theme='light']";
+export const SHARED_SELECTOR = ':root,\n[data-theme]';
+export const FELT_SELECTOR = "[data-theme='dark']";
+
 export const THEMES = {
-  paper: [':root', ':root,\n[data-theme]'],
-  felt: [':root', ':root,\n[data-theme]', "[data-theme='dark']"],
+  paper: [PAPER_SELECTOR, SHARED_SELECTOR],
+  felt: [PAPER_SELECTOR, SHARED_SELECTOR, FELT_SELECTOR],
 };
 
 export function stripComments(css) {

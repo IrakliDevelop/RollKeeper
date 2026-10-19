@@ -3,7 +3,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-import { readBlock } from './design-contrast.mjs';
+import { PAPER_SELECTOR, readBlock } from './design-contrast.mjs';
 import { buildCss, ruleFor } from './lib/design-css.mjs';
 import {
   readGlobalsCss,
@@ -60,7 +60,7 @@ test('font variables are set on <html>, where :root tokens can read them', async
 });
 
 test('font tokens point at the new families with safe fallbacks', async () => {
-  const root = readBlock(await readGlobalsCss(), ':root');
+  const root = readBlock(await readGlobalsCss(), PAPER_SELECTOR);
   assert.match(root['--font-body-family'], /^var\(--font-barlow, 'Barlow'\)/);
   assert.match(
     root['--font-display-family'],

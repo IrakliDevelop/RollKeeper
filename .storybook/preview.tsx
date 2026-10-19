@@ -22,16 +22,24 @@ const WRAPPER_STYLE = {
 // Theme wrapper component (must be PascalCase to use hooks)
 function ThemeWrapper({
   theme,
+  scoped,
   children,
 }: {
   theme: StoryTheme;
+  scoped: boolean;
   children: ReactNode;
 }) {
   useEffect(() => {
-    // Apply theme to the document root for CSS variables. The body takes
-    // its background and text colour from the tokens in globals.css.
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
+    // A single story themes the document root, so the body (coloured from
+    // the tokens in globals.css) matches it. A docs page shows several
+    // stories in one document: each wrapper carries its own theme and the
+    // root stays paper, so `dark:` utilities never leak into a light story.
+    if (scoped) {
+      document.documentElement.removeAttribute('data-theme');
+    } else {
+      document.documentElement.setAttribute('data-theme', theme);
+    }
+  }, [theme, scoped]);
 
   return (
     <div data-theme={theme} style={WRAPPER_STYLE}>
@@ -46,7 +54,7 @@ const withTheme: Decorator = (Story, context) => {
 
   return (
     <MotionProvider>
-      <ThemeWrapper theme={theme}>
+      <ThemeWrapper theme={theme} scoped={context.viewMode === 'docs'}>
         <Story />
       </ThemeWrapper>
     </MotionProvider>
