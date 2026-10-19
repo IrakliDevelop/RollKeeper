@@ -9,6 +9,12 @@ import {
 } from '@testing-library/react';
 import { AddCombatantDialog } from '@/components/ui/encounter/combat-screen/AddCombatantDialog';
 import type { CampaignNPC } from '@/types/encounter';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  queryConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 afterEach(() => {
   cleanup();
@@ -257,8 +263,8 @@ describe('AddCombatantDialog', () => {
     expect(entity.abilities).toEqual([]);
   });
 
-  it('NPC delete button triggers confirmation dialog', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+  it('NPC delete button triggers confirmation dialog', async () => {
+    renderConfirmDialogHost();
     render(<AddCombatantDialog {...defaultProps} />);
 
     fireEvent.click(screen.getByRole('button', { name: /npc/i }));
@@ -269,9 +275,23 @@ describe('AddCombatantDialog', () => {
     });
     fireEvent.click(deleteBtn);
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      expect.stringContaining('Town Guard')
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Delete Town Guard?'
     );
+    await clickConfirmDialogButton('Cancel');
+  });
+
+  it('does not ask to delete an NPC when no campaign is loaded', async () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderConfirmDialogHost();
+    render(<AddCombatantDialog {...defaultProps} campaignCode="" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /npc/i }));
+    fireEvent.click(screen.getByRole('button', { name: /delete town guard/i }));
+
+    await Promise.resolve();
+    expect(queryConfirmDialog()).toBeNull();
+    expect(nativeConfirm).not.toHaveBeenCalled();
   });
 
   it('searches saved NPCs by name, group, or tag and excludes custom monsters', () => {

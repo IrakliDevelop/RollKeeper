@@ -1,6 +1,17 @@
 // Feedback & Dialog Components
 export { ConfirmationModal } from './ConfirmationModal';
 export {
+  confirmDialog,
+  alertDialog,
+  promptDialog,
+  ConfirmDialogHost,
+} from './confirm-dialog';
+export type {
+  ConfirmDialogOptions,
+  AlertDialogOptions,
+  PromptDialogOptions,
+} from './confirm-dialog';
+export {
   Dialog,
   DialogPortal,
   DialogOverlay,

@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
 import type { CharacterState } from '@/types/character';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  queryConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 afterEach(() => {
   cleanup();
@@ -96,5 +108,36 @@ describe('SyncIndicator — share toggles accessibility', () => {
     expect(root.querySelector('svg.text-red-500')).toBeNull();
     expect(root.querySelector('svg.text-accent-blue-text')).not.toBeNull();
     expect(root.querySelector('svg.text-accent-red-text')).not.toBeNull();
+  });
+});
+
+describe('SyncIndicator — Leave campaign', () => {
+  it('closes the menu, asks, and leaves only when confirmed', async () => {
+    renderConfirmDialogHost();
+    const props = baseProps();
+    render(<SyncIndicator {...props} />);
+
+    let user = await openMenu();
+    await user.click(screen.getByRole('button', { name: /leave campaign/i }));
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Leave this campaign?'
+    );
+    // The menu closed before the dialog opened.
+    expect(screen.queryByTitle(SHARE_SHEET_TITLE)).not.toBeInTheDocument();
+    await clickConfirmDialogButton('Cancel');
+    expect(props.onLeaveCampaign).not.toHaveBeenCalled();
+    expect(screen.queryByTitle(SHARE_SHEET_TITLE)).not.toBeInTheDocument();
+    // Focus returns to the button that opened the menu, not to the page body.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /test campaign/i })
+      ).toHaveFocus()
+    );
+
+    user = await openMenu();
+    await user.click(screen.getByRole('button', { name: /leave campaign/i }));
+    await clickConfirmDialogButton('Leave campaign');
+    expect(props.onLeaveCampaign).toHaveBeenCalledTimes(1);
+    expect(queryConfirmDialog()).toBeNull();
   });
 });

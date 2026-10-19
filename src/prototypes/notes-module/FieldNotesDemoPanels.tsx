@@ -70,6 +70,10 @@ import {
   ZoomIn,
   ZoomOut,
 } from 'lucide-react';
+import {
+  alertDialog,
+  confirmDialog,
+} from '@/components/ui/feedback/confirm-dialog';
 
 const TOOL_DEFS: {
   name: string;
@@ -399,7 +403,7 @@ export function FieldNotesDemoToolbar({
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert('SVG export failed');
+      void alertDialog({ title: "Couldn't export the SVG" });
     }
   };
 
@@ -416,7 +420,10 @@ export function FieldNotesDemoToolbar({
         try {
           viewport.loadJSON(reader.result);
         } catch {
-          alert('Invalid canvas file');
+          void alertDialog({
+            title: "Couldn't open the canvas file",
+            message: 'Choose a JSON file exported from this canvas.',
+          });
         }
       };
       reader.readAsText(file);
@@ -426,7 +433,13 @@ export function FieldNotesDemoToolbar({
 
   const handleClear = async () => {
     if (viewport.store.count === 0) return;
-    if (!confirm('Clear all elements from the canvas?')) return;
+    const confirmed = await confirmDialog({
+      title: 'Clear the canvas?',
+      message: 'Everything on the canvas is removed.',
+      confirmLabel: 'Clear canvas',
+      tone: 'danger',
+    });
+    if (!confirmed || viewport.store.count === 0) return;
     viewport.store.clear();
     await onClearExtras?.();
     viewport.requestRender();

@@ -13,6 +13,7 @@ import { useNPCStore } from '@/store/npcStore';
 import { buildNpcEntity } from './buildEntity';
 import { SharedOptions } from './SharedOptions';
 import { SavedCreaturePicker } from './SavedCreaturePicker';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface NpcTabProps {
   npcs: CampaignNPC[];
@@ -74,10 +75,15 @@ export function NpcTab({ npcs, campaignCode, onAdd }: NpcTabProps) {
     );
   };
 
-  const handleDelete = (npc: CampaignNPC) => {
-    if (confirm(`Delete "${npc.name}"?`) && campaignCode) {
-      deleteNPC(campaignCode, npc.id);
-    }
+  const handleDelete = async (npc: CampaignNPC) => {
+    if (!campaignCode) return;
+    const confirmed = await confirmDialog({
+      title: `Delete ${npc.name}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete NPC',
+      tone: 'danger',
+    });
+    if (confirmed) deleteNPC(campaignCode, npc.id);
   };
 
   return (

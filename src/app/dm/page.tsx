@@ -29,6 +29,10 @@ import {
 } from '@/lib/durableDm/campaignSettingsLegacyProjection';
 import { isMigrationWizardVisible } from '@/lib/durableDm/slice11gFlags';
 import { CampaignInfo } from '@/types/campaign';
+import {
+  alertDialog,
+  confirmDialog,
+} from '@/components/ui/feedback/confirm-dialog';
 
 /**
  * Spec R2b / R8.3: whether this campaign's `campaign_settings` family is
@@ -131,12 +135,13 @@ export default function DmDashboardPage() {
   };
 
   const handleDeleteCampaign = async (campaign: CampaignInfo) => {
-    if (
-      !confirm(
-        `Are you sure you want to delete "${campaign.name}"? This will remove it from Redis and your local list.`
-      )
-    )
-      return;
+    const confirmed = await confirmDialog({
+      title: `Delete ${campaign.name}?`,
+      message: 'It is removed from the server and from your campaign list.',
+      confirmLabel: 'Delete campaign',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
 
     try {
       await fetch(`/api/campaign/${campaign.code}`, { method: 'DELETE' });
@@ -179,9 +184,10 @@ export default function DmDashboardPage() {
       a.click();
       URL.revokeObjectURL(url);
     } catch {
-      alert(
-        'Could not export campaign data. Ask your players to reconnect, then try again.'
-      );
+      void alertDialog({
+        title: "Couldn't export the campaign",
+        message: 'Ask your players to reconnect, then try again.',
+      });
     }
   };
 

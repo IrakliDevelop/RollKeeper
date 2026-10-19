@@ -73,11 +73,16 @@ test.describe('explicitly selected profile', () => {
       .click();
     await expect(page.getByText(/2 entries/i)).toBeVisible();
 
-    page.once('dialog', dialog => dialog.accept());
     const downloadPromise = page.waitForEvent('download');
     const selectionReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /download recovery and select migration/i })
+      .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Prepare this browser for the new storage?',
+      })
+      .getByRole('button', { name: 'Prepare browser' })
       .click();
     const download = await downloadPromise;
     await selectionReload;
@@ -89,10 +94,15 @@ test.describe('explicitly selected profile', () => {
     await expect(
       page.getByRole('button', { name: /confirm indexeddb cutover/i })
     ).toBeVisible({ timeout: 30_000 });
-    page.once('dialog', dialog => dialog.accept());
     const activationReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /confirm indexeddb cutover/i })
+      .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Switch character storage on this browser?',
+      })
+      .getByRole('button', { name: 'Switch storage' })
       .click();
     await activationReload;
     await expect(
@@ -261,11 +271,16 @@ test.describe('explicitly selected profile', () => {
     await page
       .getByRole('button', { name: /preview character migration/i })
       .click();
-    page.once('dialog', dialog => dialog.accept());
     const downloadPromise = page.waitForEvent('download');
     const selectionReload = page.waitForEvent('domcontentloaded');
     await page
       .getByRole('button', { name: /download recovery and select migration/i })
+      .click();
+    await page
+      .getByRole('dialog', {
+        name: 'Prepare this browser for the new storage?',
+      })
+      .getByRole('button', { name: 'Prepare browser' })
       .click();
     await downloadPromise;
     await selectionReload;

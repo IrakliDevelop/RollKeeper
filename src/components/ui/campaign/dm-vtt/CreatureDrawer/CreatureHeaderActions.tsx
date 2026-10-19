@@ -6,6 +6,7 @@ import { Coffee, Eye, Lock, LockOpen, Moon, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export interface CreatureHeaderActionsProps {
   entity: EncounterEntity;
@@ -27,10 +28,13 @@ export function CreatureHeaderActions({
   const npcSourceId = entity.npcSourceId;
   const onViewNPC = actions.onViewNPC;
 
-  const handleRemove = () => {
-    if (window.confirm(`Remove ${entity.name} from combat?`)) {
-      actions.onRemove(entity.id);
-    }
+  const handleRemove = async () => {
+    const confirmed = await confirmDialog({
+      title: `Remove ${entity.name} from combat?`,
+      confirmLabel: 'Remove from combat',
+      tone: 'danger',
+    });
+    if (confirmed) actions.onRemove(entity.id);
   };
 
   return (

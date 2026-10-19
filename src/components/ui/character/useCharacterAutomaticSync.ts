@@ -26,6 +26,7 @@ import {
   configureAutomaticCharacterSyncRuntime,
 } from '@/lib/supabase/automaticCharacterSyncRuntime';
 import { usePlayerStore } from '@/store/playerStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export type CharacterAutomaticSyncStatus = AutomaticCharacterCloudStatus;
 
@@ -330,11 +331,14 @@ function useCharacterAutomaticSyncController(
     async enable(character) {
       const context = contextRef.current;
       if (!context) throw new Error('Sign in before enabling automatic sync');
-      if (
-        !window.confirm(
-          `Enable automatic sync for ${character.name} to ${context.accountLabel}? Local data remains available offline.`
-        )
-      ) {
+      const confirmed = await confirmDialog({
+        title: `Enable automatic sync for ${character.name}?`,
+        message: `Changes sync to ${context.accountLabel}. The character still works offline.`,
+        confirmLabel: 'Enable sync',
+      });
+      // The account can change while the dialog is open: only go ahead for
+      // the one the player was asked about.
+      if (!confirmed || contextRef.current?.accountId !== context.accountId) {
         return;
       }
       await run(`enable:${character.id}`, async () => {

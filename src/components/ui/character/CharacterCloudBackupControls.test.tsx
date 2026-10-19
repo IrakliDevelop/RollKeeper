@@ -9,6 +9,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CharacterCloudBackupControls } from './CharacterCloudBackupControls';
 import type { ManualCharacterCloudContext } from '@/lib/supabase/characterCloud';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const localCharacter = {
   id: 'legacy-a',
@@ -129,7 +134,7 @@ describe('CharacterCloudBackupControls', () => {
 
   it('uploads only the explicitly selected guest character after target-account confirmation', async () => {
     enabledEnvironment();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
     const cloud = cloudContext();
 
     render(
@@ -143,10 +148,15 @@ describe('CharacterCloudBackupControls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Back up Aria now' }));
 
-    await waitFor(() => expect(cloud.service.backup).toHaveBeenCalledTimes(1));
-    expect(window.confirm).toHaveBeenCalledWith(
+    const dialog = await findConfirmDialog();
+    expect(dialog).toHaveAccessibleName('Back up Aria?');
+    expect(dialog).toHaveAccessibleDescription(
       expect.stringContaining('owner@example.com')
     );
+    expect(cloud.service.backup).not.toHaveBeenCalled();
+    await clickConfirmDialogButton('Back up character');
+
+    await waitFor(() => expect(cloud.service.backup).toHaveBeenCalledTimes(1));
     expect(cloud.service.backup).toHaveBeenCalledWith(
       localCharacter,
       { id: 'user-a', email: 'owner@example.com' },

@@ -22,6 +22,7 @@ import { CombatConfigDialog } from '@/components/ui/encounter/CombatConfigDialog
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 import { Encounter } from '@/types/encounter';
 import type { BattleMap } from '@/types/battlemap';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface EncounterListProps {
   campaignCode: string;
@@ -122,12 +123,14 @@ export function EncounterList({ campaignCode }: EncounterListProps) {
               encounter={encounter}
               campaignCode={campaignCode}
               linkedBattleMap={findLinkedBattleMap(battleMaps, encounter.id)}
-              onDelete={() => {
-                if (
-                  confirm(`Delete "${encounter.name}"? This cannot be undone.`)
-                ) {
-                  deleteEncounter(encounter.id);
-                }
+              onDelete={async () => {
+                const confirmed = await confirmDialog({
+                  title: `Delete ${encounter.name}?`,
+                  message: "This can't be undone.",
+                  confirmLabel: 'Delete encounter',
+                  tone: 'danger',
+                });
+                if (confirmed) deleteEncounter(encounter.id);
               }}
             />
           ))}

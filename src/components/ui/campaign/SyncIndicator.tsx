@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/layout/badge';
 import { Switch } from '@/components/ui/forms/switch';
 import { Button } from '@/components/ui/forms/button';
 import { CharacterState } from '@/types/character';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface SyncIndicatorProps {
   syncStatus: 'idle' | 'syncing' | 'synced' | 'error';
@@ -77,6 +78,7 @@ export function SyncIndicator({
   const [menuOpen, setMenuOpen] = useState(false);
   const [displayTime, setDisplayTime] = useState(formatSyncTime(lastSyncedAt));
   const menuRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -104,6 +106,7 @@ export function SyncIndicator({
   return (
     <div className="relative" ref={menuRef}>
       <button
+        ref={triggerRef}
         onClick={() => setMenuOpen(!menuOpen)}
         className="border-divider bg-surface-secondary hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
       >
@@ -206,15 +209,20 @@ export function SyncIndicator({
 
             {/* Leave campaign */}
             <button
-              onClick={() => {
-                if (
-                  confirm(
-                    'Leave this campaign? Your character data will remain locally.'
-                  )
-                ) {
-                  onLeaveCampaign();
-                  setMenuOpen(false);
-                }
+              onClick={async () => {
+                // Close the menu first: the dialog is outside it, so the
+                // menu's click-outside handler would close it anyway. Focus
+                // the trigger first so the dialog returns focus to it, not to
+                // the menu button that is about to unmount.
+                triggerRef.current?.focus();
+                setMenuOpen(false);
+                const confirmed = await confirmDialog({
+                  title: 'Leave this campaign?',
+                  message:
+                    'Your character stays on this device. You can rejoin with the campaign code.',
+                  confirmLabel: 'Leave campaign',
+                });
+                if (confirmed) onLeaveCampaign();
               }}
               className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-red-500 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20"
             >

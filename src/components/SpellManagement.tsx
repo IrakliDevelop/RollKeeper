@@ -66,6 +66,11 @@ import {
   ACTION_TYPES,
   DAMAGE_TYPES,
 } from '@/utils/spellConstants';
+import {
+  alertDialog,
+  confirmDialog,
+} from '@/components/ui/feedback/confirm-dialog';
+import { castCostAlertTitle } from '@/utils/spellCastCost';
 
 interface SpellFilters {
   searchQuery: string;
@@ -855,11 +860,21 @@ export const SpellManagement: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id: string) => {
-    if (confirm('Are you sure you want to delete this spell?')) {
-      const updatedSpells = character.spells.filter(spell => spell.id !== id);
-      updateCharacter({ spells: updatedSpells });
-    }
+  const handleDelete = async (id: string) => {
+    const spellName =
+      character.spells.find(spell => spell.id === id)?.name ?? 'this spell';
+    const confirmed = await confirmDialog({
+      title: `Delete ${spellName}?`,
+      message: 'It is removed from your spell list.',
+      confirmLabel: 'Delete spell',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    // Filter the latest list: the sheet may have changed while the dialog was open.
+    const updatedSpells = useCharacterStore
+      .getState()
+      .character.spells.filter(spell => spell.id !== id);
+    updateCharacter({ spells: updatedSpells });
   };
 
   const handlePreparedToggle = (id: string) => {
@@ -905,9 +920,9 @@ export const SpellManagement: React.FC = () => {
   ) => {
     if (!selectedSpell) return;
     if (!consumeInventoryCost(selectedSpell.inventoryCost)) {
-      window.alert(
-        'Not enough of the linked inventory item to cast this spell.'
-      );
+      void alertDialog({
+        title: castCostAlertTitle(selectedSpell, character.inventoryItems),
+      });
       return;
     }
 

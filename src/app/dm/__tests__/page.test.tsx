@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -8,6 +14,12 @@ import {
   campaignSettingsProjectionAuthorityKey,
   type ProjectionAuthorityMarker,
 } from '@/lib/durableDm/campaignSettingsLegacyProjection';
+
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 import DmDashboardPage from '../page';
 
@@ -436,5 +448,57 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
     expect(
       useDmStore.getState().campaigns.find(c => c.code === 'BETA')?.bannerUrl
     ).toBe('https://example.test/new-banner.png');
+  });
+});
+
+describe('DmDashboardPage — deleting a campaign', () => {
+  beforeEach(() => {
+    useCharacterStore.setState({ hasHydrated: true });
+    useDmStore.setState({
+      dmId: 'dm-local',
+      campaigns: [
+        {
+          code: 'ALPHA',
+          name: 'Canary',
+          createdAt: '2026-08-24T00:00:00.000Z',
+        },
+      ],
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null));
+    delete process.env.NEXT_PUBLIC_MIGRATION_WIZARD_VISIBLE;
+    delete process.env.NEXT_PUBLIC_CAMPAIGN_SETTINGS_SYNC_VISIBLE;
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.restoreAllMocks();
+    localStorage.clear();
+  });
+
+  it('deletes only after the destructive confirm', async () => {
+    renderConfirmDialogHost();
+    render(<DmDashboardPage />);
+    const deleteButton = () =>
+      within(campaignCard('ALPHA')).getByRole('button', { name: /delete/i });
+
+    await userEvent.setup().click(deleteButton());
+    const dialog = await findConfirmDialog();
+    expect(dialog).toHaveAttribute('role', 'alertdialog');
+    expect(dialog).toHaveAccessibleName('Delete Canary?');
+    await clickConfirmDialogButton('Cancel');
+    expect(useDmStore.getState().campaigns).toHaveLength(1);
+    expect(globalThis.fetch).not.toHaveBeenCalledWith(
+      '/api/campaign/ALPHA',
+      expect.anything()
+    );
+
+    await userEvent.setup().click(deleteButton());
+    await clickConfirmDialogButton('Delete campaign');
+    await waitFor(() =>
+      expect(useDmStore.getState().campaigns).toHaveLength(0)
+    );
+    expect(globalThis.fetch).toHaveBeenCalledWith('/api/campaign/ALPHA', {
+      method: 'DELETE',
+    });
   });
 });

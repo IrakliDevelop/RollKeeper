@@ -6,6 +6,7 @@ import {
   createManualCharacterCloud,
 } from '@/lib/supabase/characterCloud';
 import { downloadCharacterCloudRecovery } from '@/lib/supabase/characterCloudRecovery';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export interface CharacterCloudLocalSummary {
   id: string;
@@ -60,13 +61,12 @@ export function useCharacterCloudBackup({
     run(`backup:${character.id}`, async () => {
       const account = await cloud!.getAccount();
       const target = account.email ?? account.id;
-      if (
-        !window.confirm(
-          `Back up only ${character.name} to the signed-in account ${target}? Local data remains authoritative.`
-        )
-      ) {
-        return;
-      }
+      const confirmed = await confirmDialog({
+        title: `Back up ${character.name}?`,
+        message: `A copy goes to ${target}. The character on this device stays as it is.`,
+        confirmLabel: 'Back up character',
+      });
+      if (!confirmed) return;
       const result = await cloud!.service.backup(character, account, {
         guestSelected: true,
         confirmedTargetAccountId: account.id,

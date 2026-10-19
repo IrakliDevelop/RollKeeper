@@ -5,6 +5,11 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { CreatureHeader } from '../CreatureHeader';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+import {
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 afterEach(() => cleanup());
 
@@ -108,22 +113,23 @@ describe('CreatureHeader', () => {
     expect(actions.onLongRest).toHaveBeenCalledWith('e1');
   });
 
-  it('confirms before removing, and only removes when confirmed', () => {
+  it('confirms before removing, and only removes when confirmed', async () => {
     const actions = makeActions();
-    const confirmSpy = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
     render(<CreatureHeader {...baseProps({ actions })} />);
     const removeButton = screen.getByRole('button', {
       name: 'Remove from combat',
     });
     fireEvent.click(removeButton);
+    await clickConfirmDialogButton('Cancel');
     expect(actions.onRemove).not.toHaveBeenCalled();
+
     fireEvent.click(removeButton);
-    expect(confirmSpy).toHaveBeenCalledWith('Remove Goblin Boss from combat?');
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Remove Goblin Boss from combat?'
+    );
+    await clickConfirmDialogButton('Remove from combat');
     expect(actions.onRemove).toHaveBeenCalledWith('e1');
-    confirmSpy.mockRestore();
   });
 
   it('shows the eye button only for entities with both npcSourceId and onViewNPC', () => {

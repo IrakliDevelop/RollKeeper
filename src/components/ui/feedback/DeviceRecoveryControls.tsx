@@ -25,6 +25,7 @@ import {
   type StagedRecoveryGeneration,
 } from '@/lib/deviceRecovery';
 import { APP_VERSION } from '@/utils/constants';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export function DeviceRecoveryControls() {
   const inputRef = useRef<HTMLInputElement>(null);
@@ -111,15 +112,15 @@ export function DeviceRecoveryControls() {
     }
   };
 
-  const handleRestore = () => {
+  const handleRestore = async () => {
     if (!generation || !activated || selectedKeys.size === 0) return;
-    if (
-      !window.confirm(
-        'Restore selected missing values? Existing values and conflicts will not be overwritten.'
-      )
-    ) {
-      return;
-    }
+    const confirmed = await confirmDialog({
+      title: 'Restore the selected entries?',
+      message:
+        'Only entries missing from this browser are restored. Existing entries and conflicts are left as they are.',
+      confirmLabel: 'Restore entries',
+    });
+    if (!confirmed) return;
     const result = restoreRecoveryEntries(
       generation.bundle,
       window.localStorage,
