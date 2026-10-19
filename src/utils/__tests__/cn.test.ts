@@ -55,4 +55,30 @@ describe('cn', () => {
   it('returns empty string with no arguments', () => {
     expect(cn()).toBe('');
   });
+
+  describe('type scale', () => {
+    it('keeps the last type step', () => {
+      expect(cn('type-heading', 'type-body')).toBe('type-body');
+      expect(cn('type-num-lg', 'type-num-md')).toBe('type-num-md');
+    });
+
+    it('lets a type step replace an earlier size, weight and family', () => {
+      expect(cn('text-sm font-bold font-sans leading-5', 'type-ui')).toBe(
+        'type-ui'
+      );
+    });
+
+    it('keeps a type step when a later class overrides one property', () => {
+      expect(cn('type-ui', 'text-lg')).toBe('type-ui text-lg');
+      expect(cn('type-heading', 'font-semibold')).toBe(
+        'type-heading font-semibold'
+      );
+    });
+
+    it('keeps numeric variants and the text colour next to a type step', () => {
+      expect(cn('type-num-md', 'tabular-nums', 'text-heading')).toBe(
+        'type-num-md tabular-nums text-heading'
+      );
+    });
+  });
 });
