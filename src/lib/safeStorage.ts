@@ -1,4 +1,5 @@
 import type { StateStorage } from 'zustand/middleware';
+import { readBrowserLocalStorage } from '@/lib/browserStorage';
 import { isIndexedDbMigrationEnabled } from '@/lib/indexeddb/persistenceBootstrap';
 
 /** Window event fired when a localStorage write fails because the quota is full. */
@@ -23,8 +24,7 @@ export function isQuotaExceeded(e: unknown): boolean {
  * `localStorage` on the client.
  */
 export function createSafeStorage(backing?: Storage): StateStorage {
-  const store =
-    backing ?? (typeof localStorage !== 'undefined' ? localStorage : undefined);
+  const store = backing ?? readBrowserLocalStorage();
 
   return {
     getItem: key => (store ? store.getItem(key) : null),
