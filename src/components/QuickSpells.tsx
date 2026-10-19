@@ -34,6 +34,12 @@ import { RollSummary } from '@/types/dice';
 import { d20Notation } from '@/utils/sheetRoll';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
+
+const NO_SPELLCASTING_ABILITY = {
+  title: "Can't cast spells",
+  message: 'This character has no spellcasting ability set.',
+};
 
 interface QuickSpellsProps {
   showAttackRoll: (
@@ -492,7 +498,7 @@ export function QuickSpells({
   // Spell action handlers
   const rollSpellAttack = async (spell: Spell) => {
     if (spellAttackBonus === null) {
-      alert('Cannot cast spells - no spellcasting ability detected');
+      void alertDialog(NO_SPELLCASTING_ABILITY);
       return;
     }
 
@@ -539,7 +545,7 @@ export function QuickSpells({
 
   const showSavingThrow = async (spell: Spell) => {
     if (spellSaveDC === null) {
-      alert('Cannot cast spells - no spellcasting ability detected');
+      void alertDialog(NO_SPELLCASTING_ABILITY);
       return;
     }
     showSaveToast(
@@ -554,7 +560,7 @@ export function QuickSpells({
   const rollSpellDamage = async (spell: Spell) => {
     const damage = getScaledSpellDamage(spell, totalLevel);
     if (!damage) {
-      alert('This spell does not have damage dice specified');
+      void alertDialog({ title: 'This spell has no damage dice' });
       return;
     }
 
@@ -622,9 +628,9 @@ export function QuickSpells({
       usePact,
     });
     if (!cast) {
-      window.alert(
-        'Not enough of the linked inventory item to cast this spell.'
-      );
+      void alertDialog({
+        title: 'Not enough of the linked item to cast this spell',
+      });
       return;
     }
     setCastModalOpen(false);

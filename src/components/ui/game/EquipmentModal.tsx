@@ -39,6 +39,7 @@ import { WeaponAutocomplete } from '@/components/ui/forms/WeaponAutocomplete';
 import { useWeaponsDbData } from '@/hooks/useWeaponsDbData';
 import { convertProcessedWeaponToFormData } from '@/utils/weaponConversion';
 import type { ProcessedMagicItem, ProcessedWeapon } from '@/types/items';
+import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 
 interface EquipmentModalProps {
   isOpen: boolean;
@@ -389,9 +390,10 @@ export default function EquipmentModal({
 
   const handleAttunement = (item: MagicItem, shouldAttune: boolean) => {
     if (shouldAttune && totalAttuned >= character.attunementSlots.max) {
-      alert(
-        `Cannot attune to more items. Maximum attunement slots: ${character.attunementSlots.max}`
-      );
+      void alertDialog({
+        title: 'No attunement slots left',
+        message: `You can attune to ${character.attunementSlots.max} items at a time. End attunement to another item first.`,
+      });
       return;
     }
     attuneMagicItem(item.id, shouldAttune);

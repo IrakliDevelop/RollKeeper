@@ -12,6 +12,7 @@ import { MagicItemFormDialog } from './MagicItemFormDialog';
 import { EquipmentFilterBar, type FilterConfig } from './EquipmentFilterBar';
 import { useEquipmentFilters } from '@/hooks/useEquipmentFilters';
 import type { MagicItemFormData } from '@/components/ui/game/equipment/MagicItemForm';
+import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 
 const FILTER_CONFIG: FilterConfig = {
   showAttuned: true,
@@ -73,9 +74,10 @@ export function MagicItemsTab() {
 
   const handleAttunement = (item: MagicItem, shouldAttune: boolean) => {
     if (shouldAttune && totalAttuned >= character.attunementSlots.max) {
-      alert(
-        `Cannot attune to more items. Maximum attunement slots: ${character.attunementSlots.max}`
-      );
+      void alertDialog({
+        title: 'No attunement slots left',
+        message: `You can attune to ${character.attunementSlots.max} items at a time. End attunement to another item first.`,
+      });
       return;
     }
     attuneMagicItem(item.id, shouldAttune);
