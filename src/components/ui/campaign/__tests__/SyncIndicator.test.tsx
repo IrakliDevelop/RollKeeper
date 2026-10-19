@@ -1,5 +1,11 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup, within } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
@@ -121,6 +127,12 @@ describe('SyncIndicator — Leave campaign', () => {
     await clickConfirmDialogButton('Cancel');
     expect(props.onLeaveCampaign).not.toHaveBeenCalled();
     expect(screen.queryByTitle(SHARE_SHEET_TITLE)).not.toBeInTheDocument();
+    // Focus returns to the button that opened the menu, not to the page body.
+    await waitFor(() =>
+      expect(
+        screen.getByRole('button', { name: /test campaign/i })
+      ).toHaveFocus()
+    );
 
     user = await openMenu();
     await user.click(screen.getByRole('button', { name: /leave campaign/i }));
