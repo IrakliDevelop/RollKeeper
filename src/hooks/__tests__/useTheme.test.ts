@@ -241,6 +241,37 @@ describe('useThemeInit', () => {
     expect(localStorage.getItem(STORAGE_KEY)).toBe('sepia');
   });
 
+  it('falls back to system when reading storage throws', async () => {
+    vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('Storage is blocked', 'SecurityError');
+    });
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+
+    expect(result.current.theme).toBe('system');
+    expect(result.current.resolvedTheme).toBe('light');
+  });
+
+  it('still applies the chosen theme when saving it throws', async () => {
+    const { useThemeInit } = await import('@/hooks/useTheme');
+
+    const { result } = renderHook(() => useThemeInit());
+    await act(async () => {});
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new DOMException('Storage is full', 'QuotaExceededError');
+    });
+
+    act(() => {
+      result.current.setTheme('dark');
+    });
+
+    expect(result.current.theme).toBe('dark');
+    expect(result.current.resolvedTheme).toBe('dark');
+    expect(document.documentElement.getAttribute('data-theme')).toBe('dark');
+  });
+
   it('system resolves only to light or dark', async () => {
     localStorage.setItem(STORAGE_KEY, 'system');
     const { useThemeInit } = await import('@/hooks/useTheme');
