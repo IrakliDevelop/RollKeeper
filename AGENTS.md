@@ -23,6 +23,17 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
+## Branch naming
+
+Name branches with the repository's prefixes, by the change's main nature:
+`feat/`, `fix/`, `chore/`, `ci/`. Long efforts use an integration branch
+`feature/<name>`, with part branches `feat/<name>-NN-<part>` merged into it
+(for example `feature/felt-and-brass` ← `feat/felt-and-brass-01a-tokens`).
+
+Never use a tool's own prefix (`claude/`, `codex/`, …) or the random suffix a
+tool adds to a worktree branch (`-51a5b1`). If your tool created the branch for
+you, rename it with `git branch -m <new-name>` before the first commit.
+
 ## Pull request writing
 
 Keep PR titles, bodies, and verification notes concise. Include only the
