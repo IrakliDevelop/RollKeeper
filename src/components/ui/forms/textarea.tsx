@@ -66,12 +66,24 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
       maxLength,
       rows = 3,
       onChange,
+      id,
+      'aria-describedby': ariaDescribedBy,
+      'aria-invalid': ariaInvalid,
       ...props
     },
     ref
   ) => {
     const textareaRef = React.useRef<HTMLTextAreaElement | null>(null);
+    const generatedId = React.useId();
+    const textareaId = id ?? generatedId;
+    const messageId = `${textareaId}-message`;
+    const message = error || helperText;
     const textareaVariant = error ? 'error' : variant;
+    const isInvalid = ariaInvalid ?? (textareaVariant === 'error' || undefined);
+    const describedBy =
+      [ariaDescribedBy, message ? messageId : undefined]
+        .filter(Boolean)
+        .join(' ') || undefined;
     const characterCount = typeof value === 'string' ? value.length : 0;
 
     // Handle auto-resize
@@ -102,11 +114,11 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
         {label && (
           <label
             className="text-heading mb-1.5 block text-sm font-medium"
-            htmlFor={props.id}
+            htmlFor={textareaId}
           >
             {label}
             {props.required && (
-              <span className="ml-1 text-red-500" aria-label="required">
+              <span className="text-blood-text ml-1" aria-label="required">
                 *
               </span>
             )}
@@ -126,23 +138,24 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             className
           )}
           ref={setRefs}
+          id={textareaId}
           disabled={disabled}
           value={value}
           maxLength={maxLength}
           rows={rows}
           onChange={onChange}
+          aria-invalid={isInvalid}
+          aria-describedby={describedBy}
           {...props}
         />
 
         <div className="mt-1.5 flex items-center justify-between gap-2">
-          {(error || helperText) && (
+          {message && (
             <p
-              className={cn(
-                'text-sm',
-                error ? 'text-red-600 dark:text-red-400' : 'text-body'
-              )}
+              id={messageId}
+              className={cn('text-sm', error ? 'text-blood-text' : 'text-body')}
             >
-              {error || helperText}
+              {message}
             </p>
           )}
 
@@ -152,8 +165,8 @@ const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
                 'text-body ml-auto text-sm',
                 maxLength &&
                   characterCount > maxLength * 0.9 &&
-                  'text-amber-600',
-                maxLength && characterCount >= maxLength && 'text-red-600'
+                  'text-ember-text',
+                maxLength && characterCount >= maxLength && 'text-blood-text'
               )}
               aria-live="polite"
             >

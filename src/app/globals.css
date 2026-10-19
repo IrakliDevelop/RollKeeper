@@ -569,13 +569,75 @@ button {
   select {
     color: var(--input-text);
     background-color: var(--input-bg);
-    border-radius: 0.5rem; /* rounded-lg default for all inputs */
+  }
+
+  /* Controls take the 4px radius; checkboxes, radios, sliders and pickers
+     keep their own shape. */
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color']
+  ),
+  textarea,
+  select {
+    border-radius: 0.25rem;
   }
 
   input::placeholder,
   textarea::placeholder {
     color: var(--input-placeholder);
     opacity: 1;
+  }
+
+  /* Touch: a field without a size utility is at least 16px, so iOS Safari
+     doesn't zoom in on focus. 1em is the inherited size. */
+  @media (pointer: coarse) {
+    input:not(
+      [type='checkbox'],
+      [type='radio'],
+      [type='range'],
+      [type='file'],
+      [type='color'],
+      [type='button'],
+      [type='submit'],
+      [type='reset'],
+      [type='image'],
+      [type='hidden']
+    ),
+    textarea,
+    select {
+      font-size: max(16px, 1em);
+    }
+  }
+}
+
+/* Touch: the small text steps resolve to 16px inside text fields, so
+   text-xs, text-sm and the small type-* steps stop iOS Safari zooming on
+   focus while larger sizes (ability scores, HP) keep theirs. Unlayered and
+   on the field itself, so it wins over the theme's :root values. */
+@media (pointer: coarse) {
+  input:not(
+    [type='checkbox'],
+    [type='radio'],
+    [type='range'],
+    [type='file'],
+    [type='color'],
+    [type='button'],
+    [type='submit'],
+    [type='reset'],
+    [type='image'],
+    [type='hidden']
+  ),
+  textarea,
+  select {
+    --text-xs: 1rem;
+    --text-sm: 1rem;
+    --type-body-size: 1rem;
+    --type-ui-size: 1rem;
+    --type-small-size: 1rem;
+    --type-caption-size: 1rem;
   }
 }
 

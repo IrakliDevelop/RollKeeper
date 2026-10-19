@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, within } from 'storybook/test';
 import {
   Mail,
   Save,
@@ -279,4 +279,53 @@ export const WithDisabledItems: Story = {
       </>
     ),
   },
+};
+
+function SelectStates() {
+  return (
+    <div className="space-y-4">
+      <SelectField
+        label="Class"
+        defaultValue="fighter"
+        helperText="Sets your hit die"
+        triggerProps={{ 'aria-label': 'Class' }}
+      >
+        <SelectItem value="fighter">Fighter</SelectItem>
+        <SelectItem value="wizard">Wizard</SelectItem>
+      </SelectField>
+      <SelectField
+        label="Alignment"
+        error="Pick an alignment"
+        triggerProps={{ 'aria-label': 'Alignment' }}
+      >
+        <SelectItem value="lg">Lawful good</SelectItem>
+      </SelectField>
+      <SelectField
+        label="Background"
+        defaultValue="sage"
+        disabled
+        triggerProps={{ 'aria-label': 'Background' }}
+      >
+        <SelectItem value="sage">Sage</SelectItem>
+      </SelectField>
+    </div>
+  );
+}
+
+export const States: Story = {
+  render: () => <SelectStates />,
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const alignment = canvas.getByRole('combobox', { name: 'Alignment' });
+    await expect(alignment).toHaveAttribute('aria-invalid', 'true');
+    await expect(alignment).toHaveAccessibleDescription('Pick an alignment');
+    await expect(getComputedStyle(alignment).borderTopLeftRadius).toBe('4px');
+  },
+};
+
+export const StatesDark: Story = {
+  render: () => <SelectStates />,
+  parameters: { a11y: { test: 'error' } },
+  globals: { theme: 'dark' },
 };

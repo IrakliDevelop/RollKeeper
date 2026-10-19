@@ -31,6 +31,7 @@ const SelectTrigger = React.forwardRef<
 >(({ className, children, variant, size = 'md', ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
+    aria-invalid={variant === 'error' || undefined}
     className={cn(
       inputVariants({ variant, size }),
       'flex items-center justify-between [&>span]:line-clamp-1',
@@ -212,15 +213,26 @@ const SelectField = React.forwardRef<
     },
     ref
   ) => {
+    const generatedId = React.useId();
+    const triggerId = triggerProps?.id ?? `${generatedId}-trigger`;
+    const messageId = `${generatedId}-message`;
+    const message = error || helperText;
     const triggerVariant = error ? 'error' : triggerProps?.variant;
+    const describedBy =
+      [triggerProps?.['aria-describedby'], message ? messageId : undefined]
+        .filter(Boolean)
+        .join(' ') || undefined;
 
     return (
       <div className={cn('w-full', wrapperClassName)}>
         {label && (
-          <label className="text-heading mb-1.5 block text-sm font-medium">
+          <label
+            className="text-heading mb-1.5 block text-sm font-medium"
+            htmlFor={triggerId}
+          >
             {label}
             {required && (
-              <span className="ml-1 text-red-500" aria-label="required">
+              <span className="text-blood-text ml-1" aria-label="required">
                 *
               </span>
             )}
@@ -228,20 +240,27 @@ const SelectField = React.forwardRef<
         )}
 
         <Select {...props}>
-          <SelectTrigger {...triggerProps} variant={triggerVariant} ref={ref}>
+          <SelectTrigger
+            {...triggerProps}
+            id={triggerId}
+            variant={triggerVariant}
+            aria-describedby={describedBy}
+            ref={ref}
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent {...contentProps}>{children}</SelectContent>
         </Select>
 
-        {(error || helperText) && (
+        {message && (
           <p
+            id={messageId}
             className={cn(
               'mt-1.5 text-sm',
-              error ? 'text-red-600 dark:text-red-400' : 'text-body'
+              error ? 'text-blood-text' : 'text-body'
             )}
           >
-            {error || helperText}
+            {message}
           </p>
         )}
       </div>
