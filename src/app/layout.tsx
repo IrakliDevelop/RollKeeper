@@ -5,6 +5,8 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 import { MotionProvider } from './MotionProvider';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
+import { StorageBlockedBanner } from '@/components/ui/feedback/StorageBlockedBanner';
+import { storageFallbackScript } from '@/lib/browserStorage';
 import { themeScript } from './themeScript';
 
 // Felt and Brass type: Vollkorn for headings, Barlow for body and UI,
@@ -100,6 +102,8 @@ export default function RootLayout({
   return (
     <html lang="en" className={FONT_VARIABLES} suppressHydrationWarning>
       <head>
+        {/* First, so no later script reads storage the browser refuses. */}
+        <script dangerouslySetInnerHTML={{ __html: storageFallbackScript }} />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
         <script
           dangerouslySetInnerHTML={{ __html: characterPersistenceScript }}
@@ -108,6 +112,7 @@ export default function RootLayout({
       <body className="antialiased" suppressHydrationWarning={true}>
         <ThemeProviderWrapper>
           <MotionProvider>
+            <StorageBlockedBanner />
             <PersistenceBootstrap>
               <ErrorBoundary>{children}</ErrorBoundary>
             </PersistenceBootstrap>

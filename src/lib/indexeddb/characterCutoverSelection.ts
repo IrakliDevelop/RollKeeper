@@ -1,3 +1,4 @@
+import { readBrowserLocalStorage } from '@/lib/browserStorage';
 import type { StorageNamespace } from '@/lib/indexeddb/shadowJournal';
 import type { CharacterActivationEvidence } from './characterAuthority';
 
@@ -354,16 +355,13 @@ export function resolveCharacterCutoverNamespace(
 export function isBrowserCharacterCutoverParticipant(
   namespace?: StorageNamespace
 ): boolean {
-  if (
-    !isCharacterCutoverDeploymentEnabled() ||
-    typeof localStorage === 'undefined'
-  ) {
-    return false;
-  }
+  if (!isCharacterCutoverDeploymentEnabled()) return false;
+  const storage = readBrowserLocalStorage();
+  if (!storage) return false;
   const selectedNamespace =
-    namespace ?? resolveCharacterCutoverNamespace(localStorage);
+    namespace ?? resolveCharacterCutoverNamespace(storage);
   return isSelectedCharacterCutoverProfile(
-    localStorage,
+    storage,
     selectedNamespace ?? 'guest'
   );
 }
