@@ -308,4 +308,19 @@ describe('confirm dialog', () => {
     expect(onParentOpenChange).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Note' })).toBeInTheDocument();
   });
+
+  it('renders in one host only, and the next host takes over when it unmounts', async () => {
+    const first = render(<ConfirmDialogHost />);
+    render(<ConfirmDialogHost />);
+
+    void confirmDialog(DELETE_SPELL);
+    await findConfirmDialog();
+    expect(document.querySelectorAll('[data-confirm-dialog]')).toHaveLength(1);
+    await clickConfirmDialogButton('Cancel');
+
+    first.unmount();
+    void confirmDialog(DELETE_SPELL);
+    await findConfirmDialog();
+    expect(document.querySelectorAll('[data-confirm-dialog]')).toHaveLength(1);
+  });
 });

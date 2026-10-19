@@ -10,6 +10,7 @@ import { usePathname } from 'next/navigation';
 import { ConfirmDialogView } from './ConfirmDialogView';
 import {
   cancelAllDialogs,
+  getActiveDialogHost,
   getCurrentDialog,
   getDialogReturnFocus,
   registerDialogHost,
@@ -31,6 +32,14 @@ export function ConfirmDialogHost() {
     getServerSnapshot
   );
 
+  // Several hosts may be mounted; only the first one renders.
+  const [hostToken] = useState(() => ({}));
+  const activeHost = useSyncExternalStore(
+    subscribeDialogQueue,
+    getActiveDialogHost,
+    getServerSnapshot
+  );
+
   // Keep the last request on screen while its exit animation runs.
   const [last, setLast] = useState<{
     request: DialogRequest;
@@ -41,7 +50,7 @@ export function ConfirmDialogHost() {
   }
   const shown = current ?? last?.request ?? null;
 
-  useEffect(() => registerDialogHost(), []);
+  useEffect(() => registerDialogHost(hostToken), [hostToken]);
 
   // A dialog belongs to the screen that opened it: leaving the screen
   // cancels it, so its handler never runs against the next page.
@@ -53,7 +62,7 @@ export function ConfirmDialogHost() {
     cancelAllDialogs();
   }, [pathname]);
 
-  if (!shown) return null;
+  if (!shown || activeHost !== hostToken) return null;
 
   const open = current !== null;
   const resolve = (result: boolean | string | null) =>

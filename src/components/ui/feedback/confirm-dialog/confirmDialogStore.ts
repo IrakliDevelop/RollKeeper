@@ -54,7 +54,8 @@ type Listener = () => void;
 
 let queue: QueueEntry[] = [];
 let nextId = 1;
-let hostCount = 0;
+/** Mounted hosts in registration order; only the first one renders. */
+let hosts: object[] = [];
 /**
  * Where the most recently resolved dialog was going to return focus. A
  * dialog opened while that one is still animating out would otherwise
@@ -95,7 +96,7 @@ function captureOpener(): Element | null {
 }
 
 function enqueue(request: DialogRequest): Promise<DialogResult> {
-  if (hostCount === 0) {
+  if (hosts.length === 0) {
     // A missing host must never read as consent: cancel, and say why.
     console.error(
       `[confirm-dialog] No <ConfirmDialogHost /> is mounted, so "${request.title}" was cancelled.`
@@ -169,10 +170,22 @@ export function cancelAllDialogs() {
   emit();
 }
 
-export function registerDialogHost(): () => void {
-  hostCount += 1;
+/** The mounted host that renders the dialogs, or null when none is mounted. */
+export function getActiveDialogHost(): object | null {
+  return hosts[0] ?? null;
+}
+
+/**
+ * Registers a mounted host. Several hosts may be mounted (a Storybook docs
+ * page has one per story); only the first registered still-mounted host
+ * renders, so a request never shows twice.
+ */
+export function registerDialogHost(token: object): () => void {
+  hosts = [...hosts, token];
+  emit();
   return () => {
-    hostCount -= 1;
-    if (hostCount === 0) cancelAllDialogs();
+    hosts = hosts.filter(host => host !== token);
+    if (hosts.length === 0) cancelAllDialogs();
+    emit();
   };
 }
