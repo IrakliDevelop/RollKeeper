@@ -8,11 +8,11 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-export type Theme = 'light' | 'dark' | 'parchment' | 'system';
-export type ResolvedTheme = 'light' | 'dark' | 'parchment';
+export type Theme = 'light' | 'dark' | 'system';
+export type ResolvedTheme = 'light' | 'dark';
 
 interface ThemeContextValue {
-  /** The user-chosen preference: 'light', 'dark', 'parchment', or 'system'. */
+  /** The user-chosen preference: 'light', 'dark', or 'system'. */
   theme: Theme;
   /** The actual applied theme after resolving 'system'. */
   resolvedTheme: ResolvedTheme;
@@ -21,6 +21,9 @@ interface ThemeContextValue {
 }
 
 const STORAGE_KEY = 'rollkeeper-theme';
+
+/** Retired in Felt and Brass 1b. A stored value migrates to 'light'. */
+const RETIRED_PARCHMENT = 'parchment';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -36,12 +39,17 @@ function getSystemPreference(): ResolvedTheme {
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (
-    stored === 'light' ||
-    stored === 'dark' ||
-    stored === 'parchment' ||
-    stored === 'system'
-  ) {
+  if (stored === RETIRED_PARCHMENT) {
+    // Paper replaces parchment. Write it back so later reads, including the
+    // pre-hydration script in themeScript.ts, see 'light'.
+    try {
+      localStorage.setItem(STORAGE_KEY, 'light');
+    } catch {
+      // Storage is full or blocked: still render paper for this visit.
+    }
+    return 'light';
+  }
+  if (stored === 'light' || stored === 'dark' || stored === 'system') {
     return stored;
   }
   return 'system';
