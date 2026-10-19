@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e-indexeddb',
   outputDir: '../../test-results/indexeddb',
@@ -35,8 +37,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command:
+    command: withLocalRedis(
       'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true npm run dev -- --port 3107',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://localhost:3107/player',
     reuseExistingServer: false,

@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './config/playwright/e2eRedis';
+
 export default defineConfig({
   testDir: './e2e',
   // Specs with their own config because they need services this project's
@@ -12,6 +14,9 @@ export default defineConfig({
     '**/shop-purchase-reconciliation.spec.ts',
     '**/map-sheet-drawer.spec.ts',
     '**/dm-creature-drawer.spec.ts',
+    '**/table-offline-changes.spec.ts',
+    '**/table-fog-order.spec.ts',
+    '**/shop-table-npc.spec.ts',
   ],
   outputDir: 'test-results',
   timeout: 60_000,
@@ -27,9 +32,12 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command: 'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
+    command: withLocalRedis(
+      'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false npm run dev',
+      'none'
+    ),
     url: 'http://localhost:3000/player',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: false,
     timeout: 120_000,
   },
   projects: [{ name: 'chromium', use: { browserName: 'chromium' } }],

@@ -114,10 +114,6 @@ export function campaignMarkerClaimKey(
   return `campaign:${code}:marker-claim:${mapId}:${playerId}:${requestId}`;
 }
 
-export function campaignDisplayKeyKey(code: string): string {
-  return `campaign:${code}:displaykey`;
-}
-
 export function campaignFogAppearanceKey(
   code: string,
   battleMapId: string

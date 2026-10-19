@@ -1,5 +1,7 @@
 import { defineConfig } from '@playwright/test';
 
+import { withLocalRedis } from './e2eRedis';
+
 export default defineConfig({
   testDir: '../../e2e-automatic-sync',
   outputDir: '../../test-results/automatic-sync',
@@ -35,8 +37,10 @@ export default defineConfig({
     video: 'retain-on-failure',
   },
   webServer: {
-    command:
+    command: withLocalRedis(
       'env NEXT_PUBLIC_SUPABASE_AUTH_ENABLED=false NEXT_PUBLIC_SUPABASE_CHARACTER_BACKUP_ENABLED=false NEXT_PUBLIC_SUPABASE_CHARACTER_AUTOMATIC_SYNC_ENABLED=true NEXT_PUBLIC_INDEXEDDB_MIGRATION_ENABLED=false NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED=true npm run dev -- --port 3108',
+      'none'
+    ),
     cwd: '../..',
     url: 'http://127.0.0.1:3108/player',
     reuseExistingServer: false,

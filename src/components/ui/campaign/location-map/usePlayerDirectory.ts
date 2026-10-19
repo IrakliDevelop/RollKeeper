@@ -2,6 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 
+import {
+  loadSharedPlayers,
+  useTablePlayersCache,
+} from '@/components/ui/campaign/table/useTablePlayersSnapshot';
 import type { CampaignPlayerData } from '@/types/campaign';
 
 export interface PlayerDirectory {
@@ -15,6 +19,8 @@ interface DirectoryState {
   requested: Set<string>;
   inFlight: Promise<void> | null;
   refreshQueued: boolean;
+  /** The queued refresh must bypass a fresh shared snapshot (new id). */
+  forceQueued: boolean;
 }
 
 /**
@@ -42,15 +48,24 @@ export function usePlayerDirectory(
     requested: new Set(),
     inFlight: null,
     refreshQueued: false,
+    forceQueued: false,
   });
+  // FU-4: on the Table canvas, read through the workspace players cache.
+  const cache = useTablePlayersCache();
 
   const fetchOnce = useCallback(
-    async (generation: number): Promise<void> => {
+    async (generation: number, force: boolean): Promise<void> => {
       try {
-        const res = await fetch(`/api/campaign/${campaignCode}/players`);
-        if (stateRef.current.generation !== generation) return;
-        if (!res.ok) return;
-        const data = (await res.json()) as { players?: CampaignPlayerData[] };
+        let data: { players?: CampaignPlayerData[] };
+        if (cache) {
+          const ready = await loadSharedPlayers(cache, campaignCode, force);
+          data = { players: ready.data };
+        } else {
+          const res = await fetch(`/api/campaign/${campaignCode}/players`);
+          if (stateRef.current.generation !== generation) return;
+          if (!res.ok) return;
+          data = (await res.json()) as { players?: CampaignPlayerData[] };
+        }
         if (stateRef.current.generation !== generation) return;
         const names = new Map<string, string>();
         for (const p of data.players ?? []) {
@@ -66,27 +81,34 @@ export function usePlayerDirectory(
         // best-effort
       }
     },
-    [campaignCode]
+    [cache, campaignCode]
   );
 
-  const load = useCallback((): void => {
-    const state = stateRef.current;
-    if (state.inFlight) {
-      state.refreshQueued = true;
-      return;
-    }
-    const generation = state.generation;
-    state.inFlight = (async () => {
-      do {
-        state.refreshQueued = false;
-        await fetchOnce(generation);
-      } while (
-        state.refreshQueued &&
-        stateRef.current.generation === generation
-      );
-      if (stateRef.current.generation === generation) state.inFlight = null;
-    })();
-  }, [fetchOnce]);
+  const load = useCallback(
+    (force: boolean): void => {
+      const state = stateRef.current;
+      if (state.inFlight) {
+        state.refreshQueued = true;
+        state.forceQueued ||= force;
+        return;
+      }
+      const generation = state.generation;
+      state.inFlight = (async () => {
+        let forced = force;
+        do {
+          state.refreshQueued = false;
+          state.forceQueued = false;
+          await fetchOnce(generation, forced);
+          forced = state.forceQueued;
+        } while (
+          state.refreshQueued &&
+          stateRef.current.generation === generation
+        );
+        if (stateRef.current.generation === generation) state.inFlight = null;
+      })();
+    },
+    [fetchOnce]
+  );
 
   // Campaign change: new generation, fresh books; a still-running loop for
   // the old generation exits at its next check and its responses are ignored.
@@ -97,13 +119,14 @@ export function usePlayerDirectory(
       requested: new Set(),
       inFlight: null,
       refreshQueued: false,
+      forceQueued: false,
     };
     setDirectory(null);
   }, [campaignCode]);
 
   useEffect(() => {
     if (!enabled) return;
-    load();
+    load(false);
   }, [enabled, load]);
 
   const ensureKnown = useCallback(
@@ -117,7 +140,7 @@ export function usePlayerDirectory(
         state.requested.add(id);
         unknown = true;
       }
-      if (unknown) load();
+      if (unknown) load(true);
     },
     [enabled, load]
   );

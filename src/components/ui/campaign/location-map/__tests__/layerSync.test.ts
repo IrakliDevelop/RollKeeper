@@ -200,3 +200,39 @@ describe('publishOwnedLayers', () => {
     expect(published).toEqual([]);
   });
 });
+
+describe('PR02 DM-created party band (C1)', () => {
+  it('keeps a DM-published player band visible on display, DM and other players, including after the canonical player re-publish', async () => {
+    const { canonicalPlayerBand } = await import('../playerLayer');
+    const band = def('player-legacy-a', {
+      name: 'Aria',
+      order: PLAYER_BAND_ORDER,
+    });
+    for (const [role, ownLayerId] of [
+      ['display', undefined],
+      ['dm', undefined],
+      ['player', 'player-legacy-b'],
+    ] as const) {
+      const vp = makeVp(role === 'player' ? 'player' : 'dm');
+      const apply = makeApplyRemoteLayer(vp, role, { ownLayerId });
+      apply(upsert(band, 1));
+      apply(
+        upsert(
+          canonicalPlayerBand({
+            ...band,
+            name: 'My elements',
+            visible: false,
+            opacity: 0.2,
+            order: 900,
+          }),
+          2
+        )
+      );
+      const applied = vp.layerManager.getLayer('player-legacy-a');
+      expect(applied, role).toMatchObject({ visible: true, opacity: 1 });
+      expect(vp.layerManager.isLayerVisible('player-legacy-a'), role).toBe(
+        true
+      );
+    }
+  });
+});

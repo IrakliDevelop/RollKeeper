@@ -84,15 +84,36 @@ export interface DmVttToolbarProps {
   markerAudienceNotice?: string | null;
   /** Kind + colour for the marker tool; threaded to the shared options bar. */
   markerControls?: MarkerToolControls;
+  /** Tool names not offered on this surface (the private editor, CC4). */
+  hiddenTools?: readonly string[];
   measureSharing?: MeasureSharingControl;
   movementControls?: MovementControls;
   exportControl?: ReactNode;
   viewsControl?: ReactNode;
   /** Shared-presence "who is viewing" + cursor-sharing switches. */
   presenceControl?: ReactNode;
+  /** PR06 W10: the Table "Edit map" tool group (absent on legacy maps). */
+  editMapControl?: ReactNode;
+  /**
+   * When session controls and canvas tools share one row (otherwise they
+   * stack as full-width rows): `2xl` (default, legacy VTT screen) or `never`
+   * (Table workspace, acceptance A2: the header always stacks above a
+   * full-width tool strip, because its live line, banners and audience row
+   * leave too little width for the tools at any viewport).
+   */
+  sideBySide?: '2xl' | 'never';
   fogControls?: DmFogControls;
   fogPresetControls?: FogPresetControls;
 }
+
+// Literal class strings (Tailwind scans source text).
+const SIDE_BY_SIDE = {
+  '2xl': {
+    dock: '2xl:flex-row 2xl:flex-wrap',
+    session: '2xl:border-r 2xl:border-b-0',
+  },
+  never: { dock: '', session: '' },
+} as const;
 
 const TOKEN_INFO_ICON: Record<TokenInfoMode, typeof Eye> = {
   full: Eye,
@@ -113,8 +134,8 @@ const TOKEN_INFO_LABEL: Record<TokenInfoMode, string> = {
  * The canvas tools structurally mirror
  * `PlayerBattleMapCanvas`'s `PlayerToolbar`, minus the token tool (placed via
  * the roster in Task 8, never through this toolbar) plus a Clear-drawings
- * action. The connection-status chip lives solely in `DmVttTopBar` now (see
- * P7c) — this toolbar no longer duplicates it. */
+ * action. It shows no connection status: the original editor has no live
+ * room under Table v1 (`DmVttTopBar` shows a privacy label instead). */
 export function DmVttToolbar({
   sessionControls,
   onClearDrawings,
@@ -129,11 +150,14 @@ export function DmVttToolbar({
   selectedElementIsMarker,
   markerAudienceNotice,
   markerControls,
+  hiddenTools,
   measureSharing,
   movementControls,
   exportControl,
   viewsControl,
   presenceControl,
+  editMapControl,
+  sideBySide = '2xl',
   fogControls,
   fogPresetControls,
 }: DmVttToolbarProps) {
@@ -169,146 +193,162 @@ export function DmVttToolbar({
   return (
     <div
       ref={dockRef}
-      className="bg-surface-raised border-divider pointer-events-auto fixed inset-x-0 top-0 z-20 flex w-full flex-col overflow-hidden border-b shadow-xl 2xl:flex-row 2xl:flex-wrap"
+      className={`bg-surface-raised border-divider pointer-events-auto fixed inset-x-0 top-0 z-20 flex w-full flex-col overflow-hidden border-b shadow-xl ${
+        SIDE_BY_SIDE[sideBySide].dock
+      }`}
       data-testid="dm-vtt-command-dock"
     >
       {sessionControls && (
-        <div className="border-divider min-w-0 shrink-0 border-b 2xl:border-r 2xl:border-b-0">
+        <div
+          className={`border-divider min-w-0 shrink-0 border-b ${
+            SIDE_BY_SIDE[sideBySide].session
+          }`}
+        >
           {sessionControls}
         </div>
       )}
-      <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
-        <div className="flex shrink-0 items-center gap-1">
-          {DM_TOOLS.map(({ name, label, Icon }) => (
-            <Button
-              key={name}
-              variant={activeTool === name ? 'primary' : 'ghost'}
-              onClick={() => setTool(name)}
-              className="min-h-[44px] min-w-[44px] p-0"
-              title={label}
-              aria-label={label}
-            >
-              <Icon size={16} />
-            </Button>
-          ))}
-          {fogControls && (
-            <>
-              <Button
-                variant={activeTool === 'fog' ? 'primary' : 'ghost'}
-                onClick={fogControls.requestActivate}
-                disabled={fogControls.disabled}
-                className="min-h-[44px] min-w-[44px] p-0"
-                title={fogControls.disabledReason ?? 'Fog of war'}
-                aria-label="Fog of war"
-              >
-                <CloudFog size={16} />
-              </Button>
-              {fogControls.diagnostic && (
-                <span
-                  role="alert"
-                  className="text-accent-red-text max-w-64 text-xs"
+      <div className="flex min-w-0 flex-1 items-stretch">
+        {editMapControl && (
+          // A2: outside the scrolling strip, so it is always reachable.
+          <div className="border-divider flex shrink-0 items-center border-r px-2 py-1">
+            {editMapControl}
+          </div>
+        )}
+        <div className="scrollbar-thin flex min-w-0 flex-1 items-center gap-3 overflow-x-auto overscroll-x-contain px-2 py-1">
+          <div className="flex shrink-0 items-center gap-1">
+            {DM_TOOLS.filter(({ name }) => !hiddenTools?.includes(name)).map(
+              ({ name, label, Icon }) => (
+                <Button
+                  key={name}
+                  variant={activeTool === name ? 'primary' : 'ghost'}
+                  onClick={() => setTool(name)}
+                  className="min-h-[44px] min-w-[44px] p-0"
+                  title={label}
+                  aria-label={label}
                 >
-                  {fogControls.diagnostic}
-                </span>
-              )}
-            </>
-          )}
-        </div>
-        <div className="border-divider flex shrink-0 items-center gap-1 border-l pl-3">
-          <Button
-            variant={hiddenPlacementActive ? 'warning' : 'ghost'}
-            onClick={onToggleHiddenPlacement}
-            className="min-h-[44px] px-2"
-            title={
-              hiddenPlacementActive
-                ? 'New elements are hidden from players'
-                : 'New elements are visible to players'
-            }
-            aria-label="Place hidden elements"
-            aria-pressed={hiddenPlacementActive}
-          >
-            <EyeOff size={16} />
-            <span className="ml-1.5 hidden text-xs xl:inline">
-              {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
-            </span>
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={onRevealAll}
-            disabled={hiddenElementCount === 0}
-            className="min-h-[44px] px-2"
-            title={
-              hiddenElementCount === 0
-                ? 'No hidden elements to reveal'
-                : `Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'}`
-            }
-            aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
-          >
-            <Eye size={16} />
-            <span className="ml-1.5 hidden text-xs xl:inline">
-              Reveal all ({hiddenElementCount})
-            </span>
-          </Button>
-          {selectedElementId && (
+                  <Icon size={16} />
+                </Button>
+              )
+            )}
+            {fogControls && (
+              <>
+                <Button
+                  variant={activeTool === 'fog' ? 'primary' : 'ghost'}
+                  onClick={fogControls.requestActivate}
+                  disabled={fogControls.disabled}
+                  className="min-h-[44px] min-w-[44px] p-0"
+                  title={fogControls.disabledReason ?? 'Fog of war'}
+                  aria-label="Fog of war"
+                >
+                  <CloudFog size={16} />
+                </Button>
+                {fogControls.diagnostic && (
+                  <span
+                    role="alert"
+                    className="text-accent-red-text max-w-64 text-xs"
+                  >
+                    {fogControls.diagnostic}
+                  </span>
+                )}
+              </>
+            )}
+          </div>
+          <div className="border-divider flex shrink-0 items-center gap-1 border-l pl-3">
             <Button
-              data-testid="dm-vtt-dm-only-toggle"
-              variant={selectedElementIsDmOnly ? 'warning' : 'ghost'}
-              onClick={onToggleSelectedDmOnly}
+              variant={hiddenPlacementActive ? 'warning' : 'ghost'}
+              onClick={onToggleHiddenPlacement}
               className="min-h-[44px] px-2"
-              // A marker's audience moves every sibling pin sharing its ref,
-              // and sharing one also publishes its kind, label and colour
-              // (spec §7.4) — both stated on the control that does it.
               title={
-                selectedElementIsMarker
-                  ? markerAudienceToggleTitle(selectedElementIsDmOnly)
-                  : selectedElementIsDmOnly
-                    ? 'Reveal selected element to players'
-                    : 'Hide selected element from players'
+                hiddenPlacementActive
+                  ? 'New elements are hidden from players'
+                  : 'New elements are visible to players'
               }
-              aria-label={
-                selectedElementIsMarker
-                  ? markerAudienceToggleTitle(selectedElementIsDmOnly)
-                  : selectedElementIsDmOnly
-                    ? 'Reveal selected element'
-                    : 'Hide selected element'
-              }
+              aria-label="Place hidden elements"
+              aria-pressed={hiddenPlacementActive}
             >
-              {selectedElementIsDmOnly ? (
-                <Eye size={16} />
-              ) : (
-                <EyeOff size={16} />
-              )}
+              <EyeOff size={16} />
+              <span className="ml-1.5 hidden text-xs xl:inline">
+                {hiddenPlacementActive ? 'Placing hidden' : 'Place hidden'}
+              </span>
             </Button>
-          )}
-          {markerAudienceNotice != null && (
-            <span
-              role="status"
-              className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+            <Button
+              variant="ghost"
+              onClick={onRevealAll}
+              disabled={hiddenElementCount === 0}
+              className="min-h-[44px] px-2"
+              title={
+                hiddenElementCount === 0
+                  ? 'No hidden elements to reveal'
+                  : `Reveal all ${hiddenElementCount} hidden element${hiddenElementCount === 1 ? '' : 's'}`
+              }
+              aria-label={`Reveal all hidden elements (${hiddenElementCount})`}
             >
-              {markerAudienceNotice}
-            </span>
-          )}
-          <Button
-            variant="ghost"
-            onClick={onClearDrawings}
-            className="min-h-[44px] min-w-[44px] p-0"
-            title="Clear drawings"
-            aria-label="Clear drawings"
-          >
-            <Scissors size={16} />
-          </Button>
-          <Button
-            variant="ghost"
-            onClick={tokenInfoToggle.onCycle}
-            className="min-h-[44px] min-w-[44px] p-0"
-            title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-            aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
-          >
-            <TokenInfoIcon size={16} />
-          </Button>
-          {exportControl}
-          {viewsControl}
-          {presenceControl}
+              <Eye size={16} />
+              <span className="ml-1.5 hidden text-xs xl:inline">
+                Reveal all ({hiddenElementCount})
+              </span>
+            </Button>
+            {selectedElementId && (
+              <Button
+                data-testid="dm-vtt-dm-only-toggle"
+                variant={selectedElementIsDmOnly ? 'warning' : 'ghost'}
+                onClick={onToggleSelectedDmOnly}
+                className="min-h-[44px] px-2"
+                // A marker's audience moves every sibling pin sharing its ref,
+                // and sharing one also publishes its kind, label and colour
+                // (spec §7.4); both stated on the control that does it.
+                title={
+                  selectedElementIsMarker
+                    ? markerAudienceToggleTitle(selectedElementIsDmOnly)
+                    : selectedElementIsDmOnly
+                      ? 'Reveal selected element to players'
+                      : 'Hide selected element from players'
+                }
+                aria-label={
+                  selectedElementIsMarker
+                    ? markerAudienceToggleTitle(selectedElementIsDmOnly)
+                    : selectedElementIsDmOnly
+                      ? 'Reveal selected element'
+                      : 'Hide selected element'
+                }
+              >
+                {selectedElementIsDmOnly ? (
+                  <Eye size={16} />
+                ) : (
+                  <EyeOff size={16} />
+                )}
+              </Button>
+            )}
+            {markerAudienceNotice != null && (
+              <span
+                role="status"
+                className="text-accent-amber-text bg-accent-amber-bg border-accent-amber-border max-w-xs rounded border px-2 py-1 text-xs"
+              >
+                {markerAudienceNotice}
+              </span>
+            )}
+            <Button
+              variant="ghost"
+              onClick={onClearDrawings}
+              className="min-h-[44px] min-w-[44px] p-0"
+              title="Clear drawings"
+              aria-label="Clear drawings"
+            >
+              <Scissors size={16} />
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={tokenInfoToggle.onCycle}
+              className="min-h-[44px] min-w-[44px] p-0"
+              title={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+              aria-label={TOKEN_INFO_LABEL[tokenInfoToggle.mode ?? 'compact']}
+            >
+              <TokenInfoIcon size={16} />
+            </Button>
+            {exportControl}
+            {viewsControl}
+            {presenceControl}
+          </div>
         </div>
       </div>
       <div className="border-divider w-full border-t empty:hidden">

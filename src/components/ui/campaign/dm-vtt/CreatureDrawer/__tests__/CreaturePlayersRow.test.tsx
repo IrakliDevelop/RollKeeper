@@ -80,7 +80,7 @@ describe('CreaturePlayersRow', () => {
     const actions = makeActions();
     render(<CreaturePlayersRow entity={makeEntity()} actions={actions} />);
     fireEvent.click(
-      screen.getByTitle('Name visible to players — click to hide')
+      screen.getByTitle('Name visible to players. Click to hide.')
     );
     expect(actions.onUpdate).toHaveBeenCalledWith('e1', { isHidden: true });
   });
@@ -165,7 +165,7 @@ describe('CreaturePlayersRow', () => {
     );
     expect(
       screen.getByRole('button', {
-        name: 'Name visible to players — click to hide',
+        name: 'Name visible to players. Click to hide.',
       })
     ).toHaveAttribute('aria-pressed', 'false');
     rerender(
@@ -176,7 +176,7 @@ describe('CreaturePlayersRow', () => {
     );
     expect(
       screen.getByRole('button', {
-        name: 'Name hidden from players — click to reveal',
+        name: 'Name hidden from players. Click to reveal.',
       })
     ).toHaveAttribute('aria-pressed', 'true');
   });

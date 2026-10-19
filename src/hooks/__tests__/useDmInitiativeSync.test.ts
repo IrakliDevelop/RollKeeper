@@ -6,6 +6,16 @@ import type {
   SharedInitiativeState,
 } from '@/types/sharedState';
 
+const control = vi.hoisted(() => ({
+  status: 'broadcasting' as string,
+  error: null as string | null,
+  publish: vi.fn(async () => {}),
+}));
+
+vi.mock('@/hooks/useTableControl', () => ({
+  useTableControl: () => control,
+}));
+
 const state: SharedInitiativeState = {
   encounterId: 'enc-1',
   isActive: true,
@@ -24,61 +34,77 @@ const request: InitiativeRollRequest = {
   requestedAt: 1000,
 };
 
-describe('useDmInitiativeSync', () => {
+describe('useDmInitiativeSync (Table control publication)', () => {
   beforeEach(() => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn(() => Promise.resolve({ ok: true }))
-    );
+    control.status = 'broadcasting';
+    control.error = null;
+    control.publish.mockClear();
+    vi.stubGlobal('fetch', vi.fn());
   });
   afterEach(() => vi.unstubAllGlobals());
 
-  it('POSTs the initiative feature with the dmId', async () => {
+  it('publishes initiative through Table control, never the legacy writer', async () => {
     const { result } = renderHook(() =>
       useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
     );
     await result.current.pushInitiative(state);
-
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/campaign/ABC123/shared',
-      expect.objectContaining({ method: 'POST' })
-    );
-    const body = JSON.parse(
-      (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
-    );
-    expect(body.feature).toBe('initiative');
-    expect(body.dmId).toBe('dm-1');
-    expect(body.data.encounterId).toBe('enc-1');
+    expect(control.publish).toHaveBeenCalledWith('publishInitiative', {
+      initiative: state,
+      runId: 'enc-1',
+    });
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('POSTs the initiativeRequest feature with the dmId', async () => {
+  it('ends initiative when the encounter is no longer active', async () => {
+    const { result } = renderHook(() =>
+      useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
+    );
+    await result.current.pushInitiative({ ...state, isActive: false });
+    expect(control.publish).toHaveBeenCalledWith('endInitiative', undefined);
+  });
+
+  it('publishes and clears the roll request through Table control', async () => {
     const { result } = renderHook(() =>
       useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
     );
     await result.current.pushInitiativeRequest(request);
-
-    expect(fetch).toHaveBeenCalledWith(
-      '/api/campaign/ABC123/shared',
-      expect.objectContaining({ method: 'POST' })
+    await result.current.pushInitiativeRequest(null);
+    expect(control.publish).toHaveBeenNthCalledWith(
+      1,
+      'publishInitiativeRequest',
+      { request }
     );
-    const body = JSON.parse(
-      (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+    expect(control.publish).toHaveBeenNthCalledWith(
+      2,
+      'publishInitiativeRequest',
+      { request: null }
     );
-    expect(body.feature).toBe('initiativeRequest');
-    expect(body.dmId).toBe('dm-1');
-    expect(body.data.requestId).toBe('req-1');
+    expect(fetch).not.toHaveBeenCalled();
   });
 
-  it('POSTs a null data payload when clearing the request', async () => {
+  it('says live control is still being checked before the first answer', async () => {
+    control.status = 'checking';
     const { result } = renderHook(() =>
       useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
     );
-    await result.current.pushInitiativeRequest(null);
-
-    const body = JSON.parse(
-      (fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body
+    await expect(result.current.pushInitiative(state)).rejects.toThrow(
+      'Checking live control'
     );
-    expect(body.feature).toBe('initiativeRequest');
-    expect(body.data).toBeNull();
+    await expect(result.current.pushInitiativeRequest(request)).rejects.toThrow(
+      'Checking live control'
+    );
+    expect(control.publish).not.toHaveBeenCalled();
+  });
+
+  it('rejects instead of publishing while not broadcasting', async () => {
+    control.status = 'not-broadcasting';
+    control.error = 'Live control lease expired';
+    const { result } = renderHook(() =>
+      useDmInitiativeSync({ campaignCode: 'ABC123', dmId: 'dm-1' })
+    );
+    await expect(result.current.pushInitiative(state)).rejects.toThrow(
+      'Live control lease expired'
+    );
+    expect(control.publish).not.toHaveBeenCalled();
   });
 });

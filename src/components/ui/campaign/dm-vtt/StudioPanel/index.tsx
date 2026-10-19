@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon, type IconName } from '@/components/ui/icons';
@@ -10,7 +11,10 @@ import { InitiativeTab } from './InitiativeTab';
 import { TokenSettings } from './TokenSettings';
 
 import type { Encounter, EncounterEntity } from '@/types/encounter';
-import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
+import type {
+  CombatantDetailCapabilities,
+  EntityActions,
+} from '@/components/ui/encounter/combat-screen/types';
 
 export interface StudioPanelProps {
   encounter: Encounter | null; // the followed encounter (Task 6 resolves it)
@@ -32,6 +36,30 @@ export interface StudioPanelProps {
       'avatarUrl' | 'tokenSize' | 'chessPiece' | 'color'
     >
   ) => void;
+  /**
+   * Table scene runs (all optional; legacy rendering when omitted):
+   * replaces the "Encounter page ↗" link (`null` hides it), adds a toolbar
+   * under the header, replaces the empty/inactive Initiative messages and
+   * restricts the Selected tab's detail controls.
+   */
+  encounterLink?: ReactNode;
+  toolbar?: ReactNode;
+  emptyContent?: ReactNode;
+  inactiveContent?: ReactNode;
+  detailCapabilities?: (
+    entity: EncounterEntity
+  ) => CombatantDetailCapabilities | undefined;
+  /** Initiative rows whose live HP is not loaded yet ("HP —"). */
+  hpUnknownEntityIds?: ReadonlySet<string>;
+  /** Panel width classes (default `w-[min(390px,40vw)]`). */
+  widthClassName?: string;
+  /** Scroll the toolbar together with the tab content (narrow viewports). */
+  scrollToolbar?: boolean;
+  /**
+   * Fixed footer below the scrolling content (Table save status, C1): what
+   * appears there never moves the rows above it.
+   */
+  footer?: ReactNode;
 }
 
 const TABS: {
@@ -60,6 +88,15 @@ export function StudioPanel({
   onToggleCollapsed,
   followNote,
   onTokenIdentityChange,
+  encounterLink,
+  toolbar,
+  emptyContent,
+  inactiveContent,
+  detailCapabilities,
+  hpUnknownEntityIds,
+  widthClassName = 'w-[min(390px,40vw)]',
+  scrollToolbar = false,
+  footer,
 }: StudioPanelProps) {
   if (collapsed) {
     return (
@@ -83,7 +120,7 @@ export function StudioPanel({
 
   return (
     <div
-      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex w-[min(390px,40vw)] flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
+      className={`bg-surface-raised border-divider pointer-events-auto fixed top-[var(--dm-vtt-panel-top,8rem)] right-0 flex ${widthClassName} flex-col overflow-hidden rounded-l-2xl border shadow-xl ${
         activeTab === 'initiative'
           ? 'max-h-[70vh]'
           : 'max-h-[calc(100vh-var(--dm-vtt-panel-top,8rem)-0.75rem)]'
@@ -107,14 +144,18 @@ export function StudioPanel({
           ))}
         </div>
         <div className="flex items-center gap-1">
-          <Link
-            href={encounterHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-accent-blue-text hidden px-1 text-xs font-semibold hover:underline lg:block"
-          >
-            Encounter page ↗
-          </Link>
+          {encounterLink !== undefined ? (
+            encounterLink
+          ) : (
+            <Link
+              href={encounterHref}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent-blue-text hidden px-1 text-xs font-semibold hover:underline lg:block"
+            >
+              Encounter page ↗
+            </Link>
+          )}
           <Button
             variant="ghost"
             size="lg"
@@ -130,19 +171,25 @@ export function StudioPanel({
           {followNote}
         </p>
       )}
+      {!scrollToolbar && toolbar}
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {scrollToolbar && toolbar}
         {activeTab === 'initiative' ? (
           <InitiativeTab
             encounter={encounter}
             selectedEntityId={selectedEntityId}
             onSelectEntity={onSelectEntity}
             encounterHref={encounterHref}
+            emptyContent={emptyContent}
+            inactiveContent={inactiveContent}
+            hpUnknownEntityIds={hpUnknownEntityIds}
           />
         ) : selectedEntity ? (
           <>
             <CombatantDetail
               entity={selectedEntity}
               actions={actions}
+              capabilities={detailCapabilities?.(selectedEntity)}
               key={`detail-${selectedEntity.id}`}
             />
             {onTokenIdentityChange && (
@@ -161,6 +208,7 @@ export function StudioPanel({
           </p>
         )}
       </div>
+      {footer && <div className="shrink-0">{footer}</div>}
     </div>
   );
 }

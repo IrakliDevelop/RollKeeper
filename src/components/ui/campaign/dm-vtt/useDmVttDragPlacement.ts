@@ -13,6 +13,8 @@ import type { RosterDragState } from './useRosterDrag';
 
 export interface UseDmVttDragPlacementOptions {
   status: BattleMapConnectionStatus;
+  /** Same rule as tap-to-arm: only a surface with a live room waits. */
+  liveRequired: boolean;
   getViewport: () => Viewport | null;
   getCanvasEl: () => HTMLElement | null;
   addToast: (toast: Omit<ToastData, 'id'>) => void;
@@ -31,15 +33,16 @@ export interface UseDmVttDragPlacementResult {
  * Wraps `useRosterDrag` for the DM VTT studio, sibling-extracted from
  * `DmVttScreen.hooks.ts` to stay under the 150-line file cap:
  *
- * - Gates drag-to-place on a live connection with the SAME toast as the
- *   tap-to-arm path (`useDmVttPlacementAndSelection.armPlacement`) — a drag
- *   must never stamp a token while offline.
+ * - Gates drag-to-place on a live connection (when the surface has one)
+ *   with the SAME toast as the tap-to-arm path
+ *   (`useDmVttPlacementAndSelection.armPlacement`).
  * - A completed drop clears any tap-armed `pendingPlacement` for a
  *   DIFFERENT entity before selecting the dropped one, so the two
  *   placement gestures can't leave stale armed state behind.
  */
 export function useDmVttDragPlacement({
   status,
+  liveRequired,
   getViewport,
   getCanvasEl,
   addToast,
@@ -62,7 +65,7 @@ export function useDmVttDragPlacement({
 
   const startDrag = useCallback(
     (entity: EncounterEntity, e: ReactPointerEvent) => {
-      if (status !== 'live') {
+      if (liveRequired && status !== 'live') {
         addToast({
           type: 'info',
           title: 'Not connected',
@@ -72,7 +75,7 @@ export function useDmVttDragPlacement({
       }
       rawStartDrag(entity, e);
     },
-    [status, addToast, rawStartDrag]
+    [liveRequired, status, addToast, rawStartDrag]
   );
 
   return { drag, startDrag, wasDrag };
