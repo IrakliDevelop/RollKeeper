@@ -30,8 +30,16 @@ sibling of `forms/`/`layout/`/etc.
 
 Theme is `data-theme="dark"` on `<html>`, set pre-hydration from `localStorage`
 key `rollkeeper-theme`, toggled via `useTheme`. **Always use semantic tokens**
-(`bg-surface`, `text-heading`, `border-divider`, `text-accent-{color}-text`,
-etc.) — never raw Tailwind color classes. Full token list is in `AGENTS.md` (which `CLAUDE.md` imports).
+(`bg-surface`, `text-heading`, `border-divider`, and the role
+tokens `text-brass-text`, `bg-blood-fill`, …) — never raw Tailwind color classes. Full token list is in `AGENTS.md` (which `CLAUDE.md` imports).
+
+Colour comes from six roles, each with one job: brass (primary action, focus,
+proficiency), blood (harm, destructive), verdigris (healing, success), lapis
+(magic), ember (conditions, warnings) and frost (temporary HP). The old
+hue-named `accent-*` tokens and `--gradient-*` variables are deprecated
+aliases that point at the nearest role until the Phase 3 sweeps remove them.
+`npm run design:contrast` checks every role and neutral pairing against WCAG
+AA in both themes.
 
 ## Design ratchet
 

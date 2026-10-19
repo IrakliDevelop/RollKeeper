@@ -114,6 +114,27 @@ Chromium via Storybook Component Tests), Playwright (general e2e plus several
 purpose-specific configs), and Node's built-in test runner for Supabase/DB
 integration tests. `npm run test` only runs the jsdom `unit` project.
 
+## Copy review gate
+
+Every PR that adds or changes user-visible text (headings, buttons, labels,
+empty states, toasts, errors, confirmations, placeholders, aria-labels,
+tooltips) gets a copy review after automated checks pass and before the
+manual browser gate. The rubric is the `rollkeeper-copy` skill: plain,
+specific, table-side wording in the game's own terms, with no generic
+LLM-style copy ("X, not Y" slogans, "everything you need", "seamlessly",
+hype or fantasy filler).
+
+- **Claude Code** — dispatch the `rollkeeper-copy-reviewer` subagent
+  (`.claude/agents/rollkeeper-copy-reviewer.md`) with the PR's base branch.
+- **Codex and other agents** — follow "Reviewing a branch" in
+  `.agents/skills/rollkeeper-copy/SKILL.md`.
+
+`npm run copy:changed -- --base <base>` lists the strings to review. Fix every
+new string the review flags before opening the PR. Rewording an existing
+string is a visible change and needs the owner's approval. Record the verdict
+in the PR. A PR that changes no user-visible text marks the gate not
+applicable.
+
 ## Manual browser acceptance gate
 
 For PRs that affect browser-visible UI, navigation, authentication, local
@@ -168,14 +189,19 @@ The app supports light and dark themes via a `data-theme="dark"` attribute on `<
 **Always use semantic CSS custom-property tokens — never raw Tailwind color classes like `bg-gray-800` or `text-white`.** The tokens automatically resolve to the correct value for each theme:
 
 ```
-Backgrounds:  bg-surface, bg-surface-raised, bg-surface-secondary, bg-surface-elevated
-Text:         text-heading, text-body, text-muted, text-faint
-Borders:      border-divider
-Accents:      text-accent-{color}-text, bg-accent-{color}-bg, border-accent-{color}-border
-              (colors: red, blue, purple, amber, emerald, orange)
+Backgrounds:  bg-surface, bg-surface-secondary, bg-surface-raised, bg-surface-elevated, bg-surface-inset
+Text:         text-heading, text-body, text-muted (text-faint is decorative/disabled only)
+Borders:      border-divider, border-divider-strong, border-input-border
+Roles:        text-{role}-text, bg-{role}-fill, border-{role}-border, bg-{role}-bg,
+              text-on-brass, text-on-blood
+              brass = primary action/focus/proficiency, blood = harm/destructive,
+              verdigris = healing/success, lapis = magic, ember = conditions/warnings,
+              frost = temporary HP
+Deprecated:   text-accent-{hue}-*, bg-accent-{hue}-*, --gradient-* (bridged to roles;
+              existing uses only, never add new ones)
 ```
 
-When building or reviewing UI, verify it looks correct in both themes. If hardcoded colors appear, replace them with the appropriate semantic token.
+When building or reviewing UI, verify it looks correct in both themes. `npm run design:contrast` (CI) fails if any role or neutral pairing drops below WCAG AA. If hardcoded colors appear, replace them with the appropriate semantic token.
 
 ### Design system — always use existing components
 

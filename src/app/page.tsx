@@ -196,7 +196,7 @@ export default function LandingPage() {
           <div className="flex h-16 items-center justify-between">
             <Link href="/" className="flex items-center gap-2">
               <Dice6 className="text-accent-purple-text h-7 w-7" />
-              <span className="font-cinzel text-heading text-xl font-bold tracking-wide">
+              <span className="font-heading text-heading text-xl font-bold tracking-wide">
                 RollKeeper
               </span>
             </Link>
@@ -869,7 +869,7 @@ export default function LandingPage() {
           <div className="flex flex-col items-center gap-6 sm:flex-row sm:justify-between">
             <div className="flex items-center gap-2">
               <Dice6 className="text-accent-purple-text h-5 w-5" />
-              <span className="font-cinzel text-heading text-sm font-bold tracking-wide">
+              <span className="font-heading text-heading text-sm font-bold tracking-wide">
                 RollKeeper
               </span>
             </div>

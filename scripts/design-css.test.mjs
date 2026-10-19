@@ -2,32 +2,10 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
-import { fileURLToPath } from 'node:url';
 
-import { compile } from '@tailwindcss/node';
-
-const repositoryRoot = path.resolve(
-  path.dirname(fileURLToPath(import.meta.url)),
-  '..'
-);
-const globalsPath = path.join(repositoryRoot, 'src', 'app', 'globals.css');
-
-// Compiles the real globals.css and generates CSS for the given class names,
-// so assertions run against exactly what the app ships.
-export async function buildCss(candidates) {
-  const css = await readFile(globalsPath, 'utf8');
-  const compiler = await compile(css, {
-    base: path.dirname(globalsPath),
-    onDependency: () => {},
-  });
-  return compiler.build(candidates);
-}
-
-export function ruleFor(output, escapedSelector) {
-  const start = output.indexOf(escapedSelector);
-  assert.notEqual(start, -1, `expected a rule for ${escapedSelector}`);
-  return output.slice(start, output.indexOf('}', start) + 1);
-}
+import { readBlock, stripComments } from './design-contrast.mjs';
+import { buildCss, ruleFor } from './lib/design-css.mjs';
+import { readGlobalsCss, repositoryRoot } from './lib/design-source.mjs';
 
 test('dark: variant follows the data-theme attribute', async () => {
   const output = await buildCss(['dark:bg-surface']);
@@ -84,12 +62,150 @@ test('reduced motion keeps spinners turning', async () => {
   );
 });
 
-test('surface-elevated resolves through the theme-aware hover token', async () => {
+test('surface-elevated has its own felt and paper values', async () => {
+  const css = await readGlobalsCss();
+  assert.equal(readBlock(css, ':root')['--surface-elevated'], '#fbfbf8');
+  assert.equal(
+    readBlock(css, "[data-theme='dark']")['--surface-elevated'],
+    '#1f2b25'
+  );
   const output = await buildCss(['bg-surface-elevated']);
-  assert.match(output, /--surface-elevated:\s*var\(--surface-hover\)/);
   assert.match(
     ruleFor(output, '.bg-surface-elevated'),
-    // @theme inline writes the underlying variable straight into the utility.
     /background-color:\s*var\(--surface-elevated\)/
   );
+});
+
+test('native controls follow the theme through color-scheme', async () => {
+  const css = await readGlobalsCss();
+  const scheme = selector =>
+    stripComments(css)
+      .slice(stripComments(css).indexOf(`${selector} {`))
+      .match(/color-scheme:\s*(\w+)/)?.[1];
+  assert.equal(scheme(':root'), 'light');
+  assert.equal(scheme("[data-theme='dark']"), 'dark');
+  assert.equal(scheme("[data-theme='parchment']"), 'light');
+});
+
+test('role utilities are generated from the role tokens', async () => {
+  const output = await buildCss([
+    'text-brass-text',
+    'bg-brass-fill',
+    'text-on-brass',
+    'border-blood-border',
+    'bg-lapis-bg',
+  ]);
+  assert.match(
+    ruleFor(output, '.text-brass-text'),
+    /color:\s*var\(--brass-text\)/
+  );
+  assert.match(
+    ruleFor(output, '.bg-brass-fill'),
+    /background-color:\s*var\(--brass-fill\)/
+  );
+  assert.match(ruleFor(output, '.text-on-brass'), /color:\s*var\(--on-brass\)/);
+  assert.match(
+    ruleFor(output, '.border-blood-border'),
+    /border-color:\s*var\(--blood-border\)/
+  );
+  assert.match(
+    ruleFor(output, '.bg-lapis-bg'),
+    /background-color:\s*var\(--lapis-bg\)/
+  );
+});
+
+const BRIDGE = {
+  emerald: 'verdigris',
+  green: 'verdigris',
+  red: 'blood',
+  purple: 'lapis',
+  violet: 'lapis',
+  indigo: 'lapis',
+  blue: 'lapis',
+  amber: 'ember',
+  yellow: 'ember',
+  orange: 'ember',
+};
+
+test('every deprecated accent token points at its role', async () => {
+  const shared = readBlock(await readGlobalsCss(), ':root,\n[data-theme]');
+  for (const [hue, role] of Object.entries(BRIDGE)) {
+    assert.equal(shared[`--accent-${hue}-text`], `var(--${role}-text)`);
+    assert.equal(shared[`--accent-${hue}-text-muted`], `var(--${role}-text)`);
+    assert.equal(
+      shared[`--accent-${hue}-border`],
+      `var(--bridge-${role}-border)`
+    );
+    assert.equal(
+      shared[`--accent-${hue}-border-strong`],
+      `var(--${role}-border)`
+    );
+    assert.equal(shared[`--accent-${hue}-bg`], `var(--${role}-bg)`);
+    assert.equal(
+      shared[`--accent-${hue}-bg-strong`],
+      `var(--bridge-${role}-bg-strong)`
+    );
+  }
+});
+
+test('paper and felt each declare the softer bridge border literals', async () => {
+  const css = await readGlobalsCss();
+  for (const selector of [':root', "[data-theme='dark']"]) {
+    const block = readBlock(css, selector);
+    for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
+      assert.match(
+        block[`--bridge-${role}-border`] ?? '',
+        /^#[0-9a-f]{6}$/,
+        `${selector} should declare --bridge-${role}-border as a hex literal`
+      );
+    }
+  }
+});
+
+test('felt and paper declare no hue-named accent or gradient literals', async () => {
+  const css = await readGlobalsCss();
+  for (const selector of [':root', "[data-theme='dark']"]) {
+    const names = Object.keys(readBlock(css, selector));
+    assert.deepEqual(
+      names.filter(name => /^--(accent|gradient)-/.test(name)),
+      [],
+      `${selector} still declares legacy literals`
+    );
+  }
+});
+
+test('gradient endpoints are flattened to surfaces', async () => {
+  const shared = readBlock(await readGlobalsCss(), ':root,\n[data-theme]');
+  for (const stop of ['from', 'via', 'to']) {
+    assert.equal(shared[`--gradient-page-${stop}`], 'var(--background)');
+  }
+  assert.equal(shared['--gradient-purple-from'], 'var(--lapis-bg)');
+});
+
+test('parchment keeps its own palette until it is retired in 1b', async () => {
+  const parchment = readBlock(
+    await readGlobalsCss(),
+    "[data-theme='parchment']"
+  );
+  assert.equal(parchment['--accent-emerald-text'], '#0c6344');
+  assert.equal(parchment['--input-bg'], '#fcfbf8');
+  assert.equal(parchment['--surface-elevated'], 'var(--surface-hover)');
+});
+
+test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/postcss', async () => {
+  const read = async file =>
+    JSON.parse(await readFile(path.join(repositoryRoot, file), 'utf8'));
+  const pkg = await read('package.json');
+  const lock = await read('package-lock.json');
+  assert.equal(
+    pkg.devDependencies['@tailwindcss/node'],
+    pkg.devDependencies['@tailwindcss/postcss']
+  );
+  assert.equal(
+    lock.packages[''].devDependencies['@tailwindcss/node'],
+    pkg.devDependencies['@tailwindcss/node']
+  );
+  const version = name => lock.packages[`node_modules/${name}`]?.version;
+  assert.ok(version('@tailwindcss/node'), 'lockfile has @tailwindcss/node');
+  assert.equal(version('@tailwindcss/node'), version('@tailwindcss/postcss'));
 });

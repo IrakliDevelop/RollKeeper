@@ -1,6 +1,7 @@
 import type { Preview, Decorator } from '@storybook/nextjs-vite';
 import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';
+import { MotionProvider } from '../src/app/MotionProvider';
 
 // Theme wrapper component (must be PascalCase to use hooks)
 function ThemeWrapper({
@@ -48,9 +49,11 @@ const withTheme: Decorator = (Story, context) => {
   const theme = context.globals.theme || 'light';
 
   return (
-    <ThemeWrapper theme={theme}>
-      <Story />
-    </ThemeWrapper>
+    <MotionProvider>
+      <ThemeWrapper theme={theme}>
+        <Story />
+      </ThemeWrapper>
+    </MotionProvider>
   );
 };
 

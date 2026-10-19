@@ -407,8 +407,7 @@ export default function RichTextEditor({
         .rich-text-editor-content .ProseMirror {
           outline: none !important;
           color: var(--heading);
-          font-family:
-            -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+          font-family: var(--font-body-family);
           background-color: var(--surface-raised, white) !important;
           min-height: inherit !important;
           height: 100% !important;

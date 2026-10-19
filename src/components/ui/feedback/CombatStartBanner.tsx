@@ -56,7 +56,7 @@ export function CombatStartBanner({
           className={`border-accent-red-border bg-surface-raised text-accent-red-text flex items-center gap-3 rounded-xl border-2 px-8 py-4 shadow-2xl ${
             phase === 'enter' ? 'combat-banner-enter' : 'combat-banner-exit'
           }`}
-          style={{ fontFamily: 'var(--font-cinzel-decorative), serif' }}
+          style={{ fontFamily: 'var(--font-heading-family)' }}
         >
           <Swords size={28} />
           <span className="text-2xl font-bold tracking-widest uppercase sm:text-3xl">
