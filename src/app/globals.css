@@ -615,8 +615,9 @@ button {
 
 /* Touch: the small text steps resolve to 16px inside text fields, so
    text-xs, text-sm and the small type-* steps stop iOS Safari zooming on
-   focus while larger sizes (ability scores, HP) keep theirs. Unlayered and
-   on the field itself, so it wins over the theme's :root values. */
+   focus while larger sizes (ability scores, HP) keep theirs. The variables
+   are set on the field itself, which beats the value inherited from :root
+   in any layer. */
 @media (pointer: coarse) {
   input:not(
     [type='checkbox'],

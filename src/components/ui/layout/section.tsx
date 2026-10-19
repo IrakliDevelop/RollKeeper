@@ -70,7 +70,7 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
           >
             {heading}
           </Heading>
-          {trailing && (
+          {trailing != null && (
             <div className="flex shrink-0 items-center gap-2">{trailing}</div>
           )}
         </div>

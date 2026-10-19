@@ -43,6 +43,16 @@ describe('Section', () => {
     expect(row).toContainElement(screen.getByRole('button', { name: 'Add' }));
   });
 
+  it('renders a trailing 0 and omits the wrapper without trailing', () => {
+    const { rerender } = render(<Section heading="Notes" trailing={0} />);
+
+    const row = screen.getByRole('heading', { name: 'Notes' }).parentElement;
+    expect(row).toContainElement(screen.getByText('0'));
+
+    rerender(<Section heading="Notes" />);
+    expect(row?.children).toHaveLength(1);
+  });
+
   it('has no box of its own', () => {
     render(<Section heading="Notes" data-testid="section" />);
 

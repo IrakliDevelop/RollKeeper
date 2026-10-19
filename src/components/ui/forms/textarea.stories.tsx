@@ -33,7 +33,10 @@ function TextareaStates() {
   const [motto, setMotto] = useState('Stand fast, strike true');
   return (
     <div className="space-y-4">
-      <Textarea label="Session notes" placeholder="What happened tonight?" />
+      <Textarea
+        label="Session notes"
+        placeholder="Met the Red Hand at the bridge."
+      />
       <Textarea
         label="Motto"
         value={motto}

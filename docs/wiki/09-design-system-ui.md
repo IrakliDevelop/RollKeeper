@@ -50,7 +50,7 @@ Text sizes come from composite `type-*` utilities in `globals.css`: `type-title`
 sets family, size, line height and weight; the sizes are `--type-*-size`
 variables. They are not under `--text-*`, which would clash with the
 `text-heading` colour. `cn()` knows the group: a later `type-*` replaces an
-earlier one (and any earlier size, weight or family), while a later `text-lg`
+earlier one (and any earlier size, line height, weight or family), while a later `text-lg`
 or `font-semibold` only overrides that property.
 
 ## Touch rules for fields
@@ -63,10 +63,13 @@ variables as `1rem`, and a base rule sets `font-size: max(16px, 1em)` on fields
 without a size utility. A field with `text-2xl` keeps 24px. Arbitrary sizes such
 as `text-[13px]` are not covered, so don't put them on inputs. `Input` and the
 `Select` trigger also reach 44px tall; `Checkbox`, `Switch` and `RadioGroupItem`
-keep their size and grow a 44px hit area instead;
-with a label, their row is at least 44px and holds the hit area (a one-line
-row centres the control, a described row pads its top), so stacked rows' hit
-areas don't overlap.
+keep their size and grow a 44px hit area instead. `Textarea` keeps its 80px
+minimum height on coarse pointers; it does not drop to 44px. With a label,
+their row is at least 44px and holds the hit area (a one-line row centres the
+control, a described row pads its top), so stacked rows' hit areas don't
+overlap. A bare `Checkbox`, `Switch` or `RadioGroupItem` (no `label` prop)
+stacked in a list needs its row to be at least 44px on coarse pointers at the
+call site (`pointer-coarse:min-h-11`), or neighbouring hit areas overlap.
 
 Storybook can't switch to a coarse pointer, so stories call
 `emulateCoarsePointer()` (`src/test/storybook/`) to copy the coarse rules in and

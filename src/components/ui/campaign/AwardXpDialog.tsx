@@ -140,7 +140,7 @@ export function AwardXpDialog({
             {players.map(p => (
               <label
                 key={p.playerId}
-                className="flex items-center gap-2 text-sm"
+                className="flex items-center gap-2 text-sm pointer-coarse:min-h-11"
               >
                 <Checkbox
                   checked={!excluded.has(p.playerId)}

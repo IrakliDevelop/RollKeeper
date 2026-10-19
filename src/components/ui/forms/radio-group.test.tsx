@@ -28,13 +28,13 @@ describe('RadioGroup', () => {
 
   it('marks the chosen card option from data-state, outside a form', () => {
     render(
-      <RadioGroup aria-label="Initiative" defaultValue="auto">
-        <RadioGroupItem value="auto" label="Roll for me" variant="card" />
-        <RadioGroupItem value="manual" label="I'll roll" variant="card" />
+      <RadioGroup aria-label="Rest" defaultValue="short">
+        <RadioGroupItem value="short" label="Short rest" variant="card" />
+        <RadioGroupItem value="long" label="Long rest" variant="card" />
       </RadioGroup>
     );
 
-    const card = screen.getByText('Roll for me').closest('label');
+    const card = screen.getByText('Short rest').closest('label');
     expect(card).toHaveClass(
       'rounded-md',
       'border',
@@ -42,8 +42,8 @@ describe('RadioGroup', () => {
     );
     expect(card?.className).not.toMatch(/has-\[:checked\]|shadow/);
 
-    fireEvent.click(screen.getByRole('radio', { name: "I'll roll" }));
-    expect(screen.getByRole('radio', { name: "I'll roll" })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('radio', { name: 'Long rest' }));
+    expect(screen.getByRole('radio', { name: 'Long rest' })).toHaveAttribute(
       'data-state',
       'checked'
     );

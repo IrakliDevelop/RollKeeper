@@ -41,21 +41,17 @@ function RadioStates() {
         <RadioGroupItem value="short" label="Short rest" />
         <RadioGroupItem value="long" label="Long rest" />
       </RadioGroupField>
-      <RadioGroupField
-        label="Initiative"
-        defaultValue="auto"
-        aria-label="Initiative"
-      >
+      <RadioGroupField label="Lodging" defaultValue="camp" aria-label="Lodging">
         <RadioGroupItem
-          value="auto"
-          label="Roll for me"
-          description="The app rolls for every monster"
+          value="camp"
+          label="Roadside camp"
+          description="Free, but someone keeps watch"
           variant="card"
         />
         <RadioGroupItem
-          value="manual"
-          label="I'll roll"
-          description="Enter each result yourself"
+          value="inn"
+          label="Inn"
+          description="Costs gold, safe sleep"
           variant="card"
         />
       </RadioGroupField>
@@ -79,11 +75,11 @@ export const States: Story = {
     await expect(long).toHaveFocus();
     await expect(getComputedStyle(long).outlineStyle).toBe('solid');
 
-    const auto = canvas.getByText('Roll for me').closest('label')!;
-    const manual = canvas.getByText("I'll roll").closest('label')!;
+    const camp = canvas.getByText('Roadside camp').closest('label')!;
+    const inn = canvas.getByText('Inn').closest('label')!;
     await waitFor(() =>
-      expect(getComputedStyle(manual).borderTopColor).not.toBe(
-        getComputedStyle(auto).borderTopColor
+      expect(getComputedStyle(inn).borderTopColor).not.toBe(
+        getComputedStyle(camp).borderTopColor
       )
     );
   },
