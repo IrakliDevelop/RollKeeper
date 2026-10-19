@@ -329,14 +329,13 @@ are otherwise identical for both.
   is consistent with the flag being either on or off — confirm the flag state
   some other way (e.g. the card's presence/absence, or an authenticated
   request).
-- The `window.confirm` override must be **reinstalled after every
-  navigation** (including a reload). Several of the card's actions
-  (`activateLocal`, `activateCloud`, `enrollDevice`, `applyExactCloudVersion`,
-  `deleteArchive`, `rollback`, `removeAccountFromDevice`, `restoreVersion`)
-  call `window.confirm`, and a navigation replaces the page's `window` object
-  — a stale override left over from before the reload silently stops
-  intercepting, and the real browser dialog blocks the run instead.
-
+- The card's confirmations (`activateLocal`, `activateCloud`, `enrollDevice`,
+  `applyExactCloudVersion`, `deleteArchive`, `rollback`,
+  `removeAccountFromDevice`, `restoreVersion`) are in-app dialogs
+  (`[data-confirm-dialog]`, `role="dialog"` or `"alertdialog"`), not
+  `window.confirm`. Answer them by clicking the dialog's own buttons; the
+  confirm button is last in the footer and has focus when the dialog opens.
+  Navigating away while one is open cancels it.
 ## Slice 11G — Campaign data migration wizard
 
 Applies to changes touching the migration wizard (the launcher on `/dm` and
@@ -431,13 +430,11 @@ control origin with the flag off.
   **absent**, and on the absence of the `rollkeeper-local` IndexedDB database
   and of `rollkeeper:` markers — **never** on a status code. Do not record a
   403 as proof of anything about the flag.
-- **Reinstall the `window.confirm` override after every navigation**,
-  including a reload — see the §11F note. The **cards** call it; the wizard,
-  its route and all six adapters deliberately do not (spec R12), so an
-  override that the wizard never trips is working correctly, not broken. It
-  is scenarios 2, 3 and 5 — the ones that drive a card — that need it. A
-  navigation replaces the page's `window`, so a stale override silently stops
-  intercepting and the real dialog blocks the run.
+- **Answer the cards' confirmations in the in-app dialog** — see the §11F
+  note. The **cards** ask; the wizard, its route and all six adapters
+  deliberately do not (spec R12), so a walk of the wizard that never opens a
+  dialog is working correctly, not broken. Scenarios 2, 3 and 5 — the ones
+  that drive a card — each open them.
 - **Byte-identity is a per-entry hash comparison, not a glance.** Capture the
   per-entry hash vector before and after each scenario; an entry that looks
   unchanged in the storage viewer can still have been rewritten with
