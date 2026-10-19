@@ -79,10 +79,14 @@ export function ConfirmDialogView({
     if (isPrompt && inputRef.current) {
       const input = inputRef.current;
       input.focus();
-      // iOS Safari ignores select() inside the focus handler.
-      requestAnimationFrame(() =>
-        input.setSelectionRange(0, input.value.length)
-      );
+      // iOS Safari ignores select() inside the focus handler. By the time
+      // the frame runs the player may already be typing; selecting then
+      // would make the next keystroke replace what they typed.
+      requestAnimationFrame(() => {
+        if (document.activeElement === input && input.value === defaultValue) {
+          input.setSelectionRange(0, input.value.length);
+        }
+      });
       return;
     }
     confirmRef.current?.focus();

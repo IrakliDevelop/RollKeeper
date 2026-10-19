@@ -228,6 +228,37 @@ describe('confirm dialog', () => {
     await expect(cancelled).resolves.toBeNull();
   });
 
+  it('does not reselect the prompt text once the player has started typing', async () => {
+    // Hold the frame the dialog defers its select-all to, so the test can
+    // type first and run it afterwards.
+    const frames: FrameRequestCallback[] = [];
+    vi.spyOn(window, 'requestAnimationFrame').mockImplementation(callback => {
+      frames.push(callback);
+      return frames.length;
+    });
+    render(<ConfirmDialogHost />);
+    const named = promptDialog({
+      title: 'Duplicate Thalia Vane',
+      label: 'Name',
+      defaultValue: 'Thalia Vane (Copy)',
+      confirmLabel: 'Duplicate character',
+    });
+
+    const dialog = await findConfirmDialog();
+    const field = within(dialog).getByLabelText<HTMLInputElement>('Name');
+    await waitFor(() => expect(field).toHaveFocus());
+    await waitFor(() => expect(frames.length).toBeGreaterThan(0));
+
+    fireEvent.change(field, { target: { value: 'Thalia the Second' } });
+    act(() => frames.splice(0).forEach(frame => frame(performance.now())));
+
+    expect(field).toHaveValue('Thalia the Second');
+    expect(field.selectionStart).toBe(field.selectionEnd);
+
+    await clickConfirmDialogButton('Cancel');
+    await expect(named).resolves.toBeNull();
+  });
+
   it('shows queued requests one at a time, in order', async () => {
     render(<ConfirmDialogHost />);
     const first = confirmDialog({ ...DELETE_SPELL, title: 'First?' });

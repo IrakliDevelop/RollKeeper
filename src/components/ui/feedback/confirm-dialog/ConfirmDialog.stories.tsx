@@ -155,8 +155,15 @@ export const Prompt: Story = {
     const dialog = await body().findByRole('dialog', {
       name: 'Duplicate Thalia Vane',
     });
-    const field = within(dialog).getByLabelText('Name');
+    const field = within(dialog).getByLabelText<HTMLInputElement>('Name');
     await waitFor(() => expect(field).toHaveFocus());
+    // The dialog selects the default text a frame after focusing; wait for
+    // it so typing can't race that selection.
+    await waitFor(() =>
+      expect(
+        field.selectionStart === 0 && field.selectionEnd === field.value.length
+      ).toBe(true)
+    );
     await userEvent.clear(field);
     await userEvent.type(field, 'Thalia the Second{Enter}');
     await expect(
