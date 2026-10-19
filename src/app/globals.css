@@ -13,8 +13,10 @@
    hardcoded color classes like bg-white or text-gray-800.
    ============================================================ */
 
-/* Paper (light) theme: the default when <html> has no data-theme. */
-:root {
+/* Paper (light) theme: the default when <html> has no data-theme, and the
+   scope of any nested [data-theme='light'] wrapper inside a felt page. */
+:root,
+[data-theme='light'] {
   color-scheme: light;
 
   /* --- Font families --- */

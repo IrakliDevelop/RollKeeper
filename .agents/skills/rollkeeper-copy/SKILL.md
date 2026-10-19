@@ -117,10 +117,14 @@ a review: report findings, don't silently rewrite.
    - `const`: SCREAMING_SNAKE constants, and variables named `message`,
      `title`, `label`, `text`, `hint`, … or ending in one (`errorMessage`,
      `emptyTitle`);
+   - `error`: a message of two or more words passed to `new Error(…)` anywhere
+     in `src` except `src/lib`, `src/app/api` and `src/test`. Many reach the
+     screen through `error.message`; judge the ones a player or DM can see.
+     Errors in those three folders are developer messages and are not listed;
    - `other`: the catch-all. Any other string of two or more words, unless it
-     is a class list, CSS, a module path, a type, a property key, a
-     `console` or `new Error` message, or sits inside `className`, `key`,
-     `href`, `data-*` or an event handler.
+     is a class list, CSS, a module path, an id or URL path, a type, a
+     property key or a `console` message, or sits inside `className`, `key`,
+     `href` or `data-*`. Strings inside event handlers are listed.
 
    It includes multi-line strings when any of their lines changed, and
    untracked files. It is deliberately broad, so expect noise rows (file
@@ -134,8 +138,9 @@ a review: report findings, don't silently rewrite.
    ```
 
    The extractor misses strings built by concatenation or helper functions,
-   values computed at runtime, messages passed to `new Error` that the UI
-   later shows, text outside `src/**/*.ts(x)`, and test and story files.
+   values computed at runtime, messages passed to `new Error` in `src/lib`
+   or `src/app/api` that the UI later shows, single words outside label
+   contexts, text outside `src/**/*.ts(x)`, and test and story files.
    Judge any user-visible prose you find there as well.
 3. Read each string in its component, so you know where it appears and what
    the user is doing at that moment.

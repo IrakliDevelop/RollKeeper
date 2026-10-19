@@ -18,9 +18,10 @@ You review user-visible copy for RollKeeper. You do not edit files.
      `git ls-files --others --exclude-standard -- src`.
 
    Look for user-visible prose the extractor did not list: strings built by
-   concatenation or helper functions, messages passed to `new Error` that the
-   UI later shows, and anything else a player or DM would read. Judge those
-   too.
+   concatenation or helper functions, messages passed to `new Error` in
+   `src/lib` or `src/app/api` that the UI later shows, and anything else a
+   player or DM would read. Judge those too. Rows of kind `error` are thrown
+   messages from UI code: judge the ones a player or DM can see.
 5. For each string from step 3 or step 4, open its file at that line to see
    the context, then judge it with the skill's four questions, tells table
    and element patterns. Skip game rules text and user-authored content.

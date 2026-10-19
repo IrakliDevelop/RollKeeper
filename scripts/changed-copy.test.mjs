@@ -42,11 +42,12 @@ test('extracts JSX text, copy props, toasts and branch strings', () => {
       [10, 'jsx-text', 'Saved'],
       [17, 'message', 'Character saved successfully!'],
       [18, 'message', 'Long rest taken'],
+      [20, 'error', 'Unexpected state'],
     ]
   );
 });
 
-test('ignores class names, test ids, icon names, keys and thrown errors', () => {
+test('ignores class names, test ids, icon names and keys', () => {
   const texts = extractCopy('src/Hero.tsx', component).map(({ text }) => text);
   for (const ignored of [
     'hero bg-surface',
@@ -55,7 +56,6 @@ test('ignores class names, test ids, icon names, keys and thrown errors', () => 
     'sword',
     'success',
     'campaign:abc',
-    'Unexpected state',
   ]) {
     assert.ok(!texts.includes(ignored), `${ignored} should be ignored`);
   }
@@ -296,11 +296,10 @@ function f(active: boolean) {
   const classes = cn('flex items-center', active && 'bg-surface');
   const merged = clsx('px-2 py-1', { 'text-heading font-bold': active });
   console.warn('cache miss for key');
-  if (!active) throw new Error('Unexpected state here');
   const lazy = import('lazy module');
   const map = { 'some key here': 1 };
   return (
-    <div className="flex gap-2" data-state="is open" onClick={() => go('to the page')}>
+    <div className="flex gap-2" data-state="is open" onClick={() => go('/to/the/page')}>
       <style jsx>{\`.a { color: red; }\`}</style>
       <style>{'.b { color: blue; }'}</style>
     </div>
@@ -384,4 +383,128 @@ setCount('3');
     assert.equal(kindOf(entries, text), 'message', text);
   }
   assert.ok(!entries.some(e => e.text === '3'));
+});
+
+test('lowercase prose with a hyphen or colon is not mistaken for a class list', () => {
+  const source = `
+const a = 'level-up complete';
+const b = 'note: saved locally';
+const c = 'pick a spell/cantrip';
+const d = '7-day weeks, 12 months of 30 days';
+`;
+  const texts = extractCopy('src/test.tsx', source).map(e => e.text);
+  for (const text of [
+    'level-up complete',
+    'note: saved locally',
+    'pick a spell/cantrip',
+    '7-day weeks, 12 months of 30 days',
+  ]) {
+    assert.ok(texts.includes(text), `${text} should be reported`);
+  }
+});
+
+test('Tailwind class lists, ids, paths and CSS stay skipped', () => {
+  const source = `
+const a = 'flex items-center gap-2';
+const b = 'bg-surface text-heading';
+const c = '-mt-2 !w-full md:w-1/2';
+const d = 'data-[state=open]:bg-surface';
+const e = 'long-rest';
+const f = 'begin_calendar_staging';
+const g = 'application/json,.json';
+const h = '/api/campaign/' + code;
+const i = \`/api/campaign/\${code}/maps\`;
+const j = 'radial-gradient(circle, red 0%, transparent 70%)';
+const k = '@/lib/redis';
+`;
+  assert.deepEqual(extractCopy('src/test.tsx', source), []);
+});
+
+test('strings in event handler expressions are listed', () => {
+  const source = `
+const a = (
+  <div>
+    <button onClick={() => toast('Character saved')}>Go</button>
+    <button onClick={() => addRow('New Day')}>Add</button>
+    <button onChange={e => notify(e.ok ? 'Concentration Save' : 'Spell Attack')}>Roll</button>
+    <button onClick={() => go('/player/characters')}>Open</button>
+  </div>
+);
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.equal(kindOf(entries, 'Character saved'), 'message');
+  assert.equal(kindOf(entries, 'New Day'), 'other');
+  assert.equal(kindOf(entries, 'Concentration Save'), 'other');
+  assert.equal(kindOf(entries, 'Spell Attack'), 'other');
+  assert.ok(!entries.some(e => e.text.startsWith('/player')));
+});
+
+test('single words are listed in label contexts only', () => {
+  const source = `
+<Button label="Save" />;
+<Button>Delete</Button>;
+const item = { label: 'Cancel', value: 'cancel' };
+const direction = 'Enter';
+const keys = ['Escape', 'Backspace'];
+`;
+  const entries = extractCopy('src/test.tsx', source);
+  assert.equal(kindOf(entries, 'Save'), 'prop');
+  assert.equal(kindOf(entries, 'Delete'), 'jsx-text');
+  assert.equal(kindOf(entries, 'Cancel'), 'object');
+  for (const text of ['cancel', 'Enter', 'Escape', 'Backspace']) {
+    assert.ok(!entries.some(e => e.text === text), `${text} is not copy`);
+  }
+});
+
+test('new Error messages in UI files are listed as error', () => {
+  const source = `
+throw new Error('Sign in to the owner account first.');
+throw new TypeError(\`Failed to load \${name}\`);
+throw new Error('Unexpected');
+throw new Error(ok ? 'Upload failed' : 'Download failed');
+`;
+  assert.deepEqual(
+    extractCopy('src/components/Sync.tsx', source).map(e => [e.kind, e.text]),
+    [
+      ['error', 'Sign in to the owner account first.'],
+      ['error', 'Failed to load {…}'],
+      ['error', 'Upload failed'],
+      ['error', 'Download failed'],
+    ]
+  );
+});
+
+test('identifier-like new Error messages are not listed as copy', () => {
+  const entries = extractCopy(
+    'src/components/Sync.tsx',
+    `
+throw new Error('recovery-unavailable');
+throw new Error('Could not save the character');
+`
+  );
+  assert.deepEqual(
+    entries.map(e => [e.kind, e.text]),
+    [['error', 'Could not save the character']]
+  );
+});
+
+test('times and ratios are not Tailwind variant evidence', () => {
+  const source = `
+const a = 'starts at 10:30 sharp';
+const b = 'aspect 3:2 portrait';
+const c = 'md:flex 2xl:grid hover:bg-surface';
+`;
+  const texts = extractCopy('src/test.tsx', source).map(e => e.text);
+  assert.deepEqual(texts, ['starts at 10:30 sharp', 'aspect 3:2 portrait']);
+});
+
+test('new Error messages in lib, api and test code stay developer messages', () => {
+  const source = `throw new Error('Sign in to the owner account first.');`;
+  for (const file of [
+    'src/lib/sync.ts',
+    'src/app/api/x/route.ts',
+    'src/test/setup.ts',
+  ]) {
+    assert.deepEqual(extractCopy(file, source), [], file);
+  }
 });

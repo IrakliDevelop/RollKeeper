@@ -3,7 +3,13 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import test from 'node:test';
 
-import { readBlock, stripComments } from './design-contrast.mjs';
+import {
+  FELT_SELECTOR,
+  PAPER_SELECTOR,
+  SHARED_SELECTOR,
+  readBlock,
+  stripComments,
+} from './design-contrast.mjs';
 import { buildCss, ruleFor } from './lib/design-css.mjs';
 import { readGlobalsCss, repositoryRoot } from './lib/design-source.mjs';
 
@@ -64,11 +70,8 @@ test('reduced motion keeps spinners turning', async () => {
 
 test('surface-elevated has its own felt and paper values', async () => {
   const css = await readGlobalsCss();
-  assert.equal(readBlock(css, ':root')['--surface-elevated'], '#fbfbf8');
-  assert.equal(
-    readBlock(css, "[data-theme='dark']")['--surface-elevated'],
-    '#1f2b25'
-  );
+  assert.equal(readBlock(css, PAPER_SELECTOR)['--surface-elevated'], '#fbfbf8');
+  assert.equal(readBlock(css, FELT_SELECTOR)['--surface-elevated'], '#1f2b25');
   const output = await buildCss(['bg-surface-elevated']);
   assert.match(
     ruleFor(output, '.bg-surface-elevated'),
@@ -82,8 +85,8 @@ test('native controls follow the theme through color-scheme', async () => {
     stripComments(css)
       .slice(stripComments(css).indexOf(`${selector} {`))
       .match(/color-scheme:\s*(\w+)/)?.[1];
-  assert.equal(scheme(':root'), 'light');
-  assert.equal(scheme("[data-theme='dark']"), 'dark');
+  assert.equal(scheme(PAPER_SELECTOR), 'light');
+  assert.equal(scheme(FELT_SELECTOR), 'dark');
   const declarations = stripComments(css).match(/(?<![\w-])color-scheme:/g);
   assert.equal(declarations.length, 2, 'only paper and felt set color-scheme');
 });
@@ -129,7 +132,7 @@ const BRIDGE = {
 };
 
 test('every deprecated accent token points at its role', async () => {
-  const shared = readBlock(await readGlobalsCss(), ':root,\n[data-theme]');
+  const shared = readBlock(await readGlobalsCss(), SHARED_SELECTOR);
   for (const [hue, role] of Object.entries(BRIDGE)) {
     assert.equal(shared[`--accent-${hue}-text`], `var(--${role}-text)`);
     assert.equal(shared[`--accent-${hue}-text-muted`], `var(--${role}-text)`);
@@ -151,7 +154,7 @@ test('every deprecated accent token points at its role', async () => {
 
 test('paper and felt each declare the softer bridge border literals', async () => {
   const css = await readGlobalsCss();
-  for (const selector of [':root', "[data-theme='dark']"]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
     const block = readBlock(css, selector);
     for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
       assert.match(
@@ -165,7 +168,7 @@ test('paper and felt each declare the softer bridge border literals', async () =
 
 test('felt and paper declare no hue-named accent or gradient literals', async () => {
   const css = await readGlobalsCss();
-  for (const selector of [':root', "[data-theme='dark']"]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
     const names = Object.keys(readBlock(css, selector));
     assert.deepEqual(
       names.filter(name => /^--(accent|gradient)-/.test(name)),
@@ -176,7 +179,7 @@ test('felt and paper declare no hue-named accent or gradient literals', async ()
 });
 
 test('gradient endpoints are flattened to surfaces', async () => {
-  const shared = readBlock(await readGlobalsCss(), ':root,\n[data-theme]');
+  const shared = readBlock(await readGlobalsCss(), SHARED_SELECTOR);
   for (const stop of ['from', 'via', 'to']) {
     assert.equal(shared[`--gradient-page-${stop}`], 'var(--background)');
   }
@@ -190,7 +193,7 @@ test('parchment is retired: paper and felt are the only theme blocks', async () 
       match => match[1]
     )
   );
-  assert.deepEqual([...themed], ['dark']);
+  assert.deepEqual([...themed].sort(), ['dark', 'light']);
   assert.doesNotMatch(css, /parchment/i);
 });
 
@@ -200,14 +203,14 @@ test('no theme block redeclares a shared token', async () => {
   // either be dead (paper sits before the shared block) or win over it
   // (felt sits after), splitting the themes.
   const css = await readGlobalsCss();
-  const shared = Object.keys(readBlock(css, ':root,\n[data-theme]'));
+  const shared = Object.keys(readBlock(css, SHARED_SELECTOR));
   for (const name of ['--background', '--foreground', '--ring', '--input-bg']) {
     assert.ok(
       shared.includes(name),
       `${name} must be declared on :root, [data-theme]`
     );
   }
-  for (const selector of [':root', "[data-theme='dark']"]) {
+  for (const selector of [PAPER_SELECTOR, FELT_SELECTOR]) {
     const block = readBlock(css, selector);
     assert.deepEqual(
       shared.filter(name => name in block),
@@ -251,4 +254,21 @@ test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/pos
   const version = name => lock.packages[`node_modules/${name}`]?.version;
   assert.ok(version('@tailwindcss/node'), 'lockfile has @tailwindcss/node');
   assert.equal(version('@tailwindcss/node'), version('@tailwindcss/postcss'));
+});
+
+test('a light wrapper inside a felt page re-declares every paper literal', async () => {
+  // Custom properties inherit, so without [data-theme='light'] on the paper
+  // block a light wrapper inside <html data-theme="dark"> would keep felt.
+  const css = await readGlobalsCss();
+  assert.match(
+    stripComments(css),
+    /:root,\s*\[data-theme='light'\]\s*\{\s*color-scheme:\s*light/
+  );
+  const paper = Object.keys(readBlock(css, PAPER_SELECTOR));
+  const felt = Object.keys(readBlock(css, FELT_SELECTOR));
+  assert.deepEqual(
+    felt.filter(name => !paper.includes(name)),
+    [],
+    'felt declares literals the paper block lacks'
+  );
 });

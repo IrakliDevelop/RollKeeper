@@ -51,14 +51,37 @@ function pairs() {
 
 export const PAIRS = pairs();
 
-// The theme blocks that define each palette, in cascade order.
+// The theme blocks that define each palette, in cascade order. Paper also
+// applies to a nested [data-theme='light'] wrapper inside a felt page.
+export const PAPER_SELECTOR = ":root,\n[data-theme='light']";
+export const SHARED_SELECTOR = ':root,\n[data-theme]';
+export const FELT_SELECTOR = "[data-theme='dark']";
+
 export const THEMES = {
-  paper: [':root', ':root,\n[data-theme]'],
-  felt: [':root', ':root,\n[data-theme]', "[data-theme='dark']"],
+  paper: [PAPER_SELECTOR, SHARED_SELECTOR],
+  felt: [PAPER_SELECTOR, SHARED_SELECTOR, FELT_SELECTOR],
 };
 
 export function stripComments(css) {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
+}
+
+function escapeRegExp(text) {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// Matches `selector {` only as a whole rule prelude: at the start of the file
+// or right after a `}`, `;` or `{`. The selector list is compared whole, so
+// `[data-theme]` does not match inside `:root,\n[data-theme] {` and `:root`
+// does not match `html:root {`. Whitespace, including around commas, is not
+// significant.
+function blockPattern(selector) {
+  const body = selector
+    .trim()
+    .split(/\s*,\s*/)
+    .map(item => item.split(/\s+/).map(escapeRegExp).join('\\s+'))
+    .join('\\s*,\\s*');
+  return new RegExp(`(?:^|[};{])\\s*${body}\\s*\\{`, 'g');
 }
 
 // Declarations of every block whose selector is exactly `selector`, merged
@@ -67,16 +90,14 @@ export function readBlock(css, selector) {
   const source = stripComments(css);
   const declarations = {};
   let found = false;
-  let start = source.indexOf(`${selector} {`);
-  while (start !== -1) {
+  for (const match of source.matchAll(blockPattern(selector))) {
     found = true;
-    const open = start + selector.length + 2;
+    const open = match.index + match[0].length;
     const close = source.indexOf('}', open);
     for (const part of source.slice(open, close).split(';')) {
-      const match = part.match(/^\s*(--[\w-]+)\s*:\s*([\s\S]+?)\s*$/);
-      if (match) declarations[match[1]] = match[2].replace(/\s+/g, ' ');
+      const decl = part.match(/^\s*(--[\w-]+)\s*:\s*([\s\S]+?)\s*$/);
+      if (decl) declarations[decl[1]] = decl[2].replace(/\s+/g, ' ');
     }
-    start = source.indexOf(`${selector} {`, close);
   }
   if (!found) throw new Error(`No "${selector}" block in globals.css`);
   return declarations;

@@ -166,3 +166,107 @@ test('the repository has no token reference problems', async () => {
   ]);
   assert.deepEqual(findTokenProblems(files, globals), []);
 });
+
+test('flags the less common variants glued to an interpolation', () => {
+  const variants = [
+    'file:',
+    'target:',
+    'open:',
+    'first-letter:',
+    'first-line:',
+    'details-content:',
+    'user-invalid:',
+    'out-of-range:',
+    'autofill:',
+    'optional:',
+    'default:',
+    'only-of-type:',
+    'contrast-less:',
+    'noscript:',
+    'pointer-none:',
+    'popover-open:',
+    'nth-3:',
+    'nth-last-of-type-2:',
+    'in-data-[state=open]:',
+    '@md:',
+    '@max-lg:',
+    '*:',
+    '**:',
+    '[&:hover]:',
+    '[&>svg]:',
+    '[&_a:hover]:',
+    '[@media(min-width:640px)]:',
+  ];
+  const problems = findTokenProblems(
+    file(variants.map(variant => `\`${variant}\${a}\``).join('\n')),
+    css
+  );
+  assert.deepEqual(
+    problems.map(problem => problem.detail),
+    variants.map(variant => `${variant}\${`)
+  );
+});
+
+test('a defined token behind any variant, including arbitrary ones, is accepted', () => {
+  const classes = [
+    'file:bg-surface',
+    'target:border-divider',
+    'open:bg-surface/50',
+    'user-valid:text-heading',
+    'details-content:bg-surface',
+    'nth-3:bg-surface',
+    '@md:bg-surface',
+    '*:border-divider',
+    '[&:hover]:bg-surface',
+    '[&_a:hover]:text-heading',
+    'supports-[display:grid]:bg-surface',
+    'data-[state=open]:bg-(--surface)',
+    'bg-[color:var(--surface)]',
+  ];
+  assert.deepEqual(
+    findTokenProblems(
+      file(`<div className="${classes.join(' ')}" />`),
+      css.replace('--color-divider', '--color-heading: #000; --color-divider')
+    ),
+    []
+  );
+});
+
+test('an undefined token is still flagged behind any variant', () => {
+  const problems = findTokenProblems(
+    file(
+      `<div className="file:bg-surface-elevated [&:hover]:text-brass-txt open:border-nope" />`
+    ),
+    css
+  );
+  assert.deepEqual(
+    problems.map(problem => problem.detail),
+    ['surface-elevated', 'brass-txt']
+  );
+});
+
+test('does not mistake Markdown bold before a template hole for a child variant', () => {
+  for (const snippet of [
+    '`**Damage**:${x}`',
+    '`**${name}**:${x}`',
+    '`***:${x}`',
+  ]) {
+    assert.deepEqual(
+      findTokenProblems(file(`const a = ${snippet};`), css),
+      [],
+      snippet
+    );
+  }
+});
+
+test('does not mistake more template keys for variants', () => {
+  assert.deepEqual(
+    findTokenProblems(
+      file(
+        'const a = `user:${id}`; const b = `@lib:${x}`; const c = `max:${n}`; const d = `data:${x}`; const e = arr[${i}];'
+      ),
+      css
+    ),
+    []
+  );
+});

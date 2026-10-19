@@ -38,7 +38,13 @@ function getSystemPreference(): ResolvedTheme {
 
 function getStoredTheme(): Theme {
   if (typeof window === 'undefined') return 'system';
-  const stored = localStorage.getItem(STORAGE_KEY);
+  let stored: string | null;
+  try {
+    stored = localStorage.getItem(STORAGE_KEY);
+  } catch {
+    // Storage is blocked: follow the system preference for this visit.
+    return 'system';
+  }
   if (stored === RETIRED_PARCHMENT) {
     // Paper replaces parchment. Write it back so later reads, including the
     // pre-hydration script in themeScript.ts, see 'light'.
@@ -170,7 +176,11 @@ export function useThemeInit(): ThemeContextValue {
   );
 
   const setTheme = useCallback((next: Theme) => {
-    localStorage.setItem(STORAGE_KEY, next);
+    try {
+      localStorage.setItem(STORAGE_KEY, next);
+    } catch {
+      // Storage is full or blocked: the choice still applies for this visit.
+    }
     currentTheme = next;
     currentResolved = resolveTheme(next);
     applyTheme(currentResolved);
