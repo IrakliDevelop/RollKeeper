@@ -29,6 +29,25 @@ const eslintConfig = [
       "react-hooks/void-use-memo": "off",
     },
   },
+  {
+    // Native confirm/alert/prompt are replaced by the shared in-app dialog
+    // (confirmDialog, alertDialog, promptDialog in
+    // src/components/ui/feedback/confirm-dialog).
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: [
+      // Cloud-sync cards still use window.confirm until Felt and Brass 1c1b
+      // part (b) moves them to confirmDialog.
+      "src/components/ui/campaign/CombatLogArchiveSyncControls/CombatLogArchiveSyncControls.hooks.ts",
+      "src/components/ui/campaign/NpcSyncControls/NpcSyncControls.hooks.ts",
+      "src/components/ui/campaign/EncounterSyncControls/EncounterSyncControls.hooks.ts",
+      "src/components/ui/campaign/MagicItemLibrary/MagicItemSyncControls.tsx",
+      "src/components/ui/campaign/CampaignSettingsSyncControls.tsx",
+      "src/components/ui/calendar/CalendarSyncControls.tsx",
+    ],
+    rules: {
+      "no-alert": "error",
+    },
+  },
   globalIgnores([
     "storybook-static/**",
     "claude_design/**",
