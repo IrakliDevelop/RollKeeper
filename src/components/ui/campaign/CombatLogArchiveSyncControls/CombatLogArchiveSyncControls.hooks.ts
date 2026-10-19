@@ -59,6 +59,11 @@ import type { CampaignInfo } from '@/types/campaign';
 import type { CombatLogState, CombatLogTombstone } from '@/types/combatLog';
 import { APP_VERSION, COMBAT_LOG_STORAGE_KEY } from '@/utils/constants';
 import { useCombatLogStore } from '@/store/combatLogStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface StoreDocument {
   legacyId: string;
@@ -424,6 +429,12 @@ export function useCombatLogArchiveSyncController(
   // partway — and device enrollment — leave both set while the store still
   // shows the frozen legacy copy or the un-uploaded local candidate.
   const [hydrated, setHydrated] = useState(false);
+  // deleteArchive re-reads this after its confirm dialog: autosave can be
+  // disarmed while the dialog is open.
+  const hydratedRef = useRef(hydrated);
+  useEffect(() => {
+    hydratedRef.current = hydrated;
+  }, [hydrated]);
   const lastFingerprints = useRef<Map<string, string> | null>(null);
   // The exact local generation the store was hydrated from, so a repeated
   // Supabase auth event cannot re-run hydration over newer local work.
@@ -883,9 +894,9 @@ export function useCombatLogArchiveSyncController(
       );
       setRecoveryVerified(true);
       if (
-        !window.confirm(
-          `Safety copy checked. Continue with the combat logs for ${campaignName}? Nothing is moved or backed up yet.`
-        )
+        !(await confirmDialog(
+          syncConfirm.selectFamily(SYNC_FAMILIES.combatLogs, campaignName)
+        ))
       ) {
         setArchivesSelected(false);
         setStatus('Safety copy checked. Nothing was changed.');
@@ -995,9 +1006,12 @@ export function useCombatLogArchiveSyncController(
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Switch this browser over to the new way of storing combat logs? Your safety copy is already saved. Reference: ${manifest.fingerprint.slice(0, 12)}`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(
+          SYNC_FAMILIES.combatLogs,
+          manifest.fingerprint
+        )
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1102,7 +1116,7 @@ export function useCombatLogArchiveSyncController(
     )
       return;
     if (
-      !window.confirm('Turn on backup to your account for these combat logs?')
+      !(await confirmDialog(syncConfirm.turnOnBackup(SYNC_FAMILIES.combatLogs)))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1262,16 +1276,16 @@ export function useCombatLogArchiveSyncController(
     setBusy(true);
     setError(null);
     try {
+      if (
+        !(await confirmDialog(
+          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+        ))
+      )
+        return;
       const local = await buildCombatLogArchiveManifest({
         campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
-      if (
-        !window.confirm(
-          `Add this browser to your account's backup? What is on this browser is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
-        )
-      )
-        return;
       const namespace = `user:${context.accountId}` as const;
       const campaignId = workspace.cloudId;
       const deviceKey = deviceKeyFor(context.accountId, campaignId);
@@ -1392,9 +1406,9 @@ export function useCombatLogArchiveSyncController(
     ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
-      !window.confirm(
-        `Load ${combatLogCount(liveDocumentCount)} from your account onto this browser? Work on this browser that has not been backed up will stop this.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.combatLogs, liveDocumentCount)
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1564,11 +1578,7 @@ export function useCombatLogArchiveSyncController(
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion}? It is added as a new version, and every earlier version is kept.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     setBusy(true);
     setError(null);
@@ -1647,9 +1657,7 @@ export function useCombatLogArchiveSyncController(
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
     if (
-      !window.confirm(
-        'Stop backing these combat logs up to your account? Everything already backed up is kept.'
-      )
+      !(await confirmDialog(syncConfirm.stopBackup(SYNC_FAMILIES.combatLogs)))
     )
       return;
     setBusy(true);
@@ -1745,9 +1753,12 @@ export function useCombatLogArchiveSyncController(
     )
       return;
     if (
-      !window.confirm(
-        `Remove ${context.accountLabel}'s combat logs from this browser? Your account keeps everything.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(
+          SYNC_FAMILIES.combatLogs,
+          context.accountLabel
+        )
+      ))
     )
       return;
     setBusy(true);
@@ -1764,10 +1775,7 @@ export function useCombatLogArchiveSyncController(
             entry.state !== 'acknowledged' && entry.state !== 'superseded'
         );
         const lossConfirmed =
-          !unresolved ||
-          window.confirm(
-            'Some changes on this browser have not been backed up yet and will be lost. Continue?'
-          );
+          !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
           const deviceId = localStorage.getItem(
@@ -1814,7 +1822,7 @@ export function useCombatLogArchiveSyncController(
     }
   };
 
-  const deleteArchive = (archiveId: string) => {
+  const deleteArchive = async (archiveId: string) => {
     if (!campaignCode) return;
     // A routed campaign's legacy key is frozen by the aware storage, so the
     // only path a deletion has to durable storage is the autosave chain — and
@@ -1826,22 +1834,26 @@ export function useCombatLogArchiveSyncController(
     // and still report success — the archive is back on the next reload.
     // Refusing here rather than hiding the button keeps the control the
     // refused-edit banner's guidance names, and says why it cannot run yet.
-    const routedAuthority =
-      authority?.authority ??
-      readCombatLogArchiveAuthorityMarker(localStorage, campaignCode)
-        ?.authority;
-    if (routedAuthority && routedAuthority !== 'localStorage' && !hydrated) {
-      setError(
-        "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
-      );
-      return;
-    }
-    if (
-      !window.confirm(
-        'Delete this combat log? It stays in your account history if backup is on.'
-      )
-    )
-      return;
+    const refusedBeforeHydration = (isHydrated: boolean) => {
+      const routedAuthority =
+        authority?.authority ??
+        readCombatLogArchiveAuthorityMarker(localStorage, campaignCode)
+          ?.authority;
+      if (
+        routedAuthority &&
+        routedAuthority !== 'localStorage' &&
+        !isHydrated
+      ) {
+        setError(
+          "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
+        );
+        return true;
+      }
+      return false;
+    };
+    if (refusedBeforeHydration(hydrated)) return;
+    if (!(await confirmDialog(syncConfirm.deleteCombatLog()))) return;
+    if (refusedBeforeHydration(hydratedRef.current)) return;
     useCombatLogStore.getState().clearArchive(archiveId);
     setStatus('Combat log deleted.');
   };

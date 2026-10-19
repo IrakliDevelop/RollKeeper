@@ -489,7 +489,7 @@ export function CombatLogArchiveSyncControls({
                       whose store is not hydrated — and says so in words rather
                       than leaving a greyed-out button the guidance points at.
                       It is last in the row, after both downloads, and
-                      `window.confirm` still covers the destructive step. */}
+                      `confirmDialog` still covers the destructive step. */}
                   <Button
                     size="sm"
                     variant="ghost"

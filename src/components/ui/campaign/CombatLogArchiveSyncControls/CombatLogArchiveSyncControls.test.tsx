@@ -50,6 +50,12 @@ import {
   planCombatLogArchiveMutations,
   runCombatLogArchiveMutationPlan,
 } from './index';
+import {
+  answerConfirmDialogs,
+  clickConfirmDialogButton,
+  findConfirmDialog,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-25T00:00:00.000Z';
 const ACCOUNT_ID = '33333333-3333-4333-8333-333333333333';
@@ -408,7 +414,8 @@ async function enrollAgainstCloudGeneration(
         });
       throw new Error(`unexpected action ${String(body.action)}`);
     });
-  vi.spyOn(window, 'confirm').mockReturnValue(true);
+  renderConfirmDialogHost();
+  answerConfirmDialogs('confirm');
   commitSpy = vi.spyOn(IndexedDbCombatLogArchiveRepository.prototype, 'commit');
 
   renderControls();
@@ -498,7 +505,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     await selectWorkspaceAndPreview();
@@ -518,6 +526,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     // legacy copy plus the authority marker, and IndexedDB keeps the cutover
     // generation. Cloud activation never happened.
     cleanup();
+    renderConfirmDialogHost();
     seedArchives({ 'arc-1': endedArchive() });
     renderControls();
 
@@ -976,7 +985,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(supabaseBrowser, 'createSupabaseBrowserClient').mockReturnValue(
       null
     );
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    const dialogs = answerConfirmDialogs('confirm');
 
     renderControls();
     await userEvent.click(
@@ -988,7 +998,7 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
         "This browser hasn't finished loading your combat logs, so nothing was deleted. Finish setting this browser up, then try again."
       )
     ).toBeVisible();
-    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(dialogs.titles).toEqual([]);
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
     expect(
       useCombatLogStore.getState().combatLogTombstones['arc-1']
@@ -1028,7 +1038,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     await selectWorkspaceAndPreview();
@@ -1153,7 +1164,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     );
     await screen.findByText('These two versions are exactly the same.');
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
     fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
     await screen.findByText(
       'Backup is off and everything was kept. Reload the page to keep working on this browser.'
@@ -1250,7 +1262,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
       `rollkeeper:combat-log-archive-device:${ACCOUNT_ID}:${CAMPAIGN_ID}`,
       'device-a'
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     await screen.findByText('Your combat logs are loaded from this browser.');
@@ -1297,7 +1310,8 @@ describe('CombatLogArchiveSyncControls durability guards', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
     fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockImplementation(async (_input, init?: RequestInit) => {
@@ -1628,7 +1642,7 @@ describe('CombatLogArchiveSyncControls card', () => {
     mockOwnerWorkspace();
     mockOwnerSession();
     seedArchives({ 'arc-1': endedArchive() });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderConfirmDialogHost();
     const commit = vi.spyOn(
       IndexedDbCombatLogArchiveRepository.prototype,
       'commit'
@@ -1642,17 +1656,20 @@ describe('CombatLogArchiveSyncControls card', () => {
     fireEvent.click(
       screen.getByRole('button', { name: /delete this combat log/i })
     );
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    expect(await findConfirmDialog()).toHaveAccessibleName(
+      'Delete this combat log?'
+    );
+    await clickConfirmDialogButton('Cancel');
     // Bounded window: a declined confirmation must leave the store and the
     // local generation exactly as they were.
     await new Promise(resolve => setTimeout(resolve, 25));
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
     expect(commit).not.toHaveBeenCalled();
 
-    confirmSpy.mockReturnValue(true);
     fireEvent.click(
       screen.getByRole('button', { name: /delete this combat log/i })
     );
+    await clickConfirmDialogButton('Delete combat log');
 
     await waitFor(() =>
       expect(commit).toHaveBeenCalledWith(
@@ -1662,10 +1679,10 @@ describe('CombatLogArchiveSyncControls card', () => {
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeUndefined();
   });
 
-  it('offers the delete control the refused-edit guidance names, with no workspace chosen', () => {
+  it('offers the delete control the refused-edit guidance names, with no workspace chosen', async () => {
     vi.stubEnv('NEXT_PUBLIC_COMBAT_LOG_SYNC_VISIBLE', 'true');
     seedArchives({ 'arc-1': endedArchive() });
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderConfirmDialogHost();
 
     renderControls();
 
@@ -1688,13 +1705,13 @@ describe('CombatLogArchiveSyncControls card', () => {
     fireEvent.click(
       screen.getByRole('button', { name: 'Delete this combat log' })
     );
-    expect(confirmSpy).toHaveBeenCalledTimes(1);
+    await clickConfirmDialogButton('Cancel');
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeDefined();
 
-    confirmSpy.mockReturnValue(true);
     fireEvent.click(
       screen.getByRole('button', { name: 'Delete this combat log' })
     );
+    await clickConfirmDialogButton('Delete combat log');
     expect(useCombatLogStore.getState().encounters['arc-1']).toBeUndefined();
   });
 
