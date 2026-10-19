@@ -21,13 +21,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-vi.mock('@/store/npcStore', () => ({
-  useNPCStore: () => ({
+vi.mock('@/store/npcStore', () => {
+  const store = {
+    npcsByCampaign: {},
     getNPCsForCampaign: vi.fn().mockReturnValue([]),
     createNPC: vi.fn(),
     deleteNPC: vi.fn(),
-  }),
-}));
+  };
+  return {
+    useNPCStore: (selector?: (state: typeof store) => unknown) =>
+      selector ? selector(store) : store,
+  };
+});
 
 const campaignPlayers = [
   {
