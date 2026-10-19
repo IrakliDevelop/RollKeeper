@@ -30,6 +30,10 @@ import {
 import { useDmStore } from '@/store/dmStore';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -1311,7 +1315,8 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       vi.spyOn(URL, 'createObjectURL').mockReturnValue(
         'blob:campaign-settings-recovery'
       );

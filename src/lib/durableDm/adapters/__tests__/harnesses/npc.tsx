@@ -49,6 +49,10 @@ import { useDmStore } from '@/store/dmStore';
 import type { CampaignNPC } from '@/types/encounter';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-25T00:00:00.000Z';
 const ACCOUNT_ID = '99999999-9999-4999-8999-999999999999';
@@ -1496,7 +1500,8 @@ export function createNpcHarness(): NpcConformanceHarness {
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       const createObjectURL = vi
         .spyOn(URL, 'createObjectURL')
         .mockReturnValue('blob:npc-recovery');

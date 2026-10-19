@@ -70,6 +70,11 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 import type { CampaignInfo } from '@/types/campaign';
 import { APP_VERSION } from '@/utils/constants';
 import { useCalendarStore } from '@/store/calendarStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface VersionMetadata {
   serverVersion: number;
@@ -575,9 +580,9 @@ export function CalendarSyncControls({ campaign }: Props) {
       );
       setRecoveryVerified(true);
       if (
-        !window.confirm(
-          `Recovery file verified. Select only calendar for ${campaign.name}? This does not cut over local or cloud authority.`
-        )
+        !(await confirmDialog(
+          syncConfirm.selectFamily(SYNC_FAMILIES.calendar, campaign.name)
+        ))
       ) {
         setCalendarSelected(false);
         setStatus(
@@ -690,9 +695,9 @@ export function CalendarSyncControls({ campaign }: Props) {
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only calendar to IndexedDB?`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(SYNC_FAMILIES.calendar, manifest.fingerprint)
+      ))
     )
       return;
     const database = await openRollkeeperDatabase();
@@ -779,9 +784,7 @@ export function CalendarSyncControls({ campaign }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        'Stage, revalidate, and atomically activate only calendar in Postgres?'
-      )
+      !(await confirmDialog(syncConfirm.turnOnBackup(SYNC_FAMILIES.calendar)))
     )
       return;
     setBusy(true);
@@ -923,16 +926,16 @@ export function CalendarSyncControls({ campaign }: Props) {
       enrollmentPreview.schemaVersion === undefined
     )
       return;
+    if (
+      !(await confirmDialog(
+        syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+      ))
+    )
+      return;
     const local = await buildCalendarManifest({
       campaignCode: campaign.code,
       rawEnvelope: currentRawEnvelope(),
     });
-    if (
-      !window.confirm(
-        `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
-      )
-    )
-      return;
     const deviceKey = `rollkeeper:campaign-calendar-device:${context.accountId}:${workspace.cloudId}`;
     const deviceId = localStorage.getItem(deviceKey) ?? crypto.randomUUID();
     localStorage.setItem(deviceKey, deviceId);
@@ -1034,9 +1037,9 @@ export function CalendarSyncControls({ campaign }: Props) {
       return;
     }
     if (
-      !window.confirm(
-        `Apply exact cloud version ${enrollmentPreview.serverVersion} to this enrolled browser? Unresolved local work blocks hydration.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.calendar)
+      ))
     )
       return;
     setBusy(true);
@@ -1136,11 +1139,7 @@ export function CalendarSyncControls({ campaign }: Props) {
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion} as a new higher version? Immutable history will not be changed.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     const restored = await calendarApi<{
       serverVersion: number;
@@ -1200,11 +1199,7 @@ export function CalendarSyncControls({ campaign }: Props) {
   const rollback = async () => {
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
-    if (
-      !window.confirm(
-        'Verified rollback creates a new epoch and preserves every Postgres/history/projection source. Continue?'
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.stopBackup(SYNC_FAMILIES.calendar))))
       return;
     const [current, projection] = await Promise.all([
       calendarApi<EnrollmentPreview>({
@@ -1286,9 +1281,12 @@ export function CalendarSyncControls({ campaign }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(
+          SYNC_FAMILIES.calendar,
+          context.accountLabel
+        )
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1301,10 +1299,7 @@ export function CalendarSyncControls({ campaign }: Props) {
         entry => entry.state !== 'acknowledged' && entry.state !== 'superseded'
       );
       const lossConfirmed =
-        !unresolved ||
-        window.confirm(
-          'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
-        );
+        !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
       if (!lossConfirmed) return;
       if (authority.authority === 'postgres') {
         const deviceId = localStorage.getItem(

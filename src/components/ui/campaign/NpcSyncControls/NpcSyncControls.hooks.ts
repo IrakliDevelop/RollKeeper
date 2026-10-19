@@ -60,6 +60,11 @@ import type { CampaignInfo } from '@/types/campaign';
 import type { CampaignNPC } from '@/types/encounter';
 import { APP_VERSION } from '@/utils/constants';
 import { useNPCStore } from '@/store/npcStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface VersionMetadata {
   serverVersion: number;
@@ -722,9 +727,9 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       );
       setRecoveryVerified(true);
       if (
-        !window.confirm(
-          `Recovery file verified. Select only the NPCs for ${campaignName}? This does not cut over local or cloud authority.`
-        )
+        !(await confirmDialog(
+          syncConfirm.selectFamily(SYNC_FAMILIES.npcs, campaignName)
+        ))
       ) {
         setNpcsSelected(false);
         setStatus(
@@ -834,9 +839,9 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only NPC data to IndexedDB?`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(SYNC_FAMILIES.npcs, manifest.fingerprint)
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -930,11 +935,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       authority?.authority !== 'indexedDB'
     )
       return;
-    if (
-      !window.confirm(
-        'Stage, revalidate, and atomically activate only NPC data in Postgres?'
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.turnOnBackup(SYNC_FAMILIES.npcs))))
       return;
     const namespace = `user:${context.accountId}` as const;
     const campaignId = workspace.cloudId;
@@ -1085,16 +1086,16 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     setBusy(true);
     setError(null);
     try {
+      if (
+        !(await confirmDialog(
+          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+        ))
+      )
+        return;
       const local = await buildNpcManifest({
         campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
-      if (
-        !window.confirm(
-          `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
-        )
-      )
-        return;
       const namespace = `user:${context.accountId}` as const;
       const campaignId = workspace.cloudId;
       const deviceKey = `rollkeeper:npc-device:${context.accountId}:${campaignId}`;
@@ -1191,9 +1192,9 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     const documents = enrollmentPreview.documents;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
-      !window.confirm(
-        `Apply the exact cloud generation of ${documents.length} records to this enrolled browser? Unresolved local work blocks hydration.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.npcs, documents.length)
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1318,11 +1319,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion} as a new higher version? Immutable history will not be changed.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     setBusy(true);
     setError(null);
@@ -1395,11 +1392,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     if (!campaignCode) return;
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
-    if (
-      !window.confirm(
-        'Verified rollback creates a new epoch and preserves every Postgres and history source. Continue?'
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.stopBackup(SYNC_FAMILIES.npcs))))
       return;
     setBusy(true);
     setError(null);
@@ -1486,9 +1479,9 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     )
       return;
     if (
-      !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(SYNC_FAMILIES.npcs, context.accountLabel)
+      ))
     )
       return;
     setBusy(true);
@@ -1505,10 +1498,7 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
             entry.state !== 'acknowledged' && entry.state !== 'superseded'
         );
         const lossConfirmed =
-          !unresolved ||
-          window.confirm(
-            'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
-          );
+          !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
           const deviceId = localStorage.getItem(

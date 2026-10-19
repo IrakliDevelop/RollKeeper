@@ -35,6 +35,10 @@ import type {
 } from '@/types/calendar';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '55555555-5555-4555-8555-555555555555';
@@ -1355,7 +1359,8 @@ export function createCalendarHarness(): CalendarConformanceHarness {
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       const createObjectURL = vi
         .spyOn(URL, 'createObjectURL')
         .mockReturnValue('blob:calendar-recovery');

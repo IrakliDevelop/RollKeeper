@@ -32,6 +32,10 @@ import { expectCloudProductVocabulary } from '@/test/helpers';
 import type { CalendarConfig, CampaignCalendar } from '@/types/calendar';
 
 import { CalendarSyncControls } from './CalendarSyncControls';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-22T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -376,9 +380,8 @@ describe('CalendarSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs(['cancel', 'confirm']);
     fireEvent.click(
       screen.getByRole('button', { name: 'Download recovery file' })
     );
@@ -422,7 +425,8 @@ describe('CalendarSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     await completeLocalCutover();
 
@@ -591,7 +595,8 @@ describe('CalendarSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = render(<CalendarSyncControls campaign={campaign} />);
     fireEvent.click(
@@ -671,7 +676,8 @@ describe('CalendarSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<CalendarSyncControls campaign={campaign} />);
     fireEvent.click(
@@ -797,7 +803,8 @@ describe('CalendarSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     render(<CalendarSyncControls campaign={campaign} />);
     fireEvent.click(

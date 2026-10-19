@@ -42,6 +42,10 @@ import {
   planEncounterMutations,
   runEncounterMutationPlan,
 } from './index';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-23T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -346,9 +350,8 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs(['cancel', 'confirm']);
     fireEvent.click(
       screen.getByRole('button', { name: 'Download a safety copy' })
     );
@@ -621,7 +624,8 @@ describe('EncounterSyncControls gates', () => {
     );
     await waitFor(() => expect(downloads).toContain('encounter-enc-1-v2.json'));
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
     fireEvent.click(screen.getByRole('button', { name: 'Stop backing up' }));
     await screen.findByText(
       'Backup is off and everything was kept. Reload the page to keep working on this browser.'
@@ -666,7 +670,8 @@ describe('EncounterSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = renderControls();
     fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
@@ -776,7 +781,8 @@ describe('EncounterSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));
@@ -833,7 +839,8 @@ describe('EncounterSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(screen.getByRole('button', { name: 'Find my campaigns' }));

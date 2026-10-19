@@ -70,6 +70,11 @@ import type { DmWorkspaceDocument } from '@/lib/indexeddb/dmWorkspaceRepository'
 import type { CampaignInfo } from '@/types/campaign';
 import { APP_VERSION } from '@/utils/constants';
 import { useDmStore } from '@/store/dmStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface VersionMetadata {
   serverVersion: number;
@@ -541,9 +546,12 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
     if (!context || !workspace?.cloudId || !recovery || !manifest) return;
     await initiateDeviceBackupDownload(recovery, browserRecoveryRepository);
     if (
-      !window.confirm(
-        `Recovery download initiated. Select only campaign_settings for ${campaign.name}? This does not cut over local or cloud authority.`
-      )
+      !(await confirmDialog(
+        syncConfirm.selectAfterDownload(
+          SYNC_FAMILIES.campaignSettings,
+          campaign.name
+        )
+      ))
     ) {
       setStatus('Recovery downloaded; data category selection was cancelled.');
       return;
@@ -622,9 +630,12 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only campaign_settings to IndexedDB?`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(
+          SYNC_FAMILIES.campaignSettings,
+          manifest.fingerprint
+        )
+      ))
     )
       return;
     const database = await openRollkeeperDatabase();
@@ -712,9 +723,9 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        'Stage, revalidate, and atomically activate only campaign_settings in Postgres?'
-      )
+      !(await confirmDialog(
+        syncConfirm.turnOnBackup(SYNC_FAMILIES.campaignSettings)
+      ))
     )
       return;
     setBusy(true);
@@ -856,16 +867,16 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
       enrollmentPreview.schemaVersion === undefined
     )
       return;
+    if (
+      !(await confirmDialog(
+        syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+      ))
+    )
+      return;
     const local = await buildCampaignSettingsManifest({
       campaignCode: campaign.code,
       rawEnvelope: currentRawEnvelope(),
     });
-    if (
-      !window.confirm(
-        `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
-      )
-    )
-      return;
     const deviceKey = `rollkeeper:campaign-settings-device:${context.accountId}:${workspace.cloudId}`;
     const deviceId = localStorage.getItem(deviceKey) ?? crypto.randomUUID();
     localStorage.setItem(deviceKey, deviceId);
@@ -969,9 +980,9 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
       return;
     }
     if (
-      !window.confirm(
-        `Apply exact cloud version ${enrollmentPreview.serverVersion} to this enrolled browser? Unresolved local work blocks hydration.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.campaignSettings)
+      ))
     )
       return;
     setBusy(true);
@@ -1071,11 +1082,7 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion} as a new higher version? Immutable history will not be changed.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     const restored = await campaignSettingsApi<{
       serverVersion: number;
@@ -1138,9 +1145,9 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
     if (
-      !window.confirm(
-        'Verified rollback creates a new epoch and preserves every Postgres/history/projection source. Continue?'
-      )
+      !(await confirmDialog(
+        syncConfirm.stopBackup(SYNC_FAMILIES.campaignSettings)
+      ))
     )
       return;
     const [current, projection] = await Promise.all([
@@ -1230,9 +1237,12 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(
+          SYNC_FAMILIES.campaignSettings,
+          context.accountLabel
+        )
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1245,10 +1255,7 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
         entry => entry.state !== 'acknowledged' && entry.state !== 'superseded'
       );
       const lossConfirmed =
-        !unresolved ||
-        window.confirm(
-          'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
-        );
+        !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
       if (!lossConfirmed) return;
       if (authority.authority === 'postgres') {
         const deviceId = localStorage.getItem(

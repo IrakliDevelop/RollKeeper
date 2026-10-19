@@ -47,6 +47,10 @@ import { DEFAULT_COMBAT_CONFIG, type Encounter } from '@/types/encounter';
 import { ENCOUNTER_STORAGE_KEY } from '@/utils/constants';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-25T00:00:00.000Z';
 const ACCOUNT_ID = '88888888-8888-4888-8888-888888888888';
@@ -1443,7 +1447,8 @@ export function createEncounterHarness(): EncounterConformanceHarness {
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       const createObjectURL = vi
         .spyOn(URL, 'createObjectURL')
         .mockReturnValue('blob:encounter-recovery');

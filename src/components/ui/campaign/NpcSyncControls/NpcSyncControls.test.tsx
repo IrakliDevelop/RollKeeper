@@ -38,6 +38,10 @@ import {
   planNpcMutations,
   runNpcMutationPlan,
 } from './index';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-23T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -453,9 +457,8 @@ describe('NpcSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs(['cancel', 'confirm']);
     fireEvent.click(
       screen.getByRole('button', { name: 'Download recovery file' })
     );
@@ -581,7 +584,8 @@ describe('NpcSyncControls gates', () => {
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(
       () => undefined
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(
@@ -788,7 +792,8 @@ describe('NpcSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     const { container } = renderControls();
     fireEvent.click(
@@ -894,7 +899,8 @@ describe('NpcSyncControls gates', () => {
         throw new Error(`unexpected action ${String(body.action)}`);
       }
     );
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderConfirmDialogHost();
+    answerConfirmDialogs('confirm');
 
     renderControls();
     fireEvent.click(
