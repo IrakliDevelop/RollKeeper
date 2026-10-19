@@ -35,7 +35,14 @@ function pairs() {
     add('ring', surface, NON_TEXT);
   }
   for (const text of ['heading', 'body']) add(text, 'surface-hover', TEXT);
+  // A selected toggle and a danger outline Button keep their role text
+  // while hovered.
+  for (const role of ['brass', 'blood']) {
+    add(`${role}-text`, 'surface-hover', TEXT);
+  }
   for (const role of ROLES) add(`${role}-text`, `${role}-bg`, TEXT);
+  // Ghost Buttons inside a warning banner (StorageBlockedBanner).
+  add('heading', 'ember-bg', TEXT);
   // Deprecated accent bridge: bg-accent-*-bg-strong behind role text.
   for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
     add(`${role}-text`, `bridge-${role}-bg-strong`, TEXT);
