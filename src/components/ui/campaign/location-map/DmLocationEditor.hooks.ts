@@ -1638,7 +1638,8 @@ export function useDmLocationEditor(
   ]);
 
   const handleClear = useCallback(async () => {
-    if (!getVp()?.store.count) return;
+    const before = getVp();
+    if (!before?.store.count) return;
     const confirmed = await confirmDialog({
       title: 'Clear the canvas?',
       message: 'Everything on this map is removed. Fog of war is kept.',
@@ -1646,9 +1647,10 @@ export function useDmLocationEditor(
       tone: 'danger',
     });
     if (!confirmed) return;
-    // Re-read the viewport: the editor can remount while the dialog is open.
+    // Re-read the viewport: the editor can remount while the dialog is open,
+    // and the answer was about the map that was open when it was asked.
     const vp = getVp();
-    if (!vp) return;
+    if (!vp || vp !== before) return;
     vp.store.clear();
     await autoSaveRef.current?.clear();
     vp.requestRender();
