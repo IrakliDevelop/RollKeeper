@@ -224,7 +224,7 @@ flag-profile server.
     combat-log, magic-item, canvas, theme, and sentinel raw hashes at the
     end. They must remain byte-identical except for an explicitly exercised
     recovery action targeting that key.
-16. Check 390 px and desktop layouts; light, dark, and parchment themes;
+16. Check 390 px and desktop layouts; light and dark themes;
     keyboard-only completion; focus after step changes/errors; accessible
     names; live regions; contrast; and no horizontal overflow.
 17. On the race origin, open two tabs under the same account and let both

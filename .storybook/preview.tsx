@@ -3,42 +3,38 @@ import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';
 import { MotionProvider } from '../src/app/MotionProvider';
 
+type StoryTheme = 'light' | 'dark';
+
+// Paper unless the toolbar asks for felt. Story links saved with a retired
+// or unknown theme value render as paper.
+function toStoryTheme(value: unknown): StoryTheme {
+  return value === 'dark' ? 'dark' : 'light';
+}
+
+// Colours come from the theme tokens, which resolve per data-theme scope.
+const WRAPPER_STYLE = {
+  padding: '1rem',
+  minHeight: '100vh',
+  backgroundColor: 'var(--background)',
+  color: 'var(--foreground)',
+} as const;
+
 // Theme wrapper component (must be PascalCase to use hooks)
 function ThemeWrapper({
   theme,
   children,
 }: {
-  theme: string;
+  theme: StoryTheme;
   children: ReactNode;
 }) {
   useEffect(() => {
-    // Apply theme to the document root for CSS variables
+    // Apply theme to the document root for CSS variables. The body takes
+    // its background and text colour from the tokens in globals.css.
     document.documentElement.setAttribute('data-theme', theme);
-    // Also set background color for the story container
-    document.body.style.backgroundColor =
-      theme === 'dark'
-        ? '#0f172a'
-        : theme === 'parchment'
-          ? '#f4ead4'
-          : '#f8fafc';
-    document.body.style.color = theme === 'dark' ? '#f1f5f9' : '#1e293b';
   }, [theme]);
 
   return (
-    <div
-      data-theme={theme}
-      style={{
-        padding: '1rem',
-        minHeight: '100vh',
-        backgroundColor:
-          theme === 'dark'
-            ? '#0f172a'
-            : theme === 'parchment'
-              ? '#f4ead4'
-              : '#f8fafc',
-        color: theme === 'dark' ? '#f1f5f9' : '#1e293b',
-      }}
-    >
+    <div data-theme={theme} style={WRAPPER_STYLE}>
       {children}
     </div>
   );
@@ -46,7 +42,7 @@ function ThemeWrapper({
 
 // Theme decorator that applies data-theme attribute based on toolbar selection
 const withTheme: Decorator = (Story, context) => {
-  const theme = context.globals.theme || 'light';
+  const theme = toStoryTheme(context.globals.theme);
 
   return (
     <MotionProvider>
@@ -85,7 +81,6 @@ const preview: Preview = {
         items: [
           { value: 'light', title: 'Light', icon: 'sun' },
           { value: 'dark', title: 'Dark', icon: 'moon' },
-          { value: 'parchment', title: 'Parchment', icon: 'document' },
         ],
         dynamicTitle: true,
       },

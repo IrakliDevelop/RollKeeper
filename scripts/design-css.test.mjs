@@ -209,6 +209,16 @@ test('no theme block redeclares a shared token', async () => {
   }
 });
 
+test('Storybook takes its theme colours from the tokens', async () => {
+  const preview = await readFile(
+    path.join(repositoryRoot, '.storybook/preview.tsx'),
+    'utf8'
+  );
+  assert.doesNotMatch(preview, /#[0-9a-f]{3,8}\b/i);
+  assert.doesNotMatch(preview, /parchment/i);
+  assert.match(preview, /var\(--background\)/);
+});
+
 test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/postcss', async () => {
   const read = async file =>
     JSON.parse(await readFile(path.join(repositoryRoot, file), 'utf8'));
