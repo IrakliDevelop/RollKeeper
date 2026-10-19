@@ -33,14 +33,14 @@ export async function clickConfirmDialogButton(name: string | RegExp) {
 
 type DialogAnswer = 'confirm' | 'cancel';
 
+let stopAnswering: (() => void) | null = null;
+
 /**
  * Answers every shared dialog that opens, in order, by clicking its real
  * buttons: a single answer for all of them, or one per dialog (dialogs past
  * the end of the list are cancelled). `titles` records what was asked.
  * Answers stop when the test ends, or earlier with `stop()`.
  */
-let stopAnswering: (() => void) | null = null;
-
 export function answerConfirmDialogs(answers: DialogAnswer | DialogAnswer[]) {
   // A later call replaces the earlier answers instead of adding to them.
   stopAnswering?.();

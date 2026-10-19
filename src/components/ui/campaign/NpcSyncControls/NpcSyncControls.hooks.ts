@@ -1190,10 +1190,13 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !(await confirmDialog(
-        syncConfirm.loadFromAccount(SYNC_FAMILIES.npcs, documents.length)
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.npcs, liveDocumentCount)
       ))
     )
       return;

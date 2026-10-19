@@ -1446,7 +1446,7 @@ export function createNpcHarness(): NpcConformanceHarness {
      * Named, expected differences from the adapter's own chain:
      *   - the card discovers and selects a workspace interactively; the
      *     adapter receives an already-selected `MigrationRunContext`.
-     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card asks in the shared confirm dialog (`confirmDialog`); the adapter has none (spec R12).
      *   - the card has no `verifyCloud` equivalent (adapter-only, per R1).
      *   - mutation ids are random (`crypto.randomUUID()`) on the card and
      *     deterministic on the adapter.

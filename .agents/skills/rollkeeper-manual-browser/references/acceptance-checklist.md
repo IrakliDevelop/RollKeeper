@@ -335,7 +335,9 @@ are otherwise identical for both.
   (`[data-confirm-dialog]`, `role="dialog"` or `"alertdialog"`), not
   `window.confirm`. Answer them by clicking the dialog's own buttons; the
   confirm button is last in the footer and has focus when the dialog opens.
-  Navigating away while one is open cancels it.
+  Navigating away while one is open cancels it. The NPC, encounter,
+  magic-item, campaign-settings and calendar sync cards ask the same way.
+
 ## Slice 11G — Campaign data migration wizard
 
 Applies to changes touching the migration wizard (the launcher on `/dm` and

@@ -1206,10 +1206,13 @@ export function MagicItemSyncControls({ campaign }: Props) {
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !(await confirmDialog(
-        syncConfirm.loadFromAccount(SYNC_FAMILIES.magicItems, documents.length)
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.magicItems, liveDocumentCount)
       ))
     )
       return;

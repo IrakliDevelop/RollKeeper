@@ -1310,7 +1310,7 @@ export function createCalendarHarness(): CalendarConformanceHarness {
      *     recovery and select". Both still reach the same
      *     recorded-and-verified-receipt-plus-selected state the adapter's
      *     `selectFamily` requires.
-     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card asks in the shared confirm dialog (`confirmDialog`); the adapter has none (spec R12).
      *   - the card has no `verifyCloud` equivalent (new per R1).
      *   - mutation ids are random (`crypto.randomUUID()`) on the card and
      *     deterministic on the adapter.

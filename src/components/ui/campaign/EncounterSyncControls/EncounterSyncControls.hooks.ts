@@ -1298,10 +1298,13 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
       !(await confirmDialog(
-        syncConfirm.loadFromAccount(SYNC_FAMILIES.encounters, documents.length)
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.encounters, liveDocumentCount)
       ))
     )
       return;
