@@ -40,7 +40,8 @@
 | `types/` | TypeScript interfaces; `character.ts` is the central type file |
 | `contexts/` | React context providers |
 | `test/` | Shared test setup (`setup.ts` for the vitest `unit` project) |
-| `examples/`, `prototypes/`, `docs/` | Scratch/reference code not part of the shipped app — check before assuming something here is live |
+| `examples/`, `docs/` | Scratch/reference code not part of the shipped app — check before assuming something here is live |
+| `prototypes/` | The FieldNotes canvas prototype, served at `/prototype/fieldnotes` |
 
 ## `src/app/` structure
 

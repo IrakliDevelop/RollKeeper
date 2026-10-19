@@ -4,7 +4,6 @@ export { default as ActionsSection } from './ActionsSection';
 export { default as ArmorClassManager } from './ArmorClassManager';
 export { default as CharacterBackgroundEditor } from './CharacterBackgroundEditor';
 export { default as CharacterBasicInfo } from './CharacterBasicInfo';
-export { default as CharacterHeaderSection } from './CharacterHeaderSection';
 export { default as CharacterSheetHeader } from './CharacterSheetHeader';
 export { default as ClassSelector } from './ClassSelector';
 export { default as CombatStats } from './CombatStats';
