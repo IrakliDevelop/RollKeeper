@@ -34,11 +34,15 @@ function ThemeWrapper({
     // the tokens in globals.css) matches it. A docs page shows several
     // stories in one document: each wrapper carries its own theme and the
     // root stays paper, so `dark:` utilities never leak into a light story.
+    // On docs pages, portaled content (tooltips, popovers) renders under the
+    // unthemed root, so it shows paper even in a Dark story.
     if (scoped) {
       document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', theme);
+      return;
     }
+    document.documentElement.setAttribute('data-theme', theme);
+    // Leaving for a page without a story (an MDX docs page) resets to paper.
+    return () => document.documentElement.removeAttribute('data-theme');
   }, [theme, scoped]);
 
   return (
