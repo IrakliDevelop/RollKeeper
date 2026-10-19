@@ -38,6 +38,7 @@ import {
   formatProficiencyType,
 } from '@/utils/classFilters';
 import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
+import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export default function NewCharacterPage() {
   const router = useRouter();
@@ -118,7 +119,7 @@ export default function NewCharacterPage() {
 
     try {
       if (!characterName.trim()) {
-        alert('Please enter a character name');
+        void alertDialog({ title: 'Enter a character name' });
         setIsCreating(false);
         return;
       }
@@ -127,7 +128,7 @@ export default function NewCharacterPage() {
       const classData = COMMON_CLASSES.find(c => c.name === selectedClass);
 
       if (!classData) {
-        alert('Invalid class selected');
+        void alertDialog({ title: 'Choose a class from the list' });
         setIsCreating(false);
         return;
       }
@@ -166,7 +167,7 @@ export default function NewCharacterPage() {
       router.push(`/player/characters/${characterId}`);
     } catch (error) {
       console.error('Failed to create character:', error);
-      alert('Failed to create character. Please try again.');
+      void alertDialog({ title: "Couldn't create the character. Try again." });
     } finally {
       setIsCreating(false);
     }

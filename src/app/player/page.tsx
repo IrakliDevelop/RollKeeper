@@ -28,6 +28,11 @@ import { AvatarUpload } from '@/components/ui/character/AvatarUpload';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { JoinCampaignDialog } from '@/components/ui/campaign/JoinCampaignDialog';
 import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import {
+  alertDialog,
+  confirmDialog,
+  promptDialog,
+} from '@/components/ui/feedback/confirm-dialog';
 import { DataSafetyBanner } from '@/components/ui/feedback/DataSafetyBanner';
 import { DeviceRecoveryControls } from '@/components/ui/feedback/DeviceRecoveryControls';
 import { CharacterStorageMigrationControls } from '@/components/ui/feedback/CharacterStorageMigrationControls';
@@ -116,39 +121,46 @@ export default function PlayerDashboardPage() {
     setActiveCharacter(character.id);
   };
 
-  const handleArchiveCharacter = (characterId: string) => {
-    if (
-      confirm(
-        'Are you sure you want to archive this character? You can restore it later.'
-      )
-    ) {
-      archiveCharacter(characterId);
+  const characterName = (characterId: string) =>
+    characters.find(character => character.id === characterId)?.name ??
+    'this character';
+
+  const handleArchiveCharacter = async (characterId: string) => {
+    const confirmed = await confirmDialog({
+      title: `Archive ${characterName(characterId)}?`,
+      message: 'You can restore it from your archived characters.',
+      confirmLabel: 'Archive character',
+    });
+    if (confirmed) archiveCharacter(characterId);
+  };
+
+  const handleDeleteCharacter = async (characterId: string) => {
+    const confirmed = await confirmDialog({
+      title: `Delete ${characterName(characterId)}?`,
+      message: "This can't be undone.",
+      confirmLabel: 'Delete character',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    // Read the roster after the dialog: it may have changed while it was open.
+    const beforeImage = usePlayerStore
+      .getState()
+      .characters.find(character => character.id === characterId);
+    deleteCharacter(characterId);
+    if (beforeImage) {
+      void awaitCharacterPersistenceResult().then(result => {
+        if (result.saved) return recordAutomaticCharacterDelete(beforeImage);
+      });
     }
   };
 
-  const handleDeleteCharacter = (characterId: string) => {
-    if (
-      confirm(
-        'Are you sure you want to permanently delete this character? This action cannot be undone.'
-      )
-    ) {
-      const beforeImage = characters.find(
-        character => character.id === characterId
-      );
-      deleteCharacter(characterId);
-      if (beforeImage) {
-        void awaitCharacterPersistenceResult().then(result => {
-          if (result.saved) return recordAutomaticCharacterDelete(beforeImage);
-        });
-      }
-    }
-  };
-
-  const handleDuplicateCharacter = (character: PlayerCharacter) => {
-    const newName = prompt(
-      'Enter a name for the duplicated character:',
-      `${character.name} (Copy)`
-    );
+  const handleDuplicateCharacter = async (character: PlayerCharacter) => {
+    const newName = await promptDialog({
+      title: `Duplicate ${character.name}`,
+      label: 'Name',
+      defaultValue: `${character.name} (Copy)`,
+      confirmLabel: 'Duplicate character',
+    });
     if (newName) {
       duplicateCharacter(character.id, newName);
     }
@@ -191,15 +203,22 @@ export default function PlayerDashboardPage() {
         }
 
         const characterId = importCharacter(characterData, characterName);
-        alert(`Successfully imported character: ${characterName}`);
-
-        // Ask if they want to switch to the imported character
-        if (confirm('Would you like to open the imported character?')) {
+        // Clear the input now: the dialog below waits for the player.
+        event.target.value = '';
+        const openSheet = await confirmDialog({
+          title: `${characterName} imported`,
+          confirmLabel: 'Open character',
+          cancelLabel: 'Stay here',
+        });
+        if (openSheet) {
           window.location.href = `/player/characters/${characterId}`;
         }
       } catch (error) {
         console.error('Import failed:', error);
-        alert('Failed to import character. Please check the file format.');
+        void alertDialog({
+          title: "Couldn't import the character",
+          message: 'Check that the file is a RollKeeper character export.',
+        });
       }
     }
     // Reset the input
@@ -208,11 +227,11 @@ export default function PlayerDashboardPage() {
 
   const handleTryMigration = () => {
     const migrated = migrateFromOldStorage();
-    if (migrated) {
-      alert('Successfully migrated your old character!');
-    } else {
-      alert('No old character data found to migrate.');
-    }
+    void alertDialog({
+      title: migrated
+        ? 'Old character migrated'
+        : 'No old character data found',
+    });
   };
 
   const handleJoinCampaign = (
@@ -310,7 +329,7 @@ export default function PlayerDashboardPage() {
               {!isArchived && (
                 <div className="flex flex-shrink-0">
                   <Button
-                    onClick={() => handleDuplicateCharacter(character)}
+                    onClick={() => void handleDuplicateCharacter(character)}
                     variant="ghost"
                     size="sm"
                     title="Duplicate Character"
@@ -318,7 +337,7 @@ export default function PlayerDashboardPage() {
                     <Copy size={14} />
                   </Button>
                   <Button
-                    onClick={() => handleArchiveCharacter(character.id)}
+                    onClick={() => void handleArchiveCharacter(character.id)}
                     variant="ghost"
                     size="sm"
                     title="Archive Character"
@@ -399,7 +418,7 @@ export default function PlayerDashboardPage() {
                 Restore
               </Button>
               <Button
-                onClick={() => handleDeleteCharacter(character.id)}
+                onClick={() => void handleDeleteCharacter(character.id)}
                 variant="danger"
                 size="md"
                 title="Delete Permanently"

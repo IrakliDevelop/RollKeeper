@@ -81,6 +81,7 @@ import {
   setCharacterSubTab,
   setInventorySubTab,
 } from '@/components/ui/character/tabbedSheetConfig';
+import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 
 export default function CharacterSheet() {
   const params = useParams();
@@ -860,7 +861,7 @@ export default function CharacterSheet() {
       exportCharacterToFile(exportData);
     } catch (error) {
       console.error('Export failed:', error);
-      alert('Failed to export character. Please try again.');
+      void alertDialog({ title: "Couldn't export the character. Try again." });
     }
   };
 

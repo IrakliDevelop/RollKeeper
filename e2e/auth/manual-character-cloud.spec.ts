@@ -106,8 +106,11 @@ test('manual backup restores empty profiles, preserves collisions, and uses soft
   );
   await page.reload();
 
-  page.once('dialog', dialog => dialog.accept());
   await page.getByRole('button', { name: 'Back up Aria now' }).click();
+  await page
+    .getByRole('dialog', { name: 'Back up Aria?' })
+    .getByRole('button', { name: 'Back up character' })
+    .click();
   await expect(
     page.getByText(/refetched and fingerprint-verified/i)
   ).toBeVisible();
