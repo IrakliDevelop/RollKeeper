@@ -16,6 +16,8 @@ import {
   isDmWorkspaceCloudEnabled,
 } from './dmWorkspaceService';
 
+import { SIGNED_IN_ACCOUNT_LABEL } from './accountLabel';
+
 export interface BrowserDmWorkspaceContext {
   accountId: string;
   accountLabel: string;
@@ -77,7 +79,7 @@ export async function createBrowserDmWorkspace(): Promise<BrowserDmWorkspaceCont
 
   return {
     accountId: data.user.id,
-    accountLabel: data.user.email ?? 'Signed-in account',
+    accountLabel: data.user.email ?? SIGNED_IN_ACCOUNT_LABEL,
     list() {
       return repository.list(`user:${data.user.id}`);
     },

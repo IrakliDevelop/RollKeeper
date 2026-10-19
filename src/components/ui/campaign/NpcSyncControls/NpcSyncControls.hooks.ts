@@ -1088,7 +1088,10 @@ export function useNpcSyncController(campaign: CampaignInfo | undefined) {
     try {
       if (
         !(await confirmDialog(
-          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.npcs,
+            enrollmentPreview.previewFingerprint
+          )
         ))
       )
         return;

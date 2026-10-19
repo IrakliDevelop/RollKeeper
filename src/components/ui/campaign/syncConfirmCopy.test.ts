@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { SIGNED_IN_ACCOUNT_LABEL } from '@/lib/supabase/accountLabel';
+
 import { SYNC_FAMILIES, syncConfirm } from './syncConfirmCopy';
 
 describe('syncConfirm copy', () => {
@@ -29,19 +31,19 @@ describe('syncConfirm copy', () => {
     ).toMatchObject({
       title: 'Load 3 encounters from your account?',
       message:
-        "They replace the encounters on this browser. Work that hasn't been backed up stops this.",
+        "They replace the encounters on this browser. If this browser has changes that aren't backed up, nothing is loaded.",
       tone: 'danger',
     });
     expect(syncConfirm.loadFromAccount(SYNC_FAMILIES.calendar)).toMatchObject({
       title: 'Load the calendar from your account?',
       message:
-        "It replaces the calendar on this browser. Work that hasn't been backed up stops this.",
+        "It replaces the calendar on this browser. If this browser has changes that aren't backed up, nothing is loaded.",
     });
   });
 
   it('uses "It" when loading a single document of a plural type', () => {
     expect(syncConfirm.loadFromAccount(SYNC_FAMILIES.npcs, 1).message).toBe(
-      "It replaces the NPCs on this browser. Work that hasn't been backed up stops this."
+      "It replaces the NPCs on this browser. If this browser has changes that aren't backed up, nothing is loaded."
     );
   });
 
@@ -50,18 +52,37 @@ describe('syncConfirm copy', () => {
       syncConfirm.switchStorage(SYNC_FAMILIES.magicItems, 'abcdef0123456789')
         .message
     ).toBe('Your safety copy is already saved. Reference: abcdef012345');
-    expect(syncConfirm.addBrowser('0123456789abcdef').message).toMatch(
-      /Reference: 0123456789ab$/
+    expect(
+      syncConfirm.addBrowser(SYNC_FAMILIES.npcs, '0123456789abcdef')
+    ).toMatchObject({
+      title: 'Add this browser to the backup for NPCs?',
+      message:
+        'The NPCs on this browser are kept and never uploaded on their own. Reference: 0123456789ab',
+    });
+    expect(
+      syncConfirm.addBrowser(SYNC_FAMILIES.calendar, '0123456789abcdef').message
+    ).toBe(
+      'The calendar on this browser is kept and never uploaded on its own. Reference: 0123456789ab'
     );
   });
 
-  it('names the account and marks removals as destructive', () => {
+  it('names the data and the account, and marks removals as destructive', () => {
     expect(
-      syncConfirm.removeFromBrowser(SYNC_FAMILIES.campaignSettings, 'Ana')
+      syncConfirm.removeFromBrowser(
+        SYNC_FAMILIES.campaignSettings,
+        'ana@example.test'
+      )
     ).toMatchObject({
-      title: "Remove Ana's campaign settings from this browser?",
+      title: 'Remove the campaign settings from this browser?',
+      message: 'Your account (ana@example.test) keeps everything.',
       tone: 'danger',
     });
+    expect(
+      syncConfirm.removeFromBrowser(
+        SYNC_FAMILIES.calendar,
+        SIGNED_IN_ACCOUNT_LABEL
+      ).message
+    ).toBe('Your account keeps everything.');
     expect(syncConfirm.unbackedWork().tone).toBe('danger');
     expect(syncConfirm.deleteCombatLog().tone).toBe('danger');
     expect(syncConfirm.restoreVersion(4).tone).toBeUndefined();

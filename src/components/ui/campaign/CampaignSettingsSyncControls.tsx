@@ -869,7 +869,10 @@ export function CampaignSettingsSyncControls({ campaign, headless }: Props) {
       return;
     if (
       !(await confirmDialog(
-        syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+        syncConfirm.addBrowser(
+          SYNC_FAMILIES.campaignSettings,
+          enrollmentPreview.previewFingerprint
+        )
       ))
     )
       return;

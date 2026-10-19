@@ -1,4 +1,5 @@
 import type { ConfirmDialogOptions } from '@/components/ui/feedback/confirm-dialog';
+import { SIGNED_IN_ACCOUNT_LABEL } from '@/lib/supabase/accountLabel';
 
 /**
  * Dialog copy for the cloud-sync cards (combat logs, NPCs, encounters, magic
@@ -94,10 +95,16 @@ export const syncConfirm = {
     };
   },
 
-  addBrowser(previewFingerprint: string): ConfirmDialogOptions {
+  addBrowser(
+    family: SyncFamily,
+    previewFingerprint: string
+  ): ConfirmDialogOptions {
+    const kept = family.plural
+      ? 'are kept and never uploaded on their own'
+      : 'is kept and never uploaded on its own';
     return {
-      title: "Add this browser to your account's backup?",
-      message: `What is on this browser is kept and is never uploaded on its own. ${reference(previewFingerprint)}`,
+      title: `Add this browser to the backup for ${named(family)}?`,
+      message: `The ${family.noun} on this browser ${kept}. ${reference(previewFingerprint)}`,
       confirmLabel: 'Add browser',
     };
   },
@@ -109,7 +116,7 @@ export const syncConfirm = {
     const several = family.plural && count !== 1;
     return {
       title: `Load ${what} from your account?`,
-      message: `${several ? 'They replace' : 'It replaces'} the ${family.noun} on this browser. Work that hasn't been backed up stops this.`,
+      message: `${several ? 'They replace' : 'It replaces'} the ${family.noun} on this browser. If this browser has changes that aren't backed up, nothing is loaded.`,
       confirmLabel: 'Load from account',
       tone: 'danger',
     };
@@ -137,8 +144,11 @@ export const syncConfirm = {
     accountLabel: string
   ): ConfirmDialogOptions {
     return {
-      title: `Remove ${accountLabel}'s ${family.noun} from this browser?`,
-      message: 'Your account keeps everything.',
+      title: `Remove the ${family.noun} from this browser?`,
+      message:
+        accountLabel === SIGNED_IN_ACCOUNT_LABEL
+          ? 'Your account keeps everything.'
+          : `Your account (${accountLabel}) keeps everything.`,
       confirmLabel: 'Remove from browser',
       tone: 'danger',
     };

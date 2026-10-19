@@ -928,7 +928,10 @@ export function CalendarSyncControls({ campaign }: Props) {
       return;
     if (
       !(await confirmDialog(
-        syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+        syncConfirm.addBrowser(
+          SYNC_FAMILIES.calendar,
+          enrollmentPreview.previewFingerprint
+        )
       ))
     )
       return;

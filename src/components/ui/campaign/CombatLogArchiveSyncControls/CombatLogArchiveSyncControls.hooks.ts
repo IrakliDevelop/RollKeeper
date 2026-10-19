@@ -1278,7 +1278,10 @@ export function useCombatLogArchiveSyncController(
     try {
       if (
         !(await confirmDialog(
-          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.combatLogs,
+            enrollmentPreview.previewFingerprint
+          )
         ))
       )
         return;

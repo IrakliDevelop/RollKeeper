@@ -1105,7 +1105,10 @@ export function MagicItemSyncControls({ campaign }: Props) {
     try {
       if (
         !(await confirmDialog(
-          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.magicItems,
+            enrollmentPreview.previewFingerprint
+          )
         ))
       )
         return;

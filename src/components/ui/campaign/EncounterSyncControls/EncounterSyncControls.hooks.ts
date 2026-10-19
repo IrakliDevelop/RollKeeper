@@ -1197,7 +1197,10 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     try {
       if (
         !(await confirmDialog(
-          syncConfirm.addBrowser(enrollmentPreview.previewFingerprint)
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.encounters,
+            enrollmentPreview.previewFingerprint
+          )
         ))
       )
         return;
@@ -1349,7 +1352,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           .map(document => [document.legacyId, document.payloadFingerprint])
       );
       setStatus(
-        `Loaded ${documents.length === 1 ? '1 encounter' : `${documents.length} encounters`} from your account.`
+        `Loaded ${liveDocumentCount === 1 ? '1 encounter' : `${liveDocumentCount} encounters`} from your account.`
       );
     } catch (cause) {
       setError(
