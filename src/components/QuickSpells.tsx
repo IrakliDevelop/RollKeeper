@@ -152,7 +152,6 @@ const SpellCard: React.FC<{
             onClick={() => onAction('cast')}
             variant="primary"
             size="xs"
-            className="bg-purple-600 hover:bg-purple-700"
             title="Cast spell"
           >
             <Wand2 size={12} />
@@ -252,7 +251,6 @@ const SpellCard: React.FC<{
           variant="primary"
           size="sm"
           leftIcon={<Wand2 size={14} />}
-          className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
         >
           Cast
         </Button>
@@ -702,7 +700,6 @@ export function QuickSpells({
                   ? 'Switch to detailed view'
                   : 'Switch to compact view'
               }
-              className={compactView ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
               {compactView ? 'Detailed' : 'Compact'}
             </Button>

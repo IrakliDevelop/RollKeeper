@@ -400,11 +400,6 @@ export default function ConditionsDiseasesManager() {
                       <Plus className="h-4 w-4" />
                     )
                   }
-                  className={
-                    showAddPanel
-                      ? ''
-                      : 'bg-linear-to-r from-red-500 to-orange-500 hover:from-red-600 hover:to-orange-600'
-                  }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Condition'}
                 </Button>
@@ -541,11 +536,6 @@ export default function ConditionsDiseasesManager() {
                   variant={showAddPanel ? 'outline' : 'primary'}
                   size="sm"
                   leftIcon={<Plus className="h-4 w-4" />}
-                  className={
-                    showAddPanel
-                      ? ''
-                      : 'bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
-                  }
                 >
                   {showAddPanel ? 'Cancel' : 'Add Disease'}
                 </Button>

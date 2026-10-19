@@ -260,7 +260,6 @@ export default function SpellDetailsModal({
                 variant="primary"
                 size="md"
                 leftIcon={<Wand2 size={16} />}
-                className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Cast Spell
               </Button>

@@ -272,7 +272,6 @@ export function WeaponForm({
             variant="primary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
           >
             Add Damage Type
           </Button>
@@ -481,7 +480,6 @@ export function WeaponForm({
             variant="primary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
           >
             Add Charge Ability
           </Button>
@@ -873,7 +871,6 @@ export function WeaponForm({
           variant="primary"
           size="md"
           disabled={!formData.name.trim()}
-          className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
         >
           {isEditing ? 'Update' : 'Add'} Weapon
         </Button>

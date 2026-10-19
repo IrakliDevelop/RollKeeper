@@ -46,7 +46,6 @@ export default function Languages({
               variant="primary"
               size="xs"
               leftIcon={<Plus size={16} />}
-              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
               title="Add language"
             />
           )}
@@ -69,12 +68,7 @@ export default function Languages({
               className="flex-1"
               autoFocus
             />
-            <Button
-              onClick={handleAddLanguage}
-              variant="primary"
-              size="sm"
-              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
-            >
+            <Button onClick={handleAddLanguage} variant="primary" size="sm">
               Add
             </Button>
             <Button

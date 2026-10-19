@@ -204,7 +204,6 @@ const SpellCard: React.FC<{
             onClick={onCast}
             variant="primary"
             size="xs"
-            className="bg-purple-600 hover:bg-purple-700"
             title="Cast spell"
           >
             <Wand2 size={12} />
@@ -386,7 +385,6 @@ const SpellCard: React.FC<{
             variant="primary"
             size="sm"
             leftIcon={<Wand2 size={14} />}
-            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             Cast
           </Button>
@@ -1018,7 +1016,6 @@ export const SpellManagement: React.FC = () => {
                   ? 'Switch to detailed view'
                   : 'Switch to compact view'
               }
-              className={compactView ? 'bg-purple-600 hover:bg-purple-700' : ''}
             >
               {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
             </Button>
@@ -1030,11 +1027,6 @@ export const SpellManagement: React.FC = () => {
               }
               size="sm"
               leftIcon={<Filter size={16} />}
-              className={
-                showFilters || activeFilterCount > 0
-                  ? 'bg-purple-600 hover:bg-purple-700'
-                  : ''
-              }
             >
               Filters
               {activeFilterCount > 0 && (
@@ -1053,7 +1045,6 @@ export const SpellManagement: React.FC = () => {
               variant="primary"
               size="sm"
               leftIcon={<Plus size={16} />}
-              className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
             >
               Add Spell
             </Button>
@@ -1327,7 +1318,7 @@ export const SpellManagement: React.FC = () => {
                 onClick={clearFilters}
                 variant="primary"
                 size="md"
-                className="mt-4 bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
+                className="mt-4"
               >
                 Clear All Filters
               </Button>
@@ -1437,12 +1428,7 @@ export const SpellManagement: React.FC = () => {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
-                >
+                <Button type="submit" variant="primary" size="md">
                   {editingId ? 'Update Spell' : 'Add Spell'}
                 </Button>
               </div>

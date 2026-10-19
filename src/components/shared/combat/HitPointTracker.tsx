@@ -640,7 +640,7 @@ export function HitPointTracker({
                       variant="warning"
                       size="sm"
                       leftIcon={<Sparkles size={16} />}
-                      className="bg-gradient-to-r from-amber-500 to-yellow-500 font-semibold text-white shadow-md hover:from-amber-600 hover:to-yellow-600"
+                      className="font-semibold"
                     >
                       Natural 20! (Regain 1 HP)
                     </Button>

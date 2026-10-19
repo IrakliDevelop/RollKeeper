@@ -105,12 +105,7 @@ export const WeaponProficiencies: React.FC = () => {
                 e.key === 'Enter' && (e.preventDefault(), addSpecificWeapon())
               }
             />
-            <Button
-              onClick={addSpecificWeapon}
-              variant="primary"
-              size="sm"
-              className="bg-blue-600 hover:bg-blue-700"
-            >
+            <Button onClick={addSpecificWeapon} variant="primary" size="sm">
               <Plus size={14} />
             </Button>
           </div>

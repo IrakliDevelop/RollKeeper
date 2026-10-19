@@ -204,7 +204,6 @@ export function XPTracker({
               disabled={!inputValue || isNaN(parseInt(inputValue))}
               variant="primary"
               size={compact ? 'sm' : 'md'}
-              className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
             >
               {mode === 'add' ? 'Add' : 'Set'}
             </Button>

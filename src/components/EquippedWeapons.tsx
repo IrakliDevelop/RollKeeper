@@ -511,7 +511,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                   variant="warning"
                   size="sm"
                   leftIcon={<Zap size={14} />}
-                  className="min-w-[110px] bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700"
+                  className="min-w-[110px]"
                   title="Roll damage"
                 >
                   Damage
@@ -533,7 +533,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                     variant="primary"
                     size="sm"
                     leftIcon={<Zap size={14} />}
-                    className="min-w-[110px] bg-gradient-to-r from-purple-600 to-violet-700 hover:from-purple-700 hover:to-violet-800"
+                    className="min-w-[110px]"
                     title="Roll versatile damage"
                   >
                     Versatile

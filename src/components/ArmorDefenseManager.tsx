@@ -232,7 +232,6 @@ export default function ArmorDefenseManager() {
           variant="primary"
           size="sm"
           leftIcon={<Plus size={16} />}
-          className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
         >
           Add Armor
         </Button>
@@ -541,12 +540,7 @@ export default function ArmorDefenseManager() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  variant="primary"
-                  size="md"
-                  className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
-                >
+                <Button type="submit" variant="primary" size="md">
                   {editingId ? 'Update' : 'Add'} Armor
                 </Button>
               </DialogFooter>

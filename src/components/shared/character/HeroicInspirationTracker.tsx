@@ -190,12 +190,7 @@ export function HeroicInspirationTracker({
               className="w-20 text-sm"
               size="sm"
             />
-            <Button
-              onClick={handleMaxCountChange}
-              variant="warning"
-              size="sm"
-              className="bg-accent-amber-text-muted hover:bg-accent-amber-text"
-            >
+            <Button onClick={handleMaxCountChange} variant="warning" size="sm">
               Set
             </Button>
             <Button
