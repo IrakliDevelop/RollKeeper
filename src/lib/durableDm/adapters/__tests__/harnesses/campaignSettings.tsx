@@ -30,6 +30,10 @@ import {
 import { useDmStore } from '@/store/dmStore';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '11111111-1111-4111-8111-111111111111';
@@ -1274,7 +1278,7 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
      *     verification is what the adapter's guard trusts. This harness
      *     satisfies both: `seed()` already records AND verifies the
      *     receipt, which is a superset of what the card's own flow needs.
-     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card asks in the shared confirm dialog (`confirmDialog`); the adapter has none (spec R12).
      *   - the card has no `verifyCloud` equivalent (new per R1).
      *   - mutation ids are random (`crypto.randomUUID()`) on the card and
      *     deterministic (`migrationMutationId`) on the adapter — excluded
@@ -1311,7 +1315,8 @@ export function createCampaignSettingsHarness(): CampaignSettingsConformanceHarn
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       vi.spyOn(URL, 'createObjectURL').mockReturnValue(
         'blob:campaign-settings-recovery'
       );

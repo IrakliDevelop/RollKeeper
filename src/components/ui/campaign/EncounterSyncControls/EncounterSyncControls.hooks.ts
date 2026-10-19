@@ -63,6 +63,11 @@ import {
   useEncounterStore,
   type EncounterDeletionTombstone,
 } from '@/store/encounterStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface VersionMetadata {
   serverVersion: number;
@@ -818,9 +823,9 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       );
       setRecoveryVerified(true);
       if (
-        !window.confirm(
-          `Safety copy checked. Continue with the encounters for ${campaignName}? Nothing is moved or backed up yet.`
-        )
+        !(await confirmDialog(
+          syncConfirm.selectFamily(SYNC_FAMILIES.encounters, campaignName)
+        ))
       ) {
         setEncountersSelected(false);
         setStatus('Safety copy checked. Nothing was changed.');
@@ -930,9 +935,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Switch this browser over to the new way of storing encounters? Your safety copy is already saved. Reference: ${manifest.fingerprint.slice(0, 12)}`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(
+          SYNC_FAMILIES.encounters,
+          manifest.fingerprint
+        )
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1032,7 +1040,9 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       authority?.authority !== 'indexedDB'
     )
       return;
-    if (!window.confirm('Turn on backup to your account for these encounters?'))
+    if (
+      !(await confirmDialog(syncConfirm.turnOnBackup(SYNC_FAMILIES.encounters)))
+    )
       return;
     const namespace = `user:${context.accountId}` as const;
     const campaignId = workspace.cloudId;
@@ -1185,16 +1195,19 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     setBusy(true);
     setError(null);
     try {
+      if (
+        !(await confirmDialog(
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.encounters,
+            enrollmentPreview.previewFingerprint
+          )
+        ))
+      )
+        return;
       const local = await buildEncounterManifest({
         campaignCode,
         rawEnvelope: currentRawEnvelope(),
       });
-      if (
-        !window.confirm(
-          `Add this browser to your account's backup? What is on this browser is kept and is never uploaded on its own. Reference: ${enrollmentPreview.previewFingerprint.slice(0, 12)}`
-        )
-      )
-        return;
       const namespace = `user:${context.accountId}` as const;
       const campaignId = workspace.cloudId;
       const deviceKey = `rollkeeper:encounter-device:${context.accountId}:${campaignId}`;
@@ -1288,11 +1301,14 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
-      !window.confirm(
-        `Load ${documents.length === 1 ? '1 encounter' : `${documents.length} encounters`} from your account onto this browser? Work on this browser that has not been backed up will stop this.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.encounters, liveDocumentCount)
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1336,7 +1352,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
           .map(document => [document.legacyId, document.payloadFingerprint])
       );
       setStatus(
-        `Loaded ${documents.length === 1 ? '1 encounter' : `${documents.length} encounters`} from your account.`
+        `Loaded ${liveDocumentCount === 1 ? '1 encounter' : `${liveDocumentCount} encounters`} from your account.`
       );
     } catch (cause) {
       setError(
@@ -1430,11 +1446,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion}? It is added as a new version, and every earlier version is kept.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     setBusy(true);
     setError(null);
@@ -1513,9 +1525,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
     if (
-      !window.confirm(
-        'Stop backing these encounters up to your account? Everything already backed up is kept.'
-      )
+      !(await confirmDialog(syncConfirm.stopBackup(SYNC_FAMILIES.encounters)))
     )
       return;
     setBusy(true);
@@ -1606,9 +1616,12 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
     )
       return;
     if (
-      !window.confirm(
-        `Remove ${context.accountLabel}'s encounter data from this browser? Your account keeps everything.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(
+          SYNC_FAMILIES.encounters,
+          context.accountLabel
+        )
+      ))
     )
       return;
     setBusy(true);
@@ -1625,10 +1638,7 @@ export function useEncounterSyncController(campaign: CampaignInfo | undefined) {
             entry.state !== 'acknowledged' && entry.state !== 'superseded'
         );
         const lossConfirmed =
-          !unresolved ||
-          window.confirm(
-            'Some changes on this browser have not been backed up yet and will be lost. Continue?'
-          );
+          !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
           const deviceId = localStorage.getItem(

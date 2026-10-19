@@ -1295,7 +1295,7 @@ export interface CardParityHarness extends ConformanceHarness {
    * cutover, cloud activation and rollback — the full chain
    * `describeCardParity` compares against the adapter. Implementations
    * document their own named, expected differences from the adapter (no
-   * enrollment path, no history/restore/export, no `window.confirm`, and
+   * enrollment path, no history/restore/export, no shared confirm dialog (`confirmDialog`), and
    * any family-specific guard-strictness difference) in their own doc
    * comment, per the brief.
    */

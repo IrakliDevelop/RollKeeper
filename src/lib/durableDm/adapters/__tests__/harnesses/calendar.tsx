@@ -35,6 +35,10 @@ import type {
 } from '@/types/calendar';
 
 import type { CardParityHarness } from '../adapterConformance';
+import {
+  answerConfirmDialogs,
+  renderConfirmDialogHost,
+} from '@/test/confirmDialog';
 
 const NOW = '2026-08-24T00:00:00.000Z';
 const ACCOUNT_ID = '55555555-5555-4555-8555-555555555555';
@@ -1306,7 +1310,7 @@ export function createCalendarHarness(): CalendarConformanceHarness {
      *     recovery and select". Both still reach the same
      *     recorded-and-verified-receipt-plus-selected state the adapter's
      *     `selectFamily` requires.
-     *   - the card uses `window.confirm`; the adapter has none (spec R12).
+     *   - the card asks in the shared confirm dialog (`confirmDialog`); the adapter has none (spec R12).
      *   - the card has no `verifyCloud` equivalent (new per R1).
      *   - mutation ids are random (`crypto.randomUUID()`) on the card and
      *     deterministic on the adapter.
@@ -1355,7 +1359,8 @@ export function createCalendarHarness(): CalendarConformanceHarness {
           }),
         },
       } as never);
-      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      renderConfirmDialogHost();
+      answerConfirmDialogs('confirm');
       const createObjectURL = vi
         .spyOn(URL, 'createObjectURL')
         .mockReturnValue('blob:calendar-recovery');

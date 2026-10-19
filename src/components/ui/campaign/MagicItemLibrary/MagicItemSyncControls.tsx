@@ -80,6 +80,11 @@ import type { CampaignInfo } from '@/types/campaign';
 import type { CustomMagicItem } from '@/types/magicItemLibrary';
 import { APP_VERSION } from '@/utils/constants';
 import { useMagicItemLibraryStore } from '@/store/magicItemLibraryStore';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  SYNC_FAMILIES,
+  syncConfirm,
+} from '@/components/ui/campaign/syncConfirmCopy';
 
 interface VersionMetadata {
   serverVersion: number;
@@ -739,9 +744,9 @@ export function MagicItemSyncControls({ campaign }: Props) {
       );
       setRecoveryVerified(true);
       if (
-        !window.confirm(
-          `Recovery file verified. Select only the magic item library for ${campaign.name}? This does not cut over local or cloud authority.`
-        )
+        !(await confirmDialog(
+          syncConfirm.selectFamily(SYNC_FAMILIES.magicItems, campaign.name)
+        ))
       ) {
         setLibrarySelected(false);
         setStatus(
@@ -849,9 +854,12 @@ export function MagicItemSyncControls({ campaign }: Props) {
       return;
     if (manifest.blockers.length > 0) return;
     if (
-      !window.confirm(
-        `Confirm exact manifest ${manifest.fingerprint.slice(0, 12)} and cut only the magic item library to IndexedDB?`
-      )
+      !(await confirmDialog(
+        syncConfirm.switchStorage(
+          SYNC_FAMILIES.magicItems,
+          manifest.fingerprint
+        )
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -945,9 +953,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        'Stage, revalidate, and atomically activate only the magic item library in Postgres?'
-      )
+      !(await confirmDialog(syncConfirm.turnOnBackup(SYNC_FAMILIES.magicItems)))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1097,16 +1103,19 @@ export function MagicItemSyncControls({ campaign }: Props) {
     setBusy(true);
     setError(null);
     try {
+      if (
+        !(await confirmDialog(
+          syncConfirm.addBrowser(
+            SYNC_FAMILIES.magicItems,
+            enrollmentPreview.previewFingerprint
+          )
+        ))
+      )
+        return;
       const local = await buildMagicItemManifest({
         campaignCode: campaign.code,
         rawEnvelope: currentRawEnvelope(),
       });
-      if (
-        !window.confirm(
-          `Enroll this browser from exact cloud preview ${enrollmentPreview.previewFingerprint.slice(0, 12)}? The local candidate is preserved and is never uploaded automatically.`
-        )
-      )
-        return;
       const namespace = `user:${context.accountId}` as const;
       const campaignId = workspace.cloudId;
       const deviceKey = `rollkeeper:magic-item-device:${context.accountId}:${campaignId}`;
@@ -1200,11 +1209,14 @@ export function MagicItemSyncControls({ campaign }: Props) {
       return;
     }
     const documents = enrollmentPreview.documents;
+    const liveDocumentCount = documents.filter(
+      document => !document.tombstoned
+    ).length;
     const cutoverEpoch = enrollmentPreview.epoch;
     if (
-      !window.confirm(
-        `Apply the exact cloud generation of ${documents.length} records to this enrolled browser? Unresolved local work blocks hydration.`
-      )
+      !(await confirmDialog(
+        syncConfirm.loadFromAccount(SYNC_FAMILIES.magicItems, liveDocumentCount)
+      ))
     )
       return;
     const namespace = `user:${context.accountId}` as const;
@@ -1328,11 +1340,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
       versions.length === 0
     )
       return;
-    if (
-      !window.confirm(
-        `Restore version ${sourceVersion} as a new higher version? Immutable history will not be changed.`
-      )
-    )
+    if (!(await confirmDialog(syncConfirm.restoreVersion(sourceVersion))))
       return;
     setBusy(true);
     setError(null);
@@ -1408,9 +1416,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
     if (!context || !workspace?.cloudId || authority?.authority !== 'postgres')
       return;
     if (
-      !window.confirm(
-        'Verified rollback creates a new epoch and preserves every Postgres and history source. Continue?'
-      )
+      !(await confirmDialog(syncConfirm.stopBackup(SYNC_FAMILIES.magicItems)))
     )
       return;
     setBusy(true);
@@ -1500,9 +1506,12 @@ export function MagicItemSyncControls({ campaign }: Props) {
     )
       return;
     if (
-      !window.confirm(
-        `Remove only ${context.accountLabel}'s local namespace from this browser? Cloud and every preserved source remain intact.`
-      )
+      !(await confirmDialog(
+        syncConfirm.removeFromBrowser(
+          SYNC_FAMILIES.magicItems,
+          context.accountLabel
+        )
+      ))
     )
       return;
     setBusy(true);
@@ -1519,10 +1528,7 @@ export function MagicItemSyncControls({ campaign }: Props) {
             entry.state !== 'acknowledged' && entry.state !== 'superseded'
         );
         const lossConfirmed =
-          !unresolved ||
-          window.confirm(
-            'Unresolved browser-only work will become inaccessible on this browser. Confirm the described loss risk?'
-          );
+          !unresolved || (await confirmDialog(syncConfirm.unbackedWork()));
         if (!lossConfirmed) return;
         if (authority.authority === 'postgres') {
           const deviceId = localStorage.getItem(
