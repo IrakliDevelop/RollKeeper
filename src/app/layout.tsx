@@ -5,6 +5,7 @@ import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { ThemeProviderWrapper } from './ThemeProviderWrapper';
 import { MotionProvider } from './MotionProvider';
 import { PersistenceBootstrap } from '@/components/PersistenceBootstrap';
+import { themeScript } from './themeScript';
 
 // Felt and Brass type: Vollkorn for headings, Barlow for body and UI,
 // Barlow Condensed for display numerals. Self-hosted latin subsets from
@@ -74,26 +75,6 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
 };
-
-/**
- * Inline script that runs BEFORE React hydrates to prevent
- * a flash of wrong theme (FOUC). It reads localStorage or
- * the system preference and sets data-theme on <html>.
- */
-const themeScript = `
-(function() {
-  try {
-    var stored = localStorage.getItem('rollkeeper-theme');
-    var theme = stored === 'dark' || stored === 'light' || stored === 'parchment' ? stored : null;
-    if (!theme) {
-      theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
-    if (theme !== 'light') {
-      document.documentElement.setAttribute('data-theme', theme);
-    }
-  } catch (e) {}
-})();
-`;
 
 const characterPersistenceScript =
   process.env.NEXT_PUBLIC_CHARACTER_INDEXEDDB_CUTOVER_ENABLED === 'true'
