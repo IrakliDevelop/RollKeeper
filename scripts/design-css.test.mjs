@@ -185,10 +185,12 @@ test('gradient endpoints are flattened to surfaces', async () => {
 
 test('parchment is retired: paper and felt are the only theme blocks', async () => {
   const css = stripComments(await readGlobalsCss());
-  const themed = [...css.matchAll(/\[data-theme='([\w-]+)'\]\s*\{/g)].map(
-    match => match[1]
+  const themed = new Set(
+    [...css.matchAll(/\[data-theme=['"]?([\w-]+)['"]?\]/g)].map(
+      match => match[1]
+    )
   );
-  assert.deepEqual(themed, ['dark']);
+  assert.deepEqual([...themed], ['dark']);
   assert.doesNotMatch(css, /parchment/i);
 });
 
@@ -199,6 +201,12 @@ test('no theme block redeclares a shared token', async () => {
   // (felt sits after), splitting the themes.
   const css = await readGlobalsCss();
   const shared = Object.keys(readBlock(css, ':root,\n[data-theme]'));
+  for (const name of ['--background', '--foreground', '--ring', '--input-bg']) {
+    assert.ok(
+      shared.includes(name),
+      `${name} must be declared on :root, [data-theme]`
+    );
+  }
   for (const selector of [':root', "[data-theme='dark']"]) {
     const block = readBlock(css, selector);
     assert.deepEqual(
@@ -216,7 +224,15 @@ test('Storybook takes its theme colours from the tokens', async () => {
   );
   assert.doesNotMatch(preview, /#[0-9a-f]{3,8}\b/i);
   assert.doesNotMatch(preview, /parchment/i);
+  assert.doesNotMatch(preview, /document\.body\.style/);
   assert.match(preview, /var\(--background\)/);
+
+  // `ruleFor` finds the first substring match ("body-family" in the theme
+  // tokens), so read the `body` rule from the source instead.
+  const css = stripComments(await readGlobalsCss());
+  const body = css.match(/(^|\n)body\s*\{([^}]*)\}/)?.[2] ?? '';
+  assert.match(body, /background:\s*var\(--background\)/);
+  assert.match(body, /color:\s*var\(--foreground\)/);
 });
 
 test('@tailwindcss/node is a direct dependency in lockstep with @tailwindcss/postcss', async () => {
