@@ -235,6 +235,7 @@ import { Badge } from '@/components/ui/layout/badge';
 
 // Feedback / overlays
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
+import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedback/confirm-dialog'; // never window.confirm/alert/prompt (ESLint no-alert)
 
 // Design tokens
 import { colors, spacing, typography, shadows, borderRadius } from '@/components/ui/primitives';
