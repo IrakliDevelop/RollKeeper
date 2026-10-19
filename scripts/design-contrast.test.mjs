@@ -125,3 +125,43 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
   }
   assert.equal(PAIRS.length, 137);
 });
+
+test('matches a selector only as a whole rule, not as the tail of a list', () => {
+  const nested = [
+    '@import "x";',
+    ':root,',
+    '[data-theme] {',
+    '  --shared: #111111;',
+    '}',
+    'html:root {',
+    '  --html: #222222;',
+    '}',
+    '.card :root {',
+    '  --descendant: #333333;',
+    '}',
+    ':root {',
+    '  --own: #444444;',
+    '}',
+    '@layer base { [data-theme] { --inner: #555555; } }',
+  ].join('\n');
+  assert.deepEqual(readBlock(nested, ':root'), { '--own': '#444444' });
+  assert.deepEqual(readBlock(nested, '[data-theme]'), { '--inner': '#555555' });
+  assert.deepEqual(readBlock(nested, ':root,\n[data-theme]'), {
+    '--shared': '#111111',
+  });
+  assert.deepEqual(readBlock(nested, ':root, [data-theme]'), {
+    '--shared': '#111111',
+  });
+  assert.throws(() => readBlock(nested, 'root'), /No "root" block/);
+  assert.throws(() => readBlock(nested, '.card'), /No "\.card" block/);
+});
+
+test('a selector list is matched exactly, in order', () => {
+  const lists = ":root,\n[data-theme='light'] {\n  --a: #fff;\n}";
+  assert.deepEqual(readBlock(lists, ":root,\n[data-theme='light']"), {
+    '--a': '#fff',
+  });
+  assert.throws(() => readBlock(lists, ':root'), /No ":root" block/);
+  assert.throws(() => readBlock(lists, "[data-theme='light']"), /No "/);
+  assert.throws(() => readBlock(lists, "[data-theme='light'],:root"), /No "/);
+});
