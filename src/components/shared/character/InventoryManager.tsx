@@ -309,9 +309,6 @@ export function InventoryManager({
                     ? 'Switch to detailed view'
                     : 'Switch to compact view'
                 }
-                className={
-                  compactView ? 'bg-purple-600 hover:bg-purple-700' : ''
-                }
               >
                 {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
               </Button>
@@ -322,7 +319,6 @@ export function InventoryManager({
                 variant="primary"
                 size="sm"
                 leftIcon={<Plus size={16} />}
-                className="bg-gradient-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
               >
                 Add Item
               </Button>

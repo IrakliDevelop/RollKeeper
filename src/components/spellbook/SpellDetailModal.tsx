@@ -264,7 +264,8 @@ export default function SpellDetailModal({
             <div className="flex flex-wrap gap-2">
               {onToggleFavorite && (
                 <Button
-                  variant={isFavorite ? 'warning' : 'outline'}
+                  variant="outline"
+                  selected={isFavorite}
                   size="sm"
                   onClick={onToggleFavorite}
                   leftIcon={

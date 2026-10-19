@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { BannerUpload } from './BannerUpload';
@@ -80,5 +80,23 @@ describe('BannerUpload — variant="card" is display-only', () => {
 
     expect(container.querySelectorAll('input[type="file"]')).toHaveLength(0);
     expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('draws the hero edit controls in the dark palette over the image scrim', () => {
+    render(
+      <BannerUpload
+        campaignCode="ALPHA"
+        bannerUrl="https://example.test/banner.png"
+        onBannerChange={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByTitle('Edit banner'));
+
+    const change = screen.getByRole('button', { name: 'Change' });
+    expect(change.closest('[data-theme]')).toHaveAttribute(
+      'data-theme',
+      'dark'
+    );
   });
 });

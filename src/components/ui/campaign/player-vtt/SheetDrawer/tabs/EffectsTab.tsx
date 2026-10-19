@@ -90,7 +90,8 @@ export function EffectsTab({ addToast, roll }: EffectsTabProps) {
             <Button
               key={toggle.name}
               type="button"
-              variant={toggle.activeId ? 'danger' : 'outline'}
+              variant="outline"
+              selected={!!toggle.activeId}
               size="sm"
               aria-pressed={!!toggle.activeId}
               onClick={() =>

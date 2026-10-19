@@ -159,7 +159,12 @@ export function BannerUpload({
             </button>
           )}
           {editable && !isLoading && isEditing && (
-            <div className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40">
+            // The scrim is dark in both themes, so its buttons use the felt
+            // palette to stay readable on paper.
+            <div
+              data-theme="dark"
+              className="absolute inset-0 flex items-center justify-center gap-3 bg-black/40"
+            >
               <Button
                 variant="secondary"
                 size="sm"

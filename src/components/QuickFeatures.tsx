@@ -150,7 +150,6 @@ function QuickFeatureCard({
             onClick={onUse}
             variant="primary"
             size="xs"
-            className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted"
             title="Use feature"
           >
             <Zap className="h-4 w-4" />

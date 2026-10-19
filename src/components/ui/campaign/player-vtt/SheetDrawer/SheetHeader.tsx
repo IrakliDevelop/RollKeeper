@@ -81,7 +81,8 @@ export function SheetHeader({
       <div className="flex shrink-0 flex-col items-end gap-2">
         <div className="flex items-center gap-1">
           <Button
-            variant={locked ? 'outline' : 'warning'}
+            variant="outline"
+            selected={!locked}
             size="sm"
             onClick={onToggleLock}
             aria-pressed={!locked}

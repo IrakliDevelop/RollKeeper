@@ -120,7 +120,8 @@ export function ArmorRow({
           <div className="border-divider flex flex-wrap items-center gap-2 border-t pt-3">
             <Button
               onClick={() => onToggleEquip(armor.id, !armor.isEquipped)}
-              variant={armor.isEquipped ? 'success' : 'outline'}
+              variant="outline"
+              selected={armor.isEquipped}
               size="sm"
             >
               <Shield size={14} className="mr-1" />

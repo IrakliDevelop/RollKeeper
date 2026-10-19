@@ -61,7 +61,6 @@ export default function RestManager({
             variant="secondary"
             size="md"
             leftIcon={<Sun className="h-4 w-4" />}
-            className="bg-gradient-to-r from-blue-500 to-cyan-600 hover:from-blue-600 hover:to-cyan-700"
           >
             Take Short Rest
           </Button>
@@ -94,7 +93,6 @@ export default function RestManager({
             variant="secondary"
             size="md"
             leftIcon={<Moon className="h-4 w-4" />}
-            className="bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700"
           >
             Take Long Rest
           </Button>

@@ -390,7 +390,6 @@ export default function LandingPage() {
                   variant="secondary"
                   size="xl"
                   rightIcon={<ArrowRight size={18} />}
-                  className="shadow-lg"
                   asChild
                 >
                   <Link href="/player">Start as Player</Link>
@@ -404,7 +403,6 @@ export default function LandingPage() {
                   variant="outline"
                   size="xl"
                   rightIcon={<Crown size={18} />}
-                  className="shadow-sm"
                   asChild
                 >
                   <Link href="/dm">Start as DM</Link>
@@ -828,7 +826,6 @@ export default function LandingPage() {
                   variant="secondary"
                   size="lg"
                   rightIcon={<ArrowRight size={16} />}
-                  className="shadow-lg"
                   asChild
                 >
                   <Link href="/player">Start as Player</Link>

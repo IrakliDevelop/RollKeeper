@@ -26,7 +26,6 @@ export const WeaponInventory: React.FC = () => {
             variant="primary"
             size="sm"
             leftIcon={<Eye size={16} />}
-            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             View All Equipment
           </Button>

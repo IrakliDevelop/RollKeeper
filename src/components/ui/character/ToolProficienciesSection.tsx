@@ -459,12 +459,7 @@ export default function ToolProficienciesSection({
                   className="flex-1"
                   autoFocus
                 />
-                <Button
-                  onClick={handleAddCustom}
-                  variant="primary"
-                  size="sm"
-                  className="bg-accent-indigo-text-muted hover:bg-accent-indigo-text"
-                >
+                <Button onClick={handleAddCustom} variant="primary" size="sm">
                   Add
                 </Button>
                 <Button

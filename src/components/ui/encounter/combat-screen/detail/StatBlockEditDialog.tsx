@@ -74,6 +74,7 @@ export function useStatBlockEditDialog(
             Cancel
           </Button>
           <Button
+            variant="primary"
             onClick={() => {
               if (!editDraft) return;
               actions.onUpdate(entity.id, {

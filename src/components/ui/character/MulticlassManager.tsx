@@ -161,7 +161,6 @@ export default function MulticlassManager({
             variant="primary"
             size="sm"
             leftIcon={<Plus className="h-4 w-4" />}
-            className="from-accent-indigo-text-muted to-accent-purple-text-muted hover:from-accent-indigo-text hover:to-accent-purple-text bg-gradient-to-r"
           >
             Add Class
           </Button>
@@ -376,7 +375,6 @@ export default function MulticlassManager({
                 }
                 variant="primary"
                 size="sm"
-                className="from-accent-purple-text-muted hover:from-accent-purple-text bg-gradient-to-r to-pink-600 hover:to-pink-700"
               >
                 Add Class Level
               </Button>

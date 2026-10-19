@@ -95,7 +95,6 @@ export function ItemTransferNotification({
                 size="sm"
                 leftIcon={<Package size={14} />}
                 onClick={() => handleClick(transfer.id)}
-                className="border-amber-500 bg-amber-600 text-white hover:bg-amber-500"
               >
                 View in Inventory
               </Button>

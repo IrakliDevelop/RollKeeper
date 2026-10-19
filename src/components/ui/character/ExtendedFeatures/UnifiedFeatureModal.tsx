@@ -25,6 +25,7 @@ import {
 } from '@/utils/featureConversion';
 import { useFeatureSourcesData } from '@/hooks/useFeatureSourcesData';
 import { useSpellsData } from '@/hooks/useSpellsData';
+import { Button } from '@/components/ui/forms/button';
 import { FeatureAutocomplete } from '@/components/ui/forms/FeatureAutocomplete';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import { Input } from '@/components/ui/forms/input';
@@ -405,13 +406,13 @@ export default function UnifiedFeatureModal({
                         Edit
                       </button>
                       {onDelete && (
-                        <button
+                        <Button
+                          variant="danger"
                           onClick={() => setShowDeleteConfirm(true)}
-                          className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                          leftIcon={<Trash2 className="h-4 w-4" />}
                         >
-                          <Trash2 className="h-4 w-4" />
                           Delete
-                        </button>
+                        </Button>
                       )}
                     </div>
                   )}
@@ -844,19 +845,19 @@ export default function UnifiedFeatureModal({
                         &quot; will be permanently removed.
                       </p>
                       <div className="flex gap-3">
-                        <button
+                        <Button
+                          variant="danger-solid"
                           onClick={handleDelete}
-                          className="bg-accent-red-text text-inverse hover:bg-accent-red-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                          leftIcon={<Trash2 className="h-4 w-4" />}
                         >
-                          <Trash2 className="h-4 w-4" />
                           Delete Feature
-                        </button>
-                        <button
+                        </Button>
+                        <Button
+                          variant="outline"
                           onClick={() => setShowDeleteConfirm(false)}
-                          className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover rounded-lg border px-4 py-2 text-sm font-medium shadow-sm transition-colors"
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </div>
                   </div>

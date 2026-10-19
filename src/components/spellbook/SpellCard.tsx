@@ -179,7 +179,8 @@ export default function SpellCard({
               <div className="flex gap-2">
                 {onToggleFavorite && (
                   <Button
-                    variant={isFavorite ? 'warning' : 'outline'}
+                    variant="outline"
+                    selected={isFavorite}
                     size="sm"
                     onClick={handleToggleFavorite}
                     aria-label={
@@ -193,7 +194,8 @@ export default function SpellCard({
                   </Button>
                 )}
                 <Button
-                  variant={isInSpellbook ? 'success' : 'outline'}
+                  variant="outline"
+                  selected={isInSpellbook}
                   size="sm"
                   onClick={handleToggleSpellbook}
                   leftIcon={
@@ -334,7 +336,8 @@ export default function SpellCard({
           <div className="flex gap-2">
             {onToggleFavorite && (
               <Button
-                variant={isFavorite ? 'warning' : 'outline'}
+                variant="outline"
+                selected={isFavorite}
                 size="sm"
                 onClick={handleToggleFavorite}
                 aria-label={
@@ -345,7 +348,8 @@ export default function SpellCard({
               </Button>
             )}
             <Button
-              variant={isInSpellbook ? 'success' : 'outline'}
+              variant="outline"
+              selected={isInSpellbook}
               size="sm"
               onClick={handleToggleSpellbook}
               leftIcon={

@@ -256,7 +256,6 @@ export function MagicItemForm({
             variant="primary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
           >
             Add Charge Ability
           </Button>
@@ -607,7 +606,6 @@ export function MagicItemForm({
           variant="primary"
           size="md"
           disabled={!formData.name.trim()}
-          className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
         >
           {isEditing ? 'Update' : 'Add'} Item
         </Button>

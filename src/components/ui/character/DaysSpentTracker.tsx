@@ -166,7 +166,6 @@ export default function DaysSpentTracker({
             variant="secondary"
             size="sm"
             leftIcon={<Plus size={14} />}
-            className="from-accent-amber-text-muted to-accent-orange-text-muted text-inverse hover:from-accent-amber-text hover:to-accent-orange-text bg-gradient-to-r"
             title="Add 1 day"
           >
             +1 Day

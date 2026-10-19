@@ -70,7 +70,8 @@ export function FocusActiveControls({
 
       <div className="flex w-full items-center justify-end gap-2 pt-1">
         <Button
-          variant={hidePlayerHp ? 'warning' : 'ghost'}
+          variant="ghost"
+          selected={hidePlayerHp}
           size="sm"
           onClick={onToggleHidePlayerHp}
           aria-label={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}

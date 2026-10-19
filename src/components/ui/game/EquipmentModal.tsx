@@ -489,7 +489,6 @@ export default function EquipmentModal({
                     variant="primary"
                     size="md"
                     leftIcon={<Plus size={16} />}
-                    className="bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
                   >
                     Add Weapon
                   </Button>
@@ -541,7 +540,6 @@ export default function EquipmentModal({
                     variant="primary"
                     size="md"
                     leftIcon={<Plus size={16} />}
-                    className="bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700"
                   >
                     Add Magic Item
                   </Button>

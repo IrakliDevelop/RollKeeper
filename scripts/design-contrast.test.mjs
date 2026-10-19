@@ -123,7 +123,20 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
   ]) {
     assert.ok(has('inverse', `${role}-text`, 4.5), `inverse on ${role}-text`);
   }
-  assert.equal(PAIRS.length, 137);
+  assert.equal(PAIRS.length, 140);
+});
+
+test('checks selected and danger button text on the hover surface', () => {
+  const has = (foreground, background) =>
+    PAIRS.some(
+      pair =>
+        pair.foreground === foreground &&
+        pair.background === background &&
+        pair.min === 4.5
+    );
+  assert.ok(has('brass-text', 'surface-hover'), 'brass-text on surface-hover');
+  assert.ok(has('blood-text', 'surface-hover'), 'blood-text on surface-hover');
+  assert.ok(has('heading', 'ember-bg'), 'heading on ember-bg');
 });
 
 test('matches a selector only as a whole rule, not as the tail of a list', () => {

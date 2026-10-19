@@ -124,7 +124,6 @@ export function DmMessageNotification({
                 size="sm"
                 leftIcon={<BookOpen size={12} />}
                 onClick={() => handleAccept(msg)}
-                className="border-emerald-600 bg-emerald-600 text-white hover:bg-emerald-700"
               >
                 View in Notes
               </Button>

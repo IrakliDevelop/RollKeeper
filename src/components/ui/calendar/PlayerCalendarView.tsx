@@ -447,7 +447,11 @@ export function PlayerCalendarView({
               <>
                 {confirmingReset ? (
                   <div className="flex items-center gap-1">
-                    <Button variant="danger" size="sm" onClick={handleReset}>
+                    <Button
+                      variant="danger-solid"
+                      size="sm"
+                      onClick={handleReset}
+                    >
                       Confirm
                     </Button>
                     <Button

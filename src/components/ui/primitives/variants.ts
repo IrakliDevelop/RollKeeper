@@ -11,28 +11,34 @@
 import { cva, type VariantProps } from 'class-variance-authority';
 
 /**
- * Common button variants - used by Button and button-like components
+ * Common button variants - used by Button and button-like components.
+ *
+ * Felt and Brass: primary is the one brass action per view, danger-solid is
+ * only for the confirm button of a destructive dialog, and everything else
+ * is an outline or plain text. success and warning are deprecated aliases
+ * of secondary. `selected` marks the on state of an outline or text toggle.
  */
+const OUTLINE_BUTTON =
+  'border border-input-border bg-transparent text-heading hover:bg-surface-hover';
+
 export const buttonVariants = cva(
   // Base styles
-  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-lg font-medium transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex cursor-pointer items-center justify-center gap-2 rounded-sm font-medium transition-colors duration-120 ease-out focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:min-w-11',
   {
     variants: {
       variant: {
-        primary:
-          'bg-gradient-to-r from-emerald-600 to-emerald-700 text-white shadow-md hover:from-emerald-700 hover:to-emerald-800 focus-visible:ring-emerald-500 active:scale-[0.98]',
-        secondary:
-          'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-md hover:from-blue-700 hover:to-blue-800 focus-visible:ring-blue-500 active:scale-[0.98]',
-        success:
-          'bg-gradient-to-r from-green-600 to-green-700 text-white shadow-md hover:from-green-700 hover:to-green-800 focus-visible:ring-green-500 active:scale-[0.98]',
+        primary: 'bg-brass-fill text-on-brass hover:bg-brass-fill/90',
+        secondary: OUTLINE_BUTTON,
+        /** @deprecated Use `secondary`, or `selected` for an on state. */
+        success: OUTLINE_BUTTON,
+        /** @deprecated Use `secondary`, or `selected` for an on state. */
+        warning: OUTLINE_BUTTON,
+        outline: OUTLINE_BUTTON,
+        ghost: 'text-heading hover:bg-surface-hover',
         danger:
-          'bg-gradient-to-r from-red-600 to-red-700 text-white shadow-md hover:from-red-700 hover:to-red-800 focus-visible:ring-red-500 active:scale-[0.98]',
-        warning:
-          'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md hover:from-amber-700 hover:to-amber-800 focus-visible:ring-amber-500 active:scale-[0.98]',
-        outline:
-          'border-2 border-divider bg-surface-raised text-heading hover:bg-surface-hover hover:border-divider-strong focus-visible:ring-ring',
-        ghost: 'text-heading hover:bg-surface-hover focus-visible:ring-ring',
-        link: 'text-emerald-600 underline-offset-4 hover:underline focus-visible:ring-emerald-500 dark:text-emerald-400',
+          'border border-blood-border bg-transparent text-blood-text hover:bg-surface-hover',
+        'danger-solid': 'bg-blood-fill text-on-blood hover:bg-blood-fill/90',
+        link: 'text-brass-text underline-offset-4 hover:underline',
       },
       size: {
         xs: 'h-7 px-3 text-xs',
@@ -44,11 +50,23 @@ export const buttonVariants = cva(
       fullWidth: {
         true: 'w-full',
       },
+      selected: {
+        true: '',
+        false: '',
+      },
     },
+    compoundVariants: [
+      {
+        variant: ['secondary', 'success', 'warning', 'outline', 'ghost'],
+        selected: true,
+        className: 'border border-brass-border text-brass-text',
+      },
+    ],
     defaultVariants: {
-      variant: 'primary',
+      variant: 'secondary',
       size: 'md',
       fullWidth: false,
+      selected: false,
     },
   }
 );
@@ -120,27 +138,27 @@ export const cardVariants = cva(
 export type CardVariants = VariantProps<typeof cardVariants>;
 
 /**
- * Badge variants - used by Badge and badge-like labels
+ * Badge variants - used by Badge and badge-like labels.
+ *
+ * Felt and Brass: a 1px outline in the role colour with no fill. info,
+ * secondary and outline render as neutral.
  */
+const NEUTRAL_BADGE = 'border-input-border text-heading';
+
 export const badgeVariants = cva(
   // Base styles
-  'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold transition-colors',
+  'inline-flex items-center gap-1 rounded-[3px] border px-2.5 py-0.5 text-xs font-semibold transition-colors',
   {
     variants: {
       variant: {
-        primary:
-          'bg-accent-emerald-bg text-accent-emerald-text border border-accent-emerald-border',
-        secondary:
-          'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        success:
-          'bg-accent-green-bg text-accent-green-text border border-accent-green-border',
-        danger:
-          'bg-accent-red-bg text-accent-red-text border border-accent-red-border',
-        warning:
-          'bg-accent-amber-bg text-accent-amber-text border border-accent-amber-border',
-        info: 'bg-accent-blue-bg text-accent-blue-text border border-accent-blue-border',
-        neutral: 'bg-surface-secondary text-heading border border-divider',
-        outline: 'bg-transparent text-heading border border-divider-strong',
+        primary: 'border-brass-border text-brass-text',
+        success: 'border-verdigris-border text-verdigris-text',
+        warning: 'border-ember-border text-ember-text',
+        danger: 'border-blood-border text-blood-text',
+        neutral: NEUTRAL_BADGE,
+        secondary: NEUTRAL_BADGE,
+        info: NEUTRAL_BADGE,
+        outline: NEUTRAL_BADGE,
       },
       size: {
         sm: 'text-xs px-2 py-0.5',
@@ -149,7 +167,7 @@ export const badgeVariants = cva(
       },
     },
     defaultVariants: {
-      variant: 'primary',
+      variant: 'neutral',
       size: 'md',
     },
   }

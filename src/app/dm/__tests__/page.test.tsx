@@ -337,13 +337,10 @@ describe('DM dashboard — migrated campaigns (spec R2b)', () => {
 
     const manageButton = manageLink.querySelector('button');
     expect(manageButton).not.toBeNull();
-    // `outline` and `secondary` are visually distinct Button variants
-    // (src/components/ui/primitives/variants.ts); pin the outline-specific
-    // border class and rule out the secondary-specific gradient class, so a
-    // silent variant flip is caught even though both variants render as a
+    // Pin the variant through Button's data-variant attribute, so a silent
+    // variant flip is caught even though both variants render as a
     // `<button>` with the same accessible name.
-    expect(manageButton).toHaveClass('border-divider');
-    expect(manageButton).not.toHaveClass('from-blue-600');
+    expect(manageButton).toHaveAttribute('data-variant', 'outline');
   });
 
   it('shows a Synced badge next to the code badge for a routed campaign', () => {

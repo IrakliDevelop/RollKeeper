@@ -114,7 +114,6 @@ export default function ExtendedFeaturesSection({
                 variant="primary"
                 size="sm"
                 leftIcon={<Plus className="h-4 w-4" />}
-                className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted"
                 title="Add new feature"
               >
                 Add Feature
@@ -142,7 +141,7 @@ export default function ExtendedFeaturesSection({
                     variant="primary"
                     size="sm"
                     leftIcon={<Plus className="h-4 w-4" />}
-                    className="bg-accent-indigo-text hover:bg-accent-indigo-text-muted mt-4"
+                    className="mt-4"
                   >
                     Add Your First Feature
                   </Button>
@@ -195,7 +194,6 @@ export default function ExtendedFeaturesSection({
                 onClick={() => onResetFeatures('long')}
                 variant="primary"
                 size="sm"
-                className="bg-accent-blue-text hover:bg-accent-blue-text-muted"
               >
                 Long Rest Reset
               </Button>

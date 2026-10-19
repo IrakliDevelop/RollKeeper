@@ -30,7 +30,8 @@ export default function DmOnlyToggle({
   return (
     <Button
       data-testid="dm-only-toggle"
-      variant={isDmOnly ? 'warning' : 'ghost'}
+      variant="ghost"
+      selected={isDmOnly}
       onClick={onToggle}
       title={label}
       aria-label={label}

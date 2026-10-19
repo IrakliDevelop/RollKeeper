@@ -241,11 +241,6 @@ export default function CharacterSheetHeader({
                   leftIcon={
                     isEditMode ? <Eye size={16} /> : <Pencil size={16} />
                   }
-                  className={
-                    isEditMode
-                      ? 'bg-linear-to-r from-blue-600 to-blue-700 shadow-md hover:from-blue-700 hover:to-blue-800'
-                      : 'shadow-sm'
-                  }
                   title={
                     isEditMode ? 'Switch to view mode' : 'Switch to edit mode'
                   }
@@ -259,7 +254,6 @@ export default function CharacterSheetHeader({
                   variant="success"
                   size="sm"
                   leftIcon={<Save size={16} />}
-                  className="bg-gradient-to-r from-emerald-600 to-emerald-700 hover:from-emerald-700 hover:to-emerald-800 shadow-md"
                 >
                   Save
                 </Button> */}
@@ -268,7 +262,6 @@ export default function CharacterSheetHeader({
                   variant="outline"
                   size="sm"
                   leftIcon={<Download size={16} />}
-                  className="shadow-sm"
                 >
                   Export
                 </Button>
@@ -278,18 +271,12 @@ export default function CharacterSheetHeader({
                   variant="outline"
                   size="sm"
                   leftIcon={<Share2 size={16} />}
-                  className="shadow-sm"
                   title="Share character via QR code"
                 >
                   Share
                 </Button>
 
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="shadow-sm"
-                >
+                <Button asChild variant="outline" size="sm">
                   <label className="cursor-pointer">
                     <span className="flex items-center gap-2">
                       <Upload size={16} />
@@ -340,7 +327,6 @@ export default function CharacterSheetHeader({
                   variant="danger"
                   size="sm"
                   leftIcon={<RotateCcw size={16} />}
-                  className="bg-gradient-to-r from-red-600 to-red-700 shadow-md hover:from-red-700 hover:to-red-800"
                   title="Reset character - this will clear all data!"
                 >
                   Reset

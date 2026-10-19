@@ -429,7 +429,7 @@ export function MagicItemCard({
                 size="sm"
                 className={
                   item.isAttuned
-                    ? 'bg-linear-to-r from-purple-600 to-violet-600 hover:from-purple-700 hover:to-violet-700'
+                    ? undefined
                     : 'hover:border-accent-purple-border hover:bg-surface-hover'
                 }
               >
