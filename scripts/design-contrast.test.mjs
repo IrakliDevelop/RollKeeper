@@ -123,7 +123,7 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
   ]) {
     assert.ok(has('inverse', `${role}-text`, 4.5), `inverse on ${role}-text`);
   }
-  assert.equal(PAIRS.length, 140);
+  assert.equal(PAIRS.length, 141);
 });
 
 test('checks selected and danger button text on the hover surface', () => {
@@ -137,6 +137,17 @@ test('checks selected and danger button text on the hover surface', () => {
   assert.ok(has('brass-text', 'surface-hover'), 'brass-text on surface-hover');
   assert.ok(has('blood-text', 'surface-hover'), 'blood-text on surface-hover');
   assert.ok(has('heading', 'ember-bg'), 'heading on ember-bg');
+});
+
+test('checks the switch thumb against the unchecked track', () => {
+  assert.ok(
+    PAIRS.some(
+      pair =>
+        pair.foreground === 'on-brass' &&
+        pair.background === 'input-border' &&
+        pair.min === 3
+    )
+  );
 });
 
 test('matches a selector only as a whole rule, not as the tail of a list', () => {

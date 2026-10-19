@@ -95,11 +95,11 @@ export default function Skills({
       {/* Skills Legend */}
       <div className="bg-surface-secondary text-body mb-3 flex items-center gap-4 rounded p-2 text-xs">
         <div className="flex items-center gap-1">
-          <div className="h-3 w-3 rounded bg-green-600"></div>
+          <div className="bg-brass-fill h-3 w-3 rounded"></div>
           <span>P = Proficient ({formatModifier(proficiencyBonus)})</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="h-3 w-3 rounded bg-yellow-600"></div>
+          <div className="bg-brass-fill h-3 w-3 rounded"></div>
           <span>E = Expertise ({formatModifier(proficiencyBonus * 2)})</span>
         </div>
         {jackOfAllTrades && (
@@ -125,8 +125,9 @@ export default function Skills({
           return (
             <div key={skillName}>
               <div className="hover:bg-accent-green-bg flex items-center gap-2 rounded p-1 text-sm transition-colors">
-                {/* Proficiency Checkbox */}
-                <div className="flex flex-col items-center">
+                {/* Proficiency Checkbox. On touch each column is 44px wide so
+                    the P and E hit areas don't overlap. */}
+                <div className="flex flex-col items-center pointer-coarse:w-11">
                   <Checkbox
                     checked={isProficient}
                     onCheckedChange={checked => {
@@ -143,7 +144,7 @@ export default function Skills({
                 </div>
 
                 {/* Expertise Checkbox */}
-                <div className="flex flex-col items-center">
+                <div className="flex flex-col items-center pointer-coarse:w-11">
                   <Checkbox
                     checked={hasExpertise && isProficient}
                     onCheckedChange={checked =>
@@ -156,7 +157,7 @@ export default function Skills({
                   />
                   <span
                     className={`mt-0.5 text-xs ${
-                      isProficient ? 'text-yellow-600' : 'text-faint'
+                      isProficient ? 'text-brass-text' : 'text-faint'
                     }`}
                   >
                     E
