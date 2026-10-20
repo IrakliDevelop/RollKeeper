@@ -152,6 +152,24 @@ async function checkEditing(canvasElement: HTMLElement) {
   await expect(speed).toHaveValue('120');
   await userEvent.tab();
   await expect(score).toHaveFocus();
+
+  // Tabular figures in both modes: the field keeps the plain text's width
+  // for digits that differ in proportional width, so a mode switch moves
+  // nothing.
+  await expect(getComputedStyle(speed).fontVariantNumeric).toContain(
+    'tabular-nums'
+  );
+  await userEvent.click(speed);
+  await userEvent.keyboard('11{Enter}');
+  await expect(speed).toHaveValue('11');
+  const plain = within(canvas.getByTestId('speed-view')).getByText('11');
+  await expect(getComputedStyle(plain).fontVariantNumeric).toContain(
+    'tabular-nums'
+  );
+  await expect(speed.getBoundingClientRect().width).toBeCloseTo(
+    plain.getBoundingClientRect().width,
+    0
+  );
 }
 
 export const Editing: Story = {

@@ -52,7 +52,9 @@ const FIELD = cn(
  * focuses its field.
  */
 const HIT_AREA = cn(
-  'relative inline-block',
+  // The field's [font:inherit] resets font-variant-numeric after BOX's
+  // tabular-nums, so the label carries it for the field to inherit.
+  'relative inline-block tabular-nums',
   "after:absolute after:top-1/2 after:left-1/2 after:size-full after:min-h-6 after:min-w-6 after:-translate-x-1/2 after:-translate-y-1/2 after:content-['']",
   'pointer-coarse:after:min-h-11 pointer-coarse:after:min-w-11'
 );

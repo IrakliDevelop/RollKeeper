@@ -209,6 +209,7 @@ describe('InPlaceField', () => {
     expect(field()).toHaveClass('relative', 'z-[1]');
     expect(target).toHaveClass(
       'relative',
+      'tabular-nums',
       'after:min-h-6',
       'after:min-w-6',
       'pointer-coarse:after:min-h-11',
