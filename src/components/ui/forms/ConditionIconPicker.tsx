@@ -10,12 +10,14 @@ import * as Popover from '@radix-ui/react-popover';
 import type { LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import {
   CONDITION_ICON_NAMES,
   CONDITION_ICON_REGISTRY,
   DEFAULT_CONDITION_ICON_BY_KIND,
   type ConditionIconName,
 } from '@/utils/conditionIconRegistry';
+import { cn } from '@/utils/cn';
 
 export interface ConditionIconPickerProps {
   value: ConditionIconName;
@@ -72,7 +74,7 @@ export function ConditionIconPicker({
       <Popover.Portal>
         <Popover.Content
           sideOffset={4}
-          className="bg-surface-raised border-divider z-50 w-64 rounded-lg border p-2 shadow-lg"
+          className={cn(OVERLAY_SURFACE, 'z-50 w-64 p-2')}
         >
           <Input
             value={query}

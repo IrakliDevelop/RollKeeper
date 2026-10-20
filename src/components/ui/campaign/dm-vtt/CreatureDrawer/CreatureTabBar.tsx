@@ -26,7 +26,7 @@ export interface CreatureTabBarProps {
  */
 export function CreatureTabBar({ tabs, activeTab }: CreatureTabBarProps) {
   return (
-    <Tabs.List className="border-divider bg-surface-raised sticky top-0 z-10 flex gap-1 overflow-x-auto border-b px-5">
+    <Tabs.List className="border-divider bg-surface-elevated sticky top-0 z-10 flex gap-1 overflow-x-auto border-b px-5">
       {tabs.map(tab => {
         const Icon = tab.icon;
         const active = tab.id === activeTab;

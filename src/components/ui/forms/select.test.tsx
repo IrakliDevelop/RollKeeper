@@ -1,7 +1,14 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { SelectField, SelectItem } from './select';
+import {
+  Select,
+  SelectContent,
+  SelectField,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './select';
 
 describe('SelectField', () => {
   afterEach(cleanup);
@@ -62,5 +69,62 @@ describe('SelectField', () => {
     const trigger = screen.getByRole('combobox');
     expect(trigger).not.toHaveAttribute('aria-invalid');
     expect(trigger).toHaveAccessibleDescription('Sets your hit die');
+  });
+});
+
+describe('Select menu', () => {
+  afterEach(cleanup);
+
+  function renderOpenMenu() {
+    render(
+      <Select defaultOpen defaultValue="medium">
+        <SelectTrigger aria-label="Size">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="small">Small</SelectItem>
+          <SelectItem value="medium">Medium</SelectItem>
+        </SelectContent>
+      </Select>
+    );
+  }
+
+  it('floats on the elevated surface with a 1px divider, 6px radius and the overlay shadow', () => {
+    renderOpenMenu();
+
+    const menu = screen.getByRole('listbox');
+    expect(menu).toHaveClass(
+      'bg-surface-elevated',
+      'border',
+      'border-divider',
+      'rounded-md',
+      'shadow-overlay',
+      'duration-180'
+    );
+    expect(menu.className).not.toMatch(/border-2|shadow-lg|rounded-lg/);
+  });
+
+  it('gives the highlighted option a brass inset outline instead of none', () => {
+    renderOpenMenu();
+
+    const option = screen.getByRole('option', { name: 'Small' });
+    expect(option).toHaveClass(
+      'outline-hidden',
+      'data-[highlighted]:bg-surface-hover',
+      'data-[highlighted]:outline-2',
+      'data-[highlighted]:-outline-offset-2',
+      'data-[highlighted]:outline-ring',
+      'data-[highlighted]:outline-solid'
+    );
+  });
+
+  it('marks the chosen option with a brass check', () => {
+    renderOpenMenu();
+
+    const check = screen
+      .getByRole('option', { name: 'Medium' })
+      .querySelector('svg');
+    expect(check).toHaveClass('text-brass-text');
+    expect(check?.getAttribute('class')).not.toMatch(/emerald/);
   });
 });

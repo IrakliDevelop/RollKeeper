@@ -73,7 +73,8 @@ export function SideDrawer({
           onEscapeKeyDown={onEscapeKeyDown}
           aria-describedby={undefined}
           className={cn(
-            'bg-surface-raised border-divider text-body fixed top-0 right-0 bottom-0 z-40 flex w-[min(580px,100vw)] flex-col border-l shadow-2xl xl:w-[min(640px,100vw)]',
+            // Edge-attached, so no radius; otherwise the floating-layer look.
+            'bg-surface-elevated border-divider text-body shadow-overlay fixed top-0 right-0 bottom-0 z-40 flex w-[min(580px,100vw)] flex-col border-l xl:w-[min(640px,100vw)]',
             className
           )}
         >

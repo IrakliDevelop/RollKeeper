@@ -84,4 +84,20 @@ describe('ConditionIconPicker', () => {
       })
     ).toBeTruthy();
   });
+
+  it('floats the icon grid on the elevated surface with the overlay shadow', () => {
+    render(<Harness onPick={vi.fn()} />);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Condition icon: skull' })
+    );
+
+    const popover = screen.getByRole('dialog');
+    expect(popover).toHaveClass(
+      'bg-surface-elevated',
+      'border-divider',
+      'rounded-md',
+      'shadow-overlay'
+    );
+    expect(popover.className).not.toMatch(/shadow-lg|rounded-lg/);
+  });
 });

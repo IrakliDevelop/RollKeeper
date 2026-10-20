@@ -8,6 +8,8 @@ import { useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { EmojiPicker } from 'frimousse';
 import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { cn } from '@/utils/cn';
 
 export type MarkerMode = 'dot' | 'emoji';
 
@@ -86,7 +88,7 @@ export function MarkerField({
             <Popover.Portal>
               <Popover.Content
                 sideOffset={4}
-                className="bg-surface-raised border-divider z-50 rounded-lg border shadow-lg"
+                className={cn(OVERLAY_SURFACE, 'z-50')}
               >
                 <EmojiPicker.Root
                   columns={9}
