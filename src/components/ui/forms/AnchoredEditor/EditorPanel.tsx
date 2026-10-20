@@ -21,7 +21,8 @@ type EditorPanelProps = Omit<
 
 /**
  * A stepper at its bound is aria-disabled, not disabled: a disabled button
- * drops keyboard focus to the page. Stepping past a bound is a no-op anyway.
+ * drops keyboard focus to the page. A dimmed stepper does nothing when
+ * pressed, even for a typed draft past the bound (the clamp would move it).
  */
 const STEPPER =
   'w-9 shrink-0 p-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50';
@@ -71,7 +72,9 @@ export function EditorPanel({
             className={STEPPER}
             aria-label={`Decrease ${label}`}
             aria-disabled={atMin || undefined}
-            onClick={() => field.step(-1)}
+            onClick={() => {
+              if (!atMin) field.step(-1);
+            }}
           >
             <Minus className="h-4 w-4" aria-hidden />
           </Button>
@@ -97,7 +100,9 @@ export function EditorPanel({
             className={STEPPER}
             aria-label={`Increase ${label}`}
             aria-disabled={atMax || undefined}
-            onClick={() => field.step(1)}
+            onClick={() => {
+              if (!atMax) field.step(1);
+            }}
           >
             <Plus className="h-4 w-4" aria-hidden />
           </Button>

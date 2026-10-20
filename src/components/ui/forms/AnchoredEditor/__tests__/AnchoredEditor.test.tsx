@@ -229,6 +229,21 @@ describe('AnchoredEditor', () => {
     expect(field()).toHaveAccessibleDescription('Enter a number from 1 to 30.');
   });
 
+  it('leaves an out-of-range draft alone when a dimmed stepper is pressed', async () => {
+    const onSave = vi.fn();
+    render(<Harness onSave={onSave} />);
+    const user = await openEditor();
+
+    await user.clear(field());
+    await user.type(field(), '45');
+    const increase = screen.getByRole('button', { name: 'Increase Strength' });
+    expect(increase).toHaveAttribute('aria-disabled', 'true');
+    await user.click(increase);
+
+    expect(field()).toHaveValue('45');
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it('passes the draft to the context', async () => {
     render(<Harness />);
     const user = await openEditor();
