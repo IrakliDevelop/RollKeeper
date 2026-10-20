@@ -81,4 +81,16 @@ describe('cn', () => {
       );
     });
   });
+
+  describe('shadow-overlay', () => {
+    it('is replaced by a later shadow size', () => {
+      expect(cn('shadow-overlay', 'shadow-none')).toBe('shadow-none');
+    });
+
+    it('stays next to a later shadow colour', () => {
+      expect(cn('shadow-overlay', 'shadow-black/20')).toBe(
+        'shadow-overlay shadow-black/20'
+      );
+    });
+  });
 });

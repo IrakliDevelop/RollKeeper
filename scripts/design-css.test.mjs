@@ -30,6 +30,14 @@ test('popover-in keyframes ship with the stylesheet', async () => {
   assert.match(output, /animation:\s*popover-in 150ms ease-out/);
 });
 
+test('toast countdown keyframes ship with the stylesheet', async () => {
+  const output = await buildCss([]);
+  assert.match(
+    output,
+    /@keyframes toast-countdown\s*\{\s*from\s*\{\s*transform:\s*scaleX\(1\)/
+  );
+});
+
 test('enter and exit animation utilities are generated', async () => {
   const output = await buildCss([
     'animate-in',
@@ -76,6 +84,23 @@ test('surface-elevated has its own felt and paper values', async () => {
   assert.match(
     ruleFor(output, '.bg-surface-elevated'),
     /background-color:\s*var\(--surface-elevated\)/
+  );
+});
+
+test('shadow-overlay is the one floating-layer shadow, per theme', async () => {
+  const css = await readGlobalsCss();
+  assert.match(
+    readBlock(css, PAPER_SELECTOR)['--overlay-shadow'],
+    /rgb\(28 36 32 \/ 0\.16\)/
+  );
+  assert.match(
+    readBlock(css, FELT_SELECTOR)['--overlay-shadow'],
+    /rgb\(0 0 0 \/ 0\.5\)/
+  );
+  const output = await buildCss(['shadow-overlay']);
+  assert.match(
+    ruleFor(output, '.shadow-overlay'),
+    /--tw-shadow:\s*var\(--overlay-shadow\)/
   );
 });
 

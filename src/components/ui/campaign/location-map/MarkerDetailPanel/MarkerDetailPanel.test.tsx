@@ -809,7 +809,7 @@ describe('MarkerDetailPanel', () => {
    * to a `Button`'s `className` (e.g. `bg-gray-800`).
    *
    * `[role="dialog"]` already excludes the shared `DialogOverlay` scrim
-   * (`bg-black/50`), a sibling node outside this component's authored
+   * (`bg-surface-overlay`), a sibling node outside this component's authored
    * markup.
    */
   function dialogHtmlForColorScan(dialog: Element): string {

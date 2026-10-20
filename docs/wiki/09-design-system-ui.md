@@ -10,7 +10,7 @@ directory layout and where things deviate from the documented pattern.
 | Dir | Contents |
 |---|---|
 | `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
-| `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `Tabs`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
+| `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
 | `feedback/` | `dialog` (Radix-based, `dialog-new` internally), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`. Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
 | `primitives/` | `design-tokens.ts`, `animations.ts`, `variants.ts`, `Tooltip.tsx` — the actual token source `CLAUDE.md` refers to |
 | `game/` | Core D&D mechanics widgets: dice roller, conditions manager, currency, equipment, inventory (with `conditions/`, `equipment/`, `inventory/` subfolders) |
@@ -71,15 +71,41 @@ overlap. A bare `Checkbox`, `Switch` or `RadioGroupItem` (no `label` prop)
 stacked in a list needs its row to be at least 44px on coarse pointers at the
 call site (`pointer-coarse:min-h-11`), or neighbouring hit areas overlap.
 
-Storybook can't switch to a coarse pointer, so stories call
-`emulateCoarsePointer()` (`src/test/storybook/`) to copy the coarse rules in and
+Storybook can't switch to a coarse pointer or to reduced motion, so stories
+call `emulateCoarsePointer()` or `emulateReducedMotion()`
+(`src/test/storybook/emulateCoarsePointer.ts`) to copy those media rules in and
 read computed styles.
+
+## Floating layers
+
+Only things that float over the page get a shadow: menus, popovers, tooltips,
+dialogs, drawers and toasts. They share `OVERLAY_SURFACE` from
+`src/components/ui/primitives/variants.ts`: `surface-elevated`, a 1px `divider`
+border, the 6px object radius and `shadow-overlay` (the one overlay shadow,
+defined per theme as `--overlay-shadow` in `globals.css`). `SideDrawer` is
+attached to the screen edge, so it takes the same surface, border and shadow
+without the radius. Dialogs dim the page with a plain `surface-overlay` scrim,
+no blur, and open and close over 180ms. Raised blocks inside an elevated layer
+look sunken until the screen sweeps flatten them; don't add new ones.
+
+A `SelectItem` shows the keyboard highlight as `surface-hover` plus a 2px brass
+outline inside the row, because `surface-hover` alone barely shows on felt's
+elevated surface. Toasts add a 3px left rule in their role colour (verdigris for
+success and rests, blood for errors and damage, a neutral rule otherwise), a
+countdown bar that reduced motion hides, and a `role="status"` region that stays
+mounted so each new toast is announced.
+
+`BookmarkTabs` (the character sheet) and the VTT drawer tab bars are text tabs
+on a 1px divider rule; the active tab has heading text and a 2px brass
+underline. In `BookmarkTabs`, the arrow keys, Home and End move to a tab and
+open it.
 
 ## Design ratchet
 
 `npm run design:ci` (run in CI) counts retired visual patterns per file:
 gradients, hover scale, large shadows, backdrop blur, hue-named accents, raw
-Tailwind hues, uppercase labels, `Sparkles`, and `type="number"`. A file's count
+Tailwind hues, uppercase labels, `Sparkles`, `type="number"`, and
+`shadow-overlay` outside the floating-layer primitives. A file's count
 may only go down. After removing patterns, run `npm run design:baseline` to lock
 in the lower counts.
 
@@ -88,4 +114,5 @@ should encode meaning, colour comes from role tokens rather than hue names, and
 numbers use the in-place number field instead of native number inputs. The exact
 pattern list and regexes live in `PATTERNS` in `scripts/design-ratchet.mjs`.
 `src/utils/hpColor.ts` is allow-listed for raw hue classes (its raw fills are
-intentional).
+intentional), and `variants.ts` (`OVERLAY_SURFACE`) and `SideDrawer.tsx` for
+`shadow-overlay`.

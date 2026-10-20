@@ -9,7 +9,7 @@
 import * as React from 'react';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/utils/cn';
-import { inputVariants } from '../primitives/variants';
+import { inputVariants, OVERLAY_SURFACE } from '../primitives/variants';
 
 export interface AutocompleteOption {
   value: string;
@@ -106,6 +106,8 @@ export function Autocomplete({
         <button
           type="button"
           className="text-muted hover:text-heading absolute top-1/2 right-3 -translate-y-1/2 disabled:opacity-50"
+          aria-label="Show options"
+          aria-expanded={isOpen}
           onClick={() => {
             setIsOpen(!isOpen);
             if (!isOpen) {
@@ -122,7 +124,12 @@ export function Autocomplete({
       </div>
 
       {isOpen && (
-        <div className="border-divider-strong bg-surface-raised absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-lg border-2 shadow-lg">
+        <div
+          className={cn(
+            OVERLAY_SURFACE,
+            'absolute z-50 mt-1 max-h-60 w-full overflow-auto'
+          )}
+        >
           {filteredOptions.length === 0 ? (
             <div className="text-body px-3 py-2 text-sm">No results found</div>
           ) : (
@@ -132,16 +139,14 @@ export function Autocomplete({
                   <button
                     type="button"
                     className={cn(
-                      'hover:bg-surface-hover flex w-full items-center justify-between px-3 py-2 text-left text-sm transition-colors',
-                      'text-heading font-medium',
-                      option.value === value &&
-                        'bg-accent-emerald-bg text-accent-emerald-text hover:bg-accent-emerald-bg-strong'
+                      'hover:bg-surface-hover text-heading flex w-full items-center justify-between px-3 py-2 text-left text-sm font-medium transition-colors duration-120 ease-out',
+                      'focus-visible:outline-ring focus-visible:outline-2 focus-visible:-outline-offset-2'
                     )}
                     onClick={() => handleSelect(option.value)}
                   >
                     <span>{option.label}</span>
                     {option.value === value && (
-                      <Check size={16} className="text-emerald-600" />
+                      <Check size={16} className="text-brass-text" />
                     )}
                   </button>
                 </li>

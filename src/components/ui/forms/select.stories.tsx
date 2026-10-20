@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import {
   Mail,
   Save,
@@ -328,4 +328,86 @@ export const StatesDark: Story = {
   render: () => <SelectStates />,
   parameters: { a11y: { test: 'error' } },
   globals: { theme: 'dark' },
+};
+
+// Computed colours per theme: the menu surface, the brass outline (ring)
+// and the brass check mark.
+const MENU_COLOURS = {
+  paper: {
+    elevated: 'rgb(251, 251, 248)',
+    ring: 'rgb(160, 123, 44)',
+    check: 'rgb(122, 91, 23)',
+  },
+  felt: {
+    elevated: 'rgb(31, 43, 37)',
+    ring: 'rgb(200, 161, 75)',
+    check: 'rgb(200, 161, 75)',
+  },
+};
+
+function SizeSelect() {
+  return (
+    <SelectField label="Size" defaultValue="medium">
+      <SelectItem value="small">Small</SelectItem>
+      <SelectItem value="medium">Medium</SelectItem>
+      <SelectItem value="large">Large</SelectItem>
+    </SelectField>
+  );
+}
+
+async function checkMenu(
+  canvasElement: HTMLElement,
+  theme: keyof typeof MENU_COLOURS
+) {
+  const colours = MENU_COLOURS[theme];
+  const canvas = within(canvasElement);
+  const page = within(canvasElement.ownerDocument.body);
+  const trigger = canvas.getByRole('combobox', { name: 'Size' });
+
+  trigger.focus();
+  await userEvent.keyboard('{Enter}');
+  const menu = await page.findByRole('listbox');
+  const style = getComputedStyle(menu);
+  await expect(style.borderTopLeftRadius).toBe('6px');
+  await expect(style.borderTopWidth).toBe('1px');
+  await expect(style.boxShadow).not.toBe('none');
+  await waitFor(() =>
+    expect(getComputedStyle(menu).backgroundColor).toBe(colours.elevated)
+  );
+
+  const chosen = page.getByRole('option', { name: 'Medium' });
+  await expect(getComputedStyle(chosen.querySelector('svg')!).color).toBe(
+    colours.check
+  );
+
+  // The keyboard highlight is a 2px brass outline inside the row.
+  await userEvent.keyboard('{ArrowDown}');
+  const large = page.getByRole('option', { name: 'Large' });
+  await waitFor(() => expect(large).toHaveAttribute('data-highlighted'));
+  await waitFor(() => {
+    const outline = getComputedStyle(large);
+    expect(outline.outlineStyle).toBe('solid');
+    expect(outline.outlineWidth).toBe('2px');
+    expect(outline.outlineOffset).toBe('-2px');
+    expect(outline.outlineColor).toBe(colours.ring);
+  });
+  await expect(getComputedStyle(chosen).outlineStyle).toBe('none');
+
+  await userEvent.keyboard('{Enter}');
+  await waitFor(() => expect(page.queryByRole('listbox')).toBeNull());
+  await expect(trigger).toHaveTextContent('Large');
+  await expect(trigger).toHaveFocus();
+}
+
+export const Menu: Story = {
+  render: () => <SizeSelect />,
+  parameters: { a11y: { test: 'error' } },
+  play: ({ canvasElement }) => checkMenu(canvasElement, 'paper'),
+};
+
+export const MenuDark: Story = {
+  render: () => <SizeSelect />,
+  parameters: { a11y: { test: 'error' } },
+  globals: { theme: 'dark' },
+  play: ({ canvasElement }) => checkMenu(canvasElement, 'felt'),
 };

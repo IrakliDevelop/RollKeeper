@@ -1,11 +1,11 @@
 /**
- * Storybook's browser can't switch to a coarse pointer, so this copies every
- * `@media (pointer: coarse)` rule on the page into an unconditional <style>
- * element, keeping each rule's cascade layer and, for Tailwind's nested
- * variants, its parent selector. Computed styles then show what a touch
- * device would get. Returns a function that removes the copy.
+ * Storybook's browser can't switch to a coarse pointer or to reduced motion,
+ * so this copies every `@media` rule whose query matches into an
+ * unconditional <style> element, keeping each rule's cascade layer and, for
+ * Tailwind's nested variants, its parent selector. Computed styles then show
+ * what that device would get. Returns a function that removes the copy.
  */
-export function emulateCoarsePointer(): () => void {
+function emulateMedia(query: RegExp, name: string): () => void {
   const chunks: string[] = [];
 
   const wrap = (text: string, layer: string | null) =>
@@ -18,10 +18,10 @@ export function emulateCoarsePointer(): () => void {
   ) => {
     for (const rule of Array.from(rules)) {
       if (rule instanceof CSSLayerBlockRule) {
-        const name = layer ? `${layer}.${rule.name}` : rule.name;
-        visit(rule.cssRules, name, parentSelector);
+        const layerName = layer ? `${layer}.${rule.name}` : rule.name;
+        visit(rule.cssRules, layerName, parentSelector);
       } else if (rule instanceof CSSMediaRule) {
-        if (/pointer:\s*coarse/.test(rule.media.mediaText)) {
+        if (query.test(rule.media.mediaText)) {
           const body = Array.from(rule.cssRules)
             .map(inner => inner.cssText)
             .join('\n');
@@ -48,8 +48,18 @@ export function emulateCoarsePointer(): () => void {
   }
 
   const style = document.createElement('style');
-  style.dataset.emulatedPointer = 'coarse';
+  style.dataset.emulatedMedia = name;
   style.textContent = chunks.join('\n');
   document.head.appendChild(style);
   return () => style.remove();
+}
+
+/** Copies the `(pointer: coarse)` rules: what an iPad would get. */
+export function emulateCoarsePointer(): () => void {
+  return emulateMedia(/pointer:\s*coarse/, 'coarse-pointer');
+}
+
+/** Copies the `(prefers-reduced-motion: reduce)` rules. */
+export function emulateReducedMotion(): () => void {
+  return emulateMedia(/prefers-reduced-motion:\s*reduce/, 'reduced-motion');
 }

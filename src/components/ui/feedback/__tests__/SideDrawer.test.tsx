@@ -25,6 +25,25 @@ describe('SideDrawer', () => {
     expect(screen.getByText('body')).toBeInTheDocument();
   });
 
+  it('floats on the elevated surface with the overlay shadow and no radius', () => {
+    render(
+      <SideDrawer open onOpenChange={vi.fn()} title="Kaelen sheet">
+        <p>body</p>
+      </SideDrawer>
+    );
+
+    const drawer = screen.getByRole('dialog', { name: 'Kaelen sheet' });
+    expect(drawer).toHaveClass(
+      'bg-surface-elevated',
+      'border-l',
+      'border-divider',
+      'shadow-overlay'
+    );
+    expect(drawer.className).not.toMatch(
+      /shadow-2xl|bg-surface-raised|rounded/
+    );
+  });
+
   it('renders nothing when closed', () => {
     render(
       <SideDrawer open={false} onOpenChange={vi.fn()} title="t">

@@ -36,7 +36,7 @@ export function SheetTabBar({ tabs, activeTab }: SheetTabBarProps) {
             className={cn(
               'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors',
               active
-                ? 'border-accent-emerald-text-muted text-heading'
+                ? 'border-brass-fill text-heading'
                 : 'text-muted border-transparent'
             )}
           >

@@ -40,6 +40,8 @@ function pairs() {
   for (const role of ['brass', 'blood']) {
     add(`${role}-text`, 'surface-hover', TEXT);
   }
+  // The keyboard highlight of a menu item: a brass outline on the row hover.
+  add('ring', 'surface-hover', NON_TEXT);
   for (const role of ROLES) add(`${role}-text`, `${role}-bg`, TEXT);
   // Ghost Buttons inside a warning banner (StorageBlockedBanner).
   add('heading', 'ember-bg', TEXT);
