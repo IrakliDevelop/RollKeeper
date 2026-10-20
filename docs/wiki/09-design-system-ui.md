@@ -9,7 +9,7 @@ directory layout and where things deviate from the documented pattern.
 
 | Dir | Contents |
 |---|---|
-| `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
+| `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `InPlaceField` (see [Editing numbers](#editing-numbers)), `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
 | `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
 | `feedback/` | `dialog` (Radix-based, `dialog-new` internally), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`. Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
 | `primitives/` | `design-tokens.ts`, `animations.ts`, `variants.ts`, `Tooltip.tsx` — the actual token source `CLAUDE.md` refers to |
@@ -103,6 +103,31 @@ mounted so each new toast is announced.
 on a 1px divider rule; the active tab has heading text and a 2px brass
 underline. In `BookmarkTabs`, the arrow keys, Home and End move to a tab and
 open it.
+
+## Editing numbers
+
+Number fields don't show spin buttons: a global rule in `globals.css` hides
+them on the remaining native `type="number"` inputs (arrow keys still step).
+New number fields use `NumberInput`/`NumberField`, or the editing primitive
+below. It keeps a draft through `useNumberField({ live: false })`
+(`commit()`, `cancel()`, `step()`, `validity`), clamps to `min`/`max` when the
+value is saved, and announces out-of-range drafts
+(`src/utils/numberFieldMessage.ts`).
+
+- `InPlaceField` (`forms/InPlaceField`) edits a number where it is shown, in
+  the surrounding text's font. The cue is an underline inside the box (1.5px
+  `input-border` at rest, 2px brass on focus, 2px blood while out of range);
+  it is two digits wide at least and grows with the value. Enter or blur
+  saves, Escape puts the old value back, ↑/↓ step by 1 and Shift+↑/↓ by 10.
+  With `editing={false}` it is plain text with no tab stop. On touch it is at
+  least 16px in edit mode. A wrapping `<label>` gives it a tap target of at
+  least 24px (44px on touch) without changing its box. That target reaches
+  past the digits and sits above plain neighbours, so keep other tap
+  targets (buttons, another field's digits) about 12px clear of it on
+  touch layouts.
+
+It isn't used by a screen yet; it arrives with the sheet's play and edit
+modes.
 
 ## Design ratchet
 
