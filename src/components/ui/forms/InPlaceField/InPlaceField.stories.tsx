@@ -160,6 +160,7 @@ async function checkEditing(canvasElement: HTMLElement) {
     'tabular-nums'
   );
   await userEvent.click(speed);
+  await waitFor(() => expect(speed.selectionEnd).toBe(3));
   await userEvent.keyboard('11{Enter}');
   await expect(speed).toHaveValue('11');
   const plain = within(canvas.getByTestId('speed-view')).getByText('11');
