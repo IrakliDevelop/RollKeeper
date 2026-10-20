@@ -297,3 +297,15 @@ test('a light wrapper inside a felt page re-declares every paper literal', async
     'felt declares literals the paper block lacks'
   );
 });
+
+test('number fields hide their spin buttons', async () => {
+  const output = await buildCss([]);
+  assert.match(
+    output,
+    /input\[type=['"]?number['"]?\]\s*\{\s*appearance:\s*textfield/
+  );
+  assert.match(
+    output,
+    /input\[type=['"]?number['"]?\]::-webkit-inner-spin-button,\s*input\[type=['"]?number['"]?\]::-webkit-outer-spin-button\s*\{\s*appearance:\s*none;\s*margin:\s*0/
+  );
+});

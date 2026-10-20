@@ -608,6 +608,18 @@ button {
     opacity: 1;
   }
 
+  /* No spin buttons on number fields: the arrows are a few pixels tall and
+     invite stray changes. Arrow keys still step. */
+  input[type='number'] {
+    appearance: textfield;
+  }
+
+  input[type='number']::-webkit-inner-spin-button,
+  input[type='number']::-webkit-outer-spin-button {
+    appearance: none;
+    margin: 0;
+  }
+
   /* Touch: a field without a size utility is at least 16px, so iOS Safari
      doesn't zoom in on focus. 1em is the inherited size. */
   @media (pointer: coarse) {

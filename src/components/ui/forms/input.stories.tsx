@@ -349,3 +349,28 @@ export const CoarsePointer: Story = {
     await expect(size('Small field')).toBe('14px');
   },
 };
+
+/**
+ * A raw number field, as the 20 not-yet-migrated call sites render one: the
+ * global rule hides the spin buttons. The arrow keys still step (a native
+ * default action, which synthetic key events don't trigger).
+ */
+export const NumberWithoutSpinButtons: Story = {
+  render: () => (
+    <input
+      type="number"
+      aria-label="Initiative"
+      defaultValue={12}
+      className="w-24"
+    />
+  ),
+  parameters: { a11y: { test: 'error' } },
+  play: async ({ canvasElement }) => {
+    const field = within(canvasElement).getByLabelText(
+      'Initiative'
+    ) as HTMLInputElement;
+    // Computed styles can't reach the spin-button pseudo-element; the CSS
+    // test pins that rule and the Chrome gate looks at it.
+    await expect(getComputedStyle(field).appearance).toBe('textfield');
+  },
+};
