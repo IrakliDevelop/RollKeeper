@@ -309,3 +309,18 @@ test('number fields hide their spin buttons', async () => {
     /input\[type=['"]?number['"]?\]::-webkit-inner-spin-button,\s*input\[type=['"]?number['"]?\]::-webkit-outer-spin-button\s*\{\s*appearance:\s*none;\s*margin:\s*0/
   );
 });
+
+test('Radix Dialog and Popover stay pinned to the same exact version', async () => {
+  // The anchored editor opens popovers inside dialogs; mismatched versions
+  // make a nested popover close itself.
+  const read = async file =>
+    JSON.parse(await readFile(path.join(repositoryRoot, file), 'utf8'));
+  const pkg = await read('package.json');
+  const lock = await read('package-lock.json');
+  const dialog = pkg.dependencies['@radix-ui/react-dialog'];
+  assert.match(dialog, /^\d+\.\d+\.\d+$/, 'exact pin, no range');
+  assert.equal(pkg.dependencies['@radix-ui/react-popover'], dialog);
+  const version = name => lock.packages[`node_modules/${name}`]?.version;
+  assert.equal(version('@radix-ui/react-dialog'), dialog);
+  assert.equal(version('@radix-ui/react-popover'), dialog);
+});

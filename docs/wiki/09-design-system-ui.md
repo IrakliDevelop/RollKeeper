@@ -9,7 +9,7 @@ directory layout and where things deviate from the documented pattern.
 
 | Dir | Contents |
 |---|---|
-| `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `InPlaceField` (see [Editing numbers](#editing-numbers)), `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
+| `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `InPlaceField` and `AnchoredEditor` (see [Editing numbers](#editing-numbers)), `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomDropdown`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
 | `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
 | `feedback/` | `dialog` (Radix-based, `dialog-new` internally), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`. Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
 | `primitives/` | `design-tokens.ts`, `animations.ts`, `variants.ts`, `Tooltip.tsx` — the actual token source `CLAUDE.md` refers to |
@@ -108,10 +108,10 @@ open it.
 
 Number fields don't show spin buttons: a global rule in `globals.css` hides
 them on the remaining native `type="number"` inputs (arrow keys still step).
-New number fields use `NumberInput`/`NumberField`, or the editing primitive
-below. It keeps a draft through `useNumberField({ live: false })`
-(`commit()`, `cancel()`, `step()`, `validity`), clamps to `min`/`max` when the
-value is saved, and announces out-of-range drafts
+New number fields use `NumberInput`/`NumberField`, or one of the two editing
+primitives below. Both keep a draft through `useNumberField({ live: false })`
+(`commit()`, `cancel()`, `step()`, `validity`), clamp to `min`/`max` when the
+value is saved, and announce out-of-range drafts with the same messages
 (`src/utils/numberFieldMessage.ts`).
 
 - `InPlaceField` (`forms/InPlaceField`) edits a number where it is shown, in
@@ -125,8 +125,20 @@ value is saved, and announces out-of-range drafts
   past the digits and sits above plain neighbours, so keep other tap
   targets (buttons, another field's digits) about 12px clear of it on
   touch layouts.
+- `AnchoredEditor` (`forms/AnchoredEditor`) edits a number inside an
+  ornament (a medallion, the AC shield) or in too little room. It wraps the
+  ornament as its trigger and, in edit mode, gives it a dashed outline
+  (`EDITABLE_ORNAMENT`). From 640px it opens a popover next to the trigger,
+  narrower a bottom sheet that clears the home indicator and rises above the
+  on-screen keyboard. It holds the field, −/+ steppers (44px on touch), an
+  optional `context` (a node, or a function of the number being typed) and
+  Save/Cancel. Enter saves; Escape, Cancel or a tap outside drops the draft;
+  focus goes back to the trigger. The popover is modal, so Tab stays inside
+  and a tap outside doesn't also press what is under it. It works inside a dialog: Radix Dialog and
+  Popover are pinned to the same exact version (a test checks this), or a
+  nested popover closes itself.
 
-It isn't used by a screen yet; it arrives with the sheet's play and edit
+Neither is used by a screen yet; they arrive with the sheet's play and edit
 modes.
 
 ## Design ratchet
