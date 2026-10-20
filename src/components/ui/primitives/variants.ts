@@ -243,3 +243,11 @@ export type HelperTextVariants = VariantProps<typeof helperTextVariants>;
  */
 export const OVERLAY_SURFACE =
   'rounded-md border border-divider bg-surface-elevated shadow-overlay';
+
+/**
+ * Edit-mode cue on an ornament (medallion, AC shield) that opens an anchored
+ * editor: a faint dashed outline, always shown so touch users see it too.
+ * Keyboard focus swaps it for the solid brass outline.
+ */
+export const EDITABLE_ORNAMENT =
+  'outline-1 outline-dashed outline-offset-2 outline-input-border focus-visible:outline-2 focus-visible:outline-solid focus-visible:outline-ring';

@@ -60,47 +60,112 @@ const sizeClasses = {
   full: 'max-w-[95vw]',
 };
 
+/**
+ * Remembers what had focus when the dialog opened and puts focus back there
+ * when it closes. Radix only returns focus to a `DialogTrigger`, so a
+ * controlled dialog opened from a plain button would otherwise drop focus
+ * on the page. Skipped when the caller's handler already prevented the
+ * default, when the opener has gone, or when focus has already moved
+ * somewhere else (a click outside a non-modal dialog).
+ */
+function useReturnFocus(
+  onCloseAutoFocus: DialogContentProps['onCloseAutoFocus']
+) {
+  const openerRef = React.useRef<HTMLElement | null>(null);
+
+  // Keep only the first capture of each open. StrictMode re-runs the layout
+  // effect after `autoFocus` has moved focus, which would store the field.
+  const captureOpener = React.useCallback((opener: HTMLElement | null) => {
+    if (openerRef.current === null) openerRef.current = opener;
+  }, []);
+
+  const handleCloseAutoFocus = (event: Event) => {
+    const opener = openerRef.current;
+    openerRef.current = null;
+    onCloseAutoFocus?.(event);
+    if (event.defaultPrevented) return;
+    const active = document.activeElement;
+    if (!opener?.isConnected || opener === document.body) return;
+    if (active && active !== document.body) return;
+    event.preventDefault();
+    opener.focus({ preventScroll: true });
+  };
+
+  return { captureOpener, handleCloseAutoFocus };
+}
+
+/**
+ * Rendered first inside the content, so its layout effect reads the focused
+ * element before Radix moves focus in and before a child's `autoFocus`
+ * runs (Radix skips `onOpenAutoFocus` when focus is already inside).
+ */
+function OpenerCapture({
+  onCapture,
+}: {
+  onCapture: (opener: HTMLElement | null) => void;
+}) {
+  React.useLayoutEffect(() => {
+    const active = document.activeElement;
+    onCapture(active instanceof HTMLElement ? active : null);
+  }, [onCapture]);
+  return null;
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(
   (
-    { className, children, size = 'lg', showCloseButton = true, ...props },
+    {
+      className,
+      children,
+      size = 'lg',
+      showCloseButton = true,
+      onCloseAutoFocus,
+      ...props
+    },
     ref
-  ) => (
-    <DialogPortal>
-      <DialogOverlay />
-      <DialogPrimitive.Content
-        ref={ref}
-        className={cn(
-          OVERLAY_SURFACE,
-          'fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 p-6',
-          'data-[state=open]:animate-in data-[state=closed]:animate-out',
-          'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
-          'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-          'duration-180 ease-out',
-          'focus:outline-none',
-          sizeClasses[size],
-          className
-        )}
-        {...props}
-      >
-        {children}
-        {showCloseButton && (
-          <DialogPrimitive.Close asChild>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted hover:text-heading absolute top-4 right-4 min-h-[44px] min-w-[44px] p-0"
-            >
-              <X className="h-4 w-4" aria-hidden />
-              <span className="sr-only">Close</span>
-            </Button>
-          </DialogPrimitive.Close>
-        )}
-      </DialogPrimitive.Content>
-    </DialogPortal>
-  )
+  ) => {
+    const { captureOpener, handleCloseAutoFocus } =
+      useReturnFocus(onCloseAutoFocus);
+
+    return (
+      <DialogPortal>
+        <DialogOverlay />
+        <DialogPrimitive.Content
+          ref={ref}
+          className={cn(
+            OVERLAY_SURFACE,
+            'fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 p-6',
+            'data-[state=open]:animate-in data-[state=closed]:animate-out',
+            'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+            'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
+            'duration-180 ease-out',
+            'focus:outline-none',
+            sizeClasses[size],
+            className
+          )}
+          onCloseAutoFocus={handleCloseAutoFocus}
+          {...props}
+        >
+          <OpenerCapture onCapture={captureOpener} />
+          {children}
+          {showCloseButton && (
+            <DialogPrimitive.Close asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted hover:text-heading absolute top-4 right-4 min-h-[44px] min-w-[44px] p-0"
+              >
+                <X className="h-4 w-4" aria-hidden />
+                <span className="sr-only">Close</span>
+              </Button>
+            </DialogPrimitive.Close>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPortal>
+    );
+  }
 );
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
