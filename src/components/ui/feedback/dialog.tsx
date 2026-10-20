@@ -10,6 +10,8 @@
 import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { cn } from '@/utils/cn';
 
 const Dialog = DialogPrimitive.Root;
@@ -27,9 +29,10 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      'fixed inset-0 z-50 bg-black/50 backdrop-blur-sm',
+      'bg-surface-overlay fixed inset-0 z-50',
       'data-[state=open]:animate-in data-[state=closed]:animate-out',
       'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
+      'duration-180 ease-out',
       className
     )}
     {...props}
@@ -70,11 +73,12 @@ const DialogContent = React.forwardRef<
       <DialogPrimitive.Content
         ref={ref}
         className={cn(
-          'border-divider bg-surface-raised fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 rounded-xl border-2 p-6 shadow-2xl',
+          OVERLAY_SURFACE,
+          'fixed top-[50%] left-[50%] z-50 flex max-h-[90vh] w-full translate-x-[-50%] translate-y-[-50%] flex-col gap-4 p-6',
           'data-[state=open]:animate-in data-[state=closed]:animate-out',
           'data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0',
           'data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95',
-          'duration-200',
+          'duration-180 ease-out',
           'focus:outline-none',
           sizeClasses[size],
           className
@@ -83,9 +87,15 @@ const DialogContent = React.forwardRef<
       >
         {children}
         {showCloseButton && (
-          <DialogPrimitive.Close className="text-muted hover:bg-surface-hover hover:text-heading absolute top-4 right-4 min-h-[44px] min-w-[44px] rounded-lg p-2 transition-colors focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2 focus:outline-none disabled:pointer-events-none">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
+          <DialogPrimitive.Close asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-muted hover:text-heading absolute top-4 right-4 min-h-[44px] min-w-[44px] p-0"
+            >
+              <X className="h-4 w-4" aria-hidden />
+              <span className="sr-only">Close</span>
+            </Button>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Content>
@@ -125,10 +135,7 @@ const DialogTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Title
     ref={ref}
-    className={cn(
-      'text-heading text-xl leading-none font-semibold tracking-tight',
-      className
-    )}
+    className={cn('type-heading text-heading', className)}
     {...props}
   />
 ));
