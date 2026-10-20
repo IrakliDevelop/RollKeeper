@@ -19,12 +19,31 @@ export interface UseNumberFieldOptions {
   allowEmpty?: boolean;
   /** Parse as an integer (default) or a float. */
   integer?: boolean;
+  /**
+   * When true (default), every valid keystroke calls `onChange`. When false
+   * the typed text is a draft: `onChange` runs only from `commit()` (and
+   * blur), and `cancel()` throws the draft away. While a draft differs from
+   * the value, a new `value` prop doesn't overwrite it.
+   */
+  live?: boolean;
 }
+
+/** Where the typed text stands against the field's rules. */
+export type NumberFieldValidity = 'valid' | 'empty' | 'below' | 'above';
 
 export interface NumberFieldBindings {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onBlur: () => void;
+  /** Resolves the text (empty fallback, clamp), sends it and returns it. */
+  commit: () => number | undefined;
+  /** Puts the text back to the current value without sending anything. */
+  cancel: () => void;
+  /** Adds `delta` to the typed (or current) value, clamped to min/max. */
+  step: (delta: number) => void;
+  /** The typed text as a number, or undefined while it is empty or "-". */
+  draft: number | undefined;
+  validity: NumberFieldValidity;
 }
 
 const clampNumber = (n: number, min?: number, max?: number): number => {
@@ -34,13 +53,17 @@ const clampNumber = (n: number, min?: number, max?: number): number => {
   return out;
 };
 
+const toText = (value: number | undefined): string =>
+  value == null ? '' : String(value);
+
 /**
  * Manages the string buffer for a controlled numeric input so the field can be
  * emptied mid-edit without snapping back to 0 (the classic `parseInt(v) || 0`
  * bug). Spread the returned bindings onto any `<input>` (raw or design-system).
  *
  * - While typing, the raw string is preserved (empty allowed).
- * - A parsed number is emitted on every valid keystroke.
+ * - A parsed number is emitted on every valid keystroke (unless `live` is
+ *   false, see above).
  * - An emptied required field falls back to `min ?? 0` on blur; an emptied
  *   optional field (`allowEmpty`) resolves to `undefined`.
  * - Min/max are enforced on blur, not per keystroke, so intermediate values
@@ -53,17 +76,30 @@ export function useNumberField({
   max,
   allowEmpty = false,
   integer = true,
+  live = true,
 }: UseNumberFieldOptions): NumberFieldBindings {
-  const [text, setText] = useState<string>(value == null ? '' : String(value));
+  const [text, setTextState] = useState<string>(toText(value));
+  // The text as of the latest change, readable before React re-renders
+  // (a step followed by a commit in the same handler).
+  const textRef = useRef(text);
   // The last value we emitted, so we can detect external (prop-driven) changes.
   const lastEmitted = useRef<number | undefined>(value);
+  // Draft mode: the player has typed or stepped since the last commit/cancel.
+  const dirty = useRef(false);
+
+  const setText = useCallback((next: string) => {
+    textRef.current = next;
+    setTextState(next);
+  }, []);
 
   useEffect(() => {
-    if (value !== lastEmitted.current) {
-      setText(value == null ? '' : String(value));
-      lastEmitted.current = value;
-    }
-  }, [value]);
+    if (value === lastEmitted.current) return;
+    lastEmitted.current = value;
+    // Keep a draft the player is still typing; commit compares against the
+    // new value, so the draft is still sent.
+    if (!live && dirty.current) return;
+    setText(toText(value));
+  }, [value, live, setText]);
 
   const parse = useCallback(
     (raw: string): number | undefined => {
@@ -74,6 +110,15 @@ export function useNumberField({
     [integer]
   );
 
+  const emit = useCallback(
+    (next: number | undefined) => {
+      if (next === lastEmitted.current) return;
+      lastEmitted.current = next;
+      onChange(next);
+    },
+    [onChange]
+  );
+
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const raw = e.target.value;
@@ -81,47 +126,86 @@ export function useNumberField({
       const pattern = integer ? /^-?\d*$/ : /^-?\d*\.?\d*$/;
       if (raw !== '' && !pattern.test(raw)) return;
       setText(raw);
+      if (!live) {
+        dirty.current = true;
+        return;
+      }
 
       const parsed = parse(raw);
       if (parsed === undefined) {
         // Empty/partial — only propagate for optional fields; otherwise wait for blur.
-        if (allowEmpty && lastEmitted.current !== undefined) {
-          lastEmitted.current = undefined;
-          onChange(undefined);
-        }
+        if (allowEmpty) emit(undefined);
         return;
       }
       // Emit the typed value as-is; clamping happens on blur so typing isn't fought.
       lastEmitted.current = parsed;
       onChange(parsed);
     },
-    [parse, integer, allowEmpty, onChange]
+    [parse, integer, allowEmpty, live, emit, onChange, setText]
   );
 
-  const handleBlur = useCallback(() => {
-    const parsed = parse(text);
+  const commit = useCallback((): number | undefined => {
+    dirty.current = false;
+    const parsed = parse(textRef.current);
     if (parsed === undefined) {
       if (allowEmpty) {
         setText('');
-        if (lastEmitted.current !== undefined) {
-          lastEmitted.current = undefined;
-          onChange(undefined);
-        }
-      } else {
-        const fallback = clampNumber(min ?? 0, min, max);
-        setText(String(fallback));
-        lastEmitted.current = fallback;
-        onChange(fallback);
+        emit(undefined);
+        return undefined;
       }
-      return;
+      const fallback = clampNumber(min ?? 0, min, max);
+      setText(String(fallback));
+      // Always send the fallback, even if it equals the last value: the
+      // parent may hold a stale number while the field showed nothing.
+      lastEmitted.current = fallback;
+      onChange(fallback);
+      return fallback;
     }
     const clamped = clampNumber(parsed, min, max);
     setText(String(clamped));
-    if (clamped !== lastEmitted.current) {
-      lastEmitted.current = clamped;
-      onChange(clamped);
-    }
-  }, [text, parse, allowEmpty, min, max, onChange]);
+    emit(clamped);
+    return clamped;
+  }, [parse, allowEmpty, min, max, emit, onChange, setText]);
 
-  return { value: text, onChange: handleChange, onBlur: handleBlur };
+  const cancel = useCallback(() => {
+    dirty.current = false;
+    setText(toText(value));
+    lastEmitted.current = value;
+  }, [value, setText]);
+
+  const step = useCallback(
+    (delta: number) => {
+      const base = parse(textRef.current) ?? value ?? min ?? 0;
+      const next = clampNumber(base + delta, min, max);
+      setText(String(next));
+      if (live) emit(next);
+      else dirty.current = true;
+    },
+    [parse, value, min, max, live, emit, setText]
+  );
+
+  const parsedText = parse(text);
+  const validity: NumberFieldValidity =
+    parsedText === undefined
+      ? 'empty'
+      : min !== undefined && parsedText < min
+        ? 'below'
+        : max !== undefined && parsedText > max
+          ? 'above'
+          : 'valid';
+
+  const handleBlur = useCallback(() => {
+    commit();
+  }, [commit]);
+
+  return {
+    value: text,
+    onChange: handleChange,
+    onBlur: handleBlur,
+    commit,
+    cancel,
+    step,
+    draft: parsedText,
+    validity,
+  };
 }
