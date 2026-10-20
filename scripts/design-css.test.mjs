@@ -30,6 +30,14 @@ test('popover-in keyframes ship with the stylesheet', async () => {
   assert.match(output, /animation:\s*popover-in 150ms ease-out/);
 });
 
+test('toast countdown keyframes ship with the stylesheet', async () => {
+  const output = await buildCss([]);
+  assert.match(
+    output,
+    /@keyframes toast-countdown\s*\{\s*from\s*\{\s*transform:\s*scaleX\(1\)/
+  );
+});
+
 test('enter and exit animation utilities are generated', async () => {
   const output = await buildCss([
     'animate-in',

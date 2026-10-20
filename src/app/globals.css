@@ -454,6 +454,16 @@
   }
 }
 
+/* Toast countdown: the role bar shrinks to the left over the toast's life. */
+@keyframes toast-countdown {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
 @utility animate-condition-pulse {
   animation: condition-pulse 2s ease-in-out infinite;
 }
