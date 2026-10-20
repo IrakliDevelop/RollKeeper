@@ -5,6 +5,7 @@ import path from 'node:path';
 import test from 'node:test';
 
 import {
+  ALLOWLIST,
   collectCounts,
   compareToBaseline,
   formatReport,
@@ -54,6 +55,21 @@ test('allow-listed files are skipped for their pattern only', () => {
     { 'raw-hue': ['src/utils/hpColor.ts'] }
   );
   assert.deepEqual(counts, { uppercase: { 'src/utils/hpColor.ts': 1 } });
+});
+
+test('counts shadow-overlay outside the floating-layer primitives', () => {
+  assert.deepEqual(count('shadow-overlay hover:shadow-overlay shadow-md'), {
+    'overlay-shadow': { 'src/a.tsx': 2 },
+  });
+  assert.deepEqual(count('shadow-overlay-soft'), {});
+});
+
+test('the floating-layer primitives may use shadow-overlay', () => {
+  const files = [
+    'src/components/ui/primitives/variants.ts',
+    'src/components/ui/feedback/SideDrawer.tsx',
+  ].map(file => ({ path: file, text: 'border shadow-overlay' }));
+  assert.deepEqual(collectCounts(files, PATTERNS, ALLOWLIST), {});
 });
 
 test('reports per-file regressions and improvements', () => {

@@ -79,6 +79,23 @@ test('surface-elevated has its own felt and paper values', async () => {
   );
 });
 
+test('shadow-overlay is the one floating-layer shadow, per theme', async () => {
+  const css = await readGlobalsCss();
+  assert.match(
+    readBlock(css, PAPER_SELECTOR)['--overlay-shadow'],
+    /rgb\(28 36 32 \/ 0\.16\)/
+  );
+  assert.match(
+    readBlock(css, FELT_SELECTOR)['--overlay-shadow'],
+    /rgb\(0 0 0 \/ 0\.5\)/
+  );
+  const output = await buildCss(['shadow-overlay']);
+  assert.match(
+    ruleFor(output, '.shadow-overlay'),
+    /--tw-shadow:\s*var\(--overlay-shadow\)/
+  );
+});
+
 test('native controls follow the theme through color-scheme', async () => {
   const css = await readGlobalsCss();
   const scheme = selector =>

@@ -67,15 +67,26 @@ export const PATTERNS = [
     regex: /import\s*\{[^}]*\bSparkles\b[^}]*\}\s*from\s*['"]lucide-react['"]/g,
   },
   {
+    id: 'overlay-shadow',
+    description: 'shadow-overlay outside the floating-layer primitives',
+    regex: new RegExp(`${VARIANTS}shadow-overlay(?![\\w-])`, 'g'),
+  },
+  {
     id: 'number-input',
     description: 'type="number" inputs (use NumberInput)',
     regex: /type=(?:"number"|'number'|\{\s*['"]number['"]\s*\})/g,
   },
 ];
 
-// Files whose matches are intentional (hpColor.ts's raw fills are deliberate).
+// Files whose matches are intentional: hpColor.ts's raw fills are
+// deliberate, and shadow-overlay belongs to the floating-layer primitives
+// (popover, menu, tooltip, dialog, drawer, toast) and nowhere else.
 export const ALLOWLIST = {
   'raw-hue': ['src/utils/hpColor.ts'],
+  'overlay-shadow': [
+    'src/components/ui/primitives/variants.ts',
+    'src/components/ui/feedback/SideDrawer.tsx',
+  ],
 };
 
 export function collectCounts(

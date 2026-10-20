@@ -234,3 +234,12 @@ export const helperTextVariants = cva('text-sm transition-colors', {
 });
 
 export type HelperTextVariants = VariantProps<typeof helperTextVariants>;
+
+/**
+ * Floating layers (menus, popovers, tooltips, dialogs, toasts): the elevated
+ * surface, a 1px divider edge, the 6px object radius and the one overlay
+ * shadow. Nothing in the page flow takes a shadow; the design ratchet keeps
+ * shadow-overlay inside this file and SideDrawer.
+ */
+export const OVERLAY_SURFACE =
+  'rounded-md border border-divider bg-surface-elevated shadow-overlay';

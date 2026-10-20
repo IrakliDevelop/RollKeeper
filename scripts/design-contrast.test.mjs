@@ -123,7 +123,7 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
   ]) {
     assert.ok(has('inverse', `${role}-text`, 4.5), `inverse on ${role}-text`);
   }
-  assert.equal(PAIRS.length, 141);
+  assert.equal(PAIRS.length, 142);
 });
 
 test('checks selected and danger button text on the hover surface', () => {
@@ -188,4 +188,15 @@ test('a selector list is matched exactly, in order', () => {
   assert.throws(() => readBlock(lists, ':root'), /No ":root" block/);
   assert.throws(() => readBlock(lists, "[data-theme='light']"), /No "/);
   assert.throws(() => readBlock(lists, "[data-theme='light'],:root"), /No "/);
+});
+
+test('checks the menu keyboard outline against the highlighted row', () => {
+  assert.ok(
+    PAIRS.some(
+      pair =>
+        pair.foreground === 'ring' &&
+        pair.background === 'surface-hover' &&
+        pair.min === 3
+    )
+  );
 });
