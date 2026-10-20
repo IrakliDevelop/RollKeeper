@@ -18,8 +18,8 @@ function emulateMedia(query: RegExp, name: string): () => void {
   ) => {
     for (const rule of Array.from(rules)) {
       if (rule instanceof CSSLayerBlockRule) {
-        const name = layer ? `${layer}.${rule.name}` : rule.name;
-        visit(rule.cssRules, name, parentSelector);
+        const layerName = layer ? `${layer}.${rule.name}` : rule.name;
+        visit(rule.cssRules, layerName, parentSelector);
       } else if (rule instanceof CSSMediaRule) {
         if (query.test(rule.media.mediaText)) {
           const body = Array.from(rule.cssRules)

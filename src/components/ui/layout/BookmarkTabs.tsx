@@ -39,7 +39,7 @@ export interface BookmarkTabsRef {
 const PERSIST_PREFIX = 'bookmark-tabs-';
 
 const SCROLL_BUTTON =
-  'bg-surface text-muted hover:text-body absolute top-0 bottom-px z-10 flex w-8 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring pointer-coarse:w-11';
+  'bg-surface text-muted hover:text-body transition-colors duration-120 ease-out absolute top-0 bottom-px z-10 flex w-8 items-center justify-center focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring pointer-coarse:w-11';
 
 const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
   ({ tabs, defaultTab, persistKey, className = '', onTabChange }, ref) => {

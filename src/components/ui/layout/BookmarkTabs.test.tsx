@@ -151,7 +151,13 @@ describe('BookmarkTabs', () => {
 
     expect(tab('Actions')).toHaveClass('pointer-coarse:min-h-11');
     const chevron = screen.getByRole('button', { name: 'Scroll tabs right' });
-    expect(chevron).toHaveClass('pointer-coarse:w-11', 'bg-surface');
+    expect(chevron).toHaveClass(
+      'pointer-coarse:w-11',
+      'bg-surface',
+      'transition-colors',
+      'duration-120',
+      'ease-out'
+    );
     expect(chevron.className).not.toMatch(/backdrop-blur|\/90/);
   });
 });

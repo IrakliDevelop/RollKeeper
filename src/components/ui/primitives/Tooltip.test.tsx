@@ -51,7 +51,8 @@ describe('Tooltip', () => {
       'border-divider',
       'rounded-md',
       'shadow-overlay',
-      'duration-180'
+      'duration-180',
+      'ease-out'
     );
     expect(content.className).not.toMatch(/shadow-lg|rounded-lg|raised/);
   });

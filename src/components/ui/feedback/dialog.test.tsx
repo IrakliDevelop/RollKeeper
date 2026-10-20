@@ -86,7 +86,8 @@ describe('Dialog', () => {
     const dialog = renderDialog({ contentClassName: 'rounded-[18px] p-0' });
 
     expect(dialog).toHaveClass('rounded-[18px]', 'p-0');
-    expect(dialog).not.toHaveClass('rounded-md', 'p-6');
+    expect(dialog).not.toHaveClass('rounded-md');
+    expect(dialog).not.toHaveClass('p-6');
   });
 
   it('gives the close button a 44px target and the brass focus outline', () => {

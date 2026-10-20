@@ -99,7 +99,8 @@ describe('Select menu', () => {
       'border-divider',
       'rounded-md',
       'shadow-overlay',
-      'duration-180'
+      'duration-180',
+      'ease-out'
     );
     expect(menu.className).not.toMatch(/border-2|shadow-lg|rounded-lg/);
   });
