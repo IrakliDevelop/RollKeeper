@@ -87,6 +87,7 @@ attached to the screen edge, so it takes the same surface, border and shadow
 without the radius. Dialogs dim the page with a plain `surface-overlay` scrim,
 no blur, and open and close over 180ms. Raised blocks inside an elevated layer
 look sunken until the screen sweeps flatten them; don't add new ones.
+
 When a `DialogContent` closes, focus goes back to whatever had it when the
 dialog opened, so controlled dialogs opened from a plain button (no
 `DialogTrigger`) don't drop focus on the page. A caller's `onCloseAutoFocus`
@@ -116,27 +117,28 @@ value is saved, and announce out-of-range drafts with the same messages
 
 - `InPlaceField` (`forms/InPlaceField`) edits a number where it is shown, in
   the surrounding text's font. The cue is an underline inside the box (1.5px
-  `input-border` at rest, 2px brass on focus, 2px blood while out of range);
-  it is two digits wide at least and grows with the value. Enter or blur
-  saves, Escape puts the old value back, ↑/↓ step by 1 and Shift+↑/↓ by 10.
-  With `editing={false}` it is plain text with no tab stop. On touch it is at
-  least 16px in edit mode. A wrapping `<label>` gives it a tap target of at
-  least 24px (44px on touch) without changing its box. That target reaches
-  past the digits and sits above plain neighbours, so keep other tap
-  targets (buttons, another field's digits) about 12px clear of it on
-  touch layouts.
+  `input-border` at rest, 2px brass on focus, 2px blood while the draft is
+  empty or out of range); it is two digits wide at least and grows with the
+  value. Enter saves, blur saves what was typed or stepped (tabbing through
+  changes nothing), Escape puts the old value back, ↑/↓ step by 1 and
+  Shift+↑/↓ by 10. With `editing={false}` it is plain text with no tab stop.
+  On touch it is at least 16px in edit mode. A wrapping `<label>` gives it a
+  tap target of at least 24px (44px on touch) without changing its box. That
+  target reaches past the digits and sits above plain neighbours, so keep
+  other tap targets (buttons, another field's digits) about 12px clear of it
+  on touch layouts.
 - `AnchoredEditor` (`forms/AnchoredEditor`) edits a number inside an
   ornament (a medallion, the AC shield) or in too little room. It wraps the
   ornament as its trigger and, in edit mode, gives it a dashed outline
   (`EDITABLE_ORNAMENT`). From 640px it opens a popover next to the trigger,
-  narrower a bottom sheet that clears the home indicator and rises above the
-  on-screen keyboard. It holds the field, −/+ steppers (44px on touch), an
+  below that, a bottom sheet that clears the home indicator and rises above
+  the on-screen keyboard. It holds the field, −/+ steppers (44px on touch), an
   optional `context` (a node, or a function of the number being typed) and
   Save/Cancel. Enter saves; Escape, Cancel or a tap outside drops the draft;
   focus goes back to the trigger. The popover is modal, so Tab stays inside
-  and a tap outside doesn't also press what is under it. It works inside a dialog: Radix Dialog and
-  Popover are pinned to the same exact version (a test checks this), or a
-  nested popover closes itself.
+  and a tap outside doesn't also press what is under it. It works inside a
+  dialog: Radix Dialog and Popover are pinned to the same exact version (a
+  test checks this), or a nested popover closes itself.
 
 Neither is used by a screen yet; they arrive with the sheet's play and edit
 modes.

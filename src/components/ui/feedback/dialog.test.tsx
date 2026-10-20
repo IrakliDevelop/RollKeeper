@@ -206,10 +206,7 @@ describe('Dialog focus return', () => {
 
   it("leaves focus to a caller's handler that prevents the default", async () => {
     const user = userEvent.setup();
-    const onCloseAutoFocus = vi.fn((event: Event) => {
-      event.preventDefault();
-      screen.getByRole('button', { name: 'Elsewhere' }).focus();
-    });
+    const onCloseAutoFocus = vi.fn((event: Event) => event.preventDefault());
     render(<ControlledDialog onCloseAutoFocus={onCloseAutoFocus} />);
 
     await user.click(screen.getByRole('button', { name: 'Rest' }));
@@ -217,7 +214,9 @@ describe('Dialog focus return', () => {
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(onCloseAutoFocus).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole('button', { name: 'Elsewhere' })).toHaveFocus();
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(screen.getByRole('button', { name: 'Rest' })).not.toHaveFocus();
+    expect(document.activeElement).toBe(document.body);
   });
 
   it('falls back to the page when the opener is gone', async () => {

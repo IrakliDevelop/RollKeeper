@@ -229,9 +229,10 @@ export const InsideDialog: Story = {
   parameters: DESKTOP,
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body);
-    await userEvent.click(
-      within(canvasElement).getByRole('button', { name: 'Edit goblin' })
-    );
+    const opener = within(canvasElement).getByRole('button', {
+      name: 'Edit goblin',
+    });
+    await userEvent.click(opener);
     const dialog = await page.findByRole('dialog', { name: 'Goblin' });
     const trigger = within(dialog).getByRole('button', { name: /^STR/ });
 
@@ -249,6 +250,7 @@ export const InsideDialog: Story = {
     );
     await expect(page.getByRole('dialog', { name: 'Goblin' })).toBeVisible();
     await waitFor(() => expect(trigger).toHaveFocus());
+    await expect(trigger).toHaveTextContent('STR 15');
 
     // A tap on the dialog outside the editor closes only the editor. The
     // modal popover turns pointer events off under it, so skip that check.
@@ -262,7 +264,10 @@ export const InsideDialog: Story = {
     await expect(page.getByRole('dialog', { name: 'Goblin' })).toBeVisible();
     await waitFor(() => expect(trigger).toHaveFocus());
 
+    await expect(trigger).toHaveTextContent('STR 15');
+
     await userEvent.keyboard('{Escape}');
     await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
+    await waitFor(() => expect(opener).toHaveFocus());
   },
 };

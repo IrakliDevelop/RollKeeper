@@ -97,6 +97,12 @@ describe('useNumberField draft mode (live: false)', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('steps decimals without float noise', () => {
+    const { result } = setup({ value: 1.2, integer: false, live: false });
+    act(() => result.current.step(-1));
+    expect(result.current.value).toBe('0.2');
+  });
+
   it('commits a step made in the same handler', () => {
     const { result, onChange } = setup({ live: false });
     act(() => {

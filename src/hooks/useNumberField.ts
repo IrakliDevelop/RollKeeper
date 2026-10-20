@@ -22,8 +22,9 @@ export interface UseNumberFieldOptions {
   /**
    * When true (default), every valid keystroke calls `onChange`. When false
    * the typed text is a draft: `onChange` runs only from `commit()` (and
-   * blur), and `cancel()` throws the draft away. While a draft differs from
-   * the value, a new `value` prop doesn't overwrite it.
+   * blur), and `cancel()` throws the draft away. Once the player has typed or
+   * stepped, until the next `commit()` or `cancel()`, a new `value` prop
+   * doesn't overwrite the draft.
    */
   live?: boolean;
 }
@@ -53,13 +54,18 @@ const clampNumber = (n: number, min?: number, max?: number): number => {
   return out;
 };
 
+const decimalPlaces = (n: number): number =>
+  String(n).split('.')[1]?.length ?? 0;
+
 const toText = (value: number | undefined): string =>
   value == null ? '' : String(value);
 
 /**
  * Manages the string buffer for a controlled numeric input so the field can be
  * emptied mid-edit without snapping back to 0 (the classic `parseInt(v) || 0`
- * bug). Spread the returned bindings onto any `<input>` (raw or design-system).
+ * bug). Bind `value`, `onChange` and `onBlur` to any `<input>` (raw or
+ * design-system); `step`, `commit`, `cancel`, `draft` and `validity` are for
+ * the caller's own controls.
  *
  * - While typing, the raw string is preserved (empty allowed).
  * - A parsed number is emitted on every valid keystroke (unless `live` is
@@ -176,7 +182,17 @@ export function useNumberField({
   const step = useCallback(
     (delta: number) => {
       const base = parse(textRef.current) ?? value ?? min ?? 0;
-      const next = clampNumber(base + delta, min, max);
+      // Round to the finer of the two, so 1.2 - 1 is 0.2 and not
+      // 0.19999999999999996.
+      const places = Math.min(
+        Math.max(decimalPlaces(base), decimalPlaces(delta)),
+        20
+      );
+      const next = clampNumber(
+        Number((base + delta).toFixed(places)),
+        min,
+        max
+      );
       setText(String(next));
       if (live) emit(next);
       else dirty.current = true;

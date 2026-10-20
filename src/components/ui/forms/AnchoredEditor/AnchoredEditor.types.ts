@@ -19,9 +19,11 @@ export interface AnchoredEditorProps {
    */
   context?: React.ReactNode | ((draft: number | undefined) => React.ReactNode);
   /**
-   * The ornament that opens the editor; a single focusable element. Its
-   * classes are joined with the dashed cue without tailwind-merge, so an
-   * `outline-none`/`outline-hidden` on it would hide the cue.
+   * The ornament that opens the editor; a single focusable element that
+   * forwards its ref to its DOM element (the popover anchors to it and focus
+   * returns to it). Its classes are joined with the dashed cue without
+   * tailwind-merge, so an `outline-none`/`outline-hidden` on it would hide
+   * the cue.
    */
   children: React.ReactElement;
 }

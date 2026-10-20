@@ -303,6 +303,33 @@ describe('AnchoredEditor', () => {
     expect(field()).toHaveValue('16');
   });
 
+  it('keeps the field in view when the keyboard opens over the popover', async () => {
+    // jsdom has no scrollIntoView; iPads are 640px or wider, so they get the
+    // popover.
+    const proto = HTMLElement.prototype as Partial<HTMLElement>;
+    proto.scrollIntoView = () => {};
+    const scrollIntoView = vi.spyOn(HTMLElement.prototype, 'scrollIntoView');
+    try {
+      render(<Harness />);
+      await openEditor();
+      expect(screen.getByRole('dialog', { name: 'Strength' })).toHaveAttribute(
+        'data-anchored-editor',
+        'popover'
+      );
+      expect(scrollIntoView).not.toHaveBeenCalled();
+
+      act(() => {
+        viewport.height = 500;
+        viewport.dispatchEvent(new Event('resize'));
+      });
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+    } finally {
+      scrollIntoView.mockRestore();
+      delete proto.scrollIntoView;
+    }
+  });
+
   describe('narrower than 640px', () => {
     beforeEach(() => {
       wideMatches = false;

@@ -162,6 +162,18 @@ describe('InPlaceField', () => {
     expect(onCommit).not.toHaveBeenCalled();
   });
 
+  it("doesn't change an out-of-range value the player only tabbed through", async () => {
+    const onCommit = vi.fn();
+    render(<Harness initial={0} onCommit={onCommit} />);
+    const user = userEvent.setup();
+
+    await user.click(field());
+    await user.tab();
+
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(field()).toHaveValue('0');
+  });
+
   it('sizes itself in ch where field-sizing is missing (jsdom)', async () => {
     render(<Harness initial={5} />);
     expect(field().style.width).toBe('1ch');

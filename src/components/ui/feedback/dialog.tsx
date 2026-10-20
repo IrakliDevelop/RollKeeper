@@ -88,7 +88,7 @@ function useReturnFocus(
     if (!opener?.isConnected || opener === document.body) return;
     if (active && active !== document.body) return;
     event.preventDefault();
-    opener.focus();
+    opener.focus({ preventScroll: true });
   };
 
   return { captureOpener, handleCloseAutoFocus };

@@ -4,9 +4,10 @@
  * A number edited where it is shown. The input takes the surrounding text's
  * font, size, colour and alignment, so nothing moves when it gains focus;
  * the only cue is an underline drawn inside the box (1.5px input-border at
- * rest, 2px brass when focused, 2px blood while the value is out of range).
- * Enter or blur commits (clamped), Escape cancels, ↑/↓ step by 1 and
- * Shift+↑/↓ by 10. In play mode it is plain text with no tab stop.
+ * rest, 2px brass when focused, 2px blood while the draft is empty or out of
+ * range). Enter commits (clamped), blur commits what was typed or stepped,
+ * Escape cancels, ↑/↓ step by 1 and Shift+↑/↓ by 10. In play mode it is plain
+ * text with no tab stop.
  */
 
 'use client';
@@ -100,6 +101,13 @@ export function InPlaceField({
     else field.commit();
   };
 
+  // Tabbing through a field the player didn't touch saves nothing, so a
+  // stored value that is out of range isn't clamped by passing over it.
+  const handleBlur = () => {
+    if (field.value === String(value)) field.cancel();
+    else settle();
+  };
+
   const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault();
@@ -129,7 +137,7 @@ export function InPlaceField({
           value={field.value}
           onChange={field.onChange}
           onFocus={selectOnFocus}
-          onBlur={settle}
+          onBlur={handleBlur}
           onKeyDown={handleKeyDown}
         />
       </label>
