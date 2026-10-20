@@ -87,6 +87,10 @@ attached to the screen edge, so it takes the same surface, border and shadow
 without the radius. Dialogs dim the page with a plain `surface-overlay` scrim,
 no blur, and open and close over 180ms. Raised blocks inside an elevated layer
 look sunken until the screen sweeps flatten them; don't add new ones.
+When a `DialogContent` closes, focus goes back to whatever had it when the
+dialog opened, so controlled dialogs opened from a plain button (no
+`DialogTrigger`) don't drop focus on the page. A caller's `onCloseAutoFocus`
+that calls `preventDefault()` takes over.
 
 A `SelectItem` shows the keyboard highlight as `surface-hover` plus a 2px brass
 outline inside the row, because `surface-hover` alone barely shows on felt's

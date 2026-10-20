@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '../forms/button';
 import {
@@ -122,4 +123,58 @@ export const DefaultDark: Story = {
   render: () => <RestDialog />,
   globals: { theme: 'dark' },
   play: ({ canvasElement }) => checkDialog(canvasElement, 'felt'),
+};
+
+/**
+ * A controlled dialog opened from a plain button (no DialogTrigger), as
+ * most of the app's dialogs are: focus still goes back to that button.
+ */
+function ControlledRestDialog() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button onClick={() => setOpen(true)}>Short rest</Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Take a short rest?</DialogTitle>
+            <DialogDescription>Spend hit dice to heal.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+async function checkFocusReturn(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const page = within(canvasElement.ownerDocument.body);
+  const opener = canvas.getByRole('button', { name: 'Short rest' });
+
+  await userEvent.click(opener);
+  await page.findByRole('dialog', { name: 'Take a short rest?' });
+  await userEvent.keyboard('{Escape}');
+  await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(opener).toHaveFocus());
+
+  await userEvent.click(opener);
+  await userEvent.click(await page.findByRole('button', { name: 'Cancel' }));
+  await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
+  await waitFor(() => expect(opener).toHaveFocus());
+}
+
+export const ControlledFocusReturn: Story = {
+  render: () => <ControlledRestDialog />,
+  play: ({ canvasElement }) => checkFocusReturn(canvasElement),
+};
+
+export const ControlledFocusReturnDark: Story = {
+  render: () => <ControlledRestDialog />,
+  globals: { theme: 'dark' },
+  play: ({ canvasElement }) => checkFocusReturn(canvasElement),
 };
