@@ -172,6 +172,26 @@ describe('Dialog focus return', () => {
     );
   });
 
+  it('puts focus back after an autoFocus dialog under StrictMode', async () => {
+    const user = userEvent.setup();
+    render(
+      <React.StrictMode>
+        <ControlledDialog autoFocusField />
+      </React.StrictMode>
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Rest' }));
+    await waitFor(() =>
+      expect(screen.getByRole('textbox', { name: 'Note' })).toHaveFocus()
+    );
+    await user.keyboard('{Escape}');
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Rest' })).toHaveFocus()
+    );
+  });
+
   it('leaves focus where a click outside a non-modal dialog put it', async () => {
     const user = userEvent.setup();
     render(<ControlledDialog modal={false} />);

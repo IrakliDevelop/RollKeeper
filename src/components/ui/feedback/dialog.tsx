@@ -73,8 +73,10 @@ function useReturnFocus(
 ) {
   const openerRef = React.useRef<HTMLElement | null>(null);
 
+  // Keep only the first capture of each open. StrictMode re-runs the layout
+  // effect after `autoFocus` has moved focus, which would store the field.
   const captureOpener = React.useCallback((opener: HTMLElement | null) => {
-    openerRef.current = opener;
+    if (openerRef.current === null) openerRef.current = opener;
   }, []);
 
   const handleCloseAutoFocus = (event: Event) => {
