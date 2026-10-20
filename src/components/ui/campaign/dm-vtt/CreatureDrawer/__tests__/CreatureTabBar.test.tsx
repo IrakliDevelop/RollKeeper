@@ -29,4 +29,17 @@ describe('CreatureTabBar', () => {
     expect(list).toHaveClass('sticky', 'bg-surface-elevated');
     expect(list).not.toHaveClass('bg-surface-raised');
   });
+
+  it('underlines the active tab in brass', () => {
+    renderBar();
+
+    expect(screen.getByRole('tab', { name: 'Actions' })).toHaveClass(
+      'border-brass-fill',
+      'text-heading'
+    );
+    expect(screen.getByRole('tab', { name: 'Stat block' })).toHaveClass(
+      'border-transparent'
+    );
+    expect(screen.getByRole('tablist').innerHTML).not.toMatch(/accent-emerald/);
+  });
 });
