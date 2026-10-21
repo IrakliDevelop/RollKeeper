@@ -20,3 +20,21 @@ test('the copy reviewer agent uses the skill and the extractor', async () => {
   assert.match(agent, /\.claude\/skills\/rollkeeper-copy\/SKILL\.md/);
   assert.match(agent, /npm run copy:changed/);
 });
+
+test('the Codex design skill mirrors the Claude design skill exactly', async () => {
+  assert.equal(
+    await read('.agents/skills/rollkeeper-design/SKILL.md'),
+    await read('.claude/skills/rollkeeper-design/SKILL.md')
+  );
+});
+
+test('the design skill and the design system doc point at each other', async () => {
+  const skill = await read('.claude/skills/rollkeeper-design/SKILL.md');
+  assert.match(skill, /^---\nname: rollkeeper-design\ndescription: Use when /);
+  assert.match(skill, /docs\/DESIGN_SYSTEM\.md/);
+  assert.match(skill, /rollkeeper-copy/);
+  assert.match(
+    await read('docs/DESIGN_SYSTEM.md'),
+    /\.claude\/skills\/rollkeeper-design\/SKILL\.md/
+  );
+});
