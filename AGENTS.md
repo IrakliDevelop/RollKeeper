@@ -238,8 +238,8 @@ import { Section } from '@/components/ui/layout/section'; // heading + rule; Car
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogBody, DialogFooter, DialogTrigger } from '@/components/ui/feedback/dialog';
 import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedback/confirm-dialog'; // never window.confirm/alert/prompt (ESLint no-alert)
 
-// Design tokens
-import { colors, spacing, typography, shadows, borderRadius } from '@/components/ui/primitives';
+// Design tokens are CSS variables in src/app/globals.css, used through Tailwind
+// utilities (bg-surface, text-heading, type-heading). See Storybook → Foundations.
 ```
 
 Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.

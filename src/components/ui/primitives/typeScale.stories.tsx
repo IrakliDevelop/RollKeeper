@@ -1,5 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, within } from 'storybook/test';
+import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
+import { useComputedValue } from '@/components/ui/foundations/useComputedValue';
 import { TYPE_SCALE_STEPS } from '@/utils/cn';
 
 /**
@@ -14,6 +16,7 @@ const meta: Meta = {
     layout: 'padded',
     a11y: { test: 'error' },
   },
+  decorators: [remountOnTheme],
 };
 
 export default meta;
@@ -43,16 +46,30 @@ const STEPS: Record<
   'num-md': { className: 'type-num-md', sample: '+5' },
 };
 
+// The size shown next to each step is read from the browser.
+function TypeStep({ step }: { step: (typeof TYPE_SCALE_STEPS)[number] }) {
+  const size = useComputedValue<HTMLElement>('font-size');
+  return (
+    <div className="flex flex-col gap-1 sm:contents">
+      <dt className="type-caption text-muted">
+        {STEPS[step].className}
+        {size.value && ` · ${size.value}`}
+      </dt>
+      <dd
+        ref={size.ref}
+        className={`${STEPS[step].className} text-heading break-words`}
+      >
+        {STEPS[step].sample}
+      </dd>
+    </div>
+  );
+}
+
 function TypeScale() {
   return (
-    <dl className="grid grid-cols-[10rem_1fr] items-baseline gap-x-6 gap-y-4">
+    <dl className="grid grid-cols-1 items-baseline gap-x-6 gap-y-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
       {TYPE_SCALE_STEPS.map(step => (
-        <div key={step} className="contents">
-          <dt className="type-caption text-muted">{STEPS[step].className}</dt>
-          <dd className={`${STEPS[step].className} text-heading`}>
-            {STEPS[step].sample}
-          </dd>
-        </div>
+        <TypeStep key={step} step={step} />
       ))}
     </dl>
   );
@@ -76,13 +93,30 @@ export const Scale: Story = {
       'num-md': '20px',
     };
     for (const [step, size] of Object.entries(sizes)) {
-      const sample = canvas.getByText(STEPS[step as keyof typeof STEPS].sample);
-      await expect(getComputedStyle(sample).fontSize).toBe(size);
+      const { className, sample } = STEPS[step as keyof typeof STEPS];
+      await expect(getComputedStyle(canvas.getByText(sample)).fontSize).toBe(
+        size
+      );
+      // The label shows the same measured size.
+      await expect(
+        await canvas.findByText(`${className} · ${size}`)
+      ).toBeVisible();
     }
     const hp = canvas.getByText(STEPS['num-xl'].sample);
     await expect(getComputedStyle(hp).fontVariantNumeric).toBe(
       'lining-nums tabular-nums'
     );
+    // The families are declared, not just named in the tokens.
+    for (const font of [
+      '700 28px Vollkorn',
+      '400 15px Barlow',
+      '600 34px "Barlow Condensed"',
+    ]) {
+      await expect(
+        (await document.fonts.load(font)).length,
+        font
+      ).toBeGreaterThan(0);
+    }
   },
 };
 

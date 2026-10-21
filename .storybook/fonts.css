@@ -1,0 +1,65 @@
+/*
+ * Storybook does not render the root layout, where next/font loads these
+ * fonts and sets the --font-* variables. The tokens in globals.css fall back
+ * to the plain family names, so declaring those names here makes them resolve.
+ * Keep in step with src/app/layout.tsx (scripts/design-fonts.test.mjs checks
+ * every file is listed).
+ */
+
+@font-face {
+  font-family: 'Vollkorn';
+  src: url('../src/app/fonts/vollkorn-latin-wght-normal.woff2') format('woff2');
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../src/app/fonts/barlow-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../src/app/fonts/barlow-latin-400-italic.woff2') format('woff2');
+  font-weight: 400;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../src/app/fonts/barlow-latin-500-normal.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow';
+  src: url('../src/app/fonts/barlow-latin-600-normal.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../src/app/fonts/barlow-condensed-latin-600-normal.woff2')
+    format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Barlow Condensed';
+  src: url('../src/app/fonts/barlow-condensed-latin-700-normal.woff2')
+    format('woff2');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}

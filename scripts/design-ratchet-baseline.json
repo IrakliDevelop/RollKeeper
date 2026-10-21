@@ -289,7 +289,6 @@
     "src/components/ui/character/CharacterSheetHeader.tsx": 1,
     "src/components/ui/feedback/CombatStartBanner.tsx": 1,
     "src/components/ui/feedback/ErrorPage.tsx": 1,
-    "src/components/ui/forms/CustomDropdown.tsx": 1,
     "src/components/ui/layout/FeaturesNavigationSection.tsx": 1
   },
   "gradient": {
@@ -465,7 +464,6 @@
     "src/components/ui/feedback/ImageLightbox.tsx": 1,
     "src/components/ui/forms/ArmorAutocomplete.tsx": 1,
     "src/components/ui/forms/CustomCheckbox.tsx": 1,
-    "src/components/ui/forms/CustomDropdown.tsx": 1,
     "src/components/ui/forms/CustomSwitcher.tsx": 1,
     "src/components/ui/forms/FancySelect.tsx": 1,
     "src/components/ui/forms/FeatureAutocomplete.tsx": 1,
@@ -559,7 +557,6 @@
     "src/components/ui/feedback/NotHydrated.tsx": 6,
     "src/components/ui/feedback/SaveIndicator.tsx": 18,
     "src/components/ui/forms/CustomCheckbox.tsx": 37,
-    "src/components/ui/forms/CustomDropdown.tsx": 20,
     "src/components/ui/forms/CustomSwitcher.tsx": 16,
     "src/components/ui/forms/FancySelect.tsx": 50,
     "src/components/ui/forms/FeatureAutocomplete.tsx": 1,

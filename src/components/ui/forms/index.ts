@@ -27,6 +27,5 @@ export { AnchoredEditor, type AnchoredEditorProps } from './AnchoredEditor';
 
 // Legacy components (will be deprecated)
 export { default as CustomCheckbox } from './CustomCheckbox';
-export { default as CustomDropdown } from './CustomDropdown';
 export { CustomSwitcher } from './CustomSwitcher';
 export { FancySelect } from './FancySelect';

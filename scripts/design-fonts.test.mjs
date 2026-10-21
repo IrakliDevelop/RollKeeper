@@ -39,6 +39,26 @@ test('the root layout loads every shipped font file', async () => {
   }
 });
 
+test('Storybook declares every shipped font file', async () => {
+  const css = await readFile(
+    path.join(repositoryRoot, '.storybook', 'fonts.css'),
+    'utf8'
+  );
+  for (const file of FONT_FILES) {
+    assert.ok(
+      css.includes(`../src/app/fonts/${file}`),
+      `.storybook/fonts.css misses ${file}`
+    );
+  }
+  for (const family of ['Vollkorn', 'Barlow', 'Barlow Condensed']) {
+    assert.match(
+      css,
+      new RegExp(`font-family:\\s*'${family}'`),
+      `.storybook/fonts.css misses the ${family} family`
+    );
+  }
+});
+
 test('Vollkorn falls back to serif metrics while it loads', async () => {
   const layout = await readFile(path.join(appDir, 'layout.tsx'), 'utf8');
   const vollkorn = layout.match(/const vollkorn = localFont\(\{[\s\S]*?\}\);/);
