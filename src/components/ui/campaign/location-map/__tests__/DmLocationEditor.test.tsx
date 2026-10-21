@@ -287,6 +287,10 @@ describe('DmLocationEditor wiring', () => {
 
     expect(handleSaveMarkerDetail).toHaveBeenCalledOnce();
     expect(handleCloseMarkerPanel).toHaveBeenCalledOnce();
-    expect(screen.getByText('Marker saved')).toBeInTheDocument();
+    // The visible toast, and the copy screen readers hear.
+    expect(document.body.querySelector('[data-toast-type]')).toHaveTextContent(
+      'Marker saved'
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Marker saved');
   });
 });

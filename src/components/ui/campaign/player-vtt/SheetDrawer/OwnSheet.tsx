@@ -9,6 +9,7 @@ import type { ToastData } from '@/components/ui/feedback/Toast';
 import { Button } from '@/components/ui/forms/button';
 import { useSheetRoll } from '@/hooks/useSheetRoll';
 import { useCharacterStore } from '@/store/characterStore';
+import { getRestSlots } from '@/utils/calculations';
 
 import { SheetAbilities } from './SheetAbilities';
 import {
@@ -50,6 +51,11 @@ export function OwnSheet({
   const name = useCharacterStore(s => s.character.name);
   const takeShortRest = useCharacterStore(s => s.takeShortRest);
   const takeLongRest = useCharacterStore(s => s.takeLongRest);
+  // Booleans, so spending a slot doesn't re-render the whole sheet.
+  const pactMagic = useCharacterStore(s => getRestSlots(s.character).pactMagic);
+  const spellSlots = useCharacterStore(
+    s => getRestSlots(s.character).spellSlots
+  );
 
   const [locked, setLocked] = useState(true);
   const [restType, setRestType] = useState<'short' | 'long' | null>(null);
@@ -131,6 +137,7 @@ export function OwnSheet({
 
       <RestDialog
         restType={restType}
+        slots={{ pactMagic, spellSlots }}
         onClose={() => setRestType(null)}
         onConfirm={() => {
           if (restType === 'short') takeShortRest();

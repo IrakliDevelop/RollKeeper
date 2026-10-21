@@ -717,6 +717,23 @@ export function hasSpellSlots(
   return hasRegularSlots || !!hasPactSlots;
 }
 
+/** Which slot lines the rest toasts list for a character. */
+export interface RestSlots {
+  /** Pact Magic slots, restored by short and long rests. */
+  pactMagic: boolean;
+  /** Any spell slots (Pact Magic included), restored by a long rest. */
+  spellSlots: boolean;
+}
+
+export function getRestSlots(
+  character: Pick<CharacterState, 'spellSlots' | 'pactMagic'>
+): RestSlots {
+  return {
+    pactMagic: hasSpellSlots(undefined, character.pactMagic),
+    spellSlots: hasSpellSlots(character.spellSlots, character.pactMagic),
+  };
+}
+
 /**
  * Calculate level from experience points
  */

@@ -38,12 +38,14 @@ const props = () => ({
     onCancelPlacement: vi.fn(),
   },
 });
+const INITIAL_CHARACTER = useCharacterStore.getState().character;
+
 beforeEach(() => {
   window.localStorage.clear();
-  const base = useCharacterStore.getState().character;
-  useCharacterStore
-    .getState()
-    .loadCharacterState({ ...base, name: 'Kaelen Voss' } as CharacterState);
+  useCharacterStore.getState().loadCharacterState({
+    ...INITIAL_CHARACTER,
+    name: 'Kaelen Voss',
+  } as CharacterState);
 });
 afterEach(() => cleanup());
 
@@ -71,6 +73,26 @@ describe('SheetDrawer', () => {
     // RestDialog confirm button label — check REST_CONFIG in RestDialog.tsx and match it here.
     fireEvent.click(screen.getByRole('button', { name: /take long rest/i }));
     expect(p.onRested).toHaveBeenCalledWith('long');
+  });
+
+  it('promises Pact Magic on a short rest only when the character has it', () => {
+    const { rerender } = render(<SheetDrawer {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
+    expect(
+      screen.getByRole('dialog', { name: /^short rest$/i })
+    ).not.toHaveAccessibleDescription(/Pact Magic/);
+    fireEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+
+    const base = useCharacterStore.getState().character;
+    useCharacterStore.getState().loadCharacterState({
+      ...base,
+      pactMagic: { slots: { max: 1, used: 0 }, level: 1 },
+    } as CharacterState);
+    rerender(<SheetDrawer {...props()} />);
+    fireEvent.click(screen.getByRole('button', { name: /short rest/i }));
+    expect(
+      screen.getByRole('dialog', { name: /^short rest$/i })
+    ).toHaveAccessibleDescription(/restore Pact Magic slots/);
   });
 
   it('resets to locked when reopened', () => {

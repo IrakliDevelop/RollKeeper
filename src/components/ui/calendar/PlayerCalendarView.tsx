@@ -27,6 +27,7 @@ import { useCharacterStore } from '@/store/characterStore';
 import { useSharedCampaignState } from '@/hooks/useSharedCampaignState';
 import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
+import { getRestSlots } from '@/utils/calculations';
 import {
   getMsPerDay,
   timeToDate,
@@ -38,7 +39,7 @@ import {
 import { WEATHER_OPTIONS, type WeatherType } from '@/types/calendar';
 import { AppIcon, WEATHER_ICONS, getIconName } from '@/components/ui/icons';
 import type { SelectedDay } from './CalendarGrid';
-import type { ToastData } from '@/components/ui/feedback/Toast';
+import { longRestToast, type ToastData } from '@/components/ui/feedback/Toast';
 import type { CalendarEvent, CalendarEventInput } from '@/types/calendar';
 
 type PlayerTab = 'calendar' | 'events';
@@ -258,24 +259,13 @@ export function PlayerCalendarView({
     }
     setBrowseYear(null);
     setBrowseMonth(null);
-    const details = [
-      'All abilities restored',
-      'All spell slots restored',
-      'Hit points fully restored',
-      'Hit dice partially restored',
-    ];
-    if (!isSynced) {
-      details.push('Calendar advanced by 1 day');
-    }
-    addToast?.({
-      type: 'rest',
-      title: '\u{1F319} Long Rest Complete',
-      message:
-        'Your character has taken a long rest' +
-        (isSynced ? '' : ' and a new day begins'),
-      details,
-      duration: 6000,
-    });
+    // The same toast as the rest dialog's, plus the day when it moved.
+    addToast?.(
+      longRestToast(
+        getRestSlots(useCharacterStore.getState().character),
+        isSynced ? [] : ['Calendar advanced by 1 day']
+      )
+    );
   };
 
   const handlePrevMonth = () => {

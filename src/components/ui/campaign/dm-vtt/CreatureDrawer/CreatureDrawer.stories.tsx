@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
+
 import { CreatureDrawer } from '.';
 import {
   FULL_CREATURE_STANDING,
@@ -70,6 +72,21 @@ export const Monster: Story = {
   play: async () => {
     await expectDrawer(/young red dragon sheet/i);
     await expect(body().getByText('Their turn')).toBeInTheDocument();
+
+    // Touch: the tabs reach 44px and the strip stays inside the drawer.
+    const drawer = body().getByRole('dialog');
+    const restore = emulateCoarsePointer();
+    try {
+      for (const tab of within(drawer).getAllByRole('tab')) {
+        await expect(tab.getBoundingClientRect().height).toBeGreaterThanOrEqual(
+          44
+        );
+      }
+      // Taller tabs don't push the drawer into sideways scrolling.
+      await expect(drawer.scrollWidth).toBeLessThanOrEqual(drawer.clientWidth);
+    } finally {
+      restore();
+    }
   },
 };
 

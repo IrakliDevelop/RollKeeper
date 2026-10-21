@@ -23,7 +23,11 @@ import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
 import type { DmEffect, ItemTransfer, DmXpAward } from '@/types/sharedState';
 import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
-import { ToastContainer, useToast } from '@/components/ui/feedback/Toast';
+import {
+  ToastContainer,
+  longRestToast,
+  useToast,
+} from '@/components/ui/feedback/Toast';
 import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
@@ -39,6 +43,7 @@ import { ABILITY_NAMES, SKILL_NAMES } from '@/utils/constants';
 import {
   calculateModifier,
   getProficiencyBonus,
+  getRestSlots,
   hasSpellSlots,
   calculateSkillModifier,
 } from '@/utils/calculations';
@@ -118,7 +123,6 @@ export default function CharacterSheet() {
     showSavingThrow,
     showDamageRoll,
     showShortRest,
-    showLongRest,
     addToast,
   } = useToast();
 
@@ -1100,14 +1104,15 @@ export default function CharacterSheet() {
             {/* Rest Dialog triggered from HUD */}
             <RestDialog
               restType={pendingRestType}
+              slots={getRestSlots(character)}
               onConfirm={() => {
                 if (pendingRestType === 'short') {
                   takeShortRest();
-                  showShortRest();
+                  showShortRest(getRestSlots(character));
                 } else if (pendingRestType === 'long') {
                   takeLongRest();
-                  showLongRest();
                   // Advance calendar by 1 day if not synced with DM
+                  let calendarAdvanced = false;
                   if (!sharedCalendar) {
                     const cal = useCalendarStore
                       .getState()
@@ -1116,8 +1121,16 @@ export default function CharacterSheet() {
                       useCalendarStore
                         .getState()
                         .advanceTime(characterId, getMsPerDay(cal.config));
+                      calendarAdvanced = true;
                     }
                   }
+                  // The same toast as a long rest from the Calendar tab.
+                  addToast(
+                    longRestToast(
+                      getRestSlots(character),
+                      calendarAdvanced ? ['Calendar advanced by 1 day'] : []
+                    )
+                  );
                 }
               }}
               onClose={() => setPendingRestType(null)}

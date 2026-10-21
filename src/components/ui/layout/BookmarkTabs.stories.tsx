@@ -112,6 +112,14 @@ export const NarrowStrip: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    // The chevrons are the scroll cue; the strip draws no scrollbar under
+    // the tabs (classic scrollbars on Windows and Linux would).
+    const strip = canvas.getByRole('tablist');
+    await expect(getComputedStyle(strip).scrollbarWidth).toBe('none');
+    await expect(strip.scrollWidth).toBeGreaterThan(strip.clientWidth);
+    await expect(
+      canvas.getByRole('button', { name: 'Scroll tabs right' })
+    ).toBeVisible();
     await userEvent.tab();
     for (const label of MANY_TABS.slice(1).map(tab => tab.label)) {
       await userEvent.keyboard('{ArrowRight}');

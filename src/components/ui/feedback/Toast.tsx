@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon, type IconName } from '@/components/ui/icons';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import type { RestSlots } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
 export interface ToastDetail {
@@ -30,6 +31,13 @@ interface ToastProps {
 
 /** Enter and exit time; matches duration-180 on the toast. */
 const TOAST_MOTION_MS = 180;
+
+/**
+ * How long a toast's text stays in the live region: long enough for a screen
+ * reader to queue it, short enough that reading the page doesn't meet it
+ * twice.
+ */
+const ANNOUNCE_MS = 1000;
 
 interface ToastRole {
   /** The 3px left rule. */
@@ -201,6 +209,27 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
   );
 };
 
+/** A text-only copy of a toast for the live region; removes itself. */
+const ToastAnnouncement: React.FC<{ toast: ToastData }> = ({ toast }) => {
+  const [announced, setAnnounced] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAnnounced(true), ANNOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (announced) return null;
+  return (
+    <div>
+      <p>{toast.title}</p>
+      <p>{toast.message}</p>
+      {toast.details?.map((detail, index) => (
+        <p key={index}>{typeof detail === 'string' ? detail : detail.text}</p>
+      ))}
+    </div>
+  );
+};
+
 interface ToastContainerProps {
   toasts: ToastData[];
   onDismiss: (id: string) => void;
@@ -211,17 +240,24 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   onDismiss,
 }) => {
   // The status region stays mounted, so screen readers announce each toast
-  // as it is added (politely, and only the new one).
+  // as it is added (politely, and only the new one). It holds a text-only
+  // copy, so they hear the title, message and details without the dismiss
+  // button, which stays in the visible toast.
   const content = (
     <div className="pointer-events-none fixed right-4 bottom-4 z-[100]">
+      <div className="pointer-events-auto space-y-2">
+        {toasts.map(toast => (
+          <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
+        ))}
+      </div>
       <div
         role="status"
         aria-live="polite"
         aria-atomic="false"
-        className="pointer-events-auto space-y-2"
+        className="sr-only"
       >
         {toasts.map(toast => (
-          <Toast key={toast.id} toast={toast} onDismiss={onDismiss} />
+          <ToastAnnouncement key={toast.id} toast={toast} />
         ))}
       </div>
     </div>
@@ -230,6 +266,29 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   if (typeof document === 'undefined') return content;
   return createPortal(content, document.body);
 };
+
+/**
+ * The long-rest toast, shared by the rest dialog and the calendar (which
+ * adds a line when it advances the day). Slot lines only appear for
+ * characters who have those slots.
+ */
+export function longRestToast(
+  slots: RestSlots,
+  extraDetails: string[] = []
+): Omit<ToastData, 'id'> {
+  return {
+    type: 'rest',
+    title: 'Long rest taken',
+    icon: 'restLong',
+    message: 'Hit points are full and abilities are back',
+    details: [
+      ...(slots.spellSlots ? ['All spell slots restored'] : []),
+      'Hit dice partially restored',
+      ...extraDetails,
+    ],
+    duration: 6000,
+  };
+}
 
 // Hook for managing toasts
 export const useToast = () => {
@@ -349,38 +408,30 @@ export const useToast = () => {
     [addToast]
   );
 
-  const showShortRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Short Rest Complete',
-      icon: 'restShort',
-      message: 'Your character has taken a short rest',
-      details: [
-        'Short rest abilities restored',
-        'Pact Magic slots restored',
-        'Reaction reset',
-        'Ready to continue your adventure!',
-      ],
-      duration: 5000,
-    });
-  }, [addToast]);
+  // Slot lines only appear for characters who have those slots.
+  const showShortRest = useCallback(
+    (slots: RestSlots) => {
+      addToast({
+        type: 'rest',
+        title: 'Short rest taken',
+        icon: 'restShort',
+        message: 'Abilities that recharge on a short rest are back',
+        details: [
+          ...(slots.pactMagic ? ['Pact Magic slots restored'] : []),
+          'Reaction reset',
+        ],
+        duration: 5000,
+      });
+    },
+    [addToast]
+  );
 
-  const showLongRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Long Rest Complete',
-      icon: 'restLong',
-      message: 'Your character has taken a long rest',
-      details: [
-        'All abilities restored',
-        'All spell slots restored',
-        'Hit points fully restored',
-        'Hit dice partially restored',
-        'Ready for new challenges!',
-      ],
-      duration: 6000,
-    });
-  }, [addToast]);
+  const showLongRest = useCallback(
+    (slots: RestSlots) => {
+      addToast(longRestToast(slots));
+    },
+    [addToast]
+  );
 
   return {
     toasts,

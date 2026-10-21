@@ -7,6 +7,7 @@ import {
   SHEET_TAB_STORAGE_KEY,
 } from './SheetDrawer.types';
 import { useCharacterStore } from '@/store/characterStore';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { PartyMemberHP } from '@/app/api/campaign/[code]/party-hp/route';
 import type {
@@ -409,6 +410,20 @@ export const Tablet: Story = {
       screen.getByRole('dialog', { name: /kaelen voss/i })
     );
     await expect(dialog.getBoundingClientRect().width).toBeLessThanOrEqual(580);
+
+    // Touch: the tabs reach 44px and the strip stays inside the drawer.
+    const restore = emulateCoarsePointer();
+    try {
+      for (const tab of within(dialog).getAllByRole('tab')) {
+        await expect(tab.getBoundingClientRect().height).toBeGreaterThanOrEqual(
+          44
+        );
+      }
+      // Taller tabs don't push the drawer into sideways scrolling.
+      await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+    } finally {
+      restore();
+    }
   },
 };
 

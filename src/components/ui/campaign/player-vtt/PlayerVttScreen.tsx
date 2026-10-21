@@ -13,6 +13,7 @@ import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPro
 import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 import { useReactionTurnReset } from '@/hooks/useReactionTurnReset';
+import { getRestSlots } from '@/utils/calculations';
 
 import { CastingBanner } from './CastingBanner';
 import { CharacterDock } from './CharacterDock';
@@ -190,7 +191,9 @@ export function PlayerVttScreen({
           addToast={addToast}
           showAttackRoll={showAttackRoll}
           onRested={type =>
-            type === 'short' ? showShortRest() : showLongRest()
+            type === 'short'
+              ? showShortRest(getRestSlots(character))
+              : showLongRest(getRestSlots(character))
           }
           spellCasting={spellCasting}
           openTarget={openTarget}

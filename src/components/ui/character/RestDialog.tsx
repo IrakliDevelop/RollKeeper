@@ -12,11 +12,14 @@ import {
   DialogBody,
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
+import type { RestSlots } from '@/utils/calculations';
 
 type RestType = 'short' | 'long';
 
 interface RestDialogProps {
   restType: RestType | null;
+  /** Which slots this character has; the description only promises those. */
+  slots: RestSlots;
   onConfirm: () => void;
   onClose: () => void;
 }
@@ -25,29 +28,48 @@ const REST_CONFIG: Record<
   RestType,
   {
     title: string;
-    description: string;
     icon: React.ReactNode;
     confirmLabel: string;
   }
 > = {
   short: {
     title: 'Short Rest',
-    description:
-      'Take a short rest (about 1 hour). This will reset abilities that recharge on a short rest, restore Pact Magic slots, and reset your reaction.',
     icon: <Sun className="h-5 w-5 text-amber-500" />,
     confirmLabel: 'Take Short Rest',
   },
   long: {
     title: 'Long Rest',
-    description:
-      'Take a long rest (about 8 hours). This will fully restore HP, reset all abilities, restore all spell slots, restore hit dice, and clear temporary effects.',
     icon: <Moon className="h-5 w-5 text-indigo-500" />,
     confirmLabel: 'Take Long Rest',
   },
 };
 
+/** "a and b", or "a, b, and c". */
+function listPhrase(items: string[]): string {
+  if (items.length <= 2) return items.join(' and ');
+  return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
+}
+
+function restDescription(restType: RestType, slots: RestSlots): string {
+  if (restType === 'short') {
+    return `Take a short rest (about 1 hour). This will ${listPhrase([
+      'reset abilities that recharge on a short rest',
+      ...(slots.pactMagic ? ['restore Pact Magic slots'] : []),
+      'reset your reaction',
+    ])}.`;
+  }
+  return `Take a long rest (about 8 hours). This will ${listPhrase([
+    'fully restore HP',
+    'reset all abilities',
+    ...(slots.spellSlots ? ['restore all spell slots'] : []),
+    'restore hit dice',
+    'clear temporary effects',
+  ])}.`;
+}
+
 export default function RestDialog({
   restType,
+  slots,
   onConfirm,
   onClose,
 }: RestDialogProps) {
@@ -63,7 +85,9 @@ export default function RestDialog({
             {config.icon}
             {config.title}
           </DialogTitle>
-          <DialogDescription>{config.description}</DialogDescription>
+          <DialogDescription>
+            {restDescription(restType, slots)}
+          </DialogDescription>
         </DialogHeader>
         <DialogBody />
         <DialogFooter>

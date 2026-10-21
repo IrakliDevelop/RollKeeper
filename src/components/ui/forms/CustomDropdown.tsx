@@ -101,7 +101,7 @@ export default function CustomDropdown({
             className="absolute top-full right-0 left-0 z-50 mt-2"
           >
             <div className="overflow-hidden rounded-lg border border-slate-600/50 bg-slate-800/95 shadow-xl shadow-black/30 backdrop-blur-sm">
-              <div className="scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800 max-h-64 overflow-y-auto py-2">
+              <div className="scrollbar-thin max-h-64 overflow-y-auto py-2">
                 {options.map(option => (
                   <button
                     key={option.value}
