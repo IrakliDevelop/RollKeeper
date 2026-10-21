@@ -1104,6 +1104,7 @@ export default function CharacterSheet() {
             {/* Rest Dialog triggered from HUD */}
             <RestDialog
               restType={pendingRestType}
+              slots={getRestSlots(character)}
               onConfirm={() => {
                 if (pendingRestType === 'short') {
                   takeShortRest();
