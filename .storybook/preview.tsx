@@ -68,12 +68,18 @@ const withTheme: Decorator = (Story, context) => {
   );
 };
 
+const APP_FONT_FAMILIES = new Set(['Vollkorn', 'Barlow', 'Barlow Condensed']);
+
 const preview: Preview = {
-  // The app preloads its fonts. Wait for every face declared in fonts.css, so
-  // none arrives after the first paint and shifts what play functions measure.
+  // The app preloads its fonts. Wait for every face fonts.css declares for the
+  // app's families, so none arrives after the first paint and shifts what play
+  // functions measure. A face that fails to load must not fail every story.
   loaders: [
     async () => {
-      await Promise.all(Array.from(document.fonts, face => face.load()));
+      const faces = Array.from(document.fonts).filter(face =>
+        APP_FONT_FAMILIES.has(face.family.replace(/["']/g, ''))
+      );
+      await Promise.allSettled(faces.map(face => face.load()));
     },
   ],
   parameters: {
