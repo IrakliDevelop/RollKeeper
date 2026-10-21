@@ -50,7 +50,7 @@ gets no border, background or radius of its own.
 `Card` is only for one discrete object (a character, monster, spell, item,
 campaign), never inside another Card, never for a settings row.
 
-**Icons sit bare.** `<AppIcon name="spell" className="text-muted size-5" />`
+**Icons sit bare.** `<AppIcon name="inventory" className="text-muted size-5" />`
 (the app's icon registry, `ui/icons/AppIcon`; plain lucide for generic
 glyphs) next to text that needs scanning, or alone in an icon button with an
 `aria-label`. No tile, circle or tinted square behind an icon, neutral or
@@ -66,7 +66,7 @@ for the wording.
 ```tsx
 <div className="py-12 text-center">
   <p className="type-subheading text-heading">Add your first spell</p>
-  <p className="type-body text-muted mt-2">{one line on what appears here}</p>
+  <p className="type-body text-muted mt-2">{"One line on what appears here"}</p>
   <Button className="mt-4" onClick={openAddSpell}>Add spell</Button>
 </div>
 ```
@@ -77,14 +77,17 @@ The button is `primary` only if the view has no other brass button.
 shared dialog, which gives its confirm button the blood fill.
 
 ```tsx
-<Button variant="danger" onClick={handleDelete}>Delete character</Button>
+async function handleDelete() {
+  const confirmed = await confirmDialog({
+    title: `Delete ${character.name}?`,
+    message: 'The sheet is removed from this device.',
+    confirmLabel: 'Delete character',
+    tone: 'danger',
+  });
+  if (confirmed) deleteCharacter(character.id);
+}
 
-const confirmed = await confirmDialog({
-  title: `Delete ${character.name}?`,
-  message: 'The sheet is removed from this device.',
-  confirmLabel: 'Delete character',
-  tone: 'danger',
-});
+<Button variant="danger" onClick={handleDelete}>Delete character</Button>
 ```
 
 Never `ghost` for the trigger, never `danger-solid` outside the dialog, never
@@ -112,9 +115,13 @@ plain text until edit mode, so take an `editing` prop and pass it through:
 // Inside an ornament or a tight spot (popover from 640px, bottom sheet below):
 <AnchoredEditor label="Max HP" value={maxHp} onSave={setMaxHp} editing={editing} min={1}>
   {editing ? (
-    <button type="button" className="type-num-lg pointer-coarse:min-h-11 pointer-coarse:min-w-11">
-    {maxHp}
-  </button>
+    <button
+      type="button"
+      aria-label={`Max HP ${maxHp}`}
+      className="type-num-lg pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+    >
+      {maxHp}
+    </button>
   ) : (
     <span className="type-num-lg">{maxHp}</span>
   )}
@@ -126,14 +133,15 @@ true. Other number fields use `NumberInput`/`NumberField` (from
 `@/components/ui/forms/NumberInput`). Never `type="number"` or
 `parseInt(e.target.value) || 0`.
 
-**HP status.** Take the tier from `hpTier()` (`src/utils/hpState.ts`):
-`high` → healthy (verdigris bar, number stays `heading`), `mid`/`low` →
-bloodied (ember), `critical` → critical (blood; "Down" at 0 HP). Write the
-tier name as text. No other thresholds, and no `getHp*Color` in new UI.
+**HP status.** Take the tier from `hpTier(hpPercent(current, max))`
+(`src/utils/hpState.ts`): `high` → "Healthy" (verdigris bar, number stays
+`heading`), `mid`/`low` → "Bloodied" (ember), `critical` → "Critical" (blood;
+"Down" at 0 HP). Show the tier word wherever there's room. No other
+thresholds, and no `getHp*Color` in new UI.
 
 **Touch (iPad players).** Primitives already reach 44px on coarse pointers.
-For anything you build, add `pointer-coarse:min-h-11` (and `min-w-11` on
-icon buttons); never always-on oversizing or negative-margin hacks. Rows
+For anything you build, add `pointer-coarse:min-h-11` (and
+`pointer-coarse:min-w-11` on icon buttons); never always-on oversizing or negative-margin hacks. Rows
 with a tappable control: `pointer-coarse:min-h-11`. Nothing hover-only:
 if a tooltip says it, visible text says it too. No double-click,
 right-click or long-press-only actions.

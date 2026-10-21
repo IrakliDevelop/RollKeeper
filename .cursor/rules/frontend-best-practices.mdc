@@ -69,6 +69,7 @@ import {
   CardFooter 
 } from '@/components/ui/layout/card';
 import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
 ```
 
 ### Feedback Components
@@ -85,6 +86,7 @@ import {
   DialogFooter,
   DialogTrigger,
 } from '@/components/ui/feedback/dialog';
+import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedback/confirm-dialog';
 ```
 
 ### Design Tokens

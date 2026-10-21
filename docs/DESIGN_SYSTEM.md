@@ -69,12 +69,11 @@ Rules:
   lapis because it's about magic; spell slots are lapis because they are
   magic you spend. When nothing on the screen has the role's meaning, use
   neutrals.
-- **HP tiers:** take the tier from `hpTier()` in `src/utils/hpState.ts` and
-  map it to a role: `high` is healthy (verdigris bar, the number stays
-  `heading`), `mid` and `low` are bloodied (ember), `critical` is critical
-  (blood; the label reads "Down" at 0 HP). Show the tier name as text
-  wherever there's room. Don't invent
-  other thresholds.
+- **HP tiers:** take the tier from `hpTier(hpPercent(current, max))` in
+  `src/utils/hpState.ts` and map it to a role: `high` is "Healthy"
+  (verdigris bar, the number stays `heading`), `mid` and `low` are
+  "Bloodied" (ember), `critical` is "Critical" (blood; "Down" at 0 HP). Show
+  the tier word wherever there's room. Don't invent other thresholds.
 - **No gradients**: not on fills, text, page backgrounds or meters. Meters
   use a solid role colour.
 - **Retired:** the hue-named `accent-{emerald,blue,amber,red,purple,indigo,green,orange,yellow,violet}-*`
@@ -131,17 +130,18 @@ Rules:
   a 1px `divider` rule, no background, border or radius. A `Card` is only for
   a discrete object (a character, monster, spell, item or campaign). Cards
   never nest.
-- **Radius:** 0 for sections, 4px for controls (buttons, inputs, chips), 6px
-  for objects (cards, dialogs, popovers). Full circles only for dots, pips and
-  medallions. No pill buttons.
+- **Radius:** 0 for sections, 4px for controls (buttons, inputs), 3px for a
+  `Badge`, 6px for objects (cards, dialogs, popovers). Full circles only for
+  dots, pips, medallions and switches. No pill buttons.
 - **Elevation:** nothing in the page flow has a shadow. Floating layers
   (popover, menu, tooltip, dialog, drawer, toast) on `surface-elevated` take
   the one `shadow-overlay`, through `OVERLAY_SURFACE` or `SideDrawer`. No
   `backdrop-blur`.
 - **Spacing:** Tailwind's 4px grid. 8px within rows, 16px between blocks,
   24–32px between sections.
-- **Icons:** lucide, only where they help scanning (tab labels, icon-only
-  buttons with an `aria-label`). No icon in a tinted tile or circle, no
+- **Icons:** `AppIcon` (the app's registry in `ui/icons/`) or plain lucide,
+  only where they help scanning (tab labels, icon-only buttons with an
+  `aria-label`). No icon in a tinted tile or circle, no
   `Sparkles`, no decorative icon beside a heading.
 
 ## Motion
@@ -234,10 +234,11 @@ Some players use iPads at the table. Everything works by touch alone:
 - **Nothing hover-only.** Hover styles are only an extra. A tooltip is never
   the only place information appears; put it in visible text (a `Switch`
   `description`, a caption) instead.
-- **Targets:** at least 44×44px on coarse pointers (`pointer-coarse:min-h-11`,
-  plus `pointer-coarse:min-w-11` for icon buttons), 24×24px otherwise. Small visuals (8px
-  dots, 10px pips, a switch) keep their size and get a larger hit area. A row
-  with a tappable control is at least 44px tall on coarse pointers.
+- **Targets:** at least 44×44px on coarse pointers
+  (`pointer-coarse:min-h-11`, plus `pointer-coarse:min-w-11` for icon
+  buttons), 24×24px otherwise. Small visuals (8px dots, 10px pips, a switch)
+  keep their size and get a larger hit area. A row with a tappable control is
+  at least 44px tall on coarse pointers.
 - **No double-click, right-click or long-press-only actions.** Every action
   has a visible tap path.
 - **Every keyboard shortcut has a touch equivalent:** arrow-key stepping has
