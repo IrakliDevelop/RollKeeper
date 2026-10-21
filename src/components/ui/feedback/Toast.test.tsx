@@ -99,7 +99,7 @@ describe('ToastContainer', () => {
     id: 'toast-1',
     type: 'rest',
     title: 'Long rest taken',
-    message: 'Hit points and spell slots are back',
+    message: 'Hit points are full and abilities are back',
     details: ['All spell slots restored'],
     ...overrides,
   });
@@ -126,7 +126,7 @@ describe('ToastContainer', () => {
       Array.from(region.querySelectorAll('p'), p => p.textContent)
     ).toEqual([
       'Long rest taken',
-      'Hit points and spell slots are back',
+      'Hit points are full and abilities are back',
       'All spell slots restored',
     ]);
     expect(region.querySelector('button, [tabindex]')).toBeNull();

@@ -38,12 +38,14 @@ const props = () => ({
     onCancelPlacement: vi.fn(),
   },
 });
+const INITIAL_CHARACTER = useCharacterStore.getState().character;
+
 beforeEach(() => {
   window.localStorage.clear();
-  const base = useCharacterStore.getState().character;
-  useCharacterStore
-    .getState()
-    .loadCharacterState({ ...base, name: 'Kaelen Voss' } as CharacterState);
+  useCharacterStore.getState().loadCharacterState({
+    ...INITIAL_CHARACTER,
+    name: 'Kaelen Voss',
+  } as CharacterState);
 });
 afterEach(() => cleanup());
 
