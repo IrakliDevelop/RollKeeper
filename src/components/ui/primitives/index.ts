@@ -1,10 +1,9 @@
 /**
  * UI Primitives
- * 
- * Centralized exports for design tokens, variant utilities, and animations.
+ *
+ * Centralized exports for variant utilities and animations. The design
+ * tokens are CSS variables in src/app/globals.css (Storybook: Foundations).
  */
 
-export * from './design-tokens';
 export * from './variants';
 export * from './animations';
-

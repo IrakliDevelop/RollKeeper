@@ -88,11 +88,9 @@ import {
 ```
 
 ### Design Tokens
-Import from `@/components/ui/primitives/`:
-
-```typescript
-import { colors, spacing, fontSize, shadows, borderRadius } from '@/components/ui/primitives';
-```
+Tokens are CSS variables in `src/app/globals.css`, used through Tailwind
+utilities (`bg-surface`, `text-heading`, `type-heading`). Storybook's
+Foundations pages show them; `AGENTS.md` lists them.
 
 ### Component Usage Guidelines
 - Use `Button` with appropriate `variant` (primary, secondary, success, danger, warning, outline, ghost, link)
