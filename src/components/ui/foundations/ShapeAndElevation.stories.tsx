@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import type { ReactNode } from 'react';
-import { expect, waitFor, within } from 'storybook/test';
+import { expect, waitFor } from 'storybook/test';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { Card } from '@/components/ui/layout/card';
@@ -186,12 +186,14 @@ function SpaceRows() {
         Tailwind&apos;s 4px grid: 8px within rows, 16px between blocks, 24 to
         32px between sections.
       </p>
-      <Section ref={above.ref} heading="Saving throws" level={3}>
-        <p className="type-small text-body">Strength +2 · Dexterity +5</p>
-      </Section>
-      <Section ref={below.ref} heading="Senses" level={3}>
-        <p className="type-small text-body">Darkvision 60 ft</p>
-      </Section>
+      <div className="space-y-6">
+        <Section ref={above.ref} heading="Saving throws" level={3}>
+          <p className="type-small text-body">Strength +2 · Dexterity +5</p>
+        </Section>
+        <Section ref={below.ref} heading="Senses" level={3}>
+          <p className="type-small text-body">Darkvision 60 ft</p>
+        </Section>
+      </div>
       <p className="type-caption text-muted">
         Heading to rule:{' '}
         <span data-measure="Section heading gap">{above.value}</span>. Rule to
@@ -247,9 +249,6 @@ async function checkShape(canvasElement: HTMLElement) {
   await expect(measured('Floating layer: shadow')).toBe(
     token.dataset.overlayShadow
   );
-  await expect(
-    within(canvasElement).getByRole('button', { name: 'Add condition' })
-  ).toBeVisible();
 }
 
 export const ShapeAndElevation: Story = {

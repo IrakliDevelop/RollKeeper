@@ -50,12 +50,15 @@ const STEPS: Record<
 function TypeStep({ step }: { step: (typeof TYPE_SCALE_STEPS)[number] }) {
   const size = useComputedValue<HTMLElement>('font-size');
   return (
-    <div className="contents">
+    <div className="flex flex-col gap-1 sm:contents">
       <dt className="type-caption text-muted">
         {STEPS[step].className}
         {size.value && ` · ${size.value}`}
       </dt>
-      <dd ref={size.ref} className={`${STEPS[step].className} text-heading`}>
+      <dd
+        ref={size.ref}
+        className={`${STEPS[step].className} text-heading break-words`}
+      >
         {STEPS[step].sample}
       </dd>
     </div>
@@ -64,7 +67,7 @@ function TypeStep({ step }: { step: (typeof TYPE_SCALE_STEPS)[number] }) {
 
 function TypeScale() {
   return (
-    <dl className="grid grid-cols-[11rem_1fr] items-baseline gap-x-6 gap-y-4">
+    <dl className="grid grid-cols-1 items-baseline gap-x-6 gap-y-4 sm:grid-cols-[11rem_minmax(0,1fr)]">
       {TYPE_SCALE_STEPS.map(step => (
         <TypeStep key={step} step={step} />
       ))}
