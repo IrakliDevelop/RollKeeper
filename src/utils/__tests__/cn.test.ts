@@ -99,4 +99,13 @@ describe('cn', () => {
       'scrollbar-hide overflow-x-auto overflow-y-hidden'
     );
   });
+
+  it('lets an inset focus ring replace the outset one', () => {
+    expect(
+      cn(
+        'focus-visible:outline-offset-2 focus-visible:outline-ring',
+        'focus-visible:-outline-offset-2'
+      )
+    ).toBe('focus-visible:outline-ring focus-visible:-outline-offset-2');
+  });
 });

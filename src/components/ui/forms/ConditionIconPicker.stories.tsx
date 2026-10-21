@@ -34,12 +34,31 @@ async function expectGridFits(grid: HTMLElement, minCell: number) {
   await expect(second.left).toBeGreaterThanOrEqual(first.right);
 }
 
+/**
+ * The keyboard focus ring sits inside the cell: the grid clips anything
+ * outside it, which cut the ring off on edge cells.
+ */
+async function expectFocusRingInside(grid: HTMLElement) {
+  const first = within(grid).getAllByRole('button')[0];
+  for (let i = 0; i < 10 && document.activeElement !== first; i++) {
+    await userEvent.tab();
+  }
+  await expect(first).toHaveFocus();
+  await expect(first.matches(':focus-visible')).toBe(true);
+  const style = getComputedStyle(first);
+  await expect(style.outlineStyle).toBe('solid');
+  await expect(
+    parseFloat(style.outlineOffset) + parseFloat(style.outlineWidth)
+  ).toBeLessThanOrEqual(0);
+}
+
 async function checkGrid(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
   const page = within(document.body);
   await userEvent.click(canvas.getByRole('button', { name: /Condition icon/ }));
   const grid = await page.findByRole('group', { name: 'Icons' });
   await expectGridFits(grid, 36);
+  await expectFocusRingInside(grid);
 
   // A classic scrollbar (Windows, Linux) takes about 15px from the grid.
   // Storybook's headless browser hides scrollbars, so take the width away.
