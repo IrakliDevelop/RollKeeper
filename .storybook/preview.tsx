@@ -1,6 +1,7 @@
 import type { Preview, Decorator } from '@storybook/nextjs-vite';
 import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';
+import './fonts.css';
 import { MotionProvider } from '../src/app/MotionProvider';
 import { ConfirmDialogHost } from '../src/components/ui/feedback/confirm-dialog';
 
@@ -67,7 +68,22 @@ const withTheme: Decorator = (Story, context) => {
   );
 };
 
+// The app preloads its fonts. Without this, a story paints in the fallback
+// face and shifts when the fonts arrive, which moves what play functions
+// measure. These cover the common faces; the rest load on first use.
+const STORY_FONTS = [
+  '400 15px Barlow',
+  '600 15px Barlow',
+  '600 34px "Barlow Condensed"',
+  '700 28px Vollkorn',
+];
+
 const preview: Preview = {
+  loaders: [
+    async () => {
+      await Promise.all(STORY_FONTS.map(font => document.fonts.load(font)));
+    },
+  ],
   parameters: {
     controls: {
       matchers: {

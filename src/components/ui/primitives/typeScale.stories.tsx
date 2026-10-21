@@ -106,6 +106,17 @@ export const Scale: Story = {
     await expect(getComputedStyle(hp).fontVariantNumeric).toBe(
       'lining-nums tabular-nums'
     );
+    // The families are declared, not just named in the tokens.
+    for (const font of [
+      '700 28px Vollkorn',
+      '400 15px Barlow',
+      '600 34px "Barlow Condensed"',
+    ]) {
+      await expect(
+        (await document.fonts.load(font)).length,
+        font
+      ).toBeGreaterThan(0);
+    }
   },
 };
 
