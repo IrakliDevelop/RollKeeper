@@ -26,26 +26,26 @@
   --font-heading-family: var(--font-vollkorn, 'Vollkorn'), Georgia, serif;
 
   /* --- Neutrals --- */
-  --surface: #e9ebe4;
-  --surface-secondary: #eef0ea;
-  --surface-raised: #f4f5f0;
-  --surface-elevated: #fbfbf8;
-  --surface-inset: #e1e4db;
-  --surface-hover: #e4e7df;
-  --surface-overlay: rgba(28, 36, 32, 0.35);
+  --surface: #e9ebe4; /* page canvas */
+  --surface-secondary: #eef0ea; /* alternate band, table header, subtle well */
+  --surface-raised: #f4f5f0; /* cards: a character, monster, spell, item */
+  --surface-elevated: #fbfbf8; /* popovers, menus, dialogs, drawers */
+  --surface-inset: #e1e4db; /* inputs, wells */
+  --surface-hover: #e4e7df; /* row and ghost hover */
+  --surface-overlay: rgba(28, 36, 32, 0.35); /* dialog scrim */
   /* The one shadow: floating layers only (popover, menu, dialog, drawer). */
   --overlay-shadow:
     0 8px 24px rgb(28 36 32 / 0.16), 0 2px 6px rgb(28 36 32 / 0.1);
 
-  --heading: #1c2420;
-  --body: #4b544d;
-  --muted: #5f675e;
+  --heading: #1c2420; /* primary text */
+  --body: #4b544d; /* secondary text */
+  --muted: #5f675e; /* captions, metadata, placeholders */
   --faint: #8b9287; /* decorative and disabled only */
-  --inverse: #fbfbf8;
+  --inverse: #fbfbf8; /* text on a role-coloured fill (older badges) */
 
-  --divider: #cbd0c4;
-  --divider-strong: #a9b0a2;
-  --input-border: #78806f;
+  --divider: #cbd0c4; /* hairlines */
+  --divider-strong: #a9b0a2; /* emphasis rules */
+  --input-border: #78806f; /* control boundaries */
 
   /* --- Roles: each colour has exactly one job --- */
   --brass-text: #7a5b17; /* primary action, focus, proficiency, on-state */
