@@ -17,7 +17,7 @@ import { remountOnTheme } from './remountOnTheme';
 import { useComputedValue } from './useComputedValue';
 
 /**
- * Motion only answers something the user did. Durations are measured from
+ * Motion follows an action or a change on the sheet. Durations are measured from
  * the real Button, Switch and Dialog: 120ms for a state change, 180ms to
  * enter or leave, ease-out. Under reduced motion they drop to almost zero.
  */

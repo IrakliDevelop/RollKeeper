@@ -78,7 +78,7 @@ function TouchPage() {
   return (
     <div className="max-w-3xl space-y-8">
       <div className="space-y-3">
-        <h2 className="type-heading text-heading">Measured</h2>
+        <h2 className="type-heading text-heading">Measured sizes</h2>
         <ul className="space-y-4">
           <li className="flex flex-wrap items-center gap-4">
             <Button ref={button.ref} size="sm">

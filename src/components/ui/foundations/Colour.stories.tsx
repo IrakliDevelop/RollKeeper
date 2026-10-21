@@ -72,7 +72,7 @@ function ThemePanel({ theme, label }: (typeof THEMES)[number]) {
           Neutrals
         </h3>
         <p className="type-small text-body">
-          Neutrals: canvas, cards, floating layers, text and rules.
+          Page canvas, cards, floating layers, text and rules.
         </p>
         <ul className="grid gap-3 sm:grid-cols-2">
           {COLOURS.neutrals.map(({ name, note }) => (

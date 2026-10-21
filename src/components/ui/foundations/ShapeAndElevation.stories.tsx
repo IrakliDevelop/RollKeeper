@@ -93,7 +93,7 @@ function RadiusRows() {
       </Row>
       <Row
         name="Button"
-        rule="Controls share the small radius. No pill buttons."
+        rule="Controls share the control radius. No pill buttons."
         measure="radius"
         value={button.value}
       >
@@ -111,7 +111,7 @@ function RadiusRows() {
       </Row>
       <Row
         name="Card"
-        rule="Objects share the larger radius. Cards hold one thing and never nest."
+        rule="Cards and other objects share the object radius. Cards hold one thing and never nest."
         measure="radius"
         value={card.value}
       >
