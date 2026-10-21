@@ -274,7 +274,11 @@ describe('DmBattleMapCanvas wiring', () => {
 
     expect(mockHookState.handleSaveMarkerDetail).toHaveBeenCalledTimes(1);
     expect(mockHookState.handleCloseMarkerPanel).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Marker saved')).toBeInTheDocument();
+    // The visible toast, and the copy screen readers hear.
+    expect(document.body.querySelector('[data-toast-type]')).toHaveTextContent(
+      'Marker saved'
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Marker saved');
   });
 
   it('does not reach the toolbar before a viewport exists (viewport gate)', () => {

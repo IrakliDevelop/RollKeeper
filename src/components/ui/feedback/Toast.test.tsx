@@ -118,6 +118,94 @@ describe('ToastContainer', () => {
     expect(region).toHaveTextContent('Long rest taken');
   });
 
+  it('announces the title, message and details but not the dismiss button', () => {
+    render(<ToastContainer toasts={[toast()]} onDismiss={() => {}} />);
+
+    const region = screen.getByRole('status');
+    expect(
+      Array.from(region.querySelectorAll('p'), p => p.textContent)
+    ).toEqual([
+      'Long rest taken',
+      'Hit points and spell slots are back',
+      'All spell slots restored',
+    ]);
+    expect(region.querySelector('button, [tabindex]')).toBeNull();
+
+    // The button stays in the visible toast, reachable by Tab.
+    const dismiss = screen.getByRole('button', {
+      name: 'Dismiss notification',
+    });
+    expect(dismiss.closest('[aria-live]')).toBeNull();
+    expect(dismiss.closest('[data-toast-type]')).toHaveTextContent(
+      'Long rest taken'
+    );
+  });
+
+  it('clears each announcement after a second so it is read once', () => {
+    const first = toast();
+    const second = toast({ id: 'toast-2', title: 'Short rest taken' });
+    const { rerender } = render(
+      <ToastContainer toasts={[first]} onDismiss={() => {}} />
+    );
+    const region = screen.getByRole('status');
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(region).toBeEmptyDOMElement();
+    expect(
+      document.body.querySelector('[data-toast-type="rest"]')
+    ).toHaveTextContent('Long rest taken');
+
+    // A later toast is announced on its own.
+    rerender(<ToastContainer toasts={[first, second]} onDismiss={() => {}} />);
+    expect(region).toHaveTextContent('Short rest taken');
+    expect(region).not.toHaveTextContent('Long rest taken');
+  });
+
+  it('keeps an announcement in place when a second toast lands in the same second', () => {
+    const first = toast();
+    const second = toast({ id: 'toast-2', title: 'Short rest taken' });
+    const { rerender } = render(
+      <ToastContainer toasts={[first]} onDismiss={() => {}} />
+    );
+    const region = screen.getByRole('status');
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    const firstNode = region.firstElementChild;
+    rerender(<ToastContainer toasts={[first, second]} onDismiss={() => {}} />);
+    // The first copy isn't re-mounted, so it isn't read again.
+    expect(region.firstElementChild).toBe(firstNode);
+    expect(region.children).toHaveLength(2);
+
+    act(() => {
+      vi.advanceTimersByTime(700);
+    });
+    expect(region.children).toHaveLength(1);
+    expect(region).toHaveTextContent('Short rest taken');
+
+    act(() => {
+      vi.advanceTimersByTime(300);
+    });
+    expect(region).toBeEmptyDOMElement();
+  });
+
+  it('drops the announcement when the toast goes within its first second', () => {
+    const { rerender } = render(
+      <ToastContainer toasts={[toast()]} onDismiss={() => {}} />
+    );
+    const region = screen.getByRole('status');
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    rerender(<ToastContainer toasts={[]} onDismiss={() => {}} />);
+    expect(region).toBeEmptyDOMElement();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('stays announced while a modal dialog hides the rest of the page', () => {
     render(
       <>

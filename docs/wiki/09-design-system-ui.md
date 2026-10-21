@@ -98,7 +98,10 @@ outline inside the row, because `surface-hover` alone barely shows on felt's
 elevated surface. Toasts add a 3px left rule in their role colour (verdigris for
 success and rests, blood for errors and damage, a neutral rule otherwise), a
 countdown bar that reduced motion hides, and a `role="status"` region that stays
-mounted so each new toast is announced.
+mounted so each new toast is announced. The region holds a text-only copy
+(title, message, details) for one second, so screen readers don't read the
+dismiss button and browsing the page doesn't meet the toast twice; the
+visible toast sits outside it.
 
 `BookmarkTabs` (the character sheet) and the VTT drawer tab bars are text tabs
 on a 1px divider rule; the active tab has heading text and a 2px brass

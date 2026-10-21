@@ -88,7 +88,11 @@ async function checkToasts(
   const card = (type: string) =>
     doc.querySelector(`[data-toast-type="${type}"]`) as HTMLElement;
 
-  await expect(page.getByRole('status')).toHaveTextContent('Long rest taken');
+  // The live region holds text only; the dismiss buttons stay in the cards.
+  await expect(
+    within(page.getByRole('status')).queryAllByRole('button')
+  ).toHaveLength(0);
+  await expect(card('rest')).toHaveTextContent('Long rest taken');
 
   for (const type of ['rest', 'damage', 'attack'] as const) {
     await waitFor(() => {
