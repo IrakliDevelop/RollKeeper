@@ -179,11 +179,13 @@ The character page (`/player/characters/[characterId]`) uses `TabbedCharacterShe
 |---|---|
 | Actions | Weapon/spell attacks, compact spell slot tracker |
 | Stats | Basic info, ability scores, saving throws, skills, XP |
-| Combat | AC, initiative, speed, HP manager, hit dice, conditions |
+| Combat | Sub-tabs: Player (AC, initiative, speed, HP manager, hit dice, conditions) · Defenses & Buffs · Summons |
 | Spells | Spellcasting stats, spell slots, spell list (hidden for non-casters) |
 | Inventory | Sub-tabs: Weapons · Magic Items · Armor · Items · Currency |
 | Features | Sub-tabs: Abilities (extended features) · Inspiration · Proficiencies |
-| Character | Features/traits editors, character background, session notes |
+| Character | Sub-tabs: Session Notes · Features & Background · Dice |
+| Calendar | The campaign's shared calendar when the DM syncs one, otherwise the character's own |
+| Map | The campaign's synced locations (only shown when the campaign has at least one) |
 
 **UX principles to follow when adding or changing content in this page:**
 - Keep each tab focused — don't pile unrelated sections into an existing tab; add a new tab instead
@@ -242,9 +244,13 @@ import { confirmDialog, alertDialog, promptDialog } from '@/components/ui/feedba
 // utilities (bg-surface, text-heading, type-heading). See Storybook → Foundations.
 ```
 
-Use `Button` with `variant`: `primary | secondary | success | danger | warning | outline | ghost | link`.
+Use `Button` with `variant`: `primary` (brass fill, the view's one main action) · `secondary` (the default, an outline) · `outline` · `ghost` · `danger` (blood outline) · `danger-solid` (blood fill, only the confirm button of a destructive dialog) · `link`. `success` and `warning` are deprecated aliases of `secondary`. A toggle button's on state is the `selected` prop, not a different variant.
 
-**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, and `type="number"` — and fails if any file's count rises. Existing `accent-*` tokens may be reused where a file already uses them, but don't add new uses; see `docs/wiki/09-design-system-ui.md`.
+Use `Badge` with `variant`: `primary` (brass) · `success` (verdigris) · `warning` (ember) · `danger` (blood) · `neutral` (the default). `secondary`, `info` and `outline` render as `neutral`.
+
+**Design skill.** Before building or reviewing UI, load the `rollkeeper-design` skill (`.claude/skills/rollkeeper-design/SKILL.md`; Codex and other agents: `.agents/skills/rollkeeper-design/SKILL.md`). It holds the recipes and the review checklist. The written rules are in [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md); Storybook → Foundations shows the tokens.
+
+**Design ratchet.** `npm run design:ci` (run in CI) counts retired visual patterns per file — gradients, hover scale/translate, large shadows, backdrop blur, hue-named `accent-*` tokens, raw Tailwind hue classes, uppercase labels, `Sparkles`, `type="number"`, and `shadow-overlay` outside the floating-layer primitives (`variants.ts` and `SideDrawer.tsx` are allow-listed) — and fails if any file's count rises. Existing `accent-*` uses can stay until their area's sweep (restyling one is a visible change), but don't write new ones, even in a file that already has some; see `docs/wiki/09-design-system-ui.md`.
 
 ### Naming conventions
 
@@ -286,4 +292,4 @@ Use `Button` with `variant`: `primary | secondary | success | danger | warning |
 - Direct state mutation — always use immutable updates
 - `useEffect` data fetching without cleanup
 - Hardcoded colors/spacing — use design tokens
-- The legacy `Modal` component — use `Dialog` from `@/components/ui/feedback/dialog`
+- Hand-built modal overlays — use `Dialog` from `@/components/ui/feedback/dialog`, or `confirmDialog` for a yes/no question

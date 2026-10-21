@@ -1,9 +1,14 @@
 # Design System & UI
 
 Full component-usage rules (which import to use, variant names, naming
-conventions) are already documented in `/CLAUDE.md` — **read that, don't
-duplicate it here.** This file covers what CLAUDE.md doesn't: the actual
-directory layout and where things deviate from the documented pattern.
+conventions) are in `AGENTS.md` (which `CLAUDE.md` imports) — **read that,
+don't duplicate it here.** The design rules (colour roles, type scale, shape,
+motion, touch, the editing model) are in
+[`docs/DESIGN_SYSTEM.md`](../DESIGN_SYSTEM.md), Storybook → Foundations
+renders the tokens, and agents load the `rollkeeper-design` skill
+(`.claude/skills/rollkeeper-design/SKILL.md`, mirrored in `.agents/skills/`)
+before building or reviewing UI. This file covers the actual directory layout
+and where things deviate from the documented pattern.
 
 ## `src/components/ui/` subdirectories
 
@@ -11,14 +16,18 @@ directory layout and where things deviate from the documented pattern.
 |---|---|
 | `forms/` | `Button`, `Input`, `Textarea`, `Checkbox`, `SelectField`, `Switch`, `RadioGroupField`, `Autocomplete` + domain variants (`ArmorAutocomplete`, `SpellAutocomplete`, `WeaponAutocomplete`, `MagicItemAutocomplete`, `FeatureAutocomplete`, `ItemAutocomplete`), `NumberInput`, `InPlaceField` and `AnchoredEditor` (see [Editing numbers](#editing-numbers)), `RichTextEditor` / `CompactRichTextEditor`. Also `CustomCheckbox`, `CustomSwitcher`, `FancySelect` — older, pre-design-system components; **prefer the documented primitives** (`Checkbox`, `SelectField`, `Switch`) for new code rather than the `Custom*`/`Fancy*` ones. |
 | `layout/` | `card`, `section` (heading + rule + content, for layout; `Card` is for discrete objects), `badge`, `BookmarkTabs` (the tab-persistence mechanism behind `TabbedCharacterSheet`), `DragDropList` / `DragHandle`, `VirtualizedList`, `ExperimentalFeaturesSection` / `FeaturesNavigationSection` (user-facing experimental-feature toggles) |
-| `feedback/` | `dialog` (Radix-based, `dialog-new` internally), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`. Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
+| `feedback/` | `dialog` (Radix-based), `confirm-dialog` (`confirmDialog`/`alertDialog`/`promptDialog` + one `ConfirmDialogHost` in the root layout; `ConfirmationModal` wraps the same view), `ConfirmationModal`, `Toast`, `SideDrawer`, `ErrorBoundary` / `ErrorPage`, `ImageLightbox`, `LevelUpOverlay`, `YouDiedOverlay`, `NotHydrated`, `SaveIndicator`, `StorageBlockedBanner` (shown when the browser blocks storage). Also several storage-migration/recovery components that live here despite not being generic feedback primitives: `CharacterRecoveryExportControls`, `CharacterStorageMigrationControls`, `CombatStartBanner`, `DataSafetyBanner`, `DeviceRecoveryControls` — see [03](03-persistence-and-storage-migration.md). |
 | `primitives/` | `variants.ts` (the CVA class recipes, plus `OVERLAY_SURFACE` for floating layers), `animations.ts`, `Tooltip.tsx`, and the Foundations/Type scale story. The tokens themselves are CSS variables in `src/app/globals.css`; Storybook's Foundations pages render them |
+| `foundations/` | Storybook Foundations pages (Colour, Shape and elevation, Motion, Touch) and their helpers: `themeTokens.ts` reads the tokens out of `globals.css`, `useComputedValue.ts` measures rendered values, `remountOnTheme.tsx` re-measures when the toolbar theme changes |
 | `game/` | Core D&D mechanics widgets: dice roller, conditions manager, currency, equipment, inventory (with `conditions/`, `equipment/`, `inventory/` subfolders) |
 | `character/` | Character-sheet-specific composite components: ability scores, HUD, HP/hit-dice managers, class resources, level-up wizard, player-backup UI ([06](06-player-backup-wizard.md)), automatic-sync controls |
-| `campaign/` | DM/session-oriented: membership controls, cloud workspace controls, initiative panel, NPC editors, battle-map/VTT (`dm-vtt/`, `player-vtt/`, `location-map/`, `battle-map/`, `token-overlay/`), sync-status controls per domain (`*SyncControls`) |
+| `campaign/` | DM/session-oriented: membership controls, cloud workspace controls, initiative panel, NPC editors, battle-map/VTT (`dm-vtt/`, `player-vtt/`, `location-map/`, `battle-map/`, `token-overlay/`), the NPC shop (`NPCShopTab/`) and the player's view of it (`player-shop/`), sync-status controls per domain (`*SyncControls`) |
+| `encounter/` | The DM encounter tracker: `EncounterList`, `EncounterView`, the `combat-screen/` layouts, `CombatConfigDialog`, `custom-conditions/`, `MonsterStatBlockPanel` |
 | `calendar/` | Campaign calendar UI |
 | `icons/` | Icon components |
 | `utils/` | UI-layer utility functions |
+| `ThemeToggle.tsx` | The theme switch (`useTheme`) |
+| `index.ts` | Barrel that re-exports `character`, `feedback`, `forms`, `game`, `layout` and `utils` |
 
 There is no separate top-level `stats/`, `conditions/`, `combat/`, or
 `spells/` directory — those live inside `game/` and `character/` as

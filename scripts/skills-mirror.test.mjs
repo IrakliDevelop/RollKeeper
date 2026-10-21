@@ -38,3 +38,9 @@ test('the design skill and the design system doc point at each other', async () 
     /\.claude\/skills\/rollkeeper-design\/SKILL\.md/
   );
 });
+
+test('AGENTS.md points Claude Code and Codex at the design skill', async () => {
+  const agents = await read('AGENTS.md');
+  assert.match(agents, /\.claude\/skills\/rollkeeper-design\/SKILL\.md/);
+  assert.match(agents, /\.agents\/skills\/rollkeeper-design\/SKILL\.md/);
+});
