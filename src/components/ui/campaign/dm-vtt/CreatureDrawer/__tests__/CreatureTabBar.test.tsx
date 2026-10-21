@@ -42,4 +42,12 @@ describe('CreatureTabBar', () => {
     );
     expect(screen.getByRole('tablist').innerHTML).not.toMatch(/accent-emerald/);
   });
+
+  it('reaches 44px on coarse pointers', () => {
+    renderBar();
+
+    for (const tab of screen.getAllByRole('tab')) {
+      expect(tab).toHaveClass('pointer-coarse:min-h-11');
+    }
+  });
 });

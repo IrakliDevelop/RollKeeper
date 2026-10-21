@@ -30,4 +30,19 @@ describe('SheetTabBar', () => {
     );
     expect(screen.getByRole('tablist').innerHTML).not.toMatch(/accent-emerald/);
   });
+
+  it('reaches 44px on coarse pointers', () => {
+    render(
+      <Tabs.Root value="overview">
+        <SheetTabBar
+          activeTab="overview"
+          tabs={[{ id: 'overview', label: 'Overview', icon: LayoutGrid }]}
+        />
+      </Tabs.Root>
+    );
+
+    expect(screen.getByRole('tab', { name: 'Overview' })).toHaveClass(
+      'pointer-coarse:min-h-11'
+    );
+  });
 });

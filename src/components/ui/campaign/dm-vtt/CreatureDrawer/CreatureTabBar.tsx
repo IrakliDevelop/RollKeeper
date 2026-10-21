@@ -35,7 +35,7 @@ export function CreatureTabBar({ tabs, activeTab }: CreatureTabBarProps) {
             key={tab.id}
             value={tab.id}
             className={cn(
-              'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors',
+              'flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2 text-xs font-semibold transition-colors pointer-coarse:min-h-11',
               active
                 ? 'border-brass-fill text-heading'
                 : 'text-muted border-transparent'

@@ -109,6 +109,7 @@ underline. In `BookmarkTabs`, the arrow keys, Home and End move to a tab and
 open it. Its strip hides the scrollbar (`scrollbar-hide`, a `globals.css`
 utility) because the chevrons are its scroll cue. Toolbars that scroll
 sideways without chevrons keep a thin native scrollbar (`scrollbar-thin`).
+Tabs in all three strips are at least 44px tall on coarse pointers.
 
 ## Editing numbers
 
