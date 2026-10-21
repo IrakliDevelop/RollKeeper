@@ -12,6 +12,7 @@ import {
   calculatePactMagic,
   updateSpellSlotsPreservingUsed,
   hasSpellSlots,
+  getRestSlots,
   // XP
   calculateLevelFromXP,
   getXPForLevel,
@@ -522,6 +523,43 @@ describe('hasSpellSlots', () => {
 
   it('returns false when slots is undefined', () => {
     expect(hasSpellSlots(undefined)).toBe(false);
+  });
+});
+
+// ===== getRestSlots =====
+
+describe('getRestSlots', () => {
+  const makeSlots = (level1Max: number) =>
+    ({
+      ...Object.fromEntries(
+        [1, 2, 3, 4, 5, 6, 7, 8, 9].map(level => [level, { max: 0, used: 0 }])
+      ),
+      1: { max: level1Max, used: 0 },
+    }) as import('@/types/character').SpellSlots;
+  const pact = (max: number) => ({ slots: { max, used: 0 }, level: 1 });
+
+  it('lists no slots for a Fighter', () => {
+    expect(
+      getRestSlots({ spellSlots: makeSlots(0), pactMagic: undefined })
+    ).toEqual({ pactMagic: false, spellSlots: false });
+  });
+
+  it('lists spell slots but not Pact Magic for a Wizard', () => {
+    expect(
+      getRestSlots({ spellSlots: makeSlots(2), pactMagic: undefined })
+    ).toEqual({ pactMagic: false, spellSlots: true });
+  });
+
+  it('lists both for a Warlock', () => {
+    expect(
+      getRestSlots({ spellSlots: makeSlots(0), pactMagic: pact(1) })
+    ).toEqual({ pactMagic: true, spellSlots: true });
+  });
+
+  it('ignores a Pact Magic entry with no slots', () => {
+    expect(
+      getRestSlots({ spellSlots: makeSlots(0), pactMagic: pact(0) })
+    ).toEqual({ pactMagic: false, spellSlots: false });
   });
 });
 

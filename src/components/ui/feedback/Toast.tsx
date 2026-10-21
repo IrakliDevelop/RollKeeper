@@ -6,6 +6,7 @@ import { X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon, type IconName } from '@/components/ui/icons';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import type { RestSlots } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 
 export interface ToastDetail {
@@ -231,6 +232,29 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   return createPortal(content, document.body);
 };
 
+/**
+ * The long-rest toast, shared by the rest dialog and the calendar (which
+ * adds a line when it advances the day). Slot lines only appear for
+ * characters who have those slots.
+ */
+export function longRestToast(
+  slots: RestSlots,
+  extraDetails: string[] = []
+): Omit<ToastData, 'id'> {
+  return {
+    type: 'rest',
+    title: 'Long rest taken',
+    icon: 'restLong',
+    message: 'Hit points are full and abilities are back',
+    details: [
+      ...(slots.spellSlots ? ['All spell slots restored'] : []),
+      'Hit dice partially restored',
+      ...extraDetails,
+    ],
+    duration: 6000,
+  };
+}
+
 // Hook for managing toasts
 export const useToast = () => {
   const [toasts, setToasts] = useState<ToastData[]>([]);
@@ -349,38 +373,30 @@ export const useToast = () => {
     [addToast]
   );
 
-  const showShortRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Short Rest Complete',
-      icon: 'restShort',
-      message: 'Your character has taken a short rest',
-      details: [
-        'Short rest abilities restored',
-        'Pact Magic slots restored',
-        'Reaction reset',
-        'Ready to continue your adventure!',
-      ],
-      duration: 5000,
-    });
-  }, [addToast]);
+  // Slot lines only appear for characters who have those slots.
+  const showShortRest = useCallback(
+    (slots: RestSlots) => {
+      addToast({
+        type: 'rest',
+        title: 'Short rest taken',
+        icon: 'restShort',
+        message: 'Abilities that recharge on a short rest are back',
+        details: [
+          ...(slots.pactMagic ? ['Pact Magic slots restored'] : []),
+          'Reaction reset',
+        ],
+        duration: 5000,
+      });
+    },
+    [addToast]
+  );
 
-  const showLongRest = useCallback(() => {
-    addToast({
-      type: 'rest',
-      title: 'Long Rest Complete',
-      icon: 'restLong',
-      message: 'Your character has taken a long rest',
-      details: [
-        'All abilities restored',
-        'All spell slots restored',
-        'Hit points fully restored',
-        'Hit dice partially restored',
-        'Ready for new challenges!',
-      ],
-      duration: 6000,
-    });
-  }, [addToast]);
+  const showLongRest = useCallback(
+    (slots: RestSlots) => {
+      addToast(longRestToast(slots));
+    },
+    [addToast]
+  );
 
   return {
     toasts,
