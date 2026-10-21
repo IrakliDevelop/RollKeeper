@@ -468,6 +468,23 @@
   animation: condition-pulse 2s ease-in-out infinite;
 }
 
+/* Hides a scroll container's scrollbar but keeps it scrollable (wheel,
+   swipe, keyboard). Only for strips with their own scroll cue, such as the
+   sheet tabs' chevrons. */
+@utility scrollbar-hide {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* A thin native scrollbar; the theme's color-scheme colours it. For toolbars
+   whose scrollbar is their only scroll cue. */
+@utility scrollbar-thin {
+  scrollbar-width: thin;
+}
+
 /* Type scale: one class sets family, size, line height and weight. The
    num-* steps go through Tailwind's numeric variables, so adding
    tabular-nums or slashed-zero next to them composes instead of fighting. */

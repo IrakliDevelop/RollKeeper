@@ -103,7 +103,9 @@ mounted so each new toast is announced.
 `BookmarkTabs` (the character sheet) and the VTT drawer tab bars are text tabs
 on a 1px divider rule; the active tab has heading text and a 2px brass
 underline. In `BookmarkTabs`, the arrow keys, Home and End move to a tab and
-open it.
+open it. Its strip hides the scrollbar (`scrollbar-hide`, a `globals.css`
+utility) because the chevrons are its scroll cue. Toolbars that scroll
+sideways without chevrons keep a thin native scrollbar (`scrollbar-thin`).
 
 ## Editing numbers
 

@@ -90,7 +90,9 @@ export function ConditionIconPicker({
             <div
               role="group"
               aria-label="Icons"
-              className="mt-2 grid max-h-56 grid-cols-6 gap-1 overflow-y-auto"
+              // As many columns as fit: a classic scrollbar or 44px touch
+              // cells drop one instead of scrolling sideways.
+              className="mt-2 grid max-h-56 grid-cols-[repeat(auto-fill,minmax(2.25rem,1fr))] justify-items-center gap-1 overflow-x-hidden overflow-y-auto pointer-coarse:grid-cols-[repeat(auto-fill,minmax(2.75rem,1fr))]"
             >
               {names.map(name => {
                 const Icon = CONDITION_ICON_REGISTRY[name];

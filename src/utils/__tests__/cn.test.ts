@@ -93,4 +93,10 @@ describe('cn', () => {
       );
     });
   });
+
+  it('keeps scrollbar-hide next to overflow utilities', () => {
+    expect(cn('scrollbar-hide', 'overflow-x-auto', 'overflow-y-hidden')).toBe(
+      'scrollbar-hide overflow-x-auto overflow-y-hidden'
+    );
+  });
 });

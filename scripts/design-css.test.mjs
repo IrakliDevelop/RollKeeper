@@ -300,13 +300,28 @@ test('a light wrapper inside a felt page re-declares every paper literal', async
 
 test('number fields hide their spin buttons', async () => {
   const output = await buildCss([]);
+  // [^}]*? and the lookbehind let a prefixed -webkit-/-moz-appearance line
+  // come first without matching it as the unprefixed one.
   assert.match(
     output,
-    /input\[type=['"]?number['"]?\]\s*\{\s*appearance:\s*textfield/
+    /input\[type=['"]?number['"]?\]\s*\{[^}]*?(?<![\w-])appearance:\s*textfield/
   );
   assert.match(
     output,
-    /input\[type=['"]?number['"]?\]::-webkit-inner-spin-button,\s*input\[type=['"]?number['"]?\]::-webkit-outer-spin-button\s*\{\s*appearance:\s*none;\s*margin:\s*0/
+    /input\[type=['"]?number['"]?\]::-webkit-inner-spin-button,\s*input\[type=['"]?number['"]?\]::-webkit-outer-spin-button\s*\{[^}]*?(?<![\w-])appearance:\s*none;[^}]*?margin:\s*0/
+  );
+});
+
+test('scrollbar-thin draws a thin native scrollbar', async () => {
+  const output = await buildCss(['scrollbar-thin']);
+  assert.match(output, /\.scrollbar-thin\s*\{\s*scrollbar-width:\s*thin;\s*\}/);
+});
+
+test('scrollbar-hide hides the scrollbar in every engine', async () => {
+  const output = await buildCss(['scrollbar-hide']);
+  assert.match(
+    output,
+    /\.scrollbar-hide\s*\{\s*scrollbar-width:\s*none;\s*&::-webkit-scrollbar\s*\{\s*display:\s*none;/
   );
 });
 
