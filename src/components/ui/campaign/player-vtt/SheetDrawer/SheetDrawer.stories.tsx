@@ -419,8 +419,13 @@ export const Tablet: Story = {
           44
         );
       }
-      // Taller tabs don't push the drawer into sideways scrolling.
+      // Taller tabs don't push the drawer into sideways scrolling, and all
+      // six fit the strip without it scrolling either.
       await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+      const tablist = within(dialog).getByRole('tablist');
+      await expect(tablist.scrollWidth).toBeLessThanOrEqual(
+        tablist.clientWidth
+      );
     } finally {
       restore();
     }
