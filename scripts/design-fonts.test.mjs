@@ -13,15 +13,52 @@ import {
 
 const appDir = path.join(repositoryRoot, 'src', 'app');
 
-const FONT_FILES = [
-  'barlow-condensed-latin-600-normal.woff2',
-  'barlow-condensed-latin-700-normal.woff2',
-  'barlow-latin-400-italic.woff2',
-  'barlow-latin-400-normal.woff2',
-  'barlow-latin-500-normal.woff2',
-  'barlow-latin-600-normal.woff2',
-  'vollkorn-latin-wght-normal.woff2',
+const FACES = [
+  {
+    file: 'barlow-condensed-latin-600-normal.woff2',
+    family: 'Barlow Condensed',
+    weight: '600',
+    style: 'normal',
+  },
+  {
+    file: 'barlow-condensed-latin-700-normal.woff2',
+    family: 'Barlow Condensed',
+    weight: '700',
+    style: 'normal',
+  },
+  {
+    file: 'barlow-latin-400-italic.woff2',
+    family: 'Barlow',
+    weight: '400',
+    style: 'italic',
+  },
+  {
+    file: 'barlow-latin-400-normal.woff2',
+    family: 'Barlow',
+    weight: '400',
+    style: 'normal',
+  },
+  {
+    file: 'barlow-latin-500-normal.woff2',
+    family: 'Barlow',
+    weight: '500',
+    style: 'normal',
+  },
+  {
+    file: 'barlow-latin-600-normal.woff2',
+    family: 'Barlow',
+    weight: '600',
+    style: 'normal',
+  },
+  {
+    file: 'vollkorn-latin-wght-normal.woff2',
+    family: 'Vollkorn',
+    weight: '400 900',
+    style: 'normal',
+  },
 ];
+// Sorted by file name: the first test compares with readdir order.
+const FONT_FILES = FACES.map(face => face.file);
 
 const RETIRED_FONT = /geist|cinzel|bricolage|hanken/i;
 
@@ -48,6 +85,26 @@ test('Storybook declares every shipped font file', async () => {
     assert.ok(
       css.includes(`../src/app/fonts/${file}`),
       `.storybook/fonts.css misses ${file}`
+    );
+  }
+  const blocks = css.match(/@font-face\s*\{[^}]*\}/g) ?? [];
+  for (const face of FACES) {
+    const block = blocks.find(b => b.includes(`../src/app/fonts/${face.file}`));
+    assert.ok(block, `.storybook/fonts.css has no @font-face for ${face.file}`);
+    assert.match(
+      block,
+      new RegExp(`font-family:\\s*'${face.family}'`),
+      `${face.file}: family`
+    );
+    assert.match(
+      block,
+      new RegExp(`font-weight:\\s*${face.weight};`),
+      `${face.file}: weight`
+    );
+    assert.match(
+      block,
+      new RegExp(`font-style:\\s*${face.style};`),
+      `${face.file}: style`
     );
   }
   for (const family of ['Vollkorn', 'Barlow', 'Barlow Condensed']) {

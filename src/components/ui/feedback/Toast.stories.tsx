@@ -88,10 +88,12 @@ async function checkToasts(
   const card = (type: string) =>
     doc.querySelector(`[data-toast-type="${type}"]`) as HTMLElement;
 
-  // The live region holds text only; the dismiss buttons stay in the cards.
+  // The dismiss buttons live in the cards, never in the live region. The
+  // region's text and its 1s clearing are covered by Toast.test.tsx.
   await expect(
-    within(page.getByRole('status')).queryAllByRole('button')
-  ).toHaveLength(0);
+    doc.querySelectorAll('[data-toast-type] button').length
+  ).toBeGreaterThanOrEqual(3);
+  await expect(page.getByRole('status').querySelector('button')).toBeNull();
   await expect(card('rest')).toHaveTextContent('Long rest taken');
 
   for (const type of ['rest', 'damage', 'attack'] as const) {

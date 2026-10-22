@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/forms/input';
 import { Card } from '@/components/ui/layout/card';
 import { Section } from '@/components/ui/layout/section';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { Measured, measured } from './measure';
 import { remountOnTheme } from './remountOnTheme';
 import { useComputedValue } from './useComputedValue';
 
@@ -64,7 +65,7 @@ function Row({
         <p className="type-ui text-heading">{name}</p>
         <p className="type-small text-body">{rule}</p>
         <p className="type-caption text-muted">
-          {measure}: <span data-measure={`${name}: ${measure}`}>{value}</span>
+          {measure}: <Measured id={`${name}: ${measure}`} value={value} />
         </p>
       </div>
     </li>
@@ -196,8 +197,8 @@ function SpaceRows() {
       </div>
       <p className="type-caption text-muted">
         Heading to rule:{' '}
-        <span data-measure="Section heading gap">{above.value}</span>. Rule to
-        content: <span data-measure="Section content gap">{below.value}</span>.
+        <Measured id="Section heading gap" value={above.value} />. Rule to
+        content: <Measured id="Section content gap" value={below.value} />.
       </p>
     </div>
   );
@@ -226,8 +227,6 @@ function ShapePage() {
 }
 
 async function checkShape(canvasElement: HTMLElement) {
-  const measured = (name: string) =>
-    canvasElement.querySelector(`[data-measure="${name}"]`)!.textContent;
   const expected: Record<string, string> = {
     'Section: radius': '0px',
     'Button: radius': '4px',
@@ -239,14 +238,16 @@ async function checkShape(canvasElement: HTMLElement) {
     'Section content gap': '16px',
   };
   for (const [name, value] of Object.entries(expected)) {
-    await waitFor(() => expect(measured(name), name).toBe(value));
+    await waitFor(() =>
+      expect(measured(canvasElement, name), name).toBe(value)
+    );
   }
   // The floating layer casts exactly --overlay-shadow.
   const token = canvasElement.querySelector<HTMLElement>(
     '[data-overlay-shadow]'
   )!;
   await waitFor(() => expect(token.dataset.overlayShadow).toMatch(/px/));
-  await expect(measured('Floating layer: shadow')).toBe(
+  await expect(measured(canvasElement, 'Floating layer: shadow')).toBe(
     token.dataset.overlayShadow
   );
 }

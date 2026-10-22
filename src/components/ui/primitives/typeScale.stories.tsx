@@ -75,52 +75,59 @@ function TypeScale() {
   );
 }
 
+async function checkScale(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  const sizes: Record<string, string> = {
+    title: '28px',
+    heading: '22px',
+    subheading: '18px',
+    'label-heading': '16px',
+    body: '15px',
+    ui: '14px',
+    small: '13px',
+    caption: '12px',
+    'num-xl': '34px',
+    'num-lg': '26px',
+    'num-md': '20px',
+  };
+  for (const [step, size] of Object.entries(sizes)) {
+    const { className, sample } = STEPS[step as keyof typeof STEPS];
+    await expect(getComputedStyle(canvas.getByText(sample)).fontSize).toBe(
+      size
+    );
+    // The label shows the same measured size.
+    await expect(
+      await canvas.findByText(`${className} · ${size}`)
+    ).toBeVisible();
+  }
+  const hp = canvas.getByText(STEPS['num-xl'].sample);
+  await expect(getComputedStyle(hp).fontVariantNumeric).toBe(
+    'lining-nums tabular-nums'
+  );
+  // The families are declared, not just named in the tokens.
+  for (const font of [
+    '700 28px Vollkorn',
+    '400 15px Barlow',
+    'italic 400 15px Barlow',
+    '500 15px Barlow',
+    '600 15px Barlow',
+    '600 34px "Barlow Condensed"',
+    '700 34px "Barlow Condensed"',
+  ]) {
+    await expect(
+      (await document.fonts.load(font)).length,
+      font
+    ).toBeGreaterThan(0);
+  }
+}
+
 export const Scale: Story = {
   render: () => <TypeScale />,
-  play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
-    const sizes: Record<string, string> = {
-      title: '28px',
-      heading: '22px',
-      subheading: '18px',
-      'label-heading': '16px',
-      body: '15px',
-      ui: '14px',
-      small: '13px',
-      caption: '12px',
-      'num-xl': '34px',
-      'num-lg': '26px',
-      'num-md': '20px',
-    };
-    for (const [step, size] of Object.entries(sizes)) {
-      const { className, sample } = STEPS[step as keyof typeof STEPS];
-      await expect(getComputedStyle(canvas.getByText(sample)).fontSize).toBe(
-        size
-      );
-      // The label shows the same measured size.
-      await expect(
-        await canvas.findByText(`${className} · ${size}`)
-      ).toBeVisible();
-    }
-    const hp = canvas.getByText(STEPS['num-xl'].sample);
-    await expect(getComputedStyle(hp).fontVariantNumeric).toBe(
-      'lining-nums tabular-nums'
-    );
-    // The families are declared, not just named in the tokens.
-    for (const font of [
-      '700 28px Vollkorn',
-      '400 15px Barlow',
-      '600 34px "Barlow Condensed"',
-    ]) {
-      await expect(
-        (await document.fonts.load(font)).length,
-        font
-      ).toBeGreaterThan(0);
-    }
-  },
+  play: ({ canvasElement }) => checkScale(canvasElement),
 };
 
 export const ScaleDark: Story = {
   render: () => <TypeScale />,
   globals: { theme: 'dark' },
+  play: ({ canvasElement }) => checkScale(canvasElement),
 };

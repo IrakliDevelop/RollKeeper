@@ -172,7 +172,7 @@ const Toast: React.FC<ToastProps> = ({ toast, onDismiss }) => {
                   typeof detail === 'string' ? { text: detail } : detail;
                 return (
                   <li
-                    key={index}
+                    key={`${item.text}-${index}`}
                     className="text-muted flex items-start gap-2 text-xs"
                   >
                     {item.icon ? (
@@ -223,9 +223,10 @@ const ToastAnnouncement: React.FC<{ toast: ToastData }> = ({ toast }) => {
     <div>
       <p>{toast.title}</p>
       <p>{toast.message}</p>
-      {toast.details?.map((detail, index) => (
-        <p key={index}>{typeof detail === 'string' ? detail : detail.text}</p>
-      ))}
+      {toast.details?.map((detail, index) => {
+        const text = typeof detail === 'string' ? detail : detail.text;
+        return <p key={`${text}-${index}`}>{text}</p>;
+      })}
     </div>
   );
 };

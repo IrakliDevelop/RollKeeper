@@ -79,7 +79,12 @@ import { useDmXpAwardProcessor } from '@/hooks/useDmXpAwardProcessor';
 import { useJoinedBattleMap } from '@/hooks/useJoinedBattleMap';
 import { useBattleMapPokes } from '@/hooks/useBattleMapPokes';
 import { useMaterializeCampaignStackable } from '@/hooks/useMaterializeCampaignStackable';
-import { getMsPerDay, getCampaignDays } from '@/utils/calendarCalculations';
+import { getCampaignDays } from '@/utils/calendarCalculations';
+import {
+  advanceLocalCalendarForLongRest,
+  calendarRestDetails,
+  getSyncedCalendar,
+} from '@/utils/longRestCalendar';
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import {
@@ -1112,23 +1117,23 @@ export default function CharacterSheet() {
                 } else if (pendingRestType === 'long') {
                   takeLongRest();
                   // Advance calendar by 1 day if not synced with DM
-                  let calendarAdvanced = false;
-                  if (!sharedCalendar) {
-                    const cal = useCalendarStore
+                  const calendarAdvanced = advanceLocalCalendarForLongRest({
+                    synced:
+                      getSyncedCalendar(
+                        playerSync.campaignCode,
+                        sharedCalendar
+                      ) !== null,
+                    calendar: useCalendarStore
                       .getState()
-                      .getCalendar(characterId);
-                    if (cal) {
-                      useCalendarStore
-                        .getState()
-                        .advanceTime(characterId, getMsPerDay(cal.config));
-                      calendarAdvanced = true;
-                    }
-                  }
+                      .getCalendar(characterId),
+                    advance: ms =>
+                      useCalendarStore.getState().advanceTime(characterId, ms),
+                  });
                   // The same toast as a long rest from the Calendar tab.
                   addToast(
                     longRestToast(
                       getRestSlots(character),
-                      calendarAdvanced ? ['Calendar advanced by 1 day'] : []
+                      calendarRestDetails(calendarAdvanced)
                     )
                   );
                 }

@@ -13,7 +13,6 @@ import { InitiativeRollPrompt } from '@/components/ui/campaign/InitiativeRollPro
 import { useInitiativePrompt } from '@/components/ui/campaign/useInitiativePrompt';
 import { ToastContainer } from '@/components/ui/feedback/Toast';
 import { useReactionTurnReset } from '@/hooks/useReactionTurnReset';
-import { getRestSlots } from '@/utils/calculations';
 
 import { CastingBanner } from './CastingBanner';
 import { CharacterDock } from './CharacterDock';
@@ -23,6 +22,7 @@ import { SheetDrawer } from './SheetDrawer';
 import { SpellPlacementController } from './SpellPlacementController';
 import { StatusEffectTray } from './StatusEffectTray';
 import { useSheetDrawerState } from './useSheetDrawerState';
+import { useVttRest } from './useVttRest';
 
 interface PlayerVttScreenProps {
   campaignCode: string;
@@ -64,8 +64,14 @@ export function PlayerVttScreen({
     dismissToast,
     showAttackRoll,
     showShortRest,
-    showLongRest,
   } = usePlayerVttState(campaignCode, characterId);
+  const handleRested = useVttRest({
+    campaignCode,
+    characterId,
+    sharedCalendar: sharedState?.calendar,
+    addToast,
+    showShortRest,
+  });
 
   const handleReactionAutoReset = useCallback(() => {
     addToast({
@@ -190,11 +196,7 @@ export function PlayerVttScreen({
           onCloseAutoFocus={handleSheetCloseAutoFocus}
           addToast={addToast}
           showAttackRoll={showAttackRoll}
-          onRested={type =>
-            type === 'short'
-              ? showShortRest(getRestSlots(character))
-              : showLongRest(getRestSlots(character))
-          }
+          onRested={handleRested}
           spellCasting={spellCasting}
           openTarget={openTarget}
           partyMembers={partyMembers}

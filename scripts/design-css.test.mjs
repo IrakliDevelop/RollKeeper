@@ -321,7 +321,7 @@ test('scrollbar-hide hides the scrollbar in every engine', async () => {
   const output = await buildCss(['scrollbar-hide']);
   assert.match(
     output,
-    /\.scrollbar-hide\s*\{\s*scrollbar-width:\s*none;\s*&::-webkit-scrollbar\s*\{\s*display:\s*none;/
+    /\.scrollbar-hide\s*\{\s*scrollbar-width:\s*none;\s*(?:&::-webkit-scrollbar\s*\{\s*display:\s*none;|\}\s*\.scrollbar-hide::-webkit-scrollbar\s*\{\s*display:\s*none;)/
   );
 });
 

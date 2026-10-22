@@ -29,6 +29,11 @@ import { useTimeAgo } from '@/hooks/useTimeAgo';
 import { CALENDAR_PRESETS } from '@/utils/calendarPresets';
 import { getRestSlots } from '@/utils/calculations';
 import {
+  advanceLocalCalendarForLongRest,
+  calendarRestDetails,
+  getSyncedCalendar,
+} from '@/utils/longRestCalendar';
+import {
   getMsPerDay,
   timeToDate,
   dateToTime,
@@ -160,13 +165,14 @@ export function PlayerCalendarView({
   const lastFetchedAgo = useTimeAgo(lastFetched);
 
   // Synced mode: campaign code exists AND DM has shared calendar data
-  const isSynced = !!campaignCode && !!sharedCalendar;
+  const syncedCalendar = getSyncedCalendar(campaignCode, sharedCalendar);
+  const isSynced = syncedCalendar !== null;
 
   // Derive date and config from shared state when synced
   const syncedDate = isSynced
-    ? timeToDate(sharedCalendar.currentTime, sharedCalendar.config)
+    ? timeToDate(syncedCalendar.currentTime, syncedCalendar.config)
     : null;
-  const syncedConfig = isSynced ? sharedCalendar.config : null;
+  const syncedConfig = isSynced ? syncedCalendar.config : null;
 
   // Effective values (synced or local)
   const date = syncedDate ?? localDate;
@@ -236,7 +242,7 @@ export function PlayerCalendarView({
 
   // Active state
   const events = isSynced
-    ? (sharedCalendar.events ?? []).map(event => ({ ...event, createdAt: 0 }))
+    ? (syncedCalendar.events ?? []).map(event => ({ ...event, createdAt: 0 }))
     : (calendar?.events ?? []);
   const displayYear = browseYear ?? date.year;
   const displayMonth = browseMonth ?? date.month;
@@ -244,9 +250,9 @@ export function PlayerCalendarView({
 
   const campaignDays = isSynced
     ? getCampaignDays(
-        sharedCalendar.currentTime,
-        sharedCalendar.startTime,
-        sharedCalendar.config
+        syncedCalendar.currentTime,
+        syncedCalendar.startTime,
+        syncedCalendar.config
       )
     : calendar
       ? getCampaignDays(calendar.currentTime, calendar.startTime ?? 0, config)
@@ -254,16 +260,18 @@ export function PlayerCalendarView({
 
   const handleLongRest = () => {
     takeLongRest();
-    if (!isSynced) {
-      advanceTime(characterId, getMsPerDay(config));
-    }
+    const advanced = advanceLocalCalendarForLongRest({
+      synced: isSynced,
+      calendar,
+      advance: ms => advanceTime(characterId, ms),
+    });
     setBrowseYear(null);
     setBrowseMonth(null);
     // The same toast as the rest dialog's, plus the day when it moved.
     addToast?.(
       longRestToast(
         getRestSlots(useCharacterStore.getState().character),
-        isSynced ? [] : ['Calendar advanced by 1 day']
+        calendarRestDetails(advanced)
       )
     );
   };
