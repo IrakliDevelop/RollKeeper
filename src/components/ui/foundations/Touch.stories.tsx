@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/forms/checkbox';
 import { Input } from '@/components/ui/forms/input';
 import { Switch } from '@/components/ui/forms/switch';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
+import { Measured, measured } from './measure';
 import { remountOnTheme } from './remountOnTheme';
 import { useComputedValue } from './useComputedValue';
 
@@ -33,10 +34,6 @@ const checkbox = (wrapper: HTMLElement) =>
   wrapper.querySelector('[role="checkbox"]');
 const toggle = (wrapper: HTMLElement) =>
   wrapper.querySelector('[role="switch"]');
-
-function Measured({ id, value }: { id: string; value: string }) {
-  return <span data-measure={id}>{value}</span>;
-}
 
 /**
  * Both sides of a control's `::after` hit area. With a mouse it isn't drawn
@@ -168,9 +165,6 @@ function TouchPage() {
     </div>
   );
 }
-
-const measured = (canvasElement: HTMLElement, id: string) =>
-  canvasElement.querySelector(`[data-measure="${id}"]`)?.textContent;
 
 async function checkTouch(canvasElement: HTMLElement) {
   for (const id of ['Button', 'Icon button']) {

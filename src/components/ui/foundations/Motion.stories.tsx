@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { useCallback } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
 import { Button } from '@/components/ui/forms/button';
 import { Switch } from '@/components/ui/forms/switch';
@@ -13,6 +14,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/feedback/dialog';
 import { emulateReducedMotion } from '@/test/storybook/emulateCoarsePointer';
+import { Measured, measured } from './measure';
 import { remountOnTheme } from './remountOnTheme';
 import { useComputedValue } from './useComputedValue';
 
@@ -33,21 +35,20 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** `0.12s` → `120ms`, `1e-05s` → `0.01ms`; a list keeps its first entry. */
+/** `0.12s` → `120ms`; a list formats each entry and collapses equal ones. */
 function formatDuration(value: string): string {
-  const first = value.split(',')[0].trim();
-  const seconds = Number.parseFloat(first);
-  if (!first.endsWith('s') || Number.isNaN(seconds)) return first;
-  return `${Number((seconds * 1000).toFixed(2))}ms`;
+  const parts = value.split(',').map(part => {
+    const entry = part.trim();
+    const seconds = Number.parseFloat(entry);
+    if (!entry.endsWith('s') || Number.isNaN(seconds)) return entry;
+    return `${Number((seconds * 1000).toFixed(2))}ms`;
+  });
+  return [...new Set(parts)].join(', ');
 }
 
 const switchControl = (wrapper: HTMLElement) =>
   wrapper.querySelector('[role="switch"]');
 const dialogContent = (probe: HTMLElement) => probe.closest('[role="dialog"]');
-
-function Measured({ id, value }: { id: string; value: string }) {
-  return <span data-measure={id}>{value}</span>;
-}
 
 // Measured while open; dialog.tsx uses the same duration class for the exit.
 function DialogTiming() {
@@ -69,6 +70,13 @@ function MotionPage() {
   const toggle = useComputedValue<HTMLDivElement>('transition-duration', {
     pick: switchControl,
   });
+  const buttonRef = useCallback(
+    (el: HTMLButtonElement | null) => {
+      button.ref.current = el;
+      easing.ref.current = el;
+    },
+    [button.ref, easing.ref]
+  );
 
   return (
     <div className="max-w-3xl space-y-8">
@@ -76,14 +84,7 @@ function MotionPage() {
         <h2 className="type-heading text-heading">Durations</h2>
         <ul className="space-y-4">
           <li className="flex flex-wrap items-center gap-4">
-            <Button
-              ref={el => {
-                button.ref.current = el;
-                easing.ref.current = el;
-              }}
-            >
-              Take a short rest
-            </Button>
+            <Button ref={buttonRef}>Take a short rest</Button>
             <p className="type-small text-body">
               State change (hover, colour):{' '}
               <Measured id="Button" value={formatDuration(button.value)} />
@@ -115,6 +116,9 @@ function MotionPage() {
                 <DialogFooter>
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
+                  </DialogClose>
+                  <DialogClose asChild>
+                    <Button>Take Long Rest</Button>
                   </DialogClose>
                 </DialogFooter>
               </DialogContent>
@@ -166,9 +170,6 @@ async function closeDialog(canvasElement: HTMLElement) {
   const page = within(canvasElement.ownerDocument.body);
   await waitFor(() => expect(page.queryByRole('dialog')).toBeNull());
 }
-
-const measured = (root: ParentNode, id: string) =>
-  root.querySelector(`[data-measure="${id}"]`)?.textContent;
 
 async function checkMotion(canvasElement: HTMLElement) {
   await waitFor(() => expect(measured(canvasElement, 'Button')).toBe('120ms'));
