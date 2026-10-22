@@ -110,19 +110,19 @@ describe('Dialog', () => {
 /** A controlled dialog opened from a plain button, like RestDialog. */
 function ControlledDialog({
   onCloseAutoFocus,
-  removeOpenerOnOpen = false,
+  hideOpener = false,
   autoFocusField = false,
   modal = true,
 }: {
   onCloseAutoFocus?: (event: Event) => void;
-  removeOpenerOnOpen?: boolean;
+  hideOpener?: boolean;
   autoFocusField?: boolean;
   modal?: boolean;
 }) {
   const [open, setOpen] = React.useState(false);
   return (
     <>
-      {!(open && removeOpenerOnOpen) && (
+      {!hideOpener && (
         <button type="button" onClick={() => setOpen(true)}>
           Rest
         </button>
@@ -221,13 +221,19 @@ describe('Dialog focus return', () => {
 
   it('falls back to the page when the opener is gone', async () => {
     const user = userEvent.setup();
-    render(<ControlledDialog removeOpenerOnOpen />);
+    const { rerender } = render(<ControlledDialog />);
 
-    await user.click(screen.getByRole('button', { name: 'Rest' }));
+    const opener = screen.getByRole('button', { name: 'Rest' });
+    await user.click(opener);
     await screen.findByRole('dialog', { name: 'Long rest' });
+    const focus = vi.spyOn(opener, 'focus');
+    rerender(<ControlledDialog hideOpener />);
+    expect(opener.isConnected).toBe(false);
     await user.keyboard('{Escape}');
 
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(document.body));
+    // A detached opener is never refocused.
+    expect(focus).not.toHaveBeenCalled();
   });
 });

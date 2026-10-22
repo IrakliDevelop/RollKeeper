@@ -141,6 +141,23 @@ describe('ToastContainer', () => {
     );
   });
 
+  it('renders repeated detail lines without a duplicate-key warning', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      render(
+        <ToastContainer
+          toasts={[toast({ details: ['Same', 'Same'] })]}
+          onDismiss={() => {}}
+        />
+      );
+
+      expect(screen.getAllByText('Same')).toHaveLength(4);
+      expect(error).not.toHaveBeenCalled();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   it('clears each announcement after a second so it is read once', () => {
     const first = toast();
     const second = toast({ id: 'toast-2', title: 'Short rest taken' });

@@ -73,7 +73,7 @@ export const Monster: Story = {
     await expectDrawer(/young red dragon sheet/i);
     await expect(body().getByText('Their turn')).toBeInTheDocument();
 
-    // Touch: the tabs reach 44px and the strip stays inside the drawer.
+    // Touch: the tabs reach 44px and the strip does not scroll.
     const drawer = body().getByRole('dialog');
     const restore = emulateCoarsePointer();
     try {
@@ -82,8 +82,11 @@ export const Monster: Story = {
           44
         );
       }
-      // Taller tabs don't push the drawer into sideways scrolling.
-      await expect(drawer.scrollWidth).toBeLessThanOrEqual(drawer.clientWidth);
+      // The 44px tabs fit the strip without it scrolling sideways.
+      const tablist = within(drawer).getByRole('tablist');
+      await expect(tablist.scrollWidth).toBeLessThanOrEqual(
+        tablist.clientWidth
+      );
     } finally {
       restore();
     }
