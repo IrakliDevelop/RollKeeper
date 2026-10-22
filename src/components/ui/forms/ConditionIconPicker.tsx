@@ -107,8 +107,8 @@ export function ConditionIconPicker({
                     aria-pressed={name === value}
                     title={name}
                     onClick={() => handlePick(name)}
-                    // Ring inside the cell: the grid clips edge cells.
-                    className="h-9 w-9 p-0 focus-visible:-outline-offset-2"
+                    // Ring inside the cell (the grid clips edge cells), clear of the selected cell's border.
+                    className="h-9 w-9 p-0 focus-visible:-outline-offset-4"
                   >
                     <Icon size={16} aria-hidden />
                   </Button>
