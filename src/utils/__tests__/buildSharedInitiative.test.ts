@@ -9,6 +9,7 @@ import type {
   EncounterEntity,
   EnemyHpDisplay,
 } from '@/types/encounter';
+import { DEFAULT_HP_STATE_BANDS } from '@/types/encounter';
 import type { SharedTurnEntry } from '@/types/sharedState';
 
 function entity(o: Partial<EncounterEntity> & { id: string }): EncounterEntity {
@@ -559,10 +560,8 @@ describe('buildSharedInitiative — enemy HP config', () => {
       hpStateBands: bands,
       enemyConditionsDisplay: 'off',
     });
-    // 5/20 = 25% -> 'critical'
-    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe(
-      'critical'
-    );
+    // 5/20 = 25% -> 'low' (tiers include their threshold)
+    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe('low');
   });
 
   it('marks a dead enemy isDead (no tier) when HP is shown', () => {
@@ -582,6 +581,39 @@ describe('buildSharedInitiative — enemy HP config', () => {
     }).turnOrder[0];
     expect(monster.isDead).toBe(true);
     expect(monster.hpTier).toBeUndefined();
+  });
+
+  it('sends no band word for a dead enemy or a dead opted-out player (the default bands end at "Critical")', () => {
+    const e = encounter([
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        currentHp: 0,
+        maxHp: 20,
+      }),
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 18,
+        currentHp: 0,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+        hpSharedWithParty: false,
+      }),
+    ]);
+    const rows = buildSharedInitiative(e, {
+      enemyHpDisplay: 'label',
+      hpStateBands: DEFAULT_HP_STATE_BANDS,
+      enemyConditionsDisplay: 'off',
+    }).turnOrder;
+    for (const row of rows) {
+      expect(row.isDead).toBe(true);
+      expect('hpState' in row).toBe(false);
+      expect(row.hpTier).toBeUndefined();
+    }
+    expect(rows.find(r => r.entityId === 'p')!.hpMode).toBe('label');
   });
 
   it('never marks enemy death when HP display is off', () => {
@@ -627,7 +659,7 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
     enemyConditionsDisplay: 'off',
   });
 
-  // 5/20 = 25% -> tier 'critical', label 'Bloodied'.
+  // 5/20 = 25% -> tier 'low', label 'Bloodied'.
   const goblin = (o: Partial<EncounterEntity> = {}): EncounterEntity =>
     entity({
       id: 'm',
@@ -648,13 +680,13 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
   // Today's exact output per global mode for an untoggled enemy.
   const UNTOGGLED: Record<EnemyHpDisplay, SharedTurnEntry> = {
     off: BASE,
-    label: { ...BASE, isDead: false, hpTier: 'critical', hpState: 'Bloodied' },
-    bar: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
-    percent: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
+    label: { ...BASE, isDead: false, hpTier: 'low', hpState: 'Bloodied' },
+    bar: { ...BASE, isDead: false, hpTier: 'low', hpPercent: 25 },
+    percent: { ...BASE, isDead: false, hpTier: 'low', hpPercent: 25 },
     exact: {
       ...BASE,
       isDead: false,
-      hpTier: 'critical',
+      hpTier: 'low',
       currentHp: 5,
       maxHp: 20,
     },
@@ -669,7 +701,7 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
       expect(result.turnOrder[0]).toStrictEqual({
         ...BASE,
         isDead: false,
-        hpTier: 'critical',
+        hpTier: 'low',
         currentHp: 5,
         maxHp: 20,
         hpMode: 'exact',

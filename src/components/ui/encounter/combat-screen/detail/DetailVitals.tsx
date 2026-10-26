@@ -4,17 +4,13 @@ import React, { useState } from 'react';
 import { Shield, Plus, X } from 'lucide-react';
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { effectiveAc } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { DetailSectionProps } from './DetailHeader';
 import { DamageControls } from './DamageControls';
 import { DeathSaves } from './DeathSaves';
 import { ConcentrationReaction } from './ConcentrationReaction';
-import {
-  canSpendHitDie,
-  hpColorClass,
-  showDeathSaves,
-  spendHitDie,
-} from './hitDie';
+import { canSpendHitDie, showDeathSaves, spendHitDie } from './hitDie';
 
 export function DetailVitals({ entity, actions }: DetailSectionProps) {
   const [editingMax, setEditingMax] = useState(false);
@@ -39,7 +35,7 @@ export function DetailVitals({ entity, actions }: DetailSectionProps) {
       <div className="flex items-start justify-between gap-4">
         <div className="flex flex-wrap items-baseline gap-1">
           <span
-            className={`font-display text-3xl font-bold tabular-nums ${hpColorClass(entity.currentHp, entity.maxHp)}`}
+            className={`font-display text-3xl font-bold tabular-nums ${getHpNumberColor(entity.currentHp, entity.maxHp)}`}
           >
             {entity.currentHp}
           </span>

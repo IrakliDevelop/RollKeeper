@@ -133,11 +133,14 @@ true. Other number fields use `NumberInput`/`NumberField` (from
 `@/components/ui/forms/NumberInput`). Never `type="number"` or
 `parseInt(e.target.value) || 0`.
 
-**HP status.** Take the tier from `hpTier(hpPercent(current, max))`
-(`src/utils/hpState.ts`): `high` → "Healthy" (verdigris bar, number stays
-`heading`), `mid`/`low` → "Bloodied" (ember), `critical` → "Critical" (blood;
-"Down" at 0 HP). Show the tier word wherever there's room. No other
-thresholds, and no `getHp*Color` in new UI.
+**HP status.** The word is `HP_STATUS_LABELS[hpStatus(current, max)]`
+(`src/utils/hpState.ts`): "Healthy" from 75%, "Bloodied" from 25%,
+"Critical" below, "Down" at 0 HP. The colours come from
+`src/utils/hpColor.ts`: `getHpBarColor` (verdigris, ember, blood),
+`getHpNumberColor` (the number stays `heading` while healthy) and
+`getHpTierTextColor` for the word. Show the word wherever there's room. No
+other thresholds, and no HP colours written by hand. Enemy words players see
+come from the DM's editable bands (`hpStateLabel`), never `hpStatus`.
 
 **Touch (iPad players).** Primitives already reach 44px on coarse pointers.
 For anything you build, add `pointer-coarse:min-h-11` (and

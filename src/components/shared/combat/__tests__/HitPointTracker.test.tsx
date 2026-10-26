@@ -27,6 +27,23 @@ describe('HitPointTracker', () => {
     expect(screen.getByDisplayValue('5')).toBeInTheDocument();
   });
 
+  it('colours the current HP by the shared tiers: heading while healthy, ember while bloodied', () => {
+    const { container, unmount } = render(
+      <HitPointTracker hitPoints={{ ...baseHitPoints, current: 30 }} />
+    );
+    // 30 / 40 = 75%: healthy keeps the heading colour.
+    expect(container.querySelector('input[value="30"]')).toHaveClass(
+      'text-heading'
+    );
+    unmount();
+    // 25 / 40 = 62.5%: bloodied (green before the shared tiers).
+    const bloodied = render(<HitPointTracker hitPoints={baseHitPoints} />);
+    expect(bloodied.container.querySelector('input[value="25"]')).toHaveClass(
+      'text-ember-text'
+    );
+    bloodied.unmount();
+  });
+
   it('renders "Hit Points" title', () => {
     render(<HitPointTracker hitPoints={baseHitPoints} />);
     expect(screen.getAllByText('Hit Points').length).toBeGreaterThan(0);

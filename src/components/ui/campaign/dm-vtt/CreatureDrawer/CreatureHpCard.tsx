@@ -5,11 +5,12 @@ import { X } from 'lucide-react';
 
 import { HPBar } from '@/components/shared/combat/HPBar';
 import { DamageControls } from '@/components/ui/encounter/combat-screen/detail/DamageControls';
-import { hpColorClass } from '@/components/ui/encounter/combat-screen/detail/hitDie';
 import {
   HEADING_CLASS,
   SECTION_CLASS,
 } from '@/components/ui/campaign/player-vtt/SheetDrawer/sheetSectionStyles';
+
+import { getHpNumberColor } from '@/utils/hpColor';
 
 import { CreatureMaxHpField } from './CreatureMaxHpField';
 import type { CreatureVitalsProps } from './CreatureDrawer.utils';
@@ -26,7 +27,7 @@ export function CreatureHpCard({
 
       <div className="flex flex-wrap items-baseline gap-1">
         <span
-          className={`font-display text-3xl font-bold tabular-nums ${hpColorClass(entity.currentHp, entity.maxHp)}`}
+          className={`font-display text-3xl font-bold tabular-nums ${getHpNumberColor(entity.currentHp, entity.maxHp)}`}
         >
           {entity.currentHp}
         </span>

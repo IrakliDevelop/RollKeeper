@@ -123,7 +123,11 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
   ]) {
     assert.ok(has('inverse', `${role}-text`, 4.5), `inverse on ${role}-text`);
   }
-  assert.equal(PAIRS.length, 142);
+  assert.ok(
+    has('heading', 'bridge-verdigris-bg-strong', 4.5),
+    'healthy HP number in the tinted HP box'
+  );
+  assert.equal(PAIRS.length, 143);
 });
 
 test('checks selected and danger button text on the hover surface', () => {

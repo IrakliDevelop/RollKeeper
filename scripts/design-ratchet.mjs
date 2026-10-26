@@ -78,11 +78,10 @@ export const PATTERNS = [
   },
 ];
 
-// Files whose matches are intentional: hpColor.ts's raw fills are
-// deliberate, and shadow-overlay belongs to the floating-layer primitives
-// (popover, menu, tooltip, dialog, drawer, toast) and nowhere else.
+// Files whose matches are intentional: shadow-overlay belongs to the
+// floating-layer primitives (popover, menu, tooltip, dialog, drawer, toast)
+// and nowhere else.
 export const ALLOWLIST = {
-  'raw-hue': ['src/utils/hpColor.ts'],
   'overlay-shadow': [
     'src/components/ui/primitives/variants.ts',
     'src/components/ui/feedback/SideDrawer.tsx',

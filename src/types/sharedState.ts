@@ -126,7 +126,7 @@ export interface SharedTurnEntry {
   playerCharacterId?: string; // player entities only — marks "you" + identity
   currentHp?: number; // players who share HP (default) always; non-players only when the effective mode is 'exact'
   maxHp?: number; // players who share HP (default) always; non-players only when the effective mode is 'exact'
-  hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied"); also an opted-out player (hpMode 'label')
+  hpState?: string; // non-players when enemyHpMode is 'label' (e.g. "Bloodied"); also an opted-out player (hpMode 'label'); left out when the row is dead
   hpPercent?: number; // non-players when enemyHpMode is 'bar' | 'percent' (0-100)
   // Coarse health tier for colour-coding any shown HP indicator. Set for
   // non-players whenever the effective mode !== 'off', and for an opted-out

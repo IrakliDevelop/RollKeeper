@@ -144,3 +144,27 @@ describe('NPCDetailDialog — Shop tab wiring', () => {
     });
   });
 });
+
+describe('NPCDetailDialog — HP colour', () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('colours the HP by the shared tiers: heading while healthy, ember while bloodied', () => {
+    const healthy = makeNpc({ currentHp: 8 });
+    seedNpc(healthy);
+    const { unmount } = render(
+      <NPCDetailDialog npc={healthy} open={true} onOpenChange={() => {}} />
+    );
+    expect(screen.getByText('8/10')).toHaveClass('text-heading');
+    unmount();
+
+    // 7 / 10 = 70%: bloodied (green before the shared tiers).
+    const bloodied = makeNpc({ currentHp: 7 });
+    seedNpc(bloodied);
+    render(
+      <NPCDetailDialog npc={bloodied} open={true} onOpenChange={() => {}} />
+    );
+    expect(screen.getByText('7/10')).toHaveClass('text-ember-text');
+  });
+});
