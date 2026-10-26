@@ -222,6 +222,6 @@ describe('InitiativePanel', () => {
     expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.queryByText(/^\d+\/\d+$/)).not.toBeInTheDocument();
     // Tier-coloured, like an enemy's label row — not the neutral player shade.
-    expect(screen.getByText('Bloodied')).toHaveClass('text-accent-orange-text');
+    expect(screen.getByText('Bloodied')).toHaveClass('text-ember-text');
   });
 });
