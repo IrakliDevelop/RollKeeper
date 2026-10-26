@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
+import { getHpTierNumberColor } from '@/utils/hpColor';
+import { hpPercent, hpTier } from '@/utils/hpState';
 import { Button } from '@/components/ui/forms';
 import { NumberField } from '@/components/ui/forms/NumberInput';
 import { AppIcon, type IconName } from '@/components/ui/icons';
@@ -158,16 +160,17 @@ export function HitPointTracker({
     }
   };
 
+  // The shared HP tiers: healthy from 75%, bloodied from 25%, critical below.
+  const tier = hpTier(hpPercent(hitPoints.current, hitPoints.max));
+
   const getStatusColor = () => {
     if (isCharacterDead) return 'text-inverse bg-gray-800';
     if (isCharacterDying) return 'text-accent-red-text bg-accent-red-bg';
     if (isCharacterStabilized)
       return 'text-accent-amber-text bg-accent-amber-bg';
     if (isUnconscious) return 'text-accent-orange-text bg-accent-orange-bg';
-    if (hitPoints.current <= hitPoints.max * 0.25)
-      return 'text-accent-red-text bg-accent-red-bg';
-    if (hitPoints.current <= hitPoints.max * 0.5)
-      return 'text-accent-amber-text bg-accent-amber-bg';
+    if (tier === 'critical') return 'text-accent-red-text bg-accent-red-bg';
+    if (tier !== 'high') return 'text-accent-amber-text bg-accent-amber-bg';
     return 'text-accent-green-text bg-accent-green-bg';
   };
 
@@ -179,9 +182,9 @@ export function HitPointTracker({
       return 'bg-accent-amber-bg-strong border-accent-amber-border';
     if (isUnconscious)
       return 'bg-accent-orange-bg-strong border-accent-orange-border';
-    if (hitPoints.current <= hitPoints.max * 0.25)
+    if (tier === 'critical')
       return 'bg-accent-red-bg-strong border-accent-red-border';
-    if (hitPoints.current <= hitPoints.max * 0.5)
+    if (tier !== 'high')
       return 'bg-accent-amber-bg-strong border-accent-amber-border';
     return 'bg-accent-green-bg-strong border-accent-green-border';
   };
@@ -191,11 +194,7 @@ export function HitPointTracker({
     if (isCharacterDying) return 'text-accent-red-text';
     if (isCharacterStabilized) return 'text-accent-amber-text';
     if (isUnconscious) return 'text-accent-orange-text';
-    if (hitPoints.current <= hitPoints.max * 0.25)
-      return 'text-accent-red-text';
-    if (hitPoints.current <= hitPoints.max * 0.5)
-      return 'text-accent-amber-text';
-    return 'text-accent-green-text';
+    return getHpTierNumberColor(tier);
   };
 
   const getStatus = (): { icon: IconName; text: string } => {

@@ -1,8 +1,19 @@
-/** Card background/border by HP percentage: >60 emerald, 31-60 amber, <=30 red. */
+import { hpTier } from '@/utils/hpState';
+
+/**
+ * Card background/border by HP percentage, on the shared HP tiers: healthy
+ * from 75%, bloodied from 25%, critical below.
+ */
 export function getHpCardClasses(percent: number): string {
-  if (percent > 60) return 'bg-accent-emerald-bg border-accent-emerald-border';
-  if (percent > 30) return 'bg-accent-amber-bg border-accent-amber-border';
-  return 'bg-accent-red-bg border-accent-red-border';
+  switch (hpTier(percent)) {
+    case 'high':
+      return 'bg-accent-emerald-bg border-accent-emerald-border';
+    case 'mid':
+    case 'low':
+      return 'bg-accent-amber-bg border-accent-amber-border';
+    case 'critical':
+      return 'bg-accent-red-bg border-accent-red-border';
+  }
 }
 
 /** Parses a raw HP-editor input string; returns null for NaN/empty/non-positive. */

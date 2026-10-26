@@ -26,6 +26,7 @@ import {
   calculatePassiveInsight,
   calculatePassiveInvestigation,
 } from '@/utils/calculations';
+import { getHpBarColor } from '@/utils/hpColor';
 
 function getClassBadgeVariant(
   className: string
@@ -61,14 +62,6 @@ function getClassBadgeVariant(
     Warlock: 'primary',
   };
   return variants[className] || 'neutral';
-}
-
-function getHpColor(current: number, max: number): string {
-  if (max === 0) return 'bg-gray-400';
-  const pct = current / max;
-  if (pct > 0.5) return 'bg-green-500';
-  if (pct > 0.25) return 'bg-yellow-500';
-  return 'bg-red-500';
 }
 
 function formatTimeAgo(dateString: string): string {
@@ -238,7 +231,7 @@ export function PlayerSummaryCard({
               </div>
               <div className="bg-surface-secondary h-2 w-full overflow-hidden rounded-full">
                 <div
-                  className={`h-full rounded-full transition-all ${getHpColor(currentHp, maxHp)}`}
+                  className={`h-full rounded-full transition-all ${getHpBarColor(currentHp, maxHp)}`}
                   style={{
                     width: `${maxHp > 0 ? Math.min(100, (currentHp / maxHp) * 100) : 0}%`,
                   }}

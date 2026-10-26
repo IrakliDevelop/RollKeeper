@@ -56,6 +56,7 @@ import type {
 } from '@/types/encounter';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import { parseArmorClass, parseAcBonus } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
 import {
   npcInventoryItemToFormData,
   formDataToNpcInventoryPatch,
@@ -200,14 +201,8 @@ function formatMod(value: number): string {
 function CombatSummaryBar({ npc }: { npc: CampaignNPC }) {
   const currentHp = npc.currentHp ?? npc.maxHp;
   const initMod = getInitiativeModifier(npc);
-  const hpRatio = npc.maxHp > 0 ? currentHp / npc.maxHp : 1;
-
   const hpColor =
-    hpRatio > 0.5
-      ? 'text-accent-emerald-text'
-      : hpRatio > 0.25
-        ? 'text-accent-amber-text'
-        : 'text-accent-red-text';
+    npc.maxHp > 0 ? getHpNumberColor(currentHp, npc.maxHp) : 'text-heading';
 
   return (
     <div className="space-y-2">

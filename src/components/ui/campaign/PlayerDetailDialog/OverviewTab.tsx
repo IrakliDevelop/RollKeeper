@@ -32,6 +32,7 @@ import {
   getProficiencyBonus,
   calculateCharacterArmorClass,
 } from '@/utils/calculations';
+import { getHpNumberColor } from '@/utils/hpColor';
 import { CharacterState } from '@/types/character';
 
 const ABILITY_KEYS = [
@@ -82,10 +83,7 @@ function formatSkillName(key: string): string {
 
 function getHpColor(current: number, max: number): string {
   if (max === 0) return 'text-muted';
-  const pct = current / max;
-  if (pct > 0.5) return 'text-green-600 dark:text-green-400';
-  if (pct > 0.25) return 'text-yellow-600 dark:text-yellow-400';
-  return 'text-red-600 dark:text-red-400';
+  return getHpNumberColor(current, max);
 }
 
 interface OverviewTabProps {
