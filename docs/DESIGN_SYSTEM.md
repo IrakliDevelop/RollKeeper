@@ -69,11 +69,20 @@ Rules:
   lapis because it's about magic; spell slots are lapis because they are
   magic you spend. When nothing on the screen has the role's meaning, use
   neutrals.
-- **HP tiers:** take the tier from `hpTier(hpPercent(current, max))` in
-  `src/utils/hpState.ts` and map it to a role: `high` is "Healthy"
-  (verdigris bar, the number stays `heading`), `mid` and `low` are
-  "Bloodied" (ember), `critical` is "Critical" (blood; "Down" at 0 HP). Show
-  the tier word wherever there's room. Don't invent other thresholds.
+- **HP tiers:** `hpTier(hpPercent(current, max))` in `src/utils/hpState.ts`
+  gives `high` from 75%, `mid` from 50%, `low` from 25% and `critical`
+  below (each threshold inclusive). `high` is "Healthy" (verdigris bar, the
+  number stays `heading`), `mid` and `low` are "Bloodied" (ember), `critical`
+  is "Critical" (blood), and 0 HP is "Down". Take the word from
+  `HP_STATUS_LABELS[hpStatus(current, max)]` and every colour from
+  `src/utils/hpColor.ts` (`getHpBarColor`, `getHpNumberColor`,
+  `getHpTierTextColor`). Show the word wherever there's room. Don't invent
+  other thresholds or write HP colours by hand. Two exceptions: the words
+  players see for enemies come from the DM's editable bands (`hpStateLabel`
+  with the combat config's `hpStateBands`, defaults in
+  `DEFAULT_HP_STATE_BANDS`), never `hpStatus`; and until the Phase 3 sweeps,
+  `HitPointTracker`'s box and pill and the dock `HpCard` keep their old
+  tints, with only their thresholds on the tiers.
 - **No gradients**: not on fills, text, page backgrounds or meters. Meters
   use a solid role colour.
 - **Retired:** the hue-named `accent-{emerald,blue,amber,red,purple,indigo,green,orange,yellow,violet}-*`
@@ -82,8 +91,7 @@ Rules:
   even in a file that already has some. An existing use can stay when code
   only moves; restyling it is a visible change, listed for the owner.
 - Canvas and VTT data colours (marker and token colours stored in data) are
-  out of scope. `hpColor.ts` keeps its raw fills for its existing callers;
-  new UI doesn't call `getHp*Color`, it maps `hpTier()` to the roles.
+  out of scope.
 
 `npm run design:contrast` checks every role and neutral pairing against WCAG
 AA (4.5:1 text, 3:1 marks) in both themes.

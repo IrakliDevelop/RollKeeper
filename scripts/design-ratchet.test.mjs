@@ -50,11 +50,11 @@ test('does not count animation utilities as gradient stops', () => {
 
 test('allow-listed files are skipped for their pattern only', () => {
   const counts = collectCounts(
-    [{ path: 'src/utils/hpColor.ts', text: 'bg-red-500 uppercase' }],
+    [{ path: 'src/allowed.ts', text: 'bg-red-500 uppercase' }],
     PATTERNS,
-    { 'raw-hue': ['src/utils/hpColor.ts'] }
+    { 'raw-hue': ['src/allowed.ts'] }
   );
-  assert.deepEqual(counts, { uppercase: { 'src/utils/hpColor.ts': 1 } });
+  assert.deepEqual(counts, { uppercase: { 'src/allowed.ts': 1 } });
 });
 
 test('counts shadow-overlay outside the floating-layer primitives', () => {

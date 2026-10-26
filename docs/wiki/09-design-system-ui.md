@@ -171,6 +171,5 @@ These patterns are being retired by the Felt and Brass redesign: decoration
 should encode meaning, colour comes from role tokens rather than hue names, and
 numbers use the in-place number field instead of native number inputs. The exact
 pattern list and regexes live in `PATTERNS` in `scripts/design-ratchet.mjs`.
-`src/utils/hpColor.ts` is allow-listed for raw hue classes (its raw fills are
-intentional), and `variants.ts` (`OVERLAY_SURFACE`) and `SideDrawer.tsx` for
+`variants.ts` (`OVERLAY_SURFACE`) and `SideDrawer.tsx` are allow-listed for
 `shadow-overlay`.

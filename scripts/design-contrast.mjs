@@ -49,6 +49,9 @@ function pairs() {
   for (const role of ['verdigris', 'blood', 'lapis', 'ember']) {
     add(`${role}-text`, `bridge-${role}-bg-strong`, TEXT);
   }
+  // A healthy HP number keeps the heading colour inside HitPointTracker's
+  // verdigris-tinted current-HP box.
+  add('heading', 'bridge-verdigris-bg-strong', TEXT);
   // bg-accent-*-text text-inverse badges and buttons.
   for (const role of ROLES) add('inverse', `${role}-text`, TEXT);
   add('on-brass', 'brass-fill', TEXT);
