@@ -96,12 +96,14 @@ function toEntry(
     entry.isDead = entity.currentHp <= 0;
     if (entity.hpSharedWithParty === false) {
       entry.hpMode = 'label';
-      entry.hpState = hpStateLabel(
-        entity.currentHp,
-        entity.maxHp,
-        config.hpStateBands
-      );
+      // At 0 HP the renderers show "Down" from isDead, so no band word rides
+      // along (the lowest default band, "Critical", would be wrong there).
       if (!entry.isDead) {
+        entry.hpState = hpStateLabel(
+          entity.currentHp,
+          entity.maxHp,
+          config.hpStateBands
+        );
         entry.hpTier = hpTier(hpPercent(entity.currentHp, entity.maxHp));
       }
     } else {
@@ -130,11 +132,14 @@ function toEntry(
 
   switch (mode) {
     case 'label':
-      entry.hpState = hpStateLabel(
-        entity.currentHp,
-        entity.maxHp,
-        config.hpStateBands
-      );
+      // Dead: the renderers show "Defeated" from isDead; no band word.
+      if (!entry.isDead) {
+        entry.hpState = hpStateLabel(
+          entity.currentHp,
+          entity.maxHp,
+          config.hpStateBands
+        );
+      }
       break;
     case 'bar':
     case 'percent':

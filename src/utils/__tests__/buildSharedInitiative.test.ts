@@ -9,6 +9,7 @@ import type {
   EncounterEntity,
   EnemyHpDisplay,
 } from '@/types/encounter';
+import { DEFAULT_HP_STATE_BANDS } from '@/types/encounter';
 import type { SharedTurnEntry } from '@/types/sharedState';
 
 function entity(o: Partial<EncounterEntity> & { id: string }): EncounterEntity {
@@ -580,6 +581,39 @@ describe('buildSharedInitiative — enemy HP config', () => {
     }).turnOrder[0];
     expect(monster.isDead).toBe(true);
     expect(monster.hpTier).toBeUndefined();
+  });
+
+  it('sends no band word for a dead enemy or a dead opted-out player (the default bands end at "Critical")', () => {
+    const e = encounter([
+      entity({
+        id: 'm',
+        name: 'Goblin',
+        initiative: 5,
+        currentHp: 0,
+        maxHp: 20,
+      }),
+      entity({
+        id: 'p',
+        name: 'Aragorn',
+        type: 'player',
+        initiative: 18,
+        currentHp: 0,
+        maxHp: 30,
+        playerCharacterId: 'char-a',
+        hpSharedWithParty: false,
+      }),
+    ]);
+    const rows = buildSharedInitiative(e, {
+      enemyHpDisplay: 'label',
+      hpStateBands: DEFAULT_HP_STATE_BANDS,
+      enemyConditionsDisplay: 'off',
+    }).turnOrder;
+    for (const row of rows) {
+      expect(row.isDead).toBe(true);
+      expect('hpState' in row).toBe(false);
+      expect(row.hpTier).toBeUndefined();
+    }
+    expect(rows.find(r => r.entityId === 'p')!.hpMode).toBe('label');
   });
 
   it('never marks enemy death when HP display is off', () => {

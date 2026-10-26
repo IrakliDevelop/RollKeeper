@@ -258,7 +258,7 @@ describe('CombatPanel', () => {
       displayName: 'Villager',
       type: 'npc',
       disposition: 'neutral',
-      hpState: 'Unharmed',
+      hpState: 'Healthy',
     };
     render(
       <CombatPanel

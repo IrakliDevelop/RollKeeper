@@ -16,7 +16,7 @@ const SHARED_MEMBER: PartyMemberHP = {
   lastSynced: '2025-01-01T00:00:00.000Z',
   publicSheet: {
     subtitle: 'Fighter 3',
-    hpState: 'Injured',
+    hpState: 'Bloodied',
     speed: 30,
     passivePerception: 13,
     conditions: ['Prone'],
@@ -37,7 +37,7 @@ describe('PartySheet', () => {
       screen.getByText(/limited view.*played by alice/i)
     ).toBeInTheDocument();
 
-    expect(screen.getByText('Injured')).toBeInTheDocument();
+    expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.getByText('20/30')).toBeInTheDocument();
     expect(screen.getByText("Hunter's Mark")).toBeInTheDocument();
     expect(screen.getByText('Prone')).toBeInTheDocument();
@@ -91,7 +91,7 @@ describe('PartySheet', () => {
     };
     render(<PartySheet member={member} onClose={vi.fn()} />);
 
-    expect(screen.getByText('Injured')).toBeInTheDocument();
+    expect(screen.getByText('Bloodied')).toBeInTheDocument();
     expect(screen.queryByText('20/30')).toBeNull();
     expect(screen.queryByText(/\d+\/\d+/)).toBeNull();
   });
@@ -106,7 +106,7 @@ describe('PartySheet', () => {
     expect(
       screen.getByText(/thorn hasn't shared their sheet/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText('Injured')).toBeNull();
+    expect(screen.queryByText('Bloodied')).toBeNull();
   });
 
   it('shows a not-shared state and a fallback subtitle when publicSheet is null', () => {
@@ -120,7 +120,7 @@ describe('PartySheet', () => {
     expect(
       screen.getByText(/thorn hasn't shared their sheet/i)
     ).toBeInTheDocument();
-    expect(screen.queryByText('Injured')).toBeNull();
+    expect(screen.queryByText('Bloodied')).toBeNull();
     expect(
       screen.getByRole('button', { name: /close sheet/i })
     ).toBeInTheDocument();

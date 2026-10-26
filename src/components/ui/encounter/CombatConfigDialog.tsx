@@ -48,7 +48,7 @@ const HP_DISPLAY_OPTIONS: HpDisplayOption[] = [
   {
     value: 'label',
     label: 'State label',
-    description: 'Players see a word like "Bloodied" or "Injured".',
+    description: 'Players see a word like "Bloodied" or "Critical".',
   },
   {
     value: 'bar',

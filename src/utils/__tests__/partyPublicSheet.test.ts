@@ -238,6 +238,27 @@ describe('buildPartyPublicSheet', () => {
     expect(sheet!.conditions).toEqual([]);
   });
 
+  it('names the HP state with the tier words', () => {
+    const at = (current: number) =>
+      buildPartyPublicSheet(
+        fixture({
+          hitPoints: {
+            current,
+            max: 200,
+            temporary: 0,
+            calculationMode: 'auto',
+          },
+        })
+      )!.hpState;
+    expect(at(200)).toBe('Healthy');
+    expect(at(150)).toBe('Healthy'); // 75%
+    expect(at(100)).toBe('Bloodied');
+    expect(at(49)).toBe('Critical');
+    expect(at(1)).toBe('Critical'); // 0.5%: still standing
+    expect(at(0)).toBe('Down');
+    expect(at(-4)).toBe('Down');
+  });
+
   it('leaves hpState empty when max HP is zero or missing, instead of a misleading "Down"', () => {
     const zeroMax = buildPartyPublicSheet(
       fixture({
