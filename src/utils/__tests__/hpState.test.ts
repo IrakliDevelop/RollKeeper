@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { hpPercent, hpStateLabel, resolveEntryHpMode } from '../hpState';
+import {
+  HP_STATUS_LABELS,
+  hpPercent,
+  hpStateLabel,
+  hpStatus,
+  hpTier,
+  resolveEntryHpMode,
+} from '../hpState';
 import { DEFAULT_HP_STATE_BANDS } from '@/types/encounter';
 
 describe('hpPercent', () => {
@@ -8,6 +15,54 @@ describe('hpPercent', () => {
     expect(hpPercent(120, 120)).toBe(100);
     expect(hpPercent(-5, 120)).toBe(0);
     expect(hpPercent(10, 0)).toBe(0); // guard divide-by-zero
+  });
+});
+
+describe('hpTier', () => {
+  it('is high from 75% up, inclusive', () => {
+    expect(hpTier(100)).toBe('high');
+    expect(hpTier(75)).toBe('high');
+    expect(hpTier(74.9)).toBe('mid');
+  });
+
+  it('is mid from 50%, low from 25%, inclusive', () => {
+    expect(hpTier(50)).toBe('mid');
+    expect(hpTier(49.9)).toBe('low');
+    expect(hpTier(25)).toBe('low');
+    expect(hpTier(24.9)).toBe('critical');
+  });
+
+  it('is critical down to 0', () => {
+    expect(hpTier(0.5)).toBe('critical');
+    expect(hpTier(0)).toBe('critical');
+  });
+});
+
+describe('hpStatus', () => {
+  it('maps the tiers to healthy, bloodied and critical', () => {
+    expect(hpStatus(30, 40)).toBe('healthy'); // 75%
+    expect(hpStatus(29, 40)).toBe('bloodied'); // 72.5%
+    expect(hpStatus(10, 40)).toBe('bloodied'); // 25%
+    expect(hpStatus(9, 40)).toBe('critical'); // 22.5%
+  });
+
+  it('is down at 0 HP or below, and critical while any HP is left', () => {
+    expect(hpStatus(0, 40)).toBe('down');
+    expect(hpStatus(-3, 40)).toBe('down');
+    expect(hpStatus(1, 200)).toBe('critical'); // 0.5%
+  });
+
+  it('is down when there is no max and no HP', () => {
+    expect(hpStatus(0, 0)).toBe('down');
+  });
+
+  it('has a word for every status', () => {
+    expect(HP_STATUS_LABELS).toEqual({
+      healthy: 'Healthy',
+      bloodied: 'Bloodied',
+      critical: 'Critical',
+      down: 'Down',
+    });
   });
 });
 

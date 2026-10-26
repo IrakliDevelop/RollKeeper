@@ -559,10 +559,8 @@ describe('buildSharedInitiative — enemy HP config', () => {
       hpStateBands: bands,
       enemyConditionsDisplay: 'off',
     });
-    // 5/20 = 25% -> 'critical'
-    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe(
-      'critical'
-    );
+    // 5/20 = 25% -> 'low' (tiers include their threshold)
+    expect(result.turnOrder.find(r => r.entityId === 'm')!.hpTier).toBe('low');
   });
 
   it('marks a dead enemy isDead (no tier) when HP is shown', () => {
@@ -627,7 +625,7 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
     enemyConditionsDisplay: 'off',
   });
 
-  // 5/20 = 25% -> tier 'critical', label 'Bloodied'.
+  // 5/20 = 25% -> tier 'low', label 'Bloodied'.
   const goblin = (o: Partial<EncounterEntity> = {}): EncounterEntity =>
     entity({
       id: 'm',
@@ -648,13 +646,13 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
   // Today's exact output per global mode for an untoggled enemy.
   const UNTOGGLED: Record<EnemyHpDisplay, SharedTurnEntry> = {
     off: BASE,
-    label: { ...BASE, isDead: false, hpTier: 'critical', hpState: 'Bloodied' },
-    bar: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
-    percent: { ...BASE, isDead: false, hpTier: 'critical', hpPercent: 25 },
+    label: { ...BASE, isDead: false, hpTier: 'low', hpState: 'Bloodied' },
+    bar: { ...BASE, isDead: false, hpTier: 'low', hpPercent: 25 },
+    percent: { ...BASE, isDead: false, hpTier: 'low', hpPercent: 25 },
     exact: {
       ...BASE,
       isDead: false,
-      hpTier: 'critical',
+      hpTier: 'low',
       currentHp: 5,
       maxHp: 20,
     },
@@ -669,7 +667,7 @@ describe('buildSharedInitiative — per-entity hpVisibleToPlayers', () => {
       expect(result.turnOrder[0]).toStrictEqual({
         ...BASE,
         isDead: false,
-        hpTier: 'critical',
+        hpTier: 'low',
         currentHp: 5,
         maxHp: 20,
         hpMode: 'exact',
