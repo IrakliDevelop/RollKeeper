@@ -4,8 +4,8 @@ import { Badge } from './badge';
 
 /**
  * Felt and Brass badges: a 1px outline in the role colour with no fill.
- * success is verdigris, warning ember, danger blood and primary brass.
- * info, secondary and outline render as neutral.
+ * success is verdigris, warning ember, danger blood, magic lapis and
+ * primary brass. info, secondary and outline render as neutral.
  */
 const meta: Meta<typeof Badge> = {
   title: 'Layout/Badge',
@@ -24,6 +24,7 @@ const meta: Meta<typeof Badge> = {
         'success',
         'warning',
         'danger',
+        'magic',
         'info',
         'secondary',
         'outline',
@@ -53,6 +54,7 @@ function RoleRow() {
       <Badge variant="success">Healed</Badge>
       <Badge variant="warning">Poisoned</Badge>
       <Badge variant="danger">Dying</Badge>
+      <Badge variant="magic">Concentrating</Badge>
     </div>
   );
 }
@@ -68,6 +70,10 @@ export const Roles: Story = {
     await expect(canvas.getByText('Dying')).toHaveAttribute(
       'data-variant',
       'danger'
+    );
+    await expect(canvas.getByText('Concentrating')).toHaveAttribute(
+      'data-variant',
+      'magic'
     );
   },
 };

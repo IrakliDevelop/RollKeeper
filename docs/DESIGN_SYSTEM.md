@@ -75,14 +75,15 @@ Rules:
   number stays `heading`), `mid` and `low` are "Bloodied" (ember), `critical`
   is "Critical" (blood), and 0 HP is "Down". Take the word from
   `HP_STATUS_LABELS[hpStatus(current, max)]` and every colour from
-  `src/utils/hpColor.ts` (`getHpBarColor`, `getHpNumberColor`,
-  `getHpTierTextColor`). Show the word wherever there's room. Don't invent
-  other thresholds or write HP colours by hand. Two exceptions: the words
-  players see for enemies come from the DM's editable bands (`hpStateLabel`
-  with the combat config's `hpStateBands`, defaults in
-  `DEFAULT_HP_STATE_BANDS`), never `hpStatus`; and until the Phase 3 sweeps,
-  `HitPointTracker`'s box and pill and the dock `HpCard` keep their old
-  tints, with only their thresholds on the tiers.
+  `src/utils/hpColor.ts`: `getHpBarColor` and `getHpNumberColor` take
+  current and max HP; with a tier already in hand, use `getHpTierBarColor`,
+  `getHpTierNumberColor` and `getHpTierTextColor`. Show the word wherever
+  there's room. Don't invent other thresholds or write HP colours by hand.
+  Two exceptions: the words players see for enemies come from the DM's
+  editable bands (`hpStateLabel` with the combat config's `hpStateBands`,
+  defaults in `DEFAULT_HP_STATE_BANDS`), never `hpStatus`; and until the
+  Phase 3 sweeps, `HitPointTracker`'s box and pill and the dock `HpCard`
+  keep their old tints, with only their thresholds on the tiers.
 - **No gradients**: not on fills, text, page backgrounds or meters. Meters
   use a solid role colour.
 - **Retired:** the hue-named `accent-{emerald,blue,amber,red,purple,indigo,green,orange,yellow,violet}-*`
@@ -178,7 +179,7 @@ input, card, dialog or toggle. Most have stories in both themes.
 | The confirm in a destructive dialog | `danger-solid` (blood fill). `confirmDialog({ tone: 'danger' })` uses it for you |
 | A toggle button's on state | `selected` on an outline or ghost Button. Add `aria-pressed` only when the label stays the same in both states. `success` and `warning` are deprecated aliases of `secondary` |
 | A text link | `variant="link"` (brass text) |
-| A status label | `Badge`: `primary` brass, `success` verdigris, `warning` ember, `danger` blood, `neutral` (the default). `secondary`, `info` and `outline` render neutral |
+| A status label | `Badge`: `primary` brass, `success` verdigris, `warning` ember, `danger` blood, `magic` lapis (concentration), `neutral` (the default). `secondary`, `info` and `outline` render neutral |
 | Grouping on a page or tab | `Section` (`heading`, `level` 2–4, `trailing` for a heading-row control) |
 | A discrete object | `Card` (`interactive` when the whole card opens it) |
 | A question before acting | `confirmDialog`, `alertDialog`, `promptDialog` from `feedback/confirm-dialog`. Never `window.confirm`, `alert` or `prompt` (ESLint blocks them) |
@@ -216,22 +217,30 @@ controls take an `editing` prop (as `InPlaceField` and `AnchoredEditor` do)
 instead of being always live. A play value edited with `InPlaceField`
 (rolled initiative) passes `editing` as always true.
 
-## Coming in Phase 2
+## Game patterns
 
-The game patterns land as components in `src/components/ui/game/`. Until
-they exist, don't build your own versions:
+The game's own marks live in `src/components/ui/game/`, each with stories in
+both themes (Storybook → Game). Import them by path; don't draw your own.
+
+| Need | Use |
+|---|---|
+| Proficiency on a skill, tool or save | `ProficiencyDot` (`level`: `none` hollow, `half` for Jack of All Trades, `proficient` brass, `expertise` brass with an outer ring). It names its state for screen readers; pass `decorative` when nearby text already says it |
+| A proficiency toggle in edit mode | `ProficiencyDotButton`, labelled with `skillDotLabel` (cycles with `nextSkillProficiency`) or `saveDotLabel` plus `pressed`. Same look, 24px hit area (44px on touch), so keep any other tappable control at least 22px from the dot's centre and the row `pointer-coarse:min-h-11` |
+| Spell slots left | `SlotPips` (`total`, `available`, `level` 1–9 or `'pact'`): 10px lapis pips, filled while available. Display only; one label for the row; bad counts clamp and at most `MAX_PIPS` (20) are drawn |
+| Armor class | `AcShield`: the number in a brass shield outline, the only icon-shaped container in the system. Add the "AC" caption or label yourself |
+| A condition on a creature | `ConditionChip`: an ember `Badge` with the name, or `kind="concentration"` in lapis. `onRemove` adds a remove button; pass `removeLabel` when a list shows several creatures ("Remove Poisoned from Goblin 2"). The name is never cut short. It renders a `div`, so not inside a `<button>` or `<p>`. On touch, give a wrapping list `pointer-coarse:gap-x-3 pointer-coarse:gap-y-6` so remove buttons cover nothing else |
+
+The older `ConditionBadge` stays on the encounter rows and the map's status
+tray until their sweep moves them to `ConditionChip`.
+
+Still coming in Phase 2:
 
 - **Vitals strip** (`CharacterHUD`): HP in `type-num-xl` coloured by tier,
-  temporary HP as "+5 temp" in frost, a 4px tier bar; AC inside a brass shield
-  outline, the only icon-shaped container in the system.
+  temporary HP as "+5 temp" in frost, a 4px tier bar, and AC in `AcShield`.
 - **Medallion:** an ability's large number in a ring; a brass ring means a
   proficient save.
-- **Proficiency dots:** 8px; hollow, half brass (Jack of All Trades), brass,
-  brass with an outer ring (expertise).
-- **Spell slot pips:** 10px lapis circles, filled when available, hollow when
-  spent.
-- **Condition chips:** an ember `Badge` with the condition's name;
-  concentration is lapis.
+- **Ledger row:** the six abilities in one row for drawers and the DM's view
+  of a player.
 - **Large-number switch:** a "Scores large" `Switch` that swaps modifier and
   score in every ring.
 
