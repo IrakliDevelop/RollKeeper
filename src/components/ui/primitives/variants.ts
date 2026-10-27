@@ -168,6 +168,8 @@ export const badgeVariants = cva(
         success: 'border-verdigris-border text-verdigris-text',
         warning: 'border-ember-border text-ember-text',
         danger: 'border-blood-border text-blood-text',
+        // Lapis: concentration and other spell state on a chip.
+        magic: 'border-lapis-border text-lapis-text',
         neutral: NEUTRAL_BADGE,
         secondary: NEUTRAL_BADGE,
         info: NEUTRAL_BADGE,

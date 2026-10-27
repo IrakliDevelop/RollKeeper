@@ -21,6 +21,7 @@ describe('Badge', () => {
         <Badge variant="success">Healed</Badge>
         <Badge variant="warning">Poisoned</Badge>
         <Badge variant="danger">Dying</Badge>
+        <Badge variant="magic">Concentrating</Badge>
       </>
     );
 
@@ -29,6 +30,7 @@ describe('Badge', () => {
       ['Healed', 'verdigris'],
       ['Poisoned', 'ember'],
       ['Dying', 'blood'],
+      ['Concentrating', 'lapis'],
     ];
     for (const [text, role] of roles) {
       const badge = screen.getByText(text);
