@@ -206,24 +206,43 @@ const LONG_NAMES = [
   'Greywaterfenhagcursedforevermore',
 ];
 
-/** A long custom condition wraps, even one long word, instead of being cut short. */
+/**
+ * A long custom condition wraps, even one long word, instead of being cut
+ * short. It wraps in a block column and in a wrapping flex list (the layout
+ * callers use), where `max-w-full` keeps the chip from growing past the list.
+ */
 export const LongName: Story = {
   render: () => (
-    <div data-testid="column" className="w-40 space-y-2">
-      {LONG_NAMES.map(name => (
-        <ConditionChip key={name} name={name} onRemove={() => {}} />
-      ))}
+    <div className="space-y-4">
+      <div data-testid="column" className="w-40 space-y-2">
+        {LONG_NAMES.map(name => (
+          <ConditionChip key={name} name={name} onRemove={() => {}} />
+        ))}
+      </div>
+      <div data-testid="flex-column" className="flex w-40 flex-wrap gap-2">
+        <ConditionChip name={LONG_NAMES[1]} onRemove={() => {}} />
+      </div>
     </div>
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const column = canvas.getByTestId('column').getBoundingClientRect();
     for (const name of LONG_NAMES) {
-      const text = canvas.getByText(name);
+      const text = within(canvas.getByTestId('column')).getByText(name);
       const chip = text.closest('[data-kind]')!.getBoundingClientRect();
       await expect(text.scrollWidth).toBeLessThanOrEqual(text.clientWidth);
       await expect(chip.right).toBeLessThanOrEqual(column.right);
       await expect(text.getBoundingClientRect().height).toBeGreaterThan(20);
     }
+
+    const flexList = canvas.getByTestId('flex-column');
+    const flexText = within(flexList).getByText(LONG_NAMES[1]);
+    const flexChip = flexText.closest('[data-kind]')!.getBoundingClientRect();
+    await expect(flexChip.right).toBeLessThanOrEqual(
+      flexList.getBoundingClientRect().right
+    );
+    await expect(flexText.scrollWidth).toBeLessThanOrEqual(
+      flexText.clientWidth
+    );
   },
 };

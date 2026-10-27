@@ -94,7 +94,10 @@ function DotGlyph({ level }: { level: ProficiencyLevel }) {
 
 export interface ProficiencyDotProps {
   level: ProficiencyLevel;
-  /** Overrides the state word, e.g. "Stealth: expertise". */
+  /**
+   * Overrides the state word, e.g. "Stealth: expertise". An empty label falls
+   * back to the state word, so the dot is never nameless.
+   */
   label?: string;
   /**
    * Hide the dot from screen readers when nearby text already says the
@@ -118,7 +121,7 @@ export function ProficiencyDot({
       className={cn('inline-flex shrink-0', className)}
       {...(decorative
         ? { 'aria-hidden': true }
-        : { role: 'img', 'aria-label': label ?? PROFICIENCY_LABELS[shown] })}
+        : { role: 'img', 'aria-label': label || PROFICIENCY_LABELS[shown] })}
     >
       <DotGlyph level={shown} />
     </span>

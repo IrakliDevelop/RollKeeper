@@ -61,6 +61,11 @@ describe('ProficiencyDot', () => {
     ).toBeInTheDocument();
   });
 
+  it('falls back to the state word for an empty label', () => {
+    render(<ProficiencyDot level="proficient" label="" />);
+    expect(screen.getByRole('img', { name: 'Proficient' })).toBeInTheDocument();
+  });
+
   it('draws an unknown saved level as not proficient', () => {
     render(<ProficiencyDot level={'master' as ProficiencyLevel} />);
     expect(screen.getByRole('img', { name: 'Not proficient' })).toHaveAttribute(
