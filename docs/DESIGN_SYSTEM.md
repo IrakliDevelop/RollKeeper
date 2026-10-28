@@ -231,6 +231,7 @@ both themes (Storybook → Game). Import them by path; don't draw your own.
 | An ability on the Stats tab | `Medallion` (`ability`, `score`, `modifier`, `saveProficient`, `abilityDisplay`): a 48px ring with the large number inside and the small one on a tab over the bottom edge. The ring is brass when the save is proficient, `divider-strong` when not; it is never decorative. One label in both modes ("Strength: modifier +3, score 16"). With `editing` and `onScoreChange` it becomes a button that opens the "Strength score" editor (1–30, live "Modifier +3"); otherwise it is plain, with no tab stop. The tab hangs 10px below the ring, so leave that much room under it. Don't pass outline classes in `className`: in edit mode they clash with, and can hide, the editor's dashed cue and focus ring |
 | Abilities in a drawer or the DM's view of a player | `LedgerRow` (`cells`: six `{ ability, score, modifier, save, saveProficient }`, `abilityDisplay`): name, the two numbers and a save line ("Save +5" with a decorative dot) per cell, `divider` hairlines between cells, six across from 32rem of its own width and 3×2 below. Give it a block parent: as a flex item with auto width it shrinks to nothing. `editing` + `onScoreChange` open the same score editor. `onRollCheck` / `onRollSave` turn the name and save line into "Roll Strength check" / "Roll Strength saving throw" buttons; without them they stay text, and while editing rolls are off |
 | A condition on a creature | `ConditionChip`: an ember `Badge` with the name, or `kind="concentration"` in lapis. `onRemove` adds a remove button; pass `removeLabel` when a list shows several creatures ("Remove Poisoned from Goblin 2"). The name is never cut short. It renders a `div`, so not inside a `<button>` or `<p>`. On touch, give a wrapping list `pointer-coarse:gap-x-3 pointer-coarse:gap-y-6` so remove buttons cover nothing else |
+| A character's vitals (the sheet's HUD, row 1) | `CharacterHUD` (`ui/character/`). HP is `HudHitPoints`: the current value in `type-num-xl` coloured by tier, "/ max" in `body`, "+5 temp" in frost, a 4px tier bar on a `divider` track and the tier word under it; with no max HP, a plain number and an empty track. Each drop in current HP flashes the tile blood for 180ms (`useHpDamageFlash`, from state, so a hit from another tab or the DM flashes too). The other stats are `HudStat` tiles: `type-num-lg` over a caption at every width ("Initiative", "Spell save DC"), AC in `AcShield`; a tile with `onClick` is a button named by its text. Concentration is a `ConditionChip`, the conditions count an ember badge-style button with no pulse |
 
 The older `ConditionBadge` stays on the encounter rows and the map's status
 tray until their sweep moves them to `ConditionChip`.
@@ -261,8 +262,6 @@ Which number an ability shows large is the viewer's choice, per device:
 
 Still coming in Phase 2:
 
-- **Vitals strip** (`CharacterHUD`): HP in `type-num-xl` coloured by tier,
-  temporary HP as "+5 temp" in frost, a 4px tier bar, and AC in `AcShield`.
 - **"Scores large" switch:** the `Switch` at the Abilities heading that
   calls `setPref('abilityDisplay', …)`.
 
