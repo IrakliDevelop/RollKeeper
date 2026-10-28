@@ -241,3 +241,83 @@ describe('CharacterHUD stats', () => {
     expect(screen.queryByText('Spell save DC')).toBeNull();
   });
 });
+
+function activeCondition(name: string) {
+  return {
+    id: `condition-${name}`,
+    name,
+    source: 'XPHB',
+    description: '',
+    stackable: false,
+    count: 1,
+    appliedAt: '2026-10-28T00:00:00.000Z',
+  };
+}
+
+function withConditions(
+  names: string[],
+  overrides: Partial<CharacterState> = {}
+) {
+  const base = withHp(30, 40, 0, overrides);
+  return {
+    ...base,
+    conditionsAndDiseases: {
+      ...base.conditionsAndDiseases,
+      activeConditions: names.map(activeCondition),
+    },
+  };
+}
+
+describe('CharacterHUD concentration and conditions', () => {
+  it('names the concentration spell and ends it from the chip', () => {
+    const { props } = renderHud(
+      withHp(30, 40, 0, {
+        concentration: { isConcentrating: true, spellName: 'Hold Person' },
+      })
+    );
+    expect(screen.getByText('Concentrating on Hold Person')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'End concentration' }));
+    expect(props.onStopConcentration).toHaveBeenCalledTimes(1);
+  });
+
+  it('falls back to "spell" without a spell name', () => {
+    renderHud(withHp(30, 40, 0, { concentration: { isConcentrating: true } }));
+    expect(screen.getByText('Concentrating on spell')).toBeVisible();
+  });
+
+  it('only ends concentration from the X', () => {
+    const { props } = renderHud(
+      withHp(30, 40, 0, {
+        concentration: { isConcentrating: true, spellName: 'Bless' },
+      })
+    );
+    fireEvent.click(screen.getByText('Concentrating on Bless'));
+    expect(props.onStopConcentration).not.toHaveBeenCalled();
+  });
+
+  it('counts conditions and opens the Combat tab', () => {
+    const { props } = renderHud(
+      withConditions(['Poisoned', 'Prone', 'Blinded'])
+    );
+    const count = screen.getByRole('button', {
+      name: '3 conditions. Open the Combat tab',
+    });
+    expect(count).toHaveTextContent('3');
+    expect(count).not.toHaveAttribute('title');
+    expect(count).not.toHaveClass('animate-condition-pulse');
+    fireEvent.click(count);
+    expect(props.onNavigateToConditions).toHaveBeenCalledTimes(1);
+  });
+
+  it('says "1 condition" for one', () => {
+    renderHud(withConditions(['Poisoned']));
+    expect(
+      screen.getByRole('button', { name: '1 condition. Open the Combat tab' })
+    ).toBeVisible();
+  });
+
+  it('shows no count without conditions', () => {
+    renderHud(withConditions([]));
+    expect(screen.queryByRole('button', { name: /condition/ })).toBeNull();
+  });
+});

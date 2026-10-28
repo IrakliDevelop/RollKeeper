@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   ClockAlert,
-  Brain,
   Zap,
   Footprints,
   Sparkles,
@@ -19,7 +18,9 @@ import {
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { badgeVariants } from '@/components/ui/layout/badge';
 import { AcShield } from '@/components/ui/game/AcShield';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import {
   calculateCharacterArmorClass,
   calculateSpellAttackBonus,
@@ -29,6 +30,7 @@ import {
   getBuffSpeedBonus,
 } from '@/utils/calculations';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import {
   CLASS_RESOURCE_ICONS,
   CLASS_RESOURCE_COLORS,
@@ -173,28 +175,30 @@ export default function CharacterHUD({
 
         {/* Contextual Indicators */}
         {hasContextualIndicators && (
-          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3">
+          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3 pointer-coarse:gap-x-3 pointer-coarse:gap-y-6">
             {isConcentrating && (
-              <button
-                onClick={onStopConcentration}
-                className="bg-accent-amber-bg text-accent-amber-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title={`Concentrating on ${character.concentration.spellName || 'spell'} — click to stop`}
-              >
-                <Brain className="h-3.5 w-3.5 shrink-0" />
-                <span className="max-w-[100px] truncate">
-                  {character.concentration.spellName || 'Conc.'}
-                </span>
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <ConditionChip
+                kind="concentration"
+                name={`Concentrating on ${character.concentration.spellName || 'spell'}`}
+                onRemove={onStopConcentration}
+              />
             )}
 
             {activeConditionsCount > 0 && (
               <button
+                type="button"
                 onClick={onNavigateToConditions}
-                className="bg-accent-red-bg text-accent-red-text animate-condition-pulse flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title="View active conditions"
+                aria-label={
+                  activeConditionsCount === 1
+                    ? '1 condition. Open the Combat tab'
+                    : `${activeConditionsCount} conditions. Open the Combat tab`
+                }
+                className={cn(
+                  badgeVariants({ variant: 'warning' }),
+                  'hover:bg-surface-hover focus-visible:outline-ring min-h-6 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+                )}
               >
-                <AlertCircle className="h-3.5 w-3.5" />
+                <AlertCircle className="size-3.5" aria-hidden="true" />
                 <span>{activeConditionsCount}</span>
               </button>
             )}
@@ -530,7 +534,7 @@ function ActiveBuffsIndicator({
     <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-accent-blue-bg text-accent-blue-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
+        className="bg-accent-blue-bg text-accent-blue-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         title="Active buffs — click to view"
       >
         <Zap className="h-3.5 w-3.5" />
