@@ -9,6 +9,7 @@ import { snapFootprintCenter, TemplateTool } from '@fieldnotes/vtt';
 import { cellUnit } from './cellUnit';
 import { TOKEN_ELEMENT_ZINDEX, TEMPLATE_ELEMENT_ZINDEX } from './tokenSnap';
 import { uploadAsset } from '@/utils/uploadAsset';
+import { assetProxyUrl as proxyUrl } from '@/utils/assetProxyUrl';
 
 export const PLAYER_TOKEN_KIND = 'player';
 
@@ -64,14 +65,6 @@ export function tokenAvatarUrl(avatar: string | undefined): string | null {
     }
   }
   return null;
-}
-
-/** Same-origin proxy for S3 URLs so canvas compositing isn't CORS-tainted. */
-function proxyUrl(url: string): string {
-  if (url.includes('.s3.') && url.includes('.amazonaws.com')) {
-    return `/api/assets/proxy?url=${encodeURIComponent(url)}`;
-  }
-  return url;
 }
 
 const circularTokenCache = new Map<string, Promise<string | null>>();

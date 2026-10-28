@@ -1,5 +1,9 @@
 import {
   createManagedSyncConnection,
+  type AuthorityBarrier,
+  type AuthorityBarrierResult,
+  type AuthorityClientCheckpointResult,
+  type AuthorityClientStatus,
   type ManagedSyncStatus,
   type ManagedSyncTransport,
   type RemoteLayerUpdate,
@@ -15,10 +19,13 @@ import {
   normalizeFogAppearanceProjectionTimestamp,
 } from '@/lib/fogOfWar';
 import { fieldnotesElementRegistry } from '@/lib/fieldnotesVtt';
+import { createManagedBattleMapAuthorityConnection } from '@/lib/battlemapAuthority';
 
 export type { RemoteLayerUpdate };
 
-export type BattleMapConnectionStatus = ManagedSyncStatus;
+export type BattleMapConnectionStatus =
+  | ManagedSyncStatus
+  | AuthorityClientStatus;
 
 const PRINTABLE_ASCII = /^[\x20-\x7e]+$/;
 
@@ -29,43 +36,91 @@ export function isValidClientId(id: string): boolean {
 export interface BattleMapTokenRequest {
   role: BattleMapRole;
   battleMapId: string;
+  sceneId?: string;
   dmId?: string;
   playerId?: string;
   displayKey?: string;
-  protocols?: { fog?: 1 };
-  /** Registry tag only (`liveMapRooms.ts`); omitted means `battlemap`. It
-   *  grants nothing — room authority comes from the signed token. */
+  /** PR05 E5 (Table v1): the campaign display capability (body only). */
+  displayCapability?: string;
+  /** PR05 E4: the display tab's bound session nonce (body only). */
+  displaySession?: string;
+  protocols?: { fog?: 1; authority?: 1 };
+  /** Routing hint for the established location versus scene adapter. It
+   * grants nothing; the server independently resolves resource identity. */
   kind?: 'battlemap' | 'location';
 }
 
 export interface BattleMapTokenResult {
   token: string;
+  authority?: 1;
+  room?: string;
+  roomGeneration?: string;
+  /** Server-resolved Table scene (R4); map-pinned audiences scope to it. */
+  sceneId?: string;
   fogAppearance?: import('@/types/battlemap').ProjectedFogAppearance;
   fogAppearanceUpdatedAt?: string | null;
 }
 
+/** A non-ok token response: HTTP status and the server's error string. */
+export interface BattleMapTokenDenial {
+  status: number;
+  error: string | null;
+}
+
 export async function mintBattleMapToken(
   campaignCode: string,
-  req: BattleMapTokenRequest
+  req: BattleMapTokenRequest,
+  options: {
+    /** PR04 C4-1: observes a denial (null is still returned). */
+    onDenied?: (denial: BattleMapTokenDenial) => void;
+  } = {}
 ): Promise<BattleMapTokenResult | null> {
   try {
+    const sceneId =
+      req.kind === 'location' ? req.sceneId : (req.sceneId ?? req.battleMapId);
     const res = await fetch(`/api/campaign/${campaignCode}/battlemap-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'x-rollkeeper-csrf': '1',
       },
-      body: JSON.stringify({ ...req, protocols: { fog: 1 } }),
+      body: JSON.stringify({
+        ...req,
+        ...(sceneId === undefined ? {} : { sceneId }),
+        protocols: { fog: 1, authority: 1 },
+      }),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      if (options.onDenied) {
+        const body = (await res.json().catch(() => null)) as {
+          error?: unknown;
+        } | null;
+        options.onDenied({
+          status: res.status,
+          error: typeof body?.error === 'string' ? body.error : null,
+        });
+      }
+      return null;
+    }
     const data = (await res.json()) as {
       token?: string;
+      authority?: unknown;
+      room?: unknown;
+      roomGeneration?: unknown;
+      sceneId?: unknown;
       fogAppearance?: unknown;
       fogAppearanceUpdatedAt?: unknown;
     };
     if (!data.token) return null;
     return {
       token: data.token,
+      authority: data.authority === 1 ? 1 : undefined,
+      room: typeof data.room === 'string' ? data.room : undefined,
+      roomGeneration:
+        typeof data.roomGeneration === 'string'
+          ? data.roomGeneration
+          : undefined,
+      sceneId: typeof data.sceneId === 'string' ? data.sceneId : undefined,
       fogAppearance: parseProjectedFogAppearance(data.fogAppearance),
       fogAppearanceUpdatedAt: normalizeFogAppearanceProjectionTimestamp(
         data.fogAppearanceUpdatedAt
@@ -140,6 +195,14 @@ export interface ManagedConnectionOptions {
   onStatus?: (s: BattleMapConnectionStatus) => void;
   /** Receives pre-transport configuration failures for operator UI/logging. */
   onDiagnostic?: (message: string) => void;
+  /** GG3: authority only; offline drafts were released (the live room won). */
+  onOfflineDraftsReleased?: () => void;
+  /**
+   * PR04 C4-1/P10: a token mint denial (status + server error body), so a
+   * surface can tell "Scene is unavailable" from a credential denial. The
+   * connection's existing retry/backoff is unchanged.
+   */
+  onTokenDenied?: (denial: BattleMapTokenDenial) => void;
   /** Fires when the relay pokes this room (e.g. initiative changed → refetch /shared). */
   onPoke?: (feature: string) => void;
   /** Called with session metadata from each token mint (initial + refreshes). */
@@ -149,6 +212,16 @@ export interface ManagedConnectionOptions {
   }) => void;
   /** DI seam for tests; defaults to the SDK's WebSocketTransport. */
   transportFactory?: (url: string) => BattleMapTransport;
+  /**
+   * Table v1 only (R4): the scene the server resolved for a map-pinned
+   * player/display surface, and a later change of that resolution. On a
+   * change the connection is rebuilt and pending edits are discarded.
+   */
+  onSceneResolved?: (sceneId: string) => void;
+  onSceneChange?: (
+    change: import('@/lib/battlemapAuthority').BattleMapSceneChange
+  ) => void;
+  authorityTransportFactory?: import('@fieldnotes/sync').ManagedAuthorityOptions['transportFactory'];
 }
 
 /**
@@ -185,6 +258,17 @@ export interface BattleMapConnection {
   onPresence: (handler: (from: string, data: unknown) => void) => () => void;
   /** Observes presence departures (same `from` key). Returns unsubscribe. */
   onPresenceLeave: (handler: (from: string) => void) => () => void;
+  captureBarrier?: () => AuthorityBarrier | null;
+  waitForAcknowledgements?: (
+    barrier: AuthorityBarrier,
+    options?: { signal?: AbortSignal; timeoutMs?: number }
+  ) => Promise<AuthorityBarrierResult>;
+  requestCheckpoint?: (options?: {
+    barrier?: AuthorityBarrier;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  }) => Promise<AuthorityClientCheckpointResult>;
+  releaseBarrier?: (barrier: AuthorityBarrier) => boolean;
 }
 
 function inertDeniedConnection(): BattleMapConnection {
@@ -223,6 +307,29 @@ export function createManagedBattleMapConnection(
 
   const room = battleMapRelayRoom(opts.campaignCode, opts.battleMapId);
   let stopped = false;
+  let legacyAccessDenied = false;
+
+  // Table protocol v1: every non-location room (and any request naming a
+  // scene) uses fenced scene authority; only a bare location hint stays on
+  // the legacy managed sync room.
+  if (
+    opts.tokenRequest.kind !== 'location' ||
+    opts.tokenRequest.sceneId !== undefined
+  ) {
+    return createManagedBattleMapAuthorityConnection({
+      ...opts,
+      tokenRequest: {
+        ...opts.tokenRequest,
+        sceneId: opts.tokenRequest.sceneId ?? opts.battleMapId,
+        protocols: { fog: 1, authority: 1 },
+      },
+      mint: (campaignCode, request) =>
+        mintBattleMapToken(campaignCode, request, {
+          onDenied: opts.onTokenDenied,
+        }),
+      transportFactory: opts.authorityTransportFactory,
+    });
+  }
 
   const connection = createManagedSyncConnection({
     store: opts.store,
@@ -239,9 +346,26 @@ export function createManagedBattleMapConnection(
     resolveUrl: async () => {
       const result = await mintBattleMapToken(
         opts.campaignCode,
-        opts.tokenRequest
+        opts.tokenRequest,
+        { onDenied: opts.onTokenDenied }
       );
-      if (stopped || !result) return null;
+      if (stopped) return null;
+      if (!result) {
+        legacyAccessDenied = true;
+        opts.onDiagnostic?.(
+          'Live location access was denied. Reopen the location from the campaign.'
+        );
+        opts.onStatus?.('denied');
+        return null;
+      }
+      if (result.authority === 1) {
+        legacyAccessDenied = true;
+        opts.onDiagnostic?.(
+          "This location can't open live here. Reopen it from the campaign."
+        );
+        opts.onStatus?.('denied');
+        return null;
+      }
       if (opts.onTokenMetadata) {
         opts.onTokenMetadata({
           fogAppearance: result.fogAppearance,
@@ -255,6 +379,7 @@ export function createManagedBattleMapConnection(
     // the fog-enabled `live` notification by a microtask so consumers cannot
     // paint an unmasked frame between those two synchronous handlers.
     onStatus: status => {
+      if (legacyAccessDenied && status !== 'denied') return;
       if (status === 'live' && opts.fog) {
         queueMicrotask(() => {
           if (!stopped) opts.onStatus?.(status);

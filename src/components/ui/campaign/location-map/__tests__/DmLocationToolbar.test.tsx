@@ -350,4 +350,34 @@ describe('DmLocationToolbar marker chrome', () => {
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
   });
+
+  it('PR04 Table v1: "Share with players" is disabled with the Table-managed reason', () => {
+    render(<DmLocationToolbar {...baseProps} />);
+    const share = screen.getByRole('button', { name: 'Share with players' });
+    expect(share).toBeDisabled();
+    expect(
+      screen.getByText('Players now see maps through Table scenes.')
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Live for players' })
+    ).not.toBeInTheDocument();
+  });
+  it('PR05 E12: shows the Open display failure message in battlemap mode', async () => {
+    const onOpenTvDisplay = vi.fn(async () => ({
+      ok: false as const,
+      reason: 'popup-blocked' as const,
+      message:
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.',
+    }));
+    render(
+      <DmLocationToolbar {...baseProps} onOpenTvDisplay={onOpenTvDisplay} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Open TV Display/u }));
+    expect(onOpenTvDisplay).toHaveBeenCalledTimes(1);
+    expect(
+      await screen.findByText(
+        'Your browser blocked the new window. Allow pop-ups for this site, then press Open display again.'
+      )
+    ).toBeVisible();
+  });
 });

@@ -82,6 +82,8 @@ export interface UseFogPresetControlsInput {
   viewport: Viewport | null;
   applied: FogAppearance;
   onApply(appearance: FogAppearance): void;
+  /** Table scenes may read/apply legacy presets but never rewrite that library. */
+  libraryWritable?: boolean;
 }
 
 function materialFromApplied(applied: FogAppearance): CustomFogMaterialV1 {
@@ -97,7 +99,13 @@ function randomSeed(): number {
 export function useFogPresetControls(
   input: UseFogPresetControlsInput
 ): FogPresetControls {
-  const { campaignCode, viewport, applied, onApply } = input;
+  const {
+    campaignCode,
+    viewport,
+    applied,
+    onApply,
+    libraryWritable = true,
+  } = input;
   const rawLibrary = useDmStore(s => s.getCampaign(campaignCode)?.fogPresets);
   const upsertFogPreset = useDmStore(s => s.upsertFogPreset);
   const removeFogPreset = useDmStore(s => s.removeFogPreset);
@@ -313,6 +321,7 @@ export function useFogPresetControls(
     (name: string): string | null => {
       const current = editorRef.current;
       if (!current) return FOG_PRESET_ERRORS.missing;
+      if (!libraryWritable) return FOG_PRESET_ERRORS.missing;
       if (!canAddFogPreset(storageLibrary)) {
         commitEditor({ ...current, error: FOG_PRESET_ERRORS.full });
         return FOG_PRESET_ERRORS.full;
@@ -335,12 +344,20 @@ export function useFogPresetControls(
       commitEditor({ ...current, sourcePresetId: id, error: null });
       return null;
     },
-    [storageLibrary, validateName, upsertFogPreset, campaignCode, commitEditor]
+    [
+      storageLibrary,
+      validateName,
+      upsertFogPreset,
+      campaignCode,
+      commitEditor,
+      libraryWritable,
+    ]
   );
 
   const updateSourcePreset = useCallback((): string | null => {
     const current = editorRef.current;
     if (!current || !current.sourcePresetId) return FOG_PRESET_ERRORS.missing;
+    if (!libraryWritable) return FOG_PRESET_ERRORS.missing;
     const preset = storageLibrary.find(p => p.id === current.sourcePresetId);
     if (!preset) return FOG_PRESET_ERRORS.missing;
     upsertFogPreset(campaignCode, {
@@ -349,10 +366,11 @@ export function useFogPresetControls(
       updatedAt: new Date().toISOString(),
     });
     return null;
-  }, [storageLibrary, upsertFogPreset, campaignCode]);
+  }, [storageLibrary, upsertFogPreset, campaignCode, libraryWritable]);
 
   const renamePreset = useCallback(
     (id: string, name: string): string | null => {
+      if (!libraryWritable) return FOG_PRESET_ERRORS.missing;
       const preset = storageLibrary.find(p => p.id === id);
       if (!preset) return FOG_PRESET_ERRORS.missing;
       const checked = validateName(name, id);
@@ -364,11 +382,18 @@ export function useFogPresetControls(
       });
       return null;
     },
-    [storageLibrary, validateName, upsertFogPreset, campaignCode]
+    [
+      storageLibrary,
+      validateName,
+      upsertFogPreset,
+      campaignCode,
+      libraryWritable,
+    ]
   );
 
   const duplicatePreset = useCallback(
     (id: string): string | null => {
+      if (!libraryWritable) return FOG_PRESET_ERRORS.missing;
       const preset = storageLibrary.find(p => p.id === id);
       if (!preset) return FOG_PRESET_ERRORS.missing;
       if (!canAddFogPreset(storageLibrary)) return FOG_PRESET_ERRORS.full;
@@ -394,14 +419,15 @@ export function useFogPresetControls(
       });
       return null;
     },
-    [storageLibrary, upsertFogPreset, campaignCode]
+    [storageLibrary, upsertFogPreset, campaignCode, libraryWritable]
   );
 
   const confirmDelete = useCallback(() => {
-    if (pendingDeleteId) removeFogPreset(campaignCode, pendingDeleteId);
+    if (pendingDeleteId && libraryWritable)
+      removeFogPreset(campaignCode, pendingDeleteId);
     setPendingDeleteId(null);
     setManagerError(null);
-  }, [pendingDeleteId, removeFogPreset, campaignCode]);
+  }, [pendingDeleteId, removeFogPreset, campaignCode, libraryWritable]);
 
   const openManager = useCallback(() => {
     setManagerOpen(true);

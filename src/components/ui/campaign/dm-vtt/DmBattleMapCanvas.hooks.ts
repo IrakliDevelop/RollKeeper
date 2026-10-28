@@ -26,6 +26,15 @@ import {
   createManagedBattleMapConnection,
   type BattleMapConnectionStatus,
 } from '@/lib/battlemapSync';
+import {
+  CONNECTION_DROPPED_MESSAGE,
+  DM_REJECTED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
+} from '@/lib/battlemapAuthority';
+
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useLocationStore } from '@/store/locationStore';
 import {
@@ -125,6 +134,23 @@ import type {
   MarkerDetail,
   MarkerPortalTargetV1,
 } from '@/types/battlemap';
+import type { TableSceneAdapter } from '@/lib/table/sceneAdapter';
+import {
+  markerDetailsUrl,
+  markerPublishRequest,
+} from '@/components/ui/campaign/table/sideChannelRequests';
+
+/** GG6: identical live-sync notices within this window show once. */
+const LIVE_SYNC_NOTICE_DEDUPE_MS = 3_000;
+/** FF5: sync outcomes the DM must see on the Table stage. */
+const LIVE_SYNC_NOTICES = new Set([
+  CONNECTION_DROPPED_MESSAGE,
+  HELD_OVERFLOW_MESSAGE,
+  HELD_STALE_MESSAGE,
+  OFFLINE_DISCARDED_DM_MESSAGE,
+  OFFLINE_NOT_KEPT_DM_MESSAGE,
+  DM_REJECTED_MESSAGE,
+]);
 
 export interface DmBattleMapCanvasProps {
   campaignCode: string;
@@ -132,6 +158,8 @@ export interface DmBattleMapCanvasProps {
   dmId: string;
   /** Map/session controls rendered as the command dock's first row. */
   sessionControls?: React.ReactNode;
+  /** PR06 W10: Table "Edit map" tool group rendered in the dock. */
+  editMapControl?: React.ReactNode;
   /** Chrome rendered inside the ViewportContext.Provider. */
   children?: React.ReactNode;
   onStatus?: (status: BattleMapConnectionStatus) => void;
@@ -147,6 +175,11 @@ export interface DmBattleMapCanvasProps {
   onExportError: (message: string) => void;
   /** Double-click on a combatant token → open its creature drawer. Absent = tokens not activatable. */
   onOpenCombatant?: (entityId: string) => void;
+  /** Isolated Table scene state. When present no legacy map/source writer is used. */
+  tableSceneAdapter?: TableSceneAdapter;
+  onConnectionReady?: (
+    connection: import('@/lib/battlemapSync').BattleMapConnection | null
+  ) => void;
 }
 
 /** Stable identity for an empty campaign record — avoids a fresh `{}` on each
@@ -195,6 +228,10 @@ export interface DmBattleMapCanvasState {
   selectedElementIsMarker: boolean;
   /** Explanation for a refused audience transition, or null. */
   markerAudienceNotice: string | null;
+  /** Table only: the last marker publication was refused (C4-2). */
+  markerShareNotice?: string | null;
+  /** FF5: the latest live-map sync notice the DM must see. */
+  liveSyncNotice?: { message: string; at: number } | null;
   markerPanelOpen: boolean;
   markerPanelState: MarkerPanelState;
   markerPanelIsDmOnly: boolean;
@@ -221,6 +258,19 @@ export interface DmBattleMapCanvasState {
 }
 
 /**
+ * Table scenes resolve movement from their scene members; only the legacy
+ * map route reads linked encounters (which a Table scene need not have).
+ */
+export function resolveSceneMovement(
+  tableSceneAdapter: TableSceneAdapter | undefined,
+  identity: MovableTokenIdentity,
+  linkedEncounterIds: () => string[]
+): ReturnType<typeof resolveDmMovement> {
+  if (tableSceneAdapter) return tableSceneAdapter.resolveMovement(identity);
+  return resolveDmMovement(identity, linkedEncounterIds());
+}
+
+/**
  * Init/persistence/connection wiring for `DmBattleMapCanvas` — mirrors
  * `DmLocationEditor.hooks.ts`'s battlemap-mode path (loadJSON guard, AutoSave
  * + save-on-local-ops with remote-origin filtering, `createManagedBattleMapConnection`
@@ -237,14 +287,28 @@ export function useDmBattleMapCanvas({
   tokenConfigRef,
   onSelectionChange,
   onOpenCombatant,
+  tableSceneAdapter,
+  onConnectionReady,
 }: DmBattleMapCanvasProps): DmBattleMapCanvasState {
   const [viewport, setViewport] = useState<Viewport | null>(null);
   useEffect(() => {
     if (viewport) exposeStoreForE2E('viewport', viewport);
   }, [viewport]);
   const [status, setStatus] = useState<BattleMapConnectionStatus>('connecting');
+  /** FF5: a live-map sync notice the DM must see (shown as a toast). */
+  const [liveSyncNotice, setLiveSyncNotice] = useState<{
+    message: string;
+    at: number;
+  } | null>(null);
   const autoSaveRef = useRef<AutoSave | null>(null);
-  const connectionRef = useRef<{ stop: () => void } | null>(null);
+  /**
+   * FR4-3: local edits are tracked against the current connection: armed
+   * once it exists, and "before live" until it is first live.
+   */
+  const editsBeforeLiveRef = useRef({ armed: false, liveSeen: false });
+  const connectionRef = useRef<
+    import('@/lib/battlemapSync').BattleMapConnection | null
+  >(null);
   const laserCleanupRef = useRef<(() => void) | null>(null);
   const pinUnsubRef = useRef<(() => void) | null>(null);
   const hiddenPlacementUnsubRef = useRef<(() => void) | null>(null);
@@ -310,36 +374,72 @@ export function useDmBattleMapCanvas({
     awarenessRef.current?.setShowPlayerCursors(enabled);
   }, []);
 
-  const linkedEncounterIdsLive = useCallback(
+  const [, notifyTableScene] = useState(0);
+  useEffect(
     () =>
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-        ?.linkedEncounterIds ?? [],
-    [campaignCode, battleMapId]
+      tableSceneAdapter?.subscribe(() => notifyTableScene(value => value + 1)),
+    [tableSceneAdapter]
+  );
+  const legacyBattleMap = useBattleMapStore(
+    state => state.battleMaps[campaignCode]?.[battleMapId]
+  );
+  const battleMap = tableSceneAdapter?.getBattleMap() ?? legacyBattleMap;
+  const readBattleMap = useCallback(
+    () =>
+      tableSceneAdapter?.getBattleMap() ??
+      useBattleMapStore.getState().getBattleMap(campaignCode, battleMapId),
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const updateBattleMap = useCallback(
+    (updates: Partial<BattleMap>) => {
+      if (tableSceneAdapter) tableSceneAdapter.updateBattleMap(updates);
+      else
+        useBattleMapStore
+          .getState()
+          .updateBattleMap(campaignCode, battleMapId, updates);
+    },
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const setDmOnly = useCallback(
+    (elementId: string, dmOnly: boolean) => {
+      if (tableSceneAdapter) tableSceneAdapter.setDmOnly(elementId, dmOnly);
+      else
+        useBattleMapStore
+          .getState()
+          .setDmOnly(campaignCode, battleMapId, elementId, dmOnly);
+    },
+    [tableSceneAdapter, campaignCode, battleMapId]
+  );
+  const linkedEncounterIdsLive = useCallback(
+    () => readBattleMap()?.linkedEncounterIds ?? [],
+    [readBattleMap]
   );
   const resolveMovement = useCallback(
     (identity: MovableTokenIdentity) =>
-      resolveDmMovement(identity, linkedEncounterIdsLive()),
-    [linkedEncounterIdsLive]
+      resolveSceneMovement(tableSceneAdapter, identity, linkedEncounterIdsLive),
+    [tableSceneAdapter, linkedEncounterIdsLive]
   );
 
-  const hiddenElementCount = useBattleMapStore(
+  const legacyHiddenElementCount = useBattleMapStore(
     state =>
       Object.keys(
         state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements ?? {}
       ).length
   );
-  const selectedElementIsDmOnly = useBattleMapStore(state =>
+  const legacySelectedElementIsDmOnly = useBattleMapStore(state =>
     selectedElementId
       ? (state.battleMaps[campaignCode]?.[battleMapId]?.dmOnlyElements[
           selectedElementId
         ] ?? false)
       : false
   );
-  // Same store-object reference each render unless the record actually
-  // changes — safe as a selector return without a custom equality fn.
-  const battleMap = useBattleMapStore(
-    state => state.battleMaps[campaignCode]?.[battleMapId]
-  );
+  const hiddenElementCount = tableSceneAdapter
+    ? Object.keys(battleMap?.dmOnlyElements ?? {}).length
+    : legacyHiddenElementCount;
+  const selectedElementIsDmOnly = tableSceneAdapter
+    ? selectedElementId !== null &&
+      battleMap?.dmOnlyElements[selectedElementId] === true
+    : legacySelectedElementIsDmOnly;
   // ─── Portal target choices ────────────────────────────────────
   // Subscribe to the backing RECORD references (not `getBattleMaps()` /
   // `getLocations()` results — those produce fresh arrays and defeat Zustand's
@@ -372,7 +472,9 @@ export function useDmBattleMapCanvas({
   // is already established. Read the latest value via a ref instead.
   const onPokeRef = useRef(onPoke);
   onPokeRef.current = onPoke;
-  const refreshMarkerClaimsRef = useRef<() => Promise<void>>(async () => {});
+  const refreshMarkerClaimsRef = useRef<
+    (signal?: AbortSignal) => Promise<void>
+  >(async () => {});
 
   // ─── Markers ──────────────────────────────────────────────────
   // Deliberately connection-independent: nothing below reads the relay URL or
@@ -388,6 +490,10 @@ export function useDmBattleMapCanvas({
   const [markerAudienceNotice, setMarkerAudienceNotice] = useState<
     string | null
   >(null);
+  /** C4-2: a refused Table marker publication is visible, never silent. */
+  const [markerShareNotice, setMarkerShareNotice] = useState<string | null>(
+    null
+  );
 
   // Read at placement time by `DmMarkerTool`, not captured at construction:
   // the canvas keeps the first registered tool instance, so a constructor
@@ -407,12 +513,18 @@ export function useDmBattleMapCanvas({
     campaignCode,
     mapId: battleMapId,
     getViewport: getMarkerViewport,
+    productState: tableSceneAdapter?.markerProductState,
   });
-  refreshMarkerClaimsRef.current = async () => {
+  // PR04 P7: Table scenes refresh claims too; the side-channel id is the
+  // scene id (battleMapId on the Table page). Q4 credential always sent
+  // (ignored with Table v1 off). Write-back goes through `markerWrites`,
+  // i.e. the Table scene repository when `tableSceneAdapter` is set.
+  refreshMarkerClaimsRef.current = async (signal?: AbortSignal) => {
     const response = await fetch(
-      `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`
+      markerDetailsUrl(campaignCode, battleMapId, { role: 'dm', dmId }),
+      signal ? { signal } : undefined
     );
-    if (!response.ok) return;
+    if (!response.ok || signal?.aborted) return;
     const data = (await response.json()) as {
       markers?: import('@/types/battlemap').PublicMarkerDetail[];
     };
@@ -590,6 +702,7 @@ export function useDmBattleMapCanvas({
     battleMapId,
   ]);
 
+  const lastPublishedKeyRef = useRef<string | null>(null);
   // The relay transports canvas elements, not product-state marker details.
   // Publish the explicit player projection separately, together with the
   // private server-only definitions needed for authoritative loot claims.
@@ -602,16 +715,38 @@ export function useDmBattleMapCanvas({
         dmOnlyElements: battleMap.dmOnlyElements,
       });
       const loot = buildMarkerLootLedger(markerWrites.markers, markers);
-      void fetch(
-        `/api/campaign/${campaignCode}/battlemaps/${battleMapId}/markers`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dmId, markers, loot }),
-        }
-      ).catch(error => {
-        console.warn('Failed to publish marker details:', error);
+      // A5: publish only when the public projection or the loot ledger
+      // actually changed (the Table adapter hands out a fresh battleMap
+      // object on every render). A refused publish retries on the next
+      // real change, as the notice says.
+      const publishKey = JSON.stringify({ markers, loot });
+      if (publishKey === lastPublishedKeyRef.current) return;
+      lastPublishedKeyRef.current = publishKey;
+      const request = markerPublishRequest(campaignCode, battleMapId, {
+        dmId,
+        markers,
+        loot,
       });
+      // PR04 R3-2 (folded in PR06 W9): a refused or failed publish forgets
+      // its key so the next tick retries instead of waiting for a change.
+      const forget = () => {
+        if (lastPublishedKeyRef.current === publishKey)
+          lastPublishedKeyRef.current = null;
+      };
+      void fetch(request.url, request.init)
+        .then(response => {
+          if (!response.ok) forget();
+          if (!tableSceneAdapter) return;
+          setMarkerShareNotice(
+            response.ok ? null : 'Markers not shared with players'
+          );
+        })
+        .catch(error => {
+          forget();
+          console.warn('Failed to publish marker details:', error);
+          if (tableSceneAdapter)
+            setMarkerShareNotice('Markers not shared with players');
+        });
     }, 200);
     return () => window.clearTimeout(timeout);
   }, [
@@ -621,7 +756,48 @@ export function useDmBattleMapCanvas({
     dmId,
     markerWrites.markers,
     viewport,
+    tableSceneAdapter,
   ]);
+
+  // PR04 Q2(a): Table scenes get no relay poke from the markers route (it
+  // pokes the legacy room), so while a loot marker exists poll claims every
+  // 10 s: one request in flight, aborted on unmount/scene change, and
+  // refreshed immediately when the tab becomes visible again.
+  const hasLootMarker = markerWrites.markers.some(
+    marker => !marker.deletedAt && (marker.loot?.length ?? 0) > 0
+  );
+  useEffect(() => {
+    if (!tableSceneAdapter || !hasLootMarker) return;
+    let inFlight: AbortController | null = null;
+    let disposed = false;
+    // A6: keep polling while the tab is hidden; a DM often has the Table
+    // tab in the background while players claim; the browser already
+    // throttles background timers. A hung read is aborted after 5 s.
+    const tick = () => {
+      if (disposed || inFlight) return;
+      const abort = new AbortController();
+      inFlight = abort;
+      const timeout = window.setTimeout(() => abort.abort(), 5_000);
+      void refreshMarkerClaimsRef
+        .current(abort.signal)
+        .catch(() => undefined)
+        .finally(() => {
+          window.clearTimeout(timeout);
+          if (inFlight === abort) inFlight = null;
+        });
+    };
+    const timer = window.setInterval(tick, 10_000);
+    const onVisibility = () => {
+      if (!document.hidden) tick();
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      disposed = true;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibility);
+      inFlight?.abort();
+    };
+  }, [tableSceneAdapter, hasLootMarker, battleMapId]);
 
   const handleCloseMarkerPanel = useCallback(() => {
     setActiveMarkerElementId(null);
@@ -750,9 +926,7 @@ export function useDmBattleMapCanvas({
       const fogManager = getViewportFogManager(vp);
       installVttGridController(vp);
 
-      const battleMap = useBattleMapStore
-        .getState()
-        .getBattleMap(campaignCode, battleMapId);
+      const battleMap = readBattleMap();
       if (battleMap?.canvasState && battleMap.canvasState.trim().length > 0) {
         try {
           vp.loadJSON(battleMap.canvasState);
@@ -773,12 +947,10 @@ export function useDmBattleMapCanvas({
       // if anything migrated, persist the result once.
       const migrated = migrateCanvasToContract(vp, 'dm');
       if (migrated) {
-        useBattleMapStore
-          .getState()
-          .updateBattleMap(campaignCode, battleMapId, {
-            canvasState: vp.exportJSON(),
-            updatedAt: new Date().toISOString(),
-          });
+        updateBattleMap({
+          canvasState: vp.exportJSON(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
       vp.toolManager.register(new FogTool(fogManager));
@@ -786,30 +958,39 @@ export function useDmBattleMapCanvas({
       // canvas mounts; persisted state never decides the authoring view.
       configureFogView(fogManager, 'dm', false);
 
-      const autoSave = new AutoSave(vp.store, vp.camera, {
-        key: `battlemap-canvas-${battleMapId}`,
-        debounceMs: 1500,
-        layerManager: vp.layerManager,
-        elementRegistry: vp.elementRegistry,
-        pluginStateManager: vp.plugins,
-        changeEmitters: [
-          { onChange: listener => fogManager.on('change', listener) },
-        ],
-      });
-      autoSave.start();
-      autoSaveRef.current = autoSave;
+      if (!tableSceneAdapter) {
+        const autoSave = new AutoSave(vp.store, vp.camera, {
+          key: `battlemap-canvas-${battleMapId}`,
+          debounceMs: 1500,
+          layerManager: vp.layerManager,
+          elementRegistry: vp.elementRegistry,
+          pluginStateManager: vp.plugins,
+          changeEmitters: [
+            { onChange: listener => fogManager.on('change', listener) },
+          ],
+        });
+        autoSave.start();
+        autoSaveRef.current = autoSave;
+      }
 
       // Remote-origin ops (relayed from another client) must not thrash
       // zustand/localStorage on every incoming drag frame (mirrors the
       // DmLocationEditor battlemap-mode save path).
+      // FR4-3: a Table stage edit saved before its connection was first
+      // live never reached the room (the SDK refuses it until then).
+      editsBeforeLiveRef.current = { armed: false, liveSeen: false };
+      const noteLocalEdit = () => {
+        const tracking = editsBeforeLiveRef.current;
+        if (tableSceneAdapter && tracking.armed && !tracking.liveSeen)
+          tableSceneAdapter.markEditsBeforeLive();
+      };
       const saveOnLocalOps = (_data: unknown, meta?: { origin?: string }) => {
         if (meta?.origin !== undefined && meta.origin !== 'local') return;
-        useBattleMapStore
-          .getState()
-          .updateBattleMap(campaignCode, battleMapId, {
-            canvasState: vp.exportJSON(),
-            updatedAt: new Date().toISOString(),
-          });
+        noteLocalEdit();
+        updateBattleMap({
+          canvasState: vp.exportJSON(),
+          updatedAt: new Date().toISOString(),
+        });
       };
       vp.store.on('add', saveOnLocalOps);
       vp.store.on('remove', saveOnLocalOps);
@@ -819,19 +1000,16 @@ export function useDmBattleMapCanvas({
       fogPersistenceCleanupRef.current = attachFogPersistence(
         fogManager,
         () => {
-          useBattleMapStore
-            .getState()
-            .updateBattleMap(campaignCode, battleMapId, {
-              canvasState: vp.exportJSON(),
-              updatedAt: new Date().toISOString(),
-            });
+          noteLocalEdit();
+          updateBattleMap({
+            canvasState: vp.exportJSON(),
+            updatedAt: new Date().toISOString(),
+          });
         }
       );
 
       // Reconcile fog bounds after loading canvas state
-      const mapImageSize = useBattleMapStore
-        .getState()
-        .getBattleMap(campaignCode, battleMapId)?.mapImageSize;
+      const mapImageSize = readBattleMap()?.mapImageSize;
       try {
         const fogBounds = resolveMapImageBounds(
           vp.store,
@@ -852,9 +1030,7 @@ export function useDmBattleMapCanvas({
         ) {
           return;
         }
-        useBattleMapStore
-          .getState()
-          .setDmOnly(campaignCode, battleMapId, element.id, true);
+        setDmOnly(element.id, true);
       });
 
       // Markers are DM-only by DEFAULT, so unlike the hidden-placement
@@ -928,16 +1104,21 @@ export function useDmBattleMapCanvas({
             viewport: vp,
             role: 'dm',
             resolveMovement,
-            logMovement: payload =>
-              logDmMovement(linkedEncounterIdsLive(), payload),
+            logMovement: payload => {
+              if (!tableSceneAdapter)
+                logDmMovement(linkedEncounterIdsLive(), payload);
+            },
           });
         });
       }
 
       // Live sync — resolver reads Zustand LIVE via getState() (a captured
       // snapshot would go stale after the first dm-only toggle).
+      // PR08 repair 07: only a Table scene has a live room under Table v1.
+      // The original editor is private (no audience can join), so it opens
+      // no connection and mints no token (it used to retry a 409 forever).
       const relayUrl = process.env.NEXT_PUBLIC_BATTLEMAP_RELAY_URL;
-      if (relayUrl) {
+      if (relayUrl && tableSceneAdapter) {
         // Re-attach: tear down the OLD connection-scoped handles BEFORE
         // stopping the old connection, so their final frames (awareness
         // `cleared`, measure/path clears) ride the still-live socket —
@@ -946,19 +1127,58 @@ export function useDmBattleMapCanvas({
         laserCleanupRef.current = null;
         connectionRef.current?.stop();
         connectionRef.current = null;
+        onConnectionReady?.(null);
+        const showLiveMapNotice = (message: string) => {
+          console.warn('[RollKeeper] Live map:', message);
+          if (LIVE_SYNC_NOTICES.has(message))
+            // GG6: one toast per message within a few seconds.
+            setLiveSyncNotice(previous =>
+              previous &&
+              previous.message === message &&
+              Date.now() - previous.at < LIVE_SYNC_NOTICE_DEDUPE_MS
+                ? previous
+                : { message, at: Date.now() }
+            );
+        };
+        // GG3 / HH2 / FR4-3: keep the version the live room did not take in
+        // the scene's offline changes slot; the toast points to Details only
+        // when the copy was kept.
+        const keepOfflineVersion = () => {
+          void tableSceneAdapter
+            .captureOfflineFork()
+            .then(kept =>
+              showLiveMapNotice(
+                kept
+                  ? OFFLINE_DISCARDED_DM_MESSAGE
+                  : OFFLINE_NOT_KEPT_DM_MESSAGE
+              )
+            );
+        };
         const connection = createManagedBattleMapConnection({
           relayUrl,
           campaignCode,
-          battleMapId,
+          battleMapId: tableSceneAdapter?.sourceMapId ?? battleMapId,
           store: vp.store,
           clientId: dmId,
-          tokenRequest: { role: 'dm', battleMapId, dmId },
-          seedLocal: true,
+          tokenRequest: {
+            role: 'dm',
+            battleMapId: tableSceneAdapter?.sourceMapId ?? battleMapId,
+            dmId,
+            ...(tableSceneAdapter
+              ? { sceneId: tableSceneAdapter.sceneId }
+              : {}),
+          },
+          seedLocal: !tableSceneAdapter,
+          // GG3: the live room won over this tab's offline edits. The scene
+          // keeps the offline version in its own slot for "Reapply offline
+          // changes"; later edits and checkpoints leave it alone.
+          // HH2: the toast points to Details only when the copy was kept.
+          onOfflineDraftsReleased: keepOfflineVersion,
+          // PR07 A1 (review 02 N3): a refused live edit is never silent.
+          // Messages are payload-free (no element content or secrets).
+          onDiagnostic: showLiveMapNotice,
           resolveAudience: el =>
-            useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-              ?.dmOnlyElements[el.id]
-              ? DM_AUDIENCE
-              : undefined,
+            readBattleMap()?.dmOnlyElements[el.id] ? DM_AUDIENCE : undefined,
           // Layer definitions sync (replaces the unknown-layer mirror):
           // winning remote records apply through history-transparent *Direct
           // calls; the pin subscription above re-pins bands on every change.
@@ -972,6 +1192,15 @@ export function useDmBattleMapCanvas({
             preserveLocalWhenRemoteMissing: true,
           },
           onStatus: s => {
+            // FR4-3: edits saved before this connection was first live (the
+            // relay was unreachable at load, or the room was not ready yet)
+            // are replaced by the live room; keep them like offline edits.
+            // The capture reads the scene's stored local version, which the
+            // live document (remote origin) never overwrites.
+            if (s === 'live' && !editsBeforeLiveRef.current.liveSeen) {
+              editsBeforeLiveRef.current.liveSeen = true;
+              if (tableSceneAdapter.takeEditsBeforeLive()) keepOfflineVersion();
+            }
             setStatus(s);
             onStatusProp?.(s);
             // Managed sendPresence drops while not live, so the attach-time
@@ -985,6 +1214,8 @@ export function useDmBattleMapCanvas({
           },
         });
         connectionRef.current = connection;
+        editsBeforeLiveRef.current.armed = true;
+        onConnectionReady?.(connection);
         // Teach peers and late joiners the custom layers persisted in this
         // canvas (created before layer sync, or on another device). Ledger
         // buffers until the first snapshot if the socket is still connecting.
@@ -1047,10 +1278,7 @@ export function useDmBattleMapCanvas({
                 connection,
                 {
                   role: 'dm',
-                  isDmOnlyElement: id =>
-                    !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
-                      battleMapId
-                    ]?.dmOnlyElements[id],
+                  isDmOnlyElement: id => !!readBattleMap()?.dmOnlyElements[id],
                   getElement: id => vp.store.getById(id) ?? null,
                 }
               );
@@ -1105,6 +1333,7 @@ export function useDmBattleMapCanvas({
           // stopped `connection`; drop the dead reference so unmount and the
           // next re-attach do not stop it twice, then surface the error.
           connectionRef.current = null;
+          onConnectionReady?.(null);
           throw error;
         }
       }
@@ -1120,6 +1349,11 @@ export function useDmBattleMapCanvas({
       onSelectionChange,
       resolveMovement,
       linkedEncounterIdsLive,
+      readBattleMap,
+      setDmOnly,
+      tableSceneAdapter,
+      updateBattleMap,
+      onConnectionReady,
     ]
   );
 
@@ -1138,6 +1372,7 @@ export function useDmBattleMapCanvas({
       // frame may schedule a stale Zustand write while the socket closes.
       fogPersistenceCleanupRef.current?.();
       connectionRef.current?.stop();
+      onConnectionReady?.(null);
       pinUnsubRef.current?.();
       // Disposed here for the same reason as every other store subscription;
       // its absence was an oversight (the location editor already did it).
@@ -1146,7 +1381,7 @@ export function useDmBattleMapCanvas({
       markerRemovalTrackUnsubRef.current?.();
       selectionUnsubRef.current?.();
     };
-  }, []);
+  }, [onConnectionReady]);
 
   const handleClearDrawings = useCallback(() => {
     if (!viewport) return;
@@ -1171,18 +1406,13 @@ export function useDmBattleMapCanvas({
 
   const handleRevealAll = useCallback(() => {
     if (!viewport) return;
-    const hiddenIds = Object.keys(
-      useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-        ?.dmOnlyElements ?? {}
-    );
+    const hiddenIds = Object.keys(readBattleMap()?.dmOnlyElements ?? {});
     if (hiddenIds.length === 0) return;
-    useBattleMapStore
-      .getState()
-      .updateBattleMap(campaignCode, battleMapId, { dmOnlyElements: {} });
+    updateBattleMap({ dmOnlyElements: {} });
     for (const id of hiddenIds) {
       if (viewport.store.getById(id)) viewport.store.update(id, {});
     }
-  }, [viewport, campaignCode, battleMapId]);
+  }, [viewport, readBattleMap, updateBattleMap]);
 
   const handleGoToCameraView = useCallback((view: CameraView) => {
     localAnimatorRef.current?.animateTo(view);
@@ -1203,9 +1433,7 @@ export function useDmBattleMapCanvas({
     const outcome = applyMarkerAudienceToggle({
       element: viewport.store.getById(selectedElementId),
       selectedElementId,
-      readDmOnlyElements: () =>
-        useBattleMapStore.getState().battleMaps[campaignCode]?.[battleMapId]
-          ?.dmOnlyElements ?? {},
+      readDmOnlyElements: () => readBattleMap()?.dmOnlyElements ?? {},
       setMarkerAudienceForRef: markerWrites.setMarkerAudienceForRef,
     });
     if (outcome.handled) {
@@ -1214,15 +1442,26 @@ export function useDmBattleMapCanvas({
     }
 
     setMarkerAudienceNotice(null);
-    useBattleMapStore
-      .getState()
-      .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
+    if (tableSceneAdapter) tableSceneAdapter.toggleDmOnly(selectedElementId);
+    else
+      useBattleMapStore
+        .getState()
+        .toggleDmOnly(campaignCode, battleMapId, selectedElementId);
     if (viewport.store.getById(selectedElementId)) {
       viewport.store.update(selectedElementId, {});
     }
-  }, [viewport, selectedElementId, campaignCode, battleMapId, markerWrites]);
+  }, [
+    viewport,
+    selectedElementId,
+    campaignCode,
+    battleMapId,
+    markerWrites,
+    readBattleMap,
+    tableSceneAdapter,
+  ]);
 
   return {
+    liveSyncNotice,
     viewport,
     status,
     battleMap,
@@ -1254,6 +1493,7 @@ export function useDmBattleMapCanvas({
       selectedElementId !== null &&
       markerRefForElement(viewport?.store.getById(selectedElementId)) !== null,
     markerAudienceNotice,
+    markerShareNotice,
     markerPanelOpen: activeMarkerElementId !== null,
     markerPanelState,
     markerPanelIsDmOnly,

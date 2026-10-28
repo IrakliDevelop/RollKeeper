@@ -7,6 +7,8 @@ import { ChevronDown, Map as MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 
 import { BattleMapPickerDialog } from '@/components/ui/campaign/battle-map/BattleMapPickerDialog';
+import { OpenSceneRunLink } from '@/components/ui/campaign/table/combat/OpenSceneRunLink';
+import { PrepareOnMapLink } from '@/components/ui/campaign/table/TableEntryLinks';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { findLinkedBattleMap } from '@/utils/battleMapLinks';
 
@@ -31,6 +33,16 @@ export function EncounterBattleMapButton({
 
   return (
     <>
+      <OpenSceneRunLink
+        campaignCode={campaignCode}
+        encounterId={encounterId}
+        compact
+      />
+      <PrepareOnMapLink
+        campaignCode={campaignCode}
+        encounterId={encounterId}
+        compact
+      />
       {linked ? (
         <div className="flex items-center gap-0.5">
           <Link href={`/dm/campaign/${campaignCode}/battlemaps/${linked.id}`}>

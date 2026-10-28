@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, feature/scenes-table]
   pull_request:
-    branches: [master]
+    branches: [master, feature/scenes-table]
 
 permissions:
   contents: read
@@ -135,6 +135,133 @@ jobs:
       - run: npm test --prefix relay
 
       - run: npm run build --prefix relay
+
+  redis-suites:
+    name: Relay and Table control Redis suites
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            relay/package-lock.json
+
+      - run: npm ci
+
+      - run: npm ci --prefix relay
+
+      # Fenced authority, fog CAS and transport suites (no skips: the script
+      # fails when REDIS_TEST_URL is missing).
+      - name: Relay Redis suites
+        env:
+          REDIS_TEST_URL: redis://localhost:6379
+        run: npm run test:relay:redis
+
+      # Table control Lua against real Redis and serverless-redis-http; the
+      # suite starts its own disposable containers with the runner's Docker.
+      - name: Table control Redis suite
+        # Report this suite even when the relay step fails (review R2).
+        if: ${{ !cancelled() }}
+        run: npm run test:table-control:redis
+
+      # Ids-only shop token update (repair 09) against real Redis; the suite
+      # starts its own disposable container with the runner's Docker.
+      - name: Shop token links Redis suite
+        if: ${{ !cancelled() }}
+        run: npm run test:shop-tokens:redis
+
+  table-relay-e2e:
+    name: Table relay e2e (loot, shop, drawers)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+      # The app's Upstash client talks REST; the configs point it at :8079.
+      srh:
+        # Pinned (CC9): the digest of 'latest' (0.0.10) when verified.
+        image: hiett/serverless-redis-http@sha256:5b0bb9239fce53abf87b2018a7a0deb9ec7bd900c5360738fe5fbeeb426f9150
+        ports:
+          - 8079:80
+        env:
+          SRH_MODE: env
+          SRH_TOKEN: local_dev_token
+          SRH_CONNECTION_STRING: redis://redis:6379
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            relay/package-lock.json
+
+      - run: npm ci
+
+      # The loot and shop configs start the relay dev server from relay/.
+      - run: npm ci --prefix relay
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      # Cross-party Table v1 flows: the DM adds the map to the Table, goes
+      # live and Shows it; the player joins by the source map URL.
+      - name: Marker loot e2e
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:loot:e2e
+
+      - name: Shop purchase e2e
+        if: ${{ !cancelled() }}
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:shop:e2e
+
+      - name: Map sheet and creature drawer e2e
+        if: ${{ !cancelled() }}
+        # Each suite starts a fresh `next dev`. Playwright stops the previous
+        # one abruptly, which can leave the Turbopack dev cache inconsistent
+        # (CI run 38703017977: API routes answered Next's HTML 404 from the
+        # start), so every suite begins from an empty dev cache.
+        run: rm -rf .next/dev && npm run test:sheet-drawer:e2e
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: table-relay-e2e-artifacts
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: warn
 
   local-supabase:
     name: Local Supabase database suite

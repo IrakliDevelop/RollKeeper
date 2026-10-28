@@ -2,7 +2,7 @@
 
 import React from 'react';
 import type { EncounterEntity } from '@/types/encounter';
-import type { EntityActions } from '../types';
+import type { CombatantDetailCapabilities, EntityActions } from '../types';
 import { DetailHeader } from './DetailHeader';
 import { DetailVitals } from './DetailVitals';
 import { DetailAbilityScores } from './DetailAbilityScores';
@@ -14,6 +14,8 @@ export interface CombatantDetailProps {
   entity: EncounterEntity;
   actions: EntityActions;
   onOpenSheet?: () => void;
+  /** Table scene runs: restrict to supported controls (legacy when omitted). */
+  capabilities?: CombatantDetailCapabilities;
 }
 
 export function RegionalEffects({ effects }: { effects: string[] }) {
@@ -38,8 +40,42 @@ export function CombatantDetail({
   entity,
   actions,
   onOpenSheet,
+  capabilities,
 }: CombatantDetailProps) {
   const isLair = entity.type === 'lair';
+
+  if (capabilities) {
+    // Scene runs: abilities, resources, legendary/lair, rests, inventory,
+    // stat blocks and identity edits are hidden, never silent no-ops.
+    return (
+      <div className="flex flex-col">
+        <DetailHeader
+          entity={entity}
+          actions={actions}
+          capabilities={capabilities}
+        />
+        {capabilities.readOnlyNote && (
+          <p className="text-accent-amber-text px-4 pb-2 text-xs font-medium">
+            {capabilities.readOnlyNote}
+          </p>
+        )}
+        <DetailVitals
+          entity={entity}
+          actions={actions}
+          capabilities={capabilities}
+        />
+        <DetailEffects
+          entity={entity}
+          actions={actions}
+          capabilities={capabilities}
+        />
+        <p className="text-faint border-divider border-t px-4 py-2 text-xs">
+          Abilities, resources, rests, inventory and stat blocks are not
+          available in scene runs.
+        </p>
+      </div>
+    );
+  }
 
   if (isLair) {
     return (
