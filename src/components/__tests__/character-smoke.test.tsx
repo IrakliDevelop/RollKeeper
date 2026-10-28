@@ -64,7 +64,7 @@ describe('CharacterHUD', () => {
     );
     expect(screen.getByText('30')).toBeInTheDocument();
     expect(screen.getByText('40')).toBeInTheDocument();
-    expect(screen.getByText('+5')).toBeInTheDocument();
+    expect(screen.getByText('+5 temp')).toBeInTheDocument();
   });
 });
 

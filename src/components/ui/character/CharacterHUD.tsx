@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Heart,
   Shield,
   ClockAlert,
   Brain,
@@ -36,6 +35,7 @@ import {
   CLASS_RESOURCE_ICONS,
   CLASS_RESOURCE_COLORS,
 } from './classResourceStyles';
+import { HudHitPoints } from './HudHitPoints';
 
 interface CharacterHUDProps {
   character: CharacterState;
@@ -85,11 +85,6 @@ export default function CharacterHUD({
     ? character.initiative.value
     : Math.floor((character.abilities.dexterity - 10) / 2);
 
-  const hpCurrent = character.hitPoints.current;
-  const hpMax = character.hitPoints.max;
-  const hpTemp = character.hitPoints.temporary;
-  const hpPercent = hpMax > 0 ? Math.round((hpCurrent / hpMax) * 100) : 0;
-
   const activeConditionsCount =
     (character.conditionsAndDiseases?.activeConditions?.length || 0) +
     (character.conditionsAndDiseases?.activeDiseases?.length || 0);
@@ -117,18 +112,6 @@ export default function CharacterHUD({
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
 
-  const getHPColor = () => {
-    if (hpPercent > 60) return 'bg-emerald-500';
-    if (hpPercent > 30) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  const getHPTextColor = () => {
-    if (hpCurrent === 0) return 'text-red-500';
-    if (hpPercent <= 30) return 'text-amber-500';
-    return 'text-emerald-600 dark:text-emerald-400';
-  };
-
   const hasContextualIndicators =
     isConcentrating || activeConditionsCount > 0 || activeBuffCount > 0;
 
@@ -139,33 +122,12 @@ export default function CharacterHUD({
         {/* Primary Stats */}
         <div className="flex flex-wrap items-center gap-2">
           {/* HP */}
-          <button
+          <HudHitPoints
+            current={character.hitPoints.current}
+            max={character.hitPoints.max}
+            temporary={character.hitPoints.temporary}
             onClick={onNavigateToCombat}
-            className="border-divider hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors"
-            title="Go to Combat tab"
-          >
-            <Heart className="h-5 w-5 text-red-500" />
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${getHPTextColor()}`}>
-                  {hpCurrent}
-                </span>
-                <span className="text-faint text-sm">/</span>
-                <span className="text-muted text-sm">{hpMax}</span>
-                {hpTemp > 0 && (
-                  <span className="text-sm font-medium text-blue-500">
-                    +{hpTemp}
-                  </span>
-                )}
-              </div>
-              <div className="bg-surface-secondary h-1.5 w-20 overflow-hidden rounded-full">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${getHPColor()}`}
-                  style={{ width: `${Math.min(100, hpPercent)}%` }}
-                />
-              </div>
-            </div>
-          </button>
+          />
 
           {/* AC */}
           <StatChip
