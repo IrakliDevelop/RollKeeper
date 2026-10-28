@@ -338,6 +338,36 @@ const NOT_SHARED_ALLY: PartyMemberHP = {
   publicSheet: null,
 };
 
+/** The switch's ::after hit box, centred on the track. */
+function switchHitBox(toggle: HTMLElement) {
+  const box = toggle.getBoundingClientRect();
+  const after = getComputedStyle(toggle, '::after');
+  const width = parseFloat(after.width);
+  const height = parseFloat(after.height);
+  const x = box.left + box.width / 2;
+  const y = box.top + box.height / 2;
+  return {
+    left: x - width / 2,
+    right: x + width / 2,
+    top: y - height / 2,
+    bottom: y + height / 2,
+    width,
+    height,
+  };
+}
+
+function intersects(
+  a: { left: number; right: number; top: number; bottom: number },
+  b: { left: number; right: number; top: number; bottom: number }
+) {
+  return (
+    Math.round(a.left) < Math.round(b.right) &&
+    Math.round(b.left) < Math.round(a.right) &&
+    Math.round(a.top) < Math.round(b.bottom) &&
+    Math.round(b.top) < Math.round(a.bottom)
+  );
+}
+
 function body() {
   // The drawer portals to document.body via Radix — query the whole document,
   // not the Storybook canvas element.
@@ -387,8 +417,10 @@ export const Desktop: Story = {
         screen.getByRole('dialog', { name: /kaelen voss/i })
       ).toBeInTheDocument()
     );
-    await userEvent.click(screen.getByRole('button', { name: /locked/i }));
-    await expect(screen.getByText(/editing unlocked/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    await expect(
+      screen.getByText(/changes save and sync to the dm/i)
+    ).toBeInTheDocument();
   },
 };
 
@@ -430,6 +462,30 @@ export const Tablet: Story = {
       );
     } finally {
       restore();
+    }
+  },
+};
+
+/**
+ * On a touch screen the Edit sheet switch reaches 44×44 and its hit box
+ * touches neither Close nor any rest button.
+ */
+export const TouchTargets: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  beforeEach: () => emulateCoarsePointer(),
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    const drawer = within(dialog);
+    const area = switchHitBox(
+      drawer.getByRole('switch', { name: 'Edit sheet' })
+    );
+    await expect(area.width).toBeGreaterThanOrEqual(44);
+    await expect(area.height).toBeGreaterThanOrEqual(44);
+    for (const name of [/close sheet/i, /short rest/i, /long rest/i]) {
+      const box = drawer.getByRole('button', { name }).getBoundingClientRect();
+      await expect(intersects(area, box)).toBe(false);
     }
   },
 };

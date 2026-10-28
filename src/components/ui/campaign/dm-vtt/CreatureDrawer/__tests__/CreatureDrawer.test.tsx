@@ -137,7 +137,7 @@ describe('CreatureDrawer', () => {
   it('shows the editing banner and leaves it with Done', async () => {
     const user = userEvent.setup();
     render(<CreatureDrawer {...props()} />);
-    await user.click(screen.getByRole('button', { name: /^play$/i }));
+    await user.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     expect(
       screen.getByText(
         'Editing this combatant. Changes stay on this combatant.'
@@ -153,7 +153,7 @@ describe('CreatureDrawer', () => {
   it('shows the library-sync banner copy for a library-linked NPC', async () => {
     const user = userEvent.setup();
     render(<CreatureDrawer {...props({ entity: FULL_CREATURE })} />);
-    await user.click(screen.getByRole('button', { name: /^play$/i }));
+    await user.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     expect(
       screen.getByText(
         'Editing this combatant. Changes also sync back to the NPC library record.'
@@ -165,7 +165,7 @@ describe('CreatureDrawer', () => {
     const user = userEvent.setup();
     const p = props();
     const { rerender } = render(<CreatureDrawer {...p} />);
-    await user.click(screen.getByRole('button', { name: /^play$/i }));
+    await user.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     await user.click(screen.getByRole('tab', { name: /effects/i }));
     expect(screen.getByLabelText('Max HP')).toBeInTheDocument();
 

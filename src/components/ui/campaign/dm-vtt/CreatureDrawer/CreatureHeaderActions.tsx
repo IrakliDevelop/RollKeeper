@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { Coffee, Eye, Lock, LockOpen, Moon, Trash2, X } from 'lucide-react';
+import { Coffee, Eye, Moon, Trash2, X } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { Switch } from '@/components/ui/forms/switch';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '@/components/ui/encounter/combat-screen/types';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
@@ -16,7 +17,7 @@ export interface CreatureHeaderActionsProps {
   onClose: () => void;
 }
 
-/** Right-hand button rail of `CreatureHeader`: lock toggle, close, rests, remove, and view-NPC. */
+/** Right-hand button rail of `CreatureHeader`: Edit sheet switch, close, rests, remove, and view-NPC. */
 export function CreatureHeaderActions({
   entity,
   actions,
@@ -39,22 +40,15 @@ export function CreatureHeaderActions({
 
   return (
     <div className="flex shrink-0 flex-col items-end gap-1.5">
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         {!isLair && (
-          <Button
-            variant="outline"
-            selected={editing}
+          <Switch
+            label="Edit sheet"
             size="sm"
-            onClick={onToggleEditing}
-            aria-pressed={editing}
-          >
-            {editing ? (
-              <LockOpen className="mr-1 h-3.5 w-3.5" />
-            ) : (
-              <Lock className="mr-1 h-3.5 w-3.5" />
-            )}
-            {editing ? 'Editing' : 'Play'}
-          </Button>
+            checked={editing}
+            onCheckedChange={onToggleEditing}
+            wrapperClassName="shrink-0 items-center whitespace-nowrap"
+          />
         )}
         <Button
           variant="ghost"

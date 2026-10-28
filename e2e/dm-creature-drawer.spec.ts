@@ -14,7 +14,7 @@ import {
  * drawer PR1, Task 8): the DM double-clicks a combatant token with the
  * select tool, the Tidy-style side drawer opens on that creature, damage
  * applied from the drawer updates both the drawer's HP text and the token's
- * in-canvas HP decoration, switching the drawer's lock to Editing exposes
+ * in-canvas HP decoration, turning on the drawer's Edit sheet switch exposes
  * the AC field and a new AC commits immediately, and closing the drawer then
  * single-clicking the same token re-selects it into the existing Studio
  * panel's "Selected" tab (`CombatantDetail`, unchanged by this PR) showing
@@ -288,12 +288,12 @@ test.describe('DM creature drawer', () => {
     );
   });
 
-  test('the lock switches to Editing and a new AC commits on the tile', async () => {
+  test('the Edit sheet switch turns on editing and a new AC commits on the tile', async () => {
     const dialog = creatureDialog(dmPage);
 
-    await dialog.getByRole('button', { name: 'Play', exact: true }).click();
-    const lock = dialog.getByRole('button', { name: 'Editing', exact: true });
-    await expect(lock).toHaveAttribute('aria-pressed', 'true');
+    const toggle = dialog.getByRole('switch', { name: 'Edit sheet' });
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
 
     const acField = dialog.getByRole('textbox', { name: 'Armor class' });
     await expect(acField).toHaveValue(String(STARTING_AC));

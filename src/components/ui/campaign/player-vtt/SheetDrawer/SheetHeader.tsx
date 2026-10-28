@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Coffee, Lock, Moon, Star, Unlock, X, Zap } from 'lucide-react';
+import { Coffee, Moon, Star, X, Zap } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
+import { Switch } from '@/components/ui/forms/switch';
 import { Badge } from '@/components/ui/layout/badge';
 import { useCharacterStore } from '@/store/characterStore';
 
@@ -79,22 +80,14 @@ export function SheetHeader({
         </div>
       </div>
       <div className="flex shrink-0 flex-col items-end gap-2">
-        <div className="flex items-center gap-1">
-          <Button
-            variant="outline"
-            selected={!locked}
+        <div className="flex items-center gap-2">
+          <Switch
+            label="Edit sheet"
             size="sm"
-            onClick={onToggleLock}
-            aria-pressed={!locked}
-            title={locked ? 'Unlock to edit' : 'Lock the sheet'}
-          >
-            {locked ? (
-              <Lock className="mr-1 h-3.5 w-3.5" />
-            ) : (
-              <Unlock className="mr-1 h-3.5 w-3.5" />
-            )}
-            {locked ? 'Locked' : 'Editing'}
-          </Button>
+            checked={!locked}
+            onCheckedChange={onToggleLock}
+            wrapperClassName="shrink-0 items-center whitespace-nowrap"
+          />
           <Button
             variant="ghost"
             size="sm"

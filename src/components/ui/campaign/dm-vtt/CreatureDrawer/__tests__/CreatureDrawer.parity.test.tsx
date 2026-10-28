@@ -102,7 +102,7 @@ function renderDrawer(entity: EncounterEntity = FULL_CREATURE) {
 }
 
 async function startEditing(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: /^play$/i }));
+  await user.click(screen.getByRole('switch', { name: 'Edit sheet' }));
 }
 
 async function openTab(user: ReturnType<typeof userEvent.setup>, name: RegExp) {
