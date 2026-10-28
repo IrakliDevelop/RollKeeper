@@ -1016,6 +1016,22 @@ form select {
   animation: rk-otp-shake 420ms ease-in-out;
 }
 
+/* The large-number switch: each ability number starts from the other
+   number's place and size (--rk-swap-from, set per element) and settles in
+   its own. Transform only, so both numbers keep their own type at rest. */
+@keyframes rk-number-swap {
+  from {
+    transform: var(--rk-swap-from, none);
+  }
+  to {
+    transform: none;
+  }
+}
+
+.animate-rk-number-swap {
+  animation: rk-number-swap 180ms ease-out;
+}
+
 /* Respect the OS "reduce motion" setting for every CSS animation and
    transition. A near-zero duration (not "none") still fires animationend, so
    Radix can unmount closing dialogs, selects and tooltips. */
