@@ -169,7 +169,7 @@
     "src/components/ui/character/CharacterCloudBackupControls.tsx": 2,
     "src/components/ui/character/CharacterHUD.tsx": 4,
     "src/components/ui/character/ClassSelector.tsx": 2,
-    "src/components/ui/character/CombatStats.tsx": 36,
+    "src/components/ui/character/CombatStats.tsx": 34,
     "src/components/ui/character/ConcentrationTracker.tsx": 13,
     "src/components/ui/character/DaysSpentTracker.tsx": 24,
     "src/components/ui/character/ExtendedFeatures/ExtendedFeaturesSection.tsx": 8,

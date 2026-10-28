@@ -210,12 +210,39 @@ A value is edited in place (`InPlaceField`) only when it sits in plain text
 with room for its usual width. Anything inside an ornament (a medallion, the
 AC shield) or too cramped opens an `AnchoredEditor`.
 
-Play and edit modes arrive in Phase 2: the character sheet's Edit/View button
-becomes an "Edit sheet" switch, play mode is the default, and the creature
-drawer's `editing` flag follows the same rules. Until then, new build-value
-controls take an `editing` prop (as `InPlaceField` and `AnchoredEditor` do)
-instead of being always live. A play value edited with `InPlaceField`
-(rolled initiative) passes `editing` as always true.
+### Play and edit modes
+
+The character sheet is in play mode by default. The mode lives in
+`src/components/ui/character/SheetMode.tsx`: the page calls
+`useSheetModeState(characterId)`, hands the result to `SheetModeProvider`, and
+descendants read it with `useSheetMode()` (it throws outside a provider). The
+mode is UI state only. It is never persisted and resets to play on load and
+when the character changes.
+
+The "Edit sheet" `Switch` is first in the right cluster of the sticky bar, and
+an "Editing sheet" row shows inside the sticky header while editing. The bar
+never hides on scroll. Below `sm` the switch label, the save text and the
+back-link text are visually hidden but stay as accessible names.
+
+Build-value components take `editing?: boolean` (default `true`) and the page
+passes the mode. 02d gates the name, avatar, HUD speed, Combat max HP (and its
+calculation mode), base AC, and walk, fly, climb and swim speeds. The Stats tab
+follows in 02e. A play value edited with `InPlaceField` (rolled initiative)
+passes `editing` as always true. The map dock's armor class dialog keeps the
+default, so it stays editable.
+
+The map sheet drawer and the DM creature drawer use the same "Edit sheet"
+`Switch`, each with its own local state.
+
+### Escape and in-place edits
+
+An `InPlaceField` with a draft marks its input `data-in-place-dirty`.
+`DialogContent` and `SideDrawer` compose `keepOpenForInPlaceEdit`
+(`src/components/ui/forms/InPlaceField/keepOpenForInPlaceEdit.ts`) into
+`onEscapeKeyDown`: the first Escape cancels the draft and keeps the dialog or
+drawer open, the next Escape closes it. A custom Radix dialog that doesn't use
+`DialogContent` or `SideDrawer` must compose the helper itself. See the story
+Forms/InPlaceField, InDialog.
 
 ## Game patterns
 
