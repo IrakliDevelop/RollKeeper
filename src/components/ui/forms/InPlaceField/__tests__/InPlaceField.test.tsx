@@ -229,7 +229,7 @@ describe('InPlaceField', () => {
     );
   });
 
-  it('drops the draft when Escape also closes the dialog around it', async () => {
+  it('cancels the draft on the first Escape and closes the dialog on the second', async () => {
     const onCommit = vi.fn();
     const user = userEvent.setup();
     render(
@@ -249,10 +249,73 @@ describe('InPlaceField', () => {
     await user.type(field(), '45');
     await user.keyboard('{Escape}');
 
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(field()).toHaveValue('30');
+    expect(field()).toHaveFocus();
+    expect(field()).not.toHaveAttribute('data-in-place-dirty');
+
+    await user.keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(onCommit).not.toHaveBeenCalled();
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Edit goblin' })).toHaveFocus()
     );
+  });
+
+  it('closes the dialog on the first Escape when nothing was typed', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dialog>
+        <DialogTrigger>Edit goblin</DialogTrigger>
+        <DialogContent>
+          <DialogTitle>Goblin</DialogTitle>
+          <DialogDescription>Small humanoid.</DialogDescription>
+          <InPlaceField label="Speed" value={30} editing onCommit={vi.fn()} />
+        </DialogContent>
+      </Dialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Edit goblin' }));
+    await user.click(field());
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('treats an emptied field as a draft', async () => {
+    const user = userEvent.setup();
+    render(
+      <Dialog>
+        <DialogTrigger>Edit goblin</DialogTrigger>
+        <DialogContent>
+          <DialogTitle>Goblin</DialogTitle>
+          <DialogDescription>Small humanoid.</DialogDescription>
+          <InPlaceField label="Speed" value={30} editing onCommit={vi.fn()} />
+        </DialogContent>
+      </Dialog>
+    );
+    await user.click(screen.getByRole('button', { name: 'Edit goblin' }));
+    await user.click(field());
+    await user.clear(field());
+    expect(field()).toHaveAttribute('data-in-place-dirty');
+    await user.keyboard('{Escape}');
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(field()).toHaveValue('30');
+  });
+
+  it('lets a caller-supplied onEscapeKeyDown still run', async () => {
+    const onEscapeKeyDown = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Dialog defaultOpen>
+        <DialogContent onEscapeKeyDown={onEscapeKeyDown}>
+          <DialogTitle>Goblin</DialogTitle>
+          <DialogDescription>Small humanoid.</DialogDescription>
+          <InPlaceField label="Speed" value={30} editing onCommit={vi.fn()} />
+        </DialogContent>
+      </Dialog>
+    );
+    await user.click(field());
+    await user.type(field(), '5');
+    await user.keyboard('{Escape}');
+    expect(onEscapeKeyDown).toHaveBeenCalledTimes(1);
   });
 });

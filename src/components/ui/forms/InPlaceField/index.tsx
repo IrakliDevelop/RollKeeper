@@ -6,7 +6,8 @@
  * the only cue is an underline drawn inside the box (1.5px input-border at
  * rest, 2px brass when focused, 2px blood while the draft is empty or out of
  * range). Enter commits (clamped), blur commits what was typed or stepped,
- * Escape cancels, ↑/↓ step by 1 and Shift+↑/↓ by 10. In play mode it is plain
+ * Escape cancels (a dialog or drawer around it stays open; the next Escape
+ * closes it), ↑/↓ step by 1 and Shift+↑/↓ by 10. In play mode it is plain
  * text with no tab stop.
  */
 
@@ -139,6 +140,7 @@ export function InPlaceField({
           onFocus={selectOnFocus}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
+          data-in-place-dirty={field.value !== String(value) ? '' : undefined}
         />
       </label>
       <span id={messageId} role="status" className="sr-only">
