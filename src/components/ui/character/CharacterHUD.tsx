@@ -2,12 +2,10 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Shield,
   ClockAlert,
   Brain,
   Zap,
   Footprints,
-  Award,
   Sparkles,
   Sun,
   Moon,
@@ -18,10 +16,10 @@ import {
   Bird,
   Mountain,
   Waves,
-  Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { AcShield } from '@/components/ui/game/AcShield';
 import {
   calculateCharacterArmorClass,
   calculateSpellAttackBonus,
@@ -36,6 +34,7 @@ import {
   CLASS_RESOURCE_COLORS,
 } from './classResourceStyles';
 import { HudHitPoints } from './HudHitPoints';
+import { HudStat } from './HudStat';
 
 interface CharacterHUDProps {
   character: CharacterState;
@@ -120,7 +119,7 @@ export default function CharacterHUD({
       {/* Row 1: Stats + Status Indicators */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Primary Stats */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           {/* HP */}
           <HudHitPoints
             characterId={character.id}
@@ -131,18 +130,14 @@ export default function CharacterHUD({
           />
 
           {/* AC */}
-          <StatChip
-            icon={<Shield className="h-5 w-5 text-blue-500" />}
-            value={String(totalAC)}
-            label="AC"
-            onClick={onNavigateToCombat}
-          />
+          <HudStat caption="AC" onClick={onNavigateToCombat}>
+            <AcShield value={totalAC} />
+          </HudStat>
 
           {/* Initiative */}
-          <StatChip
-            icon={<Zap className="h-5 w-5 text-amber-500" />}
+          <HudStat
+            caption="Initiative"
             value={formatModifier(initiativeModifier)}
-            label="Init"
           />
 
           {/* Speed */}
@@ -152,28 +147,25 @@ export default function CharacterHUD({
           />
 
           {/* Proficiency Bonus */}
-          <StatChip
-            icon={<Award className="h-5 w-5 text-purple-500" />}
+          <HudStat
+            caption="Proficiency"
             value={formatModifier(proficiencyBonus)}
-            label="Prof"
           />
 
           {/* Spell Attack - conditional */}
           {spellAttackBonus !== null && (
-            <StatChip
-              icon={<Wand2 className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell attack"
               value={formatModifier(spellAttackBonus)}
-              label="Atk"
               onClick={onNavigateToSpells}
             />
           )}
 
           {/* Spell Save DC - conditional */}
           {spellSaveDC !== null && (
-            <StatChip
-              icon={<Sparkles className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell save DC"
               value={String(spellSaveDC)}
-              label="DC"
               onClick={onNavigateToSpells}
             />
           )}
@@ -354,35 +346,6 @@ export default function CharacterHUD({
   );
 }
 
-function StatChip({
-  icon,
-  value,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? 'button' : 'div';
-  return (
-    <Tag
-      className={`border-divider flex items-center gap-1.5 rounded-lg border px-3 py-2.5 ${
-        onClick ? 'hover:bg-surface-hover cursor-pointer transition-colors' : ''
-      }`}
-      title={label}
-      onClick={onClick}
-    >
-      {icon}
-      <span className="text-heading text-lg font-bold">{value}</span>
-      <span className="text-faint hidden text-xs uppercase sm:inline">
-        {label}
-      </span>
-    </Tag>
-  );
-}
-
 function SpeedChip({
   character,
   onUpdateCharacter,
@@ -414,50 +377,53 @@ function SpeedChip({
   }, [isOpen]);
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <div className="relative flex" ref={popoverRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="border-divider hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors"
+        className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex flex-col items-center justify-center rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         title="Click to edit speeds"
       >
-        <Footprints className="h-5 w-5 text-emerald-500" />
-        <span className="text-heading text-lg font-bold">
-          {character.speed + getBuffSpeedBonus(character)}ft
-        </span>
-        {hasExtraSpeeds && (
-          <div className="text-muted flex items-center gap-1 text-xs">
-            {!!character.flySpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Fly ${character.flySpeed}ft`}
-              >
-                <Bird size={10} />
-                {character.flySpeed}
-              </span>
-            )}
-            {!!character.climbSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Climb ${character.climbSpeed}ft`}
-              >
-                <Mountain size={10} />
-                {character.climbSpeed}
-              </span>
-            )}
-            {!!character.swimSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Swim ${character.swimSpeed}ft`}
-              >
-                <Waves size={10} />
-                {character.swimSpeed}
-              </span>
-            )}
-          </div>
-        )}
-        <span className="text-faint hidden text-xs uppercase sm:inline">
-          Spd
-        </span>
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+          <span className="flex items-baseline">
+            <span className="type-num-lg text-heading">
+              {character.speed + getBuffSpeedBonus(character)}
+            </span>
+            <span className="type-small text-muted">ft</span>
+          </span>
+          {hasExtraSpeeds && (
+            <span className="type-caption text-muted flex items-center gap-1">
+              {!!character.flySpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Fly ${character.flySpeed}ft`}
+                >
+                  <Bird size={10} />
+                  {character.flySpeed}
+                </span>
+              )}
+              {!!character.climbSpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Climb ${character.climbSpeed}ft`}
+                >
+                  <Mountain size={10} />
+                  {character.climbSpeed}
+                </span>
+              )}
+              {!!character.swimSpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Swim ${character.swimSpeed}ft`}
+                >
+                  <Waves size={10} />
+                  {character.swimSpeed}
+                </span>
+              )}
+            </span>
+          )}
+        </span>{' '}
+        <span className="type-caption text-muted whitespace-nowrap">Speed</span>
       </button>
 
       {isOpen && onUpdateCharacter && (
