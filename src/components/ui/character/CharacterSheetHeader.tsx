@@ -114,11 +114,11 @@ export default function CharacterSheetHeader({
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:gap-4">
             <div className="flex min-w-0 items-center">
-              <Link href="/player">
+              <Link href="/player" className="shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="px-2 sm:px-4"
+                  className="px-2 whitespace-nowrap sm:px-4"
                   leftIcon={<ArrowLeft size={20} />}
                 >
                   <span className="sr-only sm:not-sr-only">

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect } from 'react';
 import { expect, fn, waitFor, within } from 'storybook/test';
+import { Button } from '@/components/ui/forms/button';
 import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import CharacterSheetHeader from './CharacterSheetHeader';
@@ -34,9 +35,11 @@ const IPAD_LANDSCAPE = {
 interface HarnessProps {
   /** Start the story in edit mode, as if the switch had been turned on. */
   initialEditing: boolean;
+  /** A long name makes the name compete with the back link for room. */
+  characterName: string;
 }
 
-function Harness({ initialEditing }: HarnessProps) {
+function Harness({ initialEditing, characterName }: HarnessProps) {
   const mode = useSheetModeState('story-character');
   const { setEditing } = mode;
   useEffect(() => {
@@ -47,7 +50,7 @@ function Harness({ initialEditing }: HarnessProps) {
     <SheetModeProvider value={mode}>
       <CharacterSheetHeader
         characterId="story-character"
-        characterName="Brin Ironfoot"
+        characterName={characterName}
         characterRace="Dwarf"
         characterClass="Fighter"
         characterLevel={3}
@@ -61,6 +64,12 @@ function Harness({ initialEditing }: HarnessProps) {
         onShowResetModal={fn()}
         onUpdateName={fn()}
         onAddToast={fn()}
+        extraHeaderContent={
+          // Stand-in for the campaign sync chip, about as wide as the real one.
+          <Button variant="outline" size="sm" className="hidden sm:inline-flex">
+            Synthetic Campaign 2m ago
+          </Button>
+        }
       />
     </SheetModeProvider>
   );
@@ -86,7 +95,10 @@ const meta: Meta<typeof Harness> = {
     viewport: { options: VIEWPORTS },
   },
   globals: IPAD_LANDSCAPE,
-  args: { initialEditing: false },
+  args: {
+    initialEditing: false,
+    characterName: 'Mira Vale — Synthetic Acceptance',
+  },
   decorators: [remountOnTheme],
 };
 
@@ -114,6 +126,20 @@ async function checkBar(canvasElement: HTMLElement) {
 async function checkLabelShown(canvasElement: HTMLElement) {
   const label = within(canvasElement).getByText('Edit sheet');
   await expect(label.getBoundingClientRect().width).toBeGreaterThan(1);
+  await checkBackLinkOneLine(canvasElement);
+}
+
+/** The back link keeps its natural width; the character name gives way. */
+async function checkBackLinkOneLine(canvasElement: HTMLElement) {
+  const label = within(canvasElement).getByText('Back to Characters');
+  const button = label.closest('button')!;
+  await expect(label.getClientRects().length).toBe(1);
+  await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
+  // A wrapped label is a taller block, not a second client rect.
+  const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+  await expect(label.getBoundingClientRect().height).toBeLessThanOrEqual(
+    lineHeight + 1
+  );
 }
 
 /** Below sm the label is a 1×1 sr-only box but still names the switch. */
