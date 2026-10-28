@@ -2,13 +2,9 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
-  Heart,
-  Shield,
   ClockAlert,
-  Brain,
   Zap,
   Footprints,
-  Award,
   Sparkles,
   Sun,
   Moon,
@@ -19,10 +15,12 @@ import {
   Bird,
   Mountain,
   Waves,
-  Wand2,
 } from 'lucide-react';
 import { CharacterState } from '@/types/character';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { badgeVariants } from '@/components/ui/layout/badge';
+import { AcShield } from '@/components/ui/game/AcShield';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import {
   calculateCharacterArmorClass,
   calculateSpellAttackBonus,
@@ -32,10 +30,13 @@ import {
   getBuffSpeedBonus,
 } from '@/utils/calculations';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import {
   CLASS_RESOURCE_ICONS,
   CLASS_RESOURCE_COLORS,
 } from './classResourceStyles';
+import { HudHitPoints } from './HudHitPoints';
+import { HudStat } from './HudStat';
 
 interface CharacterHUDProps {
   character: CharacterState;
@@ -85,11 +86,6 @@ export default function CharacterHUD({
     ? character.initiative.value
     : Math.floor((character.abilities.dexterity - 10) / 2);
 
-  const hpCurrent = character.hitPoints.current;
-  const hpMax = character.hitPoints.max;
-  const hpTemp = character.hitPoints.temporary;
-  const hpPercent = hpMax > 0 ? Math.round((hpCurrent / hpMax) * 100) : 0;
-
   const activeConditionsCount =
     (character.conditionsAndDiseases?.activeConditions?.length || 0) +
     (character.conditionsAndDiseases?.activeDiseases?.length || 0);
@@ -117,18 +113,6 @@ export default function CharacterHUD({
   const activeBuffs = (character.temporaryBuffs || []).filter(b => b.isActive);
   const activeBuffCount = activeBuffs.length;
 
-  const getHPColor = () => {
-    if (hpPercent > 60) return 'bg-emerald-500';
-    if (hpPercent > 30) return 'bg-amber-500';
-    return 'bg-red-500';
-  };
-
-  const getHPTextColor = () => {
-    if (hpCurrent === 0) return 'text-red-500';
-    if (hpPercent <= 30) return 'text-amber-500';
-    return 'text-emerald-600 dark:text-emerald-400';
-  };
-
   const hasContextualIndicators =
     isConcentrating || activeConditionsCount > 0 || activeBuffCount > 0;
 
@@ -137,49 +121,25 @@ export default function CharacterHUD({
       {/* Row 1: Stats + Status Indicators */}
       <div className="flex flex-wrap items-center gap-3">
         {/* Primary Stats */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-stretch gap-2">
           {/* HP */}
-          <button
-            onClick={onNavigateToCombat}
-            className="border-divider hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-2.5 transition-colors"
-            title="Go to Combat tab"
-          >
-            <Heart className="h-5 w-5 text-red-500" />
-            <div className="flex flex-col">
-              <div className="flex items-baseline gap-1">
-                <span className={`text-lg font-bold ${getHPTextColor()}`}>
-                  {hpCurrent}
-                </span>
-                <span className="text-faint text-sm">/</span>
-                <span className="text-muted text-sm">{hpMax}</span>
-                {hpTemp > 0 && (
-                  <span className="text-sm font-medium text-blue-500">
-                    +{hpTemp}
-                  </span>
-                )}
-              </div>
-              <div className="bg-surface-secondary h-1.5 w-20 overflow-hidden rounded-full">
-                <div
-                  className={`h-full rounded-full transition-all duration-300 ${getHPColor()}`}
-                  style={{ width: `${Math.min(100, hpPercent)}%` }}
-                />
-              </div>
-            </div>
-          </button>
-
-          {/* AC */}
-          <StatChip
-            icon={<Shield className="h-5 w-5 text-blue-500" />}
-            value={String(totalAC)}
-            label="AC"
+          <HudHitPoints
+            characterId={character.id}
+            current={character.hitPoints.current}
+            max={character.hitPoints.max}
+            temporary={character.hitPoints.temporary}
             onClick={onNavigateToCombat}
           />
 
+          {/* AC */}
+          <HudStat caption="AC" onClick={onNavigateToCombat}>
+            <AcShield value={totalAC} />
+          </HudStat>
+
           {/* Initiative */}
-          <StatChip
-            icon={<Zap className="h-5 w-5 text-amber-500" />}
+          <HudStat
+            caption="Initiative"
             value={formatModifier(initiativeModifier)}
-            label="Init"
           />
 
           {/* Speed */}
@@ -189,28 +149,25 @@ export default function CharacterHUD({
           />
 
           {/* Proficiency Bonus */}
-          <StatChip
-            icon={<Award className="h-5 w-5 text-purple-500" />}
+          <HudStat
+            caption="Proficiency"
             value={formatModifier(proficiencyBonus)}
-            label="Prof"
           />
 
           {/* Spell Attack - conditional */}
           {spellAttackBonus !== null && (
-            <StatChip
-              icon={<Wand2 className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell attack"
               value={formatModifier(spellAttackBonus)}
-              label="Atk"
               onClick={onNavigateToSpells}
             />
           )}
 
           {/* Spell Save DC - conditional */}
           {spellSaveDC !== null && (
-            <StatChip
-              icon={<Sparkles className="h-5 w-5 text-indigo-500" />}
+            <HudStat
+              caption="Spell save DC"
               value={String(spellSaveDC)}
-              label="DC"
               onClick={onNavigateToSpells}
             />
           )}
@@ -218,28 +175,30 @@ export default function CharacterHUD({
 
         {/* Contextual Indicators */}
         {hasContextualIndicators && (
-          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3">
+          <div className="border-divider flex flex-wrap items-center gap-2 border-l pl-3 pointer-coarse:gap-x-3 pointer-coarse:gap-y-6">
             {isConcentrating && (
-              <button
-                onClick={onStopConcentration}
-                className="bg-accent-amber-bg text-accent-amber-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title={`Concentrating on ${character.concentration.spellName || 'spell'} — click to stop`}
-              >
-                <Brain className="h-3.5 w-3.5 shrink-0" />
-                <span className="max-w-[100px] truncate">
-                  {character.concentration.spellName || 'Conc.'}
-                </span>
-                <X className="h-3.5 w-3.5" />
-              </button>
+              <ConditionChip
+                kind="concentration"
+                name={`Concentrating on ${character.concentration.spellName || 'spell'}`}
+                onRemove={onStopConcentration}
+              />
             )}
 
             {activeConditionsCount > 0 && (
               <button
+                type="button"
                 onClick={onNavigateToConditions}
-                className="bg-accent-red-bg text-accent-red-text animate-condition-pulse flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
-                title="View active conditions"
+                aria-label={
+                  activeConditionsCount === 1
+                    ? '1 condition. Open the Combat tab'
+                    : `${activeConditionsCount} conditions. Open the Combat tab`
+                }
+                className={cn(
+                  badgeVariants({ variant: 'warning' }),
+                  'hover:bg-surface-hover focus-visible:outline-ring min-h-6 cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+                )}
               >
-                <AlertCircle className="h-3.5 w-3.5" />
+                <AlertCircle className="size-3.5" aria-hidden="true" />
                 <span>{activeConditionsCount}</span>
               </button>
             )}
@@ -391,35 +350,6 @@ export default function CharacterHUD({
   );
 }
 
-function StatChip({
-  icon,
-  value,
-  label,
-  onClick,
-}: {
-  icon: React.ReactNode;
-  value: string;
-  label: string;
-  onClick?: () => void;
-}) {
-  const Tag = onClick ? 'button' : 'div';
-  return (
-    <Tag
-      className={`border-divider flex items-center gap-1.5 rounded-lg border px-3 py-2.5 ${
-        onClick ? 'hover:bg-surface-hover cursor-pointer transition-colors' : ''
-      }`}
-      title={label}
-      onClick={onClick}
-    >
-      {icon}
-      <span className="text-heading text-lg font-bold">{value}</span>
-      <span className="text-faint hidden text-xs uppercase sm:inline">
-        {label}
-      </span>
-    </Tag>
-  );
-}
-
 function SpeedChip({
   character,
   onUpdateCharacter,
@@ -451,50 +381,53 @@ function SpeedChip({
   }, [isOpen]);
 
   return (
-    <div className="relative" ref={popoverRef}>
+    <div className="relative flex" ref={popoverRef}>
       <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="border-divider hover:bg-surface-hover flex items-center gap-1.5 rounded-lg border px-3 py-2.5 transition-colors"
+        className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex cursor-pointer flex-col items-center justify-center rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         title="Click to edit speeds"
       >
-        <Footprints className="h-5 w-5 text-emerald-500" />
-        <span className="text-heading text-lg font-bold">
-          {character.speed + getBuffSpeedBonus(character)}ft
-        </span>
-        {hasExtraSpeeds && (
-          <div className="text-muted flex items-center gap-1 text-xs">
-            {!!character.flySpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Fly ${character.flySpeed}ft`}
-              >
-                <Bird size={10} />
-                {character.flySpeed}
-              </span>
-            )}
-            {!!character.climbSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Climb ${character.climbSpeed}ft`}
-              >
-                <Mountain size={10} />
-                {character.climbSpeed}
-              </span>
-            )}
-            {!!character.swimSpeed && (
-              <span
-                className="flex items-center gap-0.5"
-                title={`Swim ${character.swimSpeed}ft`}
-              >
-                <Waves size={10} />
-                {character.swimSpeed}
-              </span>
-            )}
-          </div>
-        )}
-        <span className="text-faint hidden text-xs uppercase sm:inline">
-          Spd
-        </span>
+        <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+          <span className="flex items-baseline">
+            <span className="type-num-lg text-heading">
+              {character.speed + getBuffSpeedBonus(character)}
+            </span>
+            <span className="type-small text-muted">ft</span>
+          </span>
+          {hasExtraSpeeds && (
+            <span className="type-caption text-muted flex items-center gap-1">
+              {!!character.flySpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Fly ${character.flySpeed}ft`}
+                >
+                  <Bird size={10} />
+                  {character.flySpeed}
+                </span>
+              )}
+              {!!character.climbSpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Climb ${character.climbSpeed}ft`}
+                >
+                  <Mountain size={10} />
+                  {character.climbSpeed}
+                </span>
+              )}
+              {!!character.swimSpeed && (
+                <span
+                  className="flex items-center gap-0.5"
+                  title={`Swim ${character.swimSpeed}ft`}
+                >
+                  <Waves size={10} />
+                  {character.swimSpeed}
+                </span>
+              )}
+            </span>
+          )}
+        </span>{' '}
+        <span className="type-caption text-muted whitespace-nowrap">Speed</span>
       </button>
 
       {isOpen && onUpdateCharacter && (
@@ -601,7 +534,7 @@ function ActiveBuffsIndicator({
     <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-accent-blue-bg text-accent-blue-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80"
+        className="bg-accent-blue-bg text-accent-blue-text focus-visible:outline-ring flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         title="Active buffs — click to view"
       >
         <Zap className="h-3.5 w-3.5" />

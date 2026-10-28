@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 vi.mock('next/image', () => ({
@@ -35,7 +35,7 @@ describe('CharacterHUD', () => {
         onStopConcentration={vi.fn()}
       />
     );
-    expect(screen.getByTitle('AC')).toBeInTheDocument();
+    expect(screen.getByText('AC', { exact: true })).toBeInTheDocument();
   });
 
   it('displays HP and AC values', async () => {
@@ -50,7 +50,7 @@ describe('CharacterHUD', () => {
         calculationMode: 'auto',
       },
     });
-    render(
+    const { container } = render(
       <CharacterHUD
         character={character}
         onShortRest={vi.fn()}
@@ -62,9 +62,12 @@ describe('CharacterHUD', () => {
         onStopConcentration={vi.fn()}
       />
     );
-    expect(screen.getByText('30')).toBeInTheDocument();
-    expect(screen.getByText('40')).toBeInTheDocument();
-    expect(screen.getByText('+5')).toBeInTheDocument();
+    const hp = within(container).getByRole('button', {
+      name: /^Hit points /,
+    });
+    expect(within(hp).getByText('30')).toBeInTheDocument();
+    expect(within(hp).getByText('40')).toBeInTheDocument();
+    expect(within(hp).getByText('+5 temp')).toBeInTheDocument();
   });
 });
 
