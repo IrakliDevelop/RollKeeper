@@ -44,17 +44,17 @@ export const Unavailable = stories.Unavailable;
 
 export const NotStartedNarrow: Story = {
   args: { view: createPlayerBackupDashboardFixture('not-started') },
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const OngoingNarrow: Story = {
   args: { view: createPlayerBackupDashboardFixture('ongoing-complete') },
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const UnavailableNarrow: Story = {
   args: { view: createPlayerBackupDashboardFixture('unavailable') },
-  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  globals: { viewport: { value: 'mobile1', isRotated: false } },
 };
 
 export const OngoingDark: Story = {

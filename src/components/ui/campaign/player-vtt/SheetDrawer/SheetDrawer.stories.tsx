@@ -370,15 +370,16 @@ export const Desktop: Story = {
   decorators: [withCharacter(kaelenFixture)],
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         desktop: {
           name: 'Desktop',
           styles: { width: '1440px', height: '900px' },
+          type: 'desktop',
         },
       },
-      defaultViewport: 'desktop',
     },
   },
+  globals: { viewport: { value: 'desktop', isRotated: false } },
   play: async () => {
     const screen = body();
     await waitFor(() =>
@@ -395,15 +396,16 @@ export const Tablet: Story = {
   decorators: [withCharacter(kaelenFixture)],
   parameters: {
     viewport: {
-      viewports: {
+      options: {
         tablet: {
           name: 'Tablet',
           styles: { width: '1180px', height: '820px' },
+          type: 'tablet',
         },
       },
-      defaultViewport: 'tablet',
     },
   },
+  globals: { viewport: { value: 'tablet', isRotated: false } },
   play: async () => {
     const screen = body();
     const dialog = await waitFor(() =>

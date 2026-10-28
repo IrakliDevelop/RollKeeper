@@ -13,6 +13,23 @@ import {
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { AnchoredEditor } from './index';
 
+/** The sizes a story picks with `globals: DESKTOP` or `globals: PHONE`. */
+const VIEWPORTS = {
+  desktop: {
+    name: 'Desktop',
+    styles: { width: '1024px', height: '768px' },
+    type: 'desktop',
+  },
+  phone: {
+    name: 'Phone',
+    styles: { width: '390px', height: '844px' },
+    type: 'mobile',
+  },
+} as const;
+
+const DESKTOP = { viewport: { value: 'desktop', isRotated: false } };
+const PHONE = { viewport: { value: 'phone', isRotated: false } };
+
 /**
  * Edits a number inside an ornament. Not used by any screen yet: the
  * medallions and the AC shield adopt it with the sheet's edit mode.
@@ -23,6 +40,7 @@ const meta: Meta<typeof AnchoredEditor> = {
   parameters: {
     layout: 'centered',
     a11y: { test: 'error' },
+    viewport: { options: VIEWPORTS },
     docs: {
       description: {
         component:
@@ -35,27 +53,6 @@ const meta: Meta<typeof AnchoredEditor> = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-const DESKTOP = {
-  viewport: {
-    viewports: {
-      desktop: {
-        name: 'Desktop',
-        styles: { width: '1024px', height: '768px' },
-      },
-    },
-    defaultViewport: 'desktop',
-  },
-};
-
-const PHONE = {
-  viewport: {
-    viewports: {
-      phone: { name: 'Phone', styles: { width: '390px', height: '844px' } },
-    },
-    defaultViewport: 'phone',
-  },
-};
 
 const modifier = (score: number | undefined) =>
   score === undefined ? '—' : String(Math.floor((score - 10) / 2));
@@ -140,14 +137,13 @@ async function checkPopover(canvasElement: HTMLElement) {
 
 export const Popover: Story = {
   render: () => <StrengthMedallion />,
-  parameters: DESKTOP,
+  globals: DESKTOP,
   play: ({ canvasElement }) => checkPopover(canvasElement),
 };
 
 export const PopoverDark: Story = {
   render: () => <StrengthMedallion />,
-  parameters: DESKTOP,
-  globals: { theme: 'dark' },
+  globals: { ...DESKTOP, theme: 'dark' },
   play: ({ canvasElement }) => checkPopover(canvasElement),
 };
 
@@ -159,10 +155,16 @@ export const PopoverDark: Story = {
 async function checkSheet(canvasElement: HTMLElement) {
   const { page, trigger, editor, field } = await openEditor(canvasElement);
   await expect(editor).toHaveAttribute('data-anchored-editor', 'sheet');
-  await expect(editor.getBoundingClientRect().width).toBe(390);
+  // Sizes to the nearest pixel: on a display with fractional scaling, or
+  // when Storybook shrinks the frame to fit a short window, edges land on
+  // fractions.
+  await expect(editor.getBoundingClientRect().width).toBeCloseTo(390, 0);
   // Sits on the bottom edge once the 180ms slide-in ends.
   await waitFor(() =>
-    expect(editor.getBoundingClientRect().bottom).toBe(window.innerHeight)
+    expect(editor.getBoundingClientRect().bottom).toBeCloseTo(
+      window.innerHeight,
+      0
+    )
   );
 
   const restore = emulateCoarsePointer();
@@ -191,14 +193,13 @@ async function checkSheet(canvasElement: HTMLElement) {
 
 export const Sheet: Story = {
   render: () => <StrengthMedallion />,
-  parameters: PHONE,
+  globals: PHONE,
   play: ({ canvasElement }) => checkSheet(canvasElement),
 };
 
 export const SheetDark: Story = {
   render: () => <StrengthMedallion />,
-  parameters: PHONE,
-  globals: { theme: 'dark' },
+  globals: { ...PHONE, theme: 'dark' },
   play: ({ canvasElement }) => checkSheet(canvasElement),
 };
 
@@ -226,7 +227,7 @@ function EditorInDialog() {
 
 export const InsideDialog: Story = {
   render: () => <EditorInDialog />,
-  parameters: DESKTOP,
+  globals: DESKTOP,
   play: async ({ canvasElement }) => {
     const page = within(canvasElement.ownerDocument.body);
     const opener = within(canvasElement).getByRole('button', {
