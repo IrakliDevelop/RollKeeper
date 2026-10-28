@@ -23,6 +23,12 @@ export interface HpDamageFlashInput {
  * A sheet that opens on a stored copy and then adopts a fresher copy of the
  * same character with lower HP (a restore from another device) flashes
  * once on open: from here that is indistinguishable from a hit.
+ * Likewise a value typed into a live number field (the Combat tab's current
+ * HP) reaches the store on every keystroke, so a correction that passes
+ * through a lower number (9 → 15 typed as 1, 5; "38" backspaced to "3"; a
+ * value above max clamped on blur) flashes once on the way. The field commits
+ * per keystroke by design; the sheet sweep that moves it to `InPlaceField`
+ * (`live: false`) removes this.
  */
 export function useHpDamageFlash({
   id,

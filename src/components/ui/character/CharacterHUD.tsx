@@ -385,7 +385,7 @@ function SpeedChip({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex flex-col items-center justify-center rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+        className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex cursor-pointer flex-col items-center justify-center rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         title="Click to edit speeds"
       >
         <span className="flex items-baseline gap-1.5 whitespace-nowrap">
