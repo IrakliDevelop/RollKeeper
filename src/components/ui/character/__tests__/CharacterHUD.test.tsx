@@ -346,4 +346,27 @@ describe('CharacterHUD speed tile and sheet mode', () => {
     fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
     expect(screen.getByText('Walk')).toBeVisible();
   });
+
+  it('closes the popover when play mode starts, so edit mode reopens it shut', () => {
+    const props = hudProps(withHp(30, 40));
+    const onUpdateCharacter = vi.fn();
+    const { rerender } = render(
+      <CharacterHUD {...props} editing onUpdateCharacter={onUpdateCharacter} />
+    );
+    fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
+    expect(screen.getByText('Walk')).toBeVisible();
+
+    rerender(
+      <CharacterHUD
+        {...props}
+        editing={false}
+        onUpdateCharacter={onUpdateCharacter}
+      />
+    );
+    rerender(
+      <CharacterHUD {...props} editing onUpdateCharacter={onUpdateCharacter} />
+    );
+
+    expect(screen.queryByText('Walk')).toBeNull();
+  });
 });

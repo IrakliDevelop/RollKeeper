@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import ArmorClassManager from '../ArmorClassManager';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
@@ -43,5 +43,33 @@ describe('ArmorClassManager sheet mode', () => {
   it('keeps temp AC and shield bonus fields in play mode', () => {
     renderAc(false);
     expect(screen.getByDisplayValue('2')).toBeInTheDocument();
+  });
+
+  it('drops an uncommitted base AC draft when leaving edit mode without a blur', () => {
+    const character = makeCharacter({
+      armorClass: 17,
+      tempArmorClass: 0,
+      shieldBonus: 2,
+    });
+    const onUpdateArmorClass = vi.fn();
+    const props = {
+      character,
+      onUpdateArmorClass,
+      onUpdateTempArmorClass: vi.fn(),
+      onSetTempACActive: vi.fn(),
+      onSetShieldEquipped: vi.fn(),
+      onUpdateShieldBonus: vi.fn(),
+    };
+    const { rerender } = render(<ArmorClassManager {...props} editing />);
+    fireEvent.change(screen.getByDisplayValue('17'), {
+      target: { value: '25' },
+    });
+
+    rerender(<ArmorClassManager {...props} editing={false} />);
+    rerender(<ArmorClassManager {...props} editing />);
+
+    expect(screen.getByDisplayValue('17')).toBeInTheDocument();
+    expect(screen.queryByDisplayValue('25')).toBeNull();
+    expect(onUpdateArmorClass).not.toHaveBeenCalled();
   });
 });

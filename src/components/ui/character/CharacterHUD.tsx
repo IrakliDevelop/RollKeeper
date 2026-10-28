@@ -431,6 +431,9 @@ function SpeedChip({
     </span>
   );
 
+  // Play mode closes the popover, so edit mode never comes back with it open.
+  if (!editing && isOpen) setIsOpen(false);
+
   if (!editing) {
     return <HudStat caption="Speed">{valueLine}</HudStat>;
   }

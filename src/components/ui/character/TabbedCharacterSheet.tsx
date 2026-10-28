@@ -50,6 +50,8 @@ const TabbedCharacterSheet = forwardRef<
       tabs={tabs}
       defaultTab="actions"
       persistKey="tabbed-layout-active-tab"
+      // Tab jumps scroll the tabs to the top; keep them below the sticky bar.
+      className="scroll-mt-[calc(var(--sheet-bar-height,4rem)+1rem)]"
     />
   );
 });

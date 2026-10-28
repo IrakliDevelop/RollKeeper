@@ -43,6 +43,14 @@ export default function ArmorClassManager({
   const [shieldBonusInput, setShieldBonusInput] = useState(
     character.shieldBonus.toString()
   );
+  const [wasEditing, setWasEditing] = useState(editing);
+
+  // Leaving edit mode without a blur drops the base AC draft, so the next
+  // edit starts from the stored value (same contract as InPlaceField).
+  if (!Object.is(editing, wasEditing)) {
+    setWasEditing(editing);
+    if (!editing) setBaseACInput(character.armorClass.toString());
+  }
 
   useEffect(() => {
     setBaseACInput(character.armorClass.toString());
