@@ -12,6 +12,29 @@ import type { AbilityName } from '@/types/character';
 import { LedgerRow, type LedgerCell } from './LedgerRow';
 import type { AbilityDisplay } from './abilityNumbers';
 
+/** The sizes a story picks with `globals: DESKTOP`, `DESKTOP_TALL` or `PHONE`. */
+const VIEWPORTS = {
+  desktop: {
+    name: 'Desktop',
+    styles: { width: '1024px', height: '768px' },
+    type: 'desktop',
+  },
+  desktopTall: {
+    name: 'Desktop (tall)',
+    styles: { width: '1024px', height: '900px' },
+    type: 'desktop',
+  },
+  phone: {
+    name: 'Phone',
+    styles: { width: '390px', height: '844px' },
+    type: 'mobile',
+  },
+} as const;
+
+const DESKTOP = { viewport: { value: 'desktop', isRotated: false } };
+const PHONE = { viewport: { value: 'phone', isRotated: false } };
+const DESKTOP_TALL = { viewport: { value: 'desktopTall', isRotated: false } };
+
 /**
  * The six abilities in one row for drawers and the DM's view of a player:
  * name, the two numbers, and the save line. Six across from 32rem of its
@@ -23,6 +46,7 @@ const meta: Meta = {
   parameters: {
     layout: 'padded',
     a11y: { test: 'error' },
+    viewport: { options: VIEWPORTS },
   },
   decorators: [remountOnTheme],
 };
@@ -96,17 +120,7 @@ function cellsIn(row: HTMLElement) {
 
 export const Layout: Story = {
   render: () => <LayoutPage />,
-  parameters: {
-    viewport: {
-      viewports: {
-        desktop: {
-          name: 'Desktop',
-          styles: { width: '1024px', height: '900px' },
-        },
-      },
-      defaultViewport: 'desktop',
-    },
-  },
+  globals: DESKTOP_TALL,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     for (const { label } of THEMES) {
@@ -257,8 +271,10 @@ export const WithRolls: Story = {
     try {
       for (const button of canvas.getAllByRole('button')) {
         const box = button.getBoundingClientRect();
-        await expect(box.height).toBeGreaterThanOrEqual(44);
-        await expect(box.width).toBeGreaterThanOrEqual(44);
+        // To the nearest pixel: fractional display scaling puts edges on
+        // fractions.
+        await expect(Math.round(box.height)).toBeGreaterThanOrEqual(44);
+        await expect(Math.round(box.width)).toBeGreaterThanOrEqual(44);
       }
     } finally {
       restore();
@@ -283,27 +299,6 @@ function EditableLedger() {
     </div>
   );
 }
-
-const DESKTOP = {
-  viewport: {
-    viewports: {
-      desktop: {
-        name: 'Desktop',
-        styles: { width: '1024px', height: '768px' },
-      },
-    },
-    defaultViewport: 'desktop',
-  },
-};
-
-const PHONE = {
-  viewport: {
-    viewports: {
-      phone: { name: 'Phone', styles: { width: '390px', height: '844px' } },
-    },
-    defaultViewport: 'phone',
-  },
-};
 
 async function editDexterity(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
@@ -341,7 +336,7 @@ async function editDexterity(canvasElement: HTMLElement) {
 
 export const Editing: Story = {
   render: () => <EditableLedger />,
-  parameters: DESKTOP,
+  globals: DESKTOP,
   play: async ({ canvasElement }) => {
     const editor = await editDexterity(canvasElement);
     await expect(editor).toHaveAttribute('data-anchored-editor', 'popover');
@@ -350,15 +345,16 @@ export const Editing: Story = {
 
 export const EditingOnPhone: Story = {
   render: () => <EditableLedger />,
-  parameters: PHONE,
-  globals: { theme: 'dark' },
+  globals: { ...PHONE, theme: 'dark' },
   play: async ({ canvasElement }) => {
     const restore = emulateCoarsePointer();
     try {
       for (const trigger of within(canvasElement).getAllByRole('button')) {
         const box = trigger.getBoundingClientRect();
-        await expect(box.height).toBeGreaterThanOrEqual(44);
-        await expect(box.width).toBeGreaterThanOrEqual(44);
+        // To the nearest pixel: fractional display scaling puts edges on
+        // fractions.
+        await expect(Math.round(box.height)).toBeGreaterThanOrEqual(44);
+        await expect(Math.round(box.width)).toBeGreaterThanOrEqual(44);
         // The numbers sit in the middle of the taller touch box.
         const large = trigger
           .querySelector('[data-number="large"]')!
