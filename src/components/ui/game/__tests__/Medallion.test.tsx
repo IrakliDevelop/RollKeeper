@@ -167,6 +167,23 @@ describe('Medallion', () => {
     expect(onScoreChange).toHaveBeenCalledWith(18);
   });
 
+  it('previews the clamped score, the one Save stores', async () => {
+    const onScoreChange = vi.fn();
+    render(<Medallion {...base} editing onScoreChange={onScoreChange} />);
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Strength: modifier +3, score 16' })
+    );
+    const field = screen.getByRole('textbox', { name: 'Strength score' });
+    await userEvent.clear(field);
+    await userEvent.type(field, '40');
+    expect(screen.getByText('Modifier +10')).toBeInTheDocument();
+    expect(screen.queryByText('Modifier +15')).toBeNull();
+    await act(() =>
+      userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    );
+    expect(onScoreChange).toHaveBeenCalledWith(30);
+  });
+
   it('only adds the swap animation for a change made here', () => {
     const { container, rerender } = render(<Medallion {...base} animateSwap />);
     const large = () => container.querySelector('[data-number="large"]')!;

@@ -47,9 +47,11 @@ export const SWAP_ANIMATION = 'animate-rk-number-swap';
  * (a hydration correction, another tab) remount without the class, so they
  * snap. The class comes off when the swap ends, so a later remount (edit
  * mode, a phone turning across 640px) or a hidden tab panel shown again
- * doesn't play it a second time. (React has no animationcancel handler: a
- * panel hidden during the 180ms replays the swap once when shown.) Derived
- * during render plus one event handler: no effect, no timer.
+ * doesn't play it a second time. (React has no animationcancel handler,
+ * and a hidden element never fires animationend: a consumer hidden when
+ * the display changes, or during the 180ms, replays the swap once when it
+ * is shown.) Derived during render plus one event handler: no effect, no
+ * timer.
  */
 export function useNumberSwap(
   display: AbilityDisplay,

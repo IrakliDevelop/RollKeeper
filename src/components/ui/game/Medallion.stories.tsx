@@ -333,7 +333,6 @@ function swapState(el: HTMLElement) {
   };
 }
 
-/** A toggle in this tab: the two numbers trade places in 180ms. */
 /** The `rk-number-swap` keyframes as the browser parsed them. */
 function swapKeyframes() {
   const visit = (rules: CSSRuleList): CSSKeyframesRule | undefined => {

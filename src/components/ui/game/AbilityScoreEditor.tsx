@@ -20,7 +20,8 @@ function modifierPreview(draft: number | undefined) {
   if (draft === undefined) return null;
   return (
     <p className="type-small text-muted">
-      Modifier {formatModifier(calculateModifier(draft))}
+      Modifier{' '}
+      {formatModifier(calculateModifier(Math.min(30, Math.max(1, draft))))}
     </p>
   );
 }
