@@ -588,7 +588,7 @@ export const TouchTargets: Story = {
   },
 };
 
-/** Keyboard focus on a row-1 tile shows the brass ring. */
+/** Keyboard focus on every row-1 button shows the brass ring. */
 export const KeyboardFocus: Story = {
   args: { character: busy(wizard) },
   render: args => (
@@ -605,8 +605,12 @@ export const KeyboardFocus: Story = {
     ).color;
     await userEvent.tab();
     await expect(hpButtonIn(canvasElement)).toHaveFocus();
-    for (const name of TARGETS) {
-      const button = canvas.getByRole('button', { name });
+    // The buffs indicator comes last; its name is the bare count.
+    const buttons = [
+      ...TARGETS.map(name => canvas.getByRole('button', { name })),
+      canvas.getByTitle('Active buffs — click to view'),
+    ];
+    for (const button of buttons) {
       // Tab forward to it (the chip's X sits between the tiles and the count).
       for (let i = 0; i < 4 && button !== document.activeElement; i++) {
         await userEvent.tab();

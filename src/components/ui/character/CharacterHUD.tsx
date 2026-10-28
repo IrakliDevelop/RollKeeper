@@ -534,7 +534,7 @@ function ActiveBuffsIndicator({
     <div className="relative" ref={popoverRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-accent-blue-bg text-accent-blue-text flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        className="bg-accent-blue-bg text-accent-blue-text focus-visible:outline-ring flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-sm font-medium transition-colors hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
         title="Active buffs — click to view"
       >
         <Zap className="h-3.5 w-3.5" />
