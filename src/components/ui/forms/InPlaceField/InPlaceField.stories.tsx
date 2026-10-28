@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/feedback/dialog';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import { InPlaceField } from './index';
 
@@ -242,5 +249,52 @@ export const CoarsePointer: Story = {
     } finally {
       restore();
     }
+  },
+};
+
+function GoblinDialog() {
+  const [speed, setSpeed] = useState(30);
+  return (
+    <Dialog>
+      <DialogTrigger>Edit goblin</DialogTrigger>
+      <DialogContent size="sm">
+        <DialogTitle>Goblin</DialogTitle>
+        <DialogDescription>Small humanoid.</DialogDescription>
+        <p className="type-body">
+          Speed{' '}
+          <InPlaceField
+            label="Speed"
+            value={speed}
+            min={0}
+            max={120}
+            editing
+            onCommit={setSpeed}
+          />{' '}
+          ft
+        </p>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Escape with a draft cancels the edit; the next Escape closes the dialog. */
+export const InDialog: Story = {
+  render: () => <GoblinDialog />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const body = within(document.body);
+    await userEvent.click(canvas.getByRole('button', { name: 'Edit goblin' }));
+    const field = await body.findByRole('textbox', { name: 'Speed' });
+    await userEvent.click(field);
+    await userEvent.keyboard('45');
+    await userEvent.keyboard('{Escape}');
+    await expect(body.getByRole('dialog')).toBeInTheDocument();
+    await expect(field).toHaveValue('30');
+    await expect(field).toHaveFocus();
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(body.queryByRole('dialog')).toBeNull());
+    await expect(
+      canvas.getByRole('button', { name: 'Edit goblin' })
+    ).toHaveFocus();
   },
 };

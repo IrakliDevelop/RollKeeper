@@ -267,6 +267,27 @@ export const NonCaster: Story = {
 
 export const NonCasterDark: Story = { ...NonCaster, globals: DARK };
 
+/** Play mode: the speed is a plain tile, as tall as the Initiative tile. */
+export const PlayMode: Story = {
+  args: { character: wizard, editing: false },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.queryByRole('button', { name: /Speed$/ })).toBeNull();
+    const speed = canvas.getByText('Speed', { exact: true });
+    await expect(speed).toBeVisible();
+    const tileOf = (caption: HTMLElement) =>
+      caption.parentElement as HTMLElement;
+    const initiative = canvas.getByText('Initiative', { exact: true });
+    const speedHeight = tileOf(speed).getBoundingClientRect().height;
+    const initiativeHeight = tileOf(initiative).getBoundingClientRect().height;
+    await expect(Math.abs(speedHeight - initiativeHeight)).toBeLessThanOrEqual(
+      1
+    );
+  },
+};
+
+export const PlayModeDark: Story = { ...PlayMode, globals: DARK };
+
 /** Concentration as a lapis chip, the conditions count in ember, no pulse. */
 export const Contextual: Story = {
   args: { character: busy(wizard) },

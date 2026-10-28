@@ -36,6 +36,10 @@ import { BattleMapLiveBanner } from '@/components/ui/campaign/BattleMapLiveBanne
 import { useStorageQuotaListener } from '@/hooks/useStorageQuotaListener';
 
 import CharacterSheetHeader from '@/components/ui/character/CharacterSheetHeader';
+import {
+  SheetModeProvider,
+  useSheetModeState,
+} from '@/components/ui/character/SheetMode';
 import { useHydration } from '@/hooks/useHydration';
 import { useCharacterRosterSync } from '@/hooks/useCharacterRosterSync';
 import { useItemTransferAutoMerge } from '@/hooks/useItemTransferAutoMerge';
@@ -96,6 +100,7 @@ import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 export default function CharacterSheet() {
   const params = useParams();
   const characterId = params.characterId as string;
+  const sheetMode = useSheetModeState(characterId);
 
   const { getCharacterById, updateCharacterData } = usePlayerStore();
   const playerCharacter = getCharacterById(characterId);
@@ -877,400 +882,406 @@ export default function CharacterSheet() {
   return (
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
-        <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
-          {/* Party HP Sidebar */}
-          <PartyHPSidebar
-            campaignCode={playerSync.campaignCode ?? null}
-            partyMembers={partyMembers}
-            loading={partyMembersLoading}
-          />
-
-          {/* Shared initiative panel — shown during active combat */}
-          <InitiativePanel
-            state={liveInitiative}
-            characterId={characterId}
-            onEndTurn={handleEndTurn}
-            battleMapHref={
-              playerSync.campaignCode && activeBattleMapId
-                ? `/player/campaign/${playerSync.campaignCode}/battlemap/${activeBattleMapId}?character=${encodeURIComponent(characterId)}`
-                : undefined
-            }
-          />
-
-          {/* "Combat begins" flourish when a fight starts */}
-          <CombatStartBanner
-            isVisible={showCombatBanner}
-            onDone={() => setShowCombatBanner(false)}
-          />
-
-          {/* DM → player "roll for initiative" request */}
-          {initiativePrompt.showPrompt && initiativePrompt.request && (
-            <InitiativeRollPrompt
-              request={initiativePrompt.request}
-              modifier={getInitiativeModifier()}
-              onSubmit={initiativePrompt.handleSubmit}
-              onDismiss={initiativePrompt.dismiss}
+        <SheetModeProvider value={sheetMode}>
+          <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
+            {/* Party HP Sidebar */}
+            <PartyHPSidebar
+              campaignCode={playerSync.campaignCode ?? null}
+              partyMembers={partyMembers}
+              loading={partyMembersLoading}
             />
-          )}
 
-          {/* Live battle map banner: full "Join map" until the player joins
+            {/* Shared initiative panel — shown during active combat */}
+            <InitiativePanel
+              state={liveInitiative}
+              characterId={characterId}
+              onEndTurn={handleEndTurn}
+              battleMapHref={
+                playerSync.campaignCode && activeBattleMapId
+                  ? `/player/campaign/${playerSync.campaignCode}/battlemap/${activeBattleMapId}?character=${encodeURIComponent(characterId)}`
+                  : undefined
+              }
+            />
+
+            {/* "Combat begins" flourish when a fight starts */}
+            <CombatStartBanner
+              isVisible={showCombatBanner}
+              onDone={() => setShowCombatBanner(false)}
+            />
+
+            {/* DM → player "roll for initiative" request */}
+            {initiativePrompt.showPrompt && initiativePrompt.request && (
+              <InitiativeRollPrompt
+                request={initiativePrompt.request}
+                modifier={getInitiativeModifier()}
+                onSubmit={initiativePrompt.handleSubmit}
+                onDismiss={initiativePrompt.dismiss}
+              />
+            )}
+
+            {/* Live battle map banner: full "Join map" until the player joins
               this map; afterwards the initiative panel carries the link, with
               a compact corner pill as fallback while combat is inactive. */}
-          {playerSync.campaignCode &&
-            activeBattleMapId &&
-            (!joinedBattleMap ? (
-              <BattleMapLiveBanner
-                campaignCode={playerSync.campaignCode}
-                battleMapId={activeBattleMapId}
-                mapName={sharedState?.battleMap?.name}
-                characterId={characterId}
-                onJoin={markBattleMapJoinedNow}
-              />
-            ) : !initiativeActive ? (
-              <BattleMapLiveBanner
-                campaignCode={playerSync.campaignCode}
-                battleMapId={activeBattleMapId}
-                mapName={sharedState?.battleMap?.name}
-                characterId={characterId}
-                compact
-              />
-            ) : null)}
+            {playerSync.campaignCode &&
+              activeBattleMapId &&
+              (!joinedBattleMap ? (
+                <BattleMapLiveBanner
+                  campaignCode={playerSync.campaignCode}
+                  battleMapId={activeBattleMapId}
+                  mapName={sharedState?.battleMap?.name}
+                  characterId={characterId}
+                  onJoin={markBattleMapJoinedNow}
+                />
+              ) : !initiativeActive ? (
+                <BattleMapLiveBanner
+                  campaignCode={playerSync.campaignCode}
+                  battleMapId={activeBattleMapId}
+                  mapName={sharedState?.battleMap?.name}
+                  characterId={characterId}
+                  compact
+                />
+              ) : null)}
 
-          {/* Header */}
-          <CharacterSheetHeader
-            characterId={characterId}
-            characterName={character.name}
-            characterRace={character.race}
-            characterClass={
-              getClassDisplayString() ||
-              character.class?.name ||
-              'Unknown Class'
-            }
-            characterLevel={character.totalLevel || character.level}
-            characterAlignment={character.alignment}
-            characterCreatureType={character.creatureType || 'Humanoid'}
-            saveStatus={saveStatus}
-            lastSaved={lastSaved}
-            hasUnsavedChanges={hasUnsavedChanges}
-            onManualSave={manualSave}
-            onExport={handleExport}
-            onShowResetModal={() => setShowResetModal(true)}
-            onUpdateName={name => updateCharacter({ name })}
-            onAddToast={addToast}
-            extraHeaderContent={
-              <SyncIndicator
-                syncStatus={playerSync.syncStatus}
-                lastSyncedAt={playerSync.lastSyncedAt}
-                campaignCode={playerSync.campaignCode}
-                campaignName={playerSync.campaignName}
-                autoSync={playerSync.autoSync}
-                syncEnabled={playerSync.syncEnabled}
-                onSyncNow={playerSync.syncNow}
-                onToggleAutoSync={playerSync.toggleAutoSync}
-                onLeaveCampaign={playerSync.leaveCampaign}
-                characterData={character}
-                shareHpWithParty={character.shareHpWithParty ?? true}
-                onToggleShareHp={toggleShareHpWithParty}
-                sharePartyView={character.sharePartyView ?? true}
-                onSharePartyViewChange={setSharePartyView}
-              />
-            }
-          />
-
-          <div className="p-4">
-            {/* Main Dice Container */}
-            <div
-              id="main-dice-container"
-              className="pointer-events-none fixed inset-0 z-[9999]"
-              style={{
-                width: '100vw',
-                height: '100vh',
-                top: 0,
-                left: 0,
-              }}
-            ></div>
-            <style jsx global>{`
-              #main-dice-container {
-                position: fixed;
-                inset: 0;
-                width: 100vw;
-                height: 100vh;
+            {/* Header */}
+            <CharacterSheetHeader
+              characterId={characterId}
+              characterName={character.name}
+              characterRace={character.race}
+              characterClass={
+                getClassDisplayString() ||
+                character.class?.name ||
+                'Unknown Class'
               }
-              #main-dice-container canvas,
-              #main-dice-container > div,
-              #main-dice-container > canvas {
-                position: absolute !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100% !important;
-                height: 100% !important;
-                max-width: 100% !important;
-                max-height: 100% !important;
-                display: block !important;
+              characterLevel={character.totalLevel || character.level}
+              characterAlignment={character.alignment}
+              characterCreatureType={character.creatureType || 'Humanoid'}
+              saveStatus={saveStatus}
+              lastSaved={lastSaved}
+              hasUnsavedChanges={hasUnsavedChanges}
+              onManualSave={manualSave}
+              onExport={handleExport}
+              onShowResetModal={() => setShowResetModal(true)}
+              onUpdateName={name => updateCharacter({ name })}
+              onAddToast={addToast}
+              extraHeaderContent={
+                <SyncIndicator
+                  syncStatus={playerSync.syncStatus}
+                  lastSyncedAt={playerSync.lastSyncedAt}
+                  campaignCode={playerSync.campaignCode}
+                  campaignName={playerSync.campaignName}
+                  autoSync={playerSync.autoSync}
+                  syncEnabled={playerSync.syncEnabled}
+                  onSyncNow={playerSync.syncNow}
+                  onToggleAutoSync={playerSync.toggleAutoSync}
+                  onLeaveCampaign={playerSync.leaveCampaign}
+                  characterData={character}
+                  shareHpWithParty={character.shareHpWithParty ?? true}
+                  onToggleShareHp={toggleShareHpWithParty}
+                  sharePartyView={character.sharePartyView ?? true}
+                  onSharePartyViewChange={setSharePartyView}
+                />
               }
-            `}</style>
-
-            <ExperimentalFeaturesSection />
-
-            {/* Character HUD */}
-            <CharacterHUD
-              character={character}
-              calendarDays={calendarDays}
-              onShortRest={() => setPendingRestType('short')}
-              onLongRest={() => setPendingRestType('long')}
-              onIncrementDays={() => incrementDaysSpent(1)}
-              onDecrementDays={() =>
-                updateDaysSpent(Math.max(0, (character.daysSpent || 0) - 1))
-              }
-              onToggleInspiration={handleToggleInspiration}
-              onToggleReaction={toggleReaction}
-              onUseClassResource={expendClassResource}
-              onRestoreClassResource={restoreClassResource}
-              onStopConcentration={stopConcentration}
-              onNavigateToConditions={() => {
-                switchToTab('conditions');
-                setTimeout(() => {
-                  document
-                    .getElementById('conditions-section')
-                    ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }, 150);
-              }}
-              onNavigateToBuffs={() => {
-                switchToTab('combat');
-              }}
-              onNavigateToCombat={() => {
-                switchToTab('combat');
-              }}
-              onNavigateToSpells={() => {
-                switchToTab('spells');
-              }}
-              onToggleBuff={toggleBuff}
-              onUpdateCharacter={updateCharacter}
             />
 
-            {/* DM Effects (applied by DM in encounter) */}
-            {pendingEffectToasts.length > 0 && (
-              <DmEffectsNotification
-                effects={pendingEffectToasts}
-                onDismiss={() => setPendingEffectToasts([])}
-              />
-            )}
-
-            {/* DM Custom Counter change notification */}
-            {counterToast && (
-              <DmCounterNotification
-                label={counterToast.label}
-                value={counterToast.value}
-                delta={counterToast.delta}
-                onDismiss={() => setCounterToast(null)}
-              />
-            )}
-
-            {/* DM Message Notifications */}
-            {(sharedState?.messages?.length ?? 0) > 0 && (
-              <DmMessageNotification
-                messages={sharedState!.messages}
-                onAccept={msg => {
-                  acknowledgeMessage(msg.id);
-                  switchToTab('character');
-                  setCharacterSubTab('notes');
+            <div className="p-4">
+              {/* Main Dice Container */}
+              <div
+                id="main-dice-container"
+                className="pointer-events-none fixed inset-0 z-[9999]"
+                style={{
+                  width: '100vw',
+                  height: '100vh',
+                  top: 0,
+                  left: 0,
                 }}
-                onDismiss={messageId => {
-                  acknowledgeMessage(messageId);
-                }}
-              />
-            )}
-
-            {/* Item Transfer Notifications */}
-            {pendingTransfers.length > 0 && (
-              <ItemTransferNotification
-                transfers={pendingTransfers}
-                onDismiss={clearPendingTransfer}
-                onNavigateToInventory={() => {
-                  switchToTab('inventory');
-                  setInventorySubTab('items');
-                }}
-              />
-            )}
-
-            {/* Send Item Dialog */}
-            <SendItemDialog
-              open={sendItemDialogOpen}
-              onClose={() => {
-                setSendItemDialogOpen(false);
-                setSendingItem(null);
-              }}
-              item={sendingItem}
-              targets={sendItemTargets}
-              onSend={handleConfirmSendItem}
-              sending={isSendingItem}
-            />
-
-            {/* Rest Dialog triggered from HUD */}
-            <RestDialog
-              restType={pendingRestType}
-              slots={getRestSlots(character)}
-              onConfirm={() => {
-                if (pendingRestType === 'short') {
-                  takeShortRest();
-                  showShortRest(getRestSlots(character));
-                } else if (pendingRestType === 'long') {
-                  takeLongRest();
-                  // Advance calendar by 1 day if not synced with DM
-                  const calendarAdvanced = advanceLocalCalendarForLongRest({
-                    synced:
-                      getSyncedCalendar(
-                        playerSync.campaignCode,
-                        sharedCalendar
-                      ) !== null,
-                    calendar: useCalendarStore
-                      .getState()
-                      .getCalendar(characterId),
-                    advance: ms =>
-                      useCalendarStore.getState().advanceTime(characterId, ms),
-                  });
-                  // The same toast as a long rest from the Calendar tab.
-                  addToast(
-                    longRestToast(
-                      getRestSlots(character),
-                      calendarRestDetails(calendarAdvanced)
-                    )
-                  );
+              ></div>
+              <style jsx global>{`
+                #main-dice-container {
+                  position: fixed;
+                  inset: 0;
+                  width: 100vw;
+                  height: 100vh;
                 }
-              }}
-              onClose={() => setPendingRestType(null)}
-            />
+                #main-dice-container canvas,
+                #main-dice-container > div,
+                #main-dice-container > canvas {
+                  position: absolute !important;
+                  top: 0 !important;
+                  left: 0 !important;
+                  width: 100% !important;
+                  height: 100% !important;
+                  max-width: 100% !important;
+                  max-height: 100% !important;
+                  display: block !important;
+                }
+              `}</style>
 
-            <main className="relative z-10 mx-auto max-w-7xl">
-              <TabbedCharacterSheet
-                ref={tabbedSheetRef}
+              <ExperimentalFeaturesSection />
+
+              {/* Character HUD */}
+              <CharacterHUD
                 character={character}
-                hasHydrated={hasHydrated}
-                totalLevel={totalLevel}
-                proficiencyBonus={proficiencyBonus}
-                characterHasSpells={characterHasSpells}
-                updateAbilityScore={updateAbilityScore}
-                rollAbilityCheck={rollAbilityCheck}
-                getSavingThrowModifier={getSavingThrowModifier}
-                updateSavingThrowProficiency={updateSavingThrowProficiency}
-                rollSavingThrow={rollSavingThrow}
-                getSkillModifier={getSkillModifier}
-                updateSkillProficiency={updateSkillProficiency}
-                updateSkillExpertise={updateSkillExpertise}
-                toggleJackOfAllTrades={toggleJackOfAllTrades}
-                rollSkillCheck={rollSkillCheck}
-                toggleSkillBonusAbility={toggleSkillBonusAbility}
-                updateCharacter={updateCharacter}
-                updateClass={updateClass}
-                updateLevel={updateLevel}
-                addClassLevel={addClassLevel}
-                removeClassLevel={removeClassLevel}
-                updateClassLevel={updateClassLevel}
-                getClassDisplayString={getClassDisplayString}
-                addExperience={addExperience}
-                setExperience={setExperience}
-                changeSpellSlotBy={changeSpellSlotBy}
-                changePactMagicBy={changePactMagicBy}
-                resetSpellSlots={resetSpellSlots}
-                resetPactMagicSlots={resetPactMagicSlots}
-                getInitiativeModifier={getInitiativeModifier}
-                updateInitiative={updateInitiative}
-                resetInitiativeToDefault={resetInitiativeToDefault}
-                toggleReaction={toggleReaction}
-                resetReaction={resetReaction}
-                rollInitiative={rollInitiative}
-                updateTempArmorClass={updateTempArmorClass}
-                setTempACActive={setTempACActive}
-                setShieldEquipped={setShieldEquipped}
-                updateShieldBonus={updateShieldBonus}
-                applyDamageToCharacter={applyDamageToCharacter}
-                applyHealingToCharacter={applyHealingToCharacter}
-                addTemporaryHPToCharacter={addTemporaryHPToCharacter}
-                makeDeathSavingThrow={makeDeathSavingThrow}
-                resetDeathSavingThrows={resetDeathSavingThrows}
-                toggleHPCalculationMode={toggleHPCalculationMode}
-                recalculateMaxHP={recalculateMaxHP}
-                updateHitPoints={updateHitPoints}
-                useHitDie={useHitDie}
-                restoreHitDice={restoreHitDice}
-                resetAllHitDice={resetAllHitDice}
-                showAttackRoll={showAttackRoll}
-                showSavingThrow={showSavingThrow}
-                showDamageRoll={showDamageRoll}
-                animateRoll={diceBoxInitialized ? rollDice : undefined}
-                switchToTab={switchToTab}
-                stopConcentration={stopConcentration}
-                addExtendedFeature={addExtendedFeature}
-                updateExtendedFeature={updateExtendedFeature}
-                deleteExtendedFeature={deleteExtendedFeature}
-                useExtendedFeature={useExtendedFeature}
-                resetExtendedFeatures={resetExtendedFeatures}
-                reorderExtendedFeatures={reorderExtendedFeatures}
-                addSpellsFromFeat={handleAddSpellsFromFeat}
-                toggleFavoriteFeature={toggleFavoriteFeature}
-                addToolProficiency={addToolProficiency}
-                updateToolProficiency={updateToolProficiency}
-                deleteToolProficiency={deleteToolProficiency}
-                addHeroicInspiration={addHeroicInspiration}
-                updateHeroicInspiration={updateHeroicInspiration}
-                useHeroicInspiration={spendHeroicInspiration}
-                resetHeroicInspiration={resetHeroicInspiration}
-                stackableInspiration={character.stackableInspiration ?? false}
-                inCampaign={inCampaign}
-                setStackableInspiration={setStackableInspiration}
-                useClassResource={expendClassResource}
-                restoreClassResource={restoreClassResource}
-                resetClassResource={resetClassResource}
-                addLanguage={addLanguage}
-                deleteLanguage={deleteLanguage}
-                addFeature={addFeature}
-                updateFeature={updateFeature}
-                deleteFeature={deleteFeature}
-                addTrait={addTrait}
-                updateTrait={updateTrait}
-                deleteTrait={deleteTrait}
-                updateCharacterBackground={updateCharacterBackground}
-                addNote={addNote}
-                updateNote={updateNote}
-                deleteNote={deleteNote}
-                reorderNotes={reorderNotes}
-                addToast={addToast}
+                editing={sheetMode.editing}
                 calendarDays={calendarDays}
-                campaignCode={playerSync.campaignCode ?? undefined}
-                customCounter={sharedState?.customCounter}
-                locationCount={syncedLocations.length}
-                onSendItem={onSendItem}
+                onShortRest={() => setPendingRestType('short')}
+                onLongRest={() => setPendingRestType('long')}
+                onIncrementDays={() => incrementDaysSpent(1)}
+                onDecrementDays={() =>
+                  updateDaysSpent(Math.max(0, (character.daysSpent || 0) - 1))
+                }
+                onToggleInspiration={handleToggleInspiration}
+                onToggleReaction={toggleReaction}
+                onUseClassResource={expendClassResource}
+                onRestoreClassResource={restoreClassResource}
+                onStopConcentration={stopConcentration}
+                onNavigateToConditions={() => {
+                  switchToTab('conditions');
+                  setTimeout(() => {
+                    document
+                      .getElementById('conditions-section')
+                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 150);
+                }}
+                onNavigateToBuffs={() => {
+                  switchToTab('combat');
+                }}
+                onNavigateToCombat={() => {
+                  switchToTab('combat');
+                }}
+                onNavigateToSpells={() => {
+                  switchToTab('spells');
+                }}
+                onToggleBuff={toggleBuff}
+                onUpdateCharacter={updateCharacter}
               />
-            </main>
 
-            <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+              {/* DM Effects (applied by DM in encounter) */}
+              {pendingEffectToasts.length > 0 && (
+                <DmEffectsNotification
+                  effects={pendingEffectToasts}
+                  onDismiss={() => setPendingEffectToasts([])}
+                />
+              )}
 
-            <YouDiedOverlay
-              isVisible={showDeathAnimation}
-              onDismiss={clearDeathAnimation}
-              characterName={character.name}
-            />
+              {/* DM Custom Counter change notification */}
+              {counterToast && (
+                <DmCounterNotification
+                  label={counterToast.label}
+                  value={counterToast.value}
+                  delta={counterToast.delta}
+                  onDismiss={() => setCounterToast(null)}
+                />
+              )}
 
-            <LevelUpOverlay
-              isVisible={showLevelUpAnimation}
-              onDismiss={clearLevelUpAnimation}
-              newLevel={levelUpAnimationLevel}
-              characterName={character.name}
-            />
+              {/* DM Message Notifications */}
+              {(sharedState?.messages?.length ?? 0) > 0 && (
+                <DmMessageNotification
+                  messages={sharedState!.messages}
+                  onAccept={msg => {
+                    acknowledgeMessage(msg.id);
+                    switchToTab('character');
+                    setCharacterSubTab('notes');
+                  }}
+                  onDismiss={messageId => {
+                    acknowledgeMessage(messageId);
+                  }}
+                />
+              )}
 
-            {/* Character Reset Confirmation Modal */}
-            <ConfirmationModal
-              isOpen={showResetModal}
-              onClose={() => setShowResetModal(false)}
-              onConfirm={resetCharacter}
-              title="Reset Character"
-              message="Are you sure you want to reset this character? This will permanently delete all character data, including abilities, equipment, spells, and progress. This action cannot be undone."
-              confirmText="Reset Character"
-              cancelText="Keep Character"
-              type="danger"
-            />
+              {/* Item Transfer Notifications */}
+              {pendingTransfers.length > 0 && (
+                <ItemTransferNotification
+                  transfers={pendingTransfers}
+                  onDismiss={clearPendingTransfer}
+                  onNavigateToInventory={() => {
+                    switchToTab('inventory');
+                    setInventorySubTab('items');
+                  }}
+                />
+              )}
+
+              {/* Send Item Dialog */}
+              <SendItemDialog
+                open={sendItemDialogOpen}
+                onClose={() => {
+                  setSendItemDialogOpen(false);
+                  setSendingItem(null);
+                }}
+                item={sendingItem}
+                targets={sendItemTargets}
+                onSend={handleConfirmSendItem}
+                sending={isSendingItem}
+              />
+
+              {/* Rest Dialog triggered from HUD */}
+              <RestDialog
+                restType={pendingRestType}
+                slots={getRestSlots(character)}
+                onConfirm={() => {
+                  if (pendingRestType === 'short') {
+                    takeShortRest();
+                    showShortRest(getRestSlots(character));
+                  } else if (pendingRestType === 'long') {
+                    takeLongRest();
+                    // Advance calendar by 1 day if not synced with DM
+                    const calendarAdvanced = advanceLocalCalendarForLongRest({
+                      synced:
+                        getSyncedCalendar(
+                          playerSync.campaignCode,
+                          sharedCalendar
+                        ) !== null,
+                      calendar: useCalendarStore
+                        .getState()
+                        .getCalendar(characterId),
+                      advance: ms =>
+                        useCalendarStore
+                          .getState()
+                          .advanceTime(characterId, ms),
+                    });
+                    // The same toast as a long rest from the Calendar tab.
+                    addToast(
+                      longRestToast(
+                        getRestSlots(character),
+                        calendarRestDetails(calendarAdvanced)
+                      )
+                    );
+                  }
+                }}
+                onClose={() => setPendingRestType(null)}
+              />
+
+              <main className="relative z-10 mx-auto max-w-7xl">
+                <TabbedCharacterSheet
+                  ref={tabbedSheetRef}
+                  editing={sheetMode.editing}
+                  character={character}
+                  hasHydrated={hasHydrated}
+                  totalLevel={totalLevel}
+                  proficiencyBonus={proficiencyBonus}
+                  characterHasSpells={characterHasSpells}
+                  updateAbilityScore={updateAbilityScore}
+                  rollAbilityCheck={rollAbilityCheck}
+                  getSavingThrowModifier={getSavingThrowModifier}
+                  updateSavingThrowProficiency={updateSavingThrowProficiency}
+                  rollSavingThrow={rollSavingThrow}
+                  getSkillModifier={getSkillModifier}
+                  updateSkillProficiency={updateSkillProficiency}
+                  updateSkillExpertise={updateSkillExpertise}
+                  toggleJackOfAllTrades={toggleJackOfAllTrades}
+                  rollSkillCheck={rollSkillCheck}
+                  toggleSkillBonusAbility={toggleSkillBonusAbility}
+                  updateCharacter={updateCharacter}
+                  updateClass={updateClass}
+                  updateLevel={updateLevel}
+                  addClassLevel={addClassLevel}
+                  removeClassLevel={removeClassLevel}
+                  updateClassLevel={updateClassLevel}
+                  getClassDisplayString={getClassDisplayString}
+                  addExperience={addExperience}
+                  setExperience={setExperience}
+                  changeSpellSlotBy={changeSpellSlotBy}
+                  changePactMagicBy={changePactMagicBy}
+                  resetSpellSlots={resetSpellSlots}
+                  resetPactMagicSlots={resetPactMagicSlots}
+                  getInitiativeModifier={getInitiativeModifier}
+                  updateInitiative={updateInitiative}
+                  resetInitiativeToDefault={resetInitiativeToDefault}
+                  toggleReaction={toggleReaction}
+                  resetReaction={resetReaction}
+                  rollInitiative={rollInitiative}
+                  updateTempArmorClass={updateTempArmorClass}
+                  setTempACActive={setTempACActive}
+                  setShieldEquipped={setShieldEquipped}
+                  updateShieldBonus={updateShieldBonus}
+                  applyDamageToCharacter={applyDamageToCharacter}
+                  applyHealingToCharacter={applyHealingToCharacter}
+                  addTemporaryHPToCharacter={addTemporaryHPToCharacter}
+                  makeDeathSavingThrow={makeDeathSavingThrow}
+                  resetDeathSavingThrows={resetDeathSavingThrows}
+                  toggleHPCalculationMode={toggleHPCalculationMode}
+                  recalculateMaxHP={recalculateMaxHP}
+                  updateHitPoints={updateHitPoints}
+                  useHitDie={useHitDie}
+                  restoreHitDice={restoreHitDice}
+                  resetAllHitDice={resetAllHitDice}
+                  showAttackRoll={showAttackRoll}
+                  showSavingThrow={showSavingThrow}
+                  showDamageRoll={showDamageRoll}
+                  animateRoll={diceBoxInitialized ? rollDice : undefined}
+                  switchToTab={switchToTab}
+                  stopConcentration={stopConcentration}
+                  addExtendedFeature={addExtendedFeature}
+                  updateExtendedFeature={updateExtendedFeature}
+                  deleteExtendedFeature={deleteExtendedFeature}
+                  useExtendedFeature={useExtendedFeature}
+                  resetExtendedFeatures={resetExtendedFeatures}
+                  reorderExtendedFeatures={reorderExtendedFeatures}
+                  addSpellsFromFeat={handleAddSpellsFromFeat}
+                  toggleFavoriteFeature={toggleFavoriteFeature}
+                  addToolProficiency={addToolProficiency}
+                  updateToolProficiency={updateToolProficiency}
+                  deleteToolProficiency={deleteToolProficiency}
+                  addHeroicInspiration={addHeroicInspiration}
+                  updateHeroicInspiration={updateHeroicInspiration}
+                  useHeroicInspiration={spendHeroicInspiration}
+                  resetHeroicInspiration={resetHeroicInspiration}
+                  stackableInspiration={character.stackableInspiration ?? false}
+                  inCampaign={inCampaign}
+                  setStackableInspiration={setStackableInspiration}
+                  useClassResource={expendClassResource}
+                  restoreClassResource={restoreClassResource}
+                  resetClassResource={resetClassResource}
+                  addLanguage={addLanguage}
+                  deleteLanguage={deleteLanguage}
+                  addFeature={addFeature}
+                  updateFeature={updateFeature}
+                  deleteFeature={deleteFeature}
+                  addTrait={addTrait}
+                  updateTrait={updateTrait}
+                  deleteTrait={deleteTrait}
+                  updateCharacterBackground={updateCharacterBackground}
+                  addNote={addNote}
+                  updateNote={updateNote}
+                  deleteNote={deleteNote}
+                  reorderNotes={reorderNotes}
+                  addToast={addToast}
+                  calendarDays={calendarDays}
+                  campaignCode={playerSync.campaignCode ?? undefined}
+                  customCounter={sharedState?.customCounter}
+                  locationCount={syncedLocations.length}
+                  onSendItem={onSendItem}
+                />
+              </main>
+
+              <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
+              <YouDiedOverlay
+                isVisible={showDeathAnimation}
+                onDismiss={clearDeathAnimation}
+                characterName={character.name}
+              />
+
+              <LevelUpOverlay
+                isVisible={showLevelUpAnimation}
+                onDismiss={clearLevelUpAnimation}
+                newLevel={levelUpAnimationLevel}
+                characterName={character.name}
+              />
+
+              {/* Character Reset Confirmation Modal */}
+              <ConfirmationModal
+                isOpen={showResetModal}
+                onClose={() => setShowResetModal(false)}
+                onConfirm={resetCharacter}
+                title="Reset Character"
+                message="Are you sure you want to reset this character? This will permanently delete all character data, including abilities, equipment, spells, and progress. This action cannot be undone."
+                confirmText="Reset Character"
+                cancelText="Keep Character"
+                type="danger"
+              />
+            </div>
           </div>
-        </div>
+        </SheetModeProvider>
       </NavigationContext.Provider>
     </ErrorBoundary>
   );

@@ -55,15 +55,24 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('shows and dismisses the editing banner', () => {
     render(<SheetDrawer {...props()} />);
-    fireEvent.click(screen.getByRole('button', { name: /locked/i }));
-    expect(screen.getByText(/editing unlocked/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    expect(
+      screen.getByText(/changes save and sync to the dm/i)
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^done$/i }));
-    expect(screen.queryByText(/editing unlocked/i)).toBeNull();
+    expect(screen.queryByText(/changes save and sync to the dm/i)).toBeNull();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('confirms a long rest through RestDialog and reports it', () => {
@@ -98,10 +107,13 @@ describe('SheetDrawer', () => {
   it('resets to locked when reopened', () => {
     const p = props();
     const { rerender } = render(<SheetDrawer {...p} />);
-    fireEvent.click(screen.getByRole('button', { name: /locked/i }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
     rerender(<SheetDrawer {...p} open={false} />);
     rerender(<SheetDrawer {...p} open />);
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('closes via the close button', () => {
@@ -207,7 +219,10 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 
   it('renders PartySheet for a party target, resolved from partyMembers', () => {
@@ -225,7 +240,7 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByText(/limited view.*played by sam/i)
     ).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Edit sheet' })).toBeNull();
   });
 
   it('falls back to a generic party title and missing-member state when the id has no match', () => {
@@ -256,7 +271,10 @@ describe('SheetDrawer', () => {
     expect(
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
 
     rerender(
       <SheetDrawer
@@ -273,7 +291,7 @@ describe('SheetDrawer', () => {
       screen.getByText(/limited view.*played by sam/i)
     ).toBeInTheDocument();
     expect(screen.getByText('Mace')).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /locked/i })).toBeNull();
+    expect(screen.queryByRole('switch', { name: 'Edit sheet' })).toBeNull();
     expect(p.onClose).not.toHaveBeenCalled();
 
     rerender(
@@ -287,7 +305,10 @@ describe('SheetDrawer', () => {
       screen.getByRole('dialog', { name: /kaelen voss character sheet/i })
     ).toBeInTheDocument();
     expect(screen.queryByText(/played by sam/i)).toBeNull();
-    expect(screen.getByRole('button', { name: /locked/i })).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
     expect(p.onClose).not.toHaveBeenCalled();
   });
 });

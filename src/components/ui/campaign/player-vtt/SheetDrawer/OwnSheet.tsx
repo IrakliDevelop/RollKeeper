@@ -90,8 +90,7 @@ export function OwnSheet({
           <div className="bg-accent-amber-bg border-accent-amber-border text-accent-amber-text flex items-center gap-2 border-b px-5 py-2 text-xs">
             <Unlock className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1">
-              Editing unlocked. Changes save to {name}&apos;s sheet and sync to
-              the DM.
+              Editing {name}&apos;s sheet. Changes save and sync to the DM.
             </span>
             <Button variant="ghost" size="sm" onClick={() => setLocked(true)}>
               Done

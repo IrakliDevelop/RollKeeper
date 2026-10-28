@@ -1,5 +1,6 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import { useState } from 'react';
 import { HitPointTracker } from '../HitPointTracker';
 import { HitPoints } from '@/types/character';
 
@@ -18,6 +19,8 @@ const dyingHitPoints: HitPoints = {
   calculationMode: 'auto',
   deathSaves: { successes: 0, failures: 0, isStabilized: false },
 };
+
+afterEach(cleanup);
 
 describe('HitPointTracker', () => {
   it('renders current HP, max HP, and temp HP values', () => {
@@ -241,5 +244,75 @@ describe('HitPointTracker', () => {
   it('shows "Dying" status text when character is at 0 HP and not stabilized', () => {
     render(<HitPointTracker hitPoints={dyingHitPoints} />);
     expect(screen.getAllByText(/Dying/).length).toBeGreaterThan(0);
+  });
+
+  describe('sheet mode (editing)', () => {
+    const manual: HitPoints = { ...baseHitPoints, calculationMode: 'manual' };
+
+    it('shows max HP as text in play mode; current and temp stay editable', () => {
+      render(
+        <HitPointTracker
+          hitPoints={manual}
+          editing={false}
+          onToggleCalculationMode={vi.fn()}
+          onUpdateHitPoints={vi.fn()}
+        />
+      );
+      expect(screen.queryByDisplayValue('40')).toBeNull();
+      expect(screen.getByText('40')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('25')).toBeInTheDocument();
+      expect(screen.getByDisplayValue('5')).toBeInTheDocument();
+      expect(screen.queryByTitle(/calculation/)).toBeNull();
+    });
+
+    it('keeps the AUTO badge in play mode', () => {
+      render(
+        <HitPointTracker
+          hitPoints={baseHitPoints}
+          editing={false}
+          onToggleCalculationMode={vi.fn()}
+        />
+      );
+      expect(screen.getAllByText('AUTO').length).toBeGreaterThan(0);
+    });
+
+    it('edits max HP and shows the calculation toggle by default', () => {
+      const onUpdateHitPoints = vi.fn();
+      render(
+        <HitPointTracker
+          hitPoints={manual}
+          onToggleCalculationMode={vi.fn()}
+          onUpdateHitPoints={onUpdateHitPoints}
+        />
+      );
+      fireEvent.change(screen.getByDisplayValue('40'), {
+        target: { value: '45' },
+      });
+      expect(onUpdateHitPoints).toHaveBeenCalledWith({ max: 45 });
+      expect(screen.getByTitle(/calculation/)).toBeInTheDocument();
+    });
+
+    it('shows the typed max HP after switching to play mode', () => {
+      function Host() {
+        const [hp, setHp] = useState(manual);
+        const [editing, setEditing] = useState(true);
+        return (
+          <>
+            <button onClick={() => setEditing(false)}>play</button>
+            <HitPointTracker
+              hitPoints={hp}
+              editing={editing}
+              onUpdateHitPoints={u => setHp(h => ({ ...h, ...u }))}
+            />
+          </>
+        );
+      }
+      render(<Host />);
+      fireEvent.change(screen.getByDisplayValue('40'), {
+        target: { value: '52' },
+      });
+      fireEvent.click(screen.getByText('play'));
+      expect(screen.getByText('52')).toBeInTheDocument();
+    });
   });
 });

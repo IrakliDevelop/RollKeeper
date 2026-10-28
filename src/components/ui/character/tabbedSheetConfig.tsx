@@ -99,6 +99,12 @@ export interface TabbedSheetConfigParams {
   totalLevel: number;
   proficiencyBonus: number;
   characterHasSpells: boolean;
+  /**
+   * Sheet mode (`SheetMode.tsx`): false = play mode, build values are plain
+   * text. Passed to the Combat tab's max HP, base AC and speed (and the
+   * Stats tab in 02e).
+   */
+  editing: boolean;
 
   // Ability / skill / save handlers
   updateAbilityScore: (ability: AbilityName, score: number) => void;
@@ -449,7 +455,7 @@ export function createTabbedSheetConfig(
               })()}
             </div>
 
-            <div className="lg:sticky lg:top-4">
+            <div className="lg:sticky lg:top-[calc(var(--sheet-bar-height,4rem)+1rem)]">
               <Skills
                 skills={character.skills}
                 jackOfAllTrades={character.jackOfAllTrades ?? false}
@@ -1010,6 +1016,7 @@ function CombatTabContent({
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="space-y-6">
               <ArmorClassManager
+                editing={params.editing}
                 character={character}
                 onUpdateArmorClass={ac =>
                   params.updateCharacter({ armorClass: ac })
@@ -1020,6 +1027,7 @@ function CombatTabContent({
                 onUpdateShieldBonus={params.updateShieldBonus}
               />
               <CombatStats
+                editing={params.editing}
                 character={character}
                 getInitiativeModifier={params.getInitiativeModifier}
                 onUpdateInitiative={params.updateInitiative}
@@ -1040,6 +1048,7 @@ function CombatTabContent({
                 }
               >
                 <HitPointManager
+                  editing={params.editing}
                   hitPoints={character.hitPoints}
                   classInfo={character.class}
                   level={totalLevel}
@@ -1085,7 +1094,10 @@ function CombatTabContent({
             <WeaponProficiencies />
           </ErrorBoundary>
 
-          <div id="conditions-section">
+          <div
+            id="conditions-section"
+            className="scroll-mt-[calc(var(--sheet-bar-height,4rem)+1rem)]"
+          >
             <ErrorBoundary
               fallback={
                 <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">

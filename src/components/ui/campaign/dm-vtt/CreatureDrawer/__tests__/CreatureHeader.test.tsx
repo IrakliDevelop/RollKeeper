@@ -164,23 +164,26 @@ describe('CreatureHeader', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('toggles the lock/play button and reflects aria-pressed', () => {
+  it('toggles editing with the Edit sheet switch', () => {
     const onToggleEditing = vi.fn();
     const { rerender } = render(
       <CreatureHeader {...baseProps({ onToggleEditing, editing: false })} />
     );
-    const button = screen.getByRole('button', { name: 'Play' });
-    expect(button).toHaveAttribute('aria-pressed', 'false');
-    fireEvent.click(button);
+    const toggle = screen.getByRole('switch', { name: 'Edit sheet' });
+    expect(toggle).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(toggle);
     expect(onToggleEditing).toHaveBeenCalled();
 
     rerender(
       <CreatureHeader {...baseProps({ onToggleEditing, editing: true })} />
     );
-    expect(screen.getByRole('button', { name: 'Editing' })).toHaveAttribute(
-      'aria-pressed',
+    expect(screen.getByRole('switch', { name: 'Edit sheet' })).toHaveAttribute(
+      'aria-checked',
       'true'
     );
+    expect(
+      screen.queryByRole('button', { name: /^(play|editing)$/i })
+    ).toBeNull();
   });
 
   it('calls onClose', () => {
@@ -203,7 +206,7 @@ describe('CreatureHeader', () => {
       screen.queryByRole('button', { name: 'Long rest' })
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: 'Play' })
+      screen.queryByRole('switch', { name: 'Edit sheet' })
     ).not.toBeInTheDocument();
     expect(
       screen.getByRole('button', { name: 'Close sheet' })

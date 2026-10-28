@@ -11,6 +11,7 @@ import * as React from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
+import { keepOpenForInPlaceEdit } from '@/components/ui/forms/InPlaceField/keepOpenForInPlaceEdit';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { cn } from '@/utils/cn';
 
@@ -122,6 +123,7 @@ const DialogContent = React.forwardRef<
       size = 'lg',
       showCloseButton = true,
       onCloseAutoFocus,
+      onEscapeKeyDown,
       ...props
     },
     ref
@@ -146,6 +148,10 @@ const DialogContent = React.forwardRef<
             className
           )}
           onCloseAutoFocus={handleCloseAutoFocus}
+          onEscapeKeyDown={event => {
+            keepOpenForInPlaceEdit(event);
+            onEscapeKeyDown?.(event);
+          }}
           {...props}
         >
           <OpenerCapture onCapture={captureOpener} />
