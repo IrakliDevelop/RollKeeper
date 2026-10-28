@@ -12,6 +12,23 @@ import { calculateModifier } from '@/utils/calculations';
 import { Medallion } from './Medallion';
 import type { AbilityDisplay } from './abilityNumbers';
 
+/** The sizes a story picks with `globals: DESKTOP` or `globals: PHONE`. */
+const VIEWPORTS = {
+  desktop: {
+    name: 'Desktop',
+    styles: { width: '1024px', height: '768px' },
+    type: 'desktop',
+  },
+  phone: {
+    name: 'Phone',
+    styles: { width: '390px', height: '844px' },
+    type: 'mobile',
+  },
+} as const;
+
+const DESKTOP = { viewport: { value: 'desktop', isRotated: false } };
+const PHONE = { viewport: { value: 'phone', isRotated: false } };
+
 /**
  * An ability as a ring: the large number inside, the small one on a tab.
  * A brass ring marks a proficient saving throw. Which number is large is the
@@ -22,6 +39,7 @@ const meta: Meta = {
   parameters: {
     layout: 'padded',
     a11y: { test: 'error' },
+    viewport: { options: VIEWPORTS },
   },
   decorators: [remountOnTheme],
 };
@@ -153,27 +171,6 @@ export const States: Story = {
   },
 };
 
-const DESKTOP = {
-  viewport: {
-    viewports: {
-      desktop: {
-        name: 'Desktop',
-        styles: { width: '1024px', height: '768px' },
-      },
-    },
-    defaultViewport: 'desktop',
-  },
-};
-
-const PHONE = {
-  viewport: {
-    viewports: {
-      phone: { name: 'Phone', styles: { width: '390px', height: '844px' } },
-    },
-    defaultViewport: 'phone',
-  },
-};
-
 function EditableMedallion() {
   const [score, setScore] = useState(16);
   return (
@@ -253,21 +250,20 @@ async function checkEditing(canvasElement: HTMLElement) {
 
 export const Editing: Story = {
   render: () => <EditableMedallion />,
-  parameters: DESKTOP,
+  globals: DESKTOP,
   play: ({ canvasElement }) => checkEditing(canvasElement),
 };
 
 export const EditingDark: Story = {
   render: () => <EditableMedallion />,
-  parameters: DESKTOP,
-  globals: { theme: 'dark' },
+  globals: { ...DESKTOP, theme: 'dark' },
   play: ({ canvasElement }) => checkEditing(canvasElement),
 };
 
 /** Below 640px the editor is a bottom sheet; the ring is a 44px+ target. */
 export const EditingOnPhone: Story = {
   render: () => <EditableMedallion />,
-  parameters: PHONE,
+  globals: PHONE,
   play: async ({ canvasElement }) => {
     const restore = emulateCoarsePointer();
     try {
@@ -275,8 +271,10 @@ export const EditingOnPhone: Story = {
         name: /^Strength: modifier/,
       });
       const box = trigger.getBoundingClientRect();
-      await expect(box.width).toBeGreaterThanOrEqual(44);
-      await expect(box.height).toBeGreaterThanOrEqual(44);
+      // To the nearest pixel: fractional display scaling puts edges on
+      // fractions.
+      await expect(Math.round(box.width)).toBeGreaterThanOrEqual(44);
+      await expect(Math.round(box.height)).toBeGreaterThanOrEqual(44);
     } finally {
       restore();
     }
