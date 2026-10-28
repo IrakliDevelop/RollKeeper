@@ -131,7 +131,7 @@ export default function CombatStats({
               />
             ) : (
               <span
-                className={`flex h-10 items-center justify-center ${WALK_SPEED_VALUE}`}
+                className={`flex h-10 items-center justify-center pointer-coarse:min-h-11 ${WALK_SPEED_VALUE}`}
               >
                 {character.speed}
               </span>
@@ -166,7 +166,7 @@ export default function CombatStats({
               />
             ) : (
               <span
-                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+                className={`flex h-10 items-center justify-center pointer-coarse:min-h-11 ${EXTRA_SPEED_VALUE}`}
               >
                 {character.flySpeed || 0}
               </span>
@@ -187,7 +187,7 @@ export default function CombatStats({
               />
             ) : (
               <span
-                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+                className={`flex h-10 items-center justify-center pointer-coarse:min-h-11 ${EXTRA_SPEED_VALUE}`}
               >
                 {character.climbSpeed || 0}
               </span>
@@ -208,7 +208,7 @@ export default function CombatStats({
               />
             ) : (
               <span
-                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+                className={`flex h-10 items-center justify-center pointer-coarse:min-h-11 ${EXTRA_SPEED_VALUE}`}
               >
                 {character.swimSpeed || 0}
               </span>

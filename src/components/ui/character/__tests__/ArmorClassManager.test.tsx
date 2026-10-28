@@ -34,6 +34,10 @@ describe('ArmorClassManager sheet mode', () => {
     renderAc(false);
     expect(screen.queryByDisplayValue('17')).toBeNull();
     expect(screen.getByTestId('base-ac-value')).toHaveTextContent('17');
+    // Same wrapper as the design-system Input, so it lands where the field does.
+    expect(screen.getByTestId('base-ac-value').parentElement).toHaveClass(
+      'w-full'
+    );
   });
 
   it('keeps temp AC and shield bonus fields in play mode', () => {

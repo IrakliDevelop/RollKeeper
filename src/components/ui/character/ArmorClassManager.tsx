@@ -155,12 +155,14 @@ export default function ArmorClassManager({
                     max="30"
                   />
                 ) : (
-                  <span
-                    data-testid="base-ac-value"
-                    className={`flex h-12 w-20 items-center justify-center ${BASE_AC_VALUE}`}
-                  >
-                    {character.armorClass}
-                  </span>
+                  <div className="w-full">
+                    <span
+                      data-testid="base-ac-value"
+                      className={`flex h-12 w-20 items-center justify-center ${BASE_AC_VALUE}`}
+                    >
+                      {character.armorClass}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
