@@ -1032,6 +1032,22 @@ form select {
   animation: rk-number-swap 180ms ease-out;
 }
 
+/* Damage on the HUD's HP readout: a layer behind its numbers starts at
+   blood and fades out in 180ms, once per hit. The layer is 30% opaque, so
+   the peak is a blood wash over the tile (--blood-bg on its own is too
+   close to surface-raised to register in 180ms) and the numbers stay
+   readable through it. */
+@keyframes rk-hp-flash {
+  from {
+    background-color: var(--blood-fill);
+  }
+}
+
+.animate-rk-hp-flash {
+  animation: rk-hp-flash 180ms ease-out;
+  opacity: 0.3;
+}
+
 /* Respect the OS "reduce motion" setting for every CSS animation and
    transition. A near-zero duration (not "none") still fires animationend, so
    Radix can unmount closing dialogs, selects and tooltips. */

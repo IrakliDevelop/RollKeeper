@@ -123,6 +123,7 @@ export default function CharacterHUD({
         <div className="flex flex-wrap items-center gap-2">
           {/* HP */}
           <HudHitPoints
+            characterId={character.id}
             current={character.hitPoints.current}
             max={character.hitPoints.max}
             temporary={character.hitPoints.temporary}

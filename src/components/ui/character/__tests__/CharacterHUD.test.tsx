@@ -108,3 +108,61 @@ describe('CharacterHUD hit points', () => {
     expect(props.onNavigateToCombat).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('CharacterHUD damage flash', () => {
+  function flashLayer() {
+    return hpButton().querySelector('[data-hp-flash]');
+  }
+
+  it('does not flash on load', () => {
+    renderHud(withHp(5, 42));
+    expect(flashLayer()).not.toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('flashes when HP drops', () => {
+    const { rerender, props } = renderHud(withHp(42, 42));
+    rerender(<CharacterHUD {...props} character={withHp(31, 42)} />);
+    expect(flashLayer()).toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('does not flash on healing', () => {
+    const { rerender, props } = renderHud(withHp(31, 42));
+    rerender(<CharacterHUD {...props} character={withHp(42, 42)} />);
+    expect(flashLayer()).not.toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('replays on the next hit but not on a heal', () => {
+    const { rerender, props } = renderHud(withHp(42, 42));
+    rerender(<CharacterHUD {...props} character={withHp(31, 42)} />);
+    const first = flashLayer();
+    rerender(<CharacterHUD {...props} character={withHp(36, 42)} />);
+    expect(flashLayer()).toBe(first);
+    rerender(<CharacterHUD {...props} character={withHp(20, 42)} />);
+    expect(flashLayer()).not.toBe(first);
+    expect(flashLayer()).toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('does not flash when only temporary HP drops', () => {
+    const { rerender, props } = renderHud(withHp(30, 40, 5));
+    rerender(<CharacterHUD {...props} character={withHp(30, 40, 0)} />);
+    expect(flashLayer()).not.toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('does not flash for another character', () => {
+    const { rerender, props } = renderHud(withHp(42, 42));
+    rerender(
+      <CharacterHUD
+        {...props}
+        character={withHp(10, 42, 0, { id: 'other-character' })}
+      />
+    );
+    expect(flashLayer()).not.toHaveClass('animate-rk-hp-flash');
+  });
+
+  it('keeps focus on the HP button through a hit', () => {
+    const { rerender, props } = renderHud(withHp(42, 42));
+    hpButton().focus();
+    rerender(<CharacterHUD {...props} character={withHp(31, 42)} />);
+    expect(hpButton()).toHaveFocus();
+  });
+});
