@@ -228,21 +228,38 @@ both themes (Storybook → Game). Import them by path; don't draw your own.
 | A proficiency toggle in edit mode | `ProficiencyDotButton`, labelled with `skillDotLabel` (cycles with `nextSkillProficiency`) or `saveDotLabel` plus `pressed`. Same look, 24px hit area (44px on touch), so keep any other tappable control at least 22px from the dot's centre and the row `pointer-coarse:min-h-11` |
 | Spell slots left | `SlotPips` (`total`, `available`, `level` 1–9 or `'pact'`): 10px lapis pips, filled while available. Display only; one label for the row; bad counts clamp and at most `MAX_PIPS` (20) are drawn |
 | Armor class | `AcShield`: the number in a brass shield outline, the only icon-shaped container in the system. Add the "AC" caption or label yourself |
+| An ability on the Stats tab | `Medallion` (`ability`, `score`, `modifier`, `saveProficient`, `abilityDisplay`): a 48px ring with the large number inside and the small one on a tab over the bottom edge. The ring is brass when the save is proficient, `divider-strong` when not; it is never decorative. One label in both modes ("Strength: modifier +3, score 16"). With `editing` and `onScoreChange` it becomes a button that opens the "Strength score" editor (1–30, live "Modifier +3"); otherwise it is plain, with no tab stop. The tab hangs 10px below the ring, so leave that much room under it. Don't pass outline classes in `className`: in edit mode they replace the editor's dashed cue and focus ring |
+| Abilities in a drawer or the DM's view of a player | `LedgerRow` (`cells`: six `{ ability, score, modifier, save, saveProficient }`, `abilityDisplay`): name, the two numbers and a save line ("Save +5" with a decorative dot) per cell, `divider` hairlines between cells, six across from 32rem of its own width and 3×2 below. Give it a block parent: as a flex item with auto width it shrinks to nothing. `editing` + `onScoreChange` open the same score editor. `onRollCheck` / `onRollSave` turn the name and save line into "Roll Strength check" / "Roll Strength saving throw" buttons; without them they stay text, and while editing rolls are off |
 | A condition on a creature | `ConditionChip`: an ember `Badge` with the name, or `kind="concentration"` in lapis. `onRemove` adds a remove button; pass `removeLabel` when a list shows several creatures ("Remove Poisoned from Goblin 2"). The name is never cut short. It renders a `div`, so not inside a `<button>` or `<p>`. On touch, give a wrapping list `pointer-coarse:gap-x-3 pointer-coarse:gap-y-6` so remove buttons cover nothing else |
 
 The older `ConditionBadge` stays on the encounter rows and the map's status
 tray until their sweep moves them to `ConditionChip`.
 
+### Modifier or score large
+
+Which number an ability shows large is the viewer's choice, per device:
+`useUiPrefs()` (`src/hooks/useUiPrefs.ts`) returns `prefs.abilityDisplay`
+(`'modifier'`, the default, or `'score'`), `setPref` and `localChange`.
+
+- It lives in its own `localStorage` key, `rollkeeper-ui-prefs`, a JSON
+  object merged with the defaults on read. It is not part of
+  `PlayerSettings`, not per character and not cloud-synced. Put later UI
+  preferences there too.
+- Bad stored values fall back to the defaults, keys this version doesn't
+  know are kept on write, and a write the browser refuses still applies for
+  the visit. Other open tabs follow at once.
+- Pass `prefs.abilityDisplay` as `abilityDisplay` and `localChange` as
+  `animateSwap` to `Medallion` and `LedgerRow`. Then a change made in this
+  tab swaps the two numbers in 180ms (instant under reduced motion), while
+  the first render, the stored value replacing the default after hydration
+  and a change from another tab snap into place.
+
 Still coming in Phase 2:
 
 - **Vitals strip** (`CharacterHUD`): HP in `type-num-xl` coloured by tier,
   temporary HP as "+5 temp" in frost, a 4px tier bar, and AC in `AcShield`.
-- **Medallion:** an ability's large number in a ring; a brass ring means a
-  proficient save.
-- **Ledger row:** the six abilities in one row for drawers and the DM's view
-  of a player.
-- **Large-number switch:** a "Scores large" `Switch` that swaps modifier and
-  score in every ring.
+- **"Scores large" switch:** the `Switch` at the Abilities heading that
+  calls `setPref('abilityDisplay', …)`.
 
 ## Touch and iPad
 
