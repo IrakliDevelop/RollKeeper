@@ -6,6 +6,8 @@ interface SaveIndicatorProps {
   lastSaved?: Date | string | null;
   hasUnsavedChanges?: boolean;
   className?: string;
+  /** Extra classes for the status text and time, e.g. to hide them on phones. */
+  textClassName?: string;
 }
 
 export const SaveIndicator = ({
@@ -13,6 +15,7 @@ export const SaveIndicator = ({
   lastSaved,
   hasUnsavedChanges = false,
   className = '',
+  textClassName = '',
 }: SaveIndicatorProps) => {
   const getStatusConfig = () => {
     switch (status) {
@@ -92,14 +95,16 @@ export const SaveIndicator = ({
       <span className={`h-2 w-2 rounded-full ${config.dotColor}`}></span>
       <div className="flex items-center gap-1">
         <span className={config.textColor}>{config.icon}</span>
-        <span className={config.textColor}>{config.text}</span>
+        <span className={`${config.textColor} ${textClassName}`}>
+          {config.text}
+        </span>
       </div>
       {lastSaved &&
         (status === 'saved' ||
           status === 'saved-local' ||
           status === 'saved-local-mirror-pending') &&
         !hasUnsavedChanges && (
-          <span className="text-muted text-xs">
+          <span className={`text-muted text-xs ${textClassName}`}>
             • {formatLastSaved(lastSaved)}
           </span>
         )}

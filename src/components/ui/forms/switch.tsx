@@ -33,6 +33,8 @@ export interface SwitchProps
    * Wrapper className for the switch container.
    */
   wrapperClassName?: string;
+  /** Extra classes for the label text, e.g. to hide it visually on phones. */
+  labelClassName?: string;
 }
 
 const sizeClasses = {
@@ -79,6 +81,7 @@ const Switch = React.forwardRef<
       size = 'md',
       variant = 'default',
       wrapperClassName,
+      labelClassName,
       'aria-labelledby': ariaLabelledBy,
       'aria-describedby': ariaDescribedBy,
       ...props
@@ -151,7 +154,8 @@ const Switch = React.forwardRef<
               id={labelId}
               className={cn(
                 sizeStyle.text,
-                'text-heading peer-hover:text-body font-medium transition-colors'
+                'text-heading peer-hover:text-body font-medium transition-colors',
+                labelClassName
               )}
             >
               {label}

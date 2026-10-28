@@ -92,4 +92,14 @@ describe('Switch', () => {
       'pointer-coarse:after:w-[max(100%,2.75rem)]'
     );
   });
+
+  it('puts labelClassName on the label text and keeps the name', () => {
+    render(
+      <Switch label="Edit sheet" labelClassName="sr-only sm:not-sr-only" />
+    );
+    expect(screen.getByText('Edit sheet')).toHaveClass('sr-only');
+    expect(
+      screen.getByRole('switch', { name: 'Edit sheet' })
+    ).toBeInTheDocument();
+  });
 });

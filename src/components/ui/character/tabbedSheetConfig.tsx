@@ -99,6 +99,12 @@ export interface TabbedSheetConfigParams {
   totalLevel: number;
   proficiencyBonus: number;
   characterHasSpells: boolean;
+  /**
+   * Sheet mode (`SheetMode.tsx`): false = play mode, build values are plain
+   * text. Passed to the Combat tab's max HP, base AC and speed (and the
+   * Stats tab in 02e).
+   */
+  editing: boolean;
 
   // Ability / skill / save handlers
   updateAbilityScore: (ability: AbilityName, score: number) => void;

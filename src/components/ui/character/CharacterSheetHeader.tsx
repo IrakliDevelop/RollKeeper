@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  Download,
-  Upload,
-  RotateCcw,
-  ArrowLeft,
-  Pencil,
-  Eye,
-  Share2,
-} from 'lucide-react';
+import { Download, Upload, RotateCcw, ArrowLeft, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
 import { Badge } from '@/components/ui/layout/badge';
@@ -16,10 +8,11 @@ import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
-import { useState, useEffect } from 'react';
-import { Button, Input } from '@/components/ui/forms';
+import { useState } from 'react';
+import { Button, Input, Switch } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
 import { QRShareDialog } from './QRShareDialog';
+import { useSheetMode } from './SheetMode';
 
 interface CharacterSheetHeaderProps {
   characterId: string;
@@ -85,65 +78,28 @@ export default function CharacterSheetHeader({
     }
   };
 
-  // Header visibility state
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-  const [lastScrollY, setLastScrollY] = useState(0);
-  const [isHovering, setIsHovering] = useState(false);
-
-  const [isEditMode, setIsEditMode] = useState(false);
+  const { editing, setEditing } = useSheetMode();
   const [shareOpen, setShareOpen] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY;
-
-      if (currentScrollY < 10) {
-        setIsHeaderVisible(true);
-      } else if (!isHovering) {
-        if (currentScrollY > lastScrollY && currentScrollY > 100) {
-          setIsHeaderVisible(false);
-        } else if (currentScrollY < lastScrollY) {
-          setIsHeaderVisible(true);
-        }
-      }
-
-      setLastScrollY(currentScrollY);
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [lastScrollY, isHovering]);
 
   return (
     <>
-      {!isHeaderVisible && (
-        <div
-          className="fixed top-0 left-0 z-[60] h-3 w-full cursor-pointer"
-          onMouseEnter={() => setIsHovering(true)}
-          title="Hover to show header"
-        />
-      )}
-
-      <header
-        className={`border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg transition-transform duration-300 ease-in-out ${
-          isHeaderVisible ? 'translate-y-0' : '-translate-y-full'
-        }`}
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-      >
+      <header className="border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex min-h-16 items-center justify-between gap-4 py-2">
+          <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:gap-4">
             <div className="flex min-w-0 items-center">
               <Link href="/player">
                 <Button
                   variant="ghost"
                   size="sm"
+                  className="px-2 sm:px-4"
                   leftIcon={<ArrowLeft size={20} />}
                 >
-                  Back to Characters
+                  <span className="sr-only sm:not-sr-only">
+                    Back to Characters
+                  </span>
                 </Button>
               </Link>
-              <div className="ml-4 min-w-0">
+              <div className="ml-3 min-w-0 sm:ml-4">
                 <h1 className="text-heading truncate text-xl font-bold">
                   {characterName}
                 </h1>
@@ -154,8 +110,21 @@ export default function CharacterSheetHeader({
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center gap-3">
-              <SaveIndicator lastSaved={lastSaved} status={saveStatus} />
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              <Switch
+                label="Edit sheet"
+                size="sm"
+                checked={editing}
+                onCheckedChange={setEditing}
+                labelClassName="sr-only sm:not-sr-only"
+                wrapperClassName="shrink-0 items-center gap-0 whitespace-nowrap sm:gap-3"
+              />
+
+              <SaveIndicator
+                lastSaved={lastSaved}
+                status={saveStatus}
+                textClassName="sr-only sm:not-sr-only"
+              />
 
               {extraHeaderContent}
 
@@ -163,6 +132,13 @@ export default function CharacterSheetHeader({
             </div>
           </div>
         </div>
+        {editing && (
+          <div className="border-divider bg-surface-secondary border-t">
+            <p className="type-small text-body mx-auto max-w-7xl px-4 py-1 sm:px-6 lg:px-8">
+              Editing sheet
+            </p>
+          </div>
+        )}
       </header>
 
       {/* Main Character Header */}
@@ -176,13 +152,13 @@ export default function CharacterSheetHeader({
               characterName={characterName}
               onAvatarChange={handleAvatarChange}
               size="lg"
-              editable={isEditMode}
+              editable={editing}
             />
 
             {/* Name Input and Buttons - side by side */}
             <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
               <div className="min-w-64 flex-1">
-                {isEditMode ? (
+                {editing ? (
                   <Input
                     type="text"
                     placeholder="Character Name"
@@ -233,21 +209,6 @@ export default function CharacterSheetHeader({
 
               {/* Action Buttons */}
               <div className="flex flex-wrap justify-end gap-2">
-                {/* Edit/View Mode Toggle */}
-                <Button
-                  onClick={() => setIsEditMode(!isEditMode)}
-                  variant={isEditMode ? 'primary' : 'outline'}
-                  size="sm"
-                  leftIcon={
-                    isEditMode ? <Eye size={16} /> : <Pencil size={16} />
-                  }
-                  title={
-                    isEditMode ? 'Switch to view mode' : 'Switch to edit mode'
-                  }
-                >
-                  {isEditMode ? 'View' : 'Edit'}
-                </Button>
-
                 {/* <Button
                   onClick={onManualSave}
                   disabled={!hasUnsavedChanges}
