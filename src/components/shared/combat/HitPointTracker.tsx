@@ -39,6 +39,12 @@ interface HitPointTrackerProps {
 
   // Display options
   readonly?: boolean;
+  /**
+   * Sheet mode. False makes max HP and its calculation mode plain (the
+   * build value); current and temp HP are play values and stay editable.
+   * `readonly` still disables everything. Defaults to true.
+   */
+  editing?: boolean;
   compact?: boolean;
   showControls?: boolean;
   showDeathSaves?: boolean;
@@ -60,6 +66,7 @@ export function HitPointTracker({
   onToggleCalculationMode,
   onUpdateHitPoints,
   readonly = false,
+  editing = true,
   compact = false,
   showControls = true,
   showDeathSaves = true,
@@ -270,7 +277,7 @@ export function HitPointTracker({
             <div className="text-accent-red-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               <span className="hidden sm:inline">MAXIMUM</span>
               <span className="sm:hidden">MAX</span>
-              {!readonly && onToggleCalculationMode && (
+              {!readonly && editing && onToggleCalculationMode && (
                 <button
                   onClick={onToggleCalculationMode}
                   className="text-accent-red-text-muted hover:text-accent-red-text transition-colors"
@@ -284,7 +291,7 @@ export function HitPointTracker({
                 </button>
               )}
             </div>
-            {readonly ? (
+            {readonly || !editing ? (
               <div
                 className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text font-bold`}
               >

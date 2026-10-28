@@ -1016,6 +1016,7 @@ function CombatTabContent({
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div className="space-y-6">
               <ArmorClassManager
+                editing={params.editing}
                 character={character}
                 onUpdateArmorClass={ac =>
                   params.updateCharacter({ armorClass: ac })
@@ -1026,6 +1027,7 @@ function CombatTabContent({
                 onUpdateShieldBonus={params.updateShieldBonus}
               />
               <CombatStats
+                editing={params.editing}
                 character={character}
                 getInitiativeModifier={params.getInitiativeModifier}
                 onUpdateInitiative={params.updateInitiative}
@@ -1046,6 +1048,7 @@ function CombatTabContent({
                 }
               >
                 <HitPointManager
+                  editing={params.editing}
                   hitPoints={character.hitPoints}
                   classInfo={character.class}
                   level={totalLevel}

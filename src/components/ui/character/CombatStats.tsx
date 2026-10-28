@@ -8,8 +8,20 @@ import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { CharacterState } from '@/types/character';
 import { AppIcon } from '@/components/ui/icons';
 
+/** Speed numbers: shared by the fields and the play-mode text. */
+const WALK_SPEED_VALUE = 'text-accent-green-text text-center text-xl font-bold';
+const EXTRA_SPEED_VALUE =
+  'text-accent-green-text text-center text-sm font-bold';
+const NO_SPIN =
+  '[appearance:textfield] border-none bg-transparent [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none';
+
 interface CombatStatsProps {
   character: CharacterState;
+  /**
+   * Sheet mode: false shows the build values as plain text. Defaults to true
+   * (editable) for callers outside the character sheet.
+   */
+  editing?: boolean;
   getInitiativeModifier: () => number;
   onUpdateInitiative: (value: number, isOverridden: boolean) => void;
   onResetInitiativeToDefault: () => void;
@@ -22,6 +34,7 @@ interface CombatStatsProps {
 
 export default function CombatStats({
   character,
+  editing = true,
   getInitiativeModifier,
   onUpdateInitiative,
   onResetInitiativeToDefault,
@@ -109,12 +122,20 @@ export default function CombatStats({
                 {showExtraSpeeds ? <X size={10} /> : <Plus size={10} />}
               </Button>
             </div>
-            <NumberInput
-              value={character.speed}
-              onChange={v => onUpdateSpeed(v ?? 30)}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            />
+            {editing ? (
+              <NumberInput
+                value={character.speed}
+                onChange={v => onUpdateSpeed(v ?? 30)}
+                min={0}
+                className={`${WALK_SPEED_VALUE} ${NO_SPIN}`}
+              />
+            ) : (
+              <span
+                className={`flex h-10 items-center justify-center ${WALK_SPEED_VALUE}`}
+              >
+                {character.speed}
+              </span>
+            )}
             {getBuffSpeedBonus(character) !== 0 && (
               <div className="text-accent-blue-text mt-0.5 flex items-center justify-center gap-1 text-xs font-medium">
                 <Zap size={10} />
@@ -135,39 +156,63 @@ export default function CombatStats({
               <Bird size={12} />
               FLY
             </div>
-            <NumberInput
-              value={character.flySpeed || 0}
-              onChange={v => onUpdateCharacter({ flySpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
+            {editing ? (
+              <NumberInput
+                value={character.flySpeed || 0}
+                onChange={v => onUpdateCharacter({ flySpeed: v ?? 0 })}
+                min={0}
+                className={`${EXTRA_SPEED_VALUE} ${NO_SPIN}`}
+                placeholder="0"
+              />
+            ) : (
+              <span
+                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+              >
+                {character.flySpeed || 0}
+              </span>
+            )}
           </div>
           <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
             <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               <Mountain size={12} />
               CLIMB
             </div>
-            <NumberInput
-              value={character.climbSpeed || 0}
-              onChange={v => onUpdateCharacter({ climbSpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
+            {editing ? (
+              <NumberInput
+                value={character.climbSpeed || 0}
+                onChange={v => onUpdateCharacter({ climbSpeed: v ?? 0 })}
+                min={0}
+                className={`${EXTRA_SPEED_VALUE} ${NO_SPIN}`}
+                placeholder="0"
+              />
+            ) : (
+              <span
+                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+              >
+                {character.climbSpeed || 0}
+              </span>
+            )}
           </div>
           <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-2 text-center">
             <div className="text-accent-green-text-muted mb-1 flex items-center justify-center gap-1 text-xs font-medium">
               <Waves size={12} />
               SWIM
             </div>
-            <NumberInput
-              value={character.swimSpeed || 0}
-              onChange={v => onUpdateCharacter({ swimSpeed: v ?? 0 })}
-              min={0}
-              className="text-accent-green-text [appearance:textfield] border-none bg-transparent text-center text-sm font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-              placeholder="0"
-            />
+            {editing ? (
+              <NumberInput
+                value={character.swimSpeed || 0}
+                onChange={v => onUpdateCharacter({ swimSpeed: v ?? 0 })}
+                min={0}
+                className={`${EXTRA_SPEED_VALUE} ${NO_SPIN}`}
+                placeholder="0"
+              />
+            ) : (
+              <span
+                className={`flex h-10 items-center justify-center ${EXTRA_SPEED_VALUE}`}
+              >
+                {character.swimSpeed || 0}
+              </span>
+            )}
           </div>
         </div>
       )}

@@ -56,6 +56,11 @@ interface CharacterHUDProps {
   onNavigateToSpells?: () => void;
   onToggleBuff?: (id: string) => void;
   onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
+  /**
+   * Sheet mode: false shows the speed as a plain tile (no popover). Defaults
+   * to true (editable) for callers outside the character sheet.
+   */
+  editing?: boolean;
 }
 
 export default function CharacterHUD({
@@ -76,6 +81,7 @@ export default function CharacterHUD({
   onNavigateToSpells,
   onToggleBuff,
   onUpdateCharacter,
+  editing = true,
 }: CharacterHUDProps) {
   const totalLevel = character.totalLevel || character.level;
   const proficiencyBonus = getProficiencyBonus(totalLevel);
@@ -145,6 +151,7 @@ export default function CharacterHUD({
           {/* Speed */}
           <SpeedChip
             character={character}
+            editing={editing}
             onUpdateCharacter={onUpdateCharacter}
           />
 
@@ -352,9 +359,11 @@ export default function CharacterHUD({
 
 function SpeedChip({
   character,
+  editing,
   onUpdateCharacter,
 }: {
   character: CharacterState;
+  editing: boolean;
   onUpdateCharacter?: (updates: Partial<CharacterState>) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -380,6 +389,52 @@ function SpeedChip({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
+  const valueLine = (
+    <span className="flex items-baseline gap-1.5 whitespace-nowrap">
+      <span className="flex items-baseline">
+        <span className="type-num-lg text-heading">
+          {character.speed + getBuffSpeedBonus(character)}
+        </span>
+        <span className="type-small text-muted">ft</span>
+      </span>
+      {hasExtraSpeeds && (
+        <span className="type-caption text-muted flex items-center gap-1">
+          {!!character.flySpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Fly ${character.flySpeed}ft`}
+            >
+              <Bird size={10} />
+              {character.flySpeed}
+            </span>
+          )}
+          {!!character.climbSpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Climb ${character.climbSpeed}ft`}
+            >
+              <Mountain size={10} />
+              {character.climbSpeed}
+            </span>
+          )}
+          {!!character.swimSpeed && (
+            <span
+              className="flex items-center gap-0.5"
+              title={`Swim ${character.swimSpeed}ft`}
+            >
+              <Waves size={10} />
+              {character.swimSpeed}
+            </span>
+          )}
+        </span>
+      )}
+    </span>
+  );
+
+  if (!editing) {
+    return <HudStat caption="Speed">{valueLine}</HudStat>;
+  }
+
   return (
     <div className="relative flex" ref={popoverRef}>
       <button
@@ -388,45 +443,7 @@ function SpeedChip({
         className="border-divider hover:bg-surface-hover focus-visible:outline-ring flex cursor-pointer flex-col items-center justify-center rounded-lg border px-3 py-2.5 transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
         title="Click to edit speeds"
       >
-        <span className="flex items-baseline gap-1.5 whitespace-nowrap">
-          <span className="flex items-baseline">
-            <span className="type-num-lg text-heading">
-              {character.speed + getBuffSpeedBonus(character)}
-            </span>
-            <span className="type-small text-muted">ft</span>
-          </span>
-          {hasExtraSpeeds && (
-            <span className="type-caption text-muted flex items-center gap-1">
-              {!!character.flySpeed && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title={`Fly ${character.flySpeed}ft`}
-                >
-                  <Bird size={10} />
-                  {character.flySpeed}
-                </span>
-              )}
-              {!!character.climbSpeed && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title={`Climb ${character.climbSpeed}ft`}
-                >
-                  <Mountain size={10} />
-                  {character.climbSpeed}
-                </span>
-              )}
-              {!!character.swimSpeed && (
-                <span
-                  className="flex items-center gap-0.5"
-                  title={`Swim ${character.swimSpeed}ft`}
-                >
-                  <Waves size={10} />
-                  {character.swimSpeed}
-                </span>
-              )}
-            </span>
-          )}
-        </span>{' '}
+        {valueLine}{' '}
         <span className="type-caption text-muted whitespace-nowrap">Speed</span>
       </button>
 

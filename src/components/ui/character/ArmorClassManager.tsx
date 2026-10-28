@@ -8,8 +8,16 @@ import { Info, Zap } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { AppIcon } from '@/components/ui/icons';
 
+/** Base AC number: shared by the field and the play-mode text. */
+const BASE_AC_VALUE = 'text-accent-red-text text-center text-2xl font-bold';
+
 interface ArmorClassManagerProps {
   character: CharacterState;
+  /**
+   * Sheet mode: false shows base AC as plain text. Defaults to true — the
+   * map dock's AC dialog stays editable.
+   */
+  editing?: boolean;
   onUpdateArmorClass: (ac: number) => void;
   onUpdateTempArmorClass: (tempAC: number) => void;
   onSetTempACActive: (active: boolean) => void;
@@ -19,6 +27,7 @@ interface ArmorClassManagerProps {
 
 export default function ArmorClassManager({
   character,
+  editing = true,
   onUpdateArmorClass,
   onUpdateTempArmorClass,
   onSetTempACActive,
@@ -134,16 +143,25 @@ export default function ArmorClassManager({
                     </span>
                   </Tooltip>
                 </div>
-                <Input
-                  type="number"
-                  value={baseACInput}
-                  onChange={e => handleBaseACChange(e.target.value)}
-                  onBlur={handleBaseACBlur}
-                  onKeyDown={handleBaseACKeyDown}
-                  className="border-accent-red-border-strong bg-accent-red-bg text-accent-red-text focus:border-accent-red-text-muted h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  min="0"
-                  max="30"
-                />
+                {editing ? (
+                  <Input
+                    type="number"
+                    value={baseACInput}
+                    onChange={e => handleBaseACChange(e.target.value)}
+                    onBlur={handleBaseACBlur}
+                    onKeyDown={handleBaseACKeyDown}
+                    className={`border-accent-red-border-strong bg-accent-red-bg focus:border-accent-red-text-muted h-12 w-20 [appearance:textfield] border-2 ${BASE_AC_VALUE} [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
+                    min="0"
+                    max="30"
+                  />
+                ) : (
+                  <span
+                    data-testid="base-ac-value"
+                    className={`flex h-12 w-20 items-center justify-center ${BASE_AC_VALUE}`}
+                  >
+                    {character.armorClass}
+                  </span>
+                )}
               </div>
             </div>
 

@@ -321,3 +321,29 @@ describe('CharacterHUD concentration and conditions', () => {
     expect(screen.queryByRole('button', { name: /condition/ })).toBeNull();
   });
 });
+
+describe('CharacterHUD speed tile and sheet mode', () => {
+  it('is a plain tile in play mode, with no popover', () => {
+    const props = hudProps(withHp(30, 40));
+    render(
+      <CharacterHUD {...props} editing={false} onUpdateCharacter={vi.fn()} />
+    );
+    expect(screen.queryByRole('button', { name: /Speed$/ })).toBeNull();
+    expect(screen.queryByTitle('Click to edit speeds')).toBeNull();
+    fireEvent.click(screen.getByText('Speed'));
+    expect(screen.queryByText('Walk')).toBeNull();
+  });
+
+  it('shows the same speed text in play mode', () => {
+    const props = hudProps(withHp(30, 40));
+    const { container } = render(<CharacterHUD {...props} editing={false} />);
+    expect(container).toHaveTextContent('30ft Speed');
+  });
+
+  it('opens the popover in edit mode', () => {
+    const props = hudProps(withHp(30, 40));
+    render(<CharacterHUD {...props} editing onUpdateCharacter={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
+    expect(screen.getByText('Walk')).toBeVisible();
+  });
+});

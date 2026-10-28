@@ -1021,6 +1021,7 @@ export default function CharacterSheet() {
               {/* Character HUD */}
               <CharacterHUD
                 character={character}
+                editing={sheetMode.editing}
                 calendarDays={calendarDays}
                 onShortRest={() => setPendingRestType('short')}
                 onLongRest={() => setPendingRestType('long')}
