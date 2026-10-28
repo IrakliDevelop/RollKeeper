@@ -26,6 +26,15 @@ describe('SaveIndicator', () => {
     );
     expect(screen.getByText('All changes saved')).toHaveClass('sr-only');
     cleanup();
+    render(
+      <SaveIndicator
+        status="saved"
+        lastSaved={new Date()}
+        textClassName="sr-only sm:not-sr-only"
+      />
+    );
+    expect(screen.getByText('• just now')).toHaveClass('sr-only');
+    cleanup();
     render(<SaveIndicator status="saved" />);
     expect(screen.getByText('All changes saved')).not.toHaveClass('sr-only');
   });

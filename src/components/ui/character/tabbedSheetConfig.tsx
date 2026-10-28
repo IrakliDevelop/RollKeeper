@@ -455,7 +455,7 @@ export function createTabbedSheetConfig(
               })()}
             </div>
 
-            <div className="lg:sticky lg:top-4">
+            <div className="lg:sticky lg:top-[calc(var(--sheet-bar-height,4rem)+1rem)]">
               <Skills
                 skills={character.skills}
                 jackOfAllTrades={character.jackOfAllTrades ?? false}
@@ -1091,7 +1091,10 @@ function CombatTabContent({
             <WeaponProficiencies />
           </ErrorBoundary>
 
-          <div id="conditions-section">
+          <div
+            id="conditions-section"
+            className="scroll-mt-[calc(var(--sheet-bar-height,4rem)+1rem)]"
+          >
             <ErrorBoundary
               fallback={
                 <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">

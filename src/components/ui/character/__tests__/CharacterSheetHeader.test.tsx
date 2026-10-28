@@ -14,7 +14,10 @@ vi.mock('@/components/auth/HeaderTrailing', () => ({
 }));
 vi.mock('../QRShareDialog', () => ({ QRShareDialog: () => null }));
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+});
 
 function Harness() {
   const mode = useSheetModeState('c1');
@@ -82,7 +85,14 @@ describe('CharacterSheetHeader modes', () => {
     expect(bar).not.toHaveClass('-translate-y-full');
     expect(bar).toHaveClass('sticky');
     expect(screen.queryByTitle('Hover to show header')).toBeNull();
-    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
+  });
+
+  it('publishes the bar height for sticky content and jump targets', () => {
+    const { unmount } = render(<Harness />);
+    const root = document.documentElement;
+    expect(root.style.getPropertyValue('--sheet-bar-height')).toMatch(/px$/);
+    unmount();
+    expect(root.style.getPropertyValue('--sheet-bar-height')).toBe('');
   });
 
   it('keeps the notice inside the sticky bar', () => {

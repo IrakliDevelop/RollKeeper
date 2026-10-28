@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useEffect } from 'react';
-import { expect, fn, within } from 'storybook/test';
+import { expect, fn, waitFor, within } from 'storybook/test';
 import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import CharacterSheetHeader from './CharacterSheetHeader';
@@ -190,6 +190,18 @@ export const EditIpadLandscape: Story = {
     await checkBar(canvasElement);
     await checkLabelShown(canvasElement);
     await checkNotice(canvasElement);
+    // The published bar height includes the "Editing sheet" row.
+    const bar = barOf(canvasElement);
+    await waitFor(() => {
+      const published = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue(
+          '--sheet-bar-height'
+        )
+      );
+      expect(
+        Math.abs(published - bar.getBoundingClientRect().height)
+      ).toBeLessThanOrEqual(1);
+    });
   },
 };
 

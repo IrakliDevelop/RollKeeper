@@ -8,7 +8,7 @@ import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button, Input, Switch } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
 import { QRShareDialog } from './QRShareDialog';
@@ -81,9 +81,36 @@ export default function CharacterSheetHeader({
   const { editing, setEditing } = useSheetMode();
   const [shareOpen, setShareOpen] = useState(false);
 
+  // The bar never hides, so sticky content and scroll-to targets below it
+  // offset by its height (which grows with the "Editing sheet" row).
+  const barRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const root = document.documentElement;
+    const publish = () =>
+      root.style.setProperty(
+        '--sheet-bar-height',
+        `${bar.getBoundingClientRect().height}px`
+      );
+    publish();
+    if (typeof ResizeObserver === 'undefined') {
+      return () => root.style.removeProperty('--sheet-bar-height');
+    }
+    const observer = new ResizeObserver(publish);
+    observer.observe(bar);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--sheet-bar-height');
+    };
+  }, []);
+
   return (
     <>
-      <header className="border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg">
+      <header
+        ref={barRef}
+        className="border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg"
+      >
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:gap-4">
             <div className="flex min-w-0 items-center">
