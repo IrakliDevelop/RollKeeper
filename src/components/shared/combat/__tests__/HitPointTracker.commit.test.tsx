@@ -117,36 +117,41 @@ it('cancels a dirty HP draft on first Escape and closes its parent on second', a
 
 it.each([
   ['Damage', 'Damage'],
-  ['Healing', 'Heal'],
-  ['Temp HP amount', 'Add temp HP'],
-])('preserves the positive amount minimum for %s on blur', (label, button) => {
-  const action = vi.fn();
-  render(
-    <HitPointTracker
-      hitPoints={{
-        current: 25,
-        max: 40,
-        temporary: 5,
-        calculationMode: 'manual',
-      }}
-      onApplyDamage={action}
-      onApplyHealing={action}
-      onAddTemporaryHP={action}
-    />
-  );
-  const field = screen.getByRole('textbox', { name: label });
-  fireEvent.change(field, { target: { value: '0' } });
-  fireEvent.blur(field);
-  expect(field).toHaveValue('1');
-  fireEvent.change(field, { target: { value: '-1' } });
-  expect(screen.getByRole('button', { name: button })).toBeDisabled();
-  fireEvent.change(field, { target: { value: '8' } });
-  fireEvent.click(screen.getByRole('button', { name: button }));
-  expect(action).toHaveBeenCalledExactlyOnceWith(8);
-  expect(field).toHaveValue('');
-});
+  ['Heal', 'Heal'],
+  ['Add temp HP', 'Add temp HP'],
+])(
+  'preserves the positive amount minimum before %s on blur',
+  (_label, button) => {
+    const action = vi.fn();
+    render(
+      <HitPointTracker
+        hitPoints={{
+          current: 25,
+          max: 40,
+          temporary: 5,
+          calculationMode: 'manual',
+        }}
+        onApplyDamage={action}
+        onApplyHealing={action}
+        onAddTemporaryHP={action}
+      />
+    );
+    const field = screen.getByRole('textbox', { name: 'HP amount' });
+    fireEvent.change(field, { target: { value: '0' } });
+    fireEvent.blur(field);
+    expect(field).toHaveValue('1');
+    fireEvent.change(field, { target: { value: '-1' } });
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    expect(action).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(field);
+    fireEvent.change(field, { target: { value: '8' } });
+    fireEvent.click(screen.getByRole('button', { name: button }));
+    expect(action).toHaveBeenCalledExactlyOnceWith(8);
+    expect(field).toHaveValue('');
+  }
+);
 
-it('keeps empty and negative damage amounts unchanged when halving or doubling', () => {
+it('keeps empty and negative amounts unchanged when halving or doubling', () => {
   render(
     <HitPointTracker
       hitPoints={{
@@ -158,7 +163,7 @@ it('keeps empty and negative damage amounts unchanged when halving or doubling',
       onApplyDamage={vi.fn()}
     />
   );
-  const field = screen.getByRole('textbox', { name: 'Damage' });
+  const field = screen.getByRole('textbox', { name: 'HP amount' });
   for (const name of [
     'Halve damage (resistance)',
     'Double damage (vulnerability)',

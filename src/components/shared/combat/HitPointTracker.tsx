@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
 import {
@@ -10,7 +10,7 @@ import {
 } from '@/utils/hpColor';
 import { HP_STATUS_LABELS, hpStatus, hpPercent, hpTier } from '@/utils/hpState';
 import { Button } from '@/components/ui/forms';
-import { NumberField } from '@/components/ui/forms/NumberInput';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { InPlaceField } from '@/components/ui/forms/InPlaceField';
 import { Section } from '@/components/ui/layout/section';
 
@@ -49,39 +49,28 @@ export function HitPointTracker({
   showDeathSaves = true,
   className = '',
 }: HitPointTrackerProps) {
-  const [damageAmount, setDamageAmount] = useState<number | undefined>(
-    undefined
-  );
-  const [healingAmount, setHealingAmount] = useState<number | undefined>(
-    undefined
-  );
-  const [tempHPAmount, setTempHPAmount] = useState<number | undefined>(
-    undefined
-  );
+  const [amount, setAmount] = useState<number | undefined>(undefined);
+  const amountField = useRef<HTMLInputElement>(null);
 
   const isCharacterDying = isDying(hitPoints);
   const isCharacterDead = isDead(hitPoints);
   const isCharacterStabilized = isStabilized(hitPoints);
 
-  const handleDamage = () => {
-    if (damageAmount != null && damageAmount > 0 && onApplyDamage) {
-      onApplyDamage(damageAmount);
-      setDamageAmount(undefined);
+  const applyAmount = (apply: (n: number) => void) => {
+    if (amount == null || amount <= 0) {
+      amountField.current?.focus();
+      return;
     }
+    apply(amount);
+    setAmount(undefined);
   };
 
-  const handleHealing = () => {
-    if (healingAmount != null && healingAmount > 0 && onApplyHealing) {
-      onApplyHealing(healingAmount);
-      setHealingAmount(undefined);
+  const scaleAmount = (scale: (n: number) => number) => {
+    if (amount == null || amount <= 0) {
+      amountField.current?.focus();
+      return;
     }
-  };
-
-  const handleTempHP = () => {
-    if (tempHPAmount != null && tempHPAmount > 0 && onAddTemporaryHP) {
-      onAddTemporaryHP(tempHPAmount);
-      setTempHPAmount(undefined);
-    }
+    setAmount(scale(amount));
   };
 
   const handleAddSuccess = () => {
@@ -165,154 +154,120 @@ export function HitPointTracker({
     >
       <div
         data-hp-status={hpStatus(hitPoints.current, hitPoints.max)}
-        className="space-y-4"
+        className="grid items-center gap-x-10 gap-y-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
       >
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-4">
-          <span
-            className={`type-num-xl ${getHpNumberColor(hitPoints.current, hitPoints.max)}`}
-          >
-            <InPlaceField
-              label="Current HP"
-              value={hitPoints.current}
-              editing
-              min={0}
-              max={hitPoints.max}
-              onCommit={value => onSetCurrentHitPoints?.(value)}
-            />
-          </span>
-          <span className="type-num-lg text-body">
-            /{' '}
-            <InPlaceField
-              label="Max HP"
-              value={hitPoints.max}
-              editing={editing && mode === 'manual'}
-              min={1}
-              onCommit={max => onUpdateHitPoints?.({ max })}
-            />
-          </span>
-          <span className="type-num-md text-frost-text">
-            +
-            <InPlaceField
-              label="Temp HP"
-              value={hitPoints.temporary}
-              editing
-              min={0}
-              onCommit={temporary => onUpdateHitPoints?.({ temporary })}
-            />{' '}
-            temp
-          </span>
-        </div>
-        <div className="bg-divider h-1 w-full">
-          <div
-            className={`h-full ${getHpBarColor(hitPoints.current, hitPoints.max)}`}
-            style={{ width: `${hpPercent(hitPoints.current, hitPoints.max)}%` }}
-          />
-        </div>
-        <div className="type-small text-muted flex items-center gap-2">
-          <span>Max: {mode === 'auto' ? 'Auto' : 'Manual'}</span>
-          {editing && onToggleCalculationMode && (
-            <Button
-              size="sm"
-              onClick={onToggleCalculationMode}
-              aria-label={`Switch to ${mode === 'auto' ? 'manual' : 'auto'} calculation`}
+        <div className="space-y-3">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
+            <span
+              className={`type-num-xl ${getHpNumberColor(hitPoints.current, hitPoints.max)}`}
             >
-              {mode === 'auto' ? 'Manual' : 'Auto'}
-            </Button>
+              <InPlaceField
+                label="Current HP"
+                value={hitPoints.current}
+                editing
+                min={0}
+                max={hitPoints.max}
+                onCommit={value => onSetCurrentHitPoints?.(value)}
+              />
+            </span>
+            <span className="type-num-lg text-body">
+              /{' '}
+              <InPlaceField
+                label="Max HP"
+                value={hitPoints.max}
+                editing={editing && mode === 'manual'}
+                min={1}
+                onCommit={max => onUpdateHitPoints?.({ max })}
+              />
+            </span>
+            <span className="type-num-md text-frost-text">
+              +
+              <InPlaceField
+                label="Temp HP"
+                value={hitPoints.temporary}
+                editing
+                min={0}
+                onCommit={temporary => onUpdateHitPoints?.({ temporary })}
+              />{' '}
+              temp
+            </span>
+          </div>
+          <div className="bg-divider h-1 w-full">
+            <div
+              className={`h-full ${getHpBarColor(hitPoints.current, hitPoints.max)}`}
+              style={{
+                width: `${hpPercent(hitPoints.current, hitPoints.max)}%`,
+              }}
+            />
+          </div>
+          {editing && (
+            <div className="type-small text-muted flex items-center gap-2">
+              <span>Max: {mode === 'auto' ? 'Auto' : 'Manual'}</span>
+              {onToggleCalculationMode && (
+                <Button
+                  size="sm"
+                  onClick={onToggleCalculationMode}
+                  aria-label={`Switch to ${mode === 'auto' ? 'manual' : 'auto'} calculation`}
+                >
+                  {mode === 'auto' ? 'Manual' : 'Auto'}
+                </Button>
+              )}
+            </div>
           )}
         </div>
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="type-ui text-body block">
-                Damage
-                <NumberField
-                  aria-label="Damage"
-                  value={damageAmount}
-                  onChange={setDamageAmount}
-                  allowEmpty
-                  min={1}
-                  placeholder="8"
-                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
-                />
-              </label>
-            </div>
+        <div className="flex flex-wrap items-center gap-2 lg:col-start-2 lg:row-start-1 lg:flex-nowrap">
+          <div className="flex min-w-0 grow items-center gap-2 sm:grow-0">
+            <NumberInput
+              ref={amountField}
+              aria-label="HP amount"
+              value={amount}
+              onChange={setAmount}
+              allowEmpty
+              min={1}
+              wrapperClassName="w-24 grow sm:grow-0"
+              className="tabular-nums pointer-coarse:text-base"
+            />
             <Button
               size="sm"
               aria-label="Halve damage (resistance)"
-              onClick={() => {
-                if (damageAmount != null && damageAmount > 0)
-                  setDamageAmount(Math.floor(damageAmount / 2));
-              }}
+              onClick={() => scaleAmount(n => Math.floor(n / 2))}
             >
               ½×
             </Button>
             <Button
               size="sm"
               aria-label="Double damage (vulnerability)"
-              onClick={() => {
-                if (damageAmount != null && damageAmount > 0)
-                  setDamageAmount(damageAmount * 2);
-              }}
+              onClick={() => scaleAmount(n => n * 2)}
             >
               2×
             </Button>
-            <Button
-              variant="danger"
-              disabled={
-                damageAmount == null || damageAmount <= 0 || !onApplyDamage
-              }
-              onClick={handleDamage}
-            >
-              Damage
-            </Button>
           </div>
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="type-ui text-body block">
-                Healing
-                <NumberField
-                  aria-label="Healing"
-                  value={healingAmount}
-                  onChange={setHealingAmount}
-                  allowEmpty
-                  min={1}
-                  placeholder="8"
-                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
-                />
-              </label>
-            </div>
-            <Button
-              disabled={
-                healingAmount == null || healingAmount <= 0 || !onApplyHealing
-              }
-              onClick={handleHealing}
-            >
-              Heal
-            </Button>
-          </div>
-          <div className="flex items-end gap-2">
-            <div className="min-w-0 flex-1">
-              <label className="type-ui text-body block">
-                Temp HP
-                <NumberField
-                  aria-label="Temp HP amount"
-                  value={tempHPAmount}
-                  onChange={setTempHPAmount}
-                  allowEmpty
-                  min={1}
-                  placeholder="8"
-                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
-                />
-              </label>
-            </div>
-            <Button
-              disabled={
-                tempHPAmount == null || tempHPAmount <= 0 || !onAddTemporaryHP
-              }
-              onClick={handleTempHP}
-            >
-              Add temp HP
-            </Button>
+          <div className="grid w-full grid-cols-3 gap-2 sm:flex sm:w-auto">
+            {onApplyDamage && (
+              <Button
+                variant="danger"
+                className="px-2 sm:px-5"
+                onClick={() => applyAmount(onApplyDamage)}
+              >
+                Damage
+              </Button>
+            )}
+            {onApplyHealing && (
+              <Button
+                className="px-2 sm:px-5"
+                onClick={() => applyAmount(onApplyHealing)}
+              >
+                Heal
+              </Button>
+            )}
+            {onAddTemporaryHP && (
+              <Button
+                className="px-2 whitespace-nowrap sm:px-5"
+                onClick={() => applyAmount(onAddTemporaryHP)}
+              >
+                Add temp HP
+              </Button>
+            )}
           </div>
         </div>
         {showDeathSaves &&
@@ -322,6 +277,7 @@ export function HitPointTracker({
             <Section
               heading="Death saves"
               level={4}
+              className="lg:col-start-1 lg:row-start-2"
               trailing={
                 onResetDeathSaves && (
                   <Button
@@ -335,62 +291,61 @@ export function HitPointTracker({
               }
             >
               <div className="space-y-3">
-                {hitPoints.deathSaves &&
-                  ([true, false] as const).map(success => {
-                    const count = success
-                      ? hitPoints.deathSaves!.successes
-                      : hitPoints.deathSaves!.failures;
-                    const noun = success ? 'success' : 'failure';
-                    return (
-                      <div
-                        key={noun}
-                        className="flex flex-wrap items-center justify-between gap-2"
-                      >
-                        <span className="type-ui text-body">
-                          {success ? 'Successes' : 'Failures'}
-                        </span>
-                        <div className="flex gap-1">
-                          {[0, 1, 2].map(index => {
-                            const marked = index < count;
-                            return (
-                              <button
-                                key={index}
-                                type="button"
-                                aria-label={`${marked ? 'Clear' : 'Mark'} a death save ${noun}`}
-                                disabled={
-                                  !marked &&
-                                  (!onMakeDeathSave ||
-                                    isCharacterDead ||
-                                    isCharacterStabilized)
-                                }
-                                onClick={
-                                  marked
-                                    ? success
-                                      ? handleRemoveSuccess
-                                      : handleRemoveFailure
-                                    : success
-                                      ? handleAddSuccess
-                                      : handleAddFailure
-                                }
-                                className="focus-visible:outline-brass-border inline-flex size-6 cursor-pointer items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:size-11"
-                              >
-                                <span
-                                  aria-hidden="true"
-                                  className={`size-3 rounded-full border ${success ? 'border-verdigris-border' : 'border-blood-border'} ${marked ? (success ? 'bg-verdigris-fill' : 'bg-blood-fill') : 'bg-transparent'}`}
-                                />
-                              </button>
-                            );
-                          })}
+                <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+                  {hitPoints.deathSaves &&
+                    ([true, false] as const).map(success => {
+                      const count = success
+                        ? hitPoints.deathSaves!.successes
+                        : hitPoints.deathSaves!.failures;
+                      const noun = success ? 'success' : 'failure';
+                      return (
+                        <div key={noun} className="flex items-center gap-2">
+                          <span className="type-ui text-body w-20">
+                            {success ? 'Successes' : 'Failures'}
+                          </span>
+                          <div className="flex">
+                            {[0, 1, 2].map(index => {
+                              const marked = index < count;
+                              return (
+                                <button
+                                  key={index}
+                                  type="button"
+                                  aria-label={`${marked ? 'Clear' : 'Mark'} a death save ${noun}`}
+                                  disabled={
+                                    !marked &&
+                                    (!onMakeDeathSave ||
+                                      isCharacterDead ||
+                                      isCharacterStabilized)
+                                  }
+                                  onClick={
+                                    marked
+                                      ? success
+                                        ? handleRemoveSuccess
+                                        : handleRemoveFailure
+                                      : success
+                                        ? handleAddSuccess
+                                        : handleAddFailure
+                                  }
+                                  className="focus-visible:outline-brass-border inline-flex size-6 cursor-pointer items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:size-11"
+                                >
+                                  <span
+                                    aria-hidden="true"
+                                    className={`size-3 rounded-full border ${success ? 'border-verdigris-border' : 'border-blood-border'} ${marked ? (success ? 'bg-verdigris-fill' : 'bg-blood-fill') : 'bg-transparent'}`}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  })}
-                {isCharacterDying && onMakeDeathSave && (
-                  <Button onClick={handleCriticalSuccess}>
-                    Natural 20: regain 1 HP
-                  </Button>
-                )}
-                <div className="type-small text-muted space-y-1">
+                      );
+                    })}
+                  {isCharacterDying && onMakeDeathSave && (
+                    <Button onClick={handleCriticalSuccess}>
+                      Natural 20: regain 1 HP
+                    </Button>
+                  )}
+                </div>
+                <div className="type-small text-muted grid gap-x-6 gap-y-1 sm:grid-cols-2">
                   <p>Roll d20: 10 or higher = success, 9 or below = failure</p>
                   <p>Natural 20: regain 1 HP and become conscious</p>
                   <p>3 successes: stabilized but unconscious</p>

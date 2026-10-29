@@ -56,80 +56,117 @@ describe('HitPointTracker', () => {
     expect(screen.getAllByText(/Bloodied/).length).toBeGreaterThan(0);
   });
 
-  it('calls onApplyDamage when damage is applied', () => {
-    const onApplyDamage = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyDamage={onApplyDamage}
-      />
-    );
-    const damageInput = container.querySelector(
-      'input[placeholder="8"]'
-    ) as HTMLInputElement;
-    fireEvent.change(damageInput, { target: { value: '10' } });
-    const buttons = container.querySelectorAll('button');
-    const dmgButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Damage')
-    );
-    fireEvent.click(dmgButton!);
-    expect(onApplyDamage).toHaveBeenCalledWith(10);
-  });
+  describe('single HP amount control', () => {
+    const amountField = () =>
+      screen.getByRole('textbox', { name: 'HP amount' });
+    const renderTracker = () => {
+      const handlers = {
+        onApplyDamage: vi.fn(),
+        onApplyHealing: vi.fn(),
+        onAddTemporaryHP: vi.fn(),
+      };
+      render(<HitPointTracker hitPoints={baseHitPoints} {...handlers} />);
+      return handlers;
+    };
 
-  it('calls onApplyHealing when healing is applied', () => {
-    const onApplyHealing = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyHealing={onApplyHealing}
-      />
-    );
-    const inputs = container.querySelectorAll('input[placeholder="8"]');
-    fireEvent.change(inputs[1], { target: { value: '5' } });
-    const buttons = container.querySelectorAll('button');
-    const healButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Heal')
-    );
-    fireEvent.click(healButton!);
-    expect(onApplyHealing).toHaveBeenCalledWith(5);
-  });
+    it('renders one empty amount field with no placeholder and no per-action fields', () => {
+      renderTracker();
+      expect(amountField()).toHaveValue('');
+      expect(amountField()).not.toHaveAttribute('placeholder');
+      expect(screen.queryByRole('textbox', { name: 'Damage' })).toBeNull();
+      expect(screen.queryByRole('textbox', { name: 'Healing' })).toBeNull();
+      expect(
+        screen.queryByRole('textbox', { name: 'Temp HP amount' })
+      ).toBeNull();
+      expect(screen.queryByText('Healing')).toBeNull();
+    });
 
-  it('calls onAddTemporaryHP when temp HP is applied', () => {
-    const onAddTemporaryHP = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onAddTemporaryHP={onAddTemporaryHP}
-      />
-    );
-    const inputs = container.querySelectorAll('input[placeholder="8"]');
-    fireEvent.change(inputs[2], { target: { value: '8' } });
-    const buttons = container.querySelectorAll('button');
-    const tempButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Add temp HP')
-    );
-    fireEvent.click(tempButton!);
-    expect(onAddTemporaryHP).toHaveBeenCalledWith(8);
-  });
+    it('never disables Damage, Heal, Add temp HP, or the multipliers', () => {
+      renderTracker();
+      for (const name of [
+        'Damage',
+        'Heal',
+        'Add temp HP',
+        'Halve damage (resistance)',
+        'Double damage (vulnerability)',
+      ]) {
+        expect(screen.getByRole('button', { name })).not.toBeDisabled();
+      }
+    });
 
-  it('clears damage input after applying damage', () => {
-    const onApplyDamage = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyDamage={onApplyDamage}
-      />
+    it('omits an action whose handler prop is absent', () => {
+      render(
+        <HitPointTracker hitPoints={baseHitPoints} onApplyDamage={vi.fn()} />
+      );
+      expect(screen.getByRole('button', { name: 'Damage' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Heal' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Add temp HP' })).toBeNull();
+    });
+
+    it.each([
+      ['Damage', 'onApplyDamage'],
+      ['Heal', 'onApplyHealing'],
+      ['Add temp HP', 'onAddTemporaryHP'],
+    ] as const)(
+      'focuses the field and calls nothing when %s is pressed with an empty or zero amount',
+      (button, handler) => {
+        const handlers = renderTracker();
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        expect(document.activeElement).toBe(amountField());
+        amountField().blur();
+        fireEvent.change(amountField(), { target: { value: '0' } });
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        expect(document.activeElement).toBe(amountField());
+        for (const fn of Object.values(handlers))
+          expect(fn).not.toHaveBeenCalled();
+        expect(handlers[handler]).not.toHaveBeenCalled();
+      }
     );
-    const damageInput = container.querySelector(
-      'input[placeholder="8"]'
-    ) as HTMLInputElement;
-    fireEvent.change(damageInput, { target: { value: '10' } });
-    const buttons = container.querySelectorAll('button');
-    const dmgButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Damage')
+
+    it.each([
+      ['Damage', 'onApplyDamage'],
+      ['Heal', 'onApplyHealing'],
+      ['Add temp HP', 'onAddTemporaryHP'],
+    ] as const)(
+      '%s applies the amount to its own handler and clears the field',
+      (button, handler) => {
+        const handlers = renderTracker();
+        fireEvent.change(amountField(), { target: { value: '8' } });
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        expect(handlers[handler]).toHaveBeenCalledExactlyOnceWith(8);
+        for (const [name, fn] of Object.entries(handlers)) {
+          if (name !== handler) expect(fn).not.toHaveBeenCalled();
+        }
+        expect(amountField()).toHaveValue('');
+      }
     );
-    fireEvent.click(dmgButton!);
-    expect(damageInput.value).toBe('');
+
+    it('halves (rounding down) and doubles the amount', () => {
+      renderTracker();
+      fireEvent.change(amountField(), { target: { value: '9' } });
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Halve damage (resistance)' })
+      );
+      expect(amountField()).toHaveValue('4');
+      fireEvent.change(amountField(), { target: { value: '8' } });
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Double damage (vulnerability)' })
+      );
+      expect(amountField()).toHaveValue('16');
+    });
+
+    it('focuses the field and leaves it empty when the multipliers are pressed on an empty amount', () => {
+      renderTracker();
+      for (const name of [
+        'Halve damage (resistance)',
+        'Double damage (vulnerability)',
+      ]) {
+        fireEvent.click(screen.getByRole('button', { name }));
+        expect(document.activeElement).toBe(amountField());
+        expect(amountField()).toHaveValue('');
+        amountField().blur();
+      }
+    });
   });
 
   it('shows death saves section when character is dying', () => {
@@ -248,15 +285,27 @@ describe('HitPointTracker', () => {
       expect(screen.queryByRole('button', { name: /calculation/ })).toBeNull();
     });
 
-    it('keeps the Auto calculation text in play mode', () => {
-      render(
+    it('hides the Max calculation line in play mode and shows it with the toggle when editing', () => {
+      const { rerender } = render(
         <HitPointTracker
           hitPoints={baseHitPoints}
           editing={false}
           onToggleCalculationMode={vi.fn()}
         />
       );
-      expect(screen.getAllByText('Max: Auto').length).toBeGreaterThan(0);
+      expect(screen.queryByText(/Max:/)).toBeNull();
+      expect(screen.queryByRole('button', { name: /calculation/ })).toBeNull();
+      rerender(
+        <HitPointTracker
+          hitPoints={baseHitPoints}
+          editing
+          onToggleCalculationMode={vi.fn()}
+        />
+      );
+      expect(screen.getByText('Max: Auto')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Switch to manual calculation' })
+      ).toBeInTheDocument();
     });
 
     it('edits max HP and shows the calculation toggle by default', () => {
