@@ -1,5 +1,7 @@
 'use client';
 
+import { Button } from '@/components/ui/forms/button';
+
 import { FileText, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -21,14 +23,13 @@ import { DmEffectsNotification } from '@/components/ui/campaign/DmEffectsNotific
 import { DmCounterNotification } from '@/components/ui/campaign/DmCounterNotification';
 import { useDmConditionOverrides } from '@/hooks/useDmConditionOverrides';
 import type { DmEffect, ItemTransfer, DmXpAward } from '@/types/sharedState';
-import ExperimentalFeaturesSection from '@/components/ui/layout/ExperimentalFeaturesSection';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import {
   ToastContainer,
   longRestToast,
   useToast,
 } from '@/components/ui/feedback/Toast';
-import { ConfirmationModal } from '@/components/ui/feedback/ConfirmationModal';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import { YouDiedOverlay } from '@/components/ui/feedback/YouDiedOverlay';
 import { LevelUpOverlay } from '@/components/ui/feedback/LevelUpOverlay';
 import { CombatStartBanner } from '@/components/ui/feedback/CombatStartBanner';
@@ -146,7 +147,7 @@ export default function CharacterSheet() {
   const handleRemovedFromCampaign = useCallback(() => {
     addToast({
       type: 'info',
-      title: 'Removed from Campaign',
+      title: 'Removed from campaign',
       message: 'The DM removed this character from the campaign.',
       duration: 8000,
     });
@@ -338,7 +339,6 @@ export default function CharacterSheet() {
     [character.spells, updateCharacter]
   );
 
-  const [showResetModal, setShowResetModal] = useState(false);
   const [pendingRestType, setPendingRestType] = useState<
     'short' | 'long' | null
   >(null);
@@ -505,9 +505,7 @@ export default function CharacterSheet() {
       addToast({
         type: 'success',
         title: headline,
-        message: becamePending
-          ? 'Level up available! Use the Level Up button on the Stats tab.'
-          : '',
+        message: becamePending ? 'You can level up from the Stats tab.' : '',
       });
     },
     [addToast]
@@ -797,19 +795,14 @@ export default function CharacterSheet() {
         <div className="text-center">
           <FileText size={64} className="text-faint mx-auto mb-6" />
           <h1 className="text-heading mb-2 text-2xl font-bold">
-            Character Not Found
+            Character not found
           </h1>
           <p className="text-body mb-6">
-            The character you&apos;re looking for doesn&apos;t exist or has been
-            deleted.
+            This character isn&apos;t on this device.
           </p>
-          <Link
-            href="/player"
-            className="bg-accent-blue-text-muted text-inverse hover:bg-accent-blue-text inline-flex items-center gap-2 rounded-lg px-4 py-2 transition-colors"
-          >
-            <ArrowLeft size={16} />
-            Back to Characters
-          </Link>
+          <Button asChild variant="primary" leftIcon={<ArrowLeft size={16} />}>
+            <Link href="/player">Back to characters</Link>
+          </Button>
         </div>
       </div>
     );
@@ -842,7 +835,7 @@ export default function CharacterSheet() {
   // Roll saving throw
   const rollSavingThrow = (ability: AbilityName) =>
     rollD20ForSheet(
-      `${ABILITY_NAMES[ability]} Save`,
+      `${ABILITY_NAMES[ability]} save`,
       getSavingThrowModifier(ability)
     );
   // Roll skill check
@@ -851,7 +844,7 @@ export default function CharacterSheet() {
   // Roll ability check
   const rollAbilityCheck = (ability: AbilityName) =>
     rollD20ForSheet(
-      `${ABILITY_NAMES[ability]} Check`,
+      `${ABILITY_NAMES[ability]} check`,
       getAbilityModifier(ability)
     );
   // Roll initiative
@@ -887,7 +880,7 @@ export default function CharacterSheet() {
     <ErrorBoundary>
       <NavigationContext.Provider value={{ switchToTab }}>
         <SheetModeProvider value={sheetMode}>
-          <div className="relative min-h-screen bg-gradient-to-br from-[var(--gradient-page-from)] via-[var(--gradient-page-via)] to-[var(--gradient-page-to)]">
+          <div className="bg-surface relative min-h-screen">
             {/* Party HP Sidebar */}
             <PartyHPSidebar
               campaignCode={playerSync.campaignCode ?? null}
@@ -964,7 +957,19 @@ export default function CharacterSheet() {
               hasUnsavedChanges={hasUnsavedChanges}
               onManualSave={manualSave}
               onExport={handleExport}
-              onShowResetModal={() => setShowResetModal(true)}
+              onShowResetModal={async () => {
+                if (
+                  await confirmDialog({
+                    title: 'Reset character?',
+                    message:
+                      "This clears every ability, item, spell and note. It can't be undone.",
+                    confirmLabel: 'Reset character',
+                    cancelLabel: 'Keep character',
+                    tone: 'danger',
+                  })
+                )
+                  resetCharacter();
+              }}
               onUpdateName={name => updateCharacter({ name })}
               onAddToast={addToast}
               extraHeaderContent={
@@ -1019,8 +1024,6 @@ export default function CharacterSheet() {
                   display: block !important;
                 }
               `}</style>
-
-              <ExperimentalFeaturesSection />
 
               {/* Character HUD */}
               <CharacterHUD
@@ -1267,18 +1270,6 @@ export default function CharacterSheet() {
                 onDismiss={clearLevelUpAnimation}
                 newLevel={levelUpAnimationLevel}
                 characterName={character.name}
-              />
-
-              {/* Character Reset Confirmation Modal */}
-              <ConfirmationModal
-                isOpen={showResetModal}
-                onClose={() => setShowResetModal(false)}
-                onConfirm={resetCharacter}
-                title="Reset Character"
-                message="Are you sure you want to reset this character? This will permanently delete all character data, including abilities, equipment, spells, and progress. This action cannot be undone."
-                confirmText="Reset Character"
-                cancelText="Keep Character"
-                type="danger"
               />
             </div>
           </div>

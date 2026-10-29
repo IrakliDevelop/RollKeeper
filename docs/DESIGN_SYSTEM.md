@@ -387,3 +387,15 @@ The right chevron and `aria-expanded` show state; trailing controls stay
 outside the disclosure. The per-device boolean map `collapsed` lives in
 `rollkeeper-ui-prefs`, merged with defaults and validated on read. It has no
 production adopter in 03a.
+
+### Sheet frame (Phase 3, part 03b)
+
+The identity head is an unboxed section with a single identity line. Its name
+uses `InPlaceTextField`: a local text draft commits on Enter or blur and
+Escape cancels. In play mode it is plain text. Avatar actions live in the
+avatar popover, and the Character menu holds export, QR sharing, import and
+reset. HUD speeds use four local `NumberInput` drafts in the shared editor
+shells; Save commits changed speeds together, and dismissal discards them.
+Inventory, Character, Combat and Features use `SubTabs`; their caller-owned
+values stay unchanged. Sheet section errors use `SheetLoadError` with a
+player-facing noun and a Reload page action.

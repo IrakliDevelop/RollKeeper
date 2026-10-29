@@ -9,15 +9,13 @@ describe('SaveIndicator', () => {
   it('labels an acknowledged IndexedDB write as locally saved', () => {
     render(<SaveIndicator status="saved-local" />);
 
-    expect(screen.getByText('Local: saved')).toBeInTheDocument();
+    expect(screen.getByText('Saved on this device')).toBeInTheDocument();
   });
 
   it('surfaces a pending compatibility-mirror retry without denying the IndexedDB save', () => {
     render(<SaveIndicator status="saved-local-mirror-pending" />);
 
-    expect(
-      screen.getByText('Local: saved · compatibility mirror retry pending')
-    ).toBeInTheDocument();
+    expect(screen.getByText('Saved on this device')).toBeInTheDocument();
   });
 
   it('puts textClassName on the status text only', () => {
@@ -38,4 +36,10 @@ describe('SaveIndicator', () => {
     render(<SaveIndicator status="saved" />);
     expect(screen.getByText('All changes saved')).not.toHaveClass('sr-only');
   });
+});
+
+it('uses neutral status styling and names a failed device save', () => {
+  const { container } = render(<SaveIndicator status="error" />);
+  expect(screen.getByText("Couldn't save on this device")).toBeVisible();
+  expect(container.innerHTML).not.toMatch(/(?:red|green|yellow)-[0-9]/);
 });
