@@ -62,6 +62,7 @@ import {
 } from '@/utils/calculations';
 import { migrateToMulticlass, calculateHitDicePools } from '@/utils/multiclass';
 import {
+  getDeathSavesAfterDamage,
   applyDamage,
   applyHealing,
   addTemporaryHP,
@@ -489,6 +490,7 @@ interface CharacterStore {
     ability: keyof CharacterState['savingThrows'],
     proficient: boolean
   ) => void;
+  setCurrentHitPoints: (value: number) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
   updateInitiative: (value: number, isOverride: boolean) => void;
   resetInitiativeToDefault: () => void;
@@ -1160,6 +1162,34 @@ export const useCharacterStore = create<CharacterStore>()(
             hasUnsavedChanges: true,
             saveStatus: 'saving',
           }));
+        },
+
+        setCurrentHitPoints: value => {
+          if (!Number.isFinite(value)) return;
+          set(state => {
+            const hp = state.character.hitPoints;
+            const current = Math.max(0, Math.min(hp.max, value));
+            if (current === hp.current) return state;
+            const deathSaves =
+              current < hp.current
+                ? getDeathSavesAfterDamage(
+                    hp.deathSaves,
+                    hp.current,
+                    hp.current - current,
+                    hp.max
+                  )
+                : hp.current === 0
+                  ? undefined
+                  : hp.deathSaves;
+            return {
+              character: {
+                ...state.character,
+                hitPoints: { ...hp, current, deathSaves },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         updateHitPoints: updates => {

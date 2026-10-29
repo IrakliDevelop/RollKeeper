@@ -25,6 +25,8 @@ export interface NumberInputProps
   allowEmpty?: boolean;
   /** Parse as an integer (default) or a float. */
   integer?: boolean;
+  /** Commit on Enter/blur instead of each keystroke when false. */
+  live?: boolean;
 }
 
 const toNumber = (v: string | number | undefined): number | undefined =>
@@ -39,8 +41,10 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       max,
       allowEmpty = false,
       integer = true,
+      live = true,
       inputMode,
       onBlur,
+      onKeyDown,
       ...props
     },
     ref
@@ -52,6 +56,7 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
       max: toNumber(max),
       allowEmpty,
       integer,
+      live,
     });
 
     return (
@@ -61,7 +66,25 @@ export const NumberInput = React.forwardRef<HTMLInputElement, NumberInputProps>(
         inputMode={inputMode ?? (integer ? 'numeric' : 'decimal')}
         {...props}
         value={field.value}
+        data-in-place-dirty={
+          !live && field.value !== (value == null ? '' : String(value))
+            ? ''
+            : undefined
+        }
         onChange={field.onChange}
+        onKeyDown={e => {
+          if (!live && !e.nativeEvent.isComposing) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              field.commit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              field.cancel();
+            }
+          }
+          onKeyDown?.(e);
+        }}
         onBlur={e => {
           field.onBlur();
           onBlur?.(e);
@@ -88,6 +111,8 @@ export interface NumberFieldProps
   onChange: (value: number | undefined) => void;
   allowEmpty?: boolean;
   integer?: boolean;
+  /** Commit on Enter/blur instead of each keystroke when false. */
+  live?: boolean;
 }
 
 export const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
@@ -99,8 +124,10 @@ export const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
       max,
       allowEmpty = false,
       integer = true,
+      live = true,
       inputMode,
       onBlur,
+      onKeyDown,
       ...props
     },
     ref
@@ -112,6 +139,7 @@ export const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
       max: toNumber(max),
       allowEmpty,
       integer,
+      live,
     });
 
     return (
@@ -121,7 +149,25 @@ export const NumberField = React.forwardRef<HTMLInputElement, NumberFieldProps>(
         inputMode={inputMode ?? (integer ? 'numeric' : 'decimal')}
         {...props}
         value={field.value}
+        data-in-place-dirty={
+          !live && field.value !== (value == null ? '' : String(value))
+            ? ''
+            : undefined
+        }
         onChange={field.onChange}
+        onKeyDown={e => {
+          if (!live && !e.nativeEvent.isComposing) {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              field.commit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              field.cancel();
+            }
+          }
+          onKeyDown?.(e);
+        }}
         onBlur={e => {
           field.onBlur();
           onBlur?.(e);
