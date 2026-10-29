@@ -20,11 +20,21 @@ function otherTabWrites(value: string | null, key: string | null = KEY) {
 }
 
 describe('parseUiPrefs', () => {
+  it('accepts only a boolean spell-slot disclosure preference', async () => {
+    const { parseUiPrefs } = await load();
+    expect(parseUiPrefs('{"spellSlotsExpanded":true}').spellSlotsExpanded).toBe(
+      true
+    );
+    expect(
+      parseUiPrefs('{"spellSlotsExpanded":"true"}').spellSlotsExpanded
+    ).toBe(false);
+  });
   it('returns the defaults when nothing is stored', async () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs(null)).toEqual({
       abilityDisplay: 'modifier',
       collapsed: {},
+      spellSlotsExpanded: false,
     });
   });
 
@@ -33,6 +43,7 @@ describe('parseUiPrefs', () => {
     expect(parseUiPrefs('{"abilityDisplay":"score"}')).toEqual({
       abilityDisplay: 'score',
       collapsed: {},
+      spellSlotsExpanded: false,
     });
   });
 
@@ -43,6 +54,7 @@ describe('parseUiPrefs', () => {
       expect(parseUiPrefs(raw)).toEqual({
         abilityDisplay: 'modifier',
         collapsed: {},
+        spellSlotsExpanded: false,
       });
     }
   );
@@ -54,6 +66,7 @@ describe('parseUiPrefs', () => {
       expect(parseUiPrefs(raw)).toEqual({
         abilityDisplay: 'modifier',
         collapsed: {},
+        spellSlotsExpanded: false,
       });
     }
   );
@@ -63,6 +76,7 @@ describe('parseUiPrefs', () => {
     expect(parseUiPrefs('{"abilityDisplay":"score","future":1}')).toEqual({
       abilityDisplay: 'score',
       collapsed: {},
+      spellSlotsExpanded: false,
     });
   });
 });
@@ -104,6 +118,7 @@ describe('useUiPrefs', () => {
     expect(result.current.prefs).toEqual({
       abilityDisplay: 'modifier',
       collapsed: {},
+      spellSlotsExpanded: false,
     });
     expect(result.current.localChange).toBe(false);
   });
@@ -261,6 +276,7 @@ it('retains visit-local choices across preference keys when writes are refused',
   expect(result.current.prefs).toEqual({
     abilityDisplay: 'score',
     collapsed: { spells: true },
+    spellSlotsExpanded: false,
   });
   act(() =>
     result.current.setPref('collapsed', {
@@ -282,6 +298,7 @@ it('retains visit-local choices across preference keys when writes are refused',
   expect(result.current.prefs).toEqual({
     abilityDisplay: 'modifier',
     collapsed: { other: true },
+    spellSlotsExpanded: false,
   });
   cleanup();
   localStorage.clear();
