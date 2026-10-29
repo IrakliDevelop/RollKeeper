@@ -2,10 +2,13 @@
 
 import type { ReactNode } from 'react';
 import { Medallion } from '@/components/ui/game/Medallion';
-import { ProficiencyDot } from '@/components/ui/game/ProficiencyDot';
+import {
+  ProficiencyDot,
+  ProficiencyDotButton,
+  saveDotLabel,
+} from '@/components/ui/game/ProficiencyDot';
 import {
   ROLL_TARGET,
-  saveLineLabel,
   saveRollLabel,
 } from '@/components/ui/game/LedgerCellView';
 import type { AbilityDisplay } from '@/components/ui/game/abilityNumbers';
@@ -23,6 +26,8 @@ export interface AbilityBlockProps {
   abilityDisplay: AbilityDisplay;
   animateSwap: boolean;
   editing: boolean;
+  onScoreChange: (ability: AbilityName, score: number) => void;
+  onToggleSaveProficiency: (ability: AbilityName, proficient: boolean) => void;
   onRollCheck: (ability: AbilityName) => void;
   onRollSave: (ability: AbilityName) => void;
   /** The skill list, or "No skills". */
@@ -33,7 +38,9 @@ const SAVE_LINE = 'type-small text-body inline-flex items-center gap-1';
 
 /**
  * One ability: the medallion, the name over the save line, then its
- * skills. In play mode the name rolls the check and the save line the save.
+ * skills. Play mode: the name rolls the check and the save line the save.
+ * Edit mode: the medallion opens the score editor and the save dot toggles
+ * the save proficiency.
  */
 export function AbilityBlock({
   ability,
@@ -43,6 +50,8 @@ export function AbilityBlock({
   abilityDisplay,
   animateSwap,
   editing,
+  onScoreChange,
+  onToggleSaveProficiency,
   onRollCheck,
   onRollSave,
   children,
@@ -63,6 +72,8 @@ export function AbilityBlock({
           saveProficient={saveProficient}
           abilityDisplay={abilityDisplay}
           animateSwap={animateSwap}
+          editing={editing}
+          onScoreChange={next => onScoreChange(ability, next)}
         />
         <div className="min-w-0">
           {editing ? (
@@ -85,14 +96,17 @@ export function AbilityBlock({
             </h3>
           )}
           {editing ? (
-            <span
-              role="img"
-              aria-label={saveLineLabel(ability, save, saveProficient)}
-              className={SAVE_LINE}
-            >
-              {dot}
+            <div className={SAVE_LINE}>
+              <ProficiencyDotButton
+                level={saveProficient ? 'proficient' : 'none'}
+                pressed={saveProficient}
+                aria-label={saveDotLabel(name)}
+                onClick={() =>
+                  onToggleSaveProficiency(ability, !saveProficient)
+                }
+              />
               <span>{saveText}</span>
-            </span>
+            </div>
           ) : (
             // Named by its content, which holds the visible "Save +5".
             <button

@@ -32,7 +32,7 @@ describe('dot labels', () => {
       'Stealth: not proficient. Make proficient.'
     );
     expect(skillDotLabel('Stealth', 'half')).toBe(
-      'Stealth: not proficient. Make proficient.'
+      'Stealth: Jack of All Trades. Make proficient.'
     );
     expect(skillDotLabel('Stealth', 'proficient')).toBe(
       'Stealth: proficient. Add expertise.'

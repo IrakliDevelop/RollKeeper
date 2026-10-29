@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import type { ProficiencyLevel } from '@/components/ui/game/ProficiencyDot';
 import {
   ABILITY_ORDER,
   SKILLS_BY_ABILITY,
+  applySkillDotTap,
   skillLevel,
 } from '../AbilitiesSection.utils';
 
@@ -60,5 +62,34 @@ describe('skillLevel', () => {
 
   it('reads a missing skill as not proficient', () => {
     expect(skillLevel(undefined, false)).toBe('none');
+  });
+});
+
+describe('applySkillDotTap', () => {
+  function tap(level: ProficiencyLevel) {
+    const calls: string[] = [];
+    applySkillDotTap('stealth', level, {
+      onUpdateSkillProficiency: (skill, on) =>
+        calls.push(`proficiency ${skill} ${on}`),
+      onUpdateSkillExpertise: (skill, on) =>
+        calls.push(`expertise ${skill} ${on}`),
+    });
+    return calls;
+  }
+
+  it('makes a skill without proficiency proficient', () => {
+    expect(tap('none')).toEqual(['proficiency stealth true']);
+    expect(tap('half')).toEqual(['proficiency stealth true']);
+  });
+
+  it('adds expertise to a proficient skill', () => {
+    expect(tap('proficient')).toEqual(['expertise stealth true']);
+  });
+
+  it('clears expertise first, then proficiency', () => {
+    expect(tap('expertise')).toEqual([
+      'expertise stealth false',
+      'proficiency stealth false',
+    ]);
   });
 });

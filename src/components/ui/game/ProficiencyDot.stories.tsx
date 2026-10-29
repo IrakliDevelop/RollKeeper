@@ -196,10 +196,10 @@ export const EditMode: Story = {
         .color
     );
 
-    // A half dot (Jack of All Trades) becomes proficient.
+    // A half dot (Jack of All Trades) says so, and becomes proficient.
     await userEvent.click(
       canvas.getByRole('button', {
-        name: 'Acrobatics: not proficient. Make proficient.',
+        name: 'Acrobatics: Jack of All Trades. Make proficient.',
       })
     );
     await expect(

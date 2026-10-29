@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   within,
 } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { calculateModifier } from '@/utils/calculations';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { AbilityName, CharacterState, SkillName } from '@/types/character';
@@ -227,6 +229,187 @@ describe('AbilitiesSection in edit mode', () => {
   it('defaults to edit mode', () => {
     setup();
     expect(screen.queryByRole('button', { name: /^Roll / })).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Strength save proficiency' })
+    ).toBeInTheDocument();
+  });
+
+  it('edits a score from the medallion', async () => {
+    const { handlers } = setup({ editing: true });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Strength: modifier +3, score 16' })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Increase Strength score' })
+    );
+    expect(screen.getByText('Modifier +3')).toBeInTheDocument();
+    await act(() =>
+      userEvent.click(screen.getByRole('button', { name: 'Save' }))
+    );
+    expect(handlers.onUpdateAbilityScore).toHaveBeenCalledWith('strength', 17);
+  });
+
+  it('toggles a save proficiency from the save dot', () => {
+    const { handlers } = setup({ editing: true });
+    const strength = screen.getByRole('button', {
+      name: 'Strength save proficiency',
+    });
+    expect(strength).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(strength);
+    expect(handlers.onUpdateSavingThrowProficiency).toHaveBeenCalledWith(
+      'strength',
+      false
+    );
+    const dexterity = screen.getByRole('button', {
+      name: 'Dexterity save proficiency',
+    });
+    expect(dexterity).toHaveAttribute('aria-pressed', 'false');
+    fireEvent.click(dexterity);
+    expect(handlers.onUpdateSavingThrowProficiency).toHaveBeenCalledWith(
+      'dexterity',
+      true
+    );
+    expect(block('strength')).toHaveTextContent('Save +5');
+  });
+
+  it('cycles a skill dot through the store actions', () => {
+    const { handlers } = setup({ editing: true });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Acrobatics: not proficient. Make proficient.',
+      })
+    );
+    expect(handlers.onUpdateSkillProficiency).toHaveBeenLastCalledWith(
+      'acrobatics',
+      true
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Athletics: proficient. Add expertise.',
+      })
+    );
+    expect(handlers.onUpdateSkillExpertise).toHaveBeenLastCalledWith(
+      'athletics',
+      true
+    );
+  });
+
+  it('clears expertise before proficiency', () => {
+    const calls: string[] = [];
+    setup({
+      editing: true,
+      onUpdateSkillExpertise: (skill, on) =>
+        calls.push(`expertise ${skill} ${on}`),
+      onUpdateSkillProficiency: (skill, on) =>
+        calls.push(`proficiency ${skill} ${on}`),
+    });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Stealth: expertise. Remove proficiency.',
+      })
+    );
+    expect(calls).toEqual([
+      'expertise stealth false',
+      'proficiency stealth false',
+    ]);
+  });
+
+  it('says Jack of All Trades on a half dot', () => {
+    const { handlers } = setup({ editing: true, jackOfAllTrades: true });
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Acrobatics: Jack of All Trades. Make proficient.',
+      })
+    );
+    expect(handlers.onUpdateSkillProficiency).toHaveBeenCalledWith(
+      'acrobatics',
+      true
+    );
+  });
+
+  it('switches Jack of All Trades at the foot of the section', () => {
+    const { handlers } = setup({ editing: true });
+    const joat = screen.getByRole('switch', { name: 'Jack of All Trades' });
+    expect(joat).toHaveAccessibleDescription(
+      "Add half your proficiency bonus, rounded down, to checks with skills you're not proficient in."
+    );
+    expect(joat).not.toBeChecked();
+    fireEvent.click(joat);
+    expect(handlers.onToggleJackOfAllTrades).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows bonus abilities as badges', () => {
+    setup({ editing: true });
+    const row = document.querySelector<HTMLElement>(
+      '[data-skill="sleightOfHand"]'
+    )!;
+    expect(within(row).getByText('+WIS')).toBeInTheDocument();
+    expect(within(row).getByText('+INT')).toBeInTheDocument();
+  });
+
+  it('chooses bonus abilities in a popover', async () => {
+    const { handlers } = setup({ editing: true });
+    const toggle = screen.getByRole('button', {
+      name: 'Choose ability modifiers for Sleight of Hand',
+    });
+    expect(toggle).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.click(toggle);
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+    const popover = screen.getByRole('dialog', {
+      name: 'Add ability modifiers:',
+    });
+    const choices = within(popover).getAllByRole('button');
+    expect(choices.map(b => b.textContent)).toEqual([
+      'STR',
+      'CON',
+      'INT',
+      'WIS',
+      'CHA',
+    ]);
+    expect(
+      within(popover).getByRole('button', { name: 'WIS' })
+    ).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      within(popover).getByRole('button', { name: 'STR' })
+    ).toHaveAttribute('aria-pressed', 'false');
+    await userEvent.click(within(popover).getByRole('button', { name: 'STR' }));
+    expect(handlers.onToggleSkillBonusAbility).toHaveBeenCalledWith(
+      'sleightOfHand',
+      'strength'
+    );
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(toggle).toHaveFocus();
+  });
+
+  it('has no bonus ability control without a handler', () => {
+    setup({ editing: true, onToggleSkillBonusAbility: undefined });
+    expect(
+      screen.queryByRole('button', { name: /^Choose ability modifiers/ })
+    ).toBeNull();
+  });
+});
+
+describe('AbilitiesSection controls by mode', () => {
+  it('keeps the edit controls out of play mode', () => {
+    setup({ editing: false });
+    expect(
+      screen.queryByRole('button', { name: /save proficiency$/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /\. Make proficient\.$/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('switch', { name: 'Jack of All Trades' })
+    ).toBeNull();
+    expect(screen.queryByText('+WIS')).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Choose ability modifiers/ })
+    ).toBeNull();
+    // Plain medallions: no score editor.
+    expect(
+      screen.queryByRole('button', { name: /^Strength: modifier/ })
+    ).toBeNull();
   });
 });
 
@@ -251,5 +434,43 @@ describe('Scores large', () => {
     expect(
       screen.getByRole('switch', { name: 'Scores large' })
     ).toBeInTheDocument();
+  });
+});
+
+describe('AbilitiesSection with older data', () => {
+  it('renders a save or a skill missing from the saved character', () => {
+    const character = hero();
+    const savingThrows: Partial<CharacterState['savingThrows']> = {
+      ...character.savingThrows,
+    };
+    delete savingThrows.wisdom;
+    const skills: Partial<CharacterState['skills']> = { ...character.skills };
+    delete skills.insight;
+    setup({
+      editing: true,
+      savingThrows: savingThrows as CharacterState['savingThrows'],
+      skills: skills as CharacterState['skills'],
+    });
+    expect(
+      screen.getByRole('button', { name: 'Wisdom save proficiency' })
+    ).toHaveAttribute('aria-pressed', 'false');
+    expect(
+      screen.getByRole('button', {
+        name: 'Insight: not proficient. Make proficient.',
+      })
+    ).toBeInTheDocument();
+  });
+
+  it('has no hover titles in edit mode, with the popover open', async () => {
+    setup({ editing: true });
+    await userEvent.click(
+      screen.getByRole('button', {
+        name: 'Choose ability modifiers for Sleight of Hand',
+      })
+    );
+    expect(
+      screen.getByRole('dialog', { name: 'Add ability modifiers:' })
+    ).toBeInTheDocument();
+    expect(document.body.querySelector('[title]')).toBeNull();
   });
 });

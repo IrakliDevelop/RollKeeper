@@ -1,5 +1,9 @@
 import { SKILL_ABILITY_MAP, SKILL_NAMES } from '@/utils/constants';
-import type { ProficiencyLevel } from '@/components/ui/game/ProficiencyDot';
+import {
+  nextSkillProficiency,
+  type ProficiencyLevel,
+} from '@/components/ui/game/ProficiencyDot';
+import type { AbilitiesSectionProps } from './AbilitiesSection.types';
 import type {
   AbilityName,
   SkillName,
@@ -37,4 +41,32 @@ export function skillLevel(
 ): ProficiencyLevel {
   if (skill?.proficient) return skill.expertise ? 'expertise' : 'proficient';
   return jackOfAllTrades ? 'half' : 'none';
+}
+
+/**
+ * A tap on an edit-mode skill dot, with the store's existing actions:
+ * none or half → proficient, proficient → expertise, expertise → none.
+ * Expertise goes first on the way down, so no reader ever sees expertise
+ * without proficiency.
+ */
+export function applySkillDotTap(
+  skill: SkillName,
+  level: ProficiencyLevel,
+  {
+    onUpdateSkillProficiency,
+    onUpdateSkillExpertise,
+  }: Pick<
+    AbilitiesSectionProps,
+    'onUpdateSkillProficiency' | 'onUpdateSkillExpertise'
+  >
+): void {
+  const next = nextSkillProficiency(level);
+  if (next === 'proficient') {
+    onUpdateSkillProficiency(skill, true);
+  } else if (next === 'expertise') {
+    onUpdateSkillExpertise(skill, true);
+  } else {
+    onUpdateSkillExpertise(skill, false);
+    onUpdateSkillProficiency(skill, false);
+  }
 }

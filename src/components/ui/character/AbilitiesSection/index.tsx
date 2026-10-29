@@ -8,16 +8,22 @@ import { SkillRow } from './SkillRow';
 import {
   ABILITY_ORDER,
   SKILLS_BY_ABILITY,
+  applySkillDotTap,
   skillLevel,
 } from './AbilitiesSection.utils';
+import type { ProficiencyLevel } from '@/components/ui/game/ProficiencyDot';
+import type { AbilityName, SkillName } from '@/types/character';
 import type { AbilitiesSectionProps } from './AbilitiesSection.types';
+
+const NONE: AbilityName[] = [];
 
 export type { AbilitiesSectionProps } from './AbilitiesSection.types';
 
 /**
  * The Stats tab's abilities: six blocks (medallion, name, save line,
  * skills) in a 1/2/3-column grid, under an "Abilities" heading with the
- * "Scores large" switch.
+ * "Scores large" switch. Edit mode adds the Jack of All Trades switch at
+ * the foot.
  */
 export function AbilitiesSection({
   abilities,
@@ -26,12 +32,23 @@ export function AbilitiesSection({
   jackOfAllTrades,
   getSavingThrowModifier,
   getSkillModifier,
+  onUpdateAbilityScore,
   onRollAbilityCheck,
+  onUpdateSavingThrowProficiency,
   onRollSavingThrow,
+  onUpdateSkillProficiency,
+  onUpdateSkillExpertise,
+  onToggleJackOfAllTrades,
   onRollSkillCheck,
+  onToggleSkillBonusAbility,
   editing = true,
 }: AbilitiesSectionProps) {
   const { prefs, setPref, localChange } = useUiPrefs();
+  const handleDotTap = (skill: SkillName, level: ProficiencyLevel) =>
+    applySkillDotTap(skill, level, {
+      onUpdateSkillProficiency,
+      onUpdateSkillExpertise,
+    });
 
   return (
     <Section
@@ -61,6 +78,8 @@ export function AbilitiesSection({
               abilityDisplay={prefs.abilityDisplay}
               animateSwap={localChange}
               editing={editing}
+              onScoreChange={onUpdateAbilityScore}
+              onToggleSaveProficiency={onUpdateSavingThrowProficiency}
               onRollCheck={onRollAbilityCheck}
               onRollSave={onRollSavingThrow}
             >
@@ -70,10 +89,14 @@ export function AbilitiesSection({
                     <SkillRow
                       key={skill}
                       skill={skill}
+                      ability={ability}
                       level={skillLevel(skills[skill], jackOfAllTrades)}
                       bonus={getSkillModifier(skill)}
+                      bonusAbilities={skills[skill]?.bonusAbilities ?? NONE}
                       editing={editing}
                       onRoll={onRollSkillCheck}
+                      onDotTap={handleDotTap}
+                      onToggleBonusAbility={onToggleSkillBonusAbility}
                     />
                   ))}
                 </ul>
@@ -84,6 +107,16 @@ export function AbilitiesSection({
           );
         })}
       </div>
+      {editing && (
+        <Switch
+          wrapperClassName="mt-6"
+          label="Jack of All Trades"
+          description="Add half your proficiency bonus, rounded down, to checks with skills you're not proficient in."
+          size="sm"
+          checked={jackOfAllTrades}
+          onCheckedChange={() => onToggleJackOfAllTrades()}
+        />
+      )}
     </Section>
   );
 }
