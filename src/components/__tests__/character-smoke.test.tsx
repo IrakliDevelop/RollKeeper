@@ -11,7 +11,9 @@ vi.mock('next/image', () => ({
 
 vi.mock('@/hooks/useClassData', () => ({
   useClassData: () => ({
-    classData: [],
+    classData: [
+      { name: 'Wizard', spellcasting: { type: 'full' }, hitDie: 'd6' },
+    ],
     loading: false,
     error: null,
   }),

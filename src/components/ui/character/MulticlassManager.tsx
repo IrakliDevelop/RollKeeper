@@ -123,7 +123,7 @@ export default function MulticlassManager({
 
   if (classDataLoading)
     return <p className="type-body text-muted">Loading classes…</p>;
-  if (classDataError)
+  if (classDataError || classData.length === 0)
     return (
       <p className="type-body text-blood-text">
         Classes didn&apos;t load. Check your connection and open Manage classes

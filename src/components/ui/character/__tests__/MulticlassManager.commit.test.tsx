@@ -5,7 +5,13 @@ import { useCharacterStore } from '@/store/characterStore';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import MulticlassManager from '../MulticlassManager';
 vi.mock('@/hooks/useClassData', () => ({
-  useClassData: () => ({ classData: [], loading: false, error: null }),
+  useClassData: () => ({
+    classData: [
+      { name: 'Wizard', spellcasting: { type: 'full' }, hitDie: 'd6' },
+    ],
+    loading: false,
+    error: null,
+  }),
 }));
 vi.mock('@/components/ui/feedback/confirm-dialog', () => ({
   confirmDialog: vi.fn(),
