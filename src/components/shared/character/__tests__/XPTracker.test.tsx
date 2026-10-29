@@ -16,6 +16,14 @@ const defaultProps = {
 describe('XPTracker', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal(
+      'ResizeObserver',
+      class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      }
+    );
   });
 
   it('renders current XP and level', () => {
@@ -123,5 +131,63 @@ describe('XPTracker', () => {
     render(<XPTracker {...defaultProps} />);
     const addButton = screen.getByRole('button', { name: 'Add' });
     expect(addButton).toBeDisabled();
+  });
+
+  describe('sheet layout', () => {
+    it('shows total, thresholds and no placeholder or next-level line', () => {
+      render(<XPTracker {...defaultProps} layout="sheet" />);
+      expect(screen.getByText('10,000')).toBeInTheDocument();
+      expect(screen.getByText(/Level 5: 6,500 XP/)).toBeInTheDocument();
+      expect(screen.getByText(/Level 6: 14,000 XP/)).toBeInTheDocument();
+      expect(screen.queryByText('To next level')).not.toBeInTheDocument();
+      expect(screen.queryByText('4,000 XP')).not.toBeInTheDocument();
+      expect(screen.queryByText('Level')).not.toBeInTheDocument();
+      expect(
+        screen.getByRole('textbox', { name: 'XP to add' })
+      ).not.toHaveAttribute('placeholder');
+      expect(screen.getByRole('progressbar')).toHaveAttribute(
+        'aria-label',
+        'XP progress to level 6'
+      );
+    });
+
+    it('keeps Add enabled, focusing the field when empty', () => {
+      const onAddXP = vi.fn();
+      render(<XPTracker {...defaultProps} layout="sheet" onAddXP={onAddXP} />);
+      const add = screen.getByRole('button', { name: 'Add' });
+      expect(add).toBeEnabled();
+      fireEvent.click(add);
+      expect(onAddXP).not.toHaveBeenCalled();
+      expect(screen.getByRole('textbox', { name: 'XP to add' })).toHaveFocus();
+    });
+
+    it('adds XP and clears the field', () => {
+      const onAddXP = vi.fn();
+      render(<XPTracker {...defaultProps} layout="sheet" onAddXP={onAddXP} />);
+      const input = screen.getByRole('textbox', { name: 'XP to add' });
+      fireEvent.change(input, { target: { value: '500' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Add' }));
+      expect(onAddXP).toHaveBeenCalledWith(500);
+      expect(input).toHaveValue('');
+    });
+
+    it('reports a pending level-up in the footer', () => {
+      render(
+        <XPTracker
+          {...defaultProps}
+          layout="sheet"
+          currentXP={13500}
+          pendingLevelUp
+        />
+      );
+      expect(screen.getByText('Enough XP for level 6')).toBeInTheDocument();
+    });
+
+    it('keeps the level 20 branch', () => {
+      render(<XPTracker {...defaultProps} layout="sheet" currentLevel={20} />);
+      expect(screen.getByText('Level 20 reached')).toBeInTheDocument();
+      expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Level 21/)).not.toBeInTheDocument();
+    });
   });
 });

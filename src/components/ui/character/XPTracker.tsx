@@ -26,6 +26,7 @@ export default function XPTracker({
   return (
     <SharedXPTracker
       editing={editing}
+      layout="sheet"
       hideHeading
       currentXP={currentXP}
       currentLevel={currentLevel}

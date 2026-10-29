@@ -21,6 +21,14 @@ vi.mock('@/hooks/useClassData', () => ({
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    }
+  );
+  vi.stubGlobal(
     'matchMedia',
     vi.fn((query: string) => ({
       matches: true,

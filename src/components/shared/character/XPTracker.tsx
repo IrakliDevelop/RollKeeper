@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Button, Switch } from '@/components/ui/forms';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { Section } from '@/components/ui/layout/section';
@@ -26,6 +26,8 @@ interface XPTrackerProps {
   hideLevelUpAlert?: boolean;
   hideThresholds?: boolean;
   pendingLevelUp?: boolean;
+  /** 'sheet' is the compact character-sheet rendering; default is unchanged. */
+  layout?: 'default' | 'sheet';
 
   className?: string;
 }
@@ -44,10 +46,13 @@ export function XPTracker({
   hideLevelUpAlert = false,
   hideThresholds = false,
   pendingLevelUp = false,
+  layout = 'default',
   className = '',
 }: XPTrackerProps) {
   const [mode, setMode] = useState<'add' | 'set'>('add');
   const [inputValue, setInputValue] = useState<number | undefined>(undefined);
+  const fieldRef = useRef<HTMLInputElement>(null);
+  const isSheet = layout === 'sheet';
 
   const xpToNext = getXPToNextLevel(currentXP, currentLevel);
   const progress = getXPProgress(currentXP, currentLevel);
@@ -59,7 +64,10 @@ export function XPTracker({
     e.preventDefault();
     const value = inputValue;
 
-    if (value === undefined || value < 0) return;
+    if (value === undefined || value < 0) {
+      if (isSheet) fieldRef.current?.focus();
+      return;
+    }
 
     if (effectiveMode === 'add' && onAddXP) {
       onAddXP(value);
@@ -69,6 +77,83 @@ export function XPTracker({
 
     setInputValue(undefined);
   };
+
+  const showControls = !readonly && !hideControls && (onAddXP || onSetXP);
+  const sheetContent = (
+    <div className={`space-y-4 ${className}`}>
+      <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+        <div className="flex items-baseline gap-2">
+          <span className="type-num-lg text-heading tabular-nums">
+            {currentXP.toLocaleString()}
+          </span>
+          <span className="type-ui text-muted">XP</span>
+        </div>
+        {showControls && (
+          <form onSubmit={handleSubmit} className="flex items-center gap-2">
+            {editing && onAddXP && onSetXP && !compact && (
+              <Switch
+                label="Set XP"
+                size="sm"
+                checked={mode === 'set'}
+                onCheckedChange={checked => setMode(checked ? 'set' : 'add')}
+                wrapperClassName="mr-2"
+              />
+            )}
+            <NumberInput
+              ref={fieldRef}
+              aria-label={effectiveMode === 'add' ? 'XP to add' : 'Total XP'}
+              value={inputValue}
+              onChange={setInputValue}
+              allowEmpty
+              min={0}
+              wrapperClassName="w-28"
+              className="tabular-nums pointer-coarse:text-base"
+            />
+            <Button type="submit">
+              {effectiveMode === 'add' ? 'Add' : 'Set'}
+            </Button>
+          </form>
+        )}
+      </div>
+      {!isMaxLevel && !hideProgressBar && (
+        <div className="space-y-2">
+          <div
+            className="bg-divider h-1 w-full"
+            role="progressbar"
+            aria-label={`XP progress to level ${currentLevel + 1}`}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Number(progress.toFixed(1))}
+          >
+            <div
+              className="bg-heading h-full"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+          <div className="type-small text-muted flex flex-wrap justify-between gap-2 tabular-nums">
+            {!hideThresholds && (
+              <span>
+                Level {currentLevel}:{' '}
+                {getXPForLevel(currentLevel).toLocaleString()} XP
+              </span>
+            )}
+            <span>
+              {pendingLevelUp && !hideLevelUpAlert
+                ? `Enough XP for level ${currentLevel + 1}`
+                : `${progress.toFixed(1)}% to level ${currentLevel + 1}`}
+            </span>
+            {!hideThresholds && (
+              <span>
+                Level {currentLevel + 1}:{' '}
+                {getXPForLevel(currentLevel + 1).toLocaleString()} XP
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+      {isMaxLevel && <p className="type-small text-muted">Level 20 reached</p>}
+    </div>
+  );
 
   const content = (
     <div className={`space-y-4 ${className}`}>
@@ -153,11 +238,12 @@ export function XPTracker({
       )}
     </div>
   );
+  const body = isSheet ? sheetContent : content;
   return hideHeading ? (
-    content
+    body
   ) : (
     <Section heading={compact ? 'XP' : 'Experience points'} level={3}>
-      {content}
+      {body}
     </Section>
   );
 }
