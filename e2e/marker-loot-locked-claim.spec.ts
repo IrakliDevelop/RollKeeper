@@ -641,9 +641,7 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     // The Inventory sub-tabs (Weapons/Magic Items/Armor/Items/Currency,
     // `tabbedSheetConfig.tsx`'s `InventoryTabContent`) are plain `<button>`s,
     // not `role="tab"`.
-    await playerPage
-      .getByRole('button', { name: 'Items', exact: true })
-      .click();
+    await playerPage.getByRole('tab', { name: 'Items', exact: true }).click();
 
     const itemCard = playerPage
       .getByRole('heading', { name: ITEM_NAME, level: 5 })

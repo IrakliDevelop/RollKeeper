@@ -92,6 +92,7 @@ import {
 import TabbedCharacterSheet from '@/components/ui/character/TabbedCharacterSheet';
 import type { TabbedCharacterSheetRef } from '@/components/ui/character/TabbedCharacterSheet';
 import {
+  setCombatSubTab,
   setCharacterSubTab,
   setInventorySubTab,
 } from '@/components/ui/character/tabbedSheetConfig';
@@ -592,9 +593,12 @@ export default function CharacterSheet() {
     [character.abilities]
   );
 
-  const switchToTab = useCallback((tabId: string) => {
-    tabbedSheetRef.current?.switchToTab(tabId);
-  }, []);
+  const switchToTab = useCallback(
+    (tabId: string, options?: { scroll?: boolean }) => {
+      tabbedSheetRef.current?.switchToTab(tabId, options);
+    },
+    []
+  );
 
   // Auto-update initiative when dexterity changes (if not overridden)
   useEffect(() => {
@@ -1035,15 +1039,12 @@ export default function CharacterSheet() {
                 onRestoreClassResource={restoreClassResource}
                 onStopConcentration={stopConcentration}
                 onNavigateToConditions={() => {
-                  switchToTab('conditions');
-                  setTimeout(() => {
-                    document
-                      .getElementById('conditions-section')
-                      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }, 150);
+                  switchToTab('combat', { scroll: false });
+                  setCombatSubTab('player', { scrollToConditions: true });
                 }}
                 onNavigateToBuffs={() => {
                   switchToTab('combat');
+                  setCombatSubTab('defenses');
                 }}
                 onNavigateToCombat={() => {
                   switchToTab('combat');

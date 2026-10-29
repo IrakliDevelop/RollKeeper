@@ -32,7 +32,7 @@ interface BookmarkTabsProps {
 }
 
 export interface BookmarkTabsRef {
-  switchToTab: (tabId: string) => void;
+  switchToTab: (tabId: string, options?: { scroll?: boolean }) => void;
   getCurrentTab: () => string;
 }
 
@@ -43,6 +43,14 @@ const SCROLL_BUTTON =
 
 const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
   ({ tabs, defaultTab, persistKey, className = '', onTabChange }, ref) => {
+    const scrollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(
+      () => () => {
+        if (scrollTimerRef.current !== null)
+          clearTimeout(scrollTimerRef.current);
+      },
+      []
+    );
     const rootRef = useRef<HTMLDivElement>(null);
     const navRef = useRef<HTMLDivElement>(null);
     const tabRefs = useRef(new Map<string, HTMLButtonElement>());
@@ -125,16 +133,22 @@ const BookmarkTabs = forwardRef<BookmarkTabsRef, BookmarkTabsProps>(
     useImperativeHandle(
       ref,
       () => ({
-        switchToTab: (tabId: string) => {
+        switchToTab: (tabId: string, options?: { scroll?: boolean }) => {
+          if (scrollTimerRef.current !== null) {
+            clearTimeout(scrollTimerRef.current);
+            scrollTimerRef.current = null;
+          }
           const tab = visibleTabs.find(t => t.id === tabId && !t.disabled);
           if (tab) {
             handleTabChange(tabId);
-            setTimeout(() => {
-              rootRef.current?.scrollIntoView({
-                behavior: 'smooth',
-                block: 'start',
-              });
-            }, 100);
+            if (options?.scroll !== false)
+              scrollTimerRef.current = setTimeout(() => {
+                scrollTimerRef.current = null;
+                rootRef.current?.scrollIntoView({
+                  behavior: 'smooth',
+                  block: 'start',
+                });
+              }, 100);
           }
         },
         getCurrentTab: () => activeTab,

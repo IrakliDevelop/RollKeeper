@@ -9,7 +9,7 @@ import {
 } from './tabbedSheetConfig';
 
 export interface TabbedCharacterSheetRef {
-  switchToTab: (tabId: string) => void;
+  switchToTab: (tabId: string, options?: { scroll?: boolean }) => void;
   getCurrentTab: () => string;
 }
 
@@ -35,9 +35,9 @@ const TabbedCharacterSheet = forwardRef<
   useImperativeHandle(
     ref,
     () => ({
-      switchToTab: (tabId: string) => {
+      switchToTab: (tabId: string, options?: { scroll?: boolean }) => {
         const mappedId = TAB_ID_MAP[tabId] || tabId;
-        tabsRef.current?.switchToTab(mappedId);
+        tabsRef.current?.switchToTab(mappedId, options);
       },
       getCurrentTab: () => tabsRef.current?.getCurrentTab() || 'actions',
     }),
