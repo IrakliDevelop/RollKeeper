@@ -28,6 +28,19 @@ export function saveLineLabel(
   return proficient ? `${label}, proficient` : label;
 }
 
+/**
+ * A save roll button's name, built around its visible "Save +5":
+ * "Roll Strength Save +5, proficient" / "Roll Strength Save +5".
+ */
+export function saveRollLabel(
+  ability: AbilityName,
+  save: number,
+  proficient: boolean
+): string {
+  const label = `Roll ${ABILITY_NAMES[ability]} Save ${formatModifier(save)}`;
+  return proficient ? `${label}, proficient` : label;
+}
+
 export interface LedgerCell {
   ability: AbilityName;
   score: number;
@@ -37,7 +50,8 @@ export interface LedgerCell {
   saveProficient: boolean;
 }
 
-const ROLL_TARGET =
+/** A text roll button's target: no chrome, 24px tall (44px on touch), brass focus ring. */
+export const ROLL_TARGET =
   'cursor-pointer rounded-sm min-h-6 pointer-coarse:min-h-11 pointer-coarse:min-w-11 focus-visible:outline-ring focus-visible:outline-2 focus-visible:outline-offset-2';
 
 /** One ability in a `LedgerRow`; the row passes its swap state down. */
