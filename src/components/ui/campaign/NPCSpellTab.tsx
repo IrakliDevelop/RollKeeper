@@ -598,6 +598,7 @@ export function NPCSpellTab({
               <SpellSlotTracker
                 spellSlots={spellSlots}
                 compact
+                hideTitle
                 hideResetButtons
                 onSpellSlotChange={handleSpellSlotChange}
               />

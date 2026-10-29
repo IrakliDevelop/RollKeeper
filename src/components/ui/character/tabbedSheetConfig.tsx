@@ -2,7 +2,7 @@ import { Section } from '@/components/ui/layout/section';
 import { SubTabs } from '@/components/ui/layout/SubTabs';
 import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
-import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
+import { Angry } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
@@ -310,47 +310,19 @@ export function createTabbedSheetConfig(
             onResetClassResource={params.resetClassResource}
           />
           {characterHasSpells && (
-            <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
-              <button
-                type="button"
-                onClick={() =>
-                  params.updateCharacter({
-                    spellSlotsExpanded: !character.spellSlotsExpanded,
-                  })
-                }
-                className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
-              >
-                <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
-                  <Zap size={16} />
-                  Spell Slots
-                </div>
-                {character.spellSlotsExpanded ? (
-                  <ChevronDown size={16} className="text-accent-purple-text" />
-                ) : (
-                  <ChevronRight size={16} className="text-accent-purple-text" />
-                )}
-              </button>
-              {character.spellSlotsExpanded && (
-                <div className="p-3">
-                  <SpellSlotTracker
-                    spellSlots={character.spellSlots}
-                    pactMagic={character.pactMagic}
-                    onSpellSlotChange={params.changeSpellSlotBy}
-                    onPactMagicChange={
-                      character.pactMagic ? params.changePactMagicBy : undefined
-                    }
-                    onResetSpellSlots={params.resetSpellSlots}
-                    onResetPactMagic={
-                      character.pactMagic
-                        ? params.resetPactMagicSlots
-                        : undefined
-                    }
-                    compact
-                    hideTitle
-                  />
-                </div>
-              )}
-            </div>
+            <SpellSlotTracker
+              spellSlots={character.spellSlots}
+              pactMagic={character.pactMagic}
+              onSpellSlotChange={params.changeSpellSlotBy}
+              onPactMagicChange={
+                character.pactMagic ? params.changePactMagicBy : undefined
+              }
+              onResetSpellSlots={params.resetSpellSlots}
+              onResetPactMagic={
+                character.pactMagic ? params.resetPactMagicSlots : undefined
+              }
+              compact
+            />
           )}
         </div>
       ),
@@ -496,44 +468,18 @@ export function createTabbedSheetConfig(
           <ErrorBoundary fallback={<SheetLoadError thing="Spellcasting" />}>
             <SpellcastingStats />
           </ErrorBoundary>
-          <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
-            <button
-              type="button"
-              onClick={() =>
-                params.updateCharacter({
-                  spellSlotsExpanded: !character.spellSlotsExpanded,
-                })
-              }
-              className="bg-accent-purple-bg flex w-full items-center justify-between px-4 py-2.5 transition-all hover:opacity-90"
-            >
-              <div className="text-accent-purple-text flex items-center gap-2 font-semibold">
-                <Zap size={16} />
-                Spell Slots
-              </div>
-              {character.spellSlotsExpanded ? (
-                <ChevronDown size={16} className="text-accent-purple-text" />
-              ) : (
-                <ChevronRight size={16} className="text-accent-purple-text" />
-              )}
-            </button>
-            {character.spellSlotsExpanded && (
-              <div className="p-3">
-                <SpellSlotTracker
-                  spellSlots={character.spellSlots}
-                  pactMagic={character.pactMagic}
-                  onSpellSlotChange={params.changeSpellSlotBy}
-                  onPactMagicChange={
-                    character.pactMagic ? params.changePactMagicBy : undefined
-                  }
-                  onResetSpellSlots={params.resetSpellSlots}
-                  onResetPactMagic={
-                    character.pactMagic ? params.resetPactMagicSlots : undefined
-                  }
-                  hideTitle
-                />
-              </div>
-            )}
-          </div>
+          <SpellSlotTracker
+            spellSlots={character.spellSlots}
+            pactMagic={character.pactMagic}
+            onSpellSlotChange={params.changeSpellSlotBy}
+            onPactMagicChange={
+              character.pactMagic ? params.changePactMagicBy : undefined
+            }
+            onResetSpellSlots={params.resetSpellSlots}
+            onResetPactMagic={
+              character.pactMagic ? params.resetPactMagicSlots : undefined
+            }
+          />
           <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
             <SpellManagement />
           </ErrorBoundary>

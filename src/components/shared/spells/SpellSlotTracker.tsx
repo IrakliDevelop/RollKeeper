@@ -1,11 +1,10 @@
 'use client';
 
-import React from 'react';
-import { SpellSlots, PactMagic } from '@/types/character';
-import { Button } from '@/components/ui/forms';
-import { Badge } from '@/components/ui/layout';
-import { RotateCcw, Zap } from 'lucide-react';
-import { AppIcon } from '@/components/ui/icons';
+import type { PactMagic, SpellSlots } from '@/types/character';
+import { Button } from '@/components/ui/forms/button';
+import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
+import { Section } from '@/components/ui/layout/section';
+import { cn } from '@/utils/cn';
 
 interface SpellSlotTrackerProps {
   spellSlots: SpellSlots;
@@ -14,8 +13,6 @@ interface SpellSlotTrackerProps {
   onPactMagicChange?: (delta: number) => void;
   onResetSpellSlots?: () => void;
   onResetPactMagic?: () => void;
-
-  // Display options
   readonly?: boolean;
   compact?: boolean;
   hideControls?: boolean;
@@ -23,10 +20,10 @@ interface SpellSlotTrackerProps {
   hideTitle?: boolean;
   showOnlyUsed?: boolean;
   maxLevelToShow?: number;
-
   className?: string;
 }
 
+/** The complete spell-slot ledger, used on the sheet and in DM NPC views. */
 export function SpellSlotTracker({
   spellSlots,
   pactMagic,
@@ -41,226 +38,113 @@ export function SpellSlotTracker({
   hideTitle = false,
   showOnlyUsed = false,
   maxLevelToShow = 9,
-  className = '',
+  className,
 }: SpellSlotTrackerProps) {
-  // Check if character has any spell slots
-  const hasSpellSlots = Object.values(spellSlots).some(slot => slot.max > 0);
-  const hasPactMagic = pactMagic && pactMagic.slots.max > 0;
-
-  if (!hasSpellSlots && !hasPactMagic) {
-    return null; // Don't render if no spell slots
-  }
-
-  const renderSlotCheckboxes = (
-    max: number,
-    used: number,
-    onChange?: (delta: number) => void
-  ) => {
-    const size = compact ? 'w-3 h-3' : 'w-4 h-4';
-    const gap = compact ? 'gap-0.5' : 'gap-1';
-
-    return (
-      <div className={`flex flex-wrap ${gap}`}>
-        {Array.from({ length: max }, (_, index) => (
-          <button
-            key={index}
-            onClick={() => {
-              if (readonly || !onChange) return;
-              const newUsed = index < used ? used - 1 : index + 1;
-              const clamped = Math.max(0, Math.min(newUsed, max));
-              const delta = clamped - used;
-              if (delta !== 0) onChange(delta);
-            }}
-            disabled={readonly || !onChange}
-            className={`${size} rounded border-2 transition-colors ${
-              index < used
-                ? 'border-red-500 bg-red-500' // Used slot
-                : readonly
-                  ? 'border-divider-strong bg-surface-raised'
-                  : 'border-divider-strong bg-surface-raised hover:border-faint' // Available slot
-            } ${readonly ? '' : 'cursor-pointer'}`}
-            title={`Spell slot ${index + 1} - ${index < used ? 'Used' : 'Available'}`}
-          />
-        ))}
-      </div>
-    );
-  };
-
-  const containerClasses = compact
-    ? `rounded-lg border-2 border-accent-purple-border bg-surface-raised p-3 space-y-3 shadow-sm ${className}`
-    : `rounded-lg border-2 border-accent-purple-border bg-gradient-to-br from-[var(--gradient-purple-from)] to-[var(--gradient-purple-to)] p-4 space-y-4 shadow-sm ${className}`;
-
-  // Filter spell levels to show
-  const levelsToShow = ([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)
+  const levels = ([1, 2, 3, 4, 5, 6, 7, 8, 9] as const)
     .filter(level => level <= maxLevelToShow)
     .filter(level => {
       const slot = spellSlots[level];
-      if (showOnlyUsed) {
-        return slot.max > 0 && slot.used > 0;
-      }
-      return slot.max > 0;
+      return slot.max > 0 && (!showOnlyUsed || slot.used > 0);
     });
+  const hasPact = !!pactMagic && pactMagic.slots.max > 0;
+  if (levels.length === 0 && !hasPact) return null;
 
-  return (
-    <div className={containerClasses}>
-      {!hideTitle ? (
-        <div className="flex items-center justify-between">
-          <h3
-            className={`text-accent-purple-text flex items-center gap-2 font-semibold ${compact ? 'text-base' : 'text-lg'}`}
-          >
-            <Zap size={compact ? 16 : 20} />
-            Spell Slots
-          </h3>
-          {!readonly && !hideResetButtons && !hideControls && (
-            <div className="flex items-center space-x-2">
-              {hasSpellSlots && onResetSpellSlots && (
-                <Button
-                  onClick={onResetSpellSlots}
-                  variant="ghost"
-                  size="xs"
-                  leftIcon={<RotateCcw className="h-3 w-3" />}
-                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                  title="Reset all spell slots"
-                >
-                  Reset Slots
-                </Button>
-              )}
-              {hasPactMagic && onResetPactMagic && (
-                <Button
-                  onClick={onResetPactMagic}
-                  variant="ghost"
-                  size="xs"
-                  leftIcon={<RotateCcw className="h-3 w-3" />}
-                  className="text-accent-purple-text-muted hover:text-accent-purple-text"
-                  title="Reset pact magic slots"
-                >
-                  Reset Pact
-                </Button>
-              )}
-            </div>
-          )}
-        </div>
-      ) : !readonly && !hideResetButtons && !hideControls ? (
-        <div className="flex items-center justify-end">
-          {hasSpellSlots && onResetSpellSlots && (
-            <Button
-              onClick={onResetSpellSlots}
-              variant="ghost"
-              size="xs"
-              leftIcon={<RotateCcw className="h-3 w-3" />}
-              className="text-accent-purple-text-muted hover:text-accent-purple-text"
-              title="Reset all spell slots"
-            >
-              Reset Slots
-            </Button>
-          )}
-          {hasPactMagic && onResetPactMagic && (
-            <Button
-              onClick={onResetPactMagic}
-              variant="ghost"
-              size="xs"
-              leftIcon={<RotateCcw className="h-3 w-3" />}
-              className="text-accent-purple-text-muted hover:text-accent-purple-text"
-              title="Reset pact magic slots"
-            >
-              Reset Pact
-            </Button>
-          )}
-        </div>
-      ) : null}
-
-      {/* Regular Spell Slots */}
-      {hasSpellSlots && levelsToShow.length > 0 && (
-        <div className={compact ? 'space-y-2' : 'space-y-3'}>
-          {!compact && (
-            <h4 className="text-accent-purple-text-muted text-sm font-semibold">
-              Spell Slots
-            </h4>
-          )}
-          {levelsToShow.map(level => {
+  const showResets = !readonly && !hideControls && !hideResetButtons;
+  const content = (
+    <>
+      {levels.length > 0 && (
+        <div className="grid grid-cols-1 gap-x-4 sm:grid-cols-2">
+          {levels.map(level => {
             const slot = spellSlots[level];
-            const remaining = slot.max - slot.used;
             return (
               <div
                 key={level}
-                className="border-accent-purple-border bg-surface-raised flex items-center justify-between rounded-lg border-2 p-2"
+                className="border-divider flex flex-wrap items-center gap-x-4 border-b py-1 pointer-coarse:min-h-11"
               >
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" size="sm">
-                    {compact ? `L${level}` : `Level ${level}`}
-                  </Badge>
-                  <Badge
-                    variant={remaining > 0 ? 'success' : 'neutral'}
-                    size="sm"
-                  >
-                    {remaining}/{slot.max}
-                  </Badge>
-                </div>
-                {renderSlotCheckboxes(
-                  slot.max,
-                  slot.used,
-                  onSpellSlotChange
-                    ? delta => onSpellSlotChange(level, delta)
-                    : undefined
-                )}
+                <span className="type-ui text-heading min-w-16">
+                  Level {level}
+                </span>
+                <SlotPipsButtons
+                  total={slot.max}
+                  available={slot.max - slot.used}
+                  level={level}
+                  onSpend={
+                    !readonly && !hideControls && onSpellSlotChange
+                      ? () => onSpellSlotChange(level, 1)
+                      : undefined
+                  }
+                  onRestore={
+                    !readonly && !hideControls && onSpellSlotChange
+                      ? () => onSpellSlotChange(level, -1)
+                      : undefined
+                  }
+                />
               </div>
             );
           })}
         </div>
       )}
-
-      {/* Warlock Pact Magic */}
-      {hasPactMagic && pactMagic && (
-        <div
-          className={`border-accent-purple-border space-y-3 border-t-2 pt-3 ${compact ? 'space-y-2 pt-2' : ''}`}
+      {showResets && levels.length > 0 && onResetSpellSlots && (
+        <Button
+          type="button"
+          size="sm"
+          className="mt-3"
+          onClick={() => onResetSpellSlots()}
         >
-          <h4
-            className={`text-accent-purple-text-muted font-semibold ${compact ? 'text-xs' : 'text-sm'}`}
-          >
-            Pact Magic
-          </h4>
-          <div className="border-accent-purple-border bg-surface-raised flex items-center justify-between rounded-lg border-2 p-2">
-            <div className="flex items-center gap-2">
-              <Badge variant="info" size="sm">
-                {compact ? `L${pactMagic.level}` : `Level ${pactMagic.level}`}
-              </Badge>
-              <Badge
-                variant={
-                  pactMagic.slots.max - pactMagic.slots.used > 0
-                    ? 'success'
-                    : 'neutral'
-                }
+          Restore all slots
+        </Button>
+      )}
+      {hasPact && pactMagic && (
+        <div
+          className={cn(
+            'border-divider border-t pt-3',
+            levels.length > 0 && 'mt-4'
+          )}
+        >
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <span className="type-ui text-heading">
+              Pact slots (level {pactMagic.level})
+            </span>
+            <SlotPipsButtons
+              total={pactMagic.slots.max}
+              available={pactMagic.slots.max - pactMagic.slots.used}
+              level="pact"
+              onSpend={
+                !readonly && !hideControls && onPactMagicChange
+                  ? () => onPactMagicChange(1)
+                  : undefined
+              }
+              onRestore={
+                !readonly && !hideControls && onPactMagicChange
+                  ? () => onPactMagicChange(-1)
+                  : undefined
+              }
+            />
+            {showResets && onResetPactMagic && (
+              <Button
+                type="button"
                 size="sm"
+                onClick={() => onResetPactMagic()}
               >
-                {pactMagic.slots.max - pactMagic.slots.used}/
-                {pactMagic.slots.max}
-              </Badge>
-            </div>
-            {renderSlotCheckboxes(
-              pactMagic.slots.max,
-              pactMagic.slots.used,
-              onPactMagicChange
+                Restore pact slots
+              </Button>
             )}
           </div>
           {!compact && (
-            <p className="text-accent-purple-text-muted flex items-center gap-1 text-xs italic">
-              <AppIcon name="reaction" className="h-3.5 w-3.5" />
-              Pact magic slots recharge on a short rest
+            <p className="type-caption text-muted mt-2">
+              Pact slots come back on a short or long rest.
             </p>
           )}
         </div>
       )}
+    </>
+  );
 
-      {/* Usage Guide */}
-      {!readonly && !hideControls && !compact && (
-        <div className="border-accent-purple-border text-muted border-t-2 pt-2 text-xs">
-          <p className="flex items-center gap-1">
-            <AppIcon name="tip" className="h-3.5 w-3.5 shrink-0" />
-            Click empty slots to mark as used • Click used slots to mark as
-            available
-          </p>
-        </div>
-      )}
-    </div>
+  return hideTitle ? (
+    <div className={className}>{content}</div>
+  ) : (
+    <Section heading="Spell slots" level={3} className={className}>
+      {content}
+    </Section>
   );
 }
