@@ -207,6 +207,7 @@ export default function CharacterSheet() {
     toggleSkillBonusAbility,
     updateSavingThrowProficiency,
     updateHitPoints,
+    setCurrentHitPoints,
     updateInitiative,
     resetInitiativeToDefault,
     applyDamageToCharacter,
@@ -1205,6 +1206,7 @@ export default function CharacterSheet() {
                   toggleHPCalculationMode={toggleHPCalculationMode}
                   recalculateMaxHP={recalculateMaxHP}
                   updateHitPoints={updateHitPoints}
+                  setCurrentHitPoints={setCurrentHitPoints}
                   useHitDie={useHitDie}
                   restoreHitDice={restoreHitDice}
                   resetAllHitDice={resetAllHitDice}

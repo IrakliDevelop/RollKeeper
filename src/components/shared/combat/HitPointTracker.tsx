@@ -1,27 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import {
-  Heart,
-  Plus,
-  Minus,
-  RotateCcw,
-  Calculator,
-  Edit3,
-  Skull,
-  Shield,
-  HelpCircle,
-  Sparkles,
-  Check,
-  X,
-} from 'lucide-react';
 import { HitPoints, ClassInfo } from '@/types/character';
 import { isDying, isDead, isStabilized } from '@/utils/hpCalculations';
-import { getHpTierNumberColor } from '@/utils/hpColor';
-import { hpPercent, hpTier } from '@/utils/hpState';
+import {
+  getHpNumberColor,
+  getHpBarColor,
+  getHpTierTextColor,
+} from '@/utils/hpColor';
+import { HP_STATUS_LABELS, hpStatus, hpPercent, hpTier } from '@/utils/hpState';
 import { Button } from '@/components/ui/forms';
 import { NumberField } from '@/components/ui/forms/NumberInput';
-import { AppIcon, type IconName } from '@/components/ui/icons';
+import { InPlaceField } from '@/components/ui/forms/InPlaceField';
+import { Section } from '@/components/ui/layout/section';
 
 interface HitPointTrackerProps {
   hitPoints: HitPoints;
@@ -37,27 +28,15 @@ interface HitPointTrackerProps {
   onRecalculateMaxHP?: () => void;
   onUpdateHitPoints?: (updates: Partial<HitPoints>) => void;
 
-  // Display options
-  readonly?: boolean;
-  /**
-   * Sheet mode. False makes max HP and its calculation mode plain (the
-   * build value); current and temp HP are play values and stay editable.
-   * `readonly` still disables everything. Defaults to true.
-   */
+  onSetCurrentHitPoints?: (value: number) => void;
   editing?: boolean;
-  compact?: boolean;
-  showControls?: boolean;
   showDeathSaves?: boolean;
-  showCalculationInfo?: boolean;
-  hideLabels?: boolean;
 
   className?: string;
 }
 
 export function HitPointTracker({
   hitPoints,
-  classInfo,
-  level,
   onApplyDamage,
   onApplyHealing,
   onAddTemporaryHP,
@@ -65,13 +44,9 @@ export function HitPointTracker({
   onResetDeathSaves,
   onToggleCalculationMode,
   onUpdateHitPoints,
-  readonly = false,
+  onSetCurrentHitPoints,
   editing = true,
-  compact = false,
-  showControls = true,
   showDeathSaves = true,
-  showCalculationInfo = true,
-  hideLabels = false,
   className = '',
 }: HitPointTrackerProps) {
   const [damageAmount, setDamageAmount] = useState<number | undefined>(
@@ -87,7 +62,6 @@ export function HitPointTracker({
   const isCharacterDying = isDying(hitPoints);
   const isCharacterDead = isDead(hitPoints);
   const isCharacterStabilized = isStabilized(hitPoints);
-  const isUnconscious = hitPoints.current === 0;
 
   const handleDamage = () => {
     if (damageAmount != null && damageAmount > 0 && onApplyDamage) {
@@ -167,554 +141,265 @@ export function HitPointTracker({
     }
   };
 
-  // The shared HP tiers: healthy from 75%, bloodied from 25%, critical below.
   const tier = hpTier(hpPercent(hitPoints.current, hitPoints.max));
-
-  const getStatusColor = () => {
-    if (isCharacterDead) return 'text-inverse bg-gray-800';
-    if (isCharacterDying) return 'text-accent-red-text bg-accent-red-bg';
-    if (isCharacterStabilized)
-      return 'text-accent-amber-text bg-accent-amber-bg';
-    if (isUnconscious) return 'text-accent-orange-text bg-accent-orange-bg';
-    if (tier === 'critical') return 'text-accent-red-text bg-accent-red-bg';
-    if (tier !== 'high') return 'text-accent-amber-text bg-accent-amber-bg';
-    return 'text-accent-green-text bg-accent-green-bg';
-  };
-
-  const getCurrentHPBoxColor = () => {
-    if (isCharacterDead) return 'bg-gray-800 border-gray-900';
-    if (isCharacterDying)
-      return 'bg-accent-red-bg-strong border-accent-red-border';
-    if (isCharacterStabilized)
-      return 'bg-accent-amber-bg-strong border-accent-amber-border';
-    if (isUnconscious)
-      return 'bg-accent-orange-bg-strong border-accent-orange-border';
-    if (tier === 'critical')
-      return 'bg-accent-red-bg-strong border-accent-red-border';
-    if (tier !== 'high')
-      return 'bg-accent-amber-bg-strong border-accent-amber-border';
-    return 'bg-accent-green-bg-strong border-accent-green-border';
-  };
-
-  const getCurrentHPTextColor = () => {
-    if (isCharacterDead) return 'text-inverse';
-    if (isCharacterDying) return 'text-accent-red-text';
-    if (isCharacterStabilized) return 'text-accent-amber-text';
-    if (isUnconscious) return 'text-accent-orange-text';
-    return getHpTierNumberColor(tier);
-  };
-
-  const getStatus = (): { icon: IconName; text: string } => {
-    if (isCharacterDead) return { icon: 'monster', text: 'Dead' };
-    if (isCharacterDying) return { icon: 'criticalFailure', text: 'Dying' };
-    if (isCharacterStabilized) return { icon: 'confirm', text: 'Stabilized' };
-    if (isUnconscious) return { icon: 'prohibited', text: 'Unconscious' };
-    return { icon: 'healing', text: 'Alive' };
-  };
-
-  const containerClasses = compact
-    ? `bg-surface-raised rounded-lg shadow border border-accent-red-border p-3 space-y-3 ${className}`
-    : `bg-surface-raised rounded-lg shadow-lg border border-accent-red-border p-6 space-y-6 ${className}`;
-
-  const gridSizeClasses = compact ? 'gap-1 sm:gap-2' : 'gap-2 sm:gap-4';
-  const minHeightClasses = compact
-    ? 'min-h-[60px]'
-    : 'min-h-[80px] sm:min-h-[90px]';
-
+  const status = isCharacterDead
+    ? 'Dead'
+    : isCharacterDying
+      ? 'Dying'
+      : isCharacterStabilized
+        ? 'Stabilized'
+        : HP_STATUS_LABELS[hpStatus(hitPoints.current, hitPoints.max)];
+  const mode = hitPoints.calculationMode ?? 'auto';
   return (
-    <div className={containerClasses}>
-      {!hideLabels && (
-        <div className="flex items-center justify-between">
-          <h3
-            className={`${compact ? 'text-base' : 'text-lg'} text-accent-red-text flex items-center gap-2 font-semibold`}
+    <Section
+      heading="Hit points"
+      level={3}
+      className={className}
+      trailing={
+        <span
+          className={`type-ui ${isCharacterStabilized ? 'text-ember-text' : getHpTierTextColor(tier)}`}
+        >
+          {status}
+        </span>
+      }
+    >
+      <div
+        data-hp-status={hpStatus(hitPoints.current, hitPoints.max)}
+        className="space-y-4"
+      >
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-4">
+          <span
+            className={`type-num-xl ${getHpNumberColor(hitPoints.current, hitPoints.max)}`}
           >
-            <Heart size={compact ? 16 : 20} />
-            Hit Points
-          </h3>
-          <div
-            className={`flex items-center gap-1 rounded-full px-3 py-1 text-sm font-medium ${getStatusColor()}`}
-          >
-            <AppIcon name={getStatus().icon} className="h-3.5 w-3.5" />
-            {getStatus().text}
-          </div>
+            <InPlaceField
+              label="Current HP"
+              value={hitPoints.current}
+              editing
+              min={0}
+              max={hitPoints.max}
+              onCommit={value => onSetCurrentHitPoints?.(value)}
+            />
+          </span>
+          <span className="type-num-lg text-body">
+            /{' '}
+            <InPlaceField
+              label="Max HP"
+              value={hitPoints.max}
+              editing={editing && mode === 'manual'}
+              min={1}
+              onCommit={max => onUpdateHitPoints?.({ max })}
+            />
+          </span>
+          <span className="type-num-md text-frost-text">
+            +
+            <InPlaceField
+              label="Temp HP"
+              value={hitPoints.temporary}
+              editing
+              min={0}
+              onCommit={temporary => onUpdateHitPoints?.({ temporary })}
+            />{' '}
+            temp
+          </span>
         </div>
-      )}
-
-      {/* HP Display */}
-      <div className={`grid grid-cols-3 ${gridSizeClasses}`}>
-        <div className="text-center">
+        <div className="bg-divider h-1 w-full">
           <div
-            className={`rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} transition-colors ${getCurrentHPBoxColor()} ${minHeightClasses} flex flex-col justify-center`}
-          >
-            <div
-              className={`mb-1 text-xs font-medium ${getCurrentHPTextColor()}`}
+            className={`h-full ${getHpBarColor(hitPoints.current, hitPoints.max)}`}
+            style={{ width: `${hpPercent(hitPoints.current, hitPoints.max)}%` }}
+          />
+        </div>
+        <div className="type-small text-muted flex items-center gap-2">
+          <span>Max: {mode === 'auto' ? 'Auto' : 'Manual'}</span>
+          {editing && onToggleCalculationMode && (
+            <Button
+              size="sm"
+              onClick={onToggleCalculationMode}
+              aria-label={`Switch to ${mode === 'auto' ? 'manual' : 'auto'} calculation`}
             >
-              CURRENT
-            </div>
-            {readonly ? (
-              <div
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} font-bold ${getCurrentHPTextColor()}`}
-              >
-                {hitPoints.current}
-              </div>
-            ) : (
-              <NumberField
-                value={hitPoints.current}
-                onChange={v => onUpdateHitPoints?.({ current: v ?? 0 })}
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} w-full rounded-lg border-none bg-transparent text-center font-bold outline-none ${getCurrentHPTextColor()} leading-tight`}
-                min={0}
-                max={hitPoints.max}
-                style={{ maxWidth: '100%' }}
-              />
-            )}
-          </div>
+              {mode === 'auto' ? 'Manual' : 'Auto'}
+            </Button>
+          )}
         </div>
-
-        <div className="text-center">
-          <div
-            className={`border-accent-red-border bg-accent-red-bg-strong rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} relative ${minHeightClasses} flex flex-col justify-center`}
-          >
-            <div className="text-accent-red-text mb-1 flex items-center justify-center gap-1 text-xs font-medium">
-              <span className="hidden sm:inline">MAXIMUM</span>
-              <span className="sm:hidden">MAX</span>
-              {!readonly && editing && onToggleCalculationMode && (
-                <button
-                  onClick={onToggleCalculationMode}
-                  className="text-accent-red-text-muted hover:text-accent-red-text transition-colors"
-                  title={`Switch to ${hitPoints.calculationMode === 'auto' ? 'manual' : 'auto'} calculation`}
-                >
-                  {hitPoints.calculationMode === 'auto' ? (
-                    <Calculator size={12} />
-                  ) : (
-                    <Edit3 size={12} />
-                  )}
-                </button>
-              )}
-            </div>
-            {readonly || !editing ? (
-              <div
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text font-bold`}
-              >
-                {hitPoints.max}
-              </div>
-            ) : (
-              <NumberField
-                value={hitPoints.max}
-                onChange={v => onUpdateHitPoints?.({ max: v ?? 0 })}
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-red-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
-                disabled={hitPoints.calculationMode === 'auto'}
-                min={1}
-                style={{ maxWidth: '100%' }}
-              />
-            )}
-            {hitPoints.calculationMode === 'auto' && (
-              <div className="absolute -top-1 -right-1">
-                <div className="rounded-full bg-blue-500 px-1.5 py-0.5 text-xs text-white">
-                  AUTO
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="text-center">
-          <div
-            className={`border-accent-blue-border bg-accent-blue-bg-strong rounded-lg border-2 p-2 ${compact ? 'sm:p-2' : 'sm:p-3'} ${minHeightClasses} flex flex-col justify-center`}
-          >
-            <div className="text-accent-blue-text mb-1 text-xs font-medium">
-              <span>TEMP</span>
-            </div>
-            {readonly ? (
-              <div
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text font-bold`}
-              >
-                {hitPoints.temporary}
-              </div>
-            ) : (
-              <NumberField
-                value={hitPoints.temporary}
-                onChange={v => onUpdateHitPoints?.({ temporary: v ?? 0 })}
-                className={`${compact ? 'text-lg' : 'text-lg sm:text-xl'} text-accent-blue-text w-full rounded-lg border-none bg-transparent text-center leading-tight font-bold outline-none`}
-                min={0}
-                style={{ maxWidth: '100%' }}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* HP Management Actions */}
-      {!readonly && showControls && (
         <div className="space-y-3">
-          {/* Damage */}
-          <div className="space-y-2">
-            <label className="text-accent-red-text-muted block text-sm font-medium">
-              Apply Damage
-            </label>
-            <div className="flex gap-2">
-              <NumberField
-                value={damageAmount}
-                onChange={setDamageAmount}
-                allowEmpty
-                placeholder="Amount"
-                className="border-accent-red-border bg-surface-raised text-heading focus:border-accent-red-border-strong focus:ring-accent-red-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min={1}
-              />
-              <button
-                onClick={() => {
-                  if (damageAmount != null && damageAmount > 0)
-                    setDamageAmount(Math.floor(damageAmount / 2));
-                }}
-                className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
-                title="Half (resistance)"
-              >
-                ½×
-              </button>
-              <button
-                onClick={() => {
-                  if (damageAmount != null && damageAmount > 0)
-                    setDamageAmount(damageAmount * 2);
-                }}
-                className="bg-surface-secondary text-muted hover:text-heading min-h-[44px] min-w-[44px] rounded-md px-3 py-2 text-sm font-bold shadow-sm transition-colors"
-                title="Double (vulnerability)"
-              >
-                2×
-              </button>
-              <button
-                onClick={handleDamage}
-                disabled={damageAmount == null || damageAmount <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-red-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed"
-              >
-                <Minus size={16} />
-                Dmg
-              </button>
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <label className="type-ui text-body block">
+                Damage
+                <NumberField
+                  aria-label="Damage"
+                  value={damageAmount}
+                  onChange={setDamageAmount}
+                  allowEmpty
+                  min={1}
+                  placeholder="8"
+                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
+                />
+              </label>
             </div>
+            <Button
+              size="sm"
+              aria-label="Halve damage (resistance)"
+              onClick={() => {
+                if (damageAmount != null && damageAmount > 0)
+                  setDamageAmount(Math.floor(damageAmount / 2));
+              }}
+            >
+              ½×
+            </Button>
+            <Button
+              size="sm"
+              aria-label="Double damage (vulnerability)"
+              onClick={() => {
+                if (damageAmount != null && damageAmount > 0)
+                  setDamageAmount(damageAmount * 2);
+              }}
+            >
+              2×
+            </Button>
+            <Button
+              variant="danger"
+              disabled={
+                damageAmount == null || damageAmount <= 0 || !onApplyDamage
+              }
+              onClick={handleDamage}
+            >
+              Damage
+            </Button>
           </div>
-
-          {/* Healing */}
-          <div className="space-y-2">
-            <label className="text-accent-green-text block text-sm font-medium">
-              Apply Healing
-            </label>
-            <div className="flex gap-2">
-              <NumberField
-                value={healingAmount}
-                onChange={setHealingAmount}
-                allowEmpty
-                placeholder="Amount"
-                className="border-accent-green-border bg-surface-raised text-heading focus:border-accent-green-border-strong focus:ring-accent-green-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min={1}
-              />
-              <button
-                onClick={handleHealing}
-                disabled={healingAmount == null || healingAmount <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-green-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-green-700 disabled:cursor-not-allowed"
-              >
-                <Plus size={16} />
-                Heal
-              </button>
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <label className="type-ui text-body block">
+                Healing
+                <NumberField
+                  aria-label="Healing"
+                  value={healingAmount}
+                  onChange={setHealingAmount}
+                  allowEmpty
+                  min={1}
+                  placeholder="8"
+                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
+                />
+              </label>
             </div>
+            <Button
+              disabled={
+                healingAmount == null || healingAmount <= 0 || !onApplyHealing
+              }
+              onClick={handleHealing}
+            >
+              Heal
+            </Button>
           </div>
-
-          {/* Temporary HP */}
-          <div className="space-y-2">
-            <label className="text-accent-blue-text-muted block text-sm font-medium">
-              Add Temporary HP
-            </label>
-            <div className="flex gap-2">
-              <NumberField
-                value={tempHPAmount}
-                onChange={setTempHPAmount}
-                allowEmpty
-                placeholder="Amount"
-                className="border-accent-blue-border bg-surface-raised text-heading focus:border-accent-blue-border-strong focus:ring-accent-blue-bg-strong min-w-0 flex-1 rounded-md border px-3 py-2 text-center text-lg font-semibold focus:ring-2"
-                min={1}
-              />
-              <button
-                onClick={handleTempHP}
-                disabled={tempHPAmount == null || tempHPAmount <= 0}
-                className="disabled:bg-surface-hover disabled:text-muted flex min-h-[44px] items-center justify-center gap-1.5 rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed"
-              >
-                <Shield size={16} />
-                Temp
-              </button>
+          <div className="flex items-end gap-2">
+            <div className="min-w-0 flex-1">
+              <label className="type-ui text-body block">
+                Temp HP
+                <NumberField
+                  aria-label="Temp HP amount"
+                  value={tempHPAmount}
+                  onChange={setTempHPAmount}
+                  allowEmpty
+                  min={1}
+                  placeholder="8"
+                  className="border-input-border bg-surface-inset text-heading mt-1 h-10 w-full rounded-sm border px-2 pointer-coarse:min-h-11 pointer-coarse:text-base"
+                />
+              </label>
             </div>
+            <Button
+              disabled={
+                tempHPAmount == null || tempHPAmount <= 0 || !onAddTemporaryHP
+              }
+              onClick={handleTempHP}
+            >
+              Add temp HP
+            </Button>
           </div>
         </div>
-      )}
-
-      {/* Death Saving Throws */}
-      {showDeathSaves &&
-        (isCharacterDying || isCharacterStabilized || hitPoints.deathSaves) && (
-          <div className="border-divider from-surface-raised to-surface-secondary mt-4 rounded-xl border-2 bg-gradient-to-br p-5 shadow-md">
-            <div className="mb-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="rounded-lg bg-gradient-to-br from-gray-600 to-gray-700 p-2 shadow-md">
-                  <Skull size={18} className="text-white" />
-                </div>
-                <div>
-                  <h4 className="text-heading text-lg font-bold">
-                    Death Saving Throws
-                  </h4>
-                  {isCharacterStabilized && (
-                    <span className="text-accent-amber-text text-xs font-medium">
-                      Stabilized
-                    </span>
-                  )}
-                  {isCharacterDead && (
-                    <span className="text-accent-red-text-muted text-xs font-medium">
-                      Dead
-                    </span>
-                  )}
-                </div>
-              </div>
-              {!readonly && onResetDeathSaves && (
-                <Button
-                  onClick={onResetDeathSaves}
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<RotateCcw size={14} />}
-                  title="Reset death saves"
-                >
-                  Reset
-                </Button>
-              )}
-            </div>
-
-            {hitPoints.deathSaves && (
+        {showDeathSaves &&
+          (isCharacterDying ||
+            isCharacterStabilized ||
+            hitPoints.deathSaves) && (
+            <Section
+              heading="Death saves"
+              level={4}
+              trailing={
+                onResetDeathSaves && (
+                  <Button
+                    size="sm"
+                    aria-label="Reset death saves"
+                    onClick={onResetDeathSaves}
+                  >
+                    Reset
+                  </Button>
+                )
+              }
+            >
               <div className="space-y-3">
-                {/* Success/Failure Interactive Display - Stacked vertically */}
-                <div className="space-y-3">
-                  {/* Successes */}
-                  <div className="border-accent-green-border bg-accent-green-bg rounded-lg border-2 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex w-24 shrink-0 items-center gap-2">
-                        <Check
-                          size={16}
-                          className="text-accent-green-text shrink-0"
-                        />
-                        <span className="text-accent-green-text text-sm font-semibold">
-                          Successes
+                {hitPoints.deathSaves &&
+                  ([true, false] as const).map(success => {
+                    const count = success
+                      ? hitPoints.deathSaves!.successes
+                      : hitPoints.deathSaves!.failures;
+                    const noun = success ? 'success' : 'failure';
+                    return (
+                      <div
+                        key={noun}
+                        className="flex flex-wrap items-center justify-between gap-2"
+                      >
+                        <span className="type-ui text-body">
+                          {success ? 'Successes' : 'Failures'}
                         </span>
-                      </div>
-                      <div className="flex gap-2">
-                        {[1, 2, 3].map(i => {
-                          const isFilled = i <= hitPoints.deathSaves!.successes;
-                          const isNextEmpty =
-                            i === hitPoints.deathSaves!.successes + 1;
-                          const isLastFilled =
-                            isFilled && i === hitPoints.deathSaves!.successes;
-                          const canAdd =
-                            !readonly &&
-                            isCharacterDying &&
-                            onMakeDeathSave &&
-                            isNextEmpty;
-                          const canRemove =
-                            !readonly && onUpdateHitPoints && isLastFilled;
-                          const canClick = canAdd || canRemove;
-
-                          return (
-                            <button
-                              key={i}
-                              onClick={
-                                canAdd
-                                  ? handleAddSuccess
-                                  : canRemove
-                                    ? handleRemoveSuccess
-                                    : undefined
-                              }
-                              disabled={!canClick}
-                              className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
-                                isFilled
-                                  ? 'border-green-500 bg-green-500 shadow-md'
-                                  : 'border-accent-green-border-strong bg-surface-raised'
-                              } ${
-                                canAdd
-                                  ? 'hover:bg-accent-green-bg-strong cursor-pointer hover:scale-110 hover:border-green-500 hover:shadow-lg active:scale-95'
-                                  : canRemove
-                                    ? 'cursor-pointer hover:scale-110 hover:border-green-600 hover:bg-green-600 hover:shadow-lg active:scale-95'
-                                    : 'cursor-default'
-                              } `}
-                              title={
-                                canAdd
-                                  ? 'Click to add success'
-                                  : canRemove
-                                    ? 'Click to undo success'
-                                    : undefined
-                              }
-                            >
-                              {isFilled && (
-                                <Check
-                                  size={18}
-                                  className="absolute inset-0 m-auto text-white"
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map(index => {
+                            const marked = index < count;
+                            return (
+                              <button
+                                key={index}
+                                type="button"
+                                aria-label={`${marked ? 'Clear' : 'Mark'} a death save ${noun}`}
+                                disabled={
+                                  !marked &&
+                                  (!onMakeDeathSave ||
+                                    isCharacterDead ||
+                                    isCharacterStabilized)
+                                }
+                                onClick={
+                                  marked
+                                    ? success
+                                      ? handleRemoveSuccess
+                                      : handleRemoveFailure
+                                    : success
+                                      ? handleAddSuccess
+                                      : handleAddFailure
+                                }
+                                className="focus-visible:outline-brass-border inline-flex size-6 cursor-pointer items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:size-11"
+                              >
+                                <span
+                                  aria-hidden="true"
+                                  className={`size-3 rounded-full border ${success ? 'border-verdigris-border' : 'border-blood-border'} ${marked ? (success ? 'bg-verdigris-fill' : 'bg-blood-fill') : 'bg-transparent'}`}
                                 />
-                              )}
-                              {canAdd && !isFilled && (
-                                <span className="text-accent-green-text absolute inset-0 m-auto flex h-full w-full items-center justify-center opacity-50">
-                                  <Check size={14} />
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
+                              </button>
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-
-                  {/* Failures */}
-                  <div className="border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex w-24 shrink-0 items-center gap-2">
-                        <X
-                          size={16}
-                          className="text-accent-red-text-muted shrink-0"
-                        />
-                        <span className="text-accent-red-text-muted text-sm font-semibold">
-                          Failures
-                        </span>
-                      </div>
-                      <div className="flex gap-2">
-                        {[1, 2, 3].map(i => {
-                          const isFilled = i <= hitPoints.deathSaves!.failures;
-                          const isNextEmpty =
-                            i === hitPoints.deathSaves!.failures + 1;
-                          const isLastFilled =
-                            isFilled && i === hitPoints.deathSaves!.failures;
-                          const canAdd =
-                            !readonly &&
-                            isCharacterDying &&
-                            onMakeDeathSave &&
-                            isNextEmpty;
-                          const canRemove =
-                            !readonly && onUpdateHitPoints && isLastFilled;
-                          const canClick = canAdd || canRemove;
-
-                          return (
-                            <button
-                              key={i}
-                              onClick={
-                                canAdd
-                                  ? handleAddFailure
-                                  : canRemove
-                                    ? handleRemoveFailure
-                                    : undefined
-                              }
-                              disabled={!canClick}
-                              className={`relative h-9 w-9 rounded-full border-2 transition-all duration-200 ${
-                                isFilled
-                                  ? 'border-red-500 bg-red-500 shadow-md'
-                                  : 'border-accent-red-border-strong bg-surface-raised'
-                              } ${
-                                canAdd
-                                  ? 'hover:bg-accent-red-bg-strong cursor-pointer hover:scale-110 hover:border-red-500 hover:shadow-lg active:scale-95'
-                                  : canRemove
-                                    ? 'cursor-pointer hover:scale-110 hover:border-red-600 hover:bg-red-600 hover:shadow-lg active:scale-95'
-                                    : 'cursor-default'
-                              } `}
-                              title={
-                                canAdd
-                                  ? 'Click to add failure'
-                                  : canRemove
-                                    ? 'Click to undo failure'
-                                    : undefined
-                              }
-                            >
-                              {isFilled && (
-                                <X
-                                  size={18}
-                                  className="absolute inset-0 m-auto text-white"
-                                />
-                              )}
-                              {canAdd && !isFilled && (
-                                <span className="text-accent-red-text-muted absolute inset-0 m-auto flex h-full w-full items-center justify-center opacity-50">
-                                  <X size={14} />
-                                </span>
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Critical Success Button */}
-                {!readonly && isCharacterDying && onMakeDeathSave && (
-                  <div className="flex justify-center">
-                    <Button
-                      onClick={handleCriticalSuccess}
-                      variant="warning"
-                      size="sm"
-                      leftIcon={<Sparkles size={16} />}
-                      className="font-semibold"
-                    >
-                      Natural 20! (Regain 1 HP)
-                    </Button>
-                  </div>
+                    );
+                  })}
+                {isCharacterDying && onMakeDeathSave && (
+                  <Button onClick={handleCriticalSuccess}>
+                    Natural 20: regain 1 HP
+                  </Button>
                 )}
-
-                {/* Help Info */}
-                <div className="border-divider bg-surface-raised rounded-lg border p-3">
-                  <div className="flex items-start gap-2">
-                    <HelpCircle
-                      size={14}
-                      className="text-faint mt-0.5 shrink-0"
-                    />
-                    <div className="text-muted space-y-0.5 text-xs">
-                      <p>
-                        <span className="font-medium">Roll d20:</span> 10+ =
-                        Success, 9 or below = Failure
-                      </p>
-                      <p>
-                        <span className="text-accent-amber-text font-medium">
-                          Natural 20:
-                        </span>{' '}
-                        Regain 1 HP and become conscious
-                      </p>
-                      <p>
-                        <span className="text-accent-green-text font-medium">
-                          3 Successes:
-                        </span>{' '}
-                        Stabilized but unconscious
-                      </p>
-                      <p>
-                        <span className="text-accent-red-text-muted font-medium">
-                          3 Failures:
-                        </span>{' '}
-                        Dead
-                      </p>
-                    </div>
-                  </div>
+                <div className="type-small text-muted space-y-1">
+                  <p>Roll d20: 10 or higher = success, 9 or below = failure</p>
+                  <p>Natural 20: regain 1 HP and become conscious</p>
+                  <p>3 successes: stabilized but unconscious</p>
+                  <p>3 failures: dead</p>
                 </div>
               </div>
-            )}
-          </div>
-        )}
-
-      {/* HP Calculation Mode Info */}
-      {showCalculationInfo && classInfo && level && !compact && (
-        <div className="border-divider border-t pt-4">
-          <div className="flex items-start gap-3">
-            <HelpCircle size={16} className="text-muted mt-0.5" />
-            <div className="text-muted space-y-1 text-xs">
-              <p>
-                <strong>Auto Mode:</strong> Max HP calculated using D&D 5e rules
-                (Level 1: full hit die + CON, subsequent levels: average hit die
-                + CON)
-              </p>
-              <p>
-                <strong>Manual Mode:</strong> Set your own maximum HP value
-              </p>
-              {hitPoints.calculationMode === 'auto' && (
-                <p className="text-accent-blue-text-muted">
-                  Current calculation: Level {level} {classInfo.name} ={' '}
-                  {hitPoints.max} HP
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+            </Section>
+          )}
+      </div>
+    </Section>
   );
 }

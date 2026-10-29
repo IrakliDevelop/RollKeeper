@@ -164,6 +164,7 @@ export interface TabbedSheetConfigParams {
   resetDeathSavingThrows: () => void;
   toggleHPCalculationMode: () => void;
   recalculateMaxHP: () => void;
+  setCurrentHitPoints: (value: number) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
 
   // Hit dice
@@ -1024,6 +1025,7 @@ function CombatTabContent({
                       onResetDeathSaves={params.resetDeathSavingThrows}
                       onToggleCalculationMode={params.toggleHPCalculationMode}
                       onRecalculateMaxHP={params.recalculateMaxHP}
+                      onSetCurrentHitPoints={params.setCurrentHitPoints}
                       onUpdateHitPoints={params.updateHitPoints}
                     />
                   </ErrorBoundary>

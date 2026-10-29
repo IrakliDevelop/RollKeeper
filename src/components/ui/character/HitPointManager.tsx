@@ -16,6 +16,7 @@ interface HitPointManagerProps {
   onResetDeathSaves: () => void;
   onToggleCalculationMode: () => void;
   onRecalculateMaxHP: () => void;
+  onSetCurrentHitPoints: (value: number) => void;
   onUpdateHitPoints: (updates: Partial<HitPoints>) => void;
   /** Sheet mode: false shows the build values as plain text. Defaults to true (editable) for callers outside the character sheet. */
   editing?: boolean;
@@ -35,6 +36,7 @@ export default function HitPointManager({
   onToggleCalculationMode,
   onRecalculateMaxHP,
   onUpdateHitPoints,
+  onSetCurrentHitPoints,
   editing = true,
   className = '',
 }: HitPointManagerProps) {
@@ -53,13 +55,9 @@ export default function HitPointManager({
       onToggleCalculationMode={onToggleCalculationMode}
       onRecalculateMaxHP={onRecalculateMaxHP}
       onUpdateHitPoints={onUpdateHitPoints}
-      readonly={false}
+      onSetCurrentHitPoints={onSetCurrentHitPoints}
       editing={editing}
-      compact={false}
-      showControls={true}
       showDeathSaves={true}
-      showCalculationInfo={true}
-      hideLabels={false}
       className={className}
     />
   );
