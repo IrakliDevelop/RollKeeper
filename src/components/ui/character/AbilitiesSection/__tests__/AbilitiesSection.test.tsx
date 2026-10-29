@@ -239,14 +239,16 @@ describe('AbilitiesSection in edit mode', () => {
     await userEvent.click(
       screen.getByRole('button', { name: 'Strength: modifier +3, score 16' })
     );
-    await userEvent.click(
-      screen.getByRole('button', { name: 'Increase Strength score' })
-    );
-    expect(screen.getByText('Modifier +3')).toBeInTheDocument();
+    const increase = screen.getByRole('button', {
+      name: 'Increase Strength score',
+    });
+    await userEvent.click(increase);
+    await userEvent.click(increase);
+    expect(screen.getByText('Modifier +4')).toBeInTheDocument();
     await act(() =>
       userEvent.click(screen.getByRole('button', { name: 'Save' }))
     );
-    expect(handlers.onUpdateAbilityScore).toHaveBeenCalledWith('strength', 17);
+    expect(handlers.onUpdateAbilityScore).toHaveBeenCalledWith('strength', 18);
   });
 
   it('toggles a save proficiency from the save dot', () => {
