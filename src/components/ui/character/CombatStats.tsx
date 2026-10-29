@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import type { ReactNode } from 'react';
 import { getBuffSpeedBonus } from '@/utils/calculations';
 import { Button, Switch } from '@/components/ui/forms';
 import { InPlaceField } from '@/components/ui/forms/InPlaceField';
@@ -24,6 +24,32 @@ interface CombatStatsProps {
   onRollInitiative: () => void;
 }
 
+function StatCell({
+  caption,
+  children,
+  note,
+}: {
+  caption: string;
+  children: ReactNode;
+  note?: ReactNode;
+}) {
+  return (
+    <div className="min-w-16 space-y-1">
+      <div className="type-num-lg text-heading flex min-h-10 items-center tabular-nums pointer-coarse:min-h-11">
+        {children}
+      </div>
+      <p className="type-caption text-muted">{caption}</p>
+      {note}
+    </div>
+  );
+}
+
+const EXTRA_SPEEDS = [
+  { key: 'flySpeed', label: 'Fly' },
+  { key: 'climbSpeed', label: 'Climb' },
+  { key: 'swimSpeed', label: 'Swim' },
+] as const;
+
 export default function CombatStats({
   character,
   editing = true,
@@ -35,107 +61,88 @@ export default function CombatStats({
   onToggleReaction,
   onRollInitiative,
 }: CombatStatsProps) {
-  const [showExtraSpeeds, setShowExtraSpeeds] = useState(
-    !!(character.flySpeed || character.climbSpeed || character.swimSpeed)
-  );
   const initiative = getInitiativeModifier();
   const rollLabel = `Roll initiative (d20 ${initiative < 0 ? '−' : '+'} ${Math.abs(initiative)})`;
   const speedBonus = getBuffSpeedBonus(character);
+  const extraSpeeds = EXTRA_SPEEDS.filter(
+    ({ key }) => editing || (character[key] ?? 0) > 0
+  );
   return (
-    <div>
-      <div className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <div className="type-num-lg text-heading flex items-center gap-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+        <StatCell
+          caption="Initiative"
+          note={
+            character.initiative.isOverridden && (
+              <p className="type-small text-muted">Custom</p>
+            )
+          }
+        >
+          <span className="flex items-center gap-3">
+            <span>
+              {initiative >= 0 && <span>+</span>}
               <InPlaceField
                 label="Initiative"
                 value={initiative}
                 editing={editing}
                 onCommit={v => onUpdateInitiative(v, true)}
               />
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label={rollLabel}
-                onClick={onRollInitiative}
-              >
-                <AppIcon name="dice" className="size-4" />
-              </Button>
-            </div>
-            <p className="type-caption text-muted">Initiative</p>
-            {character.initiative.isOverridden && (
-              <p className="type-small text-muted">Custom</p>
-            )}
-            {editing && character.initiative.isOverridden && (
-              <Button size="sm" onClick={onResetInitiativeToDefault}>
-                Reset to Dexterity modifier
-              </Button>
-            )}
-          </div>
-          <div className="space-y-2">
-            <div className="type-num-lg text-heading">
-              <InPlaceField
-                label="Speed"
-                value={character.speed}
-                editing={editing}
-                min={0}
-                onCommit={onUpdateSpeed}
-              />
-            </div>
-            <p className="type-caption text-muted">Speed</p>
-            {speedBonus !== 0 && (
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={rollLabel}
+              onClick={onRollInitiative}
+            >
+              <AppIcon name="dice" className="size-4" />
+            </Button>
+          </span>
+        </StatCell>
+        <StatCell
+          caption="Speed"
+          note={
+            speedBonus !== 0 && (
               <p className="type-small text-muted">
                 {character.speed + speedBonus} ft with buffs
               </p>
-            )}
-            <Button
-              size="sm"
-              onClick={() => setShowExtraSpeeds(!showExtraSpeeds)}
-              aria-expanded={showExtraSpeeds}
-              aria-label={
-                showExtraSpeeds
-                  ? 'Hide extra speeds'
-                  : 'Add fly/climb/swim speeds'
-              }
-            >
-              {showExtraSpeeds
-                ? 'Hide extra speeds'
-                : 'Add fly/climb/swim speeds'}
-            </Button>
-          </div>
-        </div>
-        {showExtraSpeeds && (
-          <div className="grid grid-cols-3 gap-3">
-            {(['fly', 'climb', 'swim'] as const).map(kind => {
-              const key = `${kind}Speed` as const;
-              const label =
-                kind === 'fly' ? 'Fly' : kind === 'climb' ? 'Climb' : 'Swim';
-              return (
-                <div key={kind} className="space-y-2">
-                  <div className="type-num-lg text-heading">
-                    <InPlaceField
-                      label={label}
-                      value={character[key] || 0}
-                      editing={editing}
-                      min={0}
-                      onCommit={v => onUpdateCharacter({ [key]: v })}
-                    />
-                  </div>
-                  <p className="type-caption text-muted">{label}</p>
-                </div>
-              );
-            })}
-          </div>
-        )}
-        <Switch
-          label="Reaction used"
-          description={
-            character.reaction.hasUsedReaction ? 'Used this turn' : 'Available'
+            )
           }
-          checked={character.reaction.hasUsedReaction}
-          onCheckedChange={() => onToggleReaction()}
-        />
+        >
+          <InPlaceField
+            label="Speed"
+            value={character.speed}
+            editing={editing}
+            min={0}
+            onCommit={onUpdateSpeed}
+          />
+          <span className="type-small text-muted ml-1">ft</span>
+        </StatCell>
+        {extraSpeeds.map(({ key, label }) => (
+          <StatCell key={key} caption={label}>
+            <InPlaceField
+              label={label}
+              value={character[key] || 0}
+              editing={editing}
+              min={0}
+              onCommit={v => onUpdateCharacter({ [key]: v })}
+            />
+            <span className="type-small text-muted ml-1">ft</span>
+          </StatCell>
+        ))}
       </div>
+      {editing && character.initiative.isOverridden && (
+        <Button size="sm" onClick={onResetInitiativeToDefault}>
+          Reset to Dexterity modifier
+        </Button>
+      )}
+      <Switch
+        label="Reaction used"
+        description={
+          character.reaction.hasUsedReaction ? 'Used this turn' : 'Available'
+        }
+        checked={character.reaction.hasUsedReaction}
+        onCheckedChange={() => onToggleReaction()}
+      />
     </div>
   );
 }

@@ -49,6 +49,12 @@ async function checkTargets(canvasElement: HTMLElement, coarse: boolean) {
   await expect(width).toBeGreaterThanOrEqual(coarse ? 44 : 24);
   await expect(rollBox.left).toBeGreaterThanOrEqual(right);
   await expect(rollBox.height).toBeGreaterThanOrEqual(coarse ? 44 : 24);
+  for (const name of ['Fly', 'Climb', 'Swim']) {
+    await expect(canvas.getByRole('textbox', { name })).toBeVisible();
+  }
+  await expect(
+    canvas.queryByRole('button', { name: /extra speeds/i })
+  ).toBeNull();
   const reset = canvas.getByRole('button', {
     name: 'Reset to Dexterity modifier',
   });
