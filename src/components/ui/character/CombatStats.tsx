@@ -46,7 +46,7 @@ export default function CombatStats({
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <div className="type-num-lg text-heading">
+            <div className="type-num-lg text-heading flex items-center gap-3">
               <InPlaceField
                 label="Initiative"
                 value={initiative}
