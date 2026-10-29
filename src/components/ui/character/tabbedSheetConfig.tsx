@@ -1043,7 +1043,7 @@ function CombatTabContent({
               <ErrorBoundary
                 fallback={<SheetLoadError thing="Weapon proficiencies" />}
               >
-                <WeaponProficiencies />
+                <WeaponProficiencies editing={params.editing} />
               </ErrorBoundary>
 
               <div

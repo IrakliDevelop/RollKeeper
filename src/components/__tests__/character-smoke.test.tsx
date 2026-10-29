@@ -133,7 +133,7 @@ describe('CharacterBasicInfo', { timeout: 10_000 }, () => {
         getClassDisplayString={() => 'Fighter 5'}
       />
     );
-    expect(screen.getAllByText('Character Information').length).toBeGreaterThan(
+    expect(screen.getAllByText('Character information').length).toBeGreaterThan(
       0
     );
   });
@@ -202,7 +202,7 @@ describe('MulticlassManager', () => {
         onUpdateClassLevel={vi.fn()}
       />
     );
-    expect(screen.getByText('Multiclass Levels')).toBeInTheDocument();
+    expect(screen.getByText('Classes')).toBeInTheDocument();
   });
 
   it('displays class names and total level', async () => {
@@ -237,9 +237,7 @@ describe('MulticlassManager', () => {
     );
     expect(screen.getAllByText('Fighter').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Wizard').length).toBeGreaterThan(0);
-    expect(
-      screen.getAllByText('Total Character Level:').length
-    ).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total level: 5').length).toBeGreaterThan(0);
   });
 });
 
@@ -260,7 +258,7 @@ describe('ArmorClassManager', () => {
       />
     );
     expect(
-      screen.getByText('ARMOR CLASS', { exact: false })
+      screen.getByText('Armor class', { exact: false })
     ).toBeInTheDocument();
   });
 
@@ -279,7 +277,7 @@ describe('ArmorClassManager', () => {
         onUpdateShieldBonus={vi.fn()}
       />
     );
-    expect(screen.getAllByText('Total AC').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Total').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Base AC').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Temp AC').length).toBeGreaterThan(0);
   });
@@ -304,7 +302,9 @@ describe('CombatStats', () => {
         onRollInitiative={vi.fn()}
       />
     );
-    expect(screen.getByText('INITIATIVE')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Initiative' })
+    ).toBeInTheDocument();
   });
 
   it('displays speed and reaction sections', async () => {
@@ -325,8 +325,8 @@ describe('CombatStats', () => {
         onRollInitiative={vi.fn()}
       />
     );
-    expect(screen.getAllByText('SPEED').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('REACTION').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Speed').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Reaction used').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Available').length).toBeGreaterThan(0);
   });
 });

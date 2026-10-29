@@ -1,15 +1,12 @@
 'use client';
 
+import { useMemo } from 'react';
 import { calculateCharacterArmorClass } from '@/utils/calculations';
-import { Input } from '@/components/ui/forms';
+import { Switch } from '@/components/ui/forms';
+import { InPlaceField } from '@/components/ui/forms/InPlaceField';
+import { Section } from '@/components/ui/layout/section';
+import { AcShield } from '@/components/ui/game/AcShield';
 import { CharacterState } from '@/types/character';
-import { Tooltip, TooltipProvider } from '@/components/ui/primitives/Tooltip';
-import { Info, Zap } from 'lucide-react';
-import { useState, useEffect, useMemo } from 'react';
-import { AppIcon } from '@/components/ui/icons';
-
-/** Base AC number: shared by the field and the play-mode text. */
-const BASE_AC_VALUE = 'text-accent-red-text text-center text-2xl font-bold';
 
 interface ArmorClassManagerProps {
   character: CharacterState;
@@ -34,255 +31,65 @@ export default function ArmorClassManager({
   onSetShieldEquipped,
   onUpdateShieldBonus,
 }: ArmorClassManagerProps) {
-  const [baseACInput, setBaseACInput] = useState(
-    character.armorClass.toString()
-  );
-  const [tempACInput, setTempACInput] = useState(
-    character.tempArmorClass.toString()
-  );
-  const [shieldBonusInput, setShieldBonusInput] = useState(
-    character.shieldBonus.toString()
-  );
-  const [wasEditing, setWasEditing] = useState(editing);
-
-  // Leaving edit mode without a blur drops the base AC draft, so the next
-  // edit starts from the stored value (same contract as InPlaceField).
-  if (!Object.is(editing, wasEditing)) {
-    setWasEditing(editing);
-    if (!editing) setBaseACInput(character.armorClass.toString());
-  }
-
-  useEffect(() => {
-    setBaseACInput(character.armorClass.toString());
-  }, [character.armorClass]);
-
-  useEffect(() => {
-    setTempACInput(character.tempArmorClass.toString());
-  }, [character.tempArmorClass]);
-
-  useEffect(() => {
-    setShieldBonusInput(character.shieldBonus.toString());
-  }, [character.shieldBonus]);
-
-  const handleBaseACChange = (value: string) => {
-    setBaseACInput(value);
-  };
-
-  const handleBaseACBlur = () => {
-    const numValue = parseInt(baseACInput);
-    const finalValue = isNaN(numValue) ? 10 : numValue;
-    const clampedValue = Math.max(0, Math.min(30, finalValue));
-    setBaseACInput(clampedValue.toString());
-    onUpdateArmorClass(clampedValue);
-  };
-
-  const handleBaseACKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
-  };
-
-  const handleTempACChange = (value: string) => {
-    setTempACInput(value);
-  };
-
-  const handleTempACBlur = () => {
-    const numValue = parseInt(tempACInput);
-    const finalValue = isNaN(numValue) ? 0 : numValue;
-    const clampedValue = Math.max(0, Math.min(20, finalValue));
-    setTempACInput(clampedValue.toString());
-    onUpdateTempArmorClass(clampedValue);
-  };
-
-  const handleTempACKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
-  };
-
-  const handleShieldBonusChange = (value: string) => {
-    setShieldBonusInput(value);
-  };
-
-  const handleShieldBonusBlur = () => {
-    const numValue = parseInt(shieldBonusInput);
-    const finalValue = isNaN(numValue) ? 2 : numValue;
-    const clampedValue = Math.max(0, Math.min(5, finalValue));
-    setShieldBonusInput(clampedValue.toString());
-    onUpdateShieldBonus(clampedValue);
-  };
-
-  const handleShieldBonusKeyDown = (
-    e: React.KeyboardEvent<HTMLInputElement>
-  ) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    }
-  };
-
   return (
-    <TooltipProvider>
-      <div className="mb-6">
-        <div className="border-accent-red-border rounded-xl border-2 bg-gradient-to-r from-[var(--gradient-red-from)] to-[var(--gradient-red-to)] p-6">
-          <div className="mb-6 text-center">
-            <h3 className="text-accent-red-text mb-3 flex items-center justify-center gap-2 text-xl font-bold">
-              <AppIcon name="armor" className="h-5 w-5" /> ARMOR CLASS
-            </h3>
-            <div className="text-accent-red-text mb-2 text-5xl font-bold">
-              {calculateCharacterArmorClass(character)}
-            </div>
-            <div className="text-accent-red-text-muted text-base font-medium">
-              Total AC
-            </div>
-          </div>
-
-          {/* AC Components - Row Layout with Better Alignment */}
-          <div className="mb-6 space-y-4">
-            {/* Base AC Row */}
-            <div className="border-accent-red-border-strong bg-surface-raised rounded-lg border-2 p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-[140px] items-center gap-1.5">
-                  <div className="text-accent-red-text text-lg font-bold">
-                    Base AC
-                  </div>
-                  <Tooltip content="From armor & dexterity modifier">
-                    <span className="text-accent-red-text-muted hover:text-accent-red-text cursor-help transition-colors">
-                      <Info size={16} />
-                    </span>
-                  </Tooltip>
-                </div>
-                {editing ? (
-                  <Input
-                    type="number"
-                    value={baseACInput}
-                    onChange={e => handleBaseACChange(e.target.value)}
-                    onBlur={handleBaseACBlur}
-                    onKeyDown={handleBaseACKeyDown}
-                    className={`border-accent-red-border-strong bg-accent-red-bg focus:border-accent-red-text-muted h-12 w-20 [appearance:textfield] border-2 ${BASE_AC_VALUE} [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none`}
-                    min="0"
-                    max="30"
-                  />
-                ) : (
-                  <div className="w-full">
-                    <span
-                      data-testid="base-ac-value"
-                      className={`flex h-12 w-20 items-center justify-center ${BASE_AC_VALUE}`}
-                    >
-                      {character.armorClass}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Temporary AC Row */}
-            <div
-              className={`bg-surface-raised rounded-lg border-2 p-4 shadow-sm transition-all duration-200 ${
-                character.isTempACActive
-                  ? 'bg-accent-orange-bg border-orange-500'
-                  : 'border-accent-orange-border hover:border-orange-400'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-[140px] items-center gap-1.5">
-                  <Tooltip
-                    content={`Click to ${character.isTempACActive ? 'deactivate' : 'activate'} temporary AC`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onSetTempACActive(!character.isTempACActive)
-                      }
-                      className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
-                        character.isTempACActive
-                          ? 'text-orange-700'
-                          : 'text-orange-800'
-                      }`}
-                    >
-                      <span>Temp AC</span>
-                    </button>
-                  </Tooltip>
-                  <Tooltip content="Bonuses from spells & temporary magical effects">
-                    <span className="cursor-help text-orange-400 transition-colors hover:text-orange-600">
-                      <Info size={16} />
-                    </span>
-                  </Tooltip>
-                </div>
-                <Input
-                  type="number"
-                  value={tempACInput}
-                  onChange={e => handleTempACChange(e.target.value)}
-                  onBlur={handleTempACBlur}
-                  onKeyDown={handleTempACKeyDown}
-                  disabled={!character.isTempACActive}
-                  className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-orange-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                    character.isTempACActive
-                      ? 'border-accent-orange-border bg-accent-orange-bg text-accent-orange-text'
-                      : 'border-divider bg-surface-secondary text-faint'
-                  }`}
-                  min="0"
-                  max="20"
-                />
-              </div>
-            </div>
-
-            {/* Shield Row */}
-            <div
-              className={`bg-surface-raised rounded-lg border-2 p-4 shadow-sm transition-all duration-200 ${
-                character.isWearingShield
-                  ? 'border-accent-blue-border-strong bg-accent-blue-bg'
-                  : 'border-accent-blue-border-strong hover:border-accent-blue-text-muted'
-              }`}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex min-w-[140px] items-center gap-1.5">
-                  <Tooltip
-                    content={`Click to ${character.isWearingShield ? 'unequip' : 'equip'} shield`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() =>
-                        onSetShieldEquipped(!character.isWearingShield)
-                      }
-                      className={`flex items-center gap-2 text-lg font-bold transition-opacity hover:opacity-80 ${
-                        character.isWearingShield
-                          ? 'text-blue-700'
-                          : 'text-blue-800'
-                      }`}
-                    >
-                      <span>Shield +</span>
-                    </button>
-                  </Tooltip>
-                  <Tooltip content="Shield bonus to AC (typically +2, or more for magical shields)">
-                    <span className="cursor-help text-blue-400 transition-colors hover:text-blue-600">
-                      <Info size={16} />
-                    </span>
-                  </Tooltip>
-                </div>
-                <Input
-                  type="number"
-                  value={shieldBonusInput}
-                  onChange={e => handleShieldBonusChange(e.target.value)}
-                  onBlur={handleShieldBonusBlur}
-                  onKeyDown={handleShieldBonusKeyDown}
-                  disabled={!character.isWearingShield}
-                  className={`h-12 w-20 [appearance:textfield] border-2 text-center text-2xl font-bold focus:border-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${
-                    character.isWearingShield
-                      ? 'border-accent-blue-border-strong bg-accent-blue-bg text-accent-blue-text'
-                      : 'border-divider bg-surface-secondary text-faint'
-                  }`}
-                  min="0"
-                  max="5"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* AC Formula Display */}
-          <ACFormulaDisplay character={character} />
+    <Section heading="Armor class" level={3}>
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <AcShield value={calculateCharacterArmorClass(character)} />
+          <span className="type-caption text-muted">Total</span>
         </div>
+        <div className="flex min-h-10 items-center justify-between gap-3 pointer-coarse:min-h-11">
+          <span className="type-ui text-body">Base AC</span>
+          <InPlaceField
+            label="Base AC"
+            value={character.armorClass}
+            editing={editing}
+            min={0}
+            max={30}
+            onCommit={onUpdateArmorClass}
+            className="type-num-lg text-heading"
+          />
+        </div>
+        <p className="type-small text-muted">Armor and Dexterity</p>
+        <div className="flex min-h-10 items-center justify-between gap-3 pointer-coarse:min-h-11">
+          <Switch
+            label="Temp AC"
+            checked={character.isTempACActive}
+            onCheckedChange={onSetTempACActive}
+          />
+          <InPlaceField
+            label="Temp AC"
+            value={character.tempArmorClass}
+            editing
+            min={0}
+            max={20}
+            onCommit={onUpdateTempArmorClass}
+            className="type-num-lg text-heading"
+          />
+        </div>
+        <p className="type-small text-muted">
+          Bonuses from spells and temporary magical effects
+        </p>
+        <div className="flex min-h-10 items-center justify-between gap-3 pointer-coarse:min-h-11">
+          <Switch
+            label="Shield"
+            checked={character.isWearingShield}
+            onCheckedChange={onSetShieldEquipped}
+          />
+          <InPlaceField
+            label="Shield bonus"
+            value={character.shieldBonus}
+            editing={editing}
+            min={0}
+            max={5}
+            onCommit={onUpdateShieldBonus}
+            className="type-num-lg text-heading"
+          />
+        </div>
+        <p className="type-small text-muted">Shield bonus to AC</p>
+        <ACFormulaDisplay character={character} />
       </div>
-    </TooltipProvider>
+    </Section>
   );
 }
 
@@ -323,59 +130,35 @@ function ACFormulaDisplay({ character }: { character: CharacterState }) {
   }, [character.temporaryBuffs]);
 
   return (
-    <div className="text-center">
-      <div className="border-accent-red-border-strong bg-surface-raised text-accent-red-text inline-flex flex-wrap items-center justify-center gap-3 rounded-lg border-2 px-6 py-3 text-lg font-medium shadow-sm">
+    <div className="type-small text-muted space-y-2">
+      <p>
         {buffBreakdown.override ? (
           <>
-            <Tooltip content={`${buffBreakdown.override.name} (override)`}>
-              <span className="text-accent-blue-text flex items-center gap-1 text-xl font-bold">
-                <Zap className="h-4 w-4" />
-                {buffBreakdown.override.value}
-              </span>
-            </Tooltip>
+            {buffBreakdown.override.value} ({buffBreakdown.override.name})
           </>
         ) : (
           <>
-            <span className="text-xl font-bold">{character.armorClass}</span>
+            {character.armorClass}
             {character.isTempACActive && character.tempArmorClass > 0 && (
-              <>
-                <span className="text-accent-red-text-muted text-lg">+</span>
-                <span className="text-xl font-bold">
-                  {character.tempArmorClass}
-                </span>
-              </>
+              <> + {character.tempArmorClass}</>
             )}
           </>
         )}
-        {character.isWearingShield && (
-          <>
-            <span className="text-accent-red-text-muted text-lg">+</span>
-            <span className="text-xl font-bold">{character.shieldBonus}</span>
-          </>
-        )}
+        {character.isWearingShield && <> + {character.shieldBonus}</>}
         {buffBreakdown.additive !== 0 && (
           <>
-            <span className="text-accent-red-text-muted text-lg">
-              {buffBreakdown.additive > 0 ? '+' : '−'}
-            </span>
-            <Tooltip content="From temporary buffs">
-              <span className="text-accent-blue-text flex items-center gap-1 text-xl font-bold">
-                <Zap className="h-4 w-4" />
-                {Math.abs(buffBreakdown.additive)}
-              </span>
-            </Tooltip>
+            {' '}
+            {buffBreakdown.additive > 0 ? '+' : '−'}{' '}
+            {Math.abs(buffBreakdown.additive)} (From temporary buffs)
           </>
         )}
-        <span className="text-accent-red-text-muted text-lg">=</span>
-        <span className="text-accent-red-text text-2xl font-bold">
-          {totalAC}
-        </span>
-      </div>
+        {' = '}
+        {totalAC}
+      </p>
       {buffBreakdown.floor && (
-        <div className="text-accent-blue-text mt-2 flex items-center justify-center gap-1 text-xs">
-          <Zap className="h-3 w-3" />
-          Min AC {buffBreakdown.floor.value} ({buffBreakdown.floor.name})
-        </div>
+        <p>
+          Minimum AC {buffBreakdown.floor.value} from {buffBreakdown.floor.name}
+        </p>
       )}
     </div>
   );

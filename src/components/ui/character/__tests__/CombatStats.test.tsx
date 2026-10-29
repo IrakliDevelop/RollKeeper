@@ -30,17 +30,19 @@ describe('CombatStats sheet mode', () => {
     expect(screen.getByDisplayValue('60')).toBeInTheDocument();
   });
 
-  it('shows speeds as text in play mode; initiative stays editable', () => {
+  it('shows speeds as text in play mode; initiative is plain text', () => {
     renderStats(false);
     expect(screen.queryByDisplayValue('35')).toBeNull();
     expect(screen.queryByDisplayValue('60')).toBeNull();
     expect(screen.getByText('35')).toBeInTheDocument();
     expect(screen.getByText('60')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('3')).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Initiative' })).toBeNull();
   });
 
   it('keeps the extra-speeds toggle in play mode', () => {
     renderStats(false);
-    expect(screen.getByTitle('Hide extra speeds')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Hide extra speeds' })
+    ).toBeInTheDocument();
   });
 });

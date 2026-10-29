@@ -33,16 +33,15 @@ describe('ArmorClassManager sheet mode', () => {
   it('shows base AC as text in play mode', () => {
     renderAc(false);
     expect(screen.queryByDisplayValue('17')).toBeNull();
-    expect(screen.getByTestId('base-ac-value')).toHaveTextContent('17');
-    // Same wrapper as the design-system Input, so it lands where the field does.
-    expect(screen.getByTestId('base-ac-value').parentElement).toHaveClass(
-      'w-full'
-    );
+    expect(screen.queryByRole('textbox', { name: 'Base AC' })).toBeNull();
   });
 
-  it('keeps temp AC and shield bonus fields in play mode', () => {
+  it('keeps temp AC live and gates shield bonus in play mode', () => {
     renderAc(false);
-    expect(screen.getByDisplayValue('2')).toBeInTheDocument();
+    expect(
+      screen.getByRole('textbox', { name: 'Temp AC' })
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Shield bonus' })).toBeNull();
   });
 
   it('drops an uncommitted base AC draft when leaving edit mode without a blur', () => {
