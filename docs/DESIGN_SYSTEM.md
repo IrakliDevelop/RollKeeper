@@ -361,3 +361,29 @@ Vane? The sheet is removed from this device." with "Delete character").
 - `npm run design:contrast` (CI) fails if a role or neutral pairing drops
   below WCAG AA in either theme.
 - `npm run copy:changed` lists the strings a branch adds for the copy review.
+
+
+## Shared app header and sub-tabs
+
+`AppHeader` (`ui/layout/AppHeader`) supplies the brass keyhole home link and
+Vollkorn wordmark (`sm+`), then a `leading` crumb, `title`, optional `nav`
+(`md+`), `actions`, built-in `HeaderTrailing` and optional `subbar`. `sticky`
+keeps it at the top. It publishes its complete observed height as
+`--app-header-height`; sheet jump targets use that value. The sheet is its
+first adopter. Its identity card remains for 03b.
+
+Account and theme triggers are ghost icon buttons; Sign in is secondary.
+The theme cycle defaults to light → system → dark → light on every page.
+The campaign chip shows just its dot and link icon below `sm`, with its
+campaign and time still available to screen readers.
+
+`SubTabs` (`ui/layout/SubTabs`) uses Radix text tabs and a 2px brass active
+underline. Callers supply stable ids and values, contents, and a list label;
+selection may be controlled or uncontrolled and is never persisted here.
+It is unwired until 03b.
+
+`Section` accepts `collapsible="stable-key"` to make its heading a disclosure.
+The right chevron and `aria-expanded` show state; trailing controls stay
+outside the disclosure. The per-device boolean map `collapsed` lives in
+`rollkeeper-ui-prefs`, merged with defaults and validated on read. It has no
+production adopter in 03a.

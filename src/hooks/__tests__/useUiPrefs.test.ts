@@ -22,13 +22,17 @@ function otherTabWrites(value: string | null, key: string | null = KEY) {
 describe('parseUiPrefs', () => {
   it('returns the defaults when nothing is stored', async () => {
     const { parseUiPrefs } = await load();
-    expect(parseUiPrefs(null)).toEqual({ abilityDisplay: 'modifier' });
+    expect(parseUiPrefs(null)).toEqual({
+      abilityDisplay: 'modifier',
+      collapsed: {},
+    });
   });
 
   it('reads a stored value', async () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs('{"abilityDisplay":"score"}')).toEqual({
       abilityDisplay: 'score',
+      collapsed: {},
     });
   });
 
@@ -36,7 +40,10 @@ describe('parseUiPrefs', () => {
     'returns the defaults for %s',
     async raw => {
       const { parseUiPrefs } = await load();
-      expect(parseUiPrefs(raw)).toEqual({ abilityDisplay: 'modifier' });
+      expect(parseUiPrefs(raw)).toEqual({
+        abilityDisplay: 'modifier',
+        collapsed: {},
+      });
     }
   );
 
@@ -44,7 +51,10 @@ describe('parseUiPrefs', () => {
     'falls back to the default for a bad value in %s',
     async raw => {
       const { parseUiPrefs } = await load();
-      expect(parseUiPrefs(raw)).toEqual({ abilityDisplay: 'modifier' });
+      expect(parseUiPrefs(raw)).toEqual({
+        abilityDisplay: 'modifier',
+        collapsed: {},
+      });
     }
   );
 
@@ -52,6 +62,7 @@ describe('parseUiPrefs', () => {
     const { parseUiPrefs } = await load();
     expect(parseUiPrefs('{"abilityDisplay":"score","future":1}')).toEqual({
       abilityDisplay: 'score',
+      collapsed: {},
     });
   });
 });
@@ -90,7 +101,10 @@ describe('useUiPrefs', () => {
   it('starts from the defaults with nothing stored', async () => {
     const { useUiPrefs } = await load();
     const { result } = renderHook(() => useUiPrefs());
-    expect(result.current.prefs).toEqual({ abilityDisplay: 'modifier' });
+    expect(result.current.prefs).toEqual({
+      abilityDisplay: 'modifier',
+      collapsed: {},
+    });
     expect(result.current.localChange).toBe(false);
   });
 
@@ -219,4 +233,56 @@ describe('useUiPrefs', () => {
     b.unmount();
     expect(remove).toHaveBeenCalledWith('storage', expect.any(Function));
   });
+});
+
+describe('collapsed section preferences', () => {
+  it('validates the entire boolean map and tolerates older preferences', async () => {
+    const { parseUiPrefs } = await load();
+    expect(
+      parseUiPrefs('{"collapsed":{"spells":true,"notes":false}}').collapsed
+    ).toEqual({ spells: true, notes: false });
+    for (const collapsed of [null, [], true, { spells: 'yes' }]) {
+      expect(parseUiPrefs(JSON.stringify({ collapsed })).collapsed).toEqual({});
+    }
+  });
+});
+
+it('retains visit-local choices across preference keys when writes are refused', async () => {
+  localStorage.clear();
+  vi.resetModules();
+  localStorage.setItem(KEY, '{"abilityDisplay":"modifier","future":1}');
+  const { useUiPrefs } = await load();
+  const { result } = renderHook(() => useUiPrefs());
+  vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+    throw new DOMException('full', 'QuotaExceededError');
+  });
+  act(() => result.current.setPref('collapsed', { spells: true }));
+  act(() => result.current.setPref('abilityDisplay', 'score'));
+  expect(result.current.prefs).toEqual({
+    abilityDisplay: 'score',
+    collapsed: { spells: true },
+  });
+  act(() =>
+    result.current.setPref('collapsed', {
+      ...result.current.prefs.collapsed,
+      notes: true,
+    })
+  );
+  expect(result.current.prefs.abilityDisplay).toBe('score');
+  expect(result.current.prefs.collapsed).toEqual({ spells: true, notes: true });
+  expect(JSON.parse(localStorage.getItem(KEY)!)).toEqual({
+    abilityDisplay: 'modifier',
+    future: 1,
+  });
+  // A genuine external write invalidates the visit-local values.
+  vi.restoreAllMocks();
+  act(() =>
+    otherTabWrites('{"abilityDisplay":"modifier","collapsed":{"other":true}}')
+  );
+  expect(result.current.prefs).toEqual({
+    abilityDisplay: 'modifier',
+    collapsed: { other: true },
+  });
+  cleanup();
+  localStorage.clear();
 });

@@ -63,22 +63,25 @@ describe('AccountHeaderEntry', () => {
     await screen.findByRole('button', {
       name: 'Account menu for lyra@example.com',
     });
-    expect(screen.getByText('lyra@example.com')).toHaveClass(
-      'hidden',
-      'sm:block'
-    );
+    expect(
+      screen.getByRole('button', { name: 'Account menu for lyra@example.com' })
+    ).toHaveAttribute('data-variant', 'ghost');
+    expect(screen.getByText('LY')).toBeVisible();
   });
 
   it('opens sign-in from the header chip and shows the signed-in menu', async () => {
     render(<AccountHeaderEntry />);
 
+    expect(screen.getByRole('button', { name: 'Sign in' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
     fireEvent.click(screen.getByRole('button', { name: 'Sign in' }));
     expect(screen.getByLabelText(/^Email address/)).toBeInTheDocument();
 
     authListener?.('SIGNED_IN', { user: { email: 'lyra@example.com' } });
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
 
-    expect(await screen.findByText('lyra@example.com')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /lyra@example.com/i }));
     expect(
       screen.getByRole('menuitem', { name: 'Switch account' })

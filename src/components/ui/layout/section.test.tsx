@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { Section } from './section';
@@ -59,4 +59,66 @@ describe('Section', () => {
     const section = screen.getByTestId('section');
     expect(section.className).not.toMatch(/\b(bg-|border|rounded|shadow)/);
   });
+});
+
+describe('collapsible Section', () => {
+  afterEach(() => {
+    cleanup();
+    localStorage.removeItem('rollkeeper-ui-prefs');
+  });
+  it('discloses from the heading, persists by key, and keeps trailing controls separate', () => {
+    const { unmount } = render(
+      <Section
+        heading="Spells"
+        collapsible="test-spells"
+        trailing={<button>Add spell</button>}
+      >
+        <p>Prepared spells</p>
+      </Section>
+    );
+    const trigger = screen.getByRole('button', { name: 'Spells' });
+    expect(trigger).toHaveAttribute('aria-expanded', 'true');
+    expect(trigger).not.toContainElement(
+      screen.getByRole('button', { name: 'Add spell' })
+    );
+    fireEvent.click(trigger);
+    expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Prepared spells')).not.toBeInTheDocument();
+    expect(
+      JSON.parse(localStorage.getItem('rollkeeper-ui-prefs')!).collapsed[
+        'test-spells'
+      ]
+    ).toBe(true);
+    unmount();
+    render(
+      <Section heading="Spells" collapsible="test-spells">
+        <p>Prepared spells</p>
+      </Section>
+    );
+    expect(screen.getByRole('button', { name: 'Spells' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Spells' }));
+    expect(screen.getByText('Prepared spells')).toBeVisible();
+  });
+});
+
+it('does not submit an enclosing form when disclosing its content', () => {
+  let submitted = false;
+  render(
+    <form
+      onSubmit={event => {
+        event.preventDefault();
+        submitted = true;
+      }}
+    >
+      <Section heading="Notes" collapsible="form-notes">
+        Session notes
+      </Section>
+    </form>
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Notes' }));
+  expect(submitted).toBe(false);
+  cleanup();
 });

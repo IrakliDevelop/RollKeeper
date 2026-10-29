@@ -1081,7 +1081,7 @@ function CombatTabContent({
 
           <div
             id="conditions-section"
-            className="scroll-mt-[calc(var(--sheet-bar-height,4rem)+1rem)]"
+            className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
           >
             <ErrorBoundary
               fallback={

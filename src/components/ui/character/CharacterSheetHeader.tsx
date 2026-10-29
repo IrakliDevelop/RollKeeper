@@ -4,11 +4,11 @@ import { Download, Upload, RotateCcw, ArrowLeft, Share2 } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
 import { Badge } from '@/components/ui/layout/badge';
-import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
+import { AppHeader } from '@/components/ui/layout/AppHeader';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Button, Input, Switch } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
 import { QRShareDialog } from './QRShareDialog';
@@ -81,92 +81,58 @@ export default function CharacterSheetHeader({
   const { editing, setEditing } = useSheetMode();
   const [shareOpen, setShareOpen] = useState(false);
 
-  // The bar never hides, so sticky content and scroll-to targets below it
-  // offset by its height (which grows with the "Editing sheet" row).
-  const barRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const bar = barRef.current;
-    if (!bar) return;
-    const root = document.documentElement;
-    const publish = () =>
-      root.style.setProperty(
-        '--sheet-bar-height',
-        `${bar.getBoundingClientRect().height}px`
-      );
-    publish();
-    if (typeof ResizeObserver === 'undefined') {
-      return () => root.style.removeProperty('--sheet-bar-height');
-    }
-    const observer = new ResizeObserver(publish);
-    observer.observe(bar);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty('--sheet-bar-height');
-    };
-  }, []);
-
   return (
     <>
-      <header
-        ref={barRef}
-        className="border-divider bg-surface-raised sticky top-0 z-50 border-b shadow-lg"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex min-h-16 items-center justify-between gap-3 py-2 sm:gap-4">
-            <div className="flex min-w-0 items-center">
-              <Link href="/player" className="shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="px-2 whitespace-nowrap sm:px-4"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  <span className="sr-only sm:not-sr-only">
-                    Back to Characters
-                  </span>
-                </Button>
-              </Link>
-              <div className="ml-3 min-w-0 sm:ml-4">
-                <h1 className="text-heading truncate text-xl font-bold">
-                  {characterName}
-                </h1>
-                <p className="text-body truncate text-sm">
-                  {characterRace} {characterClass || 'Unknown Class'} • Level{' '}
-                  {characterLevel}
-                </p>
-              </div>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
-              <Switch
-                label="Edit sheet"
-                size="sm"
-                checked={editing}
-                onCheckedChange={setEditing}
-                labelClassName="sr-only sm:not-sr-only"
-                wrapperClassName="shrink-0 items-center gap-0 whitespace-nowrap sm:gap-3"
-              />
-
-              <SaveIndicator
-                lastSaved={lastSaved}
-                status={saveStatus}
-                textClassName="sr-only sm:not-sr-only"
-              />
-
-              {extraHeaderContent}
-
-              <HeaderTrailing />
-            </div>
-          </div>
-        </div>
-        {editing && (
-          <div className="border-divider bg-surface-secondary border-t">
-            <p className="type-small text-body mx-auto max-w-7xl px-4 py-1 sm:px-6 lg:px-8">
-              Editing sheet
+      <AppHeader
+        sticky
+        leading={
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            className="shrink-0 px-2 whitespace-nowrap sm:px-4"
+            leftIcon={<ArrowLeft size={20} />}
+          >
+            <Link href="/player">
+              <span className="sr-only sm:not-sr-only">Characters</span>
+            </Link>
+          </Button>
+        }
+        title={
+          <>
+            <h1 className="type-subheading text-heading truncate">
+              {characterName}
+            </h1>
+            <p className="type-small text-body truncate">
+              {characterRace} {characterClass || 'Unknown Class'} • Level{' '}
+              {characterLevel}
             </p>
-          </div>
-        )}
-      </header>
+          </>
+        }
+        actions={
+          <>
+            <Switch
+              label="Edit sheet"
+              size="sm"
+              checked={editing}
+              onCheckedChange={setEditing}
+              labelClassName="sr-only sm:not-sr-only"
+              wrapperClassName="min-h-6 shrink-0 items-center gap-0 whitespace-nowrap sm:gap-3"
+            />
+            <SaveIndicator
+              lastSaved={lastSaved}
+              status={saveStatus}
+              textClassName="sr-only sm:not-sr-only"
+            />
+            {extraHeaderContent}
+          </>
+        }
+        subbar={
+          editing ? (
+            <p className="type-small text-body py-1">Editing sheet</p>
+          ) : undefined
+        }
+      />
 
       {/* Main Character Header */}
       <header className="relative z-30 mx-auto mb-8 max-w-7xl">

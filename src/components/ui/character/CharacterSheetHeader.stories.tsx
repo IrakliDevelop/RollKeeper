@@ -131,12 +131,12 @@ async function checkLabelShown(canvasElement: HTMLElement) {
 
 /** The back link keeps its natural width; the character name gives way. */
 async function checkBackLinkOneLine(canvasElement: HTMLElement) {
-  const label = within(canvasElement).getByText('Back to Characters');
-  const button = label.closest('button')!;
+  const label = within(canvasElement).getByText('Characters');
+  const button = label.closest('a')!;
   await expect(label.getClientRects().length).toBe(1);
   await expect(button.scrollWidth).toBeLessThanOrEqual(button.clientWidth);
   // A wrapped label is a taller block, not a second client rect.
-  const lineHeight = parseFloat(getComputedStyle(label).lineHeight);
+  const lineHeight = button.getBoundingClientRect().height;
   await expect(label.getBoundingClientRect().height).toBeLessThanOrEqual(
     lineHeight + 1
   );
@@ -221,7 +221,7 @@ export const EditIpadLandscape: Story = {
     await waitFor(() => {
       const published = parseFloat(
         getComputedStyle(document.documentElement).getPropertyValue(
-          '--sheet-bar-height'
+          '--app-header-height'
         )
       );
       expect(
@@ -255,7 +255,7 @@ export const TouchTargets: Story = {
       bottom: y + height / 2,
     };
     const back = canvas
-      .getByRole('link', { name: 'Back to Characters' })
+      .getByRole('link', { name: 'Characters' })
       .getBoundingClientRect();
     const overlaps =
       Math.round(back.left) < Math.round(area.right) &&

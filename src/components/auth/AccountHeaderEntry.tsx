@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ChevronDown, LogIn, LogOut, RefreshCw, Shield } from 'lucide-react';
+import { LogIn, LogOut, RefreshCw, Shield } from 'lucide-react';
 
 import { Button } from '@/components/ui/forms/button';
 
@@ -117,26 +117,18 @@ function AccountHeaderSession() {
     <div className="relative" ref={menuRef}>
       {email ? (
         <>
-          <button
+          <Button
             type="button"
-            className="border-divider bg-surface-raised text-heading hover:bg-surface-hover inline-flex h-9 items-center gap-2 rounded-full border py-0 pr-2 pl-1 text-sm font-medium"
+            variant="ghost"
+            size="sm"
+            className="size-9 shrink-0 px-0"
             aria-label={`Account menu for ${email}`}
             aria-haspopup="menu"
             aria-expanded={menuOpen}
             onClick={() => setMenuOpen(open => !open)}
           >
-            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-emerald-700 text-xs font-bold text-white">
-              {accountInitials(email)}
-            </span>
-            <span className="hidden max-w-[168px] truncate sm:block">
-              {email}
-            </span>
-            <ChevronDown
-              className={`text-muted mr-1 hidden h-4 w-4 transition-transform duration-150 sm:block ${
-                menuOpen ? 'rotate-180' : ''
-              }`}
-            />
-          </button>
+            <span className="type-ui">{accountInitials(email)}</span>
+          </Button>
           {menuOpen && (
             <div
               role="menu"
@@ -196,9 +188,8 @@ function AccountHeaderSession() {
       ) : (
         <Button
           type="button"
-          variant="primary"
+          variant="secondary"
           size="sm"
-          className="rounded-full"
           leftIcon={<LogIn className="h-4 w-4" />}
           onClick={() => setSignInOpen(true)}
         >
