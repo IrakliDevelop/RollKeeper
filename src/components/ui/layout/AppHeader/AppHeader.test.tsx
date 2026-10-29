@@ -4,7 +4,10 @@ import { AppHeader } from './index';
 vi.mock('@/components/auth/HeaderTrailing', () => ({
   HeaderTrailing: () => <button>Theme</button>,
 }));
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 it('renders one banner with slots and publishes its full observed height', () => {
   let publish = () => {};
   const disconnect = vi.fn();
@@ -47,5 +50,4 @@ it('renders one banner with slots and publishes its full observed height', () =>
   expect(
     document.documentElement.style.getPropertyValue('--app-header-height')
   ).toBe('');
-  vi.unstubAllGlobals();
 });

@@ -34,7 +34,7 @@ export function SubTabs({ tabs, label, ...props }: SubTabsProps) {
             value={tab.value}
             disabled={tab.disabled}
             aria-controls={`${tab.id}-panel`}
-            className="type-ui text-muted focus-visible:ring-brass-fill data-[state=active]:border-brass-fill data-[state=active]:text-heading min-h-6 shrink-0 cursor-pointer border-b-2 border-transparent px-3 py-2 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
+            className="type-ui text-muted focus-visible:ring-brass-fill data-[state=active]:border-brass-fill data-[state=active]:text-heading -mb-px min-h-6 shrink-0 cursor-pointer border-b-2 border-transparent px-3 py-2 focus-visible:ring-2 focus-visible:outline-none focus-visible:ring-inset disabled:cursor-not-allowed disabled:opacity-50 pointer-coarse:min-h-11"
           >
             {tab.label}
           </Tabs.Trigger>

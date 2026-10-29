@@ -165,6 +165,14 @@ export function setPref<K extends keyof UiPrefs>(key: K, value: UiPrefs[K]) {
   emitChange();
 }
 
+/**
+ * Set one section's collapsed state, merged into the freshest stored map so
+ * a change made elsewhere since the last render is kept.
+ */
+export function setCollapsed(key: string, collapsed: boolean) {
+  setPref('collapsed', { ...getSnapshot().prefs.collapsed, [key]: collapsed });
+}
+
 export interface UseUiPrefs extends UiPrefsSnapshot {
   setPref: typeof setPref;
 }

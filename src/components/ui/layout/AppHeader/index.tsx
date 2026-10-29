@@ -15,7 +15,10 @@ export interface AppHeaderProps {
   sticky?: boolean;
 }
 
-/** Shared shell. The measured height includes wrapped controls and subbar. */
+/**
+ * Shared shell. Title and controls share one row when they fit and wrap to two
+ * otherwise. The measured height includes wrapped controls and subbar.
+ */
 export function AppHeader({
   leading,
   title,
@@ -55,13 +58,13 @@ export function AppHeader({
       )}
     >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 flex-1 basis-full items-center gap-2 xl:basis-0">
+        <div className="flex min-w-0 flex-[1_1_24rem] items-center gap-2">
           <Brand />
           {leading}
           <div className="min-w-0 flex-1">{title}</div>
         </div>
         {nav && <div className="hidden md:block">{nav}</div>}
-        <div className="flex w-full shrink-0 items-center justify-end gap-2 sm:gap-3 xl:w-auto">
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
           {actions && (
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               {actions}
@@ -72,7 +75,7 @@ export function AppHeader({
       </div>
       {subbar != null && (
         <div className="border-divider bg-surface-secondary border-t">
-          {subbar}
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">{subbar}</div>
         </div>
       )}
     </header>

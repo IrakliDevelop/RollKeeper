@@ -129,9 +129,7 @@ export default function CharacterSheetHeader({
         }
         subbar={
           editing ? (
-            <p className="type-small text-body mx-auto max-w-7xl px-4 py-1 sm:px-6 lg:px-8">
-              Editing sheet
-            </p>
+            <p className="type-small text-body py-1">Editing sheet</p>
           ) : undefined
         }
       />

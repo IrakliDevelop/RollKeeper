@@ -107,6 +107,7 @@ export function SyncIndicator({
     <div className="relative" ref={menuRef}>
       <button
         ref={triggerRef}
+        aria-expanded={menuOpen}
         onClick={() => setMenuOpen(!menuOpen)}
         className="border-divider bg-surface-secondary hover:bg-surface-hover focus-visible:outline-ring flex min-h-6 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >

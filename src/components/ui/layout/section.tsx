@@ -11,7 +11,7 @@
 import * as React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { useUiPrefs } from '@/hooks/useUiPrefs';
+import { setCollapsed, useUiPrefs } from '@/hooks/useUiPrefs';
 import { cn } from '@/utils/cn';
 
 export type SectionHeadingLevel = 2 | 3 | 4;
@@ -45,11 +45,16 @@ const HEADING_CLASS: Record<SectionHeadingLevel, string> = {
   4: 'type-label-heading',
 };
 
-const Section = React.forwardRef<HTMLElement, SectionProps>(
+interface SectionViewProps extends Omit<SectionProps, 'collapsible'> {
+  /** Present only for a collapsible section. */
+  toggle?: { collapsed: boolean; onToggle: () => void };
+}
+
+const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
   (
     {
       heading,
-      collapsible,
+      toggle,
       level = 2,
       trailing,
       className,
@@ -61,10 +66,7 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
   ) => {
     const headingId = React.useId();
     const contentId = React.useId();
-    const { prefs, setPref } = useUiPrefs();
-    const collapsed = collapsible
-      ? prefs.collapsed[collapsible] === true
-      : false;
+    const collapsed = toggle?.collapsed ?? false;
     const Heading = `h${level}` as const;
 
     return (
@@ -79,7 +81,7 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
             id={headingId}
             className={cn('text-heading min-w-0', HEADING_CLASS[level])}
           >
-            {collapsible ? (
+            {toggle ? (
               <Button
                 type="button"
                 variant="ghost"
@@ -89,12 +91,7 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
                   'h-auto min-h-6 justify-start px-0 py-0 text-left pointer-coarse:min-h-11',
                   HEADING_CLASS[level]
                 )}
-                onClick={() =>
-                  setPref('collapsed', {
-                    ...prefs.collapsed,
-                    [collapsible]: !collapsed,
-                  })
-                }
+                onClick={toggle.onToggle}
               >
                 {heading}
                 <ChevronDown
@@ -120,6 +117,36 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
       </section>
     );
   }
+);
+SectionView.displayName = 'SectionView';
+
+// Only collapsible sections subscribe to the UI prefs store.
+const CollapsibleSection = React.forwardRef<
+  HTMLElement,
+  SectionProps & { collapsible: string }
+>(({ collapsible, ...props }, ref) => {
+  const { prefs } = useUiPrefs();
+  const collapsed = prefs.collapsed[collapsible] === true;
+  return (
+    <SectionView
+      ref={ref}
+      {...props}
+      toggle={{
+        collapsed,
+        onToggle: () => setCollapsed(collapsible, !collapsed),
+      }}
+    />
+  );
+});
+CollapsibleSection.displayName = 'CollapsibleSection';
+
+const Section = React.forwardRef<HTMLElement, SectionProps>(
+  ({ collapsible, ...props }, ref) =>
+    collapsible ? (
+      <CollapsibleSection ref={ref} collapsible={collapsible} {...props} />
+    ) : (
+      <SectionView ref={ref} {...props} />
+    )
 );
 Section.displayName = 'Section';
 
