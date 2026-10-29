@@ -92,7 +92,7 @@ export default function CombatStats({
               variant="ghost"
               size="sm"
               aria-label={rollLabel}
-              onClick={onRollInitiative}
+              onClick={() => onRollInitiative()}
             >
               <AppIcon name="dice" className="size-4" />
             </Button>
@@ -131,7 +131,7 @@ export default function CombatStats({
         ))}
       </div>
       {editing && character.initiative.isOverridden && (
-        <Button size="sm" onClick={onResetInitiativeToDefault}>
+        <Button size="sm" onClick={() => onResetInitiativeToDefault()}>
           Reset to Dexterity modifier
         </Button>
       )}

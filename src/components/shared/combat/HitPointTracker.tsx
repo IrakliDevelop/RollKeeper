@@ -206,7 +206,7 @@ export function HitPointTracker({
               {onToggleCalculationMode && (
                 <Button
                   size="sm"
-                  onClick={onToggleCalculationMode}
+                  onClick={() => onToggleCalculationMode()}
                   aria-label={`Switch to ${mode === 'auto' ? 'manual' : 'auto'} calculation`}
                 >
                   {mode === 'auto' ? 'Manual' : 'Auto'}
@@ -282,7 +282,7 @@ export function HitPointTracker({
                   <Button
                     size="sm"
                     aria-label="Reset death saves"
-                    onClick={onResetDeathSaves}
+                    onClick={() => onResetDeathSaves()}
                   >
                     Reset
                   </Button>

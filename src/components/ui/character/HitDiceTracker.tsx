@@ -73,7 +73,7 @@ export default function HitDiceTracker({
       </div>
       {dieTypes.length > 0 && (
         <div className="mt-3">
-          <Button size="sm" onClick={onResetAllHitDice}>
+          <Button size="sm" onClick={() => onResetAllHitDice()}>
             Restore all hit dice
           </Button>
         </div>

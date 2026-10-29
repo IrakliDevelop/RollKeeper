@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import CombatStats from '../CombatStats';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
@@ -9,7 +9,8 @@ afterEach(cleanup);
 function renderStats(
   editing?: boolean,
   overrides: Partial<CharacterState> = {},
-  initiative = 3
+  initiative = 3,
+  handlers: { reset?: () => void; roll?: () => void } = {}
 ) {
   const character = makeCharacter({ speed: 35, flySpeed: 60, ...overrides });
   return render(
@@ -18,12 +19,12 @@ function renderStats(
       editing={editing}
       getInitiativeModifier={() => initiative}
       onUpdateInitiative={vi.fn()}
-      onResetInitiativeToDefault={vi.fn()}
+      onResetInitiativeToDefault={handlers.reset ?? vi.fn()}
       onUpdateSpeed={vi.fn()}
       onUpdateCharacter={vi.fn()}
       onToggleReaction={vi.fn()}
       onResetReaction={vi.fn()}
-      onRollInitiative={vi.fn()}
+      onRollInitiative={handlers.roll ?? vi.fn()}
     />
   );
 }
@@ -114,5 +115,19 @@ describe('CombatStats sheet mode', () => {
     cleanup();
     renderStats(true, { initiative: { value: 3, isOverridden: false } });
     expect(screen.queryByRole('button', reset)).toBeNull();
+  });
+});
+
+describe('CombatStats click handlers', () => {
+  it('calls the initiative actions without the click event', () => {
+    const reset = vi.fn();
+    const roll = vi.fn();
+    renderStats(true, overridden, 3, { reset, roll });
+    fireEvent.click(screen.getByRole('button', { name: /^Roll initiative/ }));
+    expect(roll).toHaveBeenCalledWith();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reset to Dexterity modifier' })
+    );
+    expect(reset).toHaveBeenCalledWith();
   });
 });

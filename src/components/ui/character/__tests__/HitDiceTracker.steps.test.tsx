@@ -23,7 +23,7 @@ it('uses or restores exactly one die regardless of pip position', () => {
   );
   expect(restore).toHaveBeenCalledExactlyOnceWith('d10', 1);
   fireEvent.click(screen.getByRole('button', { name: 'Restore all hit dice' }));
-  expect(all).toHaveBeenCalledOnce();
+  expect(all).toHaveBeenCalledExactlyOnceWith();
 });
 
 const noop = vi.fn();

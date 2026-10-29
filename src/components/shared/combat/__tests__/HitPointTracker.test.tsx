@@ -295,6 +295,25 @@ describe('HitPointTracker', () => {
     expect(onResetDeathSaves).toHaveBeenCalled();
   });
 
+  it('calls onResetDeathSaves and onToggleCalculationMode without the click event', () => {
+    const onResetDeathSaves = vi.fn();
+    const onToggleCalculationMode = vi.fn();
+    render(
+      <HitPointTracker
+        hitPoints={dyingHitPoints}
+        editing
+        onResetDeathSaves={onResetDeathSaves}
+        onToggleCalculationMode={onToggleCalculationMode}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Reset death saves' }));
+    expect(onResetDeathSaves).toHaveBeenCalledWith();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Switch to manual calculation' })
+    );
+    expect(onToggleCalculationMode).toHaveBeenCalledWith();
+  });
+
   it('shows "Dying" status text when character is at 0 HP and not stabilized', () => {
     render(<HitPointTracker hitPoints={dyingHitPoints} />);
     expect(screen.getAllByText(/Dying/).length).toBeGreaterThan(0);
