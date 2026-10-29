@@ -44,3 +44,14 @@ export interface EditorShellProps {
   onSave: () => void;
   onCancel: () => void;
 }
+
+/** Structured editors reuse the same focus, keyboard and viewport shells. */
+export interface StructuredEditorShellProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
+  label: string;
+  ids: { field: string; label: string; message: string };
+  fieldRef: React.RefObject<HTMLInputElement | null>;
+  children: React.ReactNode;
+}

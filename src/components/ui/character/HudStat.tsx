@@ -13,7 +13,7 @@ export interface HudStatProps {
 }
 
 const TILE =
-  'border-divider flex flex-col items-center justify-center rounded-lg border px-3 py-2.5';
+  'border-divider flex flex-col items-center justify-center rounded-sm border px-3 py-2.5';
 
 /**
  * One HUD stat: the number in `type-num-lg` over its caption, in a hairline

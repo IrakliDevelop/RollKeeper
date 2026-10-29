@@ -52,14 +52,14 @@ export function HudHitPoints({
       aria-label={label}
       aria-describedby={temporary > 0 ? tempId : undefined}
       data-hp-status={status}
-      className="border-divider hover:bg-surface-hover focus-visible:outline-ring relative isolate flex cursor-pointer flex-col justify-center gap-1 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
+      className="border-divider hover:bg-surface-hover focus-visible:outline-ring relative isolate flex cursor-pointer flex-col justify-center gap-1 rounded-sm border px-3 py-2.5 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2"
     >
       <span
         key={flashCount}
         data-hp-flash=""
         aria-hidden="true"
         className={cn(
-          'pointer-events-none absolute inset-0 -z-10 rounded-lg',
+          'pointer-events-none absolute inset-0 -z-10 rounded-sm',
           flashCount > 0 && 'animate-rk-hp-flash'
         )}
       />
