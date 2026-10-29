@@ -1,3 +1,4 @@
+import { Section } from '@/components/ui/layout/section';
 import { SubTabs } from '@/components/ui/layout/SubTabs';
 import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
@@ -74,17 +75,12 @@ function LevelUpButton({
   return (
     <>
       <Button
-        variant="primary"
+        variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
         onClick={() => setIsOpen(true)}
-        className={
-          pendingLevelUp
-            ? 'ring-accent-emerald-border animate-pulse ring-2'
-            : undefined
-        }
       >
         <AppIcon name="levelUp" size={14} />
-        Level Up
+        Level up
       </Button>
       {isOpen && (
         <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
@@ -168,6 +164,7 @@ export interface TabbedSheetConfigParams {
   resetDeathSavingThrows: () => void;
   toggleHPCalculationMode: () => void;
   recalculateMaxHP: () => void;
+  setCurrentHitPoints: (value: number) => void;
   updateHitPoints: (updates: Partial<CharacterState['hitPoints']>) => void;
 
   // Hit dice
@@ -369,6 +366,7 @@ export function createTabbedSheetConfig(
           {/* Header row: Basic Info + Quick Stats */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CharacterBasicInfo
+              editing={params.editing}
               character={character}
               race={character.race}
               characterClass={character.class}
@@ -437,23 +435,23 @@ export function createTabbedSheetConfig(
               totalLevel
             );
             return (
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
-                  <h2 className="text-heading text-lg font-bold">
-                    Experience Points
-                  </h2>
-                  {totalLevel < 20 && (
+              <Section
+                heading="Experience points"
+                trailing={
+                  totalLevel < 20 ? (
                     <LevelUpButton pendingLevelUp={pendingLevelUp} />
-                  )}
-                </div>
+                  ) : undefined
+                }
+              >
                 <XPTracker
+                  editing={params.editing}
                   currentXP={character.experience}
                   currentLevel={totalLevel}
                   onAddXP={params.addExperience}
                   onSetXP={params.setExperience}
                   pendingLevelUp={pendingLevelUp}
                 />
-              </div>
+              </Section>
             );
           })()}
         </div>
@@ -983,20 +981,47 @@ function CombatTabContent({
           ),
         content: {
           player: (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="space-y-6">
-                  <ArmorClassManager
+            <div className="space-y-8">
+              <div className="grid grid-cols-1 items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+                <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
+                  <HitPointManager
                     editing={params.editing}
-                    character={character}
-                    onUpdateArmorClass={ac =>
-                      params.updateCharacter({ armorClass: ac })
-                    }
-                    onUpdateTempArmorClass={params.updateTempArmorClass}
-                    onSetTempACActive={params.setTempACActive}
-                    onSetShieldEquipped={params.setShieldEquipped}
-                    onUpdateShieldBonus={params.updateShieldBonus}
+                    hitPoints={character.hitPoints}
+                    classInfo={character.class}
+                    level={totalLevel}
+                    constitutionScore={character.abilities.constitution}
+                    onApplyDamage={params.applyDamageToCharacter}
+                    onApplyHealing={params.applyHealingToCharacter}
+                    onAddTemporaryHP={params.addTemporaryHPToCharacter}
+                    onMakeDeathSave={params.makeDeathSavingThrow}
+                    onResetDeathSaves={params.resetDeathSavingThrows}
+                    onToggleCalculationMode={params.toggleHPCalculationMode}
+                    onRecalculateMaxHP={params.recalculateMaxHP}
+                    onSetCurrentHitPoints={params.setCurrentHitPoints}
+                    onUpdateHitPoints={params.updateHitPoints}
                   />
+                </ErrorBoundary>
+                <ArmorClassManager
+                  layout="ledger"
+                  editing={params.editing}
+                  character={character}
+                  onUpdateArmorClass={ac =>
+                    params.updateCharacter({ armorClass: ac })
+                  }
+                  onUpdateTempArmorClass={params.updateTempArmorClass}
+                  onSetTempACActive={params.setTempACActive}
+                  onSetShieldEquipped={params.setShieldEquipped}
+                  onUpdateShieldBonus={params.updateShieldBonus}
+                />
+                <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
+                  <HitDiceTracker
+                    hitDicePools={character.hitDicePools || {}}
+                    onUseHitDie={params.useHitDie}
+                    onRestoreHitDice={params.restoreHitDice}
+                    onResetAllHitDice={params.resetAllHitDice}
+                  />
+                </ErrorBoundary>
+                <Section heading="Initiative and speed" level={3}>
                   <CombatStats
                     editing={params.editing}
                     character={character}
@@ -1009,43 +1034,15 @@ function CombatTabContent({
                     onResetReaction={params.resetReaction}
                     onRollInitiative={params.rollInitiative}
                   />
-                </div>
-                <div className="space-y-6">
+                </Section>
+                <div className="lg:col-span-2">
                   <ErrorBoundary
-                    fallback={<SheetLoadError thing="Hit points" />}
+                    fallback={<SheetLoadError thing="Weapon proficiencies" />}
                   >
-                    <HitPointManager
-                      editing={params.editing}
-                      hitPoints={character.hitPoints}
-                      classInfo={character.class}
-                      level={totalLevel}
-                      constitutionScore={character.abilities.constitution}
-                      onApplyDamage={params.applyDamageToCharacter}
-                      onApplyHealing={params.applyHealingToCharacter}
-                      onAddTemporaryHP={params.addTemporaryHPToCharacter}
-                      onMakeDeathSave={params.makeDeathSavingThrow}
-                      onResetDeathSaves={params.resetDeathSavingThrows}
-                      onToggleCalculationMode={params.toggleHPCalculationMode}
-                      onRecalculateMaxHP={params.recalculateMaxHP}
-                      onUpdateHitPoints={params.updateHitPoints}
-                    />
-                  </ErrorBoundary>
-                  <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
-                    <HitDiceTracker
-                      hitDicePools={character.hitDicePools || {}}
-                      onUseHitDie={params.useHitDie}
-                      onRestoreHitDice={params.restoreHitDice}
-                      onResetAllHitDice={params.resetAllHitDice}
-                    />
+                    <WeaponProficiencies editing={params.editing} />
                   </ErrorBoundary>
                 </div>
               </div>
-
-              <ErrorBoundary
-                fallback={<SheetLoadError thing="Weapon proficiencies" />}
-              >
-                <WeaponProficiencies />
-              </ErrorBoundary>
 
               <div
                 id="conditions-section"

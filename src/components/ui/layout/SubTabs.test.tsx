@@ -38,3 +38,17 @@ it('uses caller values and ids with arrow-key activation and associated panels',
   );
   expect(screen.getByRole('tabpanel')).toHaveTextContent('Rope');
 });
+
+it('hides vertical overflow on the tab strip so no scrollbar shows beside it', () => {
+  render(
+    <SubTabs
+      defaultValue="a"
+      label="Strip"
+      tabs={[{ value: 'a', id: 'strip-a', label: 'A', content: <p>A</p> }]}
+    />
+  );
+  expect(screen.getByRole('tablist')).toHaveClass(
+    'overflow-x-auto',
+    'overflow-y-hidden'
+  );
+});

@@ -25,7 +25,7 @@ export function SubTabs({ tabs, label, ...props }: SubTabsProps) {
     <Tabs.Root {...props}>
       <Tabs.List
         aria-label={label}
-        className="border-divider flex gap-1 overflow-x-auto border-b"
+        className="border-divider flex gap-1 overflow-x-auto overflow-y-hidden border-b"
       >
         {tabs.map(tab => (
           <Tabs.Trigger

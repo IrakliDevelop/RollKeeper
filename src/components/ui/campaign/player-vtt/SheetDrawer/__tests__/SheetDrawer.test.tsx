@@ -94,7 +94,7 @@ describe('SheetDrawer', () => {
     render(<SheetDrawer {...p} />);
     fireEvent.click(screen.getByRole('button', { name: /long rest/i }));
     // RestDialog confirm button label — check REST_CONFIG in RestDialog.tsx and match it here.
-    fireEvent.click(screen.getByRole('button', { name: /take long rest/i }));
+    fireEvent.click(screen.getByRole('button', { name: /take a long rest/i }));
     expect(p.onRested).toHaveBeenCalledWith('long');
   });
 

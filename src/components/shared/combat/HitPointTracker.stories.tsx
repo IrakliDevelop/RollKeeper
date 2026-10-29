@@ -23,6 +23,7 @@ const meta: Meta<typeof HitPointTracker> = {
     onResetDeathSaves: fn(),
     onToggleCalculationMode: fn(),
     onUpdateHitPoints: fn(),
+    onSetCurrentHitPoints: fn(),
   },
   decorators: [
     Story => (
@@ -86,23 +87,5 @@ export const Stabilized: Story = {
 
 export const StabilizedDark: Story = {
   ...Stabilized,
-  globals: { theme: 'dark' },
-};
-
-export const Readonly: Story = {
-  args: { readonly: true },
-};
-
-export const ReadonlyDark: Story = {
-  ...Readonly,
-  globals: { theme: 'dark' },
-};
-
-export const Compact: Story = {
-  args: { compact: true },
-};
-
-export const CompactDark: Story = {
-  ...Compact,
   globals: { theme: 'dark' },
 };

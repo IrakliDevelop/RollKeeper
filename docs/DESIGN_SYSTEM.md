@@ -82,8 +82,7 @@ Rules:
   Two exceptions: the words players see for enemies come from the DM's
   editable bands (`hpStateLabel` with the combat config's `hpStateBands`,
   defaults in `DEFAULT_HP_STATE_BANDS`), never `hpStatus`; and until the
-  Phase 3 sweeps, `HitPointTracker`'s box and pill and the dock `HpCard`
-  keep their old tints, with only their thresholds on the tiers.
+  Phase 3 sweeps, the dock `HpCard` keeps its old tint, with its thresholds on the tiers.
 - **No gradients**: not on fills, text, page backgrounds or meters. Meters
   use a solid role colour.
 - **Retired:** the hue-named `accent-{emerald,blue,amber,red,purple,indigo,green,orange,yellow,violet}-*`
@@ -209,6 +208,8 @@ Values are sorted by when they change:
 A value is edited in place (`InPlaceField`) only when it sits in plain text
 with room for its usual width. Anything inside an ornament (a medallion, the
 AC shield) or too cramped opens an `AnchoredEditor`.
+
+Direct current HP, level and per-class level edits commit on Enter or blur. Escape cancels the draft; inside a dialog, a second Escape closes the dialog. Direct current-HP targets use `setCurrentHitPoints`, preserving temporary HP and applying the damage/healing death-save transitions.
 
 ### Play and edit modes
 

@@ -2,10 +2,16 @@
 
 import React, { useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
-import { Shield, Plus, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Checkbox, Input, Button } from '@/components/ui/forms';
+import { Section } from '@/components/ui/layout/section';
+import { Badge } from '@/components/ui/layout/badge';
 
-export const WeaponProficiencies: React.FC = () => {
+export const WeaponProficiencies = ({
+  editing = true,
+}: {
+  editing?: boolean;
+}) => {
   const { character, updateCharacter } = useCharacterStore();
   const [specificWeaponInput, setSpecificWeaponInput] = useState('');
 
@@ -58,86 +64,72 @@ export const WeaponProficiencies: React.FC = () => {
     });
   };
 
+  const proficiencies = character.weaponProficiencies;
+  const names = [
+    ...(proficiencies.simpleWeapons ? ['Simple weapons'] : []),
+    ...(proficiencies.martialWeapons ? ['Martial weapons'] : []),
+    ...proficiencies.specificWeapons,
+  ];
   return (
-    <div className="border-divider bg-surface-raised rounded-lg border p-4 shadow-lg">
-      <h2 className="border-divider text-heading mb-3 flex items-center gap-2 border-b pb-2 text-lg font-bold">
-        <Shield className="text-accent-blue-text-muted" size={20} />
-        Weapon Proficiencies
-      </h2>
-
-      <div className="space-y-3">
-        {/* Category Proficiencies */}
-        <div className="space-y-2">
+    <Section heading="Weapon proficiencies">
+      {!editing ? (
+        <p className="type-body text-body">
+          {names.join(', ') || 'No specific weapon proficiencies'}
+        </p>
+      ) : (
+        <div className="space-y-3">
           <Checkbox
-            checked={character.weaponProficiencies.simpleWeapons}
+            checked={proficiencies.simpleWeapons}
             onCheckedChange={toggleSimpleWeapons}
-            label="Simple Weapons"
-            size="sm"
-            variant="primary"
-            className="hover:bg-surface-hover rounded-lg p-2 transition-colors"
+            label="Simple weapons"
           />
-
           <Checkbox
-            checked={character.weaponProficiencies.martialWeapons}
+            checked={proficiencies.martialWeapons}
             onCheckedChange={toggleMartialWeapons}
-            label="Martial Weapons"
-            size="sm"
-            variant="primary"
-            className="hover:bg-surface-hover rounded-lg p-2 transition-colors"
+            label="Martial weapons"
           />
-        </div>
-
-        {/* Specific Weapons */}
-        <div className="mt-4">
-          <h4 className="text-body mb-2 text-sm font-semibold">
-            Specific Weapons
-          </h4>
-
-          <div className="mb-2 flex gap-2">
+          <div className="flex items-end gap-2">
             <Input
-              type="text"
+              label="Specific weapons"
               value={specificWeaponInput}
               onChange={e => setSpecificWeaponInput(e.target.value)}
-              placeholder="Rapier, Longbow, etc."
-              size="sm"
-              className="flex-1"
-              onKeyPress={e =>
-                e.key === 'Enter' && (e.preventDefault(), addSpecificWeapon())
-              }
+              placeholder="Rapier"
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addSpecificWeapon();
+                }
+              }}
             />
-            <Button onClick={addSpecificWeapon} variant="primary" size="sm">
-              <Plus size={14} />
+            <Button
+              aria-label="Add weapon proficiency"
+              onClick={addSpecificWeapon}
+            >
+              Add
             </Button>
           </div>
-
-          <div className="flex flex-wrap gap-1">
-            {character.weaponProficiencies.specificWeapons.map(
-              (weapon, index) => (
-                <span
-                  key={index}
-                  className="bg-accent-green-bg text-accent-green-text inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium"
+          <div className="flex flex-wrap gap-2">
+            {proficiencies.specificWeapons.map(weapon => (
+              <Badge key={weapon}>
+                {weapon}
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  aria-label={`Remove ${weapon} proficiency`}
+                  onClick={() => removeSpecificWeapon(weapon)}
                 >
-                  {weapon}
-                  <Button
-                    onClick={() => removeSpecificWeapon(weapon)}
-                    variant="ghost"
-                    size="xs"
-                    className="text-accent-green-text hover:text-accent-green-text ml-1 h-auto p-0 hover:bg-transparent"
-                  >
-                    <X size={12} />
-                  </Button>
-                </span>
-              )
-            )}
+                  <X size={12} />
+                </Button>
+              </Badge>
+            ))}
           </div>
-
-          {character.weaponProficiencies.specificWeapons.length === 0 && (
-            <p className="text-muted mt-1 text-xs">
+          {proficiencies.specificWeapons.length === 0 && (
+            <p className="type-small text-muted">
               No specific weapon proficiencies
             </p>
           )}
         </div>
-      </div>
-    </div>
+      )}
+    </Section>
   );
 };

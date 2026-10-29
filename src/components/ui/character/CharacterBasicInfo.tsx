@@ -1,16 +1,24 @@
 'use client';
 
 import { useState } from 'react';
-import { Settings } from 'lucide-react';
 import SimpleClassSelector from '@/components/ui/character/SimpleClassSelector';
 import MulticlassManager from '@/components/ui/character/MulticlassManager';
 import { Button, Input } from '@/components/ui/forms';
-import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { InPlaceField } from '@/components/ui/forms/InPlaceField';
+import { Section } from '@/components/ui/layout/section';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogBody,
+} from '@/components/ui/feedback/dialog';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ALIGNMENTS, CREATURE_TYPES } from '@/utils/constants';
 import { CharacterState } from '@/types/character';
 
 interface CharacterBasicInfoProps {
+  editing?: boolean;
   character: CharacterState;
   race: string;
   characterClass: CharacterState['class'];
@@ -41,6 +49,7 @@ interface CharacterBasicInfoProps {
 
 export default function CharacterBasicInfo({
   character,
+  editing = true,
   race,
   characterClass,
   level,
@@ -64,136 +73,137 @@ export default function CharacterBasicInfo({
 
   const isMulticlassed = (character.classes?.length || 0) > 1;
   const classDisplayString = getClassDisplayString();
+  const information = [
+    ['Race', race],
+    ['Class', classDisplayString],
+    ['Level', String(level)],
+    ['Background', background],
+    ['Player name', playerName],
+    ['Alignment', alignment],
+    ['Creature type', creatureType || 'Humanoid'],
+  ];
   return (
-    <div className="space-y-4">
-      <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-        <h2 className="border-divider text-heading mb-4 border-b pb-2 text-lg font-bold">
-          Character Information
-        </h2>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <div>
+    <Section heading="Character information">
+      {!editing ? (
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+          {information.map(([label, value]) => (
+            <div key={label} className="min-w-0">
+              <dt className="type-caption text-muted">{label}</dt>
+              <dd className="type-body text-heading break-words">
+                {value || '—'}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Input
               label="Race"
-              type="text"
               placeholder="Human"
               value={race}
               onChange={e => onUpdateRace(e.target.value)}
             />
-          </div>
-
-          {/* Class Display - Show multiclass info or single class selector */}
-          {isMulticlassed ? (
-            <div>
-              <label className="text-body mb-1 block text-sm font-medium">
-                Classes
-              </label>
-              <div className="flex items-center gap-2">
-                <div className="border-divider-strong bg-surface-secondary text-heading flex-1 rounded-md border p-2">
-                  {classDisplayString}
-                </div>
-                <Button
-                  onClick={() =>
-                    setShowMulticlassManager(!showMulticlassManager)
-                  }
-                  variant="primary"
-                  size="sm"
-                  leftIcon={<Settings size={16} />}
-                  title="Manage multiclass levels"
-                  className="px-2"
-                />
+            {isMulticlassed ? (
+              <div>
+                <span className="type-ui text-muted">Classes</span>
+                <p className="type-body text-heading">{classDisplayString}</p>
               </div>
-            </div>
-          ) : (
-            <div>
+            ) : (
               <SimpleClassSelector
                 value={characterClass}
                 onChange={onUpdateClass}
               />
+            )}
+            <div>
+              <span className="text-heading mb-1.5 block text-sm font-medium">
+                Level
+              </span>
+              <div className="flex min-h-10 items-center pointer-coarse:min-h-11">
+                <InPlaceField
+                  label="Level"
+                  value={level}
+                  min={1}
+                  max={20}
+                  editing={editing}
+                  onCommit={onUpdateLevel}
+                />
+              </div>
             </div>
-          )}
-
-          {/* Multiclass Settings Button - Separate row for single class */}
-          {!isMulticlassed && (
-            <div className="sm:col-span-2">
-              <Button
-                onClick={() => setShowMulticlassManager(!showMulticlassManager)}
-                variant="outline"
-                size="md"
-                leftIcon={<Settings size={16} />}
-                fullWidth
-                className="border-accent-blue-border bg-accent-blue-bg text-accent-blue-text-muted hover:bg-accent-blue-bg-strong"
+            <div>
+              <Input
+                label="Background"
+                type="text"
+                placeholder="Soldier"
+                value={background}
+                onChange={e => onUpdateBackground(e.target.value)}
+              />
+            </div>
+            <div>
+              <Input
+                label="Player name"
+                type="text"
+                placeholder="Sam"
+                value={playerName}
+                onChange={e => onUpdatePlayerName(e.target.value)}
+              />
+            </div>
+            <div>
+              <SelectField
+                label="Alignment"
+                value={alignment}
+                onValueChange={onUpdateAlignment}
               >
-                Manage Multiclassing
-              </Button>
+                {ALIGNMENTS.map(align => (
+                  <SelectItem key={align} value={align}>
+                    {align}
+                  </SelectItem>
+                ))}
+              </SelectField>
             </div>
-          )}
-
-          <div>
-            <NumberInput
-              label="Level"
-              placeholder="1"
-              min="1"
-              max="20"
-              value={level}
-              onChange={v => onUpdateLevel(v ?? 1)}
-            />
+            <div>
+              <SelectField
+                label="Creature type"
+                value={creatureType || 'Humanoid'}
+                onValueChange={onUpdateCreatureType}
+              >
+                {CREATURE_TYPES.map(type => (
+                  <SelectItem key={type} value={type}>
+                    {type}
+                  </SelectItem>
+                ))}
+              </SelectField>
+            </div>
           </div>
-          <div>
-            <Input
-              label="Background"
-              type="text"
-              placeholder="Soldier"
-              value={background}
-              onChange={e => onUpdateBackground(e.target.value)}
-            />
-          </div>
-          <div>
-            <Input
-              label="Player Name"
-              type="text"
-              placeholder="Your Name"
-              value={playerName}
-              onChange={e => onUpdatePlayerName(e.target.value)}
-            />
-          </div>
-          <div>
-            <SelectField
-              label="Alignment"
-              value={alignment}
-              onValueChange={onUpdateAlignment}
-            >
-              {ALIGNMENTS.map(align => (
-                <SelectItem key={align} value={align}>
-                  {align}
-                </SelectItem>
-              ))}
-            </SelectField>
-          </div>
-          <div>
-            <SelectField
-              label="Creature Type"
-              value={creatureType || 'Humanoid'}
-              onValueChange={onUpdateCreatureType}
-            >
-              {CREATURE_TYPES.map(type => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectField>
-          </div>
-        </div>
-      </div>
-
-      {/* Multiclass Manager */}
-      {showMulticlassManager && (
-        <MulticlassManager
-          character={character}
-          onAddClassLevel={onAddClassLevel}
-          onRemoveClassLevel={onRemoveClassLevel}
-          onUpdateClassLevel={onUpdateClassLevel}
-        />
+          <Button
+            className="mt-4"
+            variant="secondary"
+            onClick={() => setShowMulticlassManager(true)}
+          >
+            Manage classes
+          </Button>
+          <Dialog
+            open={showMulticlassManager}
+            onOpenChange={setShowMulticlassManager}
+          >
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Manage classes</DialogTitle>
+              </DialogHeader>
+              <DialogBody>
+                {showMulticlassManager && (
+                  <MulticlassManager
+                    character={character}
+                    onAddClassLevel={onAddClassLevel}
+                    onRemoveClassLevel={onRemoveClassLevel}
+                    onUpdateClassLevel={onUpdateClassLevel}
+                  />
+                )}
+              </DialogBody>
+            </DialogContent>
+          </Dialog>
+        </>
       )}
-    </div>
+    </Section>
   );
 }

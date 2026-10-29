@@ -186,3 +186,37 @@ it('keeps the conditions aligned while they load, until the player takes over', 
   view.unmount();
   scroll.mockRestore();
 });
+
+it('pairs the Player panel sections in rows, with proficiencies spanning both columns', () => {
+  render(<>{config().find(t => t.id === 'combat')!.content}</>);
+  const wanted = [
+    'Hit points',
+    'Armor class',
+    'Hit dice',
+    'Initiative and speed',
+    'Weapon proficiencies',
+  ];
+  const headings = screen.getAllByRole('heading');
+  const seen = headings
+    .map(h => h.textContent?.trim() ?? '')
+    .filter(text => wanted.includes(text));
+  expect(seen).toEqual(wanted);
+  const heading = (name: string) =>
+    headings.find(h => h.textContent?.trim() === name)!;
+  const grid = heading('Hit points').closest('.lg\\:grid-cols-2')!;
+  expect(grid.className).toContain('grid-cols-1');
+  expect(grid.className).toContain('items-start');
+  expect(grid.className).toContain('gap-x-10');
+  expect(grid.className).toContain('gap-y-8');
+  const itemOf = (name: string) => {
+    let node: Element = heading(name);
+    while (node.parentElement !== grid) node = node.parentElement!;
+    return node;
+  };
+  expect(itemOf('Weapon proficiencies').className).toContain('lg:col-span-2');
+  for (const name of wanted.slice(0, 4))
+    expect(itemOf(name).className).not.toContain('col-span-2');
+  expect(screen.getByRole('switch', { name: 'Shield' })).toBeInTheDocument();
+  expect(screen.getByRole('switch', { name: 'Temp AC' })).toBeInTheDocument();
+  expect(screen.queryByText('Armor and Dexterity')).not.toBeInTheDocument();
+});

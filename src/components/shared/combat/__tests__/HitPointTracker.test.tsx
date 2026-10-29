@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { HitPointTracker } from '../HitPointTracker';
 import { HitPoints } from '@/types/character';
@@ -26,7 +27,7 @@ describe('HitPointTracker', () => {
   it('renders current HP, max HP, and temp HP values', () => {
     render(<HitPointTracker hitPoints={baseHitPoints} />);
     expect(screen.getByDisplayValue('25')).toBeInTheDocument();
-    expect(screen.getByDisplayValue('40')).toBeInTheDocument();
+    expect(screen.getByText('40')).toBeInTheDocument();
     expect(screen.getByDisplayValue('5')).toBeInTheDocument();
   });
 
@@ -34,103 +35,172 @@ describe('HitPointTracker', () => {
     const { container, unmount } = render(
       <HitPointTracker hitPoints={{ ...baseHitPoints, current: 30 }} />
     );
-    // 30 / 40 = 75%: healthy keeps the heading colour.
-    expect(container.querySelector('input[value="30"]')).toHaveClass(
-      'text-heading'
+    expect(container.querySelector('[data-hp-status]')).toHaveAttribute(
+      'data-hp-status',
+      'healthy'
     );
     unmount();
-    // 25 / 40 = 62.5%: bloodied (green before the shared tiers).
     const bloodied = render(<HitPointTracker hitPoints={baseHitPoints} />);
-    expect(bloodied.container.querySelector('input[value="25"]')).toHaveClass(
-      'text-ember-text'
-    );
+    expect(
+      bloodied.container.querySelector('[data-hp-status]')
+    ).toHaveAttribute('data-hp-status', 'bloodied');
     bloodied.unmount();
   });
 
-  it('renders "Hit Points" title', () => {
+  it('renders "Hit points" title', () => {
     render(<HitPointTracker hitPoints={baseHitPoints} />);
-    expect(screen.getAllByText('Hit Points').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Hit points').length).toBeGreaterThan(0);
   });
 
-  it('shows "Alive" status text for healthy character', () => {
+  it('shows "Bloodied" status text for healthy character', () => {
     render(<HitPointTracker hitPoints={baseHitPoints} />);
-    expect(screen.getAllByText(/Alive/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Bloodied/).length).toBeGreaterThan(0);
   });
 
-  it('calls onApplyDamage when damage is applied', () => {
-    const onApplyDamage = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyDamage={onApplyDamage}
-      />
+  describe('single HP amount control', () => {
+    const amountField = () =>
+      screen.getByRole('textbox', { name: 'HP amount' });
+    const renderTracker = () => {
+      const handlers = {
+        onApplyDamage: vi.fn(),
+        onApplyHealing: vi.fn(),
+        onAddTemporaryHP: vi.fn(),
+      };
+      render(<HitPointTracker hitPoints={baseHitPoints} {...handlers} />);
+      return handlers;
+    };
+
+    it('renders one empty amount field with no placeholder and no per-action fields', () => {
+      renderTracker();
+      expect(amountField()).toHaveValue('');
+      expect(amountField()).not.toHaveAttribute('placeholder');
+      expect(screen.queryByRole('textbox', { name: 'Damage' })).toBeNull();
+      expect(screen.queryByRole('textbox', { name: 'Healing' })).toBeNull();
+      expect(
+        screen.queryByRole('textbox', { name: 'Temp HP amount' })
+      ).toBeNull();
+      expect(screen.queryByText('Healing')).toBeNull();
+    });
+
+    it('never disables Damage, Heal, Add temp HP, or the multipliers', () => {
+      renderTracker();
+      for (const name of [
+        'Damage',
+        'Heal',
+        'Add temp HP',
+        'Halve damage (resistance)',
+        'Double damage (vulnerability)',
+      ]) {
+        expect(screen.getByRole('button', { name })).not.toBeDisabled();
+      }
+    });
+
+    it('omits an action whose handler prop is absent', () => {
+      render(
+        <HitPointTracker hitPoints={baseHitPoints} onApplyDamage={vi.fn()} />
+      );
+      expect(screen.getByRole('button', { name: 'Damage' })).toBeVisible();
+      expect(screen.queryByRole('button', { name: 'Heal' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Add temp HP' })).toBeNull();
+    });
+
+    it.each(['Damage', 'Heal', 'Add temp HP'] as const)(
+      'focuses the field and calls nothing when %s is pressed with an empty amount',
+      button => {
+        const handlers = renderTracker();
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        expect(document.activeElement).toBe(amountField());
+        for (const fn of Object.values(handlers))
+          expect(fn).not.toHaveBeenCalled();
+      }
     );
-    const damageInput = container.querySelector(
-      'input[placeholder="Amount"]'
-    ) as HTMLInputElement;
-    fireEvent.change(damageInput, { target: { value: '10' } });
-    const buttons = container.querySelectorAll('button');
-    const dmgButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Dmg')
+
+    it.each([
+      ['Damage', '0'],
+      ['Damage', '-3'],
+      ['Heal', '0'],
+      ['Add temp HP', '0'],
+    ] as const)(
+      'focuses the field and calls nothing when %s is pressed after typing %s',
+      async (button, typed) => {
+        const user = userEvent.setup();
+        const handlers = renderTracker();
+        const field = amountField();
+        await user.click(field);
+        await user.type(field, typed);
+        await user.click(screen.getByRole('button', { name: button }));
+        for (const fn of Object.values(handlers))
+          expect(fn).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(field);
+      }
     );
-    fireEvent.click(dmgButton!);
-    expect(onApplyDamage).toHaveBeenCalledWith(10);
+
+    it.each([
+      ['Damage', 'onApplyDamage'],
+      ['Heal', 'onApplyHealing'],
+      ['Add temp HP', 'onAddTemporaryHP'],
+    ] as const)(
+      '%s applies the amount to its own handler and clears the field',
+      (button, handler) => {
+        const handlers = renderTracker();
+        fireEvent.change(amountField(), { target: { value: '8' } });
+        fireEvent.click(screen.getByRole('button', { name: button }));
+        expect(handlers[handler]).toHaveBeenCalledExactlyOnceWith(8);
+        for (const [name, fn] of Object.entries(handlers)) {
+          if (name !== handler) expect(fn).not.toHaveBeenCalled();
+        }
+        expect(amountField()).toHaveValue('');
+      }
+    );
+
+    it('halves (rounding down) and doubles the amount', () => {
+      renderTracker();
+      fireEvent.change(amountField(), { target: { value: '9' } });
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Halve damage (resistance)' })
+      );
+      expect(amountField()).toHaveValue('4');
+      fireEvent.change(amountField(), { target: { value: '8' } });
+      fireEvent.click(
+        screen.getByRole('button', { name: 'Double damage (vulnerability)' })
+      );
+      expect(amountField()).toHaveValue('16');
+    });
+
+    it('focuses the field and leaves it empty when the multipliers are pressed on an empty amount', () => {
+      renderTracker();
+      for (const name of [
+        'Halve damage (resistance)',
+        'Double damage (vulnerability)',
+      ]) {
+        fireEvent.click(screen.getByRole('button', { name }));
+        expect(document.activeElement).toBe(amountField());
+        expect(amountField()).toHaveValue('');
+        amountField().blur();
+      }
+    });
   });
 
-  it('calls onApplyHealing when healing is applied', () => {
-    const onApplyHealing = vi.fn();
+  it('stacks the readout, then the amount controls, then death saves, with no band grid', () => {
     const { container } = render(
       <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyHealing={onApplyHealing}
+        hitPoints={dyingHitPoints}
+        onApplyDamage={vi.fn()}
+        onMakeDeathSave={vi.fn()}
+        onUpdateHitPoints={vi.fn()}
       />
     );
-    const inputs = container.querySelectorAll('input[placeholder="Amount"]');
-    fireEvent.change(inputs[1], { target: { value: '5' } });
-    const buttons = container.querySelectorAll('button');
-    const healButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Heal')
+    const current = screen.getByRole('textbox', { name: 'Current HP' });
+    const amount = screen.getByRole('textbox', { name: 'HP amount' });
+    const deathSaves = screen.getByRole('heading', { name: 'Death saves' });
+    const before = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(current.compareDocumentPosition(amount) & before).toBeTruthy();
+    expect(amount.compareDocumentPosition(deathSaves) & before).toBeTruthy();
+    const body = container.querySelector('[data-hp-status]')!;
+    expect(body).toHaveClass('space-y-5');
+    expect(container.innerHTML).not.toMatch(
+      /lg:(grid-cols|col-start|row-start|flex-nowrap)/
     );
-    fireEvent.click(healButton!);
-    expect(onApplyHealing).toHaveBeenCalledWith(5);
-  });
-
-  it('calls onAddTemporaryHP when temp HP is applied', () => {
-    const onAddTemporaryHP = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onAddTemporaryHP={onAddTemporaryHP}
-      />
-    );
-    const inputs = container.querySelectorAll('input[placeholder="Amount"]');
-    fireEvent.change(inputs[2], { target: { value: '8' } });
-    const buttons = container.querySelectorAll('button');
-    const tempButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Temp')
-    );
-    fireEvent.click(tempButton!);
-    expect(onAddTemporaryHP).toHaveBeenCalledWith(8);
-  });
-
-  it('clears damage input after applying damage', () => {
-    const onApplyDamage = vi.fn();
-    const { container } = render(
-      <HitPointTracker
-        hitPoints={baseHitPoints}
-        onApplyDamage={onApplyDamage}
-      />
-    );
-    const damageInput = container.querySelector(
-      'input[placeholder="Amount"]'
-    ) as HTMLInputElement;
-    fireEvent.change(damageInput, { target: { value: '10' } });
-    const buttons = container.querySelectorAll('button');
-    const dmgButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Dmg')
-    );
-    fireEvent.click(dmgButton!);
-    expect(damageInput.value).toBe('');
   });
 
   it('shows death saves section when character is dying', () => {
@@ -141,9 +211,7 @@ describe('HitPointTracker', () => {
         onUpdateHitPoints={vi.fn()}
       />
     );
-    expect(screen.getAllByText('Death Saving Throws').length).toBeGreaterThan(
-      0
-    );
+    expect(screen.getAllByText('Death saves').length).toBeGreaterThan(0);
   });
 
   it('calls onMakeDeathSave(true, false) when success circle is clicked', () => {
@@ -156,7 +224,7 @@ describe('HitPointTracker', () => {
       />
     );
     const successButtons = container.querySelectorAll(
-      'button[title="Click to add success"]'
+      'button[aria-label="Mark a death save success"]'
     );
     fireEvent.click(successButtons[0]);
     expect(onMakeDeathSave).toHaveBeenCalledWith(true, false);
@@ -172,7 +240,7 @@ describe('HitPointTracker', () => {
       />
     );
     const failButtons = container.querySelectorAll(
-      'button[title="Click to add failure"]'
+      'button[aria-label="Mark a death save failure"]'
     );
     fireEvent.click(failButtons[0]);
     expect(onMakeDeathSave).toHaveBeenCalledWith(false, false);
@@ -223,22 +291,27 @@ describe('HitPointTracker', () => {
         onUpdateHitPoints={vi.fn()}
       />
     );
-    fireEvent.click(screen.getByTitle('Reset death saves'));
+    fireEvent.click(screen.getByRole('button', { name: 'Reset death saves' }));
     expect(onResetDeathSaves).toHaveBeenCalled();
   });
 
-  it('hides damage/healing/temp controls in readonly mode', () => {
-    const { container } = render(
-      <HitPointTracker hitPoints={baseHitPoints} readonly />
+  it('calls onResetDeathSaves and onToggleCalculationMode without the click event', () => {
+    const onResetDeathSaves = vi.fn();
+    const onToggleCalculationMode = vi.fn();
+    render(
+      <HitPointTracker
+        hitPoints={dyingHitPoints}
+        editing
+        onResetDeathSaves={onResetDeathSaves}
+        onToggleCalculationMode={onToggleCalculationMode}
+      />
     );
-    expect(
-      container.querySelectorAll('input[placeholder="Amount"]')
-    ).toHaveLength(0);
-    const buttons = container.querySelectorAll('button');
-    const dmgButton = Array.from(buttons).find(b =>
-      b.textContent?.includes('Dmg')
+    fireEvent.click(screen.getByRole('button', { name: 'Reset death saves' }));
+    expect(onResetDeathSaves).toHaveBeenCalledWith();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Switch to manual calculation' })
     );
-    expect(dmgButton).toBeUndefined();
+    expect(onToggleCalculationMode).toHaveBeenCalledWith();
   });
 
   it('shows "Dying" status text when character is at 0 HP and not stabilized', () => {
@@ -262,18 +335,30 @@ describe('HitPointTracker', () => {
       expect(screen.getByText('40')).toBeInTheDocument();
       expect(screen.getByDisplayValue('25')).toBeInTheDocument();
       expect(screen.getByDisplayValue('5')).toBeInTheDocument();
-      expect(screen.queryByTitle(/calculation/)).toBeNull();
+      expect(screen.queryByRole('button', { name: /calculation/ })).toBeNull();
     });
 
-    it('keeps the AUTO badge in play mode', () => {
-      render(
+    it('hides the Max calculation line in play mode and shows it with the toggle when editing', () => {
+      const { rerender } = render(
         <HitPointTracker
           hitPoints={baseHitPoints}
           editing={false}
           onToggleCalculationMode={vi.fn()}
         />
       );
-      expect(screen.getAllByText('AUTO').length).toBeGreaterThan(0);
+      expect(screen.queryByText(/Max:/)).toBeNull();
+      expect(screen.queryByRole('button', { name: /calculation/ })).toBeNull();
+      rerender(
+        <HitPointTracker
+          hitPoints={baseHitPoints}
+          editing
+          onToggleCalculationMode={vi.fn()}
+        />
+      );
+      expect(screen.getByText('Max: Auto')).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: 'Switch to manual calculation' })
+      ).toBeInTheDocument();
     });
 
     it('edits max HP and shows the calculation toggle by default', () => {
@@ -288,8 +373,12 @@ describe('HitPointTracker', () => {
       fireEvent.change(screen.getByDisplayValue('40'), {
         target: { value: '45' },
       });
+      expect(onUpdateHitPoints).not.toHaveBeenCalled();
+      fireEvent.keyDown(screen.getByDisplayValue('45'), { key: 'Enter' });
       expect(onUpdateHitPoints).toHaveBeenCalledWith({ max: 45 });
-      expect(screen.getByTitle(/calculation/)).toBeInTheDocument();
+      expect(
+        screen.getByRole('button', { name: /calculation/ })
+      ).toBeInTheDocument();
     });
 
     it('shows the typed max HP after switching to play mode', () => {
@@ -311,6 +400,7 @@ describe('HitPointTracker', () => {
       fireEvent.change(screen.getByDisplayValue('40'), {
         target: { value: '52' },
       });
+      fireEvent.blur(screen.getByDisplayValue('52'));
       fireEvent.click(screen.getByText('play'));
       expect(screen.getByText('52')).toBeInTheDocument();
     });
