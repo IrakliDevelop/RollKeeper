@@ -57,22 +57,23 @@ const isDomEvent = (value: unknown): boolean => {
  * BroadcastChannel structured-clones every message. A button wired straight
  * to a store action (`onClick={action}`) passes its click event, which the
  * leader's direct call ignores, so drop it here too (trailing event
- * arguments are removed, so the action sees the same arity). Returns null
- * when an argument still can't be cloned.
+ * arguments are removed, so the action sees the same arity). Returns the
+ * cloned arguments, so retries and promotion replay exactly what was
+ * checked, or null when an argument still can't be cloned.
  */
 function toCloneableArgs(args: unknown[]): unknown[] | null {
   const cleaned = args.map(arg => (isDomEvent(arg) ? undefined : arg));
   let end = cleaned.length;
   while (end > 0 && isDomEvent(args[end - 1])) end -= 1;
   const result = cleaned.slice(0, end);
-  if (typeof structuredClone === 'function') {
-    try {
-      structuredClone(result);
-    } catch {
-      return null;
-    }
+  // Every browser with BroadcastChannel has structuredClone (Safari added
+  // both in 15.4); without it the bus is inert, so skipping is safe.
+  if (typeof structuredClone !== 'function') return result;
+  try {
+    return structuredClone(result);
+  } catch {
+    return null;
   }
-  return result;
 }
 
 const newOpId = (): string =>

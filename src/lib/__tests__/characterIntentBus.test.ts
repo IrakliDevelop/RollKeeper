@@ -46,7 +46,10 @@ function makeBus(overrides: Partial<IntentBusDeps> = {}) {
 }
 
 beforeEach(() => vi.useFakeTimers());
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+});
 
 describe('follower side', () => {
   it('send() assigns contiguous per-character seqs and posts intents', () => {
@@ -169,7 +172,6 @@ describe('uncloneable arguments', () => {
       ['applyHealingToCharacter', 1],
     ]);
     expect(error).toHaveBeenCalledOnce();
-    error.mockRestore();
   });
 
   it('a failed re-send does not stop the rest of the queue', () => {
@@ -188,7 +190,38 @@ describe('uncloneable arguments', () => {
       })
     ).not.toThrow();
     expect(channel.posted.map(m => m.actionName)).toEqual(['b']);
-    error.mockRestore();
+
+    // 'a' stays pending and goes out on the next retry once posting works.
+    channel.posted.length = 0;
+    channel.failOn = null;
+    vi.advanceTimersByTime(2100);
+    expect(channel.posted.map(m => m.actionName)).toEqual(['a', 'b']);
+    expect(error).toHaveBeenCalled();
+  });
+
+  it('replaces an event in the middle and keeps the arguments after it', () => {
+    const { bus, channel } = makeCloningBus();
+    bus.send('char-1', 'someAction', [syntheticClick(), 2]);
+    expect(channel.posted).toMatchObject([
+      { actionName: 'someAction', args: [undefined, 2] },
+    ]);
+  });
+
+  it('queues a copy, so later changes to an argument are not sent', () => {
+    const { bus, channel } = makeCloningBus();
+    const updates = { name: 'Mira' };
+    bus.send('char-1', 'updateCharacter', [updates]);
+    updates.name = 'Changed';
+    channel.posted.length = 0;
+    channel.receive({
+      type: 'leader',
+      characterId: 'char-1',
+      tabId: 'other-tab',
+      epoch: 1,
+    });
+    expect(channel.posted).toMatchObject([
+      { actionName: 'updateCharacter', args: [{ name: 'Mira' }] },
+    ]);
   });
 });
 
