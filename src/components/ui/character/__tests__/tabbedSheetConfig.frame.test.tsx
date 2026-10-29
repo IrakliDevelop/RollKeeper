@@ -187,13 +187,13 @@ it('keeps the conditions aligned while they load, until the player takes over', 
   scroll.mockRestore();
 });
 
-it('lays the Player panel out as HP, then armor class, initiative and hit dice, then proficiencies', () => {
+it('lays the Player panel out as HP and hit dice, then armor class, initiative and proficiencies', () => {
   render(<>{config().find(t => t.id === 'combat')!.content}</>);
   const wanted = [
     'Hit points',
+    'Hit dice',
     'Armor class',
     'Initiative and speed',
-    'Hit dice',
     'Weapon proficiencies',
   ];
   const seen = screen

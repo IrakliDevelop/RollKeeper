@@ -154,7 +154,7 @@ export function HitPointTracker({
     >
       <div
         data-hp-status={hpStatus(hitPoints.current, hitPoints.max)}
-        className="grid items-center gap-x-10 gap-y-5 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+        className="space-y-5"
       >
         <div className="space-y-3">
           <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
@@ -215,7 +215,7 @@ export function HitPointTracker({
             </div>
           )}
         </div>
-        <div className="flex flex-wrap items-center gap-2 lg:col-start-2 lg:row-start-1 lg:flex-nowrap">
+        <div className="flex flex-wrap items-center gap-2">
           <div className="flex min-w-0 grow items-center gap-2 sm:grow-0">
             <NumberInput
               ref={amountField}
@@ -277,7 +277,6 @@ export function HitPointTracker({
             <Section
               heading="Death saves"
               level={4}
-              className="lg:col-start-1 lg:row-start-2"
               trailing={
                 onResetDeathSaves && (
                   <Button

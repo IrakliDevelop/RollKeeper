@@ -181,6 +181,28 @@ describe('HitPointTracker', () => {
     });
   });
 
+  it('stacks the readout, then the amount controls, then death saves, with no band grid', () => {
+    const { container } = render(
+      <HitPointTracker
+        hitPoints={dyingHitPoints}
+        onApplyDamage={vi.fn()}
+        onMakeDeathSave={vi.fn()}
+        onUpdateHitPoints={vi.fn()}
+      />
+    );
+    const current = screen.getByRole('textbox', { name: 'Current HP' });
+    const amount = screen.getByRole('textbox', { name: 'HP amount' });
+    const deathSaves = screen.getByRole('heading', { name: 'Death saves' });
+    const before = Node.DOCUMENT_POSITION_FOLLOWING;
+    expect(current.compareDocumentPosition(amount) & before).toBeTruthy();
+    expect(amount.compareDocumentPosition(deathSaves) & before).toBeTruthy();
+    const body = container.querySelector('[data-hp-status]')!;
+    expect(body).toHaveClass('space-y-5');
+    expect(container.innerHTML).not.toMatch(
+      /lg:(grid-cols|col-start|row-start|flex-nowrap)/
+    );
+  });
+
   it('shows death saves section when character is dying', () => {
     render(
       <HitPointTracker
