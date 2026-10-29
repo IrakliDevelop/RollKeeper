@@ -595,6 +595,7 @@ export const SpellManagement: React.FC = () => {
     reorderSpells,
     toggleSpellFavorite,
     spendSpellSlot,
+    spendPactMagicSlot,
     startConcentration,
     stopConcentration,
     toggleReaction,
@@ -892,7 +893,8 @@ export const SpellManagement: React.FC = () => {
   const handleCastSpellConfirm = (
     spellLevel: number,
     useFreecast: boolean,
-    isRitual?: boolean
+    isRitual?: boolean,
+    usePact?: boolean
   ) => {
     if (!selectedSpell) return;
     if (!consumeInventoryCost(selectedSpell.inventoryCost)) {
@@ -911,6 +913,8 @@ export const SpellManagement: React.FC = () => {
 
     if (isRitual) {
       // Ritual casting: no slot consumed, no freecast used
+    } else if (usePact) {
+      spendPactMagicSlot();
     } else if (useFreecast) {
       if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
         updateCharacter({
@@ -1441,6 +1445,7 @@ export const SpellManagement: React.FC = () => {
           }}
           spell={selectedSpell}
           spellSlots={character.spellSlots}
+          pactMagic={character.pactMagic}
           concentration={character.concentration}
           hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpellConfirm}
