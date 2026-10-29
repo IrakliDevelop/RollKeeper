@@ -85,16 +85,11 @@ export default function CharacterBasicInfo({
   return (
     <Section heading="Character information">
       {!editing ? (
-        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
           {information.map(([label, value]) => (
-            <div
-              key={label}
-              className={`min-w-0 ${label === 'Class' && !isMulticlassed ? 'pb-6' : ''}`}
-            >
-              <dt className="text-heading mb-1.5 block text-sm font-medium">
-                {label}
-              </dt>
-              <dd className="type-body text-heading flex min-h-10 items-center break-words pointer-coarse:min-h-11">
+            <div key={label} className="min-w-0">
+              <dt className="type-caption text-muted">{label}</dt>
+              <dd className="type-body text-heading break-words">
                 {value || '—'}
               </dd>
             </div>
@@ -208,9 +203,6 @@ export default function CharacterBasicInfo({
             </DialogContent>
           </Dialog>
         </>
-      )}
-      {!editing && (
-        <div aria-hidden="true" className="mt-4 h-10 pointer-coarse:min-h-11" />
       )}
     </Section>
   );

@@ -47,39 +47,36 @@ export default function QuickStats({
   ];
   return (
     <Section heading="Quick stats">
-      <dl className="space-y-3">
+      <div className="grid grid-cols-3 gap-x-4 gap-y-5">
         {rows.map(([label, value]) => (
-          <div key={label} className="flex items-center justify-between gap-4">
-            <dt className="type-body text-body">{label}</dt>
-            <dd className="type-ui text-heading tabular-nums">{value}</dd>
-          </div>
+          <dl key={label} className="flex min-w-0 flex-col-reverse">
+            <dt className="type-caption text-muted">{label}</dt>
+            <dd className="type-num-lg text-heading tabular-nums">{value}</dd>
+          </dl>
         ))}
-        <div>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <dt className="type-body text-body">Carrying capacity</dt>
-            <dd
-              className={`type-ui tabular-nums ${encumbered ? 'text-ember-text' : 'text-heading'}`}
-            >
-              {currentWeight.toFixed(1)} / {carryingCapacity} lb
-            </dd>
-          </div>
-          <div className="bg-divider h-1 w-full">
-            <div
-              className={`h-full ${encumbered ? 'bg-ember-fill' : 'bg-heading'}`}
-              style={{ width: `${weightBarPercent}%` }}
-            />
-          </div>
-          {encumbered && (
-            <p className="type-small text-ember-text mt-2">Encumbered</p>
-          )}
-          {showWeightNudge && (
-            <p className="type-small text-muted mt-2">
-              None of your items have a weight. Add weights on the Inventory
-              tab.
-            </p>
-          )}
+      </div>
+      <div className="mt-5 space-y-2">
+        <dl className="flex flex-wrap items-baseline gap-x-3">
+          <dt className="type-body text-body">Carrying capacity</dt>
+          <dd
+            className={`type-ui tabular-nums ${encumbered ? 'text-ember-text' : 'text-heading'}`}
+          >
+            {currentWeight.toFixed(1)} / {carryingCapacity} lb
+          </dd>
+        </dl>
+        <div className="bg-divider h-1 w-full">
+          <div
+            className={`h-full ${encumbered ? 'bg-ember-fill' : 'bg-heading'}`}
+            style={{ width: `${weightBarPercent}%` }}
+          />
         </div>
-      </dl>
+        {encumbered && <p className="type-small text-ember-text">Encumbered</p>}
+        {showWeightNudge && (
+          <p className="type-small text-muted">
+            None of your items have a weight. Add weights on the Inventory tab.
+          </p>
+        )}
+      </div>
     </Section>
   );
 }
