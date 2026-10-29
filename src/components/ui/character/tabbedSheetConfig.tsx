@@ -1,3 +1,4 @@
+import { Section } from '@/components/ui/layout/section';
 import { SubTabs } from '@/components/ui/layout/SubTabs';
 import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
@@ -74,17 +75,12 @@ function LevelUpButton({
   return (
     <>
       <Button
-        variant="primary"
+        variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
         onClick={() => setIsOpen(true)}
-        className={
-          pendingLevelUp
-            ? 'ring-accent-emerald-border animate-pulse ring-2'
-            : undefined
-        }
       >
         <AppIcon name="levelUp" size={14} />
-        Level Up
+        Level up
       </Button>
       {isOpen && (
         <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
@@ -438,23 +434,23 @@ export function createTabbedSheetConfig(
               totalLevel
             );
             return (
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
-                  <h2 className="text-heading text-lg font-bold">
-                    Experience Points
-                  </h2>
-                  {totalLevel < 20 && (
+              <Section
+                heading="Experience points"
+                trailing={
+                  totalLevel < 20 ? (
                     <LevelUpButton pendingLevelUp={pendingLevelUp} />
-                  )}
-                </div>
+                  ) : undefined
+                }
+              >
                 <XPTracker
+                  editing={params.editing}
                   currentXP={character.experience}
                   currentLevel={totalLevel}
                   onAddXP={params.addExperience}
                   onSetXP={params.setExperience}
                   pendingLevelUp={pendingLevelUp}
                 />
-              </div>
+              </Section>
             );
           })()}
         </div>

@@ -4,6 +4,7 @@ import React from 'react';
 import { XPTracker as SharedXPTracker } from '@/components/shared/character';
 
 interface XPTrackerProps {
+  editing?: boolean;
   currentXP: number;
   currentLevel: number;
   onAddXP: (xpToAdd: number) => void;
@@ -13,6 +14,7 @@ interface XPTrackerProps {
 }
 
 export default function XPTracker({
+  editing = true,
   currentXP,
   currentLevel,
   onAddXP,
@@ -23,6 +25,8 @@ export default function XPTracker({
   // Use the shared XPTracker component with full functionality
   return (
     <SharedXPTracker
+      editing={editing}
+      hideHeading
       currentXP={currentXP}
       currentLevel={currentLevel}
       onAddXP={onAddXP}

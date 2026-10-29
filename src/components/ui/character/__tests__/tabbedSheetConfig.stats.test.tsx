@@ -94,11 +94,10 @@ describe('Stats tab', () => {
     expect(screen.queryByText('Proficiency Bonus:')).toBeNull();
   });
 
-  it('puts Experience Points after the abilities', () => {
+  it('puts Experience points after the abilities', () => {
     renderStats(params(false));
     const abilities = screen.getByRole('heading', { name: 'Abilities' });
-    // The XP card and XPTracker both have this heading (a Phase 3 item).
-    const [xp] = screen.getAllByRole('heading', { name: 'Experience Points' });
+    const xp = screen.getByRole('heading', { name: 'Experience points' });
     expect(
       abilities.compareDocumentPosition(xp) & Node.DOCUMENT_POSITION_FOLLOWING
     ).toBeTruthy();

@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
-import {
-  render,
-  screen,
-  fireEvent,
-  cleanup,
-  act,
-} from '@testing-library/react';
+import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { XPTracker } from '../XPTracker';
 
 afterEach(() => {
@@ -27,14 +21,14 @@ describe('XPTracker', () => {
   it('renders current XP and level', () => {
     render(<XPTracker {...defaultProps} />);
     expect(screen.getAllByText('10,000').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Level 5').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('5').length).toBeGreaterThan(0);
   });
 
   it('shows XP to next level', () => {
     render(<XPTracker {...defaultProps} />);
     // 14,000 (level 6) - 10,000 = 4,000
     expect(screen.getByText('4,000 XP')).toBeInTheDocument();
-    expect(screen.getByText('To Next Level:')).toBeInTheDocument();
+    expect(screen.getByText('To next level')).toBeInTheDocument();
   });
 
   it('shows progress bar with correct percentage', () => {
@@ -44,14 +38,14 @@ describe('XPTracker', () => {
     expect(progressBar).not.toBeNull();
     const style = progressBar!.getAttribute('style')!;
     expect(style).toMatch(/width:\s*46\.6/);
-    expect(screen.getByText(/46\.7% to Level 6/)).toBeInTheDocument();
+    expect(screen.getByText(/46\.7% to level 6/)).toBeInTheDocument();
   });
 
   it('adds XP via form submission', () => {
     const onAddXP = vi.fn();
     render(<XPTracker {...defaultProps} onAddXP={onAddXP} />);
 
-    const input = screen.getByPlaceholderText('XP to add...');
+    const input = screen.getByRole('textbox', { name: 'XP to add' });
     fireEvent.change(input, { target: { value: '500' } });
 
     const addButton = screen.getByRole('button', { name: 'Add' });
@@ -63,14 +57,14 @@ describe('XPTracker', () => {
   it('clears input after submit', () => {
     render(<XPTracker {...defaultProps} />);
 
-    const input = screen.getByPlaceholderText('XP to add...');
+    const input = screen.getByRole('textbox', { name: 'XP to add' });
     fireEvent.change(input, { target: { value: '500' } });
-    expect(input).toHaveValue(500);
+    expect(input).toHaveValue('500');
 
     const addButton = screen.getByRole('button', { name: 'Add' });
     fireEvent.click(addButton);
 
-    expect(input).toHaveValue(null);
+    expect(input).toHaveValue('');
   });
 
   it('shows persistent badge when pendingLevelUp prop is set', () => {
@@ -80,7 +74,7 @@ describe('XPTracker', () => {
       <XPTracker {...defaultProps} currentXP={13500} pendingLevelUp={true} />
     );
 
-    expect(screen.getByText(/level up available/i)).toBeInTheDocument();
+    expect(screen.getByText(/Enough XP for level/i)).toBeInTheDocument();
   });
 
   it('does not show badge when pendingLevelUp prop is false', () => {
@@ -88,13 +82,13 @@ describe('XPTracker', () => {
       <XPTracker {...defaultProps} currentXP={13500} pendingLevelUp={false} />
     );
 
-    expect(screen.queryByText(/level up available/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Enough XP for level/i)).not.toBeInTheDocument();
   });
 
   it('does not show level-up alert when below threshold', () => {
     render(<XPTracker {...defaultProps} currentXP={10000} />);
 
-    const input = screen.getByPlaceholderText('XP to add...');
+    const input = screen.getByRole('textbox', { name: 'XP to add' });
     fireEvent.change(input, { target: { value: '100' } });
 
     const addButton = screen.getByRole('button', { name: 'Add' });
@@ -106,7 +100,7 @@ describe('XPTracker', () => {
   it('hides form when readonly is true', () => {
     render(<XPTracker {...defaultProps} readonly />);
     expect(
-      screen.queryByPlaceholderText('XP to add...')
+      screen.queryByRole('textbox', { name: 'XP to add' })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole('button', { name: 'Add' })
