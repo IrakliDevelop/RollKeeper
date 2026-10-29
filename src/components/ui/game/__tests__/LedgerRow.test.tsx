@@ -141,9 +141,25 @@ describe('LedgerRow', () => {
     );
     expect(onRollCheck).toHaveBeenCalledWith('wisdom');
     await userEvent.click(
-      screen.getByRole('button', { name: 'Roll Constitution saving throw' })
+      screen.getByRole('button', {
+        name: 'Roll Constitution Save +4, proficient',
+      })
     );
     expect(onRollSave).toHaveBeenCalledWith('constitution');
+  });
+
+  it('names a save roll by what it shows', () => {
+    render(
+      <LedgerRow
+        cells={CELLS}
+        abilityDisplay="modifier"
+        onRollCheck={vi.fn()}
+        onRollSave={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Roll Dexterity Save +2' })
+    ).toHaveTextContent('Save +2');
   });
 
   it('turns rolls off while editing and opens the score editor', async () => {

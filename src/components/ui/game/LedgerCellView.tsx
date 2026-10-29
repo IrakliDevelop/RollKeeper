@@ -118,7 +118,7 @@ export function LedgerCellView({
         level={saveProficient ? 'proficient' : 'none'}
         decorative
       />
-      <span>Save {formatModifier(save)}</span>
+      <span aria-hidden="true">Save {formatModifier(save)}</span>
     </>
   );
   const saveClass = 'type-small text-body inline-flex items-center gap-1';
@@ -170,13 +170,16 @@ export function LedgerCellView({
       </AbilityScoreEditor>
 
       {onRollSave ? (
+        // Named by its content, which holds the visible "Save +5".
         <button
           type="button"
-          aria-label={`Roll ${name} saving throw`}
           onClick={() => onRollSave(ability)}
           className={cn(saveClass, 'justify-center', ROLL_TARGET)}
         >
           {saveLine}
+          <span className="sr-only">
+            {saveRollLabel(ability, save, saveProficient)}
+          </span>
         </button>
       ) : (
         <span
