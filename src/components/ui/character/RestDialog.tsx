@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { Sun, Moon } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import {
   Dialog,
@@ -28,19 +27,16 @@ const REST_CONFIG: Record<
   RestType,
   {
     title: string;
-    icon: React.ReactNode;
     confirmLabel: string;
   }
 > = {
   short: {
-    title: 'Short Rest',
-    icon: <Sun className="h-5 w-5 text-amber-500" />,
-    confirmLabel: 'Take Short Rest',
+    title: 'Short rest',
+    confirmLabel: 'Take a short rest',
   },
   long: {
-    title: 'Long Rest',
-    icon: <Moon className="h-5 w-5 text-indigo-500" />,
-    confirmLabel: 'Take Long Rest',
+    title: 'Long rest',
+    confirmLabel: 'Take a long rest',
   },
 };
 
@@ -82,7 +78,6 @@ export default function RestDialog({
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            {config.icon}
             {config.title}
           </DialogTitle>
           <DialogDescription>

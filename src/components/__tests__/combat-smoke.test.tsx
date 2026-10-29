@@ -30,21 +30,21 @@ describe('HitDiceTracker', { timeout: 10_000 }, () => {
 
   it('renders without crashing', async () => {
     await renderTracker();
-    expect(screen.getAllByText('Hit Dice').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('Hit dice').length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays die types and remaining counts', async () => {
     await renderTracker();
-    expect(screen.getAllByText('D10').length).toBeGreaterThan(0);
-    expect(screen.getByText('3 / 5')).toBeInTheDocument();
-    expect(screen.getAllByText('D6').length).toBeGreaterThan(0);
-    expect(screen.getByText('3 / 3')).toBeInTheDocument();
+    expect(screen.getAllByText('d10').length).toBeGreaterThan(0);
+    expect(screen.getByText(/3 \/ 5/)).toBeInTheDocument();
+    expect(screen.getAllByText('d6').length).toBeGreaterThan(0);
+    expect(screen.getByText(/3 \/ 3/)).toBeInTheDocument();
   });
 
-  it('shows Long Rest button', async () => {
+  it('shows Restore all hit dice button', async () => {
     await renderTracker();
     expect(
-      screen.getByRole('button', { name: /Long Rest/i })
+      screen.getByRole('button', { name: /Restore all hit dice/i })
     ).toBeInTheDocument();
   });
 });
