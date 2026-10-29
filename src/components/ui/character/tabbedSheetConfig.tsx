@@ -306,7 +306,7 @@ export function createTabbedSheetConfig(
       label: 'Actions',
       icon: <AppIcon name="attack" className="h-4 w-4" />,
       badge: character.concentration?.isConcentrating ? (
-        <span className="bg-accent-orange-bg-strong text-accent-orange-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+        <span className="border-lapis-border text-lapis-text rounded-full border px-1.5 py-0.5 text-[10px] font-medium">
           Conc.
         </span>
       ) : undefined,

@@ -149,7 +149,7 @@ const SpellCard: React.FC<{
             </Badge>
           )}
           {spell.concentration && (
-            <Badge variant="warning" size="sm" className="flex-shrink-0">
+            <Badge variant="magic" size="sm" className="flex-shrink-0">
               ⏱
             </Badge>
           )}
@@ -206,7 +206,7 @@ const SpellCard: React.FC<{
             {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
           </Badge>
           {spell.concentration && (
-            <Badge variant="warning" size="sm">
+            <Badge variant="magic" size="sm">
               ⏱ Concentration
             </Badge>
           )}
