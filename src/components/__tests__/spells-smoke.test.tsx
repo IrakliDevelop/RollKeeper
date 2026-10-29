@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { cleanup, render, screen } from '@testing-library/react';
 import { SpellFormFields } from '@/components/shared/spells/SpellFormFields';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import type { SpellFormData } from '@/utils/spellConversion';
@@ -20,6 +20,8 @@ vi.mock('@/components/ui/forms/RichTextEditor', () => ({
     />
   ),
 }));
+
+afterEach(cleanup);
 
 const mockFormData: SpellFormData = {
   name: 'Fireball',
@@ -111,11 +113,51 @@ describe('SpellFormFields', () => {
 });
 
 describe('SpellDetailsModal', () => {
+  it('preserves optional spell details and exposes favorite state', () => {
+    const onToggleFavorite = vi.fn();
+    render(
+      <SpellDetailsModal
+        spell={{
+          ...mockSpell,
+          concentration: true,
+          ritual: true,
+          isPrepared: true,
+          actionType: 'save',
+          savingThrow: 'Dexterity',
+          damage: '8d6',
+          damageType: 'fire',
+          components: {
+            ...mockSpell.components,
+            materialDescription: 'bat guano',
+          },
+          higherLevel: 'More damage.',
+          source: 'PHB',
+        }}
+        isOpen
+        onClose={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+        isFavorite
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Favorite' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(screen.getByText('Concentration')).toBeInTheDocument();
+    expect(screen.getByText('Dexterity Save')).toBeInTheDocument();
+    expect(screen.getByText('8d6 fire')).toBeInTheDocument();
+    expect(screen.getByText('bat guano', { exact: false })).toBeInTheDocument();
+    expect(screen.getByText('More damage.')).toBeInTheDocument();
+    expect(screen.getByText('PHB')).toBeInTheDocument();
+  });
   it('renders spell name and level when open', () => {
     const onClose = vi.fn();
     render(
       <SpellDetailsModal spell={mockSpell} isOpen={true} onClose={onClose} />
     );
+    expect(
+      screen.getByRole('dialog', { name: 'Fireball' })
+    ).toBeInTheDocument();
     expect(screen.getAllByText('Fireball').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('Level 3').length).toBeGreaterThanOrEqual(1);
   });
