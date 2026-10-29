@@ -14,7 +14,7 @@ vi.mock('../tabbedSheetConfig', () => ({
   ],
 }));
 
-const BAR_OFFSET = 'scroll-mt-[calc(var(--sheet-bar-height,4rem)+1rem)]';
+const BAR_OFFSET = 'scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]';
 
 beforeEach(() => {
   // The tab strip watches its own width for the scroll chevrons.

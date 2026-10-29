@@ -90,9 +90,9 @@ describe('CharacterSheetHeader modes', () => {
   it('publishes the bar height for sticky content and jump targets', () => {
     const { unmount } = render(<Harness />);
     const root = document.documentElement;
-    expect(root.style.getPropertyValue('--sheet-bar-height')).toMatch(/px$/);
+    expect(root.style.getPropertyValue('--app-header-height')).toMatch(/px$/);
     unmount();
-    expect(root.style.getPropertyValue('--sheet-bar-height')).toBe('');
+    expect(root.style.getPropertyValue('--app-header-height')).toBe('');
   });
 
   it('keeps the notice inside the sticky bar', () => {
@@ -103,11 +103,22 @@ describe('CharacterSheetHeader modes', () => {
     );
   });
 
-  it('names the back link "Back to Characters"', () => {
+  it('names the back link "Characters"', () => {
+    render(<Harness />);
+    expect(screen.getByRole('link', { name: 'Characters' })).toHaveAttribute(
+      'href',
+      '/player'
+    );
+  });
+
+  it('has a separate home link and a crumb without a nested button', () => {
     render(<Harness />);
     expect(
-      screen.getByRole('link', { name: 'Back to Characters' })
-    ).toHaveAttribute('href', '/player');
+      screen.getByRole('link', { name: 'RollKeeper home' })
+    ).toHaveAttribute('href', '/');
+    expect(
+      screen.getByRole('link', { name: 'Characters' }).querySelector('button')
+    ).toBeNull();
   });
 
   it('keeps the bar save status for screen readers on phones', () => {

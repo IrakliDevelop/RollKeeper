@@ -1,3 +1,7 @@
+import { sb } from 'storybook/test';
+
+sb.mock(import('../src/lib/supabase/authConfig.ts'), { spy: true });
+sb.mock(import('../src/lib/supabase/browser.ts'), { spy: true });
 import type { Preview, Decorator } from '@storybook/nextjs-vite';
 import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';

@@ -108,17 +108,17 @@ export function SyncIndicator({
       <button
         ref={triggerRef}
         onClick={() => setMenuOpen(!menuOpen)}
-        className="border-divider bg-surface-secondary hover:bg-surface-hover flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors"
+        className="border-divider bg-surface-secondary hover:bg-surface-hover focus-visible:outline-ring flex min-h-6 items-center gap-2 rounded-lg border px-3 py-1.5 text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
       >
         <div className={`h-2 w-2 rounded-full ${getStatusColor(syncStatus)}`} />
         <Link2 size={14} className="text-muted" />
-        <span className="text-body max-w-[120px] truncate text-xs">
+        <span className="text-body sr-only max-w-[120px] truncate text-xs sm:not-sr-only">
           {campaignName || campaignCode}
         </span>
-        <span className="text-muted text-xs">
+        <span className="text-muted sr-only text-xs sm:not-sr-only">
           {syncStatus === 'syncing' ? 'Syncing...' : displayTime}
         </span>
-        <ChevronDown size={12} className="text-muted" />
+        <ChevronDown size={12} className="text-muted hidden sm:block" />
       </button>
 
       {menuOpen && (
