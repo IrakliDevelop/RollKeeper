@@ -186,3 +186,20 @@ it('keeps the conditions aligned while they load, until the player takes over', 
   view.unmount();
   scroll.mockRestore();
 });
+
+it('lays the Player panel out as HP, then armor class, initiative and hit dice, then proficiencies', () => {
+  render(<>{config().find(t => t.id === 'combat')!.content}</>);
+  const wanted = [
+    'Hit points',
+    'Armor class',
+    'Initiative and speed',
+    'Hit dice',
+    'Weapon proficiencies',
+  ];
+  const seen = screen
+    .getAllByRole('heading')
+    .map(h => h.textContent?.trim() ?? '')
+    .filter(text => wanted.includes(text));
+  expect(seen).toEqual(wanted);
+  expect(screen.queryByText('Armor and Dexterity')).not.toBeInTheDocument();
+});

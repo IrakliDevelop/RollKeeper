@@ -981,20 +981,40 @@ function CombatTabContent({
           ),
         content: {
           player: (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <div className="space-y-6">
-                  <ArmorClassManager
-                    editing={params.editing}
-                    character={character}
-                    onUpdateArmorClass={ac =>
-                      params.updateCharacter({ armorClass: ac })
-                    }
-                    onUpdateTempArmorClass={params.updateTempArmorClass}
-                    onSetTempACActive={params.setTempACActive}
-                    onSetShieldEquipped={params.setShieldEquipped}
-                    onUpdateShieldBonus={params.updateShieldBonus}
-                  />
+            <div className="space-y-8">
+              <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
+                <HitPointManager
+                  editing={params.editing}
+                  hitPoints={character.hitPoints}
+                  classInfo={character.class}
+                  level={totalLevel}
+                  constitutionScore={character.abilities.constitution}
+                  onApplyDamage={params.applyDamageToCharacter}
+                  onApplyHealing={params.applyHealingToCharacter}
+                  onAddTemporaryHP={params.addTemporaryHPToCharacter}
+                  onMakeDeathSave={params.makeDeathSavingThrow}
+                  onResetDeathSaves={params.resetDeathSavingThrows}
+                  onToggleCalculationMode={params.toggleHPCalculationMode}
+                  onRecalculateMaxHP={params.recalculateMaxHP}
+                  onSetCurrentHitPoints={params.setCurrentHitPoints}
+                  onUpdateHitPoints={params.updateHitPoints}
+                />
+              </ErrorBoundary>
+
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 md:grid-cols-2 lg:grid-cols-3">
+                <ArmorClassManager
+                  layout="ledger"
+                  editing={params.editing}
+                  character={character}
+                  onUpdateArmorClass={ac =>
+                    params.updateCharacter({ armorClass: ac })
+                  }
+                  onUpdateTempArmorClass={params.updateTempArmorClass}
+                  onSetTempACActive={params.setTempACActive}
+                  onSetShieldEquipped={params.setShieldEquipped}
+                  onUpdateShieldBonus={params.updateShieldBonus}
+                />
+                <Section heading="Initiative and speed" level={3}>
                   <CombatStats
                     editing={params.editing}
                     character={character}
@@ -1007,37 +1027,15 @@ function CombatTabContent({
                     onResetReaction={params.resetReaction}
                     onRollInitiative={params.rollInitiative}
                   />
-                </div>
-                <div className="space-y-6">
-                  <ErrorBoundary
-                    fallback={<SheetLoadError thing="Hit points" />}
-                  >
-                    <HitPointManager
-                      editing={params.editing}
-                      hitPoints={character.hitPoints}
-                      classInfo={character.class}
-                      level={totalLevel}
-                      constitutionScore={character.abilities.constitution}
-                      onApplyDamage={params.applyDamageToCharacter}
-                      onApplyHealing={params.applyHealingToCharacter}
-                      onAddTemporaryHP={params.addTemporaryHPToCharacter}
-                      onMakeDeathSave={params.makeDeathSavingThrow}
-                      onResetDeathSaves={params.resetDeathSavingThrows}
-                      onToggleCalculationMode={params.toggleHPCalculationMode}
-                      onRecalculateMaxHP={params.recalculateMaxHP}
-                      onSetCurrentHitPoints={params.setCurrentHitPoints}
-                      onUpdateHitPoints={params.updateHitPoints}
-                    />
-                  </ErrorBoundary>
-                  <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
-                    <HitDiceTracker
-                      hitDicePools={character.hitDicePools || {}}
-                      onUseHitDie={params.useHitDie}
-                      onRestoreHitDice={params.restoreHitDice}
-                      onResetAllHitDice={params.resetAllHitDice}
-                    />
-                  </ErrorBoundary>
-                </div>
+                </Section>
+                <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
+                  <HitDiceTracker
+                    hitDicePools={character.hitDicePools || {}}
+                    onUseHitDie={params.useHitDie}
+                    onRestoreHitDice={params.restoreHitDice}
+                    onResetAllHitDice={params.resetAllHitDice}
+                  />
+                </ErrorBoundary>
               </div>
 
               <ErrorBoundary
