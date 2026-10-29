@@ -121,9 +121,12 @@ export default function CharacterSheetHeader({
               labelClassName="sr-only sm:not-sr-only"
               wrapperClassName="min-h-6 shrink-0 items-center gap-0 whitespace-nowrap sm:gap-3"
             />
+            {/* Fixed width (longest state is 216px) so a save starting on
+                mousedown can't slide the switch out from under the click. */}
             <SaveIndicator
               lastSaved={lastSaved}
               status={saveStatus}
+              className="whitespace-nowrap sm:w-56 sm:shrink-0 sm:overflow-hidden"
               textClassName="sr-only sm:not-sr-only"
             />
             {extraHeaderContent}

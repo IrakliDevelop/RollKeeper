@@ -1,15 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { expect, fn, mocked, waitFor, within } from 'storybook/test';
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
 import { getPublicAuthConfig } from '@/lib/supabase/authConfig';
 import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
 import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
+import { Button } from '@/components/ui/forms';
 import { useCharacterStore } from '@/store/characterStore';
 import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import CharacterSheetHeader from './CharacterSheetHeader';
 import { SheetModeProvider, useSheetModeState } from './SheetMode';
+import type { SaveStatus } from '@/types/character';
 
 /** The sizes a story picks with `globals: PHONE`, `IPAD_PORTRAIT` or `IPAD_LANDSCAPE`. */
 const VIEWPORTS = {
@@ -42,9 +44,17 @@ interface HarnessProps {
   campaign?: boolean;
   /** A long name makes the name compete with the back link for room. */
   characterName: string;
+  saveStatus?: SaveStatus;
+  lastSaved?: Date | null;
 }
 
-function Harness({ initialEditing, characterName, campaign }: HarnessProps) {
+function Harness({
+  initialEditing,
+  characterName,
+  campaign,
+  saveStatus = 'saved',
+  lastSaved = null,
+}: HarnessProps) {
   const mode = useSheetModeState('story-character');
   const { setEditing } = mode;
   useEffect(() => {
@@ -61,8 +71,8 @@ function Harness({ initialEditing, characterName, campaign }: HarnessProps) {
         characterLevel={3}
         characterAlignment="Lawful Good"
         characterCreatureType="Humanoid"
-        saveStatus="saved"
-        lastSaved={null}
+        saveStatus={saveStatus}
+        lastSaved={lastSaved}
         hasUnsavedChanges={false}
         onManualSave={fn()}
         onExport={fn()}
@@ -370,4 +380,49 @@ export const CampaignSignedOutPhoneDark: Story = {
 export const CampaignSignedInPhoneDark: Story = {
   ...CampaignSignedInPhone,
   globals: { ...PHONE, theme: 'dark' },
+};
+
+/** Every save state the bar shows, longest text included. */
+const SAVE_STATES: { saveStatus: SaveStatus; lastSaved: Date | null }[] = [
+  { saveStatus: 'saved', lastSaved: new Date() },
+  { saveStatus: 'saving', lastSaved: null },
+  { saveStatus: 'saved-local', lastSaved: new Date(2026, 0, 1, 22, 58) },
+  { saveStatus: 'saved-local-mirror-pending', lastSaved: new Date() },
+  { saveStatus: 'error', lastSaved: null },
+];
+
+function SaveStatesHarness(props: HarnessProps) {
+  const [index, setIndex] = useState(0);
+  return (
+    <>
+      <Harness {...props} {...SAVE_STATES[index]} />
+      <Button onClick={() => setIndex(i => (i + 1) % SAVE_STATES.length)}>
+        Next save state
+      </Button>
+    </>
+  );
+}
+
+/**
+ * The switch holds still while the save text changes, so a click that blurs a
+ * field and starts a save still lands on it.
+ */
+export const SwitchHoldsStillWhileSaving: Story = {
+  args: { initialEditing: true },
+  globals: IPAD_PORTRAIT,
+  render: args => <SaveStatesHarness {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole('switch', { name: 'Edit sheet' });
+    const left = toggle.getBoundingClientRect().left;
+    const texts = ['Saving…', 'Saved on this device', 'Saved on this device'];
+    for (const text of [...texts, "Couldn't save on this device"]) {
+      canvas.getByRole('button', { name: 'Next save state' }).click();
+      await new Promise(done =>
+        requestAnimationFrame(() => requestAnimationFrame(done))
+      );
+      await expect(canvas.getAllByText(text).length).toBeGreaterThan(0);
+      await expect(toggle.getBoundingClientRect().left).toBeCloseTo(left, 0);
+    }
+  },
 };
