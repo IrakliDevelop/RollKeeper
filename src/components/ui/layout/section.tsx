@@ -9,6 +9,9 @@
 'use client';
 
 import * as React from 'react';
+import { ChevronDown } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { useUiPrefs } from '@/hooks/useUiPrefs';
 import { cn } from '@/utils/cn';
 
 export type SectionHeadingLevel = 2 | 3 | 4;
@@ -32,6 +35,8 @@ export interface SectionProps
    * Class names for the content below the rule.
    */
   contentClassName?: string;
+  /** Stable per-device preference key. Omit for an always-open section. */
+  collapsible?: string;
 }
 
 const HEADING_CLASS: Record<SectionHeadingLevel, string> = {
@@ -44,6 +49,7 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
   (
     {
       heading,
+      collapsible,
       level = 2,
       trailing,
       className,
@@ -54,6 +60,11 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
     ref
   ) => {
     const headingId = React.useId();
+    const contentId = React.useId();
+    const { prefs, setPref } = useUiPrefs();
+    const collapsed = collapsible
+      ? prefs.collapsed[collapsible] === true
+      : false;
     const Heading = `h${level}` as const;
 
     return (
@@ -68,13 +79,44 @@ const Section = React.forwardRef<HTMLElement, SectionProps>(
             id={headingId}
             className={cn('text-heading min-w-0', HEADING_CLASS[level])}
           >
-            {heading}
+            {collapsible ? (
+              <Button
+                type="button"
+                variant="ghost"
+                aria-expanded={!collapsed}
+                aria-controls={contentId}
+                className={cn(
+                  'h-auto min-h-6 justify-start px-0 py-0 text-left pointer-coarse:min-h-11',
+                  HEADING_CLASS[level]
+                )}
+                onClick={() =>
+                  setPref('collapsed', {
+                    ...prefs.collapsed,
+                    [collapsible]: !collapsed,
+                  })
+                }
+              >
+                {heading}
+                <ChevronDown
+                  aria-hidden="true"
+                  className={cn('size-4 shrink-0', collapsed && '-rotate-90')}
+                />
+              </Button>
+            ) : (
+              heading
+            )}
           </Heading>
           {trailing != null && (
             <div className="flex shrink-0 items-center gap-2">{trailing}</div>
           )}
         </div>
-        <div className={cn('pt-4', contentClassName)}>{children}</div>
+        <div
+          id={contentId}
+          hidden={collapsed}
+          className={cn(!collapsed && 'pt-4', contentClassName)}
+        >
+          {!collapsed && children}
+        </div>
       </section>
     );
   }

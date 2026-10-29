@@ -1,4 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
+import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
+import { within, userEvent, expect } from 'storybook/test';
 import { Plus } from 'lucide-react';
 import { Button } from '../forms/button';
 import { Section } from './section';
@@ -56,4 +58,41 @@ export const Levels: Story = {
 export const LevelsDark: Story = {
   render: () => <Sections />,
   globals: { theme: 'dark' },
+};
+
+export const Collapsible: Story = {
+  args: {
+    heading: 'Prepared spells',
+    collapsible: 'story-prepared-spells',
+    children: <p className="type-body text-body">Shield, Magic missile.</p>,
+  },
+};
+export const CollapsibleDark: Story = {
+  ...Collapsible,
+  globals: { theme: 'dark' },
+};
+
+export const Disclosure: Story = {
+  ...Collapsible,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole('button', { name: 'Prepared spells' });
+    await userEvent.click(trigger);
+    await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+    await userEvent.keyboard('{Enter}');
+    await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  },
+};
+
+export const TouchDisclosure: Story = {
+  ...Collapsible,
+  beforeEach: () => emulateCoarsePointer(),
+  play: async ({ canvasElement }) => {
+    const trigger = within(canvasElement).getByRole('button', {
+      name: 'Prepared spells',
+    });
+    await expect(trigger.getBoundingClientRect().height).toBeGreaterThanOrEqual(
+      44
+    );
+  },
 };

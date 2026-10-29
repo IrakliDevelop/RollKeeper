@@ -14,14 +14,23 @@ export const UI_PREFS_KEY = 'rollkeeper-ui-prefs';
 export interface UiPrefs {
   /** Which number an ability shows large: the modifier or the score. */
   abilityDisplay: 'modifier' | 'score';
+  collapsed: Record<string, boolean>;
 }
 
-export const DEFAULT_UI_PREFS: UiPrefs = { abilityDisplay: 'modifier' };
+export const DEFAULT_UI_PREFS: UiPrefs = {
+  abilityDisplay: 'modifier',
+  collapsed: {},
+};
 
 type Validators = { [K in keyof UiPrefs]: (value: unknown) => boolean };
 
 const VALIDATORS: Validators = {
   abilityDisplay: value => value === 'modifier' || value === 'score',
+  collapsed: value =>
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every(item => typeof item === 'boolean'),
 };
 
 function parseObject(raw: string | null): Record<string, unknown> | null {
@@ -47,7 +56,7 @@ export function parseUiPrefs(raw: string | null): UiPrefs {
   const prefs = { ...DEFAULT_UI_PREFS };
   for (const key of Object.keys(VALIDATORS) as (keyof UiPrefs)[]) {
     if (VALIDATORS[key](stored[key])) {
-      prefs[key] = stored[key] as UiPrefs[typeof key];
+      Object.assign(prefs, { [key]: stored[key] });
     }
   }
   return prefs;
@@ -134,7 +143,18 @@ function getServerSnapshot(): UiPrefsSnapshot {
  * leaves it as unset as before does not count).
  */
 export function setPref<K extends keyof UiPrefs>(key: K, value: UiPrefs[K]) {
-  const next = mergeUiPrefs(readRaw(), { [key]: value } as Partial<UiPrefs>);
+  const raw = readRaw();
+  // Preserve visit-local choices until storage itself changes.
+  const current = raw === observedRaw ? cached.prefs : parseUiPrefs(raw);
+  const stored = parseUiPrefs(raw);
+  const patch: Partial<UiPrefs> = {};
+  for (const prefKey of Object.keys(VALIDATORS) as (keyof UiPrefs)[]) {
+    if (JSON.stringify(current[prefKey]) !== JSON.stringify(stored[prefKey])) {
+      Object.assign(patch, { [prefKey]: current[prefKey] });
+    }
+  }
+  Object.assign(patch, { [key]: value });
+  const next = mergeUiPrefs(raw, patch);
   try {
     readBrowserLocalStorage()?.setItem(UI_PREFS_KEY, next);
   } catch {
