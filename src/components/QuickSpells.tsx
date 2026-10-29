@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 
 const NO_SPELLCASTING_ABILITY = {
   title: "Can't cast spells",
@@ -84,7 +85,6 @@ interface LevelSectionProps {
   totalLevel: number;
   slotMax?: number;
   slotUsed?: number;
-  onSlotChange?: (delta: number) => void;
 }
 
 const SpellCard: React.FC<{
@@ -311,7 +311,6 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   totalLevel,
   slotMax,
   slotUsed,
-  onSlotChange,
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
@@ -355,31 +354,9 @@ const LevelSection: React.FC<LevelSectionProps> = ({
         </button>
 
         {/* Inline slot dots */}
-        {hasSlots && onSlotChange && (
+        {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
-            <div className="flex gap-1">
-              {Array.from({ length: slotMax! }, (_, index) => {
-                const isUsed = index < (slotUsed ?? 0);
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
-                      const clamped = Math.max(0, Math.min(newUsed, slotMax!));
-                      const delta = clamped - (slotUsed ?? 0);
-                      if (delta !== 0) onSlotChange(delta);
-                    }}
-                    className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
-                      isUsed
-                        ? 'border-red-500 bg-red-500 opacity-70 hover:scale-110'
-                        : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)] hover:scale-110'
-                    }`}
-                    title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
-                  />
-                );
-              })}
-            </div>
+            <SlotPips total={slotMax!} available={remaining} level={level} />
             <span
               className={`text-[10px] font-bold ${
                 remaining === 0 ? 'text-accent-red-text' : 'text-heading'
@@ -419,13 +396,8 @@ export function QuickSpells({
   showDamageRoll,
   animateRoll,
 }: QuickSpellsProps) {
-  const {
-    character,
-    spendSpellSlot,
-    restoreSpellSlot,
-    toggleSpellFavorite,
-    toggleReaction,
-  } = useCharacterStore();
+  const { character, toggleSpellFavorite, toggleReaction } =
+    useCharacterStore();
   const { castSpell } = useCastSpell();
   const totalLevel = getTotalLevel(character);
 
@@ -798,12 +770,6 @@ export function QuickSpells({
                   totalLevel={totalLevel}
                   slotMax={slot?.max}
                   slotUsed={slot?.used}
-                  onSlotChange={delta => {
-                    const slotLevel =
-                      level as keyof typeof character.spellSlots;
-                    if (delta > 0) spendSpellSlot(slotLevel, delta);
-                    else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
-                  }}
                 />
               );
             })}
