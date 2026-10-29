@@ -1,11 +1,17 @@
 import type { Meta, StoryObj } from '@storybook/nextjs-vite';
-import { useEffect } from 'react';
-import { expect, fn, waitFor, within } from 'storybook/test';
-import { Button } from '@/components/ui/forms/button';
+import { useEffect, useState } from 'react';
+import { expect, fn, mocked, waitFor, within } from 'storybook/test';
+import type { AuthChangeEvent, Session } from '@supabase/supabase-js';
+import { getPublicAuthConfig } from '@/lib/supabase/authConfig';
+import { createSupabaseBrowserClient } from '@/lib/supabase/browser';
+import { SyncIndicator } from '@/components/ui/campaign/SyncIndicator';
+import { Button } from '@/components/ui/forms';
+import { useCharacterStore } from '@/store/characterStore';
 import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
 import { emulateCoarsePointer } from '@/test/storybook/emulateCoarsePointer';
 import CharacterSheetHeader from './CharacterSheetHeader';
 import { SheetModeProvider, useSheetModeState } from './SheetMode';
+import type { SaveStatus } from '@/types/character';
 
 /** The sizes a story picks with `globals: PHONE`, `IPAD_PORTRAIT` or `IPAD_LANDSCAPE`. */
 const VIEWPORTS = {
@@ -35,11 +41,20 @@ const IPAD_LANDSCAPE = {
 interface HarnessProps {
   /** Start the story in edit mode, as if the switch had been turned on. */
   initialEditing: boolean;
+  campaign?: boolean;
   /** A long name makes the name compete with the back link for room. */
   characterName: string;
+  saveStatus?: SaveStatus;
+  lastSaved?: Date | null;
 }
 
-function Harness({ initialEditing, characterName }: HarnessProps) {
+function Harness({
+  initialEditing,
+  characterName,
+  campaign,
+  saveStatus = 'saved',
+  lastSaved = null,
+}: HarnessProps) {
   const mode = useSheetModeState('story-character');
   const { setEditing } = mode;
   useEffect(() => {
@@ -52,12 +67,12 @@ function Harness({ initialEditing, characterName }: HarnessProps) {
         characterId="story-character"
         characterName={characterName}
         characterRace="Dwarf"
-        characterClass="Fighter"
+        characterClass="Fighter 3"
         characterLevel={3}
         characterAlignment="Lawful Good"
         characterCreatureType="Humanoid"
-        saveStatus="saved"
-        lastSaved={null}
+        saveStatus={saveStatus}
+        lastSaved={lastSaved}
         hasUnsavedChanges={false}
         onManualSave={fn()}
         onExport={fn()}
@@ -65,10 +80,24 @@ function Harness({ initialEditing, characterName }: HarnessProps) {
         onUpdateName={fn()}
         onAddToast={fn()}
         extraHeaderContent={
-          // Stand-in for the campaign sync chip, about as wide as the real one.
-          <Button variant="outline" size="sm" className="hidden sm:inline-flex">
-            Synthetic Campaign 2m ago
-          </Button>
+          campaign ? (
+            <SyncIndicator
+              syncStatus="synced"
+              lastSyncedAt={null}
+              campaignCode="FAKE03"
+              campaignName="Synthetic campaign"
+              autoSync
+              syncEnabled
+              onSyncNow={fn()}
+              onToggleAutoSync={fn()}
+              onLeaveCampaign={fn()}
+              characterData={useCharacterStore.getState().character}
+              shareHpWithParty
+              onToggleShareHp={fn()}
+              sharePartyView={false}
+              onSharePartyViewChange={fn()}
+            />
+          ) : undefined
         }
       />
     </SheetModeProvider>
@@ -80,19 +109,30 @@ const meta: Meta<typeof Harness> = {
   component: Harness,
   parameters: {
     layout: 'fullscreen',
+    nextjs: { appDirectory: true },
     a11y: {
       test: 'error',
-      // The sticky bar and the character card are both <header>s, so the
-      // page has two banner landmarks. That predates the sheet modes and is
-      // out of scope here.
-      config: {
-        rules: [
-          { id: 'landmark-no-duplicate-banner', enabled: false },
-          { id: 'landmark-unique', enabled: false },
-        ],
-      },
     },
     viewport: { options: VIEWPORTS },
+  },
+  beforeEach: ({ parameters }) => {
+    mocked(getPublicAuthConfig).mockReturnValue({
+      url: 'http://auth-fake.localhost',
+      publishableKey: 'synthetic-key',
+    });
+    const session = parameters.signedIn
+      ? ({ user: { email: 'mira@example.invalid' } } as Session)
+      : null;
+    mocked(createSupabaseBrowserClient).mockReturnValue({
+      auth: {
+        onAuthStateChange: (
+          callback: (event: AuthChangeEvent, session: Session | null) => void
+        ) => {
+          callback('INITIAL_SESSION', session);
+          return { data: { subscription: { unsubscribe: fn() } } };
+        },
+      },
+    } as unknown as ReturnType<typeof createSupabaseBrowserClient>);
   },
   globals: IPAD_LANDSCAPE,
   args: {
@@ -114,8 +154,11 @@ function barOf(canvasElement: HTMLElement) {
 
 async function checkBar(canvasElement: HTMLElement) {
   const bar = barOf(canvasElement);
-  // One row, nothing pushed off-screen. Only the bar's own edges: the card
-  // under it overflows at 390px already (pre-existing, out of scope here).
+  // Both the sticky bar and page head fit at every supported width.
+  await expect(canvasElement.scrollWidth).toBeLessThanOrEqual(
+    window.innerWidth
+  );
+  await expect(within(canvasElement).getAllByRole('banner')).toHaveLength(1);
   await expect(bar.scrollWidth).toBeLessThanOrEqual(bar.clientWidth);
   await expect(bar.getBoundingClientRect().right).toBeLessThanOrEqual(
     window.innerWidth + 0.5
@@ -263,5 +306,123 @@ export const TouchTargets: Story = {
       Math.round(back.top) < Math.round(area.bottom) &&
       Math.round(area.top) < Math.round(back.bottom);
     await expect(overlaps).toBe(false);
+  },
+};
+
+async function checkPopulatedPhone(
+  canvasElement: HTMLElement,
+  signedIn: boolean
+) {
+  const canvas = within(canvasElement);
+  await canvas.findByRole('button', {
+    name: signedIn ? 'Account menu for mira@example.invalid' : 'Sign in',
+  });
+  await checkBar(canvasElement);
+  const buttons = [
+    ...canvasElement.querySelectorAll<HTMLButtonElement>('header button'),
+  ];
+  const area = (button: HTMLButtonElement) => {
+    const rect = button.getBoundingClientRect();
+    if (button.getAttribute('role') !== 'switch') return rect;
+    const after = getComputedStyle(button, '::after');
+    const width = parseFloat(after.width),
+      height = parseFloat(after.height);
+    return {
+      width,
+      height,
+      left: rect.left + (rect.width - width) / 2,
+      right: rect.right + (width - rect.width) / 2,
+      top: rect.top + (rect.height - height) / 2,
+      bottom: rect.bottom + (height - rect.height) / 2,
+    };
+  };
+  for (const button of buttons) {
+    const rect = area(button);
+    await expect(rect.width).toBeGreaterThanOrEqual(43.5);
+    await expect(rect.height).toBeGreaterThanOrEqual(43.5);
+    for (const other of buttons) {
+      if (button === other) continue;
+      const b = area(other);
+      await expect(
+        rect.left < b.right - 0.5 &&
+          rect.right > b.left + 0.5 &&
+          rect.top < b.bottom - 0.5 &&
+          rect.bottom > b.top + 0.5
+      ).toBe(false);
+    }
+  }
+  const bar = barOf(canvasElement);
+  await waitFor(() =>
+    expect(
+      Math.abs(
+        parseFloat(
+          document.documentElement.style.getPropertyValue('--app-header-height')
+        ) - bar.getBoundingClientRect().height
+      )
+    ).toBeLessThan(1)
+  );
+}
+export const CampaignSignedOutPhone: Story = {
+  args: { campaign: true },
+  globals: PHONE,
+  beforeEach: () => emulateCoarsePointer(),
+  play: async ({ canvasElement }) => checkPopulatedPhone(canvasElement, false),
+};
+export const CampaignSignedInPhone: Story = {
+  ...CampaignSignedOutPhone,
+  parameters: { signedIn: true },
+  play: async ({ canvasElement }) => checkPopulatedPhone(canvasElement, true),
+};
+export const CampaignSignedOutPhoneDark: Story = {
+  ...CampaignSignedOutPhone,
+  globals: { ...PHONE, theme: 'dark' },
+};
+export const CampaignSignedInPhoneDark: Story = {
+  ...CampaignSignedInPhone,
+  globals: { ...PHONE, theme: 'dark' },
+};
+
+/** Every save state the bar shows, longest text included. */
+const SAVE_STATES: { saveStatus: SaveStatus; lastSaved: Date | null }[] = [
+  { saveStatus: 'saved', lastSaved: new Date() },
+  { saveStatus: 'saving', lastSaved: null },
+  { saveStatus: 'saved-local', lastSaved: new Date(2026, 0, 1, 22, 58) },
+  { saveStatus: 'saved-local-mirror-pending', lastSaved: new Date() },
+  { saveStatus: 'error', lastSaved: null },
+];
+
+function SaveStatesHarness(props: HarnessProps) {
+  const [index, setIndex] = useState(0);
+  return (
+    <>
+      <Harness {...props} {...SAVE_STATES[index]} />
+      <Button onClick={() => setIndex(i => (i + 1) % SAVE_STATES.length)}>
+        Next save state
+      </Button>
+    </>
+  );
+}
+
+/**
+ * The switch holds still while the save text changes, so a click that blurs a
+ * field and starts a save still lands on it.
+ */
+export const SwitchHoldsStillWhileSaving: Story = {
+  args: { initialEditing: true },
+  globals: IPAD_PORTRAIT,
+  render: args => <SaveStatesHarness {...args} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggle = canvas.getByRole('switch', { name: 'Edit sheet' });
+    const left = toggle.getBoundingClientRect().left;
+    const texts = ['Saving…', 'Saved on this device', 'Saved on this device'];
+    for (const text of [...texts, "Couldn't save on this device"]) {
+      canvas.getByRole('button', { name: 'Next save state' }).click();
+      await new Promise(done =>
+        requestAnimationFrame(() => requestAnimationFrame(done))
+      );
+      await expect(canvas.getAllByText(text).length).toBeGreaterThan(0);
+      await expect(toggle.getBoundingClientRect().left).toBeCloseTo(left, 0);
+    }
   },
 };

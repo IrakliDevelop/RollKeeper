@@ -60,3 +60,24 @@ describe('TabbedCharacterSheet tab jumps', () => {
     expect(scrolled[0]).toHaveClass(BAR_OFFSET);
   });
 });
+
+it('suppresses and cancels a pending default scroll for an anchored HUD jump', () => {
+  vi.useFakeTimers();
+  const scroll = vi
+    .spyOn(Element.prototype, 'scrollIntoView')
+    .mockImplementation(() => {});
+  const ref = createRef<TabbedCharacterSheetRef>();
+  const { unmount } = render(
+    <TabbedCharacterSheet ref={ref} {...({} as TabbedSheetConfigParams)} />
+  );
+  act(() => {
+    ref.current?.switchToTab('actions');
+    ref.current?.switchToTab('combat', { scroll: false });
+  });
+  act(() => vi.advanceTimersByTime(200));
+  expect(scroll).not.toHaveBeenCalled();
+  act(() => ref.current?.switchToTab('actions'));
+  unmount();
+  act(() => vi.advanceTimersByTime(200));
+  expect(scroll).not.toHaveBeenCalled();
+});

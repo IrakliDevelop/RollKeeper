@@ -22,46 +22,44 @@ export const SaveIndicator = ({
       case 'saving':
         return {
           icon: <Loader2 size={12} className="animate-spin" />,
-          text: 'Saving...',
-          dotColor: 'bg-yellow-500',
-          textColor: 'text-yellow-700 dark:text-yellow-400',
+          text: 'Saving…',
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
       case 'saved':
         return {
           icon: <Check size={12} />,
           text: hasUnsavedChanges ? 'Changes pending' : 'All changes saved',
-          dotColor: hasUnsavedChanges ? 'bg-yellow-500' : 'bg-green-500',
-          textColor: hasUnsavedChanges
-            ? 'text-yellow-700 dark:text-yellow-400'
-            : 'text-green-700 dark:text-green-400',
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
       case 'saved-local':
         return {
           icon: <Check size={12} />,
-          text: 'Local: saved',
-          dotColor: 'bg-green-500',
-          textColor: 'text-green-700 dark:text-green-400',
+          text: 'Saved on this device',
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
       case 'saved-local-mirror-pending':
         return {
           icon: <AlertCircle size={12} />,
-          text: 'Local: saved · compatibility mirror retry pending',
-          dotColor: 'bg-yellow-500',
-          textColor: 'text-yellow-700 dark:text-yellow-400',
+          text: 'Saved on this device',
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
       case 'error':
         return {
           icon: <AlertCircle size={12} />,
-          text: 'Save failed',
-          dotColor: 'bg-red-500',
-          textColor: 'text-red-700 dark:text-red-400',
+          text: "Couldn't save on this device",
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
       default:
         return {
           icon: <Save size={12} />,
           text: 'Not saved',
-          dotColor: 'bg-faint',
-          textColor: 'text-body',
+          dotColor: 'bg-muted',
+          textColor: 'text-muted',
         };
     }
   };

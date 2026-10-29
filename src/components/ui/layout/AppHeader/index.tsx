@@ -13,6 +13,8 @@ export interface AppHeaderProps {
   subbar?: ReactNode;
   nav?: ReactNode;
   sticky?: boolean;
+  /** Allow a populated sheet action cluster to wrap within the viewport. */
+  wrapControls?: boolean;
 }
 
 /**
@@ -26,6 +28,7 @@ export function AppHeader({
   subbar,
   nav,
   sticky = false,
+  wrapControls = false,
 }: AppHeaderProps) {
   const barRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -64,9 +67,20 @@ export function AppHeader({
           <div className="min-w-0 flex-1">{title}</div>
         </div>
         {nav && <div className="hidden md:block">{nav}</div>}
-        <div className="ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3">
+        <div
+          className={cn(
+            'ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3',
+            wrapControls && 'max-w-full min-w-0 shrink flex-wrap'
+          )}
+        >
           {actions && (
-            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div
+              className={cn(
+                'flex shrink-0 items-center gap-2 sm:gap-3',
+                wrapControls &&
+                  'max-w-full min-w-0 shrink flex-wrap justify-end'
+              )}
+            >
               {actions}
             </div>
           )}

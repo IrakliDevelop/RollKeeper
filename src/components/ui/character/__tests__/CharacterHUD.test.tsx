@@ -1,10 +1,23 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import CharacterHUD from '@/components/ui/character/CharacterHUD';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { CharacterState } from '@/types/character';
 
-afterEach(cleanup);
+beforeEach(() =>
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  )
+);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 function hudProps(character: CharacterState) {
   return {
@@ -216,15 +229,17 @@ describe('CharacterHUD stats', () => {
 
   it('shows the speed in feet', () => {
     renderHud(withHp(30, 40));
-    expect(screen.getByRole('button', { name: '30ft Speed' })).toBeVisible();
+    expect(screen.getByText('Speed')).toBeVisible();
   });
 
   it('still opens and closes the speed popover', () => {
     const props = hudProps(withHp(30, 40));
     render(<CharacterHUD {...props} onUpdateCharacter={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
     expect(screen.getByText('Walk')).toBeVisible();
-    fireEvent.mouseDown(document.body);
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Walk' }), {
+      key: 'Escape',
+    });
     expect(screen.queryByText('Walk')).toBeNull();
   });
 
@@ -343,7 +358,7 @@ describe('CharacterHUD speed tile and sheet mode', () => {
   it('opens the popover in edit mode', () => {
     const props = hudProps(withHp(30, 40));
     render(<CharacterHUD {...props} editing onUpdateCharacter={vi.fn()} />);
-    fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
     expect(screen.getByText('Walk')).toBeVisible();
   });
 
@@ -353,7 +368,7 @@ describe('CharacterHUD speed tile and sheet mode', () => {
     const { rerender } = render(
       <CharacterHUD {...props} editing onUpdateCharacter={onUpdateCharacter} />
     );
-    fireEvent.click(screen.getByRole('button', { name: '30ft Speed' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
     expect(screen.getByText('Walk')).toBeVisible();
 
     rerender(
@@ -369,4 +384,121 @@ describe('CharacterHUD speed tile and sheet mode', () => {
 
     expect(screen.queryByText('Walk')).toBeNull();
   });
+});
+
+it('keeps reaction naming stable and gives every row-two action a button type', () => {
+  const props = hudProps(withHp(30, 40));
+  const { rerender } = render(<CharacterHUD {...props} editing={false} />);
+  const reaction = screen.getByRole('button', { name: 'Reaction used' });
+  expect(reaction).toHaveAttribute('aria-pressed', 'false');
+  fireEvent.click(reaction);
+  expect(props.onToggleReaction).toHaveBeenCalledOnce();
+  rerender(
+    <CharacterHUD
+      {...props}
+      character={{ ...props.character, reaction: { hasUsedReaction: true } }}
+      editing={false}
+    />
+  );
+  expect(screen.getByRole('button', { name: 'Reaction used' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  for (const name of [
+    'Take a short rest',
+    'Take a long rest',
+    'Go back a day',
+    'Advance a day',
+    'Gain heroic inspiration',
+    'Reaction used',
+  ])
+    expect(screen.getByRole('button', { name })).toHaveAttribute(
+      'type',
+      'button'
+    );
+});
+it('saves four speed drafts together, cancels without updates and restores trigger focus', async () => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches: true,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  );
+  const update = vi.fn();
+  const props = hudProps(withHp(30, 40));
+  render(<CharacterHUD {...props} editing onUpdateCharacter={update} />);
+  const trigger = screen.getByRole('button', { name: 'Edit speeds' });
+  fireEvent.click(trigger);
+  const walk = await screen.findByRole('textbox', { name: 'Walk' });
+  fireEvent.change(walk, { target: { value: '45' } });
+  fireEvent.blur(walk);
+  expect(update).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(update).toHaveBeenCalledExactlyOnceWith({
+    speed: 45,
+  });
+  fireEvent.click(trigger);
+  fireEvent.change(await screen.findByRole('textbox', { name: 'Walk' }), {
+    target: { value: '60' },
+  });
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+  expect(update).toHaveBeenCalledTimes(1);
+  vi.unstubAllGlobals();
+});
+
+it('does not save untouched synced speeds or a no-op draft, and Enter on Cancel cancels', async () => {
+  const update = vi.fn();
+  const props = hudProps(withHp(30, 40));
+  const { rerender } = render(
+    <CharacterHUD {...props} editing onUpdateCharacter={update} />
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+  expect(update).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
+  const walk = await screen.findByRole('textbox', { name: 'Walk' });
+  fireEvent.change(walk, { target: { value: '45' } });
+  rerender(
+    <CharacterHUD
+      {...props}
+      character={{ ...props.character, flySpeed: 60 }}
+      editing
+      onUpdateCharacter={update}
+    />
+  );
+  fireEvent.keyDown(walk, { key: 'Enter' });
+  expect(update).toHaveBeenCalledExactlyOnceWith({ speed: 45 });
+  fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
+  fireEvent.change(await screen.findByRole('textbox', { name: 'Walk' }), {
+    target: { value: '50' },
+  });
+  fireEvent.keyDown(screen.getByRole('button', { name: 'Cancel' }), {
+    key: 'Enter',
+  });
+  expect(update).toHaveBeenCalledTimes(1);
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+});
+it('clearing a speed stays local and Enter saves zero; first Escape discards the next draft', async () => {
+  const update = vi.fn();
+  render(
+    <CharacterHUD
+      {...hudProps(withHp(30, 40))}
+      editing
+      onUpdateCharacter={update}
+    />
+  );
+  fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
+  const walk = await screen.findByRole('textbox', { name: 'Walk' });
+  fireEvent.change(walk, { target: { value: '' } });
+  expect(update).not.toHaveBeenCalled();
+  fireEvent.keyDown(walk, { key: 'Enter' });
+  expect(update).toHaveBeenCalledExactlyOnceWith({ speed: 0 });
+  fireEvent.click(screen.getByRole('button', { name: 'Edit speeds' }));
+  const next = await screen.findByRole('textbox', { name: 'Walk' });
+  fireEvent.change(next, { target: { value: '90' } });
+  fireEvent.keyDown(next, { key: 'Escape' });
+  expect(screen.queryByRole('dialog')).toBeNull();
+  expect(update).toHaveBeenCalledTimes(1);
 });

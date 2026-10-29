@@ -12,7 +12,6 @@ export { Section } from './section';
 export type { SectionProps, SectionHeadingLevel } from './section';
 export { default as DragDropList } from './DragDropList';
 export { default as DragHandle } from './DragHandle';
-export { default as ExperimentalFeaturesSection } from './ExperimentalFeaturesSection';
 export { default as FeaturesNavigationSection } from './FeaturesNavigationSection';
 export { default as BookmarkTabs } from './BookmarkTabs';
 export type { BookmarkTabItem, BookmarkTabsRef } from './BookmarkTabs';

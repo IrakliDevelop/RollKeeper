@@ -19,15 +19,16 @@ afterEach(() => {
   Object.defineProperty(window, 'scrollY', { value: 0, configurable: true });
 });
 
-function Harness() {
+const updateName = vi.fn();
+function Harness({ name = 'Brin' }: { name?: string } = {}) {
   const mode = useSheetModeState('c1');
   return (
     <SheetModeProvider value={mode}>
       <CharacterSheetHeader
         characterId="c1"
-        characterName="Brin"
+        characterName={name}
         characterRace="Dwarf"
-        characterClass="Fighter"
+        characterClass="Fighter 3"
         characterLevel={3}
         characterAlignment=""
         characterCreatureType="Humanoid"
@@ -37,7 +38,7 @@ function Harness() {
         onManualSave={vi.fn()}
         onExport={vi.fn()}
         onShowResetModal={vi.fn()}
-        onUpdateName={vi.fn()}
+        onUpdateName={updateName}
         onAddToast={vi.fn()}
       />
     </SheetModeProvider>
@@ -50,7 +51,7 @@ describe('CharacterSheetHeader modes', () => {
   it('starts in play mode: name as text, no notice', () => {
     render(<Harness />);
     expect(editSwitch()).toHaveAttribute('aria-checked', 'false');
-    expect(screen.queryByPlaceholderText('Character Name')).toBeNull();
+    expect(screen.queryByPlaceholderText('Thalia Vane')).toBeNull();
     expect(
       screen.getByRole('heading', { level: 2, name: 'Brin' })
     ).toBeVisible();
@@ -61,10 +62,10 @@ describe('CharacterSheetHeader modes', () => {
     render(<Harness />);
     fireEvent.click(editSwitch());
     expect(editSwitch()).toHaveAttribute('aria-checked', 'true');
-    expect(screen.getByPlaceholderText('Character Name')).toHaveValue('Brin');
+    expect(screen.getByPlaceholderText('Thalia Vane')).toHaveValue('Brin');
     expect(screen.getByText('Editing sheet')).toBeVisible();
     fireEvent.click(editSwitch());
-    expect(screen.queryByPlaceholderText('Character Name')).toBeNull();
+    expect(screen.queryByPlaceholderText('Thalia Vane')).toBeNull();
     expect(screen.queryByText('Editing sheet')).toBeNull();
   });
 
@@ -126,4 +127,49 @@ describe('CharacterSheetHeader modes', () => {
     const bar = editSwitch().closest('header')!;
     expect(within(bar).getByText('All changes saved')).toHaveClass('sr-only');
   });
+});
+
+it('has one banner, a named identity section and one text identity line', () => {
+  render(<Harness />);
+  expect(screen.getAllByRole('banner')).toHaveLength(1);
+  const head = screen.getByRole('region', { name: 'Brin' });
+  expect(within(head).getByText('Dwarf · Fighter 3 · Humanoid')).toBeVisible();
+});
+it('keeps the name local until blur and cancels with Escape', () => {
+  updateName.mockClear();
+  render(<Harness />);
+  fireEvent.click(editSwitch());
+  const field = screen.getByRole('textbox', { name: 'Character name' });
+  fireEvent.change(field, { target: { value: 'Draft' } });
+  expect(updateName).not.toHaveBeenCalled();
+  fireEvent.keyDown(field, { key: 'Escape' });
+  fireEvent.blur(field);
+  expect(updateName).not.toHaveBeenCalled();
+  fireEvent.change(field, { target: { value: 'Thalia' } });
+  fireEvent.blur(field);
+  expect(updateName).toHaveBeenCalledExactlyOnceWith('Thalia');
+});
+it('puts the four character actions in the header menu', async () => {
+  render(<Harness />);
+  const trigger = screen.getByRole('button', { name: 'Character' });
+  expect(trigger.closest('header')).toBeTruthy();
+  fireEvent.click(trigger);
+  for (const name of [
+    'Export character',
+    'Share with QR code',
+    'Reset character',
+    'Import',
+  ])
+    expect(await screen.findByRole('button', { name })).toBeVisible();
+});
+
+it('preserves the approved unnamed fallback without inserting it into the editable name', () => {
+  render(<Harness name="" />);
+  expect(
+    screen.getByRole('heading', { level: 2, name: 'Unnamed character' })
+  ).toBeVisible();
+  fireEvent.click(editSwitch());
+  expect(screen.getByRole('textbox', { name: 'Character name' })).toHaveValue(
+    ''
+  );
 });

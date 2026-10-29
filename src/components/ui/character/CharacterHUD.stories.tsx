@@ -540,7 +540,7 @@ export const LayoutIpadLandscapeDark: Story = {
 const TARGETS = [
   /^Hit points /,
   '16 AC',
-  /Speed$/,
+  'Edit speeds',
   '+7 Spell attack',
   '15 Spell save DC',
   '2 conditions. Open the Combat tab',
@@ -554,7 +554,7 @@ async function checkTargets(canvasElement: HTMLElement, min: number) {
     await expect(Math.round(box.height)).toBeGreaterThanOrEqual(min);
   }
   const buffs = canvas
-    .getByTitle('Active buffs — click to view')
+    .getByRole('button', { name: /active buffs?$/ })
     .getBoundingClientRect();
   await expect(Math.round(buffs.width)).toBeGreaterThanOrEqual(min);
   await expect(Math.round(buffs.height)).toBeGreaterThanOrEqual(min);
@@ -593,7 +593,7 @@ export const TouchTargets: Story = {
     const area = touchAreaOf(
       canvas.getByRole('button', { name: 'End concentration' })
     );
-    const buffs = canvas.getByTitle('Active buffs — click to view');
+    const buffs = canvas.getByRole('button', { name: /active buffs?$/ });
     for (const button of [
       ...TARGETS.map(name => canvas.getByRole('button', { name })),
       buffs,
@@ -629,7 +629,7 @@ export const KeyboardFocus: Story = {
     // The buffs indicator comes last; its name is the bare count.
     const buttons = [
       ...TARGETS.map(name => canvas.getByRole('button', { name })),
-      canvas.getByTitle('Active buffs — click to view'),
+      canvas.getByRole('button', { name: /active buffs?$/ }),
     ];
     for (const button of buttons) {
       // Tab forward to it (the chip's X sits between the tiles and the count).

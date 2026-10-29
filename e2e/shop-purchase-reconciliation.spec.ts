@@ -519,9 +519,7 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     await waitForCharacterLoaded(player1Page, char1Id);
 
     await player1Page.getByRole('tab', { name: 'Inventory' }).click();
-    await player1Page
-      .getByRole('button', { name: 'Items', exact: true })
-      .click();
+    await player1Page.getByRole('tab', { name: 'Items', exact: true }).click();
 
     const itemCard = player1Page
       .getByRole('heading', { name: ITEM_NAME, level: 5 })

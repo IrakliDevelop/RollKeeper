@@ -6,7 +6,7 @@ import * as Tabs from '@radix-ui/react-tabs';
 export interface SubTabDefinition {
   value: string;
   id: string;
-  label: string;
+  label: ReactNode;
   content: ReactNode;
   disabled?: boolean;
 }

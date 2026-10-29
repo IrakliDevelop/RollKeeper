@@ -181,7 +181,7 @@ The character page (`/player/characters/[characterId]`) uses `TabbedCharacterShe
 | Stats | Basic info, ability scores, saving throws, skills, XP |
 | Combat | Sub-tabs: Player (AC, initiative, speed, HP manager, hit dice, conditions) · Defenses & Buffs · Summons |
 | Spells | Spellcasting stats, spell slots, spell list (hidden for non-casters) |
-| Inventory | Sub-tabs: Weapons · Magic Items · Armor · Items · Currency |
+| Inventory | Sub-tabs: Weapons · Magic items · Armor · Items · Currency |
 | Features | Sub-tabs: Abilities (extended features) · Inspiration · Proficiencies |
 | Character | Sub-tabs: Session Notes · Features & Background · Dice |
 | Calendar | The campaign's shared calendar when the DM syncs one, otherwise the character's own |
