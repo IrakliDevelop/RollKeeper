@@ -151,3 +151,38 @@ it('scrolls the committed Player conditions on first and repeated requests, and 
   view.unmount();
   scroll.mockRestore();
 });
+
+it('keeps the conditions aligned while they load, until the player takes over', () => {
+  let resize: (
+    entries: { contentRect: { height: number } }[]
+  ) => void = () => {};
+  const disconnect = vi.fn(() => {
+    resize = () => {};
+  });
+  vi.stubGlobal(
+    'ResizeObserver',
+    class {
+      constructor(callback: typeof resize) {
+        resize = callback;
+      }
+      observe = vi.fn();
+      disconnect = disconnect;
+    }
+  );
+  const scroll = vi
+    .spyOn(Element.prototype, 'scrollIntoView')
+    .mockImplementation(() => {});
+  const view = render(<>{config().find(t => t.id === 'combat')!.content}</>);
+  act(() => setCombatSubTab('player', { scrollToConditions: true }));
+  expect(scroll).toHaveBeenCalledTimes(1);
+  act(() => resize([{ contentRect: { height: 0 } }]));
+  expect(scroll).toHaveBeenCalledTimes(1);
+  act(() => resize([{ contentRect: { height: 320 } }]));
+  expect(scroll).toHaveBeenCalledTimes(2);
+  fireEvent.pointerDown(window);
+  expect(disconnect).toHaveBeenCalled();
+  act(() => resize([{ contentRect: { height: 640 } }]));
+  expect(scroll).toHaveBeenCalledTimes(2);
+  view.unmount();
+  scroll.mockRestore();
+});

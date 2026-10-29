@@ -882,6 +882,12 @@ type CombatNavigationRequest = {
 let combatSubTabSetter: ((request: CombatNavigationRequest) => void) | null =
   null;
 let pendingCombatSubTab: CombatNavigationRequest | null = null;
+const USER_TAKEOVER_EVENTS = [
+  'wheel',
+  'touchstart',
+  'pointerdown',
+  'keydown',
+] as const;
 export function setCombatSubTab(
   tab: CombatSubTab,
   options?: { scrollToConditions?: boolean }
@@ -928,12 +934,32 @@ function CombatTabContent({
     )
       return;
     handledRequest.current = request;
-    conditionsTarget.scrollIntoView({
-      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-        ? 'auto'
-        : 'smooth',
-      block: 'start',
+    const align = () =>
+      conditionsTarget.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+          ? 'auto'
+          : 'smooth',
+        block: 'start',
+      });
+    align();
+    if (typeof ResizeObserver === 'undefined') return;
+    // The conditions load after the section mounts; re-aim as it grows until
+    // the player scrolls, taps or types.
+    let height = conditionsTarget.getBoundingClientRect().height;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry.contentRect.height === height) return;
+      height = entry.contentRect.height;
+      align();
     });
+    observer.observe(conditionsTarget);
+    const stop = () => {
+      observer.disconnect();
+      for (const type of USER_TAKEOVER_EVENTS)
+        window.removeEventListener(type, stop, true);
+    };
+    for (const type of USER_TAKEOVER_EVENTS)
+      window.addEventListener(type, stop, { capture: true, passive: true });
+    return stop;
   }, [request, conditionsTarget]);
 
   return (
