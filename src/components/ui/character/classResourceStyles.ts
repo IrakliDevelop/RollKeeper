@@ -12,10 +12,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-import type {
-  ClassResourceColor,
-  ClassResourceIcon,
-} from '@/utils/classResources';
+import type { ClassResourceIcon } from '@/utils/classResources';
 
 export const CLASS_RESOURCE_ICONS: Record<ClassResourceIcon, LucideIcon> = {
   music: Music,
@@ -40,27 +37,3 @@ export const CLASS_RESOURCE_STYLE = {
   chipOn: 'border-divider bg-surface-raised text-heading',
   barFill: 'bg-brass-fill',
 } as const;
-
-/** Transitional alias until all shared mounts are migrated in T4. */
-export const CLASS_RESOURCE_COLORS = Object.fromEntries(
-  (
-    [
-      'indigo',
-      'red',
-      'amber',
-      'emerald',
-      'blue',
-      'orange',
-      'violet',
-      'yellow',
-      'green',
-      'purple',
-    ] satisfies ClassResourceColor[]
-  ).map(color => [
-    color,
-    { ...CLASS_RESOURCE_STYLE, iconBg: CLASS_RESOURCE_STYLE.barFill },
-  ])
-) as Record<
-  ClassResourceColor,
-  typeof CLASS_RESOURCE_STYLE & { iconBg: string }
->;

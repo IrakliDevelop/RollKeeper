@@ -139,4 +139,14 @@ describe('NpcResourcesEditor', () => {
     screen.getByRole('button', { name: 'Delete resource Wild Shape' }).click();
     expect(onDelete).toHaveBeenCalledWith('res-1');
   });
+
+  it('keeps compact fields labelled and hides the dormant color picker', () => {
+    render(<Harness initial={[draft()]} />);
+    expect(screen.getByText('Resource name')).toBeVisible();
+    expect(screen.getByText('Max uses')).toBeVisible();
+    expect(screen.queryByText('Color')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Delete resource Wild Shape' })
+    ).toHaveClass('pointer-coarse:min-h-11');
+  });
 });

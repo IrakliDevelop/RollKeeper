@@ -35,11 +35,11 @@ describe('NpcResourceList', () => {
       />
     );
     await user.click(
-      screen.getByRole('button', { name: 'Wild Shape use 1 (spent)' })
+      screen.getByRole('button', { name: 'Wild Shape use 3 (spent)' })
     );
     expect(onRestore).toHaveBeenCalledWith('res-1', 1);
     await user.click(
-      screen.getByRole('button', { name: 'Wild Shape use 2 (available)' })
+      screen.getByRole('button', { name: 'Wild Shape use 1 (available)' })
     );
     expect(onSpend).toHaveBeenCalledWith('res-1', 1);
   });
@@ -102,5 +102,22 @@ describe('NpcResourceList', () => {
       screen.getByRole('button', { name: 'Spend Wild Shape' })
     ).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Restore Ki' })).toBeDisabled();
+  });
+
+  it('keeps NPC resource actions beside the name with coarse targets', () => {
+    render(
+      <NpcResourceList
+        resources={[res()]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+      />
+    );
+    const pip = screen.getByRole('button', {
+      name: 'Wild Shape use 2 (available)',
+    });
+    expect(pip).toHaveClass('pointer-coarse:min-h-11');
+    expect(pip.closest('[data-resource-row]')).toContainElement(
+      screen.getByText('Wild Shape')
+    );
   });
 });
