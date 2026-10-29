@@ -39,11 +39,7 @@ export function NpcResourceList({
                 {res.name}
               </span>
               {res.displayStyle === 'pips' ? (
-                <div
-                  className="flex flex-wrap"
-                  role="group"
-                  aria-label={`${res.name}: ${remaining} of ${res.maxUses} available`}
-                >
+                <div className="flex flex-wrap">
                   {Array.from(
                     { length: Math.min(res.maxUses, 20) },
                     (_, index) => {

@@ -84,7 +84,7 @@ export function NpcResourcesEditor({
           <SelectField
             value="__placeholder__"
             onValueChange={handleAdd}
-            triggerProps={{ size: 'lg', 'aria-label': 'Add resource' }}
+            triggerProps={{ size: 'lg', 'aria-label': 'Add resource…' }}
           >
             <SelectItem value="__placeholder__" disabled>
               Add resource…
