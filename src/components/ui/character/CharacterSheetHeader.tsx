@@ -1,15 +1,16 @@
 'use client';
 
-import { Download, Upload, RotateCcw, ArrowLeft, Share2 } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { SaveIndicator } from '@/components/ui/feedback/SaveIndicator';
-import { Badge } from '@/components/ui/layout/badge';
+import { InPlaceTextField } from '@/components/ui/forms/InPlaceTextField';
+import { CharacterActions } from './CharacterActions';
 import { AppHeader } from '@/components/ui/layout/AppHeader';
 import { usePlayerStore } from '@/store/playerStore';
 import { useCharacterStore } from '@/store/characterStore';
 import type { SaveStatus } from '@/types/character';
 import { useState } from 'react';
-import { Button, Input, Switch } from '@/components/ui/forms';
+import { Button, Switch } from '@/components/ui/forms';
 import { AvatarUpload } from './AvatarUpload';
 import { QRShareDialog } from './QRShareDialog';
 import { useSheetMode } from './SheetMode';
@@ -18,6 +19,7 @@ interface CharacterSheetHeaderProps {
   characterId: string;
   characterName: string;
   characterRace: string;
+  /** Already formatted by getClassDisplayString(), including class levels. */
   characterClass: string;
   characterLevel: number;
   characterAlignment: string;
@@ -48,7 +50,6 @@ export default function CharacterSheetHeader({
   saveStatus,
   lastSaved,
   hasUnsavedChanges,
-  onManualSave,
   onExport,
   onShowResetModal,
   onUpdateName,
@@ -85,6 +86,7 @@ export default function CharacterSheetHeader({
     <>
       <AppHeader
         sticky
+        wrapControls
         leading={
           <Button
             asChild
@@ -125,6 +127,12 @@ export default function CharacterSheetHeader({
               textClassName="sr-only sm:not-sr-only"
             />
             {extraHeaderContent}
+            <CharacterActions
+              onExport={onExport}
+              onShare={() => setShareOpen(true)}
+              onReset={onShowResetModal}
+              onAddToast={onAddToast}
+            />
           </>
         }
         subbar={
@@ -134,162 +142,53 @@ export default function CharacterSheetHeader({
         }
       />
 
-      {/* Main Character Header */}
-      <header className="relative z-30 mx-auto mb-8 max-w-7xl">
-        <div className="border-divider bg-surface-raised/90 rounded-xl border p-6 shadow-xl backdrop-blur-sm">
-          <div className="flex items-start gap-4">
-            {/* Avatar */}
-            <AvatarUpload
-              avatar={playerCharacter?.avatar}
-              characterId={characterId}
-              characterName={characterName}
-              onAvatarChange={handleAvatarChange}
-              size="lg"
-              editable={editing}
+      <section
+        aria-labelledby="character-identity-name"
+        className="border-divider relative z-30 mx-auto mb-8 max-w-7xl border-b pb-6"
+      >
+        <div className="flex flex-col items-start gap-4 sm:flex-row">
+          <AvatarUpload
+            avatar={playerCharacter?.avatar}
+            characterId={characterId}
+            characterName={characterName}
+            onAvatarChange={handleAvatarChange}
+            size="lg"
+            editable={editing}
+          />
+          <div className="w-full min-w-0 flex-1">
+            <h2
+              id="character-identity-name"
+              className="type-heading text-heading min-w-0"
+            >
+              <InPlaceTextField
+                label="Character name"
+                placeholder="Thalia Vane"
+                value={
+                  editing ? characterName : characterName || 'Unnamed character'
+                }
+                onCommit={onUpdateName}
+                editing={editing}
+              />
+            </h2>
+            <p className="type-body text-body mt-2">
+              {[
+                characterRace,
+                characterClass,
+                characterCreatureType,
+                characterAlignment,
+              ]
+                .filter(Boolean)
+                .join(' · ')}
+            </p>
+            <SaveIndicator
+              status={saveStatus}
+              lastSaved={lastSaved}
+              hasUnsavedChanges={hasUnsavedChanges}
+              className="mt-1"
             />
-
-            {/* Name Input and Buttons - side by side */}
-            <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-4">
-              <div className="min-w-64 flex-1">
-                {editing ? (
-                  <Input
-                    type="text"
-                    placeholder="Character Name"
-                    value={characterName}
-                    onChange={e => onUpdateName(e.target.value)}
-                    className="text-text-primary placeholder-text-tertiary w-full border-none bg-transparent text-3xl font-bold"
-                    size="lg"
-                  />
-                ) : (
-                  <h2 className="text-heading w-full text-3xl font-bold">
-                    {characterName || 'Unnamed Character'}
-                  </h2>
-                )}
-                {/* Identity line */}
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
-                  {characterRace && (
-                    <span className="text-body text-sm">{characterRace}</span>
-                  )}
-                  {characterRace && characterClass && (
-                    <span className="text-faint">·</span>
-                  )}
-                  {characterClass && (
-                    <Badge variant="info">{characterClass}</Badge>
-                  )}
-                  {characterCreatureType &&
-                    characterCreatureType !== 'Humanoid' && (
-                      <>
-                        <span className="text-faint">·</span>
-                        <Badge variant="neutral">{characterCreatureType}</Badge>
-                      </>
-                    )}
-                  {characterAlignment && (
-                    <>
-                      <span className="text-faint">·</span>
-                      <span className="text-muted text-sm">
-                        {characterAlignment}
-                      </span>
-                    </>
-                  )}
-                </div>
-                <SaveIndicator
-                  status={saveStatus}
-                  lastSaved={lastSaved}
-                  hasUnsavedChanges={hasUnsavedChanges}
-                  className="mt-1"
-                />
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex flex-wrap justify-end gap-2">
-                {/* <Button
-                  onClick={onManualSave}
-                  disabled={!hasUnsavedChanges}
-                  variant="success"
-                  size="sm"
-                  leftIcon={<Save size={16} />}
-                >
-                  Save
-                </Button> */}
-                <Button
-                  onClick={onExport}
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Download size={16} />}
-                >
-                  Export
-                </Button>
-
-                <Button
-                  onClick={() => setShareOpen(true)}
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Share2 size={16} />}
-                  title="Share character via QR code"
-                >
-                  Share
-                </Button>
-
-                <Button asChild variant="outline" size="sm">
-                  <label className="cursor-pointer">
-                    <span className="flex items-center gap-2">
-                      <Upload size={16} />
-                      Import
-                    </span>
-                    <input
-                      type="file"
-                      accept=".json"
-                      onChange={async e => {
-                        const file = e.target.files?.[0];
-                        if (file) {
-                          try {
-                            const text = await file.text();
-                            const data = JSON.parse(text);
-                            const { importCharacter: importToPlayerStore } =
-                              usePlayerStore.getState();
-                            const newCharacterId = importToPlayerStore(data);
-
-                            onAddToast({
-                              type: 'success',
-                              title: 'Import Successful',
-                              message:
-                                'Character imported successfully! Redirecting to new character...',
-                            });
-
-                            setTimeout(() => {
-                              window.location.href = `/player/characters/${newCharacterId}`;
-                            }, 1500);
-                          } catch (error) {
-                            console.error('Import failed:', error);
-                            onAddToast({
-                              type: 'error',
-                              title: 'Import Failed',
-                              message:
-                                'Failed to import character. Please check the file format.',
-                            });
-                          }
-                        }
-                        e.target.value = '';
-                      }}
-                      className="hidden"
-                    />
-                  </label>
-                </Button>
-
-                <Button
-                  onClick={onShowResetModal}
-                  variant="danger"
-                  size="sm"
-                  leftIcon={<RotateCcw size={16} />}
-                  title="Reset character - this will clear all data!"
-                >
-                  Reset
-                </Button>
-              </div>
-            </div>
           </div>
         </div>
-      </header>
+      </section>
 
       <QRShareDialog
         open={shareOpen}
