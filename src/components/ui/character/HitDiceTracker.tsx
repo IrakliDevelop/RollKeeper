@@ -22,17 +22,7 @@ export default function HitDiceTracker({
     (a, b) => Number(a.slice(1)) - Number(b.slice(1))
   );
   return (
-    <Section
-      heading="Hit dice"
-      level={3}
-      trailing={
-        dieTypes.length > 0 && (
-          <Button size="sm" onClick={onResetAllHitDice}>
-            Restore all hit dice
-          </Button>
-        )
-      }
-    >
+    <Section heading="Hit dice" level={3}>
       {dieTypes.length === 0 && (
         <p className="type-body text-muted">
           Add a class level to get hit dice.
@@ -81,6 +71,13 @@ export default function HitDiceTracker({
           );
         })}
       </div>
+      {dieTypes.length > 0 && (
+        <div className="mt-3">
+          <Button size="sm" onClick={onResetAllHitDice}>
+            Restore all hit dice
+          </Button>
+        </div>
+      )}
     </Section>
   );
 }

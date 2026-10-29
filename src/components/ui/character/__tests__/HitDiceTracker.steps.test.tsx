@@ -28,7 +28,7 @@ it('uses or restores exactly one die regardless of pip position', () => {
 
 const noop = vi.fn();
 
-it('has no per-die bulk buttons, only pips and the restore-all-dice trailing button', () => {
+it('has no per-die bulk buttons, only pips and the restore-all-dice button', () => {
   render(
     <HitDiceTracker
       hitDicePools={{ d10: { max: 5, used: 2 }, d8: { max: 3, used: 0 } }}
@@ -78,4 +78,30 @@ it('shows the empty state and no restore-all button with no pools', () => {
   );
   expect(screen.getByText('Add a class level to get hit dice.')).toBeTruthy();
   expect(screen.queryByRole('button')).toBeNull();
+});
+
+it('puts the restore-all button below the pips, outside the heading row', () => {
+  const all = vi.fn();
+  render(
+    <HitDiceTracker
+      hitDicePools={{ d10: { max: 5, used: 2 }, d8: { max: 3, used: 0 } }}
+      onUseHitDie={noop}
+      onRestoreHitDice={noop}
+      onResetAllHitDice={all}
+    />
+  );
+  const button = screen.getByRole('button', { name: 'Restore all hit dice' });
+  const headingRow = screen.getByRole('heading', {
+    name: 'Hit dice',
+  }).parentElement!;
+  expect(headingRow.contains(button)).toBe(false);
+  const pips = screen.getAllByRole('button', {
+    name: /^(Use|Restore) a d\d+ hit die$/,
+  });
+  expect(
+    pips.at(-1)!.compareDocumentPosition(button) &
+      Node.DOCUMENT_POSITION_FOLLOWING
+  ).toBeTruthy();
+  fireEvent.click(button);
+  expect(all).toHaveBeenCalledOnce();
 });
