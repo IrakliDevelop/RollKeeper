@@ -45,18 +45,12 @@ export default function HitDiceTracker({
           return (
             <div
               key={dieType}
-              className="space-y-3 py-3"
+              className="flex flex-wrap items-center gap-x-4 gap-y-2 py-2"
               role="group"
               aria-label={`${dieType} hit dice: ${available} of ${pool.max} available`}
             >
-              <div className="flex items-center justify-between gap-4">
-                <span className="type-num-md text-heading">{dieType}</span>
-                <span className="type-ui text-body">
-                  {available} / {pool.max}{' '}
-                  <span className="type-small text-muted">available</span>
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-1">
+              <span className="type-num-md text-heading w-8">{dieType}</span>
+              <div className="flex flex-wrap">
                 {Array.from({ length: pool.max }, (_, index) => {
                   const filled = index < available;
                   return (
@@ -79,43 +73,10 @@ export default function HitDiceTracker({
                   );
                 })}
               </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  size="xs"
-                  disabled={available === 0}
-                  aria-label={`Use 1 ${dieType} hit die`}
-                  onClick={() => onUseHitDie(dieType, 1)}
-                >
-                  Use 1
-                </Button>
-                {available > 1 && (
-                  <Button
-                    size="xs"
-                    aria-label={`Use ${Math.min(available, 5)} ${dieType} hit dice`}
-                    onClick={() => onUseHitDie(dieType, Math.min(available, 5))}
-                  >
-                    Use {Math.min(available, 5)}
-                  </Button>
-                )}
-                {pool.used > 0 && (
-                  <>
-                    <Button
-                      size="xs"
-                      aria-label={`Restore 1 ${dieType} hit die`}
-                      onClick={() => onRestoreHitDice(dieType, 1)}
-                    >
-                      Restore 1
-                    </Button>
-                    <Button
-                      size="xs"
-                      aria-label={`Restore all ${dieType} hit dice`}
-                      onClick={() => onRestoreHitDice(dieType, pool.used)}
-                    >
-                      Restore all
-                    </Button>
-                  </>
-                )}
-              </div>
+              <span className="type-ui text-body tabular-nums">
+                {available} / {pool.max}{' '}
+                <span className="type-small text-muted">available</span>
+              </span>
             </div>
           );
         })}
