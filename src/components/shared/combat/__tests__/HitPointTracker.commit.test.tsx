@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, expect, it, vi } from 'vitest';
 import { HitPointTracker } from '../HitPointTracker';
 afterEach(cleanup);
@@ -116,12 +117,14 @@ it('cancels a dirty HP draft on first Escape and closes its parent on second', a
 });
 
 it.each([
-  ['Damage', 'Damage'],
-  ['Heal', 'Heal'],
-  ['Add temp HP', 'Add temp HP'],
+  ['Damage', '0'],
+  ['Damage', '-3'],
+  ['Heal', '0'],
+  ['Add temp HP', '0'],
 ])(
-  'preserves the positive amount minimum before %s on blur',
-  (_label, button) => {
+  'ignores a typed %s amount of %s after the blur and refocuses the field',
+  async (button, typed) => {
+    const user = userEvent.setup();
     const action = vi.fn();
     render(
       <HitPointTracker
@@ -137,15 +140,14 @@ it.each([
       />
     );
     const field = screen.getByRole('textbox', { name: 'HP amount' });
-    fireEvent.change(field, { target: { value: '0' } });
-    fireEvent.blur(field);
-    expect(field).toHaveValue('1');
-    fireEvent.change(field, { target: { value: '-1' } });
-    fireEvent.click(screen.getByRole('button', { name: button }));
+    await user.click(field);
+    await user.type(field, typed);
+    await user.click(screen.getByRole('button', { name: button }));
     expect(action).not.toHaveBeenCalled();
     expect(document.activeElement).toBe(field);
-    fireEvent.change(field, { target: { value: '8' } });
-    fireEvent.click(screen.getByRole('button', { name: button }));
+    await user.clear(field);
+    await user.type(field, '8');
+    await user.click(screen.getByRole('button', { name: button }));
     expect(action).toHaveBeenCalledExactlyOnceWith(8);
     expect(field).toHaveValue('');
   }

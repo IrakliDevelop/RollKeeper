@@ -223,7 +223,7 @@ export function HitPointTracker({
               value={amount}
               onChange={setAmount}
               allowEmpty
-              min={1}
+              min={0}
               wrapperClassName="w-24 grow sm:grow-0"
               className="tabular-nums pointer-coarse:text-base"
             />

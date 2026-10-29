@@ -201,5 +201,7 @@ it('lays the Player panel out as HP, then armor class, initiative and hit dice, 
     .map(h => h.textContent?.trim() ?? '')
     .filter(text => wanted.includes(text));
   expect(seen).toEqual(wanted);
+  expect(screen.getByRole('switch', { name: 'Shield' })).toBeInTheDocument();
+  expect(screen.getByRole('switch', { name: 'Temp AC' })).toBeInTheDocument();
   expect(screen.queryByText('Armor and Dexterity')).not.toBeInTheDocument();
 });

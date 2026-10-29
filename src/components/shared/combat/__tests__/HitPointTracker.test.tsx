@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { HitPointTracker } from '../HitPointTracker';
 import { HitPoints } from '@/types/character';
@@ -103,23 +104,34 @@ describe('HitPointTracker', () => {
       expect(screen.queryByRole('button', { name: 'Add temp HP' })).toBeNull();
     });
 
-    it.each([
-      ['Damage', 'onApplyDamage'],
-      ['Heal', 'onApplyHealing'],
-      ['Add temp HP', 'onAddTemporaryHP'],
-    ] as const)(
-      'focuses the field and calls nothing when %s is pressed with an empty or zero amount',
-      (button, handler) => {
+    it.each(['Damage', 'Heal', 'Add temp HP'] as const)(
+      'focuses the field and calls nothing when %s is pressed with an empty amount',
+      button => {
         const handlers = renderTracker();
-        fireEvent.click(screen.getByRole('button', { name: button }));
-        expect(document.activeElement).toBe(amountField());
-        amountField().blur();
-        fireEvent.change(amountField(), { target: { value: '0' } });
         fireEvent.click(screen.getByRole('button', { name: button }));
         expect(document.activeElement).toBe(amountField());
         for (const fn of Object.values(handlers))
           expect(fn).not.toHaveBeenCalled();
-        expect(handlers[handler]).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['Damage', '0'],
+      ['Damage', '-3'],
+      ['Heal', '0'],
+      ['Add temp HP', '0'],
+    ] as const)(
+      'focuses the field and calls nothing when %s is pressed after typing %s',
+      async (button, typed) => {
+        const user = userEvent.setup();
+        const handlers = renderTracker();
+        const field = amountField();
+        await user.click(field);
+        await user.type(field, typed);
+        await user.click(screen.getByRole('button', { name: button }));
+        for (const fn of Object.values(handlers))
+          expect(fn).not.toHaveBeenCalled();
+        expect(document.activeElement).toBe(field);
       }
     );
 

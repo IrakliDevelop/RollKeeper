@@ -211,7 +211,7 @@ function LedgerPart({
   caption: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-start gap-1">
+    <div className="flex flex-col items-start gap-1 pointer-coarse:gap-3">
       <div
         className={cn(
           'type-num-lg flex h-13 items-center tabular-nums',
