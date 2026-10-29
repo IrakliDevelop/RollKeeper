@@ -1,6 +1,7 @@
 'use client';
 
 import { Sun, Moon, Monitor } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { useTheme, type Theme } from '@/hooks/useTheme';
 
 export interface ThemeToggleProps {
@@ -20,11 +21,11 @@ const NEXT_THEME_LABEL: Record<Theme, string> = {
 };
 
 /**
- * A compact theme toggle button. By default toggles light ↔ dark.
+ * A compact theme toggle button. By default cycles light → system → dark → light.
  * When `showSystemOption` is true, cycles light → system → dark → light.
  */
 export function ThemeToggle({
-  showSystemOption = false,
+  showSystemOption = true,
   className = '',
 }: ThemeToggleProps) {
   const { theme, resolvedTheme, setTheme } = useTheme();
@@ -45,13 +46,16 @@ export function ThemeToggle({
     );
 
   return (
-    <button
+    <Button
+      type="button"
+      variant="ghost"
+      size="sm"
       onClick={() => setTheme(next)}
-      className={`border-divider bg-surface-raised text-muted hover:bg-surface-hover hover:text-heading focus-visible:ring-ring inline-flex items-center justify-center rounded-lg border p-2 transition-colors focus-visible:ring-2 focus-visible:outline-none ${className}`}
+      className={`size-9 shrink-0 px-0 ${className}`}
       aria-label={label}
       title={label}
     >
       {icon}
-    </button>
+    </Button>
   );
 }

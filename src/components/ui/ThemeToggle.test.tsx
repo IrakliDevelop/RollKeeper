@@ -54,3 +54,19 @@ describe('ThemeToggle', () => {
     }
   );
 });
+
+it('defaults to the persisted three-state cycle and the shared ghost control', () => {
+  const setTheme = vi.fn();
+  render(
+    <ThemeContext.Provider
+      value={{ theme: 'light', resolvedTheme: 'light', setTheme }}
+    >
+      <ThemeToggle />
+    </ThemeContext.Provider>
+  );
+  const button = screen.getByRole('button', { name: 'Use system theme' });
+  expect(button).toHaveAttribute('data-variant', 'ghost');
+  fireEvent.click(button);
+  expect(setTheme).toHaveBeenCalledWith('system');
+  cleanup();
+});
