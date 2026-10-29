@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import { render, screen, within } from '@testing-library/react';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
@@ -331,44 +331,50 @@ describe('CombatStats', () => {
   });
 });
 
-describe('Skills', () => {
-  it('renders without crashing', async () => {
-    const { default: Skills } = await import(
-      '@/components/ui/character/Skills'
+describe('AbilitiesSection', () => {
+  beforeEach(() => {
+    // The medallions' score editor asks for (min-width: 640px).
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn((query: string) => ({
+        matches: true,
+        media: query,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+      }))
     );
-    const character = makeCharacter();
-    render(
-      <Skills
-        skills={character.skills}
-        jackOfAllTrades={false}
-        proficiencyBonus={3}
-        getSkillModifier={() => 2}
-        onUpdateSkillProficiency={vi.fn()}
-        onUpdateSkillExpertise={vi.fn()}
-        onToggleJackOfAllTrades={vi.fn()}
-        onRollSkillCheck={vi.fn()}
-      />
-    );
-    expect(screen.getByText('Skills')).toBeInTheDocument();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
-  it('displays skill names', async () => {
-    const { default: Skills } = await import(
-      '@/components/ui/character/Skills'
+  it('renders the abilities with their skills', async () => {
+    const { AbilitiesSection } = await import(
+      '@/components/ui/character/AbilitiesSection'
     );
     const character = makeCharacter();
     render(
-      <Skills
+      <AbilitiesSection
+        abilities={character.abilities}
+        savingThrows={character.savingThrows}
         skills={character.skills}
         jackOfAllTrades={false}
-        proficiencyBonus={3}
+        getSavingThrowModifier={() => 1}
         getSkillModifier={() => 2}
+        onUpdateAbilityScore={vi.fn()}
+        onRollAbilityCheck={vi.fn()}
+        onUpdateSavingThrowProficiency={vi.fn()}
+        onRollSavingThrow={vi.fn()}
         onUpdateSkillProficiency={vi.fn()}
         onUpdateSkillExpertise={vi.fn()}
         onToggleJackOfAllTrades={vi.fn()}
         onRollSkillCheck={vi.fn()}
+        editing={false}
       />
     );
+    expect(
+      screen.getByRole('heading', { level: 2, name: 'Abilities' })
+    ).toBeInTheDocument();
     expect(screen.getAllByText('Athletics').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Perception').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Stealth').length).toBeGreaterThan(0);

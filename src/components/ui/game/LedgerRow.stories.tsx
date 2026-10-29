@@ -233,7 +233,7 @@ export const WithRolls: Story = {
     const canvas = within(canvasElement);
     const check = canvas.getByRole('button', { name: 'Roll Strength check' });
     const save = canvas.getByRole('button', {
-      name: 'Roll Strength saving throw',
+      name: 'Roll Strength Save +5, proficient',
     });
     await expect(check).toHaveTextContent('Strength');
     await expect(save).toHaveTextContent('Save +5');

@@ -34,6 +34,7 @@ export function nextSkillProficiency(
 export function skillDotLabel(skill: string, level: ProficiencyLevel): string {
   if (level === 'proficient') return `${skill}: proficient. Add expertise.`;
   if (level === 'expertise') return `${skill}: expertise. Remove proficiency.`;
+  if (level === 'half') return `${skill}: Jack of All Trades. Make proficient.`;
   return `${skill}: not proficient. Make proficient.`;
 }
 

@@ -693,3 +693,111 @@ export const PartyNotShared: Story = {
     ).toBeInTheDocument();
   },
 };
+
+/** How many ability cells share the first cell's row. */
+function cellsPerRow(dialog: HTMLElement) {
+  const tops = Array.from(dialog.querySelectorAll('[data-ledger-cell]'), cell =>
+    Math.round(cell.getBoundingClientRect().top)
+  );
+  return tops.filter(top => top === tops[0]).length;
+}
+
+/**
+ * Editing a score inside the drawer: the score editor opens over the
+ * non-modal drawer, Escape closes only the editor, Save writes the store.
+ * Six abilities across at the drawer's width.
+ */
+export const ScoreEditorInDrawer: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: Desktop.parameters,
+  globals: Desktop.globals,
+  play: async ({ args }) => {
+    const screen = body();
+    const dialog = await waitFor(() =>
+      screen.getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(cellsPerRow(dialog)).toBe(6);
+    // Locked: plain cells, no score editor.
+    await expect(
+      within(dialog).queryByRole('button', { name: /^Strength: modifier/ })
+    ).toBeNull();
+    await userEvent.click(screen.getByRole('switch', { name: 'Edit sheet' }));
+    const before = useCharacterStore.getState().character.abilities.strength;
+    const trigger = within(dialog).getByRole('button', {
+      name: /^Strength: modifier/,
+    });
+    await userEvent.click(trigger);
+    await screen.findByRole('dialog', { name: 'Strength score' });
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() =>
+      expect(
+        screen.queryByRole('dialog', { name: 'Strength score' })
+      ).toBeNull()
+    );
+    // The drawer is controlled: Escape reaching it would call onClose.
+    await expect(args.onClose).not.toHaveBeenCalled();
+    await waitFor(() => expect(trigger).toHaveFocus());
+    await expect(dialog).toBeVisible();
+
+    await userEvent.click(trigger);
+    await screen.findByRole('dialog', { name: 'Strength score' });
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Increase Strength score' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+      expect(useCharacterStore.getState().character.abilities.strength).toBe(
+        before + 1
+      )
+    );
+    await expect(args.onClose).not.toHaveBeenCalled();
+  },
+};
+
+/** On a phone the drawer is full width and the abilities wrap 3×2. */
+export const AbilitiesOnPhone: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: {
+    viewport: {
+      options: {
+        phone: {
+          name: 'Phone',
+          styles: { width: '390px', height: '844px' },
+          type: 'mobile',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'phone', isRotated: false } },
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(cellsPerRow(dialog)).toBe(3);
+    await expect(dialog.scrollWidth).toBeLessThanOrEqual(dialog.clientWidth);
+  },
+};
+
+/** iPad portrait: the drawer is 580px and the abilities still sit six across. */
+export const AbilitiesOnIpad: Story = {
+  decorators: [withCharacter(kaelenFixture)],
+  parameters: {
+    viewport: {
+      options: {
+        ipadPortrait: {
+          name: 'iPad portrait',
+          styles: { width: '820px', height: '1180px' },
+          type: 'tablet',
+        },
+      },
+    },
+  },
+  globals: { viewport: { value: 'ipadPortrait', isRotated: false } },
+  play: async () => {
+    const dialog = await waitFor(() =>
+      body().getByRole('dialog', { name: /kaelen voss/i })
+    );
+    await expect(Math.round(dialog.getBoundingClientRect().width)).toBe(580);
+    await expect(cellsPerRow(dialog)).toBe(6);
+  },
+};

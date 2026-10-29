@@ -191,7 +191,7 @@ The character page (`/player/characters/[characterId]`) uses `TabbedCharacterShe
 - Keep each tab focused — don't pile unrelated sections into an existing tab; add a new tab instead
 - Prefer sub-tabs (like Inventory and Features do) over long vertical scrolling within a tab
 - The `CharacterHUD` at the top always shows HP, AC, and key vitals — don't duplicate those stats inline in tabs
-- Use `lg:grid-cols-2` two-column layouts for dense-but-related pairs (e.g., Abilities + Skills); full-width for detail-heavy content (e.g., spells, notes)
+- Use `lg:grid-cols-2` two-column layouts for dense-but-related pairs (e.g., Character information + Quick stats); full-width for detail-heavy content (e.g., spells, notes)
 
 ## Frontend Guidelines
 
