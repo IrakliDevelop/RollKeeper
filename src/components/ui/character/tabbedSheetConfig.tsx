@@ -283,6 +283,22 @@ export function createTabbedSheetConfig(
     onSendItem,
   } = params;
 
+  const renderSlotTracker = (compact = false) => (
+    <SpellSlotTracker
+      spellSlots={character.spellSlots}
+      pactMagic={character.pactMagic}
+      onSpellSlotChange={params.changeSpellSlotBy}
+      onPactMagicChange={
+        character.pactMagic ? params.changePactMagicBy : undefined
+      }
+      onResetSpellSlots={params.resetSpellSlots}
+      onResetPactMagic={
+        character.pactMagic ? params.resetPactMagicSlots : undefined
+      }
+      compact={compact}
+    />
+  );
+
   const tabs: BookmarkTabItem[] = [
     // Tab 1: Actions
     {
@@ -308,22 +324,10 @@ export function createTabbedSheetConfig(
             onUseClassResource={params.useClassResource}
             onRestoreClassResource={params.restoreClassResource}
             onResetClassResource={params.resetClassResource}
+            spellSlotsPanel={
+              characterHasSpells ? renderSlotTracker(true) : undefined
+            }
           />
-          {characterHasSpells && (
-            <SpellSlotTracker
-              spellSlots={character.spellSlots}
-              pactMagic={character.pactMagic}
-              onSpellSlotChange={params.changeSpellSlotBy}
-              onPactMagicChange={
-                character.pactMagic ? params.changePactMagicBy : undefined
-              }
-              onResetSpellSlots={params.resetSpellSlots}
-              onResetPactMagic={
-                character.pactMagic ? params.resetPactMagicSlots : undefined
-              }
-              compact
-            />
-          )}
         </div>
       ),
     },
@@ -468,18 +472,7 @@ export function createTabbedSheetConfig(
           <ErrorBoundary fallback={<SheetLoadError thing="Spellcasting" />}>
             <SpellcastingStats />
           </ErrorBoundary>
-          <SpellSlotTracker
-            spellSlots={character.spellSlots}
-            pactMagic={character.pactMagic}
-            onSpellSlotChange={params.changeSpellSlotBy}
-            onPactMagicChange={
-              character.pactMagic ? params.changePactMagicBy : undefined
-            }
-            onResetSpellSlots={params.resetSpellSlots}
-            onResetPactMagic={
-              character.pactMagic ? params.resetPactMagicSlots : undefined
-            }
-          />
+          {renderSlotTracker()}
           <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
             <SpellManagement />
           </ErrorBoundary>

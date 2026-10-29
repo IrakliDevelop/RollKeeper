@@ -10,8 +10,10 @@ import { QuickFeatures } from '@/components/QuickFeatures';
 import { ConcentrationTracker } from '@/components/ui/character';
 import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
+import { Section } from '@/components/ui/layout/section';
 import ClassResourceTracker from '@/components/ui/character/ClassResourceTracker';
 import { getActiveClassResources } from '@/utils/classResources';
+import { cn } from '@/utils/cn';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
@@ -42,6 +44,7 @@ interface ActionsSectionProps {
   onUseClassResource?: (id: string, amount?: number) => void;
   onRestoreClassResource?: (id: string, amount?: number) => void;
   onResetClassResource?: (id: string) => void;
+  spellSlotsPanel?: React.ReactNode;
 }
 
 // Simple collapsible component for subsections
@@ -120,6 +123,7 @@ export default function ActionsSection({
   onUseClassResource,
   onRestoreClassResource,
   onResetClassResource,
+  spellSlotsPanel,
 }: ActionsSectionProps) {
   const equippedWeapons = character.weapons.filter(weapon => weapon.isEquipped);
   // Intentionally narrow deps: only recompute when fields that affect
@@ -182,41 +186,44 @@ export default function ActionsSection({
         </ErrorBoundary>
       </CollapsibleSubsection>
 
-      {/* Class Resources - Collapsible */}
-      {classResources.length > 0 &&
-        onUseClassResource &&
-        onRestoreClassResource &&
-        onResetClassResource && (
-          <CollapsibleSubsection
-            title="Class Resources"
-            icon="damage"
-            persistKey="class-resources"
-            defaultExpanded={true}
-            badge={
-              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
-                {classResources.length}
-              </span>
-            }
-          >
-            <div className="space-y-4">
-              {classResources.map((resource, index) => (
-                <div
-                  key={resource.definition.id}
-                  className={
-                    index > 0 ? 'border-divider border-t pt-4' : undefined
-                  }
-                >
-                  <ClassResourceTracker
-                    resource={resource}
-                    onUse={onUseClassResource}
-                    onRestore={onRestoreClassResource}
-                    onReset={onResetClassResource}
-                  />
+      {(spellSlotsPanel ||
+        (classResources.length > 0 &&
+          onUseClassResource &&
+          onRestoreClassResource &&
+          onResetClassResource)) && (
+        <div
+          className={cn(
+            spellSlotsPanel &&
+              classResources.length > 0 &&
+              'grid items-start gap-6 lg:grid-cols-2'
+          )}
+        >
+          {spellSlotsPanel}
+          {classResources.length > 0 &&
+            onUseClassResource &&
+            onRestoreClassResource &&
+            onResetClassResource && (
+              <Section
+                heading="Class Resources"
+                level={3}
+                collapsible="class-resources"
+              >
+                <div className="divide-divider divide-y">
+                  {classResources.map(resource => (
+                    <div key={resource.definition.id} className="py-3">
+                      <ClassResourceTracker
+                        resource={resource}
+                        onUse={onUseClassResource}
+                        onRestore={onRestoreClassResource}
+                        onReset={onResetClassResource}
+                      />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </CollapsibleSubsection>
-        )}
+              </Section>
+            )}
+        </div>
+      )}
 
       {/* Quick Features - Collapsible */}
       {(character.favoriteFeatureIds || []).length > 0 && (
