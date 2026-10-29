@@ -1,3 +1,4 @@
+import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
 import { Angry, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -493,15 +494,7 @@ export function createTabbedSheetConfig(
         ) : undefined,
       content: (
         <div className="space-y-6">
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">
-                  Unable to load spellcasting statistics
-                </p>
-              </div>
-            }
-          >
+          <ErrorBoundary fallback={<SheetLoadError thing="Spellcasting" />}>
             <SpellcastingStats />
           </ErrorBoundary>
           <div className="border-accent-purple-border overflow-hidden rounded-lg border-2">
@@ -542,13 +535,7 @@ export function createTabbedSheetConfig(
               </div>
             )}
           </div>
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">Unable to load spell management</p>
-              </div>
-            }
-          >
+          <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
             <SpellManagement />
           </ErrorBoundary>
         </div>
@@ -601,13 +588,7 @@ export function createTabbedSheetConfig(
       label: 'Calendar',
       icon: <AppIcon name="calendar" className="h-4 w-4" />,
       content: (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load calendar</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Calendar" />}>
           <PlayerCalendarView
             characterId={character.id}
             campaignCode={params.campaignCode}
@@ -625,13 +606,7 @@ export function createTabbedSheetConfig(
       label: 'Map',
       icon: <AppIcon name="map" className="h-4 w-4" />,
       content: (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load map</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Map" />}>
           <PlayerLocationView
             characterId={character.id}
             campaignCode={params.campaignCode}
@@ -716,61 +691,31 @@ function InventoryTabContent({
       </div>
 
       {activeSubTab === 'weapons' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load weapons
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Weapons" />}>
           <WeaponsTab />
         </ErrorBoundary>
       )}
 
       {activeSubTab === 'magic-items' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load magic items
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Magic items" />}>
           <MagicItemsTab />
         </ErrorBoundary>
       )}
 
       {activeSubTab === 'armor' && (
-        <ErrorBoundary
-          fallback={
-            <div className="text-muted p-6 text-center">
-              Unable to load armor
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Armor" />}>
           <ArmorTab />
         </ErrorBoundary>
       )}
 
       {activeSubTab === 'items' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load inventory management</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Items" />}>
           <InventoryManager onSendItem={onSendItem} />
         </ErrorBoundary>
       )}
 
       {activeSubTab === 'currency' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-              <p className="text-muted">Unable to load currency management</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Currency" />}>
           <CurrencyManager />
         </ErrorBoundary>
       )}
@@ -852,13 +797,7 @@ function CharacterTabContent({
             );
           })()}
 
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load notes editor</p>
-              </div>
-            }
-          >
+          <ErrorBoundary fallback={<SheetLoadError thing="Session notes" />}>
             <NotesManager
               items={character.notes}
               onAdd={params.addNote}
@@ -874,13 +813,7 @@ function CharacterTabContent({
       {activeSubTab === 'details' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load features editor</p>
-                </div>
-              }
-            >
+            <ErrorBoundary fallback={<SheetLoadError thing="Features" />}>
               <FeaturesTraitsManager
                 items={character.features}
                 category="feature"
@@ -889,13 +822,7 @@ function CharacterTabContent({
                 onDelete={params.deleteFeature}
               />
             </ErrorBoundary>
-            <ErrorBoundary
-              fallback={
-                <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">Unable to load traits editor</p>
-                </div>
-              }
-            >
+            <ErrorBoundary fallback={<SheetLoadError thing="Traits" />}>
               <FeaturesTraitsManager
                 items={character.traits}
                 category="trait"
@@ -906,13 +833,7 @@ function CharacterTabContent({
             </ErrorBoundary>
           </div>
 
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load background editor</p>
-              </div>
-            }
-          >
+          <ErrorBoundary fallback={<SheetLoadError thing="Background" />}>
             <CharacterBackgroundEditor
               background={character.characterBackground}
               onChange={params.updateCharacterBackground}
@@ -1025,13 +946,7 @@ function CombatTabContent({
               />
             </div>
             <div className="space-y-6">
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                    <p className="text-muted">Unable to load HP manager</p>
-                  </div>
-                }
-              >
+              <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
                 <HitPointManager
                   editing={params.editing}
                   hitPoints={character.hitPoints}
@@ -1048,15 +963,7 @@ function CombatTabContent({
                   onUpdateHitPoints={params.updateHitPoints}
                 />
               </ErrorBoundary>
-              <ErrorBoundary
-                fallback={
-                  <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-4 shadow">
-                    <p className="text-muted">
-                      Unable to load hit dice tracker
-                    </p>
-                  </div>
-                }
-              >
+              <ErrorBoundary fallback={<SheetLoadError thing="Hit dice" />}>
                 <HitDiceTracker
                   hitDicePools={character.hitDicePools || {}}
                   onUseHitDie={params.useHitDie}
@@ -1068,13 +975,7 @@ function CombatTabContent({
           </div>
 
           <ErrorBoundary
-            fallback={
-              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">
-                  Unable to load weapon proficiencies
-                </p>
-              </div>
-            }
+            fallback={<SheetLoadError thing="Weapon proficiencies" />}
           >
             <WeaponProficiencies />
           </ErrorBoundary>
@@ -1084,13 +985,7 @@ function CombatTabContent({
             className="scroll-mt-[calc(var(--app-header-height,4rem)+1rem)]"
           >
             <ErrorBoundary
-              fallback={
-                <div className="border-accent-red-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                  <p className="text-muted">
-                    Unable to load conditions and diseases manager
-                  </p>
-                </div>
-              }
+              fallback={<SheetLoadError thing="Conditions and effects" />}
             >
               {hasHydrated ? (
                 <ConditionsDiseasesManager />
@@ -1111,21 +1006,11 @@ function CombatTabContent({
 
       {activeSubTab === 'defenses' && (
         <div className="space-y-6">
-          <ErrorBoundary
-            fallback={
-              <div className="border-accent-blue-border bg-surface-raised rounded-lg border p-4 shadow">
-                <p className="text-muted">Unable to load temporary buffs</p>
-              </div>
-            }
-          >
+          <ErrorBoundary fallback={<SheetLoadError thing="Buffs" />}>
             <TemporaryBuffsManager />
           </ErrorBoundary>
           <ErrorBoundary
-            fallback={
-              <div className="border-accent-emerald-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                <p className="text-muted">Unable to load defenses and senses</p>
-              </div>
-            }
+            fallback={<SheetLoadError thing="Defenses and senses" />}
           >
             <DefensesAndSenses />
           </ErrorBoundary>
@@ -1133,13 +1018,7 @@ function CombatTabContent({
       )}
 
       {activeSubTab === 'summons' && (
-        <ErrorBoundary
-          fallback={
-            <div className="border-divider bg-surface-raised rounded-lg border p-6">
-              <p className="text-muted">Unable to load summons</p>
-            </div>
-          }
-        >
+        <ErrorBoundary fallback={<SheetLoadError thing="Summons" />}>
           <SummonsSubTab />
         </ErrorBoundary>
       )}
