@@ -23,9 +23,7 @@ import { MagicItemsTab } from '@/components/ui/character/equipment/MagicItemsTab
 import { ArmorTab } from '@/components/ui/character/equipment/ArmorTab';
 import ActionsSection from '@/components/ui/character/ActionsSection';
 import CharacterBasicInfo from '@/components/ui/character/CharacterBasicInfo';
-import AbilityScores from '@/components/ui/character/AbilityScores';
-import SavingThrows from '@/components/ui/character/SavingThrows';
-import Skills from '@/components/ui/character/Skills';
+import { AbilitiesSection } from '@/components/ui/character/AbilitiesSection';
 import QuickStats from '@/components/ui/character/QuickStats';
 import XPTracker from '@/components/ui/character/XPTracker';
 import SpellSlotTracker from '@/components/ui/character/SpellSlotTracker';
@@ -101,8 +99,9 @@ export interface TabbedSheetConfigParams {
   characterHasSpells: boolean;
   /**
    * Sheet mode (`SheetMode.tsx`): false = play mode, build values are plain
-   * text. Passed to the Combat tab's max HP, base AC and speed (and the
-   * Stats tab in 02e).
+   * text. Passed to the Combat tab's max HP, base AC and speed, and to the
+   * Stats tab's abilities (scores, save and skill proficiencies, Jack of All
+   * Trades, bonus abilities; rolls only in play mode).
    */
   editing: boolean;
 
@@ -411,64 +410,50 @@ export function createTabbedSheetConfig(
             />
           </div>
 
-          {/* Core stats: Abilities + Saves + XP on left, Skills on right (sticky) */}
-          <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-            <div className="space-y-6">
-              <AbilityScores
-                abilities={character.abilities}
-                characterLevel={totalLevel}
-                onUpdateAbilityScore={params.updateAbilityScore}
-                onRollAbilityCheck={params.rollAbilityCheck}
-              />
-              <SavingThrows
-                savingThrows={character.savingThrows}
-                getSavingThrowModifier={params.getSavingThrowModifier}
-                onUpdateSavingThrowProficiency={
-                  params.updateSavingThrowProficiency
-                }
-                onRollSavingThrow={params.rollSavingThrow}
-              />
-              {(() => {
-                const pendingLevelUp = shouldLevelUp(
-                  character.experience,
-                  totalLevel
-                );
-                return (
-                  <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
-                    <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
-                      <h2 className="text-heading text-lg font-bold">
-                        Experience Points
-                      </h2>
-                      {totalLevel < 20 && (
-                        <LevelUpButton pendingLevelUp={pendingLevelUp} />
-                      )}
-                    </div>
-                    <XPTracker
-                      currentXP={character.experience}
-                      currentLevel={totalLevel}
-                      onAddXP={params.addExperience}
-                      onSetXP={params.setExperience}
-                      pendingLevelUp={pendingLevelUp}
-                    />
-                  </div>
-                );
-              })()}
-            </div>
+          <AbilitiesSection
+            abilities={character.abilities}
+            savingThrows={character.savingThrows}
+            skills={character.skills}
+            jackOfAllTrades={character.jackOfAllTrades ?? false}
+            getSavingThrowModifier={params.getSavingThrowModifier}
+            getSkillModifier={params.getSkillModifier}
+            onUpdateAbilityScore={params.updateAbilityScore}
+            onRollAbilityCheck={params.rollAbilityCheck}
+            onUpdateSavingThrowProficiency={params.updateSavingThrowProficiency}
+            onRollSavingThrow={params.rollSavingThrow}
+            onUpdateSkillProficiency={params.updateSkillProficiency}
+            onUpdateSkillExpertise={params.updateSkillExpertise}
+            onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
+            onRollSkillCheck={params.rollSkillCheck}
+            onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
+            editing={params.editing}
+          />
 
-            <div className="lg:sticky lg:top-[calc(var(--sheet-bar-height,4rem)+1rem)]">
-              <Skills
-                skills={character.skills}
-                jackOfAllTrades={character.jackOfAllTrades ?? false}
-                proficiencyBonus={proficiencyBonus}
-                getSkillModifier={params.getSkillModifier}
-                onUpdateSkillProficiency={params.updateSkillProficiency}
-                onUpdateSkillExpertise={params.updateSkillExpertise}
-                onToggleJackOfAllTrades={params.toggleJackOfAllTrades}
-                onRollSkillCheck={params.rollSkillCheck}
-                onToggleSkillBonusAbility={params.toggleSkillBonusAbility}
-              />
-            </div>
-          </div>
+          {(() => {
+            const pendingLevelUp = shouldLevelUp(
+              character.experience,
+              totalLevel
+            );
+            return (
+              <div className="border-accent-amber-border bg-surface-raised rounded-lg border p-6 shadow-lg">
+                <div className="border-divider mb-4 flex items-center justify-between border-b pb-2">
+                  <h2 className="text-heading text-lg font-bold">
+                    Experience Points
+                  </h2>
+                  {totalLevel < 20 && (
+                    <LevelUpButton pendingLevelUp={pendingLevelUp} />
+                  )}
+                </div>
+                <XPTracker
+                  currentXP={character.experience}
+                  currentLevel={totalLevel}
+                  onAddXP={params.addExperience}
+                  onSetXP={params.setExperience}
+                  pendingLevelUp={pendingLevelUp}
+                />
+              </div>
+            );
+          })()}
         </div>
       ),
     },
