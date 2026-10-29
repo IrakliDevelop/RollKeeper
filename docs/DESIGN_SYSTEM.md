@@ -226,10 +226,11 @@ back-link text are visually hidden but stay as accessible names.
 
 Build-value components take `editing?: boolean` (default `true`) and the page
 passes the mode. 02d gates the name, avatar, HUD speed, Combat max HP (and its
-calculation mode), base AC, and walk, fly, climb and swim speeds. The Stats tab
-follows in 02e. A play value edited with `InPlaceField` (rolled initiative)
-passes `editing` as always true. The map dock's armor class dialog keeps the
-default, so it stays editable.
+calculation mode), base AC, and walk, fly, climb and swim speeds; 02e gates
+the Stats tab's abilities (see "Abilities on the Stats tab"). A play value
+edited with `InPlaceField` (rolled initiative) passes `editing` as always
+true. The map dock's armor class dialog keeps the default, so it stays
+editable.
 
 The map sheet drawer and the DM creature drawer use the same "Edit sheet"
 `Switch`, each with its own local state.
@@ -256,7 +257,7 @@ both themes (Storybook → Game). Import them by path; don't draw your own.
 | Spell slots left | `SlotPips` (`total`, `available`, `level` 1–9 or `'pact'`): 10px lapis pips, filled while available. Display only; one label for the row; bad counts clamp and at most `MAX_PIPS` (20) are drawn |
 | Armor class | `AcShield`: the number in a brass shield outline, the only icon-shaped container in the system. Add the "AC" caption or label yourself |
 | An ability on the Stats tab | `Medallion` (`ability`, `score`, `modifier`, `saveProficient`, `abilityDisplay`): a 48px ring with the large number inside and the small one on a tab over the bottom edge. The ring is brass when the save is proficient, `divider-strong` when not; it is never decorative. One label in both modes ("Strength: modifier +3, score 16"). With `editing` and `onScoreChange` it becomes a button that opens the "Strength score" editor (1–30, live "Modifier +3"); otherwise it is plain, with no tab stop. The tab hangs 10px below the ring, so leave that much room under it. Don't pass outline classes in `className`: in edit mode they clash with, and can hide, the editor's dashed cue and focus ring |
-| Abilities in a drawer or the DM's view of a player | `LedgerRow` (`cells`: six `{ ability, score, modifier, save, saveProficient }`, `abilityDisplay`): name, the two numbers and a save line ("Save +5" with a decorative dot) per cell, `divider` hairlines between cells, six across from 32rem of its own width and 3×2 below. Give it a block parent: as a flex item with auto width it shrinks to nothing. `editing` + `onScoreChange` open the same score editor. `onRollCheck` / `onRollSave` turn the name and save line into "Roll Strength check" / "Roll Strength saving throw" buttons; without them they stay text, and while editing rolls are off |
+| Abilities in a drawer or the DM's view of a player | `LedgerRow` (`cells`: six `{ ability, score, modifier, save, saveProficient }`, `abilityDisplay`): name, the two numbers and a save line ("Save +5" with a decorative dot) per cell, `divider` hairlines between cells, six across from 32rem of its own width and 3×2 below. Give it a block parent: as a flex item with auto width it shrinks to nothing. `editing` + `onScoreChange` open the same score editor. `onRollCheck` / `onRollSave` turn the name and save line into roll buttons, "Roll Strength check" and "Roll Strength Save +5, proficient" (`saveRollLabel`: named by its content, so the name holds the visible "Save +5"); without them they stay text, and while editing rolls are off. The map sheet drawer and the DM's player dialog use it; neither passes rolls (the drawer's stay behind `SHEET_DICE_ROLLS_ENABLED`) |
 | A condition on a creature | `ConditionChip`: an ember `Badge` with the name, or `kind="concentration"` in lapis. `onRemove` adds a remove button; pass `removeLabel` when a list shows several creatures ("Remove Poisoned from Goblin 2"). The name is never cut short. It renders a `div`, so not inside a `<button>` or `<p>`. On touch, give a wrapping list `pointer-coarse:gap-x-3 pointer-coarse:gap-y-6` so remove buttons cover nothing else |
 | A character's vitals (the sheet's HUD, row 1) | `CharacterHUD` (`ui/character/`). HP is `HudHitPoints`: the current value in `type-num-xl` coloured by tier, "/ max" in `body`, "+5 temp" in frost, a 4px tier bar on a `divider` track and the tier word under it; with no max HP, a plain number and an empty track. Each drop in current HP flashes the tile blood for 180ms (`useHpDamageFlash`, from state, so a hit from another tab or the DM flashes too). The other stats are `HudStat` tiles: `type-num-lg` over a caption at every width ("Initiative", "Spell save DC"), AC in `AcShield`; a tile with `onClick` is a button named by its text. Concentration is a `ConditionChip`, the conditions count an ember badge-style button with no pulse |
 
@@ -287,10 +288,34 @@ Which number an ability shows large is the viewer's choice, per device:
   shown. One in another, hidden `BookmarkTabs` panel should pass
   `animateSwap={localChange && visible}` (or `false`).
 
-Still coming in Phase 2:
+The "Scores large" `Switch` (size small, no description) sits at the right
+of the Stats tab's "Abilities" heading and of the DM player dialog's
+"Abilities" heading, and calls `setPref('abilityDisplay', on ? 'score' :
+'modifier')`. The map sheet drawer has no switch; it follows the device's
+setting.
 
-- **"Scores large" switch:** the `Switch` at the Abilities heading that
-  calls `setPref('abilityDisplay', …)`.
+### Abilities on the Stats tab
+
+`AbilitiesSection` (`src/components/ui/character/AbilitiesSection/`, import
+by path) is the tab's abilities: a `Section` "Abilities" with the "Scores
+large" switch, then six blocks in one column, two from `sm` and three from
+`lg`. A block is a `Medallion`, the ability name (`h3`) over its save line,
+and its skills (dot, name, bonus); Constitution says "No skills". It takes
+`editing?: boolean` (default `true`); only the character page passes the
+sheet mode.
+
+- **Play mode:** the name rolls the check ("Roll Strength check"; the
+  heading stays "Strength"), the save line rolls the save ("Roll Strength
+  Save +5, proficient"), the skill name rolls the skill ("Roll Stealth
+  check"). Dots are images that say their state. These rolls are live, as
+  they always were on this tab.
+- **Edit mode:** no rolls. The medallion opens the score editor; the save
+  dot toggles the save (`pressed`); the skill dot cycles none → proficient
+  → expertise → none (expertise is cleared before proficiency); "+WIS"
+  badges show bonus abilities, chosen in a popover ("Choose ability
+  modifiers for Stealth"); a "Jack of All Trades" `Switch` with its
+  description sits at the foot of the section. Half dots show Jack of All
+  Trades in both modes.
 
 ## Touch and iPad
 
