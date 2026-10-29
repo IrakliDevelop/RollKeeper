@@ -96,6 +96,102 @@ describe('follower side', () => {
   });
 });
 
+/** Like a real BroadcastChannel, structured-clones every posted message, so
+ * an uncloneable argument throws DataCloneError at postMessage. */
+class CloningChannel extends FakeChannel {
+  failOn: ((data: Message) => boolean) | null = null;
+  postMessage(data: unknown) {
+    if (this.failOn?.(data as Message)) throw new Error('channel closed');
+    super.postMessage(structuredClone(data));
+  }
+}
+
+function makeCloningBus() {
+  const channel = new CloningChannel();
+  const bus = new CharacterIntentBus(
+    {
+      isLeader: () => false,
+      getLoadedCharacterId: () => 'char-1',
+      getWatermark: () => 0,
+      applyIntent: () => {},
+    },
+    () => channel
+  );
+  bus.start();
+  return { bus, channel };
+}
+
+/** What a button wired as onClick={storeAction} hands the action: a React
+ * synthetic event wrapping the DOM event, with methods that can't be cloned. */
+const syntheticClick = () => ({
+  type: 'click',
+  nativeEvent: new Event('click'),
+  preventDefault: () => {},
+});
+
+describe('uncloneable arguments', () => {
+  it('drops a DOM event argument, as the leader ignores it', () => {
+    const { bus, channel } = makeCloningBus();
+    expect(() =>
+      bus.send('char-1', 'resetAllHitDice', [new Event('click')])
+    ).not.toThrow();
+    expect(channel.posted).toMatchObject([
+      { actionName: 'resetAllHitDice', seq: 1, args: [] },
+    ]);
+  });
+
+  it('drops a React synthetic event argument', () => {
+    const { bus, channel } = makeCloningBus();
+    bus.send('char-1', 'resetDeathSavingThrows', [syntheticClick()]);
+    expect(channel.posted).toMatchObject([
+      { actionName: 'resetDeathSavingThrows', seq: 1, args: [] },
+    ]);
+  });
+
+  it('keeps later intents flowing after a click-wired action', () => {
+    const { bus, channel } = makeCloningBus();
+    bus.send('char-1', 'resetAllHitDice', [syntheticClick()]);
+    bus.send('char-1', 'applyHealingToCharacter', [2]);
+    expect(channel.posted.map(m => [m.actionName, m.seq, m.args])).toEqual([
+      ['resetAllHitDice', 1, []],
+      ['applyHealingToCharacter', 2, [2]],
+    ]);
+  });
+
+  it('refuses any other uncloneable argument without using a sequence number', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { bus, channel } = makeCloningBus();
+    expect(() =>
+      bus.send('char-1', 'updateCharacter', [{ onPick: () => {} }])
+    ).not.toThrow();
+    bus.send('char-1', 'applyHealingToCharacter', [2]);
+    expect(channel.posted.map(m => [m.actionName, m.seq])).toEqual([
+      ['applyHealingToCharacter', 1],
+    ]);
+    expect(error).toHaveBeenCalledOnce();
+    error.mockRestore();
+  });
+
+  it('a failed re-send does not stop the rest of the queue', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { bus, channel } = makeCloningBus();
+    bus.send('char-1', 'a', []);
+    bus.send('char-1', 'b', []);
+    channel.posted.length = 0;
+    channel.failOn = data => data.actionName === 'a';
+    expect(() =>
+      channel.receive({
+        type: 'leader',
+        characterId: 'char-1',
+        tabId: 'other-tab',
+        epoch: 1,
+      })
+    ).not.toThrow();
+    expect(channel.posted.map(m => m.actionName)).toEqual(['b']);
+    error.mockRestore();
+  });
+});
+
 describe('leader side', () => {
   it('tracks sender sequence gaps independently for each character', () => {
     let loadedCharacterId = 'char-1';
