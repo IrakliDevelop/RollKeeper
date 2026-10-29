@@ -369,6 +369,7 @@ export function createTabbedSheetConfig(
           {/* Header row: Basic Info + Quick Stats */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <CharacterBasicInfo
+              editing={params.editing}
               character={character}
               race={character.race}
               characterClass={character.class}
