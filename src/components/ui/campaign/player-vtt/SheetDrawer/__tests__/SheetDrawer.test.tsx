@@ -42,12 +42,26 @@ const INITIAL_CHARACTER = useCharacterStore.getState().character;
 
 beforeEach(() => {
   window.localStorage.clear();
+  // The abilities' score editor asks for (min-width: 640px); jsdom has no
+  // matchMedia.
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }))
+  );
   useCharacterStore.getState().loadCharacterState({
     ...INITIAL_CHARACTER,
     name: 'Kaelen Voss',
   } as CharacterState);
 });
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('SheetDrawer', () => {
   it('opens as a dialog named after the character, locked', () => {
