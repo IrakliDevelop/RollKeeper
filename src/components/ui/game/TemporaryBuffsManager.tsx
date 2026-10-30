@@ -1,16 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import {
-  Plus,
-  X,
-  Trash2,
-  Sparkles,
-  ChevronDown,
-  ChevronUp,
-  Zap,
-  Pencil,
-} from 'lucide-react';
+import { Plus, X, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import type {
   TemporaryBuff,
@@ -25,6 +16,15 @@ import { Input } from '@/components/ui/forms/input';
 import { Switch } from '@/components/ui/forms/switch';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Autocomplete } from '@/components/ui/forms/Autocomplete';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/feedback/dialog';
+import { Section } from '@/components/ui/layout/section';
 
 // ============================================================
 // CONSTANTS
@@ -347,33 +347,6 @@ function getEffectLabel(effect: BuffEffect): string {
   }
 }
 
-function getEffectBadgeVariant(
-  targetStat: BuffTargetStat
-): 'info' | 'success' | 'warning' | 'danger' | 'neutral' {
-  switch (targetStat) {
-    case 'ac':
-      return 'info';
-    case 'maxHp':
-      return 'success';
-    case 'tempHp':
-      return 'warning';
-    case 'speed':
-      return 'neutral';
-    case 'savingThrow':
-      return 'info';
-    case 'attackBonus':
-      return 'danger';
-    case 'damageResistance':
-      return 'warning';
-    case 'damageImmunity':
-      return 'danger';
-    case 'conditionImmunity':
-      return 'success';
-    default:
-      return 'neutral';
-  }
-}
-
 // ============================================================
 // BUFF CARD
 // ============================================================
@@ -391,58 +364,61 @@ function BuffCard({
 }) {
   return (
     <div
-      className={`border-divider rounded-lg border-2 p-4 transition-all ${
-        buff.isActive
-          ? 'border-accent-emerald-border bg-surface-raised shadow-md'
-          : 'bg-surface-secondary opacity-70'
-      }`}
+      data-buff-row={buff.id}
+      role="listitem"
+      className="border-divider flex min-w-0 flex-wrap items-start justify-between gap-3 border-b py-4 pointer-coarse:min-h-11"
     >
-      <div className="flex items-start gap-3">
+      <div className="min-w-0 flex-[1_1_12rem]">
         <Switch
+          label={buff.name}
           checked={buff.isActive}
           onCheckedChange={() => onToggle(buff.id)}
           size="sm"
-          variant={buff.isActive ? 'success' : 'default'}
+          labelClassName="break-words"
         />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2">
-            <span className="text-heading truncate font-semibold">
-              {buff.name}
-            </span>
-            {buff.source && (
-              <span className="text-muted text-xs">{buff.source}</span>
-            )}
-          </div>
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {buff.effects.map(effect => (
-              <Badge
-                key={effect.id}
-                variant={getEffectBadgeVariant(effect.targetStat)}
-                size="sm"
-              >
-                {getEffectLabel(effect)}
-              </Badge>
-            ))}
-          </div>
+        {buff.source && (
+          <p className="type-small text-muted mt-1 break-words">
+            {buff.source}
+          </p>
+        )}
+        <div className="mt-2 flex flex-wrap gap-2">
+          {buff.effects.map(effect => (
+            <Badge
+              key={effect.id}
+              data-effect-kind={effect.targetStat}
+              variant="neutral"
+              size="sm"
+              className={
+                effect.targetStat === 'tempHp'
+                  ? 'border-frost-border text-frost-text'
+                  : undefined
+              }
+            >
+              {getEffectLabel(effect)}
+            </Badge>
+          ))}
         </div>
-        <div className="flex shrink-0 gap-1">
-          <Button
-            onClick={() => onEdit(buff.id)}
-            variant="ghost"
-            size="sm"
-            className="text-muted hover:text-accent-blue-text"
-          >
-            <Pencil className="h-4 w-4" />
-          </Button>
-          <Button
-            onClick={() => onDelete(buff.id)}
-            variant="ghost"
-            size="sm"
-            className="text-muted hover:text-accent-red-text"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="sm"
+          data-buff-action="edit"
+          aria-label={`Edit ${buff.name}`}
+          onClick={() => onEdit(buff.id)}
+          className="min-w-6 px-2 pointer-coarse:min-w-11"
+        >
+          <Pencil aria-hidden="true" className="size-4" />
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          aria-label={`Delete ${buff.name}`}
+          onClick={() => onDelete(buff.id)}
+          className="min-w-6 px-2 pointer-coarse:min-w-11"
+        >
+          <Trash2 aria-hidden="true" className="size-4" />
+        </Button>
       </div>
     </div>
   );
@@ -468,6 +444,7 @@ const GRANT_ONLY_STATS: BuffTargetStat[] = [
   'damageImmunity',
   'conditionImmunity',
 ];
+const EMPTY_BUFFS: TemporaryBuff[] = [];
 
 function createEmptyEffect(): EffectFormRow {
   return {
@@ -660,26 +637,21 @@ function BuffForm({
   ]);
 
   return (
-    <div className="border-accent-blue-border from-accent-blue-bg to-accent-blue-bg rounded-lg border-2 bg-linear-to-br p-4">
-      <h5 className="text-accent-blue-text mb-3 font-bold">
-        {isEditing ? 'Edit Buff' : 'Add New Buff'}
-      </h5>
-
+    <div className="space-y-4">
       {/* Preset Templates */}
       {showPresets && (
         <div className="mb-4">
-          <p className="text-muted mb-2 text-xs font-medium">
-            Quick presets (click to auto-fill):
-          </p>
+          <p className="type-ui text-muted mb-2">Presets</p>
           <div className="flex flex-wrap gap-1.5">
             {PRESET_BUFFS.map(preset => (
-              <button
+              <Button
                 key={preset.name}
                 onClick={() => applyPreset(preset)}
-                className="border-divider bg-surface-raised hover:border-accent-blue-border text-body rounded-md border px-2.5 py-1 text-xs font-medium transition-all hover:shadow-sm"
+                variant="secondary"
+                size="sm"
               >
                 {preset.name}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
@@ -688,12 +660,12 @@ function BuffForm({
       {/* Name & Source */}
       <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Input
-          placeholder="Buff name *"
+          label="Name"
           value={name}
           onChange={e => setName(e.target.value)}
         />
         <Input
-          placeholder="Source (optional)"
+          label="Source (optional)"
           value={source}
           onChange={e => setSource(e.target.value)}
         />
@@ -701,15 +673,12 @@ function BuffForm({
 
       {/* Effects */}
       <div className="space-y-2">
-        <p className="text-body text-xs font-medium">Effects:</p>
+        <p className="type-ui text-body">Effects</p>
         {effects.map((effect, idx) => (
-          <div
-            key={effect.tempId}
-            className="border-divider bg-surface-raised rounded-lg border p-3"
-          >
+          <div key={effect.tempId} className="border-divider border-b py-3">
             <div className="flex flex-wrap items-end gap-2">
               <div className="min-w-[150px] flex-1">
-                <label className="text-muted mb-1 block text-xs">Stat</label>
+                <label className="type-ui text-muted mb-1 block">Stat</label>
                 <Autocomplete
                   options={TARGET_STAT_OPTIONS}
                   value={effect.targetStat}
@@ -720,7 +689,7 @@ function BuffForm({
 
               {!GRANT_ONLY_STATS.includes(effect.targetStat) && (
                 <div className="min-w-[110px] flex-1">
-                  <label className="text-muted mb-1 block text-xs">Mode</label>
+                  <label className="type-ui text-muted mb-1 block">Mode</label>
                   <SelectField
                     value={effect.mode}
                     onValueChange={v => handleModeChange(idx, v as BuffMode)}
@@ -736,7 +705,7 @@ function BuffForm({
 
               {effect.targetStat === 'savingThrow' && (
                 <div className="min-w-[110px] flex-1">
-                  <label className="text-muted mb-1 block text-xs">
+                  <label className="type-ui text-muted mb-1 block">
                     Ability
                   </label>
                   <SelectField
@@ -757,8 +726,8 @@ function BuffForm({
               {(effect.targetStat === 'damageResistance' ||
                 effect.targetStat === 'damageImmunity') && (
                 <div className="min-w-[130px] flex-1">
-                  <label className="text-muted mb-1 block text-xs">
-                    Damage Type
+                  <label className="type-ui text-muted mb-1 block">
+                    Damage type
                   </label>
                   <Autocomplete
                     options={DAMAGE_TYPE_OPTIONS}
@@ -777,7 +746,7 @@ function BuffForm({
 
               {effect.targetStat === 'conditionImmunity' && (
                 <div className="min-w-[130px] flex-1">
-                  <label className="text-muted mb-1 block text-xs">
+                  <label className="type-ui text-muted mb-1 block">
                     Condition
                   </label>
                   <Autocomplete
@@ -796,13 +765,19 @@ function BuffForm({
               )}
 
               {!GRANT_ONLY_STATS.includes(effect.targetStat) && (
-                <div className="w-20">
-                  <label className="text-muted mb-1 block text-xs">Value</label>
-                  <Input
-                    type="number"
-                    placeholder="0"
-                    value={effect.value}
-                    onChange={e => handleValueChange(idx, e.target.value)}
+                <div className="w-28">
+                  <NumberInput
+                    label="Value"
+                    value={
+                      effect.value === '' ? undefined : Number(effect.value)
+                    }
+                    onChange={value =>
+                      handleValueChange(
+                        idx,
+                        value === undefined ? '' : String(value)
+                      )
+                    }
+                    allowEmpty
                   />
                 </div>
               )}
@@ -812,14 +787,15 @@ function BuffForm({
                   variant="ghost"
                   size="sm"
                   onClick={() => removeEffectRow(idx)}
-                  className="text-muted hover:text-accent-red-text"
+                  aria-label="Remove"
+                  className="text-muted"
                 >
                   <X className="h-4 w-4" />
                 </Button>
               )}
             </div>
             {effect.description && (
-              <p className="text-muted mt-1.5 text-xs italic">
+              <p className="type-small text-muted mt-1.5">
                 {effect.description}
               </p>
             )}
@@ -831,9 +807,8 @@ function BuffForm({
           size="sm"
           onClick={addEffectRow}
           leftIcon={<Plus className="h-3.5 w-3.5" />}
-          className="text-accent-blue-text"
         >
-          Add Another Effect
+          Add effect
         </Button>
       </div>
 
@@ -855,7 +830,7 @@ function BuffForm({
             )
           }
         >
-          {isEditing ? 'Save Changes' : 'Add Buff'}
+          {isEditing ? 'Save buff' : 'Add buff'}
         </Button>
       </div>
     </div>
@@ -875,142 +850,147 @@ export default function TemporaryBuffsManager() {
     deleteBuff,
     clearAllBuffs,
   } = useCharacterStore();
-
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBuffId, setEditingBuffId] = useState<string | null>(null);
   const [isCollapsed, setIsCollapsed] = useState(false);
-
-  const buffs = character.temporaryBuffs || [];
-  const activeCount = buffs.filter(b => b.isActive).length;
+  const addButtonRef = React.useRef<HTMLButtonElement>(null);
+  const listRef = React.useRef<HTMLDivElement>(null);
+  const pendingFocus = React.useRef<string | 'add' | null>(null);
+  const buffs = character.temporaryBuffs ?? EMPTY_BUFFS;
+  const activeCount = buffs.filter(buff => buff.isActive).length;
   const editingBuff = editingBuffId
-    ? (buffs.find(b => b.id === editingBuffId) ?? null)
-    : null;
+    ? buffs.find(buff => buff.id === editingBuffId)
+    : undefined;
+  const formOpen = showAddForm || editingBuffId !== null;
 
-  const handleAdd = useCallback(
-    (buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>) => {
-      addBuff(buff);
-      setShowAddForm(false);
-    },
-    [addBuff]
-  );
+  React.useLayoutEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = null;
+    const row = Array.from(
+      listRef.current?.querySelectorAll<HTMLElement>('[data-buff-row]') ?? []
+    ).find(element => element.dataset.buffRow === target);
+    (
+      row?.querySelector<HTMLElement>('[data-buff-action="edit"]') ??
+      addButtonRef.current
+    )?.focus({ preventScroll: true });
+  }, [buffs]);
 
-  const handleUpdate = useCallback(
-    (id: string, updates: Partial<TemporaryBuff>) => {
-      updateBuff(id, updates);
-      setEditingBuffId(null);
-    },
-    [updateBuff]
-  );
-
-  const handleEdit = useCallback((id: string) => {
+  const closeForm = () => {
     setShowAddForm(false);
-    setEditingBuffId(id);
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
     setEditingBuffId(null);
-  }, []);
+  };
+  const handleDelete = (id: string) => {
+    const index = buffs.findIndex(buff => buff.id === id);
+    pendingFocus.current =
+      buffs[index + 1]?.id ?? buffs[index - 1]?.id ?? 'add';
+    deleteBuff(id);
+  };
+  const handleClear = () => {
+    pendingFocus.current = 'add';
+    clearAllBuffs();
+  };
+  const handleAdd = (
+    buff: Omit<TemporaryBuff, 'id' | 'createdAt' | 'updatedAt'>
+  ) => {
+    addBuff(buff);
+    closeForm();
+  };
+  const handleUpdate = (id: string, updates: Partial<TemporaryBuff>) => {
+    updateBuff(id, updates);
+    closeForm();
+  };
 
   return (
-    <div className="border-divider bg-surface rounded-lg border-2 shadow-sm">
-      {/* Header */}
-      <div className="border-divider from-surface-secondary to-surface-hover border-b-2 bg-linear-to-r p-4">
-        <div className="flex items-center justify-between">
-          <button
-            onClick={() => setIsCollapsed(!isCollapsed)}
-            className="flex items-center gap-2"
-          >
-            <Zap className="text-accent-blue-text h-5 w-5" />
-            <h3 className="text-heading text-lg font-bold">Temporary Buffs</h3>
-            {buffs.length > 0 && (
-              <Badge variant={activeCount > 0 ? 'info' : 'neutral'} size="sm">
-                {activeCount}/{buffs.length}
-              </Badge>
-            )}
-            {isCollapsed ? (
-              <ChevronDown className="text-muted h-4 w-4" />
-            ) : (
-              <ChevronUp className="text-muted h-4 w-4" />
-            )}
-          </button>
-          <div className="flex items-center gap-2">
-            {buffs.length > 0 && !isCollapsed && (
-              <Button
-                onClick={clearAllBuffs}
-                variant="ghost"
-                size="sm"
-                leftIcon={<Trash2 className="h-4 w-4" />}
-                className="text-muted hover:text-accent-red-text"
-              >
-                Clear All
-              </Button>
-            )}
-            {!isCollapsed && (
-              <Button
-                onClick={() => {
-                  setEditingBuffId(null);
-                  setShowAddForm(!showAddForm);
-                }}
-                variant={showAddForm ? 'outline' : 'primary'}
-                size="sm"
-                leftIcon={
-                  showAddForm ? (
-                    <X className="h-4 w-4" />
-                  ) : (
-                    <Plus className="h-4 w-4" />
-                  )
-                }
-              >
-                {showAddForm ? 'Cancel' : 'Add Buff'}
-              </Button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Content */}
-      {!isCollapsed && (
-        <div className="p-4">
-          {showAddForm && (
-            <div className="mb-4">
-              <BuffForm
-                onAdd={handleAdd}
-                onCancel={() => setShowAddForm(false)}
-              />
-            </div>
+    <Section
+      heading={
+        <Button
+          variant="ghost"
+          aria-expanded={!isCollapsed}
+          onClick={() => setIsCollapsed(value => !value)}
+          className="type-subheading h-auto min-h-6 px-0 py-0 text-left pointer-coarse:min-h-11"
+        >
+          Temporary buffs
+          {isCollapsed ? (
+            <ChevronDown aria-hidden="true" className="size-4" />
+          ) : (
+            <ChevronUp aria-hidden="true" className="size-4" />
           )}
-
-          <div className="space-y-3">
-            {buffs.map(buff =>
-              editingBuffId === buff.id && editingBuff ? (
-                <BuffForm
-                  key={`edit-${buff.id}`}
-                  initialBuff={editingBuff}
-                  onUpdate={handleUpdate}
-                  onCancel={handleCancelEdit}
-                />
-              ) : (
-                <BuffCard
-                  key={buff.id}
-                  buff={buff}
-                  onToggle={toggleBuff}
-                  onEdit={handleEdit}
-                  onDelete={deleteBuff}
-                />
-              )
+        </Button>
+      }
+      level={3}
+      trailing={
+        buffs.length > 0 ? (
+          <Badge variant="neutral" size="sm">
+            {activeCount}/{buffs.length}
+          </Badge>
+        ) : null
+      }
+    >
+      {!isCollapsed && (
+        <>
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            {buffs.length > 0 && (
+              <Button variant="danger" size="sm" onClick={handleClear}>
+                Clear all
+              </Button>
             )}
-            {buffs.length === 0 && !showAddForm && (
-              <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-8 text-center">
-                <Sparkles className="text-faint mx-auto mb-3 h-10 w-10" />
-                <p className="text-muted font-medium">No temporary buffs</p>
-                <p className="text-muted mt-1 text-sm">
-                  Add buffs from spells, class features, or magic items
-                </p>
-              </div>
-            )}
+            <Button
+              ref={addButtonRef}
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setEditingBuffId(null);
+                setShowAddForm(true);
+              }}
+            >
+              Add buff
+            </Button>
           </div>
-        </div>
+          <div ref={listRef} role="list" className="divide-divider divide-y">
+            {buffs.map(buff => (
+              <BuffCard
+                key={buff.id}
+                buff={buff}
+                onToggle={toggleBuff}
+                onEdit={id => {
+                  setShowAddForm(false);
+                  setEditingBuffId(id);
+                }}
+                onDelete={handleDelete}
+              />
+            ))}
+          </div>
+          {buffs.length === 0 && (
+            <p className="type-body text-muted py-8 text-center">
+              Add a buff from a spell, feature or item.
+            </p>
+          )}
+        </>
       )}
-    </div>
+      <Dialog
+        open={formOpen}
+        onOpenChange={open => {
+          if (!open) closeForm();
+        }}
+      >
+        <DialogContent size="lg" aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>{editingBuff ? 'Edit buff' : 'Add buff'}</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            {formOpen && (
+              <BuffForm
+                key={editingBuff?.id ?? 'new'}
+                initialBuff={editingBuff}
+                onAdd={handleAdd}
+                onUpdate={handleUpdate}
+                onCancel={closeForm}
+              />
+            )}
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+    </Section>
   );
 }
