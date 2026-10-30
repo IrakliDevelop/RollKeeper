@@ -610,6 +610,7 @@ interface CharacterStore {
   removeDisease: (diseaseId: string) => void;
   setExhaustionVariant: (variant: ExhaustionVariant) => void;
   clearAllConditions: () => void;
+  clearNonBuffConditions: () => void;
   clearAllDiseases: () => void;
 
   // XP management
@@ -2626,31 +2627,66 @@ export const useCharacterStore = create<CharacterStore>()(
         },
 
         clearAllConditions: () => {
-          set(state => ({
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeConditions: [],
+          set(state => {
+            if (
+              state.character.conditionsAndDiseases.activeConditions.length ===
+              0
+            )
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: [],
+                },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          }));
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
+        },
+
+        clearNonBuffConditions: () => {
+          set(state => {
+            const activeConditions =
+              state.character.conditionsAndDiseases.activeConditions;
+            if (!activeConditions.some(condition => condition.kind !== 'buff'))
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeConditions: activeConditions.filter(
+                    condition => condition.kind === 'buff'
+                  ),
+                },
+              },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         clearAllDiseases: () => {
-          set(state => ({
-            character: {
-              ...state.character,
-              conditionsAndDiseases: {
-                ...state.character.conditionsAndDiseases,
-                activeDiseases: [],
+          set(state => {
+            if (
+              state.character.conditionsAndDiseases.activeDiseases.length === 0
+            )
+              return {};
+            return {
+              character: {
+                ...state.character,
+                conditionsAndDiseases: {
+                  ...state.character.conditionsAndDiseases,
+                  activeDiseases: [],
+                },
               },
-            },
-            hasUnsavedChanges: true,
-            saveStatus: 'saving',
-          }));
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
+          });
         },
 
         // XP management

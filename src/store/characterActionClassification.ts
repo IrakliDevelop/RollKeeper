@@ -82,6 +82,7 @@ export const CHARACTER_ACTION_CLASSIFICATION: Record<string, ActionClass> = {
   removeDisease: 'CANONICAL',
   setExhaustionVariant: 'CANONICAL',
   clearAllConditions: 'CANONICAL',
+  clearNonBuffConditions: 'CANONICAL',
   clearAllDiseases: 'CANONICAL',
   // — XP —
   addExperience: 'CANONICAL',

@@ -1,5 +1,6 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { useCharacterStore } from '@/store/characterStore';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { characterIntentBus, useCharacterStore } from '@/store/characterStore';
+import { characterWriterLock } from '@/lib/characterWriterLock';
 import { usePlayerStore } from '@/store/playerStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 
@@ -31,6 +32,7 @@ function resetStore(overrides = {}) {
 
 describe('characterStore — conditions', () => {
   beforeEach(() => resetStore());
+  afterEach(() => vi.restoreAllMocks());
 
   describe('addCondition', () => {
     it('adds a condition to activeConditions', () => {
@@ -232,9 +234,85 @@ describe('characterStore — conditions', () => {
       ).toHaveLength(0);
     });
 
-    it('marks hasUnsavedChanges', () => {
+    it('does not mint a revision for an empty list', () => {
+      const character = useCharacterStore.getState().character;
       useCharacterStore.getState().clearAllConditions();
-      expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
+      expect(useCharacterStore.getState().character).toBe(character);
+      expect(useCharacterStore.getState().character.revision).toBe(
+        character.revision
+      );
+      expect(useCharacterStore.getState().hasUnsavedChanges).toBe(false);
+    });
+  });
+
+  describe('clearNonBuffConditions', () => {
+    it('removes the visible conditions, including exhaustion, in one revision and keeps buff-kind effects', () => {
+      const store = useCharacterStore.getState();
+      store.addCondition('Poisoned', 'PHB', 'Poisoned');
+      store.addCondition('Exhaustion', 'PHB', 'Exhausted', 2);
+      store.addCondition(
+        'Bless',
+        'PHB',
+        'Blessed',
+        1,
+        undefined,
+        undefined,
+        'buff'
+      );
+      const before = useCharacterStore.getState().character.revision;
+
+      useCharacterStore.getState().clearNonBuffConditions();
+
+      const after = useCharacterStore.getState().character;
+      expect(after.revision).toBe((before ?? 0) + 1);
+      expect(
+        after.conditionsAndDiseases.activeConditions.map(c => c.name)
+      ).toEqual(['Bless']);
+    });
+
+    it('does not change character identity, revision, or save flags when only buffs remain', () => {
+      const store = useCharacterStore.getState();
+      store.addCondition(
+        'Bless',
+        'PHB',
+        'Blessed',
+        1,
+        undefined,
+        undefined,
+        'buff'
+      );
+      useCharacterStore.setState({
+        hasUnsavedChanges: false,
+        saveStatus: 'saved',
+      });
+      const character = useCharacterStore.getState().character;
+
+      useCharacterStore.getState().clearNonBuffConditions();
+
+      expect(useCharacterStore.getState().character).toBe(character);
+      expect(useCharacterStore.getState().character.revision).toBe(
+        character.revision
+      );
+      expect(useCharacterStore.getState().hasUnsavedChanges).toBe(false);
+      expect(useCharacterStore.getState().saveStatus).toBe('saved');
+    });
+
+    it('forwards one zero-argument canonical intent from a follower', () => {
+      const store = useCharacterStore.getState();
+      store.addCondition('Poisoned', 'PHB', 'Poisoned');
+      const before = useCharacterStore.getState().character;
+      vi.spyOn(characterWriterLock, 'isLeader').mockReturnValue(false);
+      const send = vi.spyOn(characterIntentBus, 'send');
+
+      useCharacterStore.getState().clearNonBuffConditions();
+
+      expect(useCharacterStore.getState().character).toBe(before);
+      expect(send).toHaveBeenCalledOnce();
+      expect(send).toHaveBeenCalledWith(
+        before.id,
+        'clearNonBuffConditions',
+        []
+      );
     });
   });
 });
@@ -354,8 +432,18 @@ describe('characterStore — diseases', () => {
     });
 
     it('marks hasUnsavedChanges', () => {
+      useCharacterStore.getState().addDisease('Filth Fever', 'DMG', 'A');
+      useCharacterStore.setState({ hasUnsavedChanges: false });
       useCharacterStore.getState().clearAllDiseases();
       expect(useCharacterStore.getState().hasUnsavedChanges).toBe(true);
+    });
+    it('does not mint a revision when no diseases are active', () => {
+      const character = useCharacterStore.getState().character;
+      useCharacterStore.getState().clearAllDiseases();
+      expect(useCharacterStore.getState().character).toBe(character);
+      expect(useCharacterStore.getState().character.revision).toBe(
+        character.revision
+      );
     });
   });
 });
