@@ -1,6 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+} from 'react';
 import { Search, ArrowLeft, Plus, BookOpen, Wand2, Trash2 } from 'lucide-react';
 import type { Spell } from '@/types/character';
 import type { Summon, SavedCreature } from '@/types/summon';
@@ -233,16 +239,19 @@ export function SummonCreaturePickerModal({
 
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+      <DialogContent
+        aria-describedby={undefined}
+        className="max-h-[85vh] overflow-y-auto sm:max-w-xl"
+      >
         <DialogHeader>
           <DialogTitle>
             {showCreatorForm
               ? editingCreature
-                ? `Edit: ${editingCreature.name}`
-                : 'Create Custom Creature'
+                ? `Edit ${editingCreature.name}`
+                : 'Create creature'
               : summonType === 'familiar'
-                ? 'Choose Your Familiar'
-                : `Summon Creature — ${spell.name}`}
+                ? 'Choose your familiar'
+                : `Summon with ${spell.name}`}
           </DialogTitle>
         </DialogHeader>
 
@@ -263,13 +272,15 @@ export function SummonCreaturePickerModal({
               {!isSpirit && (
                 <div className="border-divider mb-3 flex gap-1 border-b pb-2">
                   <button
+                    type="button"
+                    aria-pressed={activeTab === 'bestiary'}
                     onClick={() => {
                       setActiveTab('bestiary');
                       setSelectedSavedCreature(null);
                     }}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       activeTab === 'bestiary'
-                        ? 'bg-accent-purple-bg text-accent-purple-text'
+                        ? 'border-brass-border text-brass-text border'
                         : 'text-muted hover:text-body hover:bg-surface-secondary'
                     }`}
                   >
@@ -277,18 +288,20 @@ export function SummonCreaturePickerModal({
                     Bestiary
                   </button>
                   <button
+                    type="button"
+                    aria-pressed={activeTab === 'saved'}
                     onClick={() => {
                       setActiveTab('saved');
                       setSelectedMonster(null);
                     }}
                     className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                       activeTab === 'saved'
-                        ? 'bg-accent-purple-bg text-accent-purple-text'
+                        ? 'border-brass-border text-brass-text border'
                         : 'text-muted hover:text-body hover:bg-surface-secondary'
                     }`}
                   >
                     <Wand2 size={14} />
-                    My Creatures
+                    My creatures
                     {savedCreatures.length > 0 && (
                       <Badge variant="neutral">{savedCreatures.length}</Badge>
                     )}
@@ -371,7 +384,7 @@ function SpiritSummonPanel({
 }) {
   return (
     <div className="space-y-4">
-      <div className="border-accent-purple-border-strong bg-surface-raised rounded-lg border-2 p-3">
+      <div className="border-divider bg-surface-raised rounded-md border p-3">
         <div className="mb-2 flex items-center justify-between">
           <h4 className="text-heading font-semibold">{spiritPreview.name}</h4>
           <Badge variant="info">Level {castAtLevel}</Badge>
@@ -397,7 +410,7 @@ function SpiritSummonPanel({
       {spiritPreview.subtypes && spiritPreview.subtypes.length > 0 && (
         <div>
           <label className="text-heading mb-1.5 block text-sm font-medium">
-            Choose Form
+            Form
           </label>
           <div className="flex flex-wrap gap-2">
             {spiritPreview.subtypes.map(st => (
@@ -406,7 +419,7 @@ function SpiritSummonPanel({
                 onClick={() => onSelectSubtype(st)}
                 className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
                   selectedSubtype === st
-                    ? 'border-accent-purple-border bg-accent-purple-bg text-accent-purple-text'
+                    ? 'border-brass-border text-brass-text bg-surface-raised'
                     : 'border-divider bg-surface text-body hover:bg-surface-secondary'
                 }`}
               >
@@ -421,7 +434,7 @@ function SpiritSummonPanel({
         value={customName}
         onChange={e => onCustomNameChange(e.target.value)}
         placeholder={spiritPreview.name}
-        label="Custom Name (optional)"
+        label="Custom name (optional)"
       />
 
       <Button
@@ -432,7 +445,7 @@ function SpiritSummonPanel({
         disabled={isCreating}
       >
         {isCreating
-          ? 'Summoning...'
+          ? 'Summoning…'
           : `Summon ${customName || spiritPreview.name}`}
       </Button>
     </div>
@@ -473,12 +486,12 @@ function BestiarySearchPanel({
           Back to search
         </button>
 
-        <div className="border-accent-purple-border-strong bg-surface-raised rounded-lg border-2 p-3">
+        <div className="border-divider bg-surface-raised rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between">
             <h4 className="text-heading font-semibold">
               {selectedMonster.name}
             </h4>
-            <span className="text-accent-purple-text bg-accent-purple-bg rounded-full px-2 py-0.5 text-xs font-medium">
+            <span className="text-muted text-xs font-medium">
               CR {selectedMonster.cr}
             </span>
           </div>
@@ -504,7 +517,7 @@ function BestiarySearchPanel({
             {(['str', 'dex', 'con', 'int', 'wis', 'cha'] as const).map(
               ability => (
                 <div key={ability}>
-                  <span className="text-muted block text-[9px] font-medium uppercase">
+                  <span className="text-muted block text-[9px] font-medium">
                     {ability}
                   </span>
                   <span className="text-body text-xs">
@@ -530,7 +543,7 @@ function BestiarySearchPanel({
           value={customName}
           onChange={e => onCustomNameChange(e.target.value)}
           placeholder={selectedMonster.name}
-          label="Custom Name (optional)"
+          label="Custom name (optional)"
         />
 
         <Button
@@ -560,7 +573,7 @@ function BestiarySearchPanel({
       />
       <div className="max-h-72 space-y-1.5 overflow-y-auto">
         {isSearching && (
-          <p className="text-muted py-8 text-center text-sm">Searching...</p>
+          <p className="text-muted py-8 text-center text-sm">Searching…</p>
         )}
         {!isSearching &&
           monsterResults.length === 0 &&
@@ -584,11 +597,11 @@ function BestiarySearchPanel({
             <button
               key={m.id}
               onClick={() => onSelectMonster(m)}
-              className="border-divider bg-surface-raised hover:border-accent-purple-border hover:bg-accent-purple-bg w-full rounded-lg border px-3 py-2.5 text-left text-sm transition-all"
+              className="border-divider bg-surface-raised hover:border-divider-strong hover:bg-surface-hover w-full rounded-md border px-3 py-2.5 text-left text-sm transition-all"
             >
               <div className="flex items-center justify-between">
                 <span className="text-heading font-semibold">{m.name}</span>
-                <span className="text-accent-purple-text bg-accent-purple-bg rounded-full px-2 py-0.5 text-xs font-medium">
+                <span className="text-muted text-xs font-medium">
                   CR {m.cr}
                 </span>
               </div>
@@ -627,6 +640,27 @@ function SavedCreaturesPanel({
   onEdit: (c: SavedCreature) => void;
   onDelete: (id: string) => void;
 }) {
+  const createRef = useRef<HTMLButtonElement>(null);
+  const selectRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const focusAfterRemoval = useRef<string | 'create' | null>(null);
+  useLayoutEffect(() => {
+    const target = focusAfterRemoval.current;
+    if (!target) return;
+    (target === 'create'
+      ? createRef.current
+      : selectRefs.current[target]
+    )?.focus();
+    focusAfterRemoval.current = null;
+  }, [savedCreatures]);
+  const handleDelete = (id: string) => {
+    const index = savedCreatures.findIndex(creature => creature.id === id);
+    focusAfterRemoval.current =
+      savedCreatures[index + 1]?.id ??
+      savedCreatures[index - 1]?.id ??
+      'create';
+    onDelete(id);
+  };
+
   if (selectedCreature) {
     const mod = (score: number) => {
       const m = Math.floor((score - 10) / 2);
@@ -643,13 +677,13 @@ function SavedCreaturesPanel({
           Back to list
         </button>
 
-        <div className="border-accent-purple-border-strong bg-surface-raised rounded-lg border-2 p-3">
+        <div className="border-divider bg-surface-raised rounded-md border p-3">
           <div className="mb-2 flex items-center justify-between">
             <h4 className="text-heading font-semibold">
               {selectedCreature.name}
             </h4>
             {selectedCreature.cr && (
-              <span className="text-accent-purple-text bg-accent-purple-bg rounded-full px-2 py-0.5 text-xs font-medium">
+              <span className="text-muted text-xs font-medium">
                 CR {selectedCreature.cr}
               </span>
             )}
@@ -682,7 +716,7 @@ function SavedCreaturesPanel({
               ] as const
             ).map(([label, score]) => (
               <div key={label}>
-                <span className="text-muted block text-[9px] font-medium uppercase">
+                <span className="text-muted block text-[9px] font-medium">
                   {label}
                 </span>
                 <span className="text-body text-xs">
@@ -712,7 +746,7 @@ function SavedCreaturesPanel({
           value={customName}
           onChange={e => onCustomNameChange(e.target.value)}
           placeholder={selectedCreature.name}
-          label="Custom Name (optional)"
+          label="Custom name (optional)"
         />
 
         <Button
@@ -730,16 +764,17 @@ function SavedCreaturesPanel({
   return (
     <div className="space-y-3">
       <Button
+        ref={createRef}
         variant="outline"
         onClick={onCreateNew}
         leftIcon={<Plus size={14} />}
         fullWidth
       >
-        Create Custom Creature
+        Create creature
       </Button>
 
       {savedCreatures.length === 0 ? (
-        <div className="border-divider bg-surface-raised rounded-lg border p-6 text-center">
+        <div className="p-6 text-center">
           <Wand2 className="text-muted mx-auto mb-2 h-8 w-8" />
           <p className="text-muted text-sm">No saved creatures yet</p>
           <p className="text-faint mt-1 text-xs">
@@ -751,18 +786,22 @@ function SavedCreaturesPanel({
           {savedCreatures.map(creature => (
             <div
               key={creature.id}
-              className="border-divider bg-surface-raised hover:border-accent-purple-border group flex items-center gap-2 rounded-lg border transition-all"
+              className="border-divider bg-surface-raised flex items-center gap-2 rounded-md border"
             >
               <button
+                ref={element => {
+                  selectRefs.current[creature.id] = element;
+                }}
+                type="button"
                 onClick={() => onSelectCreature(creature)}
-                className="hover:bg-accent-purple-bg flex-1 rounded-l-lg px-3 py-2.5 text-left text-sm transition-colors"
+                className="hover:bg-surface-hover min-w-0 flex-1 rounded-l-lg px-3 py-2.5 text-left text-sm transition-colors"
               >
                 <div className="flex items-center justify-between">
-                  <span className="text-heading font-semibold">
+                  <span className="text-heading min-w-0 font-semibold break-words">
                     {creature.name}
                   </span>
                   {creature.cr && (
-                    <span className="text-accent-purple-text bg-accent-purple-bg rounded-full px-2 py-0.5 text-xs font-medium">
+                    <span className="text-muted text-xs font-medium">
                       CR {creature.cr}
                     </span>
                   )}
@@ -775,18 +814,20 @@ function SavedCreaturesPanel({
                   {creature.size} {creature.type}
                 </div>
               </button>
-              <div className="flex gap-1 pr-2 opacity-0 transition-opacity group-hover:opacity-100">
+              <div className="flex shrink-0 gap-1 pr-2">
                 <button
+                  type="button"
+                  aria-label={`Edit ${creature.name}`}
                   onClick={() => onEdit(creature)}
-                  className="text-muted hover:text-body rounded p-1 transition-colors"
-                  title="Edit"
+                  className="text-muted hover:text-body rounded p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
                   <Wand2 size={14} />
                 </button>
                 <button
-                  onClick={() => onDelete(creature.id)}
-                  className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
-                  title="Delete"
+                  type="button"
+                  aria-label={`Delete ${creature.name}`}
+                  onClick={() => handleDelete(creature.id)}
+                  className="text-muted hover:text-body rounded p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
                   <Trash2 size={14} />
                 </button>
