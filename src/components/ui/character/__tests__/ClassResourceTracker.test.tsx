@@ -114,4 +114,59 @@ describe('ClassResourceTracker', () => {
     ).toMatchObject({ collapsed: { 'class-resources': true } });
     expect(localStorage.getItem('subsection-class-resources')).toBeNull();
   });
+
+  it('stores Actions disclosures in device preferences and keeps the resource block between lists', () => {
+    const character = makeCharacter({
+      favoriteFeatureIds: ['pinned-feature'],
+      classes: [
+        {
+          className: 'Fighter',
+          level: 1,
+          isCustom: false,
+          hitDie: 10,
+          classSource: 'XPHB',
+        },
+      ],
+      totalLevel: 1,
+    });
+    const { container } = render(
+      <ActionsSection
+        character={character}
+        showAttackRoll={vi.fn()}
+        showSavingThrow={vi.fn()}
+        showDamageRoll={vi.fn()}
+        switchToTab={vi.fn()}
+        onStopConcentration={vi.fn()}
+        showClassResources
+        onUseClassResource={vi.fn()}
+        onRestoreClassResource={vi.fn()}
+        onResetClassResource={vi.fn()}
+      />
+    );
+
+    for (const [label, key] of [
+      ['Ready Weapons', 'actions-ready-weapons'],
+      ['Quick Features', 'actions-quick-features'],
+      ['Quick Spells', 'actions-quick-spells'],
+    ]) {
+      const disclosure = screen.getByRole('button', { name: label });
+      fireEvent.click(disclosure);
+      expect(disclosure).toHaveAttribute('aria-expanded', 'false');
+      expect(
+        JSON.parse(localStorage.getItem('rollkeeper-ui-prefs')!)
+      ).toMatchObject({
+        collapsed: { [key]: true },
+      });
+    }
+    expect(localStorage.getItem('subsection-ready-weapons')).toBeNull();
+    const headings = Array.from(container.querySelectorAll('h3')).map(
+      heading => heading.textContent
+    );
+    expect(headings.indexOf('Class Resources')).toBeGreaterThan(
+      headings.indexOf('Ready Weapons')
+    );
+    expect(headings.indexOf('Class Resources')).toBeLessThan(
+      headings.indexOf('Quick Features')
+    );
+  });
 });
