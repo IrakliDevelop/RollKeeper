@@ -67,7 +67,7 @@ export function SpellFormFields({
     <div className="space-y-6">
       {/* Basic Information */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Basic Information
         </h4>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -122,7 +122,7 @@ export function SpellFormFields({
 
       {/* Casting Details */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Casting Details
         </h4>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -176,7 +176,7 @@ export function SpellFormFields({
 
       {/* Components */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Components
         </h4>
         <div className="flex flex-wrap gap-4">
@@ -246,7 +246,7 @@ export function SpellFormFields({
 
       {/* Spell Properties */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Spell Properties
         </h4>
         <div className="flex flex-wrap gap-4">
@@ -299,7 +299,7 @@ export function SpellFormFields({
 
       {/* Casting Source */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Casting Source
         </h4>
         <Input
@@ -367,7 +367,7 @@ export function SpellFormFields({
 
       {/* Description */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Description
         </h4>
         <div>
@@ -396,7 +396,7 @@ export function SpellFormFields({
 
       {/* Combat Details */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider type-subheading text-heading border-b pb-2">
           Combat Details
         </h4>
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -572,7 +572,7 @@ function SpellTagEditor({
 
   return (
     <div className="space-y-4">
-      <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+      <h4 className="border-divider type-subheading text-heading border-b pb-2">
         Tags
       </h4>
       {tags.length > 0 && (
@@ -580,13 +580,13 @@ function SpellTagEditor({
           {tags.map(tag => (
             <span
               key={tag}
-              className="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-xs font-medium"
+              className="border-divider text-heading inline-flex items-center gap-1 rounded border px-1.5 text-xs font-medium"
             >
               {tag}
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
-                className="hover:text-accent-red-text"
+                className="text-muted hover:text-blood-text flex size-6 items-center justify-center pointer-coarse:size-11"
               >
                 <X className="h-3 w-3" />
               </button>
@@ -606,16 +606,16 @@ function SpellTagEditor({
             }
           }}
           placeholder="Add tag..."
-          className="border-divider bg-surface-raised text-body placeholder:text-faint w-full rounded-md border px-3 py-1.5 text-sm"
+          className="border-input-border bg-surface text-body placeholder:text-faint w-full rounded-md border px-3 py-1.5 text-sm pointer-coarse:text-base"
         />
         {showSuggestions && (
-          <div className="bg-surface-raised border-divider absolute top-full right-0 left-0 z-10 mt-1 overflow-hidden rounded-md border shadow-lg">
+          <div className="bg-surface-elevated border-divider absolute top-full right-0 left-0 z-10 mt-1 overflow-hidden rounded-md border shadow-lg">
             {suggestions.slice(0, 5).map(s => (
               <button
                 key={s}
                 type="button"
                 onClick={() => addTag(s)}
-                className="text-body hover:bg-surface-hover block w-full px-3 py-1.5 text-left text-sm"
+                className="text-body hover:bg-surface-hover block w-full px-3 py-1.5 text-left text-sm pointer-coarse:min-h-11"
               >
                 {s}
               </button>

@@ -1273,7 +1273,7 @@ export const SpellManagement: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Spell Autocomplete - Only show when adding new spell */}
               {!editingId && (
-                <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+                <div>
                   <SpellAutocomplete
                     spells={spellbookSpells}
                     onSelect={handleSpellSelect}

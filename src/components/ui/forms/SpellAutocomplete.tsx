@@ -23,20 +23,6 @@ interface SpellAutocompleteProps {
   className?: string;
 }
 
-// Level colors
-const LEVEL_COLORS: Record<number, string> = {
-  0: 'text-gray-500',
-  1: 'text-blue-500',
-  2: 'text-green-500',
-  3: 'text-yellow-500',
-  4: 'text-orange-500',
-  5: 'text-red-500',
-  6: 'text-purple-500',
-  7: 'text-pink-500',
-  8: 'text-cyan-500',
-  9: 'text-white',
-};
-
 export function SpellAutocomplete({
   spells,
   onSelect,
@@ -173,16 +159,14 @@ export function SpellAutocomplete({
     <div className={`relative ${className}`}>
       {/* Header with icon */}
       <div className="mb-2 flex items-center gap-2">
-        <Sparkles className="text-accent-purple-text-muted h-5 w-5" />
+        <Sparkles className="text-muted h-5 w-5" />
         <h4 className="text-body text-sm font-semibold">Search Spellbook</h4>
-        {loading && (
-          <Loader2 className="text-accent-purple-text-muted h-4 w-4 animate-spin" />
-        )}
+        {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
 
       {/* Selected spell display */}
       {selectedSpell && (
-        <div className="border-accent-purple-border-strong bg-accent-purple-bg mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2">
+        <div className="border-divider mb-2 flex items-center justify-between border-b py-2">
           <div className="flex items-center gap-2">
             <AppIcon
               name={getIconName(
@@ -204,7 +188,7 @@ export function SpellAutocomplete({
           </div>
           <button
             onClick={handleClear}
-            className="text-accent-purple-text-muted hover:bg-accent-purple-bg-strong hover:text-accent-purple-text rounded p-1"
+            className="text-muted hover:bg-surface-hover flex size-6 items-center justify-center rounded pointer-coarse:size-11"
             type="button"
           >
             <X className="h-4 w-4" />
@@ -225,12 +209,12 @@ export function SpellAutocomplete({
             onFocus={() => query && setIsOpen(true)}
             placeholder={placeholder}
             disabled={disabled || loading}
-            className="border-divider-strong text-heading focus:border-accent-purple-border-strong focus:ring-accent-purple-bg/20 disabled:bg-surface-inset w-full rounded-lg border py-2 pr-10 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
+            className="border-input-border bg-surface text-heading focus:border-brass-border disabled:bg-surface-inset w-full rounded-md border py-2 pr-11 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed pointer-coarse:text-base"
           />
           {query && (
             <button
               onClick={handleClear}
-              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+              className="text-muted hover:text-body absolute top-1/2 right-0 flex size-7 -translate-y-1/2 items-center justify-center pointer-coarse:size-11"
               type="button"
             >
               <X className="h-4 w-4" />
@@ -242,7 +226,7 @@ export function SpellAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border shadow-lg"
+            className="border-divider bg-surface-elevated absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-md border shadow-lg"
           >
             {filteredSpells.length > 0 ? (
               <ul className="py-1">
@@ -251,9 +235,9 @@ export function SpellAutocomplete({
                     <button
                       type="button"
                       onClick={() => handleSelect(spell)}
-                      className={`w-full px-4 py-2 text-left transition-colors ${
+                      className={`w-full px-4 py-2 text-left transition-colors pointer-coarse:min-h-11 ${
                         index === selectedIndex
-                          ? 'bg-accent-purple-bg-strong'
+                          ? 'bg-surface-hover'
                           : 'hover:bg-surface-hover'
                       }`}
                     >
@@ -271,7 +255,7 @@ export function SpellAutocomplete({
                             {spell.name}
                           </p>
                           <p className="text-muted text-xs">
-                            <span className={LEVEL_COLORS[spell.level]}>
+                            <span className="text-muted">
                               {spell.level === 0
                                 ? 'Cantrip'
                                 : `Level ${spell.level}`}
