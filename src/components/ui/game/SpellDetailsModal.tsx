@@ -54,7 +54,7 @@ export default function SpellDetailsModal({
         <DialogBody>
           <div className="space-y-6">
             <header className="space-y-3">
-              <h2 className="type-display text-heading">{spell.name}</h2>
+              <h2 className="type-title text-heading">{spell.name}</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="neutral" size="sm">
                   {spell.level === 0 ? 'Cantrip' : `Level ${spell.level}`}
@@ -99,7 +99,7 @@ export default function SpellDetailsModal({
                     />
                   }
                 >
-                  {isFavorite ? 'Favorite' : 'Add to favorites'}
+                  Favorite
                 </Button>
               )}
             </header>

@@ -23,6 +23,15 @@ interface SpellSlotTrackerProps {
   className?: string;
 }
 
+/** "2/4" after the pips; the pip group already names the count for screen readers. */
+function SlotCount({ max, used }: { max: number; used: number }) {
+  return (
+    <span aria-hidden="true" className="type-small text-muted tabular-nums">
+      {Math.max(0, max - used)}/{max}
+    </span>
+  );
+}
+
 /** The complete spell-slot ledger, used on the sheet and in DM NPC views. */
 export function SpellSlotTracker({
   spellSlots,
@@ -79,6 +88,7 @@ export function SpellSlotTracker({
                       : undefined
                   }
                 />
+                <SlotCount max={slot.max} used={slot.used} />
               </div>
             );
           })}
@@ -97,8 +107,7 @@ export function SpellSlotTracker({
       {hasPact && pactMagic && (
         <div
           className={cn(
-            'border-divider border-t pt-3',
-            levels.length > 0 && 'mt-4'
+            levels.length > 0 && 'border-divider mt-4 border-t pt-3'
           )}
         >
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -120,6 +129,7 @@ export function SpellSlotTracker({
                   : undefined
               }
             />
+            <SlotCount max={pactMagic.slots.max} used={pactMagic.slots.used} />
             {showResets && onResetPactMagic && (
               <Button
                 type="button"

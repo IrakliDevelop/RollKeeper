@@ -24,7 +24,8 @@ describe('SpellSlotTracker', () => {
     expect(screen.getByText('Spell slots')).toBeInTheDocument();
     expect(screen.getByText('Level 1')).toBeInTheDocument();
     expect(screen.queryByText('L1')).not.toBeInTheDocument();
-    expect(screen.queryByText('3/4')).not.toBeInTheDocument();
+    expect(screen.getByText('3/4')).toBeInTheDocument();
+    expect(screen.getByText('0/2')).toBeInTheDocument();
     expect(screen.queryByText('Level 4')).not.toBeInTheDocument();
     expect(
       screen.getByRole('img', { name: '3 of 4 level 1 slots available' })
@@ -119,5 +120,28 @@ describe('SpellSlotTracker', () => {
     expect(
       render(<SpellSlotTracker spellSlots={empty} />).container
     ).toBeEmptyDOMElement();
+  });
+
+  it('shows the pact count and draws no extra rule above a pact-only ledger', () => {
+    const { container } = render(
+      <SpellSlotTracker
+        spellSlots={{
+          ...spellSlots,
+          1: { max: 0, used: 0 },
+          2: { max: 0, used: 0 },
+          3: { max: 0, used: 0 },
+        }}
+        pactMagic={pactMagic}
+      />
+    );
+    expect(screen.getByText('1/2')).toBeInTheDocument();
+    expect(container.querySelector('.border-t')).toBeNull();
+  });
+
+  it('separates the pact row from regular levels with a rule', () => {
+    const { container } = render(
+      <SpellSlotTracker spellSlots={spellSlots} pactMagic={pactMagic} />
+    );
+    expect(container.querySelector('.border-t')).not.toBeNull();
   });
 });

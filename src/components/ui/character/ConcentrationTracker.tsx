@@ -44,7 +44,7 @@ export default function ConcentrationTracker({
             {concentration.spellName}
           </p>
           <div className="type-ui text-muted flex flex-wrap items-center gap-3">
-            {concentration.castAt && concentration.castAt > 0 && (
+            {(concentration.castAt ?? 0) > 0 && (
               <span>Level {concentration.castAt}</span>
             )}
             {concentration.startedAt && duration && (

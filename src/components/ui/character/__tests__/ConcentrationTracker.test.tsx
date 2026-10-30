@@ -22,4 +22,20 @@ describe('ConcentrationTracker', () => {
     fireEvent.click(screen.getByRole('button', { name: 'End concentration' }));
     expect(onStop).toHaveBeenCalledWith();
   });
+
+  it('shows no level line for a concentration cantrip (castAt 0)', () => {
+    const { container } = render(
+      <ConcentrationTracker
+        concentration={{
+          isConcentrating: true,
+          spellName: 'Guidance',
+          castAt: 0,
+        }}
+        onStopConcentration={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Guidance')).toBeInTheDocument();
+    expect(screen.queryByText(/^Level/)).not.toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/Guidance0|\b0\b/);
+  });
 });

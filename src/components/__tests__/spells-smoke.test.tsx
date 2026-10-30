@@ -150,6 +150,26 @@ describe('SpellDetailsModal', () => {
     expect(screen.getByText('More damage.')).toBeInTheDocument();
     expect(screen.getByText('PHB')).toBeInTheDocument();
   });
+  it('keeps one favorite name and styles the spell name as the title', () => {
+    render(
+      <SpellDetailsModal
+        spell={mockSpell}
+        isOpen
+        onClose={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        isFavorite={false}
+      />
+    );
+    expect(screen.getByRole('button', { name: 'Favorite' })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    expect(screen.queryByText('Add to favorites')).not.toBeInTheDocument();
+    const visibleTitle = screen
+      .getAllByRole('heading', { level: 2, name: 'Fireball' })
+      .find(heading => !heading.classList.contains('sr-only'));
+    expect(visibleTitle).toHaveClass('type-title');
+  });
   it('renders spell name and level when open', () => {
     const onClose = vi.fn();
     render(

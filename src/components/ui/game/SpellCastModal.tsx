@@ -23,6 +23,16 @@ import {
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
 
+/** Slot levels at or above the spell's level with a slot left, as "1,3". */
+function availableLevelsKey(spellLevel: number, spellSlots: SpellSlots) {
+  const levels: number[] = [];
+  for (let level = Math.max(1, spellLevel); level <= 9; level++) {
+    const slot = spellSlots[level as keyof SpellSlots];
+    if (slot.max > 0 && slot.used < slot.max) levels.push(level);
+  }
+  return levels.join(',');
+}
+
 interface SpellCastModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -74,14 +84,13 @@ export function SpellCastModal({
     : 0;
   const canPact = pactAvailable && pactRemaining > 0;
 
-  const availableLevels = React.useMemo(() => {
-    const levels: number[] = [];
-    for (let level = Math.max(1, spell.level); level <= 9; level++) {
-      const slot = spellSlots[level as keyof SpellSlots];
-      if (slot.max > 0 && slot.used < slot.max) levels.push(level);
-    }
-    return levels;
-  }, [spell.level, spellSlots]);
+  // Keyed on the level list, not the spellSlots object: a sync from another
+  // tab replaces that object and must not reset the player's choice.
+  const levelsKey = availableLevelsKey(spell.level, spellSlots);
+  const availableLevels = React.useMemo(
+    () => (levelsKey ? levelsKey.split(',').map(Number) : []),
+    [levelsKey]
+  );
 
   React.useEffect(() => {
     if (!isOpen) return;
@@ -342,17 +351,10 @@ export function SpellCastModal({
             )}
 
             {concentrationWarning && (
-              <div className="border-lapis-border border-l-2 pl-3">
-                <p className="type-ui text-lapis-text font-semibold">
-                  Ends your concentration
-                </p>
-                <p className="type-ui text-body mt-1">
-                  You are currently concentrating on{' '}
-                  <span className="font-medium">{concentration.spellName}</span>
-                  . Casting this spell will end your concentration on the
-                  previous spell.
-                </p>
-              </div>
+              <p className="border-lapis-border type-ui text-body border-l-2 pl-3">
+                Casting this ends your concentration on{' '}
+                <span className="font-medium">{concentration.spellName}</span>.
+              </p>
             )}
           </div>
         </DialogBody>

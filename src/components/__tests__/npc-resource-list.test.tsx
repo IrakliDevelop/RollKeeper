@@ -44,6 +44,22 @@ describe('NpcResourceList', () => {
     expect(onSpend).toHaveBeenCalledWith('res-1', 1);
   });
 
+  it('pips: renders one pip per use, even past 20', () => {
+    render(
+      <NpcResourceList
+        resources={[res({ name: 'Sorcery', maxUses: 25, usesExpended: 3 })]}
+        onSpend={vi.fn()}
+        onRestore={vi.fn()}
+      />
+    );
+    expect(
+      screen.getAllByRole('button', { name: /^Sorcery use/ })
+    ).toHaveLength(25);
+    expect(
+      screen.getByRole('button', { name: 'Sorcery use 23 (spent)' })
+    ).toBeInTheDocument();
+  });
+
   it('pool: renders remaining/max with −/+ and handles large values', async () => {
     const onSpend = vi.fn();
     const user = userEvent.setup();

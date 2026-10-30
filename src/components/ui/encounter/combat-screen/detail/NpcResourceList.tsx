@@ -40,47 +40,42 @@ export function NpcResourceList({
               </span>
               {res.displayStyle === 'pips' ? (
                 <div className="flex flex-wrap">
-                  {Array.from(
-                    { length: Math.min(res.maxUses, 20) },
-                    (_, index) => {
-                      const available = index < remaining;
-                      const dot = (
-                        <span
-                          aria-hidden="true"
-                          className={`size-2.5 rounded-full border-[1.5px] ${available ? CLASS_RESOURCE_STYLE.pipOn : CLASS_RESOURCE_STYLE.pipOff}`}
-                        />
-                      );
-                      const label = `${res.name} use ${index + 1} ${available ? '(available)' : '(spent)'}`;
-                      return readOnly ? (
-                        <span
-                          key={index}
-                          aria-label={label}
-                          className="flex min-h-6 min-w-6 items-center justify-center"
-                        >
-                          {dot}
-                        </span>
-                      ) : (
-                        <button
-                          key={index}
-                          type="button"
-                          aria-label={label}
-                          title={
-                            available
-                              ? `Spend ${res.name} use`
-                              : `Restore ${res.name} use`
-                          }
-                          onClick={() =>
-                            available
-                              ? onSpend(res.id, 1)
-                              : onRestore(res.id, 1)
-                          }
-                          className="focus-visible:outline-brass-border flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
-                        >
-                          {dot}
-                        </button>
-                      );
-                    }
-                  )}
+                  {Array.from({ length: res.maxUses }, (_, index) => {
+                    const available = index < remaining;
+                    const dot = (
+                      <span
+                        aria-hidden="true"
+                        className={`size-2.5 rounded-full border-[1.5px] ${available ? CLASS_RESOURCE_STYLE.pipOn : CLASS_RESOURCE_STYLE.pipOff}`}
+                      />
+                    );
+                    const label = `${res.name} use ${index + 1} ${available ? '(available)' : '(spent)'}`;
+                    return readOnly ? (
+                      <span
+                        key={index}
+                        aria-label={label}
+                        className="flex min-h-6 min-w-6 items-center justify-center"
+                      >
+                        {dot}
+                      </span>
+                    ) : (
+                      <button
+                        key={index}
+                        type="button"
+                        aria-label={label}
+                        title={
+                          available
+                            ? `Spend ${res.name} use`
+                            : `Restore ${res.name} use`
+                        }
+                        onClick={() =>
+                          available ? onSpend(res.id, 1) : onRestore(res.id, 1)
+                        }
+                        className="focus-visible:outline-brass-border flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                      >
+                        {dot}
+                      </button>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="flex items-center gap-1">
