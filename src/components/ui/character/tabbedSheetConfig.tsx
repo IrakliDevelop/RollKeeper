@@ -1009,14 +1009,14 @@ function CombatTabContent({
             </div>
           ),
           defenses: (
-            <div className="space-y-6">
+            <div className="grid items-start gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
               <ErrorBoundary fallback={<SheetLoadError thing="Buffs" />}>
                 <TemporaryBuffsManager />
               </ErrorBoundary>
               <ErrorBoundary
                 fallback={<SheetLoadError thing="Defenses and senses" />}
               >
-                <DefensesAndSenses />
+                <DefensesAndSenses editing={params.editing} />
               </ErrorBoundary>
             </div>
           ),
