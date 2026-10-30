@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { useNavigation } from '@/contexts/NavigationContext';
 import {
@@ -71,6 +71,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
     setWeaponChargeUsed,
   } = useCharacterStore();
   const { switchToTab } = useNavigation();
+  const weaponListId = useId();
 
   // State for charge detail modal
   const [selectedCharge, setSelectedCharge] = useState<{
@@ -325,7 +326,12 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
               <div className="min-w-0 flex-1">
                 {/* Title and badges */}
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <h4 className="text-heading font-semibold">{weapon.name}</h4>
+                  <h4
+                    id={`${weaponListId}-weapon-${index}`}
+                    className="text-heading font-semibold"
+                  >
+                    {weapon.name}
+                  </h4>
                   <Badge
                     variant="neutral"
                     size="sm"
@@ -531,7 +537,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       type="button"
                       variant="ghost"
                       size="xs"
-                      aria-label={`Move ${weapon.name} up`}
+                      aria-describedby={`${weaponListId}-weapon-${index}`}
                       disabled={index === 0}
                       className="pointer-coarse:min-h-11"
                       onClick={() =>
@@ -544,7 +550,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       type="button"
                       variant="ghost"
                       size="xs"
-                      aria-label={`Move ${weapon.name} down`}
+                      aria-describedby={`${weaponListId}-weapon-${index}`}
                       disabled={index === equippedWeapons.length - 1}
                       className="pointer-coarse:min-h-11"
                       onClick={() =>

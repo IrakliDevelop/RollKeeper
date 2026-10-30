@@ -586,6 +586,7 @@ function SpellTagEditor({
               <button
                 type="button"
                 onClick={() => removeTag(tag)}
+                aria-label={`Remove tag ${tag}`}
                 className="text-muted hover:text-blood-text flex size-6 items-center justify-center pointer-coarse:size-11"
               >
                 <X className="h-3 w-3" />

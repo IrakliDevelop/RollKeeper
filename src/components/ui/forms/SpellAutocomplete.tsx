@@ -7,12 +7,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { ProcessedSpell } from '@/types/spells';
-import { Search, X, Loader2, Sparkles } from 'lucide-react';
+import { Search, X, Loader2 } from 'lucide-react';
 import {
   AppIcon,
   SPELL_SCHOOL_ICONS,
   getIconName,
 } from '@/components/ui/icons';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 interface SpellAutocompleteProps {
   spells: ProcessedSpell[];
@@ -157,9 +158,8 @@ export function SpellAutocomplete({
 
   return (
     <div className={`relative ${className}`}>
-      {/* Header with icon */}
+      {/* Header */}
       <div className="mb-2 flex items-center gap-2">
-        <Sparkles className="text-muted h-5 w-5" />
         <h4 className="text-body text-sm font-semibold">Search Spellbook</h4>
         {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
@@ -188,6 +188,7 @@ export function SpellAutocomplete({
           </div>
           <button
             onClick={handleClear}
+            aria-label="Clear selected spell"
             className="text-muted hover:bg-surface-hover flex size-6 items-center justify-center rounded pointer-coarse:size-11"
             type="button"
           >
@@ -214,6 +215,7 @@ export function SpellAutocomplete({
           {query && (
             <button
               onClick={handleClear}
+              aria-label="Clear spell search"
               className="text-muted hover:text-body absolute top-1/2 right-0 flex size-7 -translate-y-1/2 items-center justify-center pointer-coarse:size-11"
               type="button"
             >
@@ -226,7 +228,7 @@ export function SpellAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-elevated absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-md border shadow-lg"
+            className={`${OVERLAY_SURFACE} absolute z-50 mt-1 max-h-96 w-full overflow-y-auto`}
           >
             {filteredSpells.length > 0 ? (
               <ul className="py-1">

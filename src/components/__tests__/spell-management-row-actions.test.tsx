@@ -40,13 +40,14 @@ describe('SpellManagement row actions', () => {
       }),
     });
     const { unmount, rerender } = render(<SpellManagement />);
-    expect(screen.queryByRole('button', { name: 'Move Shield up' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
     rerender(<SpellManagement editing />);
 
-    expect(
-      screen.getByRole('button', { name: 'Move Shield up' })
-    ).toBeDisabled();
-    const moveDown = screen.getByRole('button', { name: 'Move Shield down' });
+    const moveUp = screen.getAllByRole('button', { name: 'Move up' })[0];
+    expect(moveUp).toBeDisabled();
+    expect(moveUp).toHaveAccessibleDescription('Shield');
+    const moveDown = screen.getAllByRole('button', { name: 'Move down' })[0];
+    expect(moveDown).toHaveAccessibleDescription('Shield');
     expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
     fireEvent.click(moveDown);
     expect(
@@ -59,6 +60,33 @@ describe('SpellManagement row actions', () => {
       .getAllByText(/^(Ward|Shield)$/)
       .map(node => node.textContent);
     expect(names).toEqual(['Ward', 'Shield']);
+  });
+
+  it('moves within a level when other levels are interleaved in storage', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [
+          spell,
+          { ...spell, id: 'fireball', name: 'Fireball', level: 3 },
+          { ...spell, id: 'ward', name: 'Ward' },
+        ],
+      }),
+    });
+    render(<SpellManagement editing />);
+    const firstMoveDown = screen.getAllByRole('button', {
+      name: 'Move down',
+    })[0];
+    fireEvent.click(firstMoveDown);
+    expect(
+      useCharacterStore.getState().character.spells.map(s => s.name)
+    ).toEqual(['Fireball', 'Ward', 'Shield']);
+    expect(firstMoveDown).toHaveAccessibleDescription('Shield');
   });
 
   it('keeps favorite and preparation actions accessible beside a secondary Cast', () => {

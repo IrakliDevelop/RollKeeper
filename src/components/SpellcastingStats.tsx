@@ -33,7 +33,7 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
           <AppIcon name="prohibited" className="mx-auto mb-2 h-10 w-10" />
           <p className="text-body font-semibold">Not a spellcaster</p>
           <p className="mt-1 text-sm">
-            Select a spellcasting class to enable this section.
+            Add a spellcasting class to see spell attack and save DC.
           </p>
         </div>
       </Section>
@@ -207,7 +207,7 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
 
       {(!editing || !showOverrides) && currentAbility && (
         <div className="text-muted mt-3 space-y-1 text-sm">
-          <div className="text-heading font-medium">Calculations:</div>
+          <div className="text-heading font-medium">Breakdown</div>
           <div>
             Attack <span>{currentAbility} modifier + proficiency</span>
           </div>

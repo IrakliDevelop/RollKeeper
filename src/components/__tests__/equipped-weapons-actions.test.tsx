@@ -48,9 +48,7 @@ describe('EquippedWeapons actions', () => {
         <EquippedWeapons showAttackRoll={vi.fn()} showDamageRoll={vi.fn()} />
       </NavigationContext.Provider>
     );
-    expect(
-      screen.queryByRole('button', { name: 'Move Sun Blade up' })
-    ).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Move up' })).toBeNull();
     rerender(
       <NavigationContext.Provider value={{ switchToTab: vi.fn() }}>
         <EquippedWeapons
@@ -61,12 +59,11 @@ describe('EquippedWeapons actions', () => {
       </NavigationContext.Provider>
     );
 
-    expect(
-      screen.getByRole('button', { name: 'Move Sun Blade up' })
-    ).toBeDisabled();
-    const moveDown = screen.getByRole('button', {
-      name: 'Move Sun Blade down',
-    });
+    const moveUp = screen.getAllByRole('button', { name: 'Move up' })[0];
+    expect(moveUp).toBeDisabled();
+    expect(moveUp).toHaveAccessibleDescription('Sun Blade');
+    const moveDown = screen.getAllByRole('button', { name: 'Move down' })[0];
+    expect(moveDown).toHaveAccessibleDescription('Sun Blade');
     expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
     fireEvent.click(moveDown);
     expect(reorderWeapons).toHaveBeenCalledWith(0, 1);

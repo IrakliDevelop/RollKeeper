@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SpellcastingStats } from '@/components/SpellcastingStats';
 import { useCharacterStore } from '@/store/characterStore';
-import { makeWizard } from '@/utils/__tests__/test-utils';
+import { makeCharacter, makeWizard } from '@/utils/__tests__/test-utils';
 
 afterEach(cleanup);
 
@@ -28,6 +28,7 @@ describe('SpellcastingStats edit gate', () => {
     expect(screen.queryByPlaceholderText('Auto')).toBeNull();
     expect(screen.getByText('+7')).toBeInTheDocument();
     expect(screen.getByText('15')).toBeInTheDocument();
+    expect(screen.getByText('Breakdown')).toBeInTheDocument();
   });
 
   it('closes the override editor on leaving edit mode without changing the values', () => {
@@ -43,5 +44,15 @@ describe('SpellcastingStats edit gate', () => {
       useCharacterStore.getState().character.spellcastingStats
         .isAbilityOverridden
     ).toBe(false);
+  });
+
+  it('uses the approved noncaster guidance', () => {
+    useCharacterStore.setState({ character: makeCharacter() });
+    render(<SpellcastingStats />);
+    expect(
+      screen.getByText(
+        'Add a spellcasting class to see spell attack and save DC.'
+      )
+    ).toBeInTheDocument();
   });
 });

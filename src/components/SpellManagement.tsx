@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useId, useState, useMemo } from 'react';
 import { Spell } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -104,6 +104,7 @@ const initialFilters: SpellFilters = {
 
 const SpellCard: React.FC<{
   spell: Spell;
+  nameId: string;
   compact: boolean;
   isFavorite: boolean;
   totalLevel: number;
@@ -115,6 +116,7 @@ const SpellCard: React.FC<{
   onCast: () => void;
 }> = ({
   spell,
+  nameId,
   compact,
   isFavorite,
   totalLevel,
@@ -150,7 +152,7 @@ const SpellCard: React.FC<{
           </Button>
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="text-heading truncate font-bold">
+            <span id={nameId} className="text-heading truncate font-bold">
               {spell.name}
             </span>
             <Badge variant="neutral" size="sm" className="flex-shrink-0">
@@ -257,7 +259,9 @@ const SpellCard: React.FC<{
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </Button>
-            <h5 className="text-heading font-bold">{spell.name}</h5>
+            <h5 id={nameId} className="text-heading font-bold">
+              {spell.name}
+            </h5>
             <Badge variant="neutral" size="sm">
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
@@ -437,6 +441,7 @@ const LevelSection: React.FC<{
   slotMax,
   slotUsed,
 }) => {
+  const levelId = useId();
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
   const preparedCount = spells.filter(
@@ -500,6 +505,7 @@ const LevelSection: React.FC<{
                 <div className="min-w-0 flex-1">
                   <SpellCard
                     spell={spell}
+                    nameId={`${levelId}-spell-${index}`}
                     compact={compact}
                     isFavorite={favoriteSpells.includes(spell.id)}
                     totalLevel={totalLevel}
@@ -517,7 +523,7 @@ const LevelSection: React.FC<{
                       type="button"
                       variant="ghost"
                       size="xs"
-                      aria-label={`Move ${spell.name} up`}
+                      aria-describedby={`${levelId}-spell-${index}`}
                       disabled={index === 0}
                       className="pointer-coarse:min-h-11"
                       onClick={() => onReorder(index, index - 1)}
@@ -528,7 +534,7 @@ const LevelSection: React.FC<{
                       type="button"
                       variant="ghost"
                       size="xs"
-                      aria-label={`Move ${spell.name} down`}
+                      aria-describedby={`${levelId}-spell-${index}`}
                       disabled={index === spells.length - 1}
                       className="pointer-coarse:min-h-11"
                       onClick={() => onReorder(index, index + 1)}
@@ -1242,7 +1248,7 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
             {activeFilterCount > 0 && (
               <Button
                 onClick={clearFilters}
-                variant="primary"
+                variant="secondary"
                 size="md"
                 className="mt-4"
               >

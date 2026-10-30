@@ -8,7 +8,7 @@ afterEach(cleanup);
 describe('SpellAutocomplete', () => {
   it('keeps keyboard selection and gives results and clear controls touch targets', () => {
     const onSelect = vi.fn();
-    render(
+    const { container } = render(
       <SpellAutocomplete
         spells={[
           {
@@ -28,9 +28,17 @@ describe('SpellAutocomplete', () => {
     fireEvent.change(input, { target: { value: 'fire' } });
     const result = screen.getByRole('button', { name: /Fireball/ });
     expect(result).toHaveClass('pointer-coarse:min-h-11');
+    expect(result.closest('.shadow-overlay')).not.toBeNull();
+    expect(container.querySelector('.lucide-sparkles')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Clear spell search' })
+    ).toHaveClass('pointer-coarse:size-11');
     fireEvent.keyDown(input, { key: 'Enter' });
     expect(onSelect).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Fireball')).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Clear selected spell' })
+    ).toHaveClass('pointer-coarse:size-11');
     expect(input).toHaveClass('pointer-coarse:text-base');
   });
 });
