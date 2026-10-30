@@ -79,7 +79,7 @@ describe('EquippedWeapons actions', () => {
       restoreWeaponCharge,
       expendWeaponCharge,
     });
-    render(
+    const { container } = render(
       <NavigationContext.Provider value={{ switchToTab: vi.fn() }}>
         <EquippedWeapons
           showAttackRoll={vi.fn()}
@@ -89,6 +89,7 @@ describe('EquippedWeapons actions', () => {
     );
 
     const restore = screen.getByTitle('Restore charge');
+    expect(container.querySelector('.lucide-sparkles')).toBeNull();
     const spend = screen.getByTitle('Use charge');
     expect(restore).toHaveClass('pointer-coarse:min-h-11');
     expect(spend).toHaveClass('pointer-coarse:min-h-11');

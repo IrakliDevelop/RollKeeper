@@ -3,16 +3,7 @@
 import React, { useId, useState } from 'react';
 import { useCharacterStore } from '@/store/characterStore';
 import { useNavigation } from '@/contexts/NavigationContext';
-import {
-  Shield,
-  Dice6,
-  Zap,
-  Sparkles,
-  Clock,
-  Minus,
-  Plus,
-  Info,
-} from 'lucide-react';
+import { Shield, Dice6, Zap, Clock, Minus, Plus, Info } from 'lucide-react';
 import { Weapon, WeaponCharge } from '@/types/character';
 import { RollSummary } from '@/types/dice';
 import { appendModifier, d20Notation } from '@/utils/sheetRoll';
@@ -414,7 +405,6 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                             className="flex min-h-6 items-center gap-1.5 transition-opacity hover:opacity-80 pointer-coarse:min-h-11"
                             title="Click for details"
                           >
-                            <Sparkles size={12} className="text-muted" />
                             <span className="text-heading max-w-[120px] truncate text-xs font-medium">
                               {charge.name || 'Ability'}
                             </span>

@@ -31,7 +31,7 @@ describe('QuickSpells rows', () => {
         spellbook: { ...makeWizard().spellbook, favoriteSpells: [] },
       }),
     });
-    render(
+    const { container } = render(
       <QuickSpells
         showAttackRoll={vi.fn()}
         showSavingThrow={vi.fn()}
@@ -40,6 +40,7 @@ describe('QuickSpells rows', () => {
     );
 
     const favorite = screen.getByRole('button', { name: 'Favorite' });
+    expect(container.querySelector('.lucide-sparkles')).toBeNull();
     expect(favorite).toHaveClass('pointer-coarse:min-h-11');
     expect(screen.getByTitle('Cast spell')).toHaveAttribute(
       'data-variant',

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
@@ -610,7 +611,9 @@ function SpellTagEditor({
           className="border-input-border bg-surface text-body placeholder:text-faint w-full rounded-md border px-3 py-1.5 text-sm pointer-coarse:text-base"
         />
         {showSuggestions && (
-          <div className="bg-surface-elevated border-divider absolute top-full right-0 left-0 z-10 mt-1 overflow-hidden rounded-md border shadow-lg">
+          <div
+            className={`${OVERLAY_SURFACE} absolute top-full right-0 left-0 z-10 mt-1 overflow-hidden`}
+          >
             {suggestions.slice(0, 5).map(s => (
               <button
                 key={s}

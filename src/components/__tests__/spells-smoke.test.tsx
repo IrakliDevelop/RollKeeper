@@ -74,6 +74,24 @@ const mockSpell: Spell = {
 };
 
 describe('SpellFormFields', () => {
+  it('uses the shared floating surface for tag suggestions', () => {
+    render(
+      <SpellFormFields
+        formData={mockFormData}
+        onChange={vi.fn()}
+        tags={[]}
+        onTagsChange={vi.fn()}
+        existingTags={['ritual']}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText('Add tag...'), {
+      target: { value: 'rit' },
+    });
+    const suggestion = screen.getByRole('button', { name: 'ritual' });
+    expect(suggestion.closest('.shadow-overlay')).not.toBeNull();
+    expect(suggestion.closest('.shadow-lg')).toBeNull();
+  });
+
   it('names the tag removal control for screen readers', () => {
     const onTagsChange = vi.fn();
     render(

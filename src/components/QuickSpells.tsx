@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Sparkles,
   Dice6,
   Wand2,
   Search,
@@ -620,7 +619,6 @@ export function QuickSpells({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
-                <Sparkles size={16} className="text-muted" />
                 <Badge variant="neutral" size="sm">
                   Attack: +{spellAttackBonus ?? 0}
                 </Badge>
