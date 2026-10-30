@@ -274,7 +274,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
   if (equippedWeapons.length === 0) {
     return (
-      <div className="border-divider bg-surface-raised rounded-lg border p-6 text-center">
+      <div className="py-6 text-center">
         <AppIcon name="weapon" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading font-semibold">No weapons equipped</p>
         <p className="text-muted mt-1 text-sm">
@@ -290,8 +290,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         items={equippedWeapons}
         onReorder={handleReorderEquippedWeapons}
         keyExtractor={weapon => weapon.id}
-        className="space-y-3"
-        itemClassName="p-4 rounded-lg border-2 border-divider bg-surface-raised transition-all hover:shadow-md hover:border-divider-strong"
+        className="divide-divider divide-y"
+        itemClassName="py-4 pl-7"
         showDragHandle={true}
         dragHandlePosition="left"
         renderItem={weapon => {
@@ -319,20 +319,20 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
           const hasCharges = weapon.charges && weapon.charges.length > 0;
 
           return (
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 {/* Title and badges */}
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <h4 className="text-heading font-bold">{weapon.name}</h4>
+                <div className="mb-2 flex flex-wrap items-center gap-2">
+                  <h4 className="text-heading font-semibold">{weapon.name}</h4>
                   <Badge
-                    variant="success"
+                    variant="neutral"
                     size="sm"
                     leftIcon={<Shield size={12} />}
                   >
                     Equipped
                   </Badge>
                   {weapon.enhancementBonus > 0 && (
-                    <Badge variant="warning" size="sm">
+                    <Badge variant="neutral" size="sm">
                       +{weapon.enhancementBonus}
                     </Badge>
                   )}
@@ -345,12 +345,12 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 </div>
 
                 {/* Attack and Damage stats */}
-                <div className="mb-3 flex flex-wrap gap-x-6 gap-y-2 text-sm">
+                <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
                   <div className="flex items-center gap-1.5">
                     <span className="text-muted flex items-center gap-1">
                       <AppIcon name="attack" className="h-3.5 w-3.5" /> Attack:
                     </span>
-                    <span className="text-accent-red-text-muted font-bold">
+                    <span className="text-heading font-semibold">
                       {attackString}
                     </span>
                   </div>
@@ -358,19 +358,19 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                     <span className="text-muted flex items-center gap-1">
                       <AppIcon name="damage" className="h-3.5 w-3.5" /> Damage:
                     </span>
-                    <span className="text-accent-blue-text-muted font-bold">
+                    <span className="text-heading font-semibold">
                       {damageString}
                     </span>
                   </div>
                 </div>
 
                 {versatileDamageString && (
-                  <div className="mb-3 flex items-center gap-1.5 text-sm">
+                  <div className="mb-2 flex items-center gap-1.5 text-sm">
                     <span className="text-muted flex items-center gap-1">
                       <AppIcon name="weapon" className="h-3.5 w-3.5" />{' '}
                       Versatile:
                     </span>
-                    <span className="text-accent-purple-text-muted font-bold">
+                    <span className="text-heading font-semibold">
                       {versatileDamageString}
                     </span>
                   </div>
@@ -378,7 +378,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
 
                 {/* Charges display - compact with +/- controls */}
                 {hasCharges && (
-                  <div className="mb-3 flex flex-wrap gap-2">
+                  <div className="mb-2 flex flex-wrap gap-2">
                     {weapon.charges!.map(charge => {
                       const maxCharges = calculateWeaponChargeMax(
                         charge,
@@ -392,11 +392,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                       return (
                         <div
                           key={charge.id}
-                          className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
-                            isExhausted
-                              ? 'border-accent-red-border bg-accent-red-bg'
-                              : 'border-accent-indigo-border bg-accent-indigo-bg'
-                          }`}
+                          className="border-divider inline-flex min-w-0 flex-wrap items-center gap-1 border-b py-1"
                         >
                           {/* Clickable name to open details */}
                           <button
@@ -407,65 +403,48 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                                 charge,
                               })
                             }
-                            className="flex items-center gap-1.5 transition-opacity hover:opacity-80"
+                            className="flex min-h-6 items-center gap-1.5 transition-opacity hover:opacity-80 pointer-coarse:min-h-11"
                             title="Click for details"
                           >
-                            <Sparkles
-                              size={12}
-                              className={
-                                isExhausted
-                                  ? 'text-accent-red-text-muted'
-                                  : 'text-accent-indigo-text'
-                              }
-                            />
+                            <Sparkles size={12} className="text-muted" />
                             <span className="text-heading max-w-[120px] truncate text-xs font-medium">
                               {charge.name || 'Ability'}
                             </span>
                           </button>
 
                           {/* Charges counter with +/- buttons */}
-                          <div className="ml-1 flex items-center gap-0.5">
-                            <button
+                          <div className="ml-1 flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
                               onClick={e => {
                                 e.stopPropagation();
                                 restoreWeaponCharge(weapon.id, charge.id);
                               }}
                               disabled={isFull}
-                              className={`rounded p-0.5 ${
-                                isFull
-                                  ? 'text-faint cursor-not-allowed'
-                                  : 'text-accent-green-text hover:bg-accent-green-bg'
-                              }`}
+                              className="min-h-6 min-w-6 p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                               title="Restore charge"
                             >
                               <Plus size={12} />
-                            </button>
-                            <span
-                              className={`min-w-[28px] text-center text-xs font-bold ${
-                                isExhausted
-                                  ? 'text-accent-red-text-muted'
-                                  : chargesRemaining <= 1
-                                    ? 'text-accent-orange-text'
-                                    : 'text-accent-indigo-text'
-                              }`}
-                            >
+                            </Button>
+                            <span className="text-heading min-w-7 text-center text-xs font-semibold">
                               {chargesRemaining}/{maxCharges}
                             </span>
-                            <button
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="xs"
                               onClick={e => {
                                 e.stopPropagation();
                                 expendWeaponCharge(weapon.id, charge.id);
                               }}
                               disabled={isExhausted}
-                              className={`rounded p-0.5 ${
-                                isExhausted
-                                  ? 'text-faint cursor-not-allowed'
-                                  : 'text-accent-red-text-muted hover:bg-accent-red-bg'
-                              }`}
+                              className="min-h-6 min-w-6 p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                               title="Use charge"
                             >
                               <Minus size={12} />
-                            </button>
+                            </Button>
                           </div>
 
                           {/* Rest type indicator */}
@@ -495,23 +474,21 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
               </div>
 
               {/* Action buttons */}
-              <div className="flex flex-shrink-0 flex-col gap-2">
+              <div className="flex flex-wrap gap-2 sm:max-w-56 sm:justify-end">
                 <Button
                   onClick={() => rollWeaponAttack(weapon)}
                   variant="secondary"
                   size="sm"
                   leftIcon={<Dice6 size={14} />}
-                  className="min-w-[110px]"
                   title="Roll attack"
                 >
                   Attack
                 </Button>
                 <Button
                   onClick={() => rollWeaponDamage(weapon)}
-                  variant="warning"
+                  variant="secondary"
                   size="sm"
                   leftIcon={<Zap size={14} />}
-                  className="min-w-[110px]"
                   title="Roll damage"
                 >
                   Damage
@@ -530,10 +507,9 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 })() && (
                   <Button
                     onClick={() => rollWeaponDamage(weapon, true)}
-                    variant="primary"
+                    variant="secondary"
                     size="sm"
                     leftIcon={<Zap size={14} />}
-                    className="min-w-[110px]"
                     title="Roll versatile damage"
                   >
                     Versatile
@@ -541,9 +517,8 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 )}
                 <Button
                   onClick={() => equipWeapon(weapon.id, false)}
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
-                  className="border-accent-orange-border text-accent-orange-text hover:bg-accent-orange-bg min-w-[110px]"
                   title="Unequip weapon"
                 >
                   Unequip
