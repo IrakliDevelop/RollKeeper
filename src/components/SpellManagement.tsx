@@ -72,6 +72,7 @@ import {
 } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
 import { SlotPips } from '@/components/ui/game/SlotPips';
+import { Section } from '@/components/ui/layout/section';
 
 interface SpellFilters {
   searchQuery: string;
@@ -980,74 +981,19 @@ export const SpellManagement: React.FC = () => {
   }, [character.spells]);
 
   return (
-    <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow">
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
-            <BookOpen className="text-accent-purple-text-muted" size={24} />
-            Spells & Cantrips
-            <Badge variant="secondary" size="sm">
-              {filteredSpells.length} of {character.spells.length}
-            </Badge>
-            {preparedSpellsCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
-                {preparedSpellsCount} prepared
-              </Badge>
-            )}
-          </h3>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setCompactView(!compactView)}
-              variant={compactView ? 'primary' : 'ghost'}
-              size="sm"
-              title={
-                compactView
-                  ? 'Switch to detailed view'
-                  : 'Switch to compact view'
-              }
-            >
-              {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
-            </Button>
-
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant={
-                showFilters || activeFilterCount > 0 ? 'primary' : 'ghost'
-              }
-              size="sm"
-              leftIcon={<Filter size={16} />}
-            >
-              Filters
-              {activeFilterCount > 0 && (
-                <Badge
-                  variant="danger"
-                  size="sm"
-                  className="text-inverse ml-1 bg-red-500"
-                >
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-
-            <Button
-              onClick={() => setIsFormOpen(true)}
-              variant="primary"
-              size="sm"
-              leftIcon={<Plus size={16} />}
-            >
-              Add Spell
-            </Button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
+    <Section heading="Spells & Cantrips" level={3}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Badge variant="neutral" size="sm">
+          {filteredSpells.length} of {character.spells.length}
+        </Badge>
+        {preparedSpellsCount > 0 && (
+          <Badge variant="neutral" size="sm">
+            {preparedSpellsCount} prepared
+          </Badge>
+        )}
+      </div>
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-48">
           <Search className="text-faint pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             value={filters.searchQuery}
@@ -1058,31 +1004,60 @@ export const SpellManagement: React.FC = () => {
             className="pl-10"
           />
         </div>
+        <Button
+          onClick={() => setCompactView(!compactView)}
+          variant="ghost"
+          selected={!compactView}
+          aria-pressed={!compactView}
+          size="sm"
+          title={
+            compactView ? 'Switch to detailed view' : 'Switch to compact view'
+          }
+        >
+          {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
+        </Button>
+        <Button
+          onClick={() => setShowFilters(true)}
+          variant="ghost"
+          selected={showFilters || activeFilterCount > 0}
+          aria-expanded={showFilters}
+          size="sm"
+          leftIcon={<Filter size={16} />}
+        >
+          Filters
+          {activeFilterCount > 0 && (
+            <Badge variant="neutral" size="sm" className="ml-1">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          onClick={() => setIsFormOpen(true)}
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus size={16} />}
+        >
+          Add Spell
+        </Button>
+      </div>
 
-        {/* Advanced Filters */}
-        {showFilters && (
-          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-heading font-bold">Advanced Filters</h4>
-              <div className="flex items-center gap-2">
-                {activeFilterCount > 0 && (
-                  <Button
-                    onClick={clearFilters}
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<X size={14} />}
-                  >
-                    Clear All
-                  </Button>
-                )}
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>Advanced Filters</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div className="mb-4 flex justify-end">
+              {activeFilterCount > 0 && (
                 <Button
-                  onClick={() => setShowFilters(false)}
+                  onClick={clearFilters}
                   variant="ghost"
                   size="sm"
+                  leftIcon={<X size={14} />}
                 >
-                  <X size={16} />
+                  Clear All
                 </Button>
-              </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -1287,9 +1262,9 @@ export const SpellManagement: React.FC = () => {
                 </label>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
       {/* Spell List */}
       <div className="space-y-4">
@@ -1468,6 +1443,6 @@ export const SpellManagement: React.FC = () => {
           spellcastingAbilityMod={getSpellcastingAbilityModifier(character)}
         />
       )}
-    </div>
+    </Section>
   );
 };
