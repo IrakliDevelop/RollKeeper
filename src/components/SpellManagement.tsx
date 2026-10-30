@@ -135,38 +135,25 @@ const SpellCard: React.FC<{
 
   if (compact) {
     return (
-      <div
-        className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
-          isSpellPrepared(spell)
-            ? 'border-accent-green-border-strong bg-surface-raised'
-            : 'border-divider bg-surface-raised hover:border-accent-purple-border'
-        }`}
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button
+      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Button
             onClick={onToggleFavorite}
-            className={`flex-shrink-0 transition-colors ${
-              isFavorite
-                ? 'text-accent-yellow-text hover:text-accent-amber-text'
-                : 'text-faint hover:text-accent-yellow-text'
-            }`}
+            variant="ghost"
+            size="xs"
+            selected={isFavorite}
+            aria-label="Favorite"
+            aria-pressed={isFavorite}
+            className="shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-          </button>
+          </Button>
 
           <div className="flex min-w-0 flex-1 items-center gap-2">
             <span className="text-heading truncate font-bold">
               {spell.name}
             </span>
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text flex-shrink-0'
-                  : 'bg-accent-purple-bg text-accent-purple-text flex-shrink-0'
-              }
-            >
+            <Badge variant="neutral" size="sm" className="flex-shrink-0">
               {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
             </Badge>
             <span className="text-muted hidden flex-shrink-0 text-xs sm:inline">
@@ -177,18 +164,18 @@ const SpellCard: React.FC<{
           <div className="flex flex-shrink-0 items-center gap-1">
             {isAtWill && (
               <Badge
-                variant="info"
+                variant="neutral"
                 size="sm"
-                className="flex-shrink-0 gap-0.5 bg-emerald-100 text-emerald-700"
+                className="flex-shrink-0 gap-0.5"
               >
                 <Infinity size={10} /> At Will
               </Badge>
             )}
             {isInnate && (
               <Badge
-                variant="info"
+                variant="neutral"
                 size="sm"
-                className={`flex-shrink-0 gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+                className="flex-shrink-0 gap-0.5"
               >
                 <Zap size={10} /> {freeCastsRemaining}/{spell.freeCastMax}
               </Badge>
@@ -199,17 +186,17 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 R
               </Badge>
             )}
           </div>
         </div>
 
-        <div className="ml-2 flex flex-shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button
             onClick={onCast}
-            variant="primary"
+            variant="secondary"
             size="xs"
             title="Cast spell"
           >
@@ -237,13 +224,7 @@ const SpellCard: React.FC<{
           >
             <Eye size={14} />
           </Button>
-          <Button
-            onClick={onEdit}
-            variant="ghost"
-            size="xs"
-            title="Edit spell"
-            className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text"
-          >
+          <Button onClick={onEdit} variant="ghost" size="xs" title="Edit spell">
             <Edit2 size={14} />
           </Button>
           <Button
@@ -251,7 +232,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
-            className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
+            className="text-blood-text"
           >
             <Trash2 size={14} />
           </Button>
@@ -261,36 +242,23 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div
-      className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-        isSpellPrepared(spell)
-          ? 'border-accent-green-border-strong bg-surface-raised'
-          : 'border-divider bg-surface-raised hover:border-accent-purple-border'
-      }`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+    <div className="py-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <button
+            <Button
               onClick={onToggleFavorite}
-              className={`transition-colors ${
-                isFavorite
-                  ? 'text-accent-yellow-text hover:text-accent-amber-text'
-                  : 'text-faint hover:text-accent-yellow-text'
-              }`}
+              variant="ghost"
+              size="xs"
+              selected={isFavorite}
+              aria-label="Favorite"
+              aria-pressed={isFavorite}
+              className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
-            </button>
+            </Button>
             <h5 className="text-heading font-bold">{spell.name}</h5>
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
-                  : 'bg-accent-purple-bg text-accent-purple-text'
-              }
-            >
+            <Badge variant="neutral" size="sm">
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
             {spell.concentration && (
@@ -299,7 +267,7 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 Ritual
               </Badge>
             )}
@@ -309,29 +277,17 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {isAtWill && (
-              <Badge
-                variant="info"
-                size="sm"
-                className="gap-0.5 bg-emerald-100 text-emerald-700"
-              >
+              <Badge variant="neutral" size="sm" className="gap-0.5">
                 <Infinity size={12} /> At Will
               </Badge>
             )}
             {isInnate && (
-              <Badge
-                variant="info"
-                size="sm"
-                className={`gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
-              >
+              <Badge variant="neutral" size="sm" className="gap-0.5">
                 <Zap size={12} /> {freeCastsRemaining}/{spell.freeCastMax} free
               </Badge>
             )}
             {spell.castingSource && (
-              <Badge
-                variant="secondary"
-                size="sm"
-                className="bg-indigo-100 text-indigo-700"
-              >
+              <Badge variant="neutral" size="sm">
                 {spell.castingSource}
               </Badge>
             )}
@@ -386,10 +342,10 @@ const SpellCard: React.FC<{
           />
         </div>
 
-        <div className="ml-4 flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2 md:max-w-56 md:justify-end">
           <Button
             onClick={onCast}
-            variant="primary"
+            variant="secondary"
             size="sm"
             leftIcon={<Wand2 size={14} />}
           >
@@ -425,7 +381,6 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Edit spell"
-              className="border-accent-blue-border-strong text-accent-blue-text-muted hover:bg-accent-blue-bg"
             >
               <Edit2 size={16} />
             </Button>
@@ -434,7 +389,7 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Delete spell"
-              className="border-accent-red-border-strong text-accent-red-text-muted hover:bg-accent-red-bg"
+              className="text-blood-text"
             >
               <Trash2 size={16} />
             </Button>
@@ -482,15 +437,6 @@ const LevelSection: React.FC<{
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
-  const levelColor = isCantrip
-    ? 'text-accent-yellow-text'
-    : 'text-accent-purple-text';
-  const levelBg = isCantrip
-    ? 'bg-linear-to-r from-accent-yellow-bg to-accent-amber-bg'
-    : 'bg-linear-to-r from-accent-purple-bg to-accent-violet-bg';
-  const borderColor = isCantrip
-    ? 'border-accent-yellow-border'
-    : 'border-accent-purple-border';
   const preparedCount = spells.filter(
     s => s.isPrepared || s.isAlwaysPrepared
   ).length;
@@ -499,44 +445,27 @@ const LevelSection: React.FC<{
   const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
 
   return (
-    <div
-      className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
-    >
-      <div
-        className={`flex w-full items-center gap-3 p-4 ${levelBg} transition-all`}
-      >
+    <div>
+      <div className="border-divider flex w-full flex-wrap items-center gap-3 border-b pb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-3 hover:opacity-90"
+          aria-expanded={isExpanded}
+          className="text-heading flex min-h-6 items-center gap-3 hover:opacity-90 pointer-coarse:min-h-11"
         >
           <div className="flex items-center gap-2">
             {isExpanded ? (
-              <ChevronDown size={18} className={levelColor} />
+              <ChevronDown size={18} />
             ) : (
-              <ChevronRight size={18} className={levelColor} />
+              <ChevronRight size={18} />
             )}
-            <span className={`text-base font-bold ${levelColor}`}>
-              {levelName}
-            </span>
+            <span className="type-label-heading">{levelName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
-                  : 'bg-accent-purple-bg text-accent-purple-text'
-              }
-            >
+            <Badge variant="neutral" size="sm">
               {spells.length} spell{spells.length !== 1 ? 's' : ''}
             </Badge>
             {preparedCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
+              <Badge variant="neutral" size="sm">
                 {preparedCount} prepared
               </Badge>
             )}
@@ -547,11 +476,7 @@ const LevelSection: React.FC<{
         {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
             <SlotPips total={slotMax!} available={remaining} level={level} />
-            <span
-              className={`text-[10px] font-bold ${
-                remaining === 0 ? 'text-accent-red-text' : 'text-heading'
-              }`}
-            >
+            <span className="text-muted text-xs">
               {remaining}/{slotMax}
             </span>
           </div>
@@ -559,13 +484,13 @@ const LevelSection: React.FC<{
       </div>
 
       {isExpanded && (
-        <div className="border-divider bg-surface-raised border-t-2 p-4">
+        <div className="pt-2">
           <DragDropList
             items={spells}
             onReorder={onReorder}
             keyExtractor={spell => spell.id}
-            className={compact ? 'space-y-2' : 'space-y-3'}
-            itemClassName=""
+            className="divide-divider divide-y"
+            itemClassName="pl-6"
             showDragHandle={true}
             dragHandlePosition="left"
             renderItem={spell => (
