@@ -470,7 +470,7 @@ export function createTabbedSheetConfig(
       content: (
         <div className="space-y-6">
           <ErrorBoundary fallback={<SheetLoadError thing="Spellcasting" />}>
-            <SpellcastingStats />
+            <SpellcastingStats editing={params.editing} />
           </ErrorBoundary>
           {renderSlotTracker()}
           <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
