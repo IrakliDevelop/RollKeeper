@@ -1,16 +1,7 @@
 'use client';
 
-import React from 'react';
-import { ActiveCondition } from '@/types/character';
-import {
-  AlertTriangle,
-  Eye,
-  Minus,
-  Plus,
-  X,
-  Calendar,
-  FileText,
-} from 'lucide-react';
+import { Eye, Minus, Plus, X } from 'lucide-react';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import {
@@ -18,6 +9,7 @@ import {
   isConditionIconName,
 } from '@/utils/conditionIconRegistry';
 import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
+import type { ActiveCondition } from '@/types/character';
 
 interface ConditionCardProps {
   condition: ActiveCondition;
@@ -26,6 +18,7 @@ interface ConditionCardProps {
   onUpdateCount: (id: string, count: number) => void;
 }
 
+/** A condition row; the saved name and source are never truncated. */
 export function ConditionCard({
   condition,
   onView,
@@ -33,122 +26,105 @@ export function ConditionCard({
   onUpdateCount,
 }: ConditionCardProps) {
   const isBuff = condition.kind === 'buff';
-  const fullSourceName =
-    SPELL_SOURCE_BOOKS[condition.source] || condition.source;
-  const HeaderIcon = isConditionIconName(condition.icon)
+  const SourceIcon = isConditionIconName(condition.icon)
     ? CONDITION_ICON_REGISTRY[condition.icon]
-    : AlertTriangle;
+    : null;
+  const source = SPELL_SOURCE_BOOKS[condition.source] || condition.source;
 
   return (
     <div
-      className={`group bg-surface-raised rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-        isBuff
-          ? 'border-accent-emerald-border hover:border-accent-emerald-border-strong'
-          : 'border-accent-red-border hover:border-accent-red-border-strong'
-      }`}
+      role="listitem"
+      data-effect-row={condition.id}
+      className="border-divider flex min-w-0 flex-wrap items-start justify-between gap-x-3 gap-y-2 border-b py-3 pointer-coarse:min-h-11"
     >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0 flex-1">
-          {/* Header */}
-          <div className="mb-2 flex flex-wrap items-center gap-2">
-            <HeaderIcon
-              className={`h-4 w-4 shrink-0 ${
-                isBuff
-                  ? 'text-accent-emerald-text-muted'
-                  : 'text-accent-red-text-muted'
-              }`}
+      <div className="min-w-0 flex-[1_1_12rem]">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          {SourceIcon && (
+            <SourceIcon
+              aria-hidden="true"
+              className="text-muted size-4 shrink-0"
             />
-            <h4 className="text-heading truncate font-bold">
-              {condition.name}
-            </h4>
-            {condition.stackable && condition.count > 1 && (
-              <Badge variant="danger" size="sm">
-                Level {condition.count}
-              </Badge>
-            )}
-            {condition.notes && (
-              <Badge variant="info" size="sm" leftIcon={<FileText size={12} />}>
-                Notes
-              </Badge>
-            )}
-            {isBuff && (
-              <Badge variant="success" size="sm">
-                Buff
-              </Badge>
-            )}
-          </div>
-
-          {/* Metadata */}
-          <div className="space-y-1 text-sm">
-            <div className="text-muted flex items-center gap-2">
-              <span className="text-body font-medium">{fullSourceName}</span>
-            </div>
-            <div className="text-muted flex items-center gap-1.5">
-              <Calendar className="h-3 w-3" />
-              <span className="text-xs">
-                Applied: {new Date(condition.appliedAt).toLocaleDateString()}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Actions */}
-        <div className="flex items-start gap-1">
-          {/* Stackable controls */}
-          {condition.stackable && (
-            <div className="border-divider bg-surface-secondary flex items-center gap-1 rounded-lg border-2 p-1">
-              <Button
-                onClick={() =>
-                  onUpdateCount(condition.id, Math.max(1, condition.count - 1))
-                }
-                variant="ghost"
-                size="xs"
-                disabled={condition.count <= 1}
-                title="Decrease level"
-                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0 disabled:opacity-30"
-              >
-                <Minus className="h-3 w-3" />
-              </Button>
-              <span className="text-heading min-w-[1.5rem] text-center text-sm font-bold">
-                {condition.count}
-              </span>
-              <Button
-                onClick={() =>
-                  onUpdateCount(condition.id, Math.min(6, condition.count + 1))
-                }
-                variant="ghost"
-                size="xs"
-                disabled={condition.count >= 6}
-                title="Increase level"
-                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0 disabled:opacity-30"
-              >
-                <Plus className="h-3 w-3" />
-              </Button>
-            </div>
           )}
-
-          {/* View details */}
-          <Button
-            onClick={() => onView(condition)}
-            variant="ghost"
-            size="xs"
-            title="View details"
-            className="text-accent-blue-text-muted hover:bg-surface-hover hover:text-accent-blue-text h-8 w-8 p-0"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
-
-          {/* Remove */}
-          <Button
-            onClick={() => onRemove(condition.id)}
-            variant="ghost"
-            size="xs"
-            title="Remove condition"
-            className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-8 w-8 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {isBuff ? (
+            <Badge
+              variant="neutral"
+              size="sm"
+              className="max-w-full break-words"
+            >
+              {condition.name}
+            </Badge>
+          ) : (
+            <ConditionChip
+              name={condition.name}
+              stackCount={condition.stackable ? condition.count : undefined}
+            />
+          )}
+          {condition.notes && (
+            <Badge variant="neutral" size="sm">
+              Notes
+            </Badge>
+          )}
         </div>
+        <p className="type-small text-muted mt-1 break-words">
+          {source} · Applied{' '}
+          {new Date(condition.appliedAt).toLocaleDateString()}
+        </p>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+        {condition.stackable && (
+          <div
+            role="group"
+            aria-label={`${condition.name} level`}
+            className="flex items-center"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Lower ${condition.name} level`}
+              disabled={condition.count <= 1}
+              onClick={() =>
+                onUpdateCount(condition.id, Math.max(1, condition.count - 1))
+              }
+              className="min-w-6 px-2 pointer-coarse:min-w-11"
+            >
+              <Minus aria-hidden="true" className="size-4" />
+            </Button>
+            <span className="type-ui text-heading min-w-6 text-center tabular-nums">
+              {condition.count}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label={`Raise ${condition.name} level`}
+              disabled={condition.count >= 6}
+              onClick={() =>
+                onUpdateCount(condition.id, Math.min(6, condition.count + 1))
+              }
+              className="min-w-6 px-2 pointer-coarse:min-w-11"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+            </Button>
+          </div>
+        )}
+        <Button
+          variant="ghost"
+          size="sm"
+          data-effect-action="details"
+          aria-label={`Show ${condition.name} details`}
+          onClick={() => onView(condition)}
+          className="min-w-6 px-2 pointer-coarse:min-w-11"
+        >
+          <Eye aria-hidden="true" className="size-4" />
+        </Button>
+        <Button
+          variant="danger"
+          size="sm"
+          aria-label={`Remove ${condition.name}`}
+          onClick={() => onRemove(condition.id)}
+          className="min-w-6 px-2 pointer-coarse:min-w-11"
+        >
+          <X aria-hidden="true" className="size-4" />
+        </Button>
       </div>
     </div>
   );
