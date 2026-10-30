@@ -159,4 +159,59 @@ describe('Summons combat effects', () => {
       )
     );
   });
+
+  it('uses rendered group order for dismissal focus and skips hidden wild shapes', async () => {
+    const user = userEvent.setup();
+    const other = {
+      ...summon,
+      id: 'other',
+      requiresConcentration: false,
+      entity: { ...summon.entity, id: 'other-entity', name: 'Other summon' },
+    };
+    const familiar = {
+      ...summon,
+      id: 'familiar',
+      type: 'familiar' as const,
+      requiresConcentration: false,
+      entity: { ...summon.entity, id: 'familiar-entity', name: 'Familiar' },
+    };
+    const wildShape = {
+      ...summon,
+      id: 'wild',
+      type: 'wild-shape' as const,
+      entity: { ...summon.entity, id: 'wild-entity', name: 'Wild shape' },
+    };
+    useCharacterStore.setState(state => ({
+      character: {
+        ...state.character,
+        summons: [other, familiar, wildShape, summon],
+      },
+    }));
+    render(<SummonsSubTab />);
+    expect(
+      screen.getAllByRole('button', { name: 'Dismiss summon' })
+    ).toHaveLength(3);
+    await user.click(
+      screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+      )
+    );
+    await user.click(
+      screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+    );
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: 'Dismiss summon' })
+      )
+    );
+    await user.click(screen.getByRole('button', { name: 'Dismiss summon' }));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', { name: /Saved creatures/ })
+      )
+    );
+  });
 });

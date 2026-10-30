@@ -40,6 +40,18 @@ export function SummonsSubTab() {
 
   const summons = character.summons || EMPTY_SUMMONS;
   const savedCreatures = character.savedCreatures ?? EMPTY_SAVED_CREATURES;
+  const familiars = summons.filter(s => s.type === 'familiar');
+  const concentrationSummons = summons.filter(
+    s => s.type === 'summon' && s.requiresConcentration
+  );
+  const otherSummons = summons.filter(
+    s => s.type === 'summon' && !s.requiresConcentration
+  );
+  const displayedSummons = [
+    ...familiars,
+    ...concentrationSummons,
+    ...otherSummons,
+  ];
 
   const [showSaved, setShowSaved] = useState(false);
   const savedToggleRef = useRef<HTMLButtonElement>(null);
@@ -62,19 +74,22 @@ export function SummonsSubTab() {
   useLayoutEffect(() => {
     const target = focusAfterDismiss.current;
     if (!target) return;
-    (target === 'saved'
-      ? savedToggleRef.current
-      : summonRefs.current[target]?.querySelector<HTMLButtonElement>(
-          'button[aria-label^="Dismiss"]'
-        )
-    )?.focus();
+    const targetButton =
+      target === 'saved'
+        ? savedToggleRef.current
+        : summonRefs.current[target]?.querySelector<HTMLButtonElement>(
+            'button[aria-label="Dismiss summon"]'
+          );
+    (targetButton ?? savedToggleRef.current)?.focus();
     focusAfterDismiss.current = null;
   }, [summons]);
 
   const handleDismiss = (id: string) => {
-    const index = summons.findIndex(summon => summon.id === id);
+    const index = displayedSummons.findIndex(summon => summon.id === id);
     focusAfterDismiss.current =
-      summons[index + 1]?.id ?? summons[index - 1]?.id ?? 'saved';
+      displayedSummons[index + 1]?.id ??
+      displayedSummons[index - 1]?.id ??
+      'saved';
     removeSummon(id);
   };
 
@@ -100,14 +115,6 @@ export function SummonsSubTab() {
     setCreatorOpen(false);
     setEditingCreature(null);
   };
-
-  const familiars = summons.filter(s => s.type === 'familiar');
-  const concentrationSummons = summons.filter(
-    s => s.type === 'summon' && s.requiresConcentration
-  );
-  const otherSummons = summons.filter(
-    s => s.type === 'summon' && !s.requiresConcentration
-  );
 
   const renderSummon = (s: (typeof summons)[number]) => (
     <div
@@ -170,7 +177,7 @@ export function SummonsSubTab() {
           type="button"
           aria-expanded={showSaved}
           onClick={() => setShowSaved(!showSaved)}
-          className="text-heading hover:text-body flex w-full items-center justify-between text-sm font-medium transition-colors"
+          className="text-heading hover:text-body focus-visible:outline-ring flex w-full items-center justify-between text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
         >
           <span className="flex items-center gap-1.5">
             <Wand2 size={14} />
