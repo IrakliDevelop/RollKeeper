@@ -1,11 +1,9 @@
 'use client';
 
-import React from 'react';
 import { Minus, Plus } from 'lucide-react';
-import {
-  CLASS_RESOURCE_ICONS,
-  CLASS_RESOURCE_COLORS,
-} from '@/components/ui/character/classResourceStyles';
+import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
+import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import type { NpcResource } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
 
@@ -17,11 +15,7 @@ export interface NpcResourceListProps {
   readOnly?: boolean;
 }
 
-/**
- * Generic class-resource tracker: pips (click to spend/restore) for
- * displayStyle 'pips', n/max with −/+ for 'pool'. Used by the encounter
- * detail panel and the NPC detail dialog.
- */
+/** Compact NPC resource rows shared by encounter and NPC detail views. */
 export function NpcResourceList({
   resources,
   onSpend,
@@ -31,94 +25,94 @@ export function NpcResourceList({
   if (resources.length === 0) return null;
 
   return (
-    <div className="space-y-1">
-      <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Class Resources
-      </h4>
-      {resources.map(res => {
-        const Icon = CLASS_RESOURCE_ICONS[res.icon];
-        const colorClasses = CLASS_RESOURCE_COLORS[res.color];
-        const remaining = Math.max(0, res.maxUses - res.usesExpended);
-
-        return (
-          <div
-            key={res.id}
-            className="bg-surface-raised flex items-center justify-between gap-2 rounded px-2 py-1.5 shadow-sm"
-          >
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span
-                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded ${colorClasses.iconBg}`}
-              >
-                <Icon size={12} aria-hidden />
-              </span>
-              <span className="text-body truncate text-sm font-medium">
+    <Section heading="Class Resources" level={4}>
+      <div className="divide-divider divide-y">
+        {resources.map(res => {
+          const remaining = Math.max(0, res.maxUses - res.usesExpended);
+          return (
+            <div
+              key={res.id}
+              data-resource-row
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 py-1"
+            >
+              <span className="type-ui text-heading w-40 min-w-0 font-semibold">
                 {res.name}
               </span>
-            </div>
-            {res.displayStyle === 'pips' ? (
-              <div className="flex flex-wrap items-center justify-end gap-1">
-                {Array.from({ length: res.maxUses }).map((_, i) => {
-                  const isSpent = i < res.usesExpended;
-                  const pipClass = `h-4 w-4 rounded-full border-2 transition-colors ${
-                    isSpent ? colorClasses.pipOff : colorClasses.pipOn
-                  }`;
-                  if (readOnly) {
-                    return (
+              {res.displayStyle === 'pips' ? (
+                <div className="flex flex-wrap">
+                  {Array.from({ length: res.maxUses }, (_, index) => {
+                    const available = index < remaining;
+                    const dot = (
                       <span
-                        key={i}
-                        aria-label={`${res.name} use ${i + 1} ${isSpent ? '(spent)' : '(available)'}`}
-                        className={pipClass}
+                        aria-hidden="true"
+                        className={`size-2.5 rounded-full border-[1.5px] ${available ? CLASS_RESOURCE_STYLE.pipOn : CLASS_RESOURCE_STYLE.pipOff}`}
                       />
                     );
-                  }
-                  return (
-                    <button
-                      key={i}
-                      onClick={() =>
-                        isSpent ? onRestore(res.id, 1) : onSpend(res.id, 1)
-                      }
-                      title={
-                        isSpent
-                          ? `Restore ${res.name} use`
-                          : `Spend ${res.name} use`
-                      }
-                      aria-label={`${res.name} use ${i + 1} ${isSpent ? '(spent)' : '(available)'}`}
-                      className={pipClass}
-                    />
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="flex shrink-0 items-center gap-1.5">
-                {!readOnly && (
-                  <button
-                    onClick={() => onSpend(res.id, 1)}
-                    disabled={remaining === 0}
-                    aria-label={`Spend ${res.name}`}
-                    className="border-divider text-muted hover:text-body disabled:text-faint rounded border p-0.5 disabled:cursor-not-allowed"
-                  >
-                    <Minus size={12} aria-hidden />
-                  </button>
-                )}
-                <span className="text-body text-sm font-semibold tabular-nums">
-                  {remaining}/{res.maxUses}
-                </span>
-                {!readOnly && (
-                  <button
-                    onClick={() => onRestore(res.id, 1)}
-                    disabled={res.usesExpended === 0}
-                    aria-label={`Restore ${res.name}`}
-                    className="border-divider text-muted hover:text-body disabled:text-faint rounded border p-0.5 disabled:cursor-not-allowed"
-                  >
-                    <Plus size={12} aria-hidden />
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
+                    const label = `${res.name} use ${index + 1} ${available ? '(available)' : '(spent)'}`;
+                    return readOnly ? (
+                      <span
+                        key={index}
+                        aria-label={label}
+                        className="flex min-h-6 min-w-6 items-center justify-center"
+                      >
+                        {dot}
+                      </span>
+                    ) : (
+                      <button
+                        key={index}
+                        type="button"
+                        aria-label={label}
+                        title={
+                          available
+                            ? `Spend ${res.name} use`
+                            : `Restore ${res.name} use`
+                        }
+                        onClick={() =>
+                          available ? onSpend(res.id, 1) : onRestore(res.id, 1)
+                        }
+                        className="focus-visible:outline-brass-border flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                      >
+                        {dot}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex items-center gap-1">
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-11 px-0 pointer-coarse:min-h-11"
+                      onClick={() => onSpend(res.id, 1)}
+                      disabled={remaining === 0}
+                      aria-label={`Spend ${res.name}`}
+                    >
+                      <Minus size={14} aria-hidden="true" />
+                    </Button>
+                  )}
+                  <span className="type-ui text-heading min-w-14 text-center tabular-nums">
+                    {remaining}/{res.maxUses}
+                  </span>
+                  {!readOnly && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="w-11 px-0 pointer-coarse:min-h-11"
+                      onClick={() => onRestore(res.id, 1)}
+                      disabled={res.usesExpended === 0}
+                      aria-label={`Restore ${res.name}`}
+                    >
+                      <Plus size={14} aria-hidden="true" />
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </Section>
   );
 }
 

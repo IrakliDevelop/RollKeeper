@@ -71,6 +71,7 @@ import {
   confirmDialog,
 } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 
 interface SpellFilters {
   searchQuery: string;
@@ -192,7 +193,7 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {spell.concentration && (
-              <Badge variant="warning" size="sm">
+              <Badge variant="magic" size="sm">
                 C
               </Badge>
             )}
@@ -292,7 +293,7 @@ const SpellCard: React.FC<{
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
             {spell.concentration && (
-              <Badge variant="warning" size="sm">
+              <Badge variant="magic" size="sm">
                 Concentration
               </Badge>
             )}
@@ -460,7 +461,6 @@ const LevelSection: React.FC<{
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
   slotMax?: number;
   slotUsed?: number;
-  onSlotChange?: (delta: number) => void;
 }> = ({
   level,
   spells,
@@ -478,7 +478,6 @@ const LevelSection: React.FC<{
   onReorder,
   slotMax,
   slotUsed,
-  onSlotChange,
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
@@ -544,31 +543,9 @@ const LevelSection: React.FC<{
         </button>
 
         {/* Inline slot dots */}
-        {hasSlots && onSlotChange && (
+        {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
-            <div className="flex gap-1">
-              {Array.from({ length: slotMax! }, (_, index) => {
-                const isUsed = index < (slotUsed ?? 0);
-                return (
-                  <button
-                    key={index}
-                    type="button"
-                    onClick={() => {
-                      const newUsed = isUsed ? (slotUsed ?? 0) - 1 : index + 1;
-                      const clamped = Math.max(0, Math.min(newUsed, slotMax!));
-                      const delta = clamped - (slotUsed ?? 0);
-                      if (delta !== 0) onSlotChange(delta);
-                    }}
-                    className={`h-4 w-4 cursor-pointer rounded-full border-2 transition-all ${
-                      isUsed
-                        ? 'border-red-500 bg-red-500 opacity-70 hover:scale-110'
-                        : 'border-emerald-400 bg-emerald-400 shadow-[0_0_4px_rgba(52,211,153,0.4)] hover:scale-110'
-                    }`}
-                    title={`Slot ${index + 1} — ${isUsed ? 'Used' : 'Available'}`}
-                  />
-                );
-              })}
-            </div>
+            <SlotPips total={slotMax!} available={remaining} level={level} />
             <span
               className={`text-[10px] font-bold ${
                 remaining === 0 ? 'text-accent-red-text' : 'text-heading'
@@ -618,7 +595,7 @@ export const SpellManagement: React.FC = () => {
     reorderSpells,
     toggleSpellFavorite,
     spendSpellSlot,
-    restoreSpellSlot,
+    spendPactMagicSlot,
     startConcentration,
     stopConcentration,
     toggleReaction,
@@ -916,7 +893,8 @@ export const SpellManagement: React.FC = () => {
   const handleCastSpellConfirm = (
     spellLevel: number,
     useFreecast: boolean,
-    isRitual?: boolean
+    isRitual?: boolean,
+    usePact?: boolean
   ) => {
     if (!selectedSpell) return;
     if (!consumeInventoryCost(selectedSpell.inventoryCost)) {
@@ -935,6 +913,8 @@ export const SpellManagement: React.FC = () => {
 
     if (isRitual) {
       // Ritual casting: no slot consumed, no freecast used
+    } else if (usePact) {
+      spendPactMagicSlot();
     } else if (useFreecast) {
       if (selectedSpell.freeCastMax && selectedSpell.freeCastMax > 0) {
         updateCharacter({
@@ -1371,16 +1351,6 @@ export const SpellManagement: React.FC = () => {
                     ]?.used
                   : undefined
               }
-              onSlotChange={
-                level > 0
-                  ? delta => {
-                      const slotLevel =
-                        level as keyof typeof character.spellSlots;
-                      if (delta > 0) spendSpellSlot(slotLevel, delta);
-                      else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
-                    }
-                  : undefined
-              }
             />
           ))
         )}
@@ -1475,6 +1445,7 @@ export const SpellManagement: React.FC = () => {
           }}
           spell={selectedSpell}
           spellSlots={character.spellSlots}
+          pactMagic={character.pactMagic}
           concentration={character.concentration}
           hasUsedReaction={character.reaction?.hasUsedReaction}
           onCastSpell={handleCastSpellConfirm}

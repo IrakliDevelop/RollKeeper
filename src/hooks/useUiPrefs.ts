@@ -15,11 +15,14 @@ export interface UiPrefs {
   /** Which number an ability shows large: the modifier or the score. */
   abilityDisplay: 'modifier' | 'score';
   collapsed: Record<string, boolean>;
+  /** Spell-slot tracker disclosure, shared by the Actions and Spells tabs. */
+  spellSlotsExpanded: boolean;
 }
 
 export const DEFAULT_UI_PREFS: UiPrefs = {
   abilityDisplay: 'modifier',
   collapsed: {},
+  spellSlotsExpanded: false,
 };
 
 type Validators = { [K in keyof UiPrefs]: (value: unknown) => boolean };
@@ -31,6 +34,7 @@ const VALIDATORS: Validators = {
     value !== null &&
     !Array.isArray(value) &&
     Object.values(value).every(item => typeof item === 'boolean'),
+  spellSlotsExpanded: value => typeof value === 'boolean',
 };
 
 function parseObject(raw: string | null): Record<string, unknown> | null {

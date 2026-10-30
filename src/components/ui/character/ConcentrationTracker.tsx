@@ -1,8 +1,10 @@
 'use client';
 
-import React from 'react';
-import { Brain, X, Clock } from 'lucide-react';
-import { ConcentrationState } from '@/types/character';
+import { useEffect, useState } from 'react';
+import { Clock } from 'lucide-react';
+import type { ConcentrationState } from '@/types/character';
+import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 
 interface ConcentrationTrackerProps {
   concentration: ConcentrationState;
@@ -10,83 +12,68 @@ interface ConcentrationTrackerProps {
   className?: string;
 }
 
+function elapsedTime(startedAt: string, now: number): string {
+  const elapsed = Math.max(0, now - new Date(startedAt).getTime());
+  const minutes = Math.floor(elapsed / 60000);
+  const seconds = Math.floor((elapsed % 60000) / 1000);
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
 export default function ConcentrationTracker({
   concentration,
   onStopConcentration,
-  className = '',
+  className,
 }: ConcentrationTrackerProps) {
-  if (!concentration.isConcentrating) {
-    return null;
-  }
+  const [duration, setDuration] = useState('');
+  useEffect(() => {
+    if (!concentration.isConcentrating || !concentration.startedAt) return;
+    const tick = () =>
+      setDuration(elapsedTime(concentration.startedAt!, Date.now()));
+    tick();
+    const timer = window.setInterval(tick, 1000);
+    return () => window.clearInterval(timer);
+  }, [concentration.isConcentrating, concentration.startedAt]);
 
-  // Calculate duration if startedAt is available
-  const getDuration = () => {
-    if (!concentration.startedAt) return '';
-
-    const start = new Date(concentration.startedAt);
-    const now = new Date();
-    const diffMs = now.getTime() - start.getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
-    const diffSeconds = Math.floor((diffMs % (1000 * 60)) / 1000);
-
-    if (diffMinutes > 0) {
-      return `${diffMinutes}m ${diffSeconds}s`;
-    }
-    return `${diffSeconds}s`;
-  };
+  if (!concentration.isConcentrating) return null;
 
   return (
-    <div
-      className={`border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border bg-gradient-to-r p-4 ${className}`}
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Brain className="text-accent-amber-text-muted" size={20} />
-            <div>
-              <h3 className="text-accent-amber-text font-semibold">
-                Concentrating
-              </h3>
-              <div className="text-accent-amber-text-muted flex items-center gap-2 text-sm">
-                <span className="font-medium">{concentration.spellName}</span>
-                {concentration.castAt && concentration.castAt > 0 && (
-                  <>
-                    <span>•</span>
-                    <span>Level {concentration.castAt}</span>
-                  </>
-                )}
-                {concentration.startedAt && (
-                  <>
-                    <span>•</span>
-                    <div className="flex items-center gap-1">
-                      <Clock size={12} />
-                      <span>{getDuration()}</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+    <Section heading="Concentrating" level={3} className={className}>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-3">
+          <p className="type-subheading text-lapis-text">
+            {concentration.spellName}
+          </p>
+          <div className="type-ui text-muted flex flex-wrap items-center gap-3">
+            {(concentration.castAt ?? 0) > 0 && (
+              <span>Level {concentration.castAt}</span>
+            )}
+            {concentration.startedAt && duration && (
+              <span className="inline-flex items-center gap-1">
+                <Clock size={14} aria-hidden="true" />
+                {duration}
+              </span>
+            )}
           </div>
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => onStopConcentration()}
+          >
+            End concentration
+          </Button>
         </div>
-
-        <button
-          onClick={onStopConcentration}
-          className="border-accent-amber-border-strong bg-accent-amber-bg-strong text-accent-amber-text-muted hover:bg-accent-amber-bg-strong/80 flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors"
-          title="End concentration"
-        >
-          <X size={14} />
-          End
-        </button>
+        <div>
+          <h4 className="type-label-heading text-heading">
+            Concentration rules
+          </h4>
+          <ul className="type-ui text-body mt-2 list-disc space-y-1 pl-5">
+            <li>Taking damage may require a Constitution saving throw</li>
+            <li>Casting another concentration spell ends this one</li>
+            <li>Being incapacitated or killed ends concentration</li>
+          </ul>
+        </div>
       </div>
-
-      <div className="bg-accent-amber-bg-strong text-accent-amber-text-muted mt-3 rounded-md px-3 py-2 text-xs">
-        <p className="mb-1 font-medium">Concentration Rules:</p>
-        <ul className="text-accent-amber-text-muted space-y-1">
-          <li>• Taking damage may require a Constitution saving throw</li>
-          <li>• Casting another concentration spell ends this one</li>
-          <li>• Being incapacitated or killed ends concentration</li>
-        </ul>
-      </div>
-    </div>
+    </Section>
   );
 }

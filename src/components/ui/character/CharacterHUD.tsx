@@ -34,7 +34,7 @@ import { getActiveClassResources } from '@/utils/classResources';
 import { cn } from '@/utils/cn';
 import {
   CLASS_RESOURCE_ICONS,
-  CLASS_RESOURCE_COLORS,
+  CLASS_RESOURCE_STYLE,
 } from './classResourceStyles';
 import { HudHitPoints } from './HudHitPoints';
 import { HudStat } from './HudStat';
@@ -299,7 +299,6 @@ export default function CharacterHUD({
           onRestoreClassResource &&
           classResourceChips.map(resource => {
             const Icon = CLASS_RESOURCE_ICONS[resource.definition.icon];
-            const colors = CLASS_RESOURCE_COLORS[resource.definition.color];
             const isPool = resource.definition.displayStyle === 'pool';
             const hasUses = resource.usesRemaining > 0;
             return (
@@ -317,7 +316,7 @@ export default function CharacterHUD({
                 aria-disabled={isPool || undefined}
                 className={`relative ${
                   hasUses
-                    ? colors.chipOn
+                    ? CLASS_RESOURCE_STYLE.chipOn
                     : 'border-divider text-muted hover:bg-surface-hover'
                 } ${isPool ? 'cursor-default' : ''}`}
                 aria-label={
