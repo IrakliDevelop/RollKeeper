@@ -638,7 +638,6 @@ export function QuickSpells({
               onClick={() => setCompactView(!compactView)}
               variant="ghost"
               selected={!compactView}
-              aria-pressed={!compactView}
               size="sm"
               leftIcon={
                 compactView ? <List size={16} /> : <Grid3X3 size={16} />

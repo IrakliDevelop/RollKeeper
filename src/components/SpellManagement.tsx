@@ -138,7 +138,7 @@ const SpellCard: React.FC<{
   if (compact) {
     return (
       <div className="flex flex-wrap items-center justify-between gap-2 py-3">
-        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+        <div className="flex min-w-0 flex-auto flex-wrap items-center gap-2">
           <Button
             onClick={onToggleFavorite}
             variant="ghost"
@@ -151,7 +151,7 @@ const SpellCard: React.FC<{
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
           </Button>
 
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="flex min-w-0 flex-auto items-center gap-2">
             <span id={nameId} className="text-heading truncate font-bold">
               {spell.name}
             </span>
@@ -955,22 +955,20 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
         )}
       </div>
       <div className="mb-6 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-0 basis-full sm:flex-1 sm:basis-48">
-          <Search className="text-faint pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+        <div className="min-w-0 basis-full sm:flex-1 sm:basis-48">
           <Input
             value={filters.searchQuery}
             onChange={e =>
               setFilters(prev => ({ ...prev, searchQuery: e.target.value }))
             }
             placeholder="Search spells by name, school, description, or damage type..."
-            className="pl-10"
+            leftIcon={<Search className="h-4 w-4" />}
           />
         </div>
         <Button
           onClick={() => setCompactView(!compactView)}
           variant="ghost"
           selected={!compactView}
-          aria-pressed={!compactView}
           size="sm"
           title={
             compactView ? 'Switch to detailed view' : 'Switch to compact view'

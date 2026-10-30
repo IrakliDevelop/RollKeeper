@@ -55,4 +55,16 @@ describe('SpellcastingStats edit gate', () => {
       )
     ).toBeInTheDocument();
   });
+
+  it('names the override inputs by their visible labels', () => {
+    useCharacterStore.setState({ character: makeWizard() });
+    render(<SpellcastingStats editing />);
+    fireEvent.click(screen.getByTitle('Toggle manual overrides'));
+
+    for (const name of ['Spell Attack', 'Spell Save DC']) {
+      const input = screen.getByRole('textbox', { name });
+      expect(input).not.toHaveAttribute('aria-label');
+      expect(input).toHaveAttribute('aria-labelledby');
+    }
+  });
 });

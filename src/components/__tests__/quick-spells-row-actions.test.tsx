@@ -51,4 +51,27 @@ describe('QuickSpells rows', () => {
       screen.getByRole('dialog', { name: 'Cast Fire Bolt' })
     ).toBeInTheDocument();
   });
+
+  it('announces the view toggle by its label alone, without a pressed state', () => {
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [spell],
+        spellbook: { ...makeWizard().spellbook, favoriteSpells: [] },
+      }),
+    });
+    render(
+      <QuickSpells
+        showAttackRoll={vi.fn()}
+        showSavingThrow={vi.fn()}
+        showDamageRoll={vi.fn()}
+      />
+    );
+
+    const toggle = screen.getByRole('button', { name: 'Detailed' });
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(toggle);
+    expect(screen.getByRole('button', { name: 'Compact' })).not.toHaveAttribute(
+      'aria-pressed'
+    );
+  });
 });

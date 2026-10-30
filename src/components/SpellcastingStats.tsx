@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useId, useState } from 'react';
 import { Edit3, Calculator } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { SpellcastingAbility } from '@/types/character';
@@ -21,6 +21,7 @@ import { AppIcon } from '@/components/ui/icons';
 export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
   const { character, updateCharacter } = useCharacterStore();
   const [showOverrides, setShowOverrides] = useState(false);
+  const labelId = useId();
 
   useEffect(() => {
     if (!editing) setShowOverrides(false);
@@ -159,14 +160,16 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
         </div>
 
         <div>
-          <span className="type-ui text-muted block">Spell Attack</span>
+          <span id={`${labelId}-attack`} className="type-ui text-muted block">
+            Spell Attack
+          </span>
           {editing && showOverrides ? (
             <NumberInput
               value={character.spellcastingStats.spellAttackBonus}
               onChange={handleAttackBonusOverride}
               allowEmpty
               placeholder="Auto"
-              aria-label="Spell Attack"
+              aria-labelledby={`${labelId}-attack`}
               size="sm"
             />
           ) : (
@@ -182,14 +185,16 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
         </div>
 
         <div>
-          <span className="type-ui text-muted block">Spell Save DC</span>
+          <span id={`${labelId}-dc`} className="type-ui text-muted block">
+            Spell Save DC
+          </span>
           {editing && showOverrides ? (
             <NumberInput
               value={character.spellcastingStats.spellSaveDC}
               onChange={handleSaveDCOverride}
               allowEmpty
               placeholder="Auto"
-              aria-label="Spell Save DC"
+              aria-labelledby={`${labelId}-dc`}
               size="sm"
             />
           ) : (

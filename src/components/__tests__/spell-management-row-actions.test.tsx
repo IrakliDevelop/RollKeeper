@@ -122,4 +122,61 @@ describe('SpellManagement row actions', () => {
       'secondary'
     );
   });
+
+  it('keeps compact spell names from collapsing on narrow screens', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    // jsdom has no layout. A flex-basis of 0 (flex-1) inside the wrapping
+    // row let the name shrink to 0px below ~500px; flex-auto wraps instead.
+    const name = screen.getByText('Shield');
+    const nameGroup = name.parentElement!;
+    const leftGroup = nameGroup.parentElement!;
+    for (const group of [nameGroup, leftGroup]) {
+      expect(group).toHaveClass('flex-auto');
+      expect(group).not.toHaveClass('flex-1');
+    }
+  });
+
+  it('announces the view toggle by its label alone, without a pressed state', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    const toggle = screen.getByTitle('Switch to detailed view');
+    expect(toggle).not.toHaveAttribute('aria-pressed');
+    fireEvent.click(toggle);
+    expect(screen.getByTitle('Switch to compact view')).not.toHaveAttribute(
+      'aria-pressed'
+    );
+  });
+
+  it('shows the search icon inside the search field', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({ character: makeWizard({ spells: [spell] }) });
+    render(<SpellManagement />);
+
+    // The icon must be drawn by Input itself: a sibling placed before
+    // Input sits under the field's background and can't be seen.
+    const search = screen.getByPlaceholderText(/^Search spells by name/);
+    expect(
+      search.parentElement!.querySelector('.lucide-search')
+    ).not.toBeNull();
+  });
 });
