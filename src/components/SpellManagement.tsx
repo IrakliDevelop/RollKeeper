@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useId, useState, useMemo } from 'react';
 import { Spell } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -72,6 +72,7 @@ import {
 } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
 import { SlotPips } from '@/components/ui/game/SlotPips';
+import { Section } from '@/components/ui/layout/section';
 
 interface SpellFilters {
   searchQuery: string;
@@ -103,6 +104,7 @@ const initialFilters: SpellFilters = {
 
 const SpellCard: React.FC<{
   spell: Spell;
+  nameId: string;
   compact: boolean;
   isFavorite: boolean;
   totalLevel: number;
@@ -114,6 +116,7 @@ const SpellCard: React.FC<{
   onCast: () => void;
 }> = ({
   spell,
+  nameId,
   compact,
   isFavorite,
   totalLevel,
@@ -134,38 +137,25 @@ const SpellCard: React.FC<{
 
   if (compact) {
     return (
-      <div
-        className={`flex items-center justify-between rounded-lg border-2 p-3 transition-all hover:shadow-md ${
-          isSpellPrepared(spell)
-            ? 'border-accent-green-border-strong bg-surface-raised'
-            : 'border-divider bg-surface-raised hover:border-accent-purple-border'
-        }`}
-      >
-        <div className="flex min-w-0 flex-1 items-center gap-3">
-          <button
+      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+        <div className="flex min-w-0 flex-auto flex-wrap items-center gap-2">
+          <Button
             onClick={onToggleFavorite}
-            className={`flex-shrink-0 transition-colors ${
-              isFavorite
-                ? 'text-accent-yellow-text hover:text-accent-amber-text'
-                : 'text-faint hover:text-accent-yellow-text'
-            }`}
+            variant="ghost"
+            size="xs"
+            selected={isFavorite}
+            aria-label="Favorite"
+            aria-pressed={isFavorite}
+            className="shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-          </button>
+          </Button>
 
-          <div className="flex min-w-0 flex-1 items-center gap-2">
-            <span className="text-heading truncate font-bold">
+          <div className="flex min-w-0 flex-auto items-center gap-2">
+            <span id={nameId} className="text-heading truncate font-bold">
               {spell.name}
             </span>
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text flex-shrink-0'
-                  : 'bg-accent-purple-bg text-accent-purple-text flex-shrink-0'
-              }
-            >
+            <Badge variant="neutral" size="sm" className="flex-shrink-0">
               {isCantrip ? 'Cantrip' : `Lv${spell.level}`}
             </Badge>
             <span className="text-muted hidden flex-shrink-0 text-xs sm:inline">
@@ -176,18 +166,18 @@ const SpellCard: React.FC<{
           <div className="flex flex-shrink-0 items-center gap-1">
             {isAtWill && (
               <Badge
-                variant="info"
+                variant="neutral"
                 size="sm"
-                className="flex-shrink-0 gap-0.5 bg-emerald-100 text-emerald-700"
+                className="flex-shrink-0 gap-0.5"
               >
                 <Infinity size={10} /> At Will
               </Badge>
             )}
             {isInnate && (
               <Badge
-                variant="info"
+                variant="neutral"
                 size="sm"
-                className={`flex-shrink-0 gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+                className="flex-shrink-0 gap-0.5"
               >
                 <Zap size={10} /> {freeCastsRemaining}/{spell.freeCastMax}
               </Badge>
@@ -198,17 +188,17 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 R
               </Badge>
             )}
           </div>
         </div>
 
-        <div className="ml-2 flex flex-shrink-0 items-center gap-1">
+        <div className="flex flex-wrap items-center gap-1">
           <Button
             onClick={onCast}
-            variant="primary"
+            variant="secondary"
             size="xs"
             title="Cast spell"
           >
@@ -236,13 +226,7 @@ const SpellCard: React.FC<{
           >
             <Eye size={14} />
           </Button>
-          <Button
-            onClick={onEdit}
-            variant="ghost"
-            size="xs"
-            title="Edit spell"
-            className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text"
-          >
+          <Button onClick={onEdit} variant="ghost" size="xs" title="Edit spell">
             <Edit2 size={14} />
           </Button>
           <Button
@@ -250,7 +234,7 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
-            className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
+            className="text-blood-text"
           >
             <Trash2 size={14} />
           </Button>
@@ -260,36 +244,25 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div
-      className={`rounded-lg border-2 p-4 transition-all hover:shadow-md ${
-        isSpellPrepared(spell)
-          ? 'border-accent-green-border-strong bg-surface-raised'
-          : 'border-divider bg-surface-raised hover:border-accent-purple-border'
-      }`}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+    <div className="py-3">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
-            <button
+            <Button
               onClick={onToggleFavorite}
-              className={`transition-colors ${
-                isFavorite
-                  ? 'text-accent-yellow-text hover:text-accent-amber-text'
-                  : 'text-faint hover:text-accent-yellow-text'
-              }`}
+              variant="ghost"
+              size="xs"
+              selected={isFavorite}
+              aria-label="Favorite"
+              aria-pressed={isFavorite}
+              className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
-            </button>
-            <h5 className="text-heading font-bold">{spell.name}</h5>
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
-                  : 'bg-accent-purple-bg text-accent-purple-text'
-              }
-            >
+            </Button>
+            <h5 id={nameId} className="text-heading font-bold">
+              {spell.name}
+            </h5>
+            <Badge variant="neutral" size="sm">
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
             {spell.concentration && (
@@ -298,7 +271,7 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {spell.ritual && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 Ritual
               </Badge>
             )}
@@ -308,29 +281,17 @@ const SpellCard: React.FC<{
               </Badge>
             )}
             {isAtWill && (
-              <Badge
-                variant="info"
-                size="sm"
-                className="gap-0.5 bg-emerald-100 text-emerald-700"
-              >
+              <Badge variant="neutral" size="sm" className="gap-0.5">
                 <Infinity size={12} /> At Will
               </Badge>
             )}
             {isInnate && (
-              <Badge
-                variant="info"
-                size="sm"
-                className={`gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
-              >
+              <Badge variant="neutral" size="sm" className="gap-0.5">
                 <Zap size={12} /> {freeCastsRemaining}/{spell.freeCastMax} free
               </Badge>
             )}
             {spell.castingSource && (
-              <Badge
-                variant="secondary"
-                size="sm"
-                className="bg-indigo-100 text-indigo-700"
-              >
+              <Badge variant="neutral" size="sm">
                 {spell.castingSource}
               </Badge>
             )}
@@ -385,10 +346,10 @@ const SpellCard: React.FC<{
           />
         </div>
 
-        <div className="ml-4 flex flex-col gap-2">
+        <div className="flex flex-wrap gap-2 md:max-w-56 md:justify-end">
           <Button
             onClick={onCast}
-            variant="primary"
+            variant="secondary"
             size="sm"
             leftIcon={<Wand2 size={14} />}
           >
@@ -424,7 +385,6 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Edit spell"
-              className="border-accent-blue-border-strong text-accent-blue-text-muted hover:bg-accent-blue-bg"
             >
               <Edit2 size={16} />
             </Button>
@@ -433,7 +393,7 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Delete spell"
-              className="border-accent-red-border-strong text-accent-red-text-muted hover:bg-accent-red-bg"
+              className="text-blood-text"
             >
               <Trash2 size={16} />
             </Button>
@@ -459,6 +419,7 @@ const LevelSection: React.FC<{
   onToggleFavorite: (id: string) => void;
   onSpellCast: (spell: Spell) => void;
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
+  showMoveControls: boolean;
   slotMax?: number;
   slotUsed?: number;
 }> = ({
@@ -476,20 +437,13 @@ const LevelSection: React.FC<{
   onToggleFavorite,
   onSpellCast,
   onReorder,
+  showMoveControls,
   slotMax,
   slotUsed,
 }) => {
+  const levelId = useId();
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
-  const levelColor = isCantrip
-    ? 'text-accent-yellow-text'
-    : 'text-accent-purple-text';
-  const levelBg = isCantrip
-    ? 'bg-linear-to-r from-accent-yellow-bg to-accent-amber-bg'
-    : 'bg-linear-to-r from-accent-purple-bg to-accent-violet-bg';
-  const borderColor = isCantrip
-    ? 'border-accent-yellow-border'
-    : 'border-accent-purple-border';
   const preparedCount = spells.filter(
     s => s.isPrepared || s.isAlwaysPrepared
   ).length;
@@ -498,44 +452,27 @@ const LevelSection: React.FC<{
   const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
 
   return (
-    <div
-      className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
-    >
-      <div
-        className={`flex w-full items-center gap-3 p-4 ${levelBg} transition-all`}
-      >
+    <div>
+      <div className="border-divider flex w-full flex-wrap items-center gap-3 border-b pb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-3 hover:opacity-90"
+          aria-expanded={isExpanded}
+          className="text-heading flex min-h-6 items-center gap-3 hover:opacity-90 pointer-coarse:min-h-11"
         >
           <div className="flex items-center gap-2">
             {isExpanded ? (
-              <ChevronDown size={18} className={levelColor} />
+              <ChevronDown size={18} />
             ) : (
-              <ChevronRight size={18} className={levelColor} />
+              <ChevronRight size={18} />
             )}
-            <span className={`text-base font-bold ${levelColor}`}>
-              {levelName}
-            </span>
+            <span className="type-label-heading">{levelName}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Badge
-              variant={isCantrip ? 'warning' : 'primary'}
-              size="sm"
-              className={
-                isCantrip
-                  ? 'bg-accent-yellow-bg text-accent-yellow-text'
-                  : 'bg-accent-purple-bg text-accent-purple-text'
-              }
-            >
+            <Badge variant="neutral" size="sm">
               {spells.length} spell{spells.length !== 1 ? 's' : ''}
             </Badge>
             {preparedCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
+              <Badge variant="neutral" size="sm">
                 {preparedCount} prepared
               </Badge>
             )}
@@ -546,11 +483,7 @@ const LevelSection: React.FC<{
         {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
             <SlotPips total={slotMax!} available={remaining} level={level} />
-            <span
-              className={`text-[10px] font-bold ${
-                remaining === 0 ? 'text-accent-red-text' : 'text-heading'
-              }`}
-            >
+            <span className="text-muted text-xs">
               {remaining}/{slotMax}
             </span>
           </div>
@@ -558,28 +491,59 @@ const LevelSection: React.FC<{
       </div>
 
       {isExpanded && (
-        <div className="border-divider bg-surface-raised border-t-2 p-4">
+        <div className="pt-2">
           <DragDropList
             items={spells}
             onReorder={onReorder}
             keyExtractor={spell => spell.id}
-            className={compact ? 'space-y-2' : 'space-y-3'}
-            itemClassName=""
+            className="divide-divider divide-y"
+            itemClassName="pl-6"
             showDragHandle={true}
             dragHandlePosition="left"
-            renderItem={spell => (
-              <SpellCard
-                spell={spell}
-                compact={compact}
-                isFavorite={favoriteSpells.includes(spell.id)}
-                totalLevel={totalLevel}
-                onEdit={() => onSpellEdit(spell)}
-                onDelete={() => onSpellDelete(spell.id)}
-                onView={() => onSpellView(spell)}
-                onTogglePrepared={() => onTogglePrepared(spell.id)}
-                onToggleFavorite={() => onToggleFavorite(spell.id)}
-                onCast={() => onSpellCast(spell)}
-              />
+            renderItem={(spell, index) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SpellCard
+                    spell={spell}
+                    nameId={`${levelId}-spell-${index}`}
+                    compact={compact}
+                    isFavorite={favoriteSpells.includes(spell.id)}
+                    totalLevel={totalLevel}
+                    onEdit={() => onSpellEdit(spell)}
+                    onDelete={() => onSpellDelete(spell.id)}
+                    onView={() => onSpellView(spell)}
+                    onTogglePrepared={() => onTogglePrepared(spell.id)}
+                    onToggleFavorite={() => onToggleFavorite(spell.id)}
+                    onCast={() => onSpellCast(spell)}
+                  />
+                </div>
+                {showMoveControls && (
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-describedby={`${levelId}-spell-${index}`}
+                      disabled={index === 0}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() => onReorder(index, index - 1)}
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-describedby={`${levelId}-spell-${index}`}
+                      disabled={index === spells.length - 1}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() => onReorder(index, index + 1)}
+                    >
+                      Move down
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           />
         </div>
@@ -588,7 +552,9 @@ const LevelSection: React.FC<{
   );
 };
 
-export const SpellManagement: React.FC = () => {
+export const SpellManagement: React.FC<{ editing?: boolean }> = ({
+  editing = false,
+}) => {
   const {
     character,
     updateCharacter,
@@ -720,9 +686,6 @@ export const SpellManagement: React.FC = () => {
           break;
         case 'level':
           comparison = a.level - b.level;
-          if (comparison === 0) {
-            comparison = a.name.localeCompare(b.name);
-          }
           break;
         case 'school':
           comparison = a.school.localeCompare(b.school);
@@ -980,109 +943,81 @@ export const SpellManagement: React.FC = () => {
   }, [character.spells]);
 
   return (
-    <div className="border-accent-purple-border bg-surface-raised rounded-lg border p-6 shadow">
-      {/* Header */}
-      <div className="mb-6 flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
-            <BookOpen className="text-accent-purple-text-muted" size={24} />
-            Spells & Cantrips
-            <Badge variant="secondary" size="sm">
-              {filteredSpells.length} of {character.spells.length}
-            </Badge>
-            {preparedSpellsCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
-                {preparedSpellsCount} prepared
-              </Badge>
-            )}
-          </h3>
-
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => setCompactView(!compactView)}
-              variant={compactView ? 'primary' : 'ghost'}
-              size="sm"
-              title={
-                compactView
-                  ? 'Switch to detailed view'
-                  : 'Switch to compact view'
-              }
-            >
-              {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
-            </Button>
-
-            <Button
-              onClick={() => setShowFilters(!showFilters)}
-              variant={
-                showFilters || activeFilterCount > 0 ? 'primary' : 'ghost'
-              }
-              size="sm"
-              leftIcon={<Filter size={16} />}
-            >
-              Filters
-              {activeFilterCount > 0 && (
-                <Badge
-                  variant="danger"
-                  size="sm"
-                  className="text-inverse ml-1 bg-red-500"
-                >
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-
-            <Button
-              onClick={() => setIsFormOpen(true)}
-              variant="primary"
-              size="sm"
-              leftIcon={<Plus size={16} />}
-            >
-              Add Spell
-            </Button>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <Search className="text-faint pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+    <Section heading="Spells & Cantrips" level={3}>
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Badge variant="neutral" size="sm">
+          {filteredSpells.length} of {character.spells.length}
+        </Badge>
+        {preparedSpellsCount > 0 && (
+          <Badge variant="neutral" size="sm">
+            {preparedSpellsCount} prepared
+          </Badge>
+        )}
+      </div>
+      <div className="mb-6 flex flex-wrap items-center gap-2">
+        <div className="min-w-0 basis-full sm:flex-1 sm:basis-48">
           <Input
             value={filters.searchQuery}
             onChange={e =>
               setFilters(prev => ({ ...prev, searchQuery: e.target.value }))
             }
             placeholder="Search spells by name, school, description, or damage type..."
-            className="pl-10"
+            leftIcon={<Search className="h-4 w-4" />}
           />
         </div>
+        <Button
+          onClick={() => setCompactView(!compactView)}
+          variant="ghost"
+          selected={!compactView}
+          size="sm"
+          title={
+            compactView ? 'Switch to detailed view' : 'Switch to compact view'
+          }
+        >
+          {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
+        </Button>
+        <Button
+          onClick={() => setShowFilters(true)}
+          variant="ghost"
+          selected={showFilters || activeFilterCount > 0}
+          aria-expanded={showFilters}
+          size="sm"
+          leftIcon={<Filter size={16} />}
+        >
+          Filters
+          {activeFilterCount > 0 && (
+            <Badge variant="neutral" size="sm" className="ml-1">
+              {activeFilterCount}
+            </Badge>
+          )}
+        </Button>
+        <Button
+          onClick={() => setIsFormOpen(true)}
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus size={16} />}
+        >
+          Add Spell
+        </Button>
+      </div>
 
-        {/* Advanced Filters */}
-        {showFilters && (
-          <div className="border-divider bg-surface-raised rounded-lg border-2 p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <h4 className="text-heading font-bold">Advanced Filters</h4>
-              <div className="flex items-center gap-2">
-                {activeFilterCount > 0 && (
-                  <Button
-                    onClick={clearFilters}
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<X size={14} />}
-                  >
-                    Clear All
-                  </Button>
-                )}
+      <Dialog open={showFilters} onOpenChange={setShowFilters}>
+        <DialogContent size="lg">
+          <DialogHeader>
+            <DialogTitle>Advanced Filters</DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <div className="mb-4 flex justify-end">
+              {activeFilterCount > 0 && (
                 <Button
-                  onClick={() => setShowFilters(false)}
+                  onClick={clearFilters}
                   variant="ghost"
                   size="sm"
+                  leftIcon={<X size={14} />}
                 >
-                  <X size={16} />
+                  Clear All
                 </Button>
-              </div>
+              )}
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
@@ -1287,9 +1222,9 @@ export const SpellManagement: React.FC = () => {
                 </label>
               </div>
             </div>
-          </div>
-        )}
-      </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
 
       {/* Spell List */}
       <div className="space-y-4">
@@ -1311,7 +1246,7 @@ export const SpellManagement: React.FC = () => {
             {activeFilterCount > 0 && (
               <Button
                 onClick={clearFilters}
-                variant="primary"
+                variant="secondary"
                 size="md"
                 className="mt-4"
               >
@@ -1337,6 +1272,9 @@ export const SpellManagement: React.FC = () => {
               onToggleFavorite={toggleSpellFavorite}
               onSpellCast={handleCastSpell}
               onReorder={handleReorderSpellsInLevel(level)}
+              showMoveControls={
+                editing && sortBy === 'level' && sortOrder === 'asc'
+              }
               slotMax={
                 level > 0
                   ? character.spellSlots[
@@ -1373,7 +1311,7 @@ export const SpellManagement: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Spell Autocomplete - Only show when adding new spell */}
               {!editingId && (
-                <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+                <div>
                   <SpellAutocomplete
                     spells={spellbookSpells}
                     onSelect={handleSpellSelect}
@@ -1468,6 +1406,6 @@ export const SpellManagement: React.FC = () => {
           spellcastingAbilityMod={getSpellcastingAbilityModifier(character)}
         />
       )}
-    </div>
+    </Section>
   );
 };

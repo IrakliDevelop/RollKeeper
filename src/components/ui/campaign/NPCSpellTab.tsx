@@ -867,7 +867,7 @@ export function NPCSpellTab({
           </DialogHeader>
           <DialogBody className="space-y-4">
             {/* DB search — pre-fills all form fields on select */}
-            <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+            <div>
               <SpellAutocomplete
                 spells={dbSpells}
                 onSelect={handleAddSpellFromDb}

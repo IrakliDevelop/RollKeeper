@@ -38,6 +38,30 @@ function slots(level3Used: number): SpellSlots {
 const noConc = { isConcentrating: false } as ConcentrationState;
 
 describe('SpellCastModal choice', () => {
+  it('shows hairline slot rows with availability pips and keeps the cast path', () => {
+    const onCastSpell = vi.fn();
+    render(
+      <SpellCastModal
+        isOpen
+        onClose={vi.fn()}
+        spell={detectMagic}
+        spellSlots={slots(1)}
+        concentration={noConc}
+        onCastSpell={onCastSpell}
+      />
+    );
+    const level3 = screen.getByRole('radio', { name: 'Level 3' });
+    expect(level3.closest('label')).toHaveClass('border-divider');
+    expect(level3.closest('label')).not.toHaveClass('bg-surface-raised');
+    expect(
+      level3.closest('label')?.querySelector('[role="img"]')
+    ).toHaveAttribute('aria-label', '1 of 2 level 3 slots available');
+
+    fireEvent.click(level3);
+    fireEvent.click(screen.getByRole('button', { name: 'Cast Detect Magic' }));
+    expect(onCastSpell).toHaveBeenCalledWith(3, false, false, false);
+  });
+
   it('keeps the chosen option when slots change but the same levels stay available', () => {
     const onCastSpell = vi.fn();
     const props = {

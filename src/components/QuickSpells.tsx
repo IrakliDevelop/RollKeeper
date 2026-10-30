@@ -2,7 +2,6 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  Sparkles,
   Dice6,
   Wand2,
   Search,
@@ -114,36 +113,36 @@ const SpellCard: React.FC<{
 
   if (compact) {
     return (
-      <div className="group border-divider bg-surface-raised hover:border-divider-strong flex items-center justify-between rounded-lg border-2 p-2.5 transition-all hover:shadow-md">
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <button
+      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Button
             onClick={onToggleFavorite}
-            className={`flex-shrink-0 transition-colors ${
-              isFavorite
-                ? 'text-accent-amber-text hover:text-accent-amber-text-muted'
-                : 'text-faint hover:text-accent-amber-text'
-            }`}
-            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            variant="ghost"
+            size="xs"
+            selected={isFavorite}
+            aria-label="Favorite"
+            aria-pressed={isFavorite}
+            className="shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             <Star size={14} fill={isFavorite ? 'currentColor' : 'none'} />
-          </button>
+          </Button>
           <span className="text-heading truncate text-sm font-medium">
             {spell.name}
           </span>
           {isAtWill && (
             <Badge
-              variant="info"
+              variant="neutral"
               size="sm"
-              className="flex-shrink-0 gap-0.5 bg-emerald-100 text-emerald-700"
+              className="flex-shrink-0 gap-0.5"
             >
               <Infinity size={10} />
             </Badge>
           )}
           {isInnate && (
             <Badge
-              variant="info"
+              variant="neutral"
               size="sm"
-              className={`flex-shrink-0 gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
+              className="flex-shrink-0 gap-0.5"
             >
               <Zap size={10} /> {freeCastsRemaining}/{spell.freeCastMax}
             </Badge>
@@ -154,10 +153,10 @@ const SpellCard: React.FC<{
             </Badge>
           )}
         </div>
-        <div className="flex flex-shrink-0 gap-1.5">
+        <div className="flex flex-wrap gap-1.5">
           <Button
             onClick={() => onAction('cast')}
-            variant="primary"
+            variant="secondary"
             size="xs"
             title="Cast spell"
           >
@@ -175,7 +174,7 @@ const SpellCard: React.FC<{
           )}
           <Button
             onClick={() => onAction('view')}
-            variant="outline"
+            variant="ghost"
             size="xs"
             title="View details"
           >
@@ -187,22 +186,22 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div className="border-divider bg-surface-raised hover:border-divider-strong rounded-lg border-2 p-4 transition-all hover:shadow-md">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="py-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <button
+          <Button
             onClick={onToggleFavorite}
-            className={`transition-colors ${
-              isFavorite
-                ? 'text-accent-amber-text hover:text-accent-amber-text-muted'
-                : 'text-faint hover:text-accent-amber-text'
-            }`}
-            title={isFavorite ? 'Remove from favorites' : 'Add to favorites'}
+            variant="ghost"
+            size="xs"
+            selected={isFavorite}
+            aria-label="Favorite"
+            aria-pressed={isFavorite}
+            className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
           >
             <Star size={16} fill={isFavorite ? 'currentColor' : 'none'} />
-          </button>
+          </Button>
           <span className="text-heading font-bold">{spell.name}</span>
-          <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
+          <Badge variant="neutral" size="sm">
             {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
           </Badge>
           {spell.concentration && (
@@ -211,29 +210,17 @@ const SpellCard: React.FC<{
             </Badge>
           )}
           {isAtWill && (
-            <Badge
-              variant="info"
-              size="sm"
-              className="gap-0.5 bg-emerald-100 text-emerald-700"
-            >
+            <Badge variant="neutral" size="sm" className="gap-0.5">
               <Infinity size={12} /> At Will
             </Badge>
           )}
           {isInnate && (
-            <Badge
-              variant="info"
-              size="sm"
-              className={`gap-0.5 ${freeCastsRemaining > 0 ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-500'}`}
-            >
+            <Badge variant="neutral" size="sm" className="gap-0.5">
               <Zap size={12} /> {freeCastsRemaining}/{spell.freeCastMax} free
             </Badge>
           )}
           {spell.castingSource && (
-            <Badge
-              variant="secondary"
-              size="sm"
-              className="bg-indigo-100 text-indigo-700"
-            >
+            <Badge variant="neutral" size="sm">
               {spell.castingSource}
             </Badge>
           )}
@@ -255,7 +242,7 @@ const SpellCard: React.FC<{
       <div className="flex flex-wrap gap-2">
         <Button
           onClick={() => onAction('cast')}
-          variant="primary"
+          variant="secondary"
           size="sm"
           leftIcon={<Wand2 size={14} />}
         >
@@ -275,7 +262,7 @@ const SpellCard: React.FC<{
 
         <Button
           onClick={() => onAction('view')}
-          variant="outline"
+          variant="ghost"
           size="sm"
           leftIcon={<Eye size={14} />}
         >
@@ -314,41 +301,26 @@ const LevelSection: React.FC<LevelSectionProps> = ({
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
-  const levelColor = isCantrip
-    ? 'text-accent-amber-text'
-    : 'text-accent-purple-text';
-  const levelBg = isCantrip
-    ? 'bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)]'
-    : 'bg-gradient-to-r from-[var(--gradient-purple-from)] to-[var(--gradient-purple-to)]';
-  const borderColor = isCantrip
-    ? 'border-accent-amber-border'
-    : 'border-accent-purple-border';
-
   const hasSlots = !isCantrip && slotMax !== undefined && slotMax > 0;
   const remaining = hasSlots ? slotMax! - (slotUsed ?? 0) : 0;
 
   return (
-    <div
-      className={`border-2 ${borderColor} bg-surface-raised overflow-hidden rounded-lg`}
-    >
-      <div
-        className={`flex w-full items-center gap-3 p-4 ${levelBg} transition-all`}
-      >
+    <div>
+      <div className="border-divider flex w-full flex-wrap items-center gap-3 border-b pb-2">
         <button
           onClick={onToggle}
-          className="flex items-center gap-3 hover:opacity-90"
+          aria-expanded={isExpanded}
+          className="text-heading flex min-h-6 items-center gap-3 hover:opacity-90 pointer-coarse:min-h-11"
         >
           <div className="flex items-center gap-2">
             {isExpanded ? (
-              <ChevronDown size={18} className={levelColor} />
+              <ChevronDown size={18} />
             ) : (
-              <ChevronRight size={18} className={levelColor} />
+              <ChevronRight size={18} />
             )}
-            <span className={`text-base font-bold ${levelColor}`}>
-              {levelName}
-            </span>
+            <span className="type-label-heading">{levelName}</span>
           </div>
-          <Badge variant={isCantrip ? 'warning' : 'primary'} size="sm">
+          <Badge variant="neutral" size="sm">
             {spells.length} spell{spells.length !== 1 ? 's' : ''}
           </Badge>
         </button>
@@ -357,11 +329,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
         {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
             <SlotPips total={slotMax!} available={remaining} level={level} />
-            <span
-              className={`text-[10px] font-bold ${
-                remaining === 0 ? 'text-accent-red-text' : 'text-heading'
-              }`}
-            >
+            <span className="text-muted text-xs">
               {remaining}/{slotMax}
             </span>
           </div>
@@ -369,8 +337,8 @@ const LevelSection: React.FC<LevelSectionProps> = ({
       </div>
 
       {isExpanded && (
-        <div className="bg-surface-raised border-divider border-t-2 p-4">
-          <div className={compactView ? 'space-y-2' : 'space-y-3'}>
+        <div className="pt-2">
+          <div className="divide-divider divide-y">
             {spells.map(spell => (
               <SpellCard
                 key={spell.id}
@@ -626,7 +594,7 @@ export function QuickSpells({
 
   if (actionSpells.length === 0) {
     return (
-      <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
+      <div className="py-8 text-center">
         <AppIcon name="spell" className="text-muted mx-auto mb-3 h-12 w-12" />
         <p className="text-heading text-lg font-semibold">No spells prepared</p>
         <p className="text-muted mt-2 text-sm">
@@ -651,15 +619,14 @@ export function QuickSpells({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2 text-sm">
-                <Sparkles size={16} className="text-accent-purple-text-muted" />
-                <Badge variant="primary" size="sm">
+                <Badge variant="neutral" size="sm">
                   Attack: +{spellAttackBonus ?? 0}
                 </Badge>
-                <Badge variant="primary" size="sm">
+                <Badge variant="neutral" size="sm">
                   Save DC: {spellSaveDC ?? 8}
                 </Badge>
                 {spellcastingAbility && (
-                  <Badge variant="secondary" size="sm">
+                  <Badge variant="neutral" size="sm">
                     {spellcastingAbility.charAt(0).toUpperCase() +
                       spellcastingAbility.slice(1)}
                   </Badge>
@@ -669,7 +636,8 @@ export function QuickSpells({
 
             <Button
               onClick={() => setCompactView(!compactView)}
-              variant={compactView ? 'primary' : 'ghost'}
+              variant="ghost"
+              selected={!compactView}
               size="sm"
               leftIcon={
                 compactView ? <List size={16} /> : <Grid3X3 size={16} />
@@ -692,28 +660,24 @@ export function QuickSpells({
               placeholder="Search spells..."
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="border-divider-strong bg-surface-raised text-heading placeholder:text-faint focus:border-accent-purple-border-strong focus:ring-accent-purple-bg-strong w-full rounded-lg border-2 py-2.5 pr-4 pl-10 text-sm transition-all focus:ring-2 focus:outline-none"
+              className="border-input-border bg-surface text-heading placeholder:text-faint focus:border-brass-border w-full rounded-md border py-2.5 pr-4 pl-10 text-sm transition-all focus:ring-2 focus:outline-none pointer-coarse:text-base"
             />
           </div>
         </div>
 
         {/* Favorites section */}
         {favoriteActionSpells.length > 0 && (
-          <div className="border-accent-amber-border rounded-lg border-2 bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] p-4 shadow-sm">
+          <div>
             <div className="mb-3 flex items-center gap-3">
-              <Heart
-                className="text-accent-amber-text"
-                size={18}
-                fill="currentColor"
-              />
-              <span className="text-accent-amber-text font-bold">
+              <Heart className="text-muted" size={18} fill="currentColor" />
+              <span className="text-heading font-semibold">
                 Favorite Spells
               </span>
-              <Badge variant="warning" size="sm">
+              <Badge variant="neutral" size="sm">
                 {favoriteActionSpells.length}
               </Badge>
             </div>
-            <div className={compactView ? 'space-y-2' : 'space-y-3'}>
+            <div className="divide-divider divide-y">
               {favoriteActionSpells.map(spell => (
                 <SpellCard
                   key={spell.id}
@@ -778,7 +742,7 @@ export function QuickSpells({
 
         {/* No results message */}
         {searchQuery && sortedLevels.length === 0 && (
-          <div className="border-divider bg-surface-raised rounded-lg border-2 p-8 text-center">
+          <div className="py-8 text-center">
             <AppIcon
               name="search"
               className="text-muted mx-auto mb-2 h-10 w-10"

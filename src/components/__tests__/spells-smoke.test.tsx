@@ -1,5 +1,5 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { SpellFormFields } from '@/components/shared/spells/SpellFormFields';
 import SpellDetailsModal from '@/components/ui/game/SpellDetailsModal';
 import type { SpellFormData } from '@/utils/spellConversion';
@@ -74,6 +74,38 @@ const mockSpell: Spell = {
 };
 
 describe('SpellFormFields', () => {
+  it('uses the shared floating surface for tag suggestions', () => {
+    render(
+      <SpellFormFields
+        formData={mockFormData}
+        onChange={vi.fn()}
+        tags={[]}
+        onTagsChange={vi.fn()}
+        existingTags={['ritual']}
+      />
+    );
+    fireEvent.change(screen.getByPlaceholderText('Add tag...'), {
+      target: { value: 'rit' },
+    });
+    const suggestion = screen.getByRole('button', { name: 'ritual' });
+    expect(suggestion.closest('.shadow-overlay')).not.toBeNull();
+    expect(suggestion.closest('.shadow-lg')).toBeNull();
+  });
+
+  it('names the tag removal control for screen readers', () => {
+    const onTagsChange = vi.fn();
+    render(
+      <SpellFormFields
+        formData={mockFormData}
+        onChange={vi.fn()}
+        tags={['ritual']}
+        onTagsChange={onTagsChange}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove tag ritual' }));
+    expect(onTagsChange).toHaveBeenCalledWith([]);
+  });
+
   it('renders without crashing', () => {
     const onChange = vi.fn();
     render(<SpellFormFields formData={mockFormData} onChange={onChange} />);

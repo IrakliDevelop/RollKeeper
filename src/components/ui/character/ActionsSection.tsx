@@ -1,8 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
-import { ChevronDown, ChevronRight } from 'lucide-react';
-import { AppIcon, type IconName } from '@/components/ui/icons';
+import React, { useMemo } from 'react';
 import ErrorBoundary from '@/components/ui/feedback/ErrorBoundary';
 import { EquippedWeapons } from '@/components/EquippedWeapons';
 import { QuickSpells } from '@/components/QuickSpells';
@@ -17,6 +15,7 @@ import { cn } from '@/utils/cn';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
+  editing?: boolean;
   character: CharacterState;
   showAttackRoll: (
     name: string,
@@ -47,71 +46,8 @@ interface ActionsSectionProps {
   spellSlotsPanel?: React.ReactNode;
 }
 
-// Simple collapsible component for subsections
-interface CollapsibleSubsectionProps {
-  title: string;
-  icon: IconName;
-  children: React.ReactNode;
-  defaultExpanded?: boolean;
-  persistKey: string;
-  badge?: React.ReactNode;
-  extraContent?: React.ReactNode;
-}
-
-const CollapsibleSubsection: React.FC<CollapsibleSubsectionProps> = ({
-  title,
-  icon,
-  children,
-  defaultExpanded = true,
-  persistKey,
-  badge,
-  extraContent,
-}) => {
-  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-
-  useEffect(() => {
-    const savedState = localStorage.getItem(`subsection-${persistKey}`);
-    if (savedState !== null) {
-      setIsExpanded(JSON.parse(savedState));
-    }
-  }, [persistKey]);
-
-  const toggleExpanded = () => {
-    const newState = !isExpanded;
-    setIsExpanded(newState);
-    localStorage.setItem(`subsection-${persistKey}`, JSON.stringify(newState));
-  };
-
-  return (
-    <div className="border-divider bg-surface-raised rounded-lg border shadow">
-      <div className="flex w-full items-center justify-between p-4">
-        <button
-          onClick={toggleExpanded}
-          className="flex flex-1 items-center gap-2 text-left transition-colors hover:opacity-80"
-          aria-expanded={isExpanded}
-        >
-          <AppIcon name={icon} className="h-5 w-5 shrink-0" />
-          <h3 className="text-heading text-lg font-bold">{title}</h3>
-          {isExpanded ? (
-            <ChevronDown size={20} className="ml-2" />
-          ) : (
-            <ChevronRight size={20} className="ml-2" />
-          )}
-        </button>
-        <div className="ml-4 flex items-center gap-2">
-          {badge}
-          {extraContent}
-        </div>
-      </div>
-
-      {isExpanded && (
-        <div className="border-divider border-t p-4">{children}</div>
-      )}
-    </div>
-  );
-};
-
 export default function ActionsSection({
+  editing = false,
   character,
   showAttackRoll,
   showSavingThrow,
@@ -155,15 +91,13 @@ export default function ActionsSection({
 
   return (
     <div className="space-y-6">
-      {/* Ready Weapons - Collapsible */}
-      <CollapsibleSubsection
-        title="Ready Weapons"
-        icon="weapon"
-        persistKey="ready-weapons"
-        defaultExpanded={true}
-        badge={
+      <Section
+        heading="Ready Weapons"
+        level={3}
+        collapsible="actions-ready-weapons"
+        trailing={
           equippedWeapons.length > 0 && (
-            <span className="bg-accent-blue-bg text-accent-blue-text rounded-full px-2 py-1 text-sm font-medium">
+            <span className="text-muted text-sm">
               {equippedWeapons.length} equipped
             </span>
           )
@@ -179,12 +113,13 @@ export default function ActionsSection({
           }
         >
           <EquippedWeapons
+            editing={editing}
             showAttackRoll={showAttackRoll}
             showDamageRoll={showDamageRoll}
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
-      </CollapsibleSubsection>
+      </Section>
 
       {(spellSlotsPanel ||
         (classResources.length > 0 &&
@@ -225,30 +160,27 @@ export default function ActionsSection({
         </div>
       )}
 
-      {/* Quick Features - Collapsible */}
       {(character.favoriteFeatureIds || []).length > 0 && (
-        <CollapsibleSubsection
-          title="Quick Features"
-          icon="abilities"
-          persistKey="quick-features"
-          defaultExpanded={true}
-          badge={
-            <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2 py-1 text-sm font-medium">
-              {(character.favoriteFeatureIds || []).length} pinned
-            </span>
-          }
-          extraContent={
-            <Button
-              onClick={e => {
-                e.stopPropagation();
-                switchToTab('features');
-              }}
-              variant="ghost"
-              size="xs"
-              className="bg-accent-amber-bg text-accent-amber-text-muted hover:bg-accent-amber-bg-strong hover:text-accent-amber-text"
-            >
-              Manage
-            </Button>
+        <Section
+          heading="Quick Features"
+          level={3}
+          collapsible="actions-quick-features"
+          trailing={
+            <>
+              <span className="text-muted text-sm">
+                {(character.favoriteFeatureIds || []).length} pinned
+              </span>
+              <Button
+                onClick={e => {
+                  e.stopPropagation();
+                  switchToTab('features');
+                }}
+                variant="ghost"
+                size="xs"
+              >
+                Manage
+              </Button>
+            </>
           }
         >
           <ErrorBoundary
@@ -262,45 +194,36 @@ export default function ActionsSection({
           >
             <QuickFeatures />
           </ErrorBoundary>
-        </CollapsibleSubsection>
+        </Section>
       )}
 
-      {/* Quick Spells - Collapsible */}
-      <CollapsibleSubsection
-        title="Quick Spells"
-        icon="features"
-        persistKey="quick-spells"
-        defaultExpanded={true}
-        badge={
+      <Section
+        heading="Quick Spells"
+        level={3}
+        collapsible="actions-quick-spells"
+        trailing={
           <div className="flex items-center gap-2">
             {actionSpells.length > 0 && (
-              <span className="bg-accent-purple-bg text-accent-purple-text rounded-full px-2 py-1 text-sm font-medium">
+              <span className="text-muted text-sm">
                 {actionSpells.length} ready
               </span>
             )}
             {preparedSpellsCount > 0 && (
-              <Badge
-                variant="success"
-                size="sm"
-                className="bg-accent-green-bg text-accent-green-text"
-              >
+              <Badge variant="neutral" size="sm">
                 {preparedSpellsCount} prepared
               </Badge>
             )}
+            <Button
+              onClick={e => {
+                e.stopPropagation();
+                switchToTab('spellcasting');
+              }}
+              variant="ghost"
+              size="xs"
+            >
+              Manage
+            </Button>
           </div>
-        }
-        extraContent={
-          <Button
-            onClick={e => {
-              e.stopPropagation();
-              switchToTab('spellcasting');
-            }}
-            variant="ghost"
-            size="xs"
-            className="bg-accent-purple-bg text-accent-purple-text-muted hover:bg-accent-purple-bg-strong hover:text-accent-purple-text"
-          >
-            Manage
-          </Button>
         }
       >
         <ErrorBoundary
@@ -319,7 +242,7 @@ export default function ActionsSection({
             animateRoll={animateRoll}
           />
         </ErrorBoundary>
-      </CollapsibleSubsection>
+      </Section>
 
       {/* Concentration Tracker */}
       {character.concentration.isConcentrating && (
