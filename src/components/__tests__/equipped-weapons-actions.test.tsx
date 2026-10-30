@@ -34,6 +34,44 @@ const weapon: Weapon = {
 };
 
 describe('EquippedWeapons actions', () => {
+  it('moves equipped weapons through edit-mode buttons using the existing reorder action', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const reorderWeapons = vi.fn();
+    useCharacterStore.setState({
+      character: makeCharacter({
+        weapons: [weapon, { ...weapon, id: 'moon-blade', name: 'Moon Blade' }],
+      }),
+      reorderWeapons,
+    });
+    const { rerender } = render(
+      <NavigationContext.Provider value={{ switchToTab: vi.fn() }}>
+        <EquippedWeapons showAttackRoll={vi.fn()} showDamageRoll={vi.fn()} />
+      </NavigationContext.Provider>
+    );
+    expect(
+      screen.queryByRole('button', { name: 'Move Sun Blade up' })
+    ).toBeNull();
+    rerender(
+      <NavigationContext.Provider value={{ switchToTab: vi.fn() }}>
+        <EquippedWeapons
+          editing
+          showAttackRoll={vi.fn()}
+          showDamageRoll={vi.fn()}
+        />
+      </NavigationContext.Provider>
+    );
+
+    expect(
+      screen.getByRole('button', { name: 'Move Sun Blade up' })
+    ).toBeDisabled();
+    const moveDown = screen.getByRole('button', {
+      name: 'Move Sun Blade down',
+    });
+    expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
+    fireEvent.click(moveDown);
+    expect(reorderWeapons).toHaveBeenCalledWith(0, 1);
+  });
+
   it('keeps charge and roll actions usable as secondary coarse targets', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: true }));
     const restoreWeaponCharge = vi.fn();

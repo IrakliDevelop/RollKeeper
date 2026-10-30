@@ -26,6 +26,41 @@ const spell: Spell = {
 };
 
 describe('SpellManagement row actions', () => {
+  it('moves spells in edit mode and preserves their level order after remount', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [spell, { ...spell, id: 'ward', name: 'Ward' }],
+        spellbook: { ...makeWizard().spellbook, favoriteSpells: [] },
+      }),
+    });
+    const { unmount, rerender } = render(<SpellManagement />);
+    expect(screen.queryByRole('button', { name: 'Move Shield up' })).toBeNull();
+    rerender(<SpellManagement editing />);
+
+    expect(
+      screen.getByRole('button', { name: 'Move Shield up' })
+    ).toBeDisabled();
+    const moveDown = screen.getByRole('button', { name: 'Move Shield down' });
+    expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
+    fireEvent.click(moveDown);
+    expect(
+      useCharacterStore.getState().character.spells.map(s => s.name)
+    ).toEqual(['Ward', 'Shield']);
+
+    unmount();
+    render(<SpellManagement editing />);
+    const names = screen
+      .getAllByText(/^(Ward|Shield)$/)
+      .map(node => node.textContent);
+    expect(names).toEqual(['Ward', 'Shield']);
+  });
+
   it('keeps favorite and preparation actions accessible beside a secondary Cast', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(

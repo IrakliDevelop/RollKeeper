@@ -313,6 +313,7 @@ export function createTabbedSheetConfig(
       content: (
         <div className="space-y-6">
           <ActionsSection
+            editing={params.editing}
             character={character}
             showAttackRoll={params.showAttackRoll}
             showSavingThrow={params.showSavingThrow}
@@ -474,7 +475,7 @@ export function createTabbedSheetConfig(
           </ErrorBoundary>
           {renderSlotTracker()}
           <ErrorBoundary fallback={<SheetLoadError thing="Spells" />}>
-            <SpellManagement />
+            <SpellManagement editing={params.editing} />
           </ErrorBoundary>
         </div>
       ),

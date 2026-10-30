@@ -15,6 +15,7 @@ import { cn } from '@/utils/cn';
 import { CharacterState } from '@/types/character';
 
 interface ActionsSectionProps {
+  editing?: boolean;
   character: CharacterState;
   showAttackRoll: (
     name: string,
@@ -46,6 +47,7 @@ interface ActionsSectionProps {
 }
 
 export default function ActionsSection({
+  editing = false,
   character,
   showAttackRoll,
   showSavingThrow,
@@ -111,6 +113,7 @@ export default function ActionsSection({
           }
         >
           <EquippedWeapons
+            editing={editing}
             showAttackRoll={showAttackRoll}
             showDamageRoll={showDamageRoll}
             animateRoll={animateRoll}

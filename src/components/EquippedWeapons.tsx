@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 
 interface EquippedWeaponsProps {
+  editing?: boolean;
   showAttackRoll: (
     weaponName: string,
     roll: number,
@@ -56,6 +57,7 @@ interface EquippedWeaponsProps {
 }
 
 export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
+  editing = false,
   showAttackRoll,
   showDamageRoll,
   animateRoll,
@@ -294,7 +296,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
         itemClassName="py-4 pl-7"
         showDragHandle={true}
         dragHandlePosition="left"
-        renderItem={weapon => {
+        renderItem={(weapon, index) => {
           const isProficient = isWeaponProficient(character, weapon);
           const attackString = getWeaponAttackString(character, weapon);
           const damageString = getWeaponDamageString(character, weapon);
@@ -523,6 +525,36 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                 >
                   Unequip
                 </Button>
+                {editing && (
+                  <div className="border-divider flex flex-wrap gap-1 border-l pl-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={`Move ${weapon.name} up`}
+                      disabled={index === 0}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() =>
+                        handleReorderEquippedWeapons(index, index - 1)
+                      }
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={`Move ${weapon.name} down`}
+                      disabled={index === equippedWeapons.length - 1}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() =>
+                        handleReorderEquippedWeapons(index, index + 1)
+                      }
+                    >
+                      Move down
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           );

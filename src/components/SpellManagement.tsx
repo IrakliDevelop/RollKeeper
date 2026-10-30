@@ -415,6 +415,7 @@ const LevelSection: React.FC<{
   onToggleFavorite: (id: string) => void;
   onSpellCast: (spell: Spell) => void;
   onReorder: (sourceIndex: number, destinationIndex: number) => void;
+  showMoveControls: boolean;
   slotMax?: number;
   slotUsed?: number;
 }> = ({
@@ -432,6 +433,7 @@ const LevelSection: React.FC<{
   onToggleFavorite,
   onSpellCast,
   onReorder,
+  showMoveControls,
   slotMax,
   slotUsed,
 }) => {
@@ -493,19 +495,49 @@ const LevelSection: React.FC<{
             itemClassName="pl-6"
             showDragHandle={true}
             dragHandlePosition="left"
-            renderItem={spell => (
-              <SpellCard
-                spell={spell}
-                compact={compact}
-                isFavorite={favoriteSpells.includes(spell.id)}
-                totalLevel={totalLevel}
-                onEdit={() => onSpellEdit(spell)}
-                onDelete={() => onSpellDelete(spell.id)}
-                onView={() => onSpellView(spell)}
-                onTogglePrepared={() => onTogglePrepared(spell.id)}
-                onToggleFavorite={() => onToggleFavorite(spell.id)}
-                onCast={() => onSpellCast(spell)}
-              />
+            renderItem={(spell, index) => (
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <SpellCard
+                    spell={spell}
+                    compact={compact}
+                    isFavorite={favoriteSpells.includes(spell.id)}
+                    totalLevel={totalLevel}
+                    onEdit={() => onSpellEdit(spell)}
+                    onDelete={() => onSpellDelete(spell.id)}
+                    onView={() => onSpellView(spell)}
+                    onTogglePrepared={() => onTogglePrepared(spell.id)}
+                    onToggleFavorite={() => onToggleFavorite(spell.id)}
+                    onCast={() => onSpellCast(spell)}
+                  />
+                </div>
+                {showMoveControls && (
+                  <div className="flex flex-wrap gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={`Move ${spell.name} up`}
+                      disabled={index === 0}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() => onReorder(index, index - 1)}
+                    >
+                      Move up
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="xs"
+                      aria-label={`Move ${spell.name} down`}
+                      disabled={index === spells.length - 1}
+                      className="pointer-coarse:min-h-11"
+                      onClick={() => onReorder(index, index + 1)}
+                    >
+                      Move down
+                    </Button>
+                  </div>
+                )}
+              </div>
             )}
           />
         </div>
@@ -514,7 +546,9 @@ const LevelSection: React.FC<{
   );
 };
 
-export const SpellManagement: React.FC = () => {
+export const SpellManagement: React.FC<{ editing?: boolean }> = ({
+  editing = false,
+}) => {
   const {
     character,
     updateCharacter,
@@ -646,9 +680,6 @@ export const SpellManagement: React.FC = () => {
           break;
         case 'level':
           comparison = a.level - b.level;
-          if (comparison === 0) {
-            comparison = a.name.localeCompare(b.name);
-          }
           break;
         case 'school':
           comparison = a.school.localeCompare(b.school);
@@ -1237,6 +1268,9 @@ export const SpellManagement: React.FC = () => {
               onToggleFavorite={toggleSpellFavorite}
               onSpellCast={handleCastSpell}
               onReorder={handleReorderSpellsInLevel(level)}
+              showMoveControls={
+                editing && sortBy === 'level' && sortOrder === 'asc'
+              }
               slotMax={
                 level > 0
                   ? character.spellSlots[
