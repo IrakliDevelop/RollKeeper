@@ -14,6 +14,7 @@ import {
   RadioGroupItem,
 } from '@/components/ui/forms/radio-group';
 import { Badge } from '@/components/ui/layout/badge';
+import { SlotPips } from '@/components/ui/game/SlotPips';
 import {
   Dialog,
   DialogContent,
@@ -261,13 +262,12 @@ export function SpellCastModal({
                       else if (value.startsWith('slot-'))
                         handleSelectSlot(Number(value.slice(5)));
                     }}
-                    className="grid-cols-1 sm:grid-cols-2"
+                    className="grid-cols-1 gap-0"
                   >
                     {hasFreeCasting && (
                       <RadioGroupItem
                         value="free"
-                        variant="card"
-                        wrapperClassName="pointer-coarse:min-h-11"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
                         disabled={!canFreecast}
                         label={
                           isAtWill
@@ -284,8 +284,7 @@ export function SpellCastModal({
                     {canRitual && (
                       <RadioGroupItem
                         value="ritual"
-                        variant="card"
-                        wrapperClassName="pointer-coarse:min-h-11"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
                         label="Cast as a ritual (no slot)"
                         description="+10 min casting time"
                       />
@@ -293,8 +292,7 @@ export function SpellCastModal({
                     {pactAvailable && (
                       <RadioGroupItem
                         value="pact"
-                        variant="card"
-                        wrapperClassName="pointer-coarse:min-h-11"
+                        wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
                         disabled={!canPact}
                         label={`Pact slot (level ${pactMagic!.level})`}
                         description={`${pactRemaining}/${pactMagic!.slots.max} remaining`}
@@ -306,10 +304,16 @@ export function SpellCastModal({
                         <RadioGroupItem
                           key={level}
                           value={`slot-${level}`}
-                          variant="card"
-                          wrapperClassName="pointer-coarse:min-h-11"
+                          wrapperClassName="border-divider border-b py-3 pointer-coarse:min-h-11"
                           label={`Level ${level}${level === spell.level ? ' (base level)' : ''}`}
                           description={`${slot.max - slot.used}/${slot.max} available`}
+                          icon={
+                            <SlotPips
+                              level={level}
+                              total={slot.max}
+                              available={slot.max - slot.used}
+                            />
+                          }
                         />
                       );
                     })}
