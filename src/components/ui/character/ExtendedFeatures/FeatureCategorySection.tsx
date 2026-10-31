@@ -21,7 +21,7 @@ interface FeatureCategorySectionProps {
   ) => void;
   onDeleteFeature: (id: string) => void;
   onUseFeature: (id: string) => void;
-  onReorderFeatures: (sourceIndex: number, destinationIndex: number) => void;
+  onReorderFeatures: (sourceId: string, targetId: string) => void;
   favoriteFeatureIds?: string[];
   onToggleFavoriteFeature?: (id: string) => void;
   readonly?: boolean;
@@ -83,7 +83,11 @@ export default function FeatureCategorySection({
         <div className="border-divider border-t p-6">
           <DragDropList
             items={features}
-            onReorder={onReorderFeatures}
+            onReorder={(sourceIndex, destinationIndex) => {
+              const source = features[sourceIndex];
+              const target = features[destinationIndex];
+              if (source && target) onReorderFeatures(source.id, target.id);
+            }}
             keyExtractor={feature => feature.id}
             disabled={readonly}
             className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"

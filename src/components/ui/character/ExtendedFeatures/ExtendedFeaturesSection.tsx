@@ -23,11 +23,7 @@ interface ExtendedFeaturesSectionProps {
   onDeleteFeature: (id: string) => void;
   onUseFeature: (id: string) => void;
   onResetFeatures: (restType: 'short' | 'long') => void;
-  onReorderFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  onReorderFeatures: (sourceId: string, targetId: string) => void;
   onAddSpells?: (spells: Spell[]) => void;
   favoriteFeatureIds?: string[];
   onToggleFavoriteFeature?: (id: string) => void;
@@ -162,16 +158,7 @@ export default function ExtendedFeaturesSection({
                   onUpdateFeature={onUpdateFeature}
                   onDeleteFeature={onDeleteFeature}
                   onUseFeature={onUseFeature}
-                  onReorderFeatures={(
-                    sourceIndex: number,
-                    destinationIndex: number
-                  ) =>
-                    onReorderFeatures(
-                      sourceIndex,
-                      destinationIndex,
-                      category.sourceType
-                    )
-                  }
+                  onReorderFeatures={onReorderFeatures}
                   favoriteFeatureIds={favoriteFeatureIds}
                   onToggleFavoriteFeature={onToggleFavoriteFeature}
                   readonly={readonly}

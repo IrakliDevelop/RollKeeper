@@ -207,11 +207,7 @@ export interface TabbedSheetConfigParams {
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
-  reorderExtendedFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  reorderExtendedFeatures: (sourceId: string, targetId: string) => void;
   addSpellsFromFeat?: (spells: Spell[]) => void;
   toggleFavoriteFeature: (id: string) => void;
 
