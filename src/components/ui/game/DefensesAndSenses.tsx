@@ -7,7 +7,7 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
-import { Plus, X, Search, Info, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, X, Search, Info, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -22,6 +22,9 @@ import {
 } from '@/components/ui/forms/select';
 import { useCharacterStore } from '@/store/characterStore';
 import { useSensesData } from '@/hooks/useSensesData';
+import type { CharacterSense } from '@/types/character';
+
+const EMPTY_SENSES: CharacterSense[] = [];
 
 const DAMAGE_TYPES = [
   'Acid',
@@ -172,6 +175,7 @@ function TagSelector({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search"
+            aria-label={`Search ${label.toLowerCase()}`}
             leftIcon={<Search size={14} />}
             size="sm"
             onKeyDown={e => {
@@ -235,7 +239,7 @@ function SensesSection({ editing }: { editing: boolean }) {
     if (!editing) setIsAdding(false);
   }, [editing]);
 
-  const characterSenses = character.senses;
+  const characterSenses = character.senses ?? EMPTY_SENSES;
   useLayoutEffect(() => {
     const target = focusAfterRemoval.current;
     if (!target) return;
@@ -325,6 +329,7 @@ function SensesSection({ editing }: { editing: boolean }) {
                       }
                       className="text-muted hover:text-body rounded p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       aria-label={`Show ${sense.name} description`}
+                      aria-expanded={expandedId === sense.id}
                     >
                       <Info size={14} />
                     </button>
@@ -464,8 +469,6 @@ export default function DefensesAndSenses({
   const removeConditionImmunity = useCharacterStore(
     s => s.removeConditionImmunity
   );
-  const [isCollapsed, setIsCollapsed] = useState(false);
-  const contentId = React.useId();
 
   const damageImmunities = character.damageImmunities || [];
   const damageResistances = character.damageResistances || [];
@@ -479,67 +482,46 @@ export default function DefensesAndSenses({
 
   return (
     <Section
-      heading={
-        <>
-          Defenses and senses{' '}
-          {totalCount > 0 && (
-            <Badge variant="neutral" size="sm">
-              {totalCount}
-            </Badge>
-          )}
-        </>
-      }
+      heading="Defenses and senses"
       level={3}
-      contentClassName={isCollapsed ? 'hidden' : undefined}
+      collapsible="combat-defenses-senses"
+      contentClassName="space-y-6"
       trailing={
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          className="px-2"
-          aria-label={isCollapsed ? 'Expand defenses' : 'Collapse defenses'}
-          aria-expanded={!isCollapsed}
-          aria-controls={contentId}
-          onClick={() => setIsCollapsed(!isCollapsed)}
-        >
-          {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-        </Button>
+        totalCount > 0 ? (
+          <Badge variant="neutral" size="sm">
+            {totalCount}
+          </Badge>
+        ) : null
       }
     >
-      <div id={contentId} className="space-y-6">
-        {!isCollapsed && (
-          <>
-            <TagSelector
-              label="Damage resistances"
-              items={damageResistances}
-              options={DAMAGE_TYPES}
-              editing={editing}
-              onAdd={addDamageResistance}
-              onRemove={removeDamageResistance}
-              allowCustom
-            />
-            <TagSelector
-              label="Damage immunities"
-              items={damageImmunities}
-              options={DAMAGE_TYPES}
-              editing={editing}
-              onAdd={addDamageImmunity}
-              onRemove={removeDamageImmunity}
-              allowCustom
-            />
-            <TagSelector
-              label="Condition immunities"
-              items={conditionImmunities}
-              options={CONDITION_TYPES}
-              editing={editing}
-              onAdd={addConditionImmunity}
-              onRemove={removeConditionImmunity}
-              allowCustom
-            />
-            <SensesSection editing={editing} />
-          </>
-        )}
-      </div>
+      <TagSelector
+        label="Damage resistances"
+        items={damageResistances}
+        options={DAMAGE_TYPES}
+        editing={editing}
+        onAdd={addDamageResistance}
+        onRemove={removeDamageResistance}
+        allowCustom
+      />
+      <TagSelector
+        label="Damage immunities"
+        items={damageImmunities}
+        options={DAMAGE_TYPES}
+        editing={editing}
+        onAdd={addDamageImmunity}
+        onRemove={removeDamageImmunity}
+        allowCustom
+      />
+      <TagSelector
+        label="Condition immunities"
+        items={conditionImmunities}
+        options={CONDITION_TYPES}
+        editing={editing}
+        onAdd={addConditionImmunity}
+        onRemove={removeConditionImmunity}
+        allowCustom
+      />
+      <SensesSection editing={editing} />
     </Section>
   );
 }

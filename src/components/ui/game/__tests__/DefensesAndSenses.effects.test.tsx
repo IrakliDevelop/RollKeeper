@@ -12,6 +12,7 @@ import { makeCharacter } from '@/utils/__tests__/test-utils';
 
 describe('DefensesAndSenses effects', () => {
   beforeEach(() => {
+    localStorage.clear();
     const character = makeCharacter();
     character.damageResistances = ['Fire', 'Cold'];
     character.damageImmunities = ['Poison'];
@@ -92,7 +93,7 @@ describe('DefensesAndSenses effects', () => {
     ).toBe(true);
   });
 
-  it('closes an open selector on edit-to-play and resets collapse on remount', async () => {
+  it('closes an open selector on edit-to-play and keeps collapse across remounts', async () => {
     const user = userEvent.setup();
     const view = render(<DefensesAndSenses editing />);
     await user.click(
@@ -111,13 +112,13 @@ describe('DefensesAndSenses effects', () => {
     ).toHaveLength(0);
     view.rerender(<DefensesAndSenses editing />);
     expect(screen.queryByPlaceholderText('Search')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Collapse defenses' }));
-    expect(
-      screen.getByRole('button', { name: 'Expand defenses' })
-    ).toBeTruthy();
+    await user.click(
+      screen.getByRole('button', { name: 'Defenses and senses' })
+    );
     expect(screen.queryByText('Fire')).toBeNull();
     view.unmount();
+    // Collapse is a per-device preference now: it survives a remount.
     render(<DefensesAndSenses editing />);
-    expect(screen.getByText('Fire')).toBeTruthy();
+    expect(screen.queryByText('Fire')).toBeNull();
   });
 });

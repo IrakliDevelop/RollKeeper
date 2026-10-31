@@ -416,6 +416,8 @@ function SpiritSummonPanel({
             {spiritPreview.subtypes.map(st => (
               <button
                 key={st}
+                type="button"
+                aria-pressed={selectedSubtype === st}
                 onClick={() => onSelectSubtype(st)}
                 className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
                   selectedSubtype === st

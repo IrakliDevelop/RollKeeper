@@ -239,6 +239,7 @@ export function SummonCard({
         <Button
           variant="ghost"
           ref={addConditionRef}
+          aria-expanded={showConditions}
           onClick={() => setShowConditions(!showConditions)}
           className="h-7 px-2 text-xs"
         >
@@ -247,6 +248,7 @@ export function SummonCard({
         {entity.monsterStatBlock && (
           <Button
             variant="ghost"
+            aria-expanded={showStatBlock}
             onClick={() => setShowStatBlock(!showStatBlock)}
             className="h-7 px-2 text-xs"
           >

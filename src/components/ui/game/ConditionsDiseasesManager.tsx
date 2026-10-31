@@ -286,7 +286,11 @@ export default function ConditionsDiseasesManager() {
     >
       <div className="border-divider flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b pb-3">
         <div className="flex flex-wrap items-center gap-2">
-          <ConditionChip name="Exhaustion" />
+          {exhaustion.level > 0 ? (
+            <ConditionChip name="Exhaustion" />
+          ) : (
+            <span className="type-ui text-heading">Exhaustion</span>
+          )}
           <span className="type-small text-muted">
             Using {exhaustionVariant} rules
           </span>

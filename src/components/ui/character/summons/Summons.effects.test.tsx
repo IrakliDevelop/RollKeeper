@@ -216,4 +216,46 @@ describe('Summons combat effects', () => {
       )
     );
   });
+
+  it('names Dismiss by the summon and reports open state on its toggles', async () => {
+    const user = userEvent.setup();
+    render(
+      <SummonCard
+        summon={{
+          ...summon,
+          entity: {
+            ...summon.entity,
+            monsterStatBlock: {
+              conditionImmunities: [],
+              traits: [],
+              actions: [],
+              reactions: [],
+              bonusActions: [],
+              lairActions: [],
+            } as unknown as NonNullable<Summon['entity']['monsterStatBlock']>,
+          },
+        }}
+        onDamage={vi.fn()}
+        onHeal={vi.fn()}
+        onAddTempHp={vi.fn()}
+        onAddCondition={vi.fn()}
+        onRemoveCondition={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Dismiss Very long summoned creature name',
+      })
+    ).toBeTruthy();
+    for (const name of ['Add condition', 'Stat block']) {
+      const toggle = screen.getByRole('button', { name });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      await user.click(toggle);
+      expect(screen.getByRole('button', { name })).toHaveAttribute(
+        'aria-expanded',
+        'true'
+      );
+    }
+  });
 });

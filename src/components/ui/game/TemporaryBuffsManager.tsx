@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { Plus, X, Trash2, ChevronDown, ChevronUp, Pencil } from 'lucide-react';
+import { Plus, X, Trash2, Pencil } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import type {
   TemporaryBuff,
@@ -852,7 +852,6 @@ export default function TemporaryBuffsManager() {
   } = useCharacterStore();
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBuffId, setEditingBuffId] = useState<string | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
   const addButtonRef = React.useRef<HTMLButtonElement>(null);
   const listRef = React.useRef<HTMLDivElement>(null);
   const pendingFocus = React.useRef<string | 'add' | null>(null);
@@ -903,22 +902,9 @@ export default function TemporaryBuffsManager() {
 
   return (
     <Section
-      heading={
-        <Button
-          variant="ghost"
-          aria-expanded={!isCollapsed}
-          onClick={() => setIsCollapsed(value => !value)}
-          className="type-subheading h-auto min-h-6 px-0 py-0 text-left pointer-coarse:min-h-11"
-        >
-          Temporary buffs
-          {isCollapsed ? (
-            <ChevronDown aria-hidden="true" className="size-4" />
-          ) : (
-            <ChevronUp aria-hidden="true" className="size-4" />
-          )}
-        </Button>
-      }
+      heading="Temporary buffs"
       level={3}
+      collapsible="combat-temporary-buffs"
       trailing={
         buffs.length > 0 ? (
           <Badge variant="neutral" size="sm">
@@ -927,46 +913,42 @@ export default function TemporaryBuffsManager() {
         ) : null
       }
     >
-      {!isCollapsed && (
-        <>
-          <div className="mb-2 flex flex-wrap justify-end gap-2">
-            {buffs.length > 0 && (
-              <Button variant="danger" size="sm" onClick={handleClear}>
-                Clear all
-              </Button>
-            )}
-            <Button
-              ref={addButtonRef}
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setEditingBuffId(null);
-                setShowAddForm(true);
-              }}
-            >
-              Add buff
-            </Button>
-          </div>
-          <div ref={listRef} role="list" className="divide-divider divide-y">
-            {buffs.map(buff => (
-              <BuffCard
-                key={buff.id}
-                buff={buff}
-                onToggle={toggleBuff}
-                onEdit={id => {
-                  setShowAddForm(false);
-                  setEditingBuffId(id);
-                }}
-                onDelete={handleDelete}
-              />
-            ))}
-          </div>
-          {buffs.length === 0 && (
-            <p className="type-body text-muted py-8 text-center">
-              Add a buff from a spell, feature or item.
-            </p>
-          )}
-        </>
+      <div className="mb-2 flex flex-wrap justify-end gap-2">
+        {buffs.length > 0 && (
+          <Button variant="danger" size="sm" onClick={handleClear}>
+            Clear all
+          </Button>
+        )}
+        <Button
+          ref={addButtonRef}
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            setEditingBuffId(null);
+            setShowAddForm(true);
+          }}
+        >
+          Add buff
+        </Button>
+      </div>
+      <div ref={listRef} role="list" className="divide-divider divide-y">
+        {buffs.map(buff => (
+          <BuffCard
+            key={buff.id}
+            buff={buff}
+            onToggle={toggleBuff}
+            onEdit={id => {
+              setShowAddForm(false);
+              setEditingBuffId(id);
+            }}
+            onDelete={handleDelete}
+          />
+        ))}
+      </div>
+      {buffs.length === 0 && (
+        <p className="type-body text-muted py-8 text-center">
+          Add a buff from a spell, feature or item.
+        </p>
       )}
       <Dialog
         open={formOpen}

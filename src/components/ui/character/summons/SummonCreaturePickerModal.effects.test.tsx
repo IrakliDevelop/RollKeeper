@@ -69,3 +69,27 @@ it('shows saved creature actions at rest in the Spells picker and restores focus
     )
   );
 });
+
+it('marks the chosen spirit form as pressed', async () => {
+  const user = userEvent.setup();
+  render(
+    <SummonCreaturePickerModal
+      open
+      onClose={vi.fn()}
+      spell={{ ...spell, name: 'Summon Beast', level: 2 }}
+      castAtLevel={2}
+      onSummonCreated={vi.fn()}
+    />
+  );
+  const land = await screen.findByRole('button', { name: 'Land' });
+  expect(land).toHaveAttribute('aria-pressed');
+  await user.click(land);
+  expect(screen.getByRole('button', { name: 'Land' })).toHaveAttribute(
+    'aria-pressed',
+    'true'
+  );
+  expect(screen.getByRole('button', { name: 'Air' })).toHaveAttribute(
+    'aria-pressed',
+    'false'
+  );
+});

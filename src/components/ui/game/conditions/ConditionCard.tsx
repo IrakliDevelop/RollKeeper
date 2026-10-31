@@ -54,10 +54,12 @@ export function ConditionCard({
               {condition.name}
             </Badge>
           ) : (
-            <ConditionChip
-              name={condition.name}
-              stackCount={condition.stackable ? condition.count : undefined}
-            />
+            <ConditionChip name={condition.name} />
+          )}
+          {condition.stackable && condition.count > 1 && (
+            <Badge variant="neutral" size="sm">
+              Level {condition.count}
+            </Badge>
           )}
           {condition.notes && (
             <Badge variant="neutral" size="sm">
