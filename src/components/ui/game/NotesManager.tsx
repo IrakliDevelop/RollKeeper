@@ -124,14 +124,14 @@ export default function NotesManager({
     <div className={className}>
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-heading text-lg font-semibold">Session Notes</h2>
+        <h2 className="text-heading text-lg font-semibold">Session notes</h2>
         <Button
           variant="primary"
           size="sm"
           leftIcon={<Plus size={14} />}
           onClick={() => setIsAddModalOpen(true)}
         >
-          Add Note
+          Add note
         </Button>
       </div>
 
@@ -142,7 +142,7 @@ export default function NotesManager({
             <Input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Search notes..."
+              placeholder="Search notes"
               size="sm"
               leftIcon={<Search size={14} />}
               clearable
@@ -174,13 +174,11 @@ export default function NotesManager({
         <div className="text-muted py-12 text-center">
           <BookOpen className="text-faint mx-auto mb-4 h-12 w-12" />
           <p className="mb-2 text-lg font-medium">
-            {searchQuery ? 'No matching notes' : 'No notes yet'}
+            {searchQuery ? 'No matching notes' : 'Write your first note'}
           </p>
-          <p className="text-sm">
-            {searchQuery
-              ? 'Try a different search term.'
-              : "Click 'Add Note' to start taking notes about your adventures."}
-          </p>
+          {searchQuery && (
+            <p className="text-sm">Try a different search term.</p>
+          )}
         </div>
       ) : (
         <DragDropList

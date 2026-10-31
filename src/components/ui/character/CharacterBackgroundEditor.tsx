@@ -1,10 +1,12 @@
 'use client';
 
-import React, { useState } from 'react';
-import { User, Heart, Star, Link, AlertTriangle } from 'lucide-react';
-import { CharacterBackground } from '@/types/character';
+import { useState } from 'react';
+import type { CharacterBackground } from '@/types/character';
 import { RichTextEditor } from '@/components/ui/forms';
-import { AppIcon } from '@/components/ui/icons';
+import { Section } from '@/components/ui/layout/section';
+import { SubTabs } from '@/components/ui/layout/SubTabs';
+
+type BackgroundTab = 'backstory' | 'personality' | 'ideals' | 'bonds' | 'flaws';
 
 interface CharacterBackgroundEditorProps {
   background: CharacterBackground;
@@ -12,189 +14,125 @@ interface CharacterBackgroundEditorProps {
   className?: string;
 }
 
-type BackgroundTab = 'backstory' | 'personality' | 'ideals' | 'bonds' | 'flaws';
-
-interface TabConfig {
+const BACKGROUND_TABS: {
   id: BackgroundTab;
   label: string;
-  icon: React.ReactNode;
   placeholder: string;
   description: string;
-  color: string;
-}
-
-const BACKGROUND_TABS: TabConfig[] = [
+  tips: string[];
+}[] = [
   {
     id: 'backstory',
     label: 'Backstory',
-    icon: <User size={16} />,
     placeholder: "Tell your character's story...",
     description:
       "Your character's history, origins, and important life events.",
-    color: 'blue',
+    tips: [
+      "Include your character's origins and family",
+      'Mention key events that shaped them',
+      'Explain how they got their class abilities',
+    ],
   },
   {
     id: 'personality',
     label: 'Personality',
-    icon: <Star size={16} />,
     placeholder: "Describe your character's personality...",
     description: 'Personality traits, mannerisms, and behavioral quirks.',
-    color: 'purple',
+    tips: [
+      'Describe how they interact with others',
+      'Include speech patterns or mannerisms',
+      'Mention what makes them laugh or angry',
+    ],
   },
   {
     id: 'ideals',
     label: 'Ideals',
-    icon: <Heart size={16} />,
     placeholder: 'What drives your character...',
     description:
       'Principles, values, and beliefs that motivate your character.',
-    color: 'rose',
+    tips: [
+      'What principles guide their decisions?',
+      'What do they believe is most important?',
+      'What would they die for?',
+    ],
   },
   {
     id: 'bonds',
     label: 'Bonds',
-    icon: <Link size={16} />,
     placeholder: 'Who or what matters to your character...',
     description:
       'Important people, places, or things your character cares about.',
-    color: 'green',
+    tips: [
+      'Important people in their life',
+      'Meaningful possessions or locations',
+      "Goals or promises they've made",
+    ],
   },
   {
     id: 'flaws',
     label: 'Flaws',
-    icon: <AlertTriangle size={16} />,
     placeholder: "Your character's weaknesses...",
     description:
       'Weaknesses, fears, or negative traits that create interesting roleplay.',
-    color: 'orange',
+    tips: [
+      'Fears or phobias they struggle with',
+      'Bad habits or vices',
+      'Ways they might betray the party',
+    ],
   },
 ];
 
 export default function CharacterBackgroundEditor({
   background,
   onChange,
-  className = '',
+  className,
 }: CharacterBackgroundEditorProps) {
   const [activeTab, setActiveTab] = useState<BackgroundTab>('backstory');
 
-  const activeTabConfig = BACKGROUND_TABS.find(tab => tab.id === activeTab)!;
-
-  const handleContentChange = (field: BackgroundTab, content: string) => {
-    onChange({ [field]: content });
-  };
-
   return (
-    <div
-      className={`border-divider bg-surface-raised rounded-lg border shadow-lg ${className}`}
-    >
-      <div className="border-divider border-b">
-        <div className="p-4">
-          <h2 className="text-heading mb-4 text-lg font-bold">
-            Character Background
-          </h2>
-
-          {/* Tab Navigation */}
-          <div className="flex flex-wrap gap-2">
-            {BACKGROUND_TABS.map(tab => (
-              <button
+    <Section heading="Character background" className={className}>
+      <SubTabs
+        label="Character background"
+        value={activeTab}
+        onValueChange={value => setActiveTab(value as BackgroundTab)}
+        tabs={BACKGROUND_TABS.map(tab => ({
+          value: tab.id,
+          id: `background-${tab.id}`,
+          label: tab.label,
+          content: (
+            <div className="space-y-4">
+              <p className="type-body text-muted">{tab.description}</p>
+              <RichTextEditor
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center space-x-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  activeTab === tab.id
-                    ? `bg-${tab.color}-100 text-${tab.color}-700 border border-${tab.color}-300`
-                    : 'text-muted hover:bg-surface-hover hover:text-heading'
-                }`}
-              >
-                {tab.icon}
-                <span>{tab.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Active Tab Content */}
-      <div className="p-4">
-        <div className="mb-4">
-          <div className="mb-2 flex items-center space-x-2">
-            <div className={`text-${activeTabConfig.color}-600`}>
-              {activeTabConfig.icon}
-            </div>
-            <h3 className={`font-semibold text-${activeTabConfig.color}-800`}>
-              {activeTabConfig.label}
-            </h3>
-          </div>
-          <p className="text-muted mb-4 text-sm">
-            {activeTabConfig.description}
-          </p>
-        </div>
-
-        <RichTextEditor
-          key={activeTab} // Force re-render when tab changes
-          content={background[activeTab]}
-          onChange={content => handleContentChange(activeTab, content)}
-          placeholder={activeTabConfig.placeholder}
-          minHeight="200px"
-        />
-
-        {/* Character Count & Tips */}
-        <div className="mt-4 flex items-start justify-between">
-          <div className="text-muted text-xs">
-            {background[activeTab] && (
-              <span>
-                {background[activeTab].replace(/<[^>]*>/g, '').length}{' '}
-                characters
-              </span>
-            )}
-          </div>
-
-          <div className="text-muted max-w-sm text-xs">
-            <details className="cursor-pointer">
-              <summary className="hover:text-body inline-flex items-center gap-1 font-medium">
-                <AppIcon name="tip" className="h-3.5 w-3.5" /> Tips for{' '}
-                {activeTabConfig.label}
-              </summary>
-              <div className="mt-2 space-y-1">
-                {activeTab === 'backstory' && (
-                  <>
-                    <p>• Include your character&apos;s origins and family</p>
-                    <p>• Mention key events that shaped them</p>
-                    <p>• Explain how they got their class abilities</p>
-                  </>
-                )}
-                {activeTab === 'personality' && (
-                  <>
-                    <p>• Describe how they interact with others</p>
-                    <p>• Include speech patterns or mannerisms</p>
-                    <p>• Mention what makes them laugh or angry</p>
-                  </>
-                )}
-                {activeTab === 'ideals' && (
-                  <>
-                    <p>• What principles guide their decisions?</p>
-                    <p>• What do they believe is most important?</p>
-                    <p>• What would they die for?</p>
-                  </>
-                )}
-                {activeTab === 'bonds' && (
-                  <>
-                    <p>• Important people in their life</p>
-                    <p>• Meaningful possessions or locations</p>
-                    <p>• Goals or promises they&apos;ve made</p>
-                  </>
-                )}
-                {activeTab === 'flaws' && (
-                  <>
-                    <p>• Fears or phobias they struggle with</p>
-                    <p>• Bad habits or vices</p>
-                    <p>• Ways they might betray the party</p>
-                  </>
-                )}
+                content={background[tab.id]}
+                onChange={content => onChange({ [tab.id]: content })}
+                placeholder={tab.placeholder}
+                minHeight="200px"
+              />
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <p className="type-caption text-muted">
+                  {background[tab.id] && (
+                    <>
+                      {background[tab.id].replace(/<[^>]*>/g, '').length}{' '}
+                      characters
+                    </>
+                  )}
+                </p>
+                <details className="type-caption text-muted max-w-sm">
+                  <summary className="hover:text-body cursor-pointer py-2 pointer-coarse:min-h-11">
+                    {tab.label} tips
+                  </summary>
+                  <ul className="mt-2 list-disc space-y-1 pl-5">
+                    {tab.tips.map(tip => (
+                      <li key={tip}>{tip}</li>
+                    ))}
+                  </ul>
+                </details>
               </div>
-            </details>
-          </div>
-        </div>
-      </div>
-    </div>
+            </div>
+          ),
+        }))}
+      />
+    </Section>
   );
 }

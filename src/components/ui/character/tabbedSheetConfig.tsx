@@ -510,7 +510,7 @@ export function createTabbedSheetConfig(
     {
       id: 'character',
       label: 'Character',
-      icon: <AppIcon name="features" className="h-4 w-4" />,
+      icon: <AppIcon name="character" className="h-4 w-4" />,
       content: <CharacterTabContent character={character} params={params} />,
     },
 
@@ -655,12 +655,12 @@ const CHARACTER_SUB_TABS = [
   {
     id: 'notes',
     label: 'Session notes',
-    icon: <AppIcon name="features" className="h-4 w-4" />,
+    icon: <AppIcon name="notes" className="h-4 w-4" />,
   },
   {
     id: 'details',
     label: 'Features and background',
-    icon: <AppIcon name="character" className="h-4 w-4" />,
+    icon: <AppIcon name="features" className="h-4 w-4" />,
   },
   {
     id: 'dice',
@@ -716,9 +716,9 @@ function CharacterTabContent({
               {(() => {
                 const days = params.calendarDays ?? character.daysSpent ?? 0;
                 return (
-                  <span className="border-accent-amber-border text-accent-amber-text inline-flex items-center gap-1.5 rounded-full border bg-gradient-to-r from-[var(--gradient-amber-from)] to-[var(--gradient-amber-to)] px-3 py-1 text-sm font-medium shadow-sm">
+                  <span className="type-caption text-muted inline-flex items-center gap-1.5">
                     <AppIcon name="calendar" className="h-4 w-4" />
-                    Campaign Day {days + 1}
+                    Campaign day {days + 1}
                   </span>
                 );
               })()}
@@ -739,26 +739,28 @@ function CharacterTabContent({
           ),
           details: (
             <div className="space-y-6">
-              <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                <ErrorBoundary fallback={<SheetLoadError thing="Features" />}>
-                  <FeaturesTraitsManager
-                    items={character.features}
-                    category="feature"
-                    onAdd={params.addFeature}
-                    onUpdate={params.updateFeature}
-                    onDelete={params.deleteFeature}
-                  />
-                </ErrorBoundary>
-                <ErrorBoundary fallback={<SheetLoadError thing="Traits" />}>
-                  <FeaturesTraitsManager
-                    items={character.traits}
-                    category="trait"
-                    onAdd={params.addTrait}
-                    onUpdate={params.updateTrait}
-                    onDelete={params.deleteTrait}
-                  />
-                </ErrorBoundary>
-              </div>
+              <Section heading="Features and traits">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                  <ErrorBoundary fallback={<SheetLoadError thing="Features" />}>
+                    <FeaturesTraitsManager
+                      items={character.features}
+                      category="feature"
+                      onAdd={params.addFeature}
+                      onUpdate={params.updateFeature}
+                      onDelete={params.deleteFeature}
+                    />
+                  </ErrorBoundary>
+                  <ErrorBoundary fallback={<SheetLoadError thing="Traits" />}>
+                    <FeaturesTraitsManager
+                      items={character.traits}
+                      category="trait"
+                      onAdd={params.addTrait}
+                      onUpdate={params.updateTrait}
+                      onDelete={params.deleteTrait}
+                    />
+                  </ErrorBoundary>
+                </div>
+              </Section>
 
               <ErrorBoundary fallback={<SheetLoadError thing="Background" />}>
                 <CharacterBackgroundEditor
