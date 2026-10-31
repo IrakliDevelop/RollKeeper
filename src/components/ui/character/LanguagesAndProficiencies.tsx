@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Plus, X, Languages as LanguagesIcon } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
+import { Section } from '@/components/ui/layout/section';
 import { Language } from '@/types/character';
 
 interface LanguagesProps {
@@ -11,105 +12,109 @@ interface LanguagesProps {
     language: Omit<Language, 'id' | 'createdAt' | 'updatedAt'>
   ) => void;
   onDeleteLanguage: (id: string) => void;
+  editing?: boolean;
 }
 
 export default function Languages({
   languages,
   onAddLanguage,
   onDeleteLanguage,
+  editing = false,
 }: LanguagesProps) {
   const [isAddingLanguage, setIsAddingLanguage] = useState(false);
   const [newLanguageName, setNewLanguageName] = useState('');
 
   const handleAddLanguage = () => {
-    if (newLanguageName.trim()) {
-      onAddLanguage({ name: newLanguageName.trim() });
-      setNewLanguageName('');
-      setIsAddingLanguage(false);
-    }
+    if (!newLanguageName.trim()) return;
+    onAddLanguage({ name: newLanguageName.trim() });
+    setNewLanguageName('');
+    setIsAddingLanguage(false);
   };
 
   return (
-    <div className="border-accent-indigo-border from-accent-indigo-bg to-accent-purple-bg mt-4 space-y-4 rounded-lg border bg-gradient-to-br p-4 shadow-md">
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h3 className="text-accent-indigo-text flex items-center gap-2 text-lg font-semibold">
-            <LanguagesIcon
-              size={18}
-              className="text-accent-indigo-text-muted"
-            />
-            Languages
-          </h3>
-          {!isAddingLanguage && (
-            <Button
-              onClick={() => setIsAddingLanguage(true)}
-              variant="primary"
-              size="xs"
-              leftIcon={<Plus size={16} />}
-              title="Add language"
-            />
-          )}
-        </div>
-
-        {isAddingLanguage && (
-          <div className="mb-3 flex items-center gap-2">
-            <Input
-              type="text"
-              value={newLanguageName}
-              onChange={e => setNewLanguageName(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') handleAddLanguage();
-                if (e.key === 'Escape') {
-                  setIsAddingLanguage(false);
-                  setNewLanguageName('');
-                }
-              }}
-              placeholder="e.g., Elvish"
-              className="flex-1"
-              autoFocus
-            />
-            <Button onClick={handleAddLanguage} variant="primary" size="sm">
-              Add
-            </Button>
-            <Button
-              onClick={() => {
+    <Section
+      heading="Languages"
+      trailing={
+        editing &&
+        !isAddingLanguage && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Add language"
+            leftIcon={<Plus className="size-4" />}
+            onClick={() => setIsAddingLanguage(true)}
+          >
+            Add
+          </Button>
+        )
+      }
+    >
+      {editing && isAddingLanguage && (
+        <div className="mb-4 flex flex-wrap items-end gap-2">
+          <Input
+            label="Language"
+            value={newLanguageName}
+            onChange={event => setNewLanguageName(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter') handleAddLanguage();
+              if (event.key === 'Escape') {
                 setIsAddingLanguage(false);
                 setNewLanguageName('');
-              }}
-              variant="ghost"
-              size="sm"
-              className="bg-bg-tertiary hover:bg-bg-tertiary/80 text-body"
-            >
-              Cancel
-            </Button>
-          </div>
-        )}
-
-        <div className="flex flex-wrap gap-2">
-          {languages.length === 0 && !isAddingLanguage && (
-            <p className="text-accent-indigo-text-muted text-sm italic">
-              No languages added yet
-            </p>
-          )}
-          {languages.map(lang => (
+              }
+            }}
+            placeholder="Elvish"
+            wrapperClassName="min-w-40 flex-1"
+            autoFocus
+          />
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            onClick={handleAddLanguage}
+          >
+            Add
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setIsAddingLanguage(false);
+              setNewLanguageName('');
+            }}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
+      {languages.length === 0 ? (
+        <p className="text-muted text-sm">No languages added yet</p>
+      ) : (
+        <div className="divide-divider divide-y">
+          {languages.map(language => (
             <div
-              key={lang.id}
-              className="group border-accent-indigo-border-strong from-accent-indigo-bg-strong to-accent-purple-bg-strong text-accent-indigo-text flex items-center gap-2 rounded-full border-2 bg-gradient-to-r px-4 py-1.5 text-sm font-medium shadow-sm transition-all hover:shadow-md"
+              key={language.id}
+              className="flex min-h-11 items-center justify-between gap-3 py-2"
             >
-              <span>{lang.name}</span>
-              <Button
-                onClick={() => onDeleteLanguage(lang.id)}
-                variant="ghost"
-                size="xs"
-                className="hover:bg-accent-red-bg h-5 w-5 rounded-full p-0.5 opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
-                title="Remove language"
-              >
-                <X size={14} className="text-red-600" />
-              </Button>
+              <span className="text-body min-w-0 text-sm break-words">
+                {language.name}
+              </span>
+              {editing && (
+                <Button
+                  type="button"
+                  variant="danger"
+                  size="sm"
+                  aria-label="Remove language"
+                  onClick={() => onDeleteLanguage(language.id)}
+                >
+                  <Trash2 className="size-4" aria-hidden="true" />
+                </Button>
+              )}
             </div>
           ))}
         </div>
-      </div>
-    </div>
+      )}
+    </Section>
   );
 }
