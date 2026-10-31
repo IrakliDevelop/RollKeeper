@@ -147,7 +147,12 @@ export function WeaponsTab() {
       {filteredItems.length > 0 ? (
         <DragDropList
           items={filteredItems}
-          onReorder={reorderWeapons}
+          onReorder={(sourceIndex, destinationIndex) => {
+            const source = filteredItems[sourceIndex];
+            const destination = filteredItems[destinationIndex];
+            if (source && destination)
+              reorderWeapons(source.id, destination.id);
+          }}
           keyExtractor={w => w.id}
           className="space-y-2"
           showDragHandle

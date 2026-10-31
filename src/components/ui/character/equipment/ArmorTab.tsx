@@ -94,7 +94,12 @@ export function ArmorTab() {
       {filteredItems.length > 0 ? (
         <DragDropList
           items={filteredItems}
-          onReorder={reorderArmorItems}
+          onReorder={(sourceIndex, destinationIndex) => {
+            const source = filteredItems[sourceIndex];
+            const destination = filteredItems[destinationIndex];
+            if (source && destination)
+              reorderArmorItems(source.id, destination.id);
+          }}
           keyExtractor={a => a.id}
           className="space-y-2"
           showDragHandle

@@ -169,7 +169,12 @@ export function MagicItemsTab() {
       {filteredItems.length > 0 ? (
         <DragDropList
           items={filteredItems}
-          onReorder={reorderMagicItems}
+          onReorder={(sourceIndex, destinationIndex) => {
+            const source = filteredItems[sourceIndex];
+            const destination = filteredItems[destinationIndex];
+            if (source && destination)
+              reorderMagicItems(source.id, destination.id);
+          }}
           keyExtractor={i => i.id}
           className="space-y-2"
           showDragHandle

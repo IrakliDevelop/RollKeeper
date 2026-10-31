@@ -64,6 +64,17 @@ describe('canonical mutation middleware', () => {
     expect(state.character.revision).toBe(10);
   });
 
+  it('replays a stale equipment reorder intent without changing the canonical character', () => {
+    const before = useCharacterStore.getState().character;
+    withIntentContext({ tabId: 'follower-reorder', seq: 3 }, () => {
+      useCharacterStore.getState().reorderWeapons('missing', 'also-missing');
+    });
+    const state = useCharacterStore.getState();
+    expect(state.character).toBe(before);
+    expect(state.character.revision).toBe(10);
+    expect(state.intentWatermarks['follower-reorder']?.seq).toBe(3);
+  });
+
   it('noteIntentApplied advances the watermark standalone', () => {
     useCharacterStore.getState().noteIntentApplied('sender-3', 4);
     expect(useCharacterStore.getState().intentWatermarks['sender-3']?.seq).toBe(
