@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { Plus, Minus, Search, ChevronDown, ChevronUp } from 'lucide-react';
-import { cn } from '@/utils/cn';
+import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/forms/radio-group';
 import { useFeatsData } from '@/hooks/useFeatsData';
 import { parseAdditionalSpells } from '@/utils/additionalSpellsParser';
 import GrantedSpellPicker from '@/components/ui/character/ExtendedFeatures/GrantedSpellPicker';
@@ -15,7 +16,7 @@ import type { ProcessedFeat } from '@/utils/featDataLoader';
 interface ASIFeatStepProps {
   abilities: CharacterAbilities;
   asiChoice: ASIChoice | undefined;
-  onChoiceChange: (choice: ASIChoice) => void;
+  onChoiceChange: (choice: ASIChoice | undefined) => void;
   allSpells: ProcessedSpell[];
   spellsLoading: boolean;
   newTotalLevel: number;
@@ -34,93 +35,82 @@ function ASIPanel({
   abilities,
   asiChoice,
   onChoiceChange,
-}: {
-  abilities: CharacterAbilities;
-  asiChoice: ASIChoice | undefined;
-  onChoiceChange: (choice: ASIChoice) => void;
-}) {
+}: Pick<ASIFeatStepProps, 'abilities' | 'asiChoice' | 'onChoiceChange'>) {
   const increases = asiChoice?.type === 'asi' ? asiChoice.increases : [];
   const totalPoints = increases.reduce((sum, inc) => sum + inc.amount, 0);
   const remaining = 2 - totalPoints;
 
-  const handleIncrement = (ability: string) => {
-    if (remaining <= 0) return;
-    const current = abilities[ability as keyof CharacterAbilities];
-    const currentIncrease =
-      increases.find(i => i.ability === ability)?.amount || 0;
-    if (current + currentIncrease >= 20) return;
-    if (currentIncrease >= 2) return;
-
-    const updated = increases.filter(i => i.ability !== ability);
-    updated.push({ ability, amount: currentIncrease + 1 });
-    onChoiceChange({ type: 'asi', increases: updated });
-  };
-
-  const handleDecrement = (ability: string) => {
-    const currentIncrease =
-      increases.find(i => i.ability === ability)?.amount || 0;
-    if (currentIncrease <= 0) return;
-
-    const updated = increases.filter(i => i.ability !== ability);
-    if (currentIncrease > 1) {
-      updated.push({ ability, amount: currentIncrease - 1 });
-    }
-    onChoiceChange({ type: 'asi', increases: updated });
+  const change = (ability: keyof CharacterAbilities, delta: number) => {
+    const amount = increases.find(i => i.ability === ability)?.amount || 0;
+    const nextAmount = amount + delta;
+    if (
+      nextAmount < 0 ||
+      nextAmount > 2 ||
+      abilities[ability] + nextAmount > 20 ||
+      (delta > 0 && remaining <= 0)
+    )
+      return;
+    const next = increases.filter(i => i.ability !== ability);
+    if (nextAmount) next.push({ ability, amount: nextAmount });
+    onChoiceChange({ type: 'asi', increases: next });
   };
 
   return (
     <div className="space-y-3">
-      <p className="text-muted text-center text-xs">
+      <p className="type-caption text-muted">
         Distribute 2 points (+2 to one, or +1 to two). Max 20 per ability.
       </p>
-      <p className="text-accent-blue-text text-center text-sm font-semibold">
+      <p className="type-ui text-heading">
         {remaining} point{remaining !== 1 ? 's' : ''} remaining
       </p>
-
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <ul className="divide-divider border-divider grid grid-cols-1 gap-x-6 border-t sm:grid-cols-2">
         {ABILITY_NAMES.map(({ key, label }) => {
           const base = abilities[key];
-          const inc = increases.find(i => i.ability === key)?.amount || 0;
-          const newVal = base + inc;
-          const atMax = newVal >= 20;
-
+          const amount = increases.find(i => i.ability === key)?.amount || 0;
           return (
-            <div
+            <li
               key={key}
-              className={cn(
-                'border-divider bg-surface-raised flex items-center justify-between rounded-lg border px-3 py-2',
-                inc > 0 && 'border-accent-blue-border bg-accent-blue-bg'
-              )}
+              className="border-divider flex min-w-0 items-center justify-between gap-2 border-b py-2"
             >
-              <div>
-                <span className="text-heading text-xs font-bold">{label}</span>
-                <span className="text-muted ml-1 text-xs">
+              <div className="min-w-0">
+                <span className="type-ui text-heading font-semibold">
+                  {label}
+                </span>
+                <span className="type-caption text-muted ml-2">
                   {base}
-                  {inc > 0 && (
-                    <span className="text-accent-blue-text"> → {newVal}</span>
-                  )}
+                  {amount > 0 && <> → {base + amount}</>}
                 </span>
               </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleDecrement(key)}
-                  disabled={inc === 0}
-                  className="text-muted hover:text-heading disabled:opacity-30"
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Lower ${key}`}
+                  disabled={amount === 0}
+                  onClick={() => change(key, -1)}
+                  className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
-                  <Minus size={14} />
-                </button>
-                <button
-                  onClick={() => handleIncrement(key)}
-                  disabled={remaining <= 0 || atMax || inc >= 2}
-                  className="text-muted hover:text-heading disabled:opacity-30"
+                  <Minus aria-hidden className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Raise ${key}`}
+                  disabled={
+                    remaining <= 0 || base + amount >= 20 || amount >= 2
+                  }
+                  onClick={() => change(key, 1)}
+                  className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
-                  <Plus size={14} />
-                </button>
+                  <Plus aria-hidden className="size-4" />
+                </Button>
               </div>
-            </div>
+            </li>
           );
         })}
-      </div>
+      </ul>
     </div>
   );
 }
@@ -131,155 +121,115 @@ function FeatPanel({
   allSpells,
   spellsLoading,
   newTotalLevel,
-}: {
-  asiChoice: ASIChoice | undefined;
-  onChoiceChange: (choice: ASIChoice) => void;
-  allSpells: ProcessedSpell[];
-  spellsLoading: boolean;
-  newTotalLevel: number;
-}) {
+}: Omit<ASIFeatStepProps, 'abilities'>) {
   const { feats, loading: featsLoading } = useFeatsData();
   const [search, setSearch] = useState('');
   const [expandedFeatId, setExpandedFeatId] = useState<string | null>(null);
   const [spellPickerFeat, setSpellPickerFeat] = useState<ProcessedFeat | null>(
     null
   );
-
   const selectedFeat = asiChoice?.type === 'feat' ? asiChoice.feat : null;
-
   const eligible = feats.filter(
     f => !f.levelRequirement || f.levelRequirement <= newTotalLevel
   );
-
   const filtered = search.trim()
     ? eligible.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
     : eligible;
 
   const handleSelectFeat = useCallback(
     (feat: ProcessedFeat) => {
-      if (feat.grantsSpells && feat.additionalSpells) {
-        setSpellPickerFeat(feat);
-      } else {
-        onChoiceChange({ type: 'feat', feat, grantedSpells: [] });
-      }
+      if (feat.grantsSpells && feat.additionalSpells) setSpellPickerFeat(feat);
+      else onChoiceChange({ type: 'feat', feat, grantedSpells: [] });
     },
     [onChoiceChange]
   );
 
   const handleSpellsConfirmed = useCallback(
     (spells: Spell[]) => {
-      if (spellPickerFeat) {
-        onChoiceChange({
-          type: 'feat',
-          feat: spellPickerFeat,
-          grantedSpells: spells,
-        });
-        setSpellPickerFeat(null);
-      }
+      if (!spellPickerFeat) return;
+      onChoiceChange({
+        type: 'feat',
+        feat: spellPickerFeat,
+        grantedSpells: spells,
+      });
+      setSpellPickerFeat(null);
     },
     [spellPickerFeat, onChoiceChange]
   );
 
-  if (featsLoading) {
+  if (featsLoading)
     return (
-      <p className="text-muted py-4 text-center text-sm">Loading feats...</p>
+      <p className="type-body text-muted py-4 text-center">Loading feats…</p>
     );
-  }
-
   const parsedSpells = spellPickerFeat?.additionalSpells
     ? parseAdditionalSpells(spellPickerFeat.additionalSpells)
     : null;
 
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <Search
-          size={14}
-          className="text-muted absolute top-1/2 left-3 -translate-y-1/2"
-        />
-        <Input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="Search feats..."
-          className="pl-8"
-        />
-      </div>
-
-      <div className="max-h-60 space-y-1 overflow-y-auto">
+      <Input
+        value={search}
+        onChange={event => setSearch(event.target.value)}
+        placeholder="Search feats"
+        aria-label="Search feats"
+        leftIcon={<Search className="size-4" />}
+      />
+      <RadioGroup
+        value={selectedFeat?.id ?? ''}
+        onValueChange={value => {
+          const feat = filtered.find(item => item.id === value);
+          if (feat) handleSelectFeat(feat);
+        }}
+        aria-label="Feats"
+        className="border-divider max-h-60 gap-0 overflow-y-auto border-t"
+      >
         {filtered.slice(0, 50).map(feat => {
-          const isSelected = selectedFeat?.id === feat.id;
-          const isExpanded = expandedFeatId === feat.id;
+          const expanded = expandedFeatId === feat.id;
           return (
-            <div
-              key={feat.id}
-              className={cn(
-                'rounded-lg border transition-all',
-                isSelected
-                  ? 'border-accent-purple-border bg-accent-purple-bg'
-                  : 'border-divider bg-surface-raised'
-              )}
-            >
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleSelectFeat(feat)}
-                  className={cn(
-                    'flex min-w-0 flex-1 flex-col px-3 py-2 text-left',
-                    !isSelected && 'hover:bg-surface-secondary'
-                  )}
+            <div key={feat.id} className="border-divider border-b">
+              <div className="flex min-w-0 items-start gap-1">
+                <RadioGroupItem
+                  value={feat.id}
+                  label={feat.name}
+                  description={[
+                    feat.source,
+                    feat.prerequisites.length > 0
+                      ? `Requires: ${feat.prerequisites.join(', ')}`
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                  wrapperClassName="border-divider min-w-0 flex-1 px-2 py-2"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Show ${feat.name} details`}
+                  aria-expanded={expanded}
+                  onClick={() => setExpandedFeatId(expanded ? null : feat.id)}
+                  className="shrink-0 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={cn(
-                        'text-sm font-medium',
-                        isSelected ? 'text-accent-purple-text' : 'text-heading'
-                      )}
-                    >
-                      {feat.name}
-                    </span>
-                    <span className="text-faint text-xs">{feat.source}</span>
-                  </div>
-                  {feat.prerequisites.length > 0 && (
-                    <span className="text-faint text-xs">
-                      Requires: {feat.prerequisites.join(', ')}
-                    </span>
-                  )}
-                </button>
-                <button
-                  onClick={e => {
-                    e.stopPropagation();
-                    setExpandedFeatId(isExpanded ? null : feat.id);
-                  }}
-                  className="text-muted hover:text-heading flex-shrink-0 px-2 py-2"
-                  title={isExpanded ? 'Hide details' : 'Show details'}
-                >
-                  {isExpanded ? (
-                    <ChevronUp size={14} />
+                  {expanded ? (
+                    <ChevronUp aria-hidden className="size-4" />
                   ) : (
-                    <ChevronDown size={14} />
+                    <ChevronDown aria-hidden className="size-4" />
                   )}
-                </button>
+                </Button>
               </div>
-              {isExpanded && (
-                <div className="border-divider border-t px-3 py-2">
-                  <div
-                    className="text-body text-xs leading-relaxed"
-                    dangerouslySetInnerHTML={{ __html: feat.description }}
-                  />
-                  {feat.abilityIncreases && (
-                    <p className="text-accent-blue-text mt-1 text-xs">
-                      {feat.abilityIncreases}
-                    </p>
-                  )}
+              {expanded && (
+                <div className="type-caption text-body space-y-1 px-2 pb-3">
+                  <div dangerouslySetInnerHTML={{ __html: feat.description }} />
+                  {feat.abilityIncreases && <p>{feat.abilityIncreases}</p>}
                 </div>
               )}
             </div>
           );
         })}
-      </div>
-
+      </RadioGroup>
       {spellPickerFeat && parsedSpells && (
         <GrantedSpellPicker
-          isOpen={true}
+          isOpen
           onClose={() => setSpellPickerFeat(null)}
           onConfirm={handleSpellsConfirmed}
           featName={spellPickerFeat.name}
@@ -301,50 +251,46 @@ export default function ASIFeatStep({
   newTotalLevel,
 }: ASIFeatStepProps) {
   const [mode, setMode] = useState<'asi' | 'feat'>(asiChoice?.type || 'asi');
-
-  const handleModeChange = (newMode: 'asi' | 'feat') => {
-    setMode(newMode);
-    if (newMode === 'asi' && asiChoice?.type !== 'asi') {
-      onChoiceChange({ type: 'asi', increases: [] });
-    }
+  const handleModeChange = (nextMode: 'asi' | 'feat') => {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    onChoiceChange(undefined);
   };
 
   return (
     <div className="space-y-4">
-      <div className="text-center">
-        <h3 className="text-heading text-lg font-semibold">
+      <div>
+        <h3 className="type-subheading text-heading">
           Ability Score Improvement
         </h3>
-        <p className="text-muted mt-1 text-sm">
+        <p className="type-body text-muted mt-1">
           Increase your ability scores or take a feat.
         </p>
       </div>
-
-      <div className="border-divider flex overflow-hidden rounded-lg border">
-        <button
+      <div
+        className="flex flex-wrap gap-2"
+        role="group"
+        aria-label="Ability Score Improvement"
+      >
+        <Button
+          type="button"
+          variant="outline"
+          selected={mode === 'asi'}
+          aria-pressed={mode === 'asi'}
           onClick={() => handleModeChange('asi')}
-          className={cn(
-            'flex-1 px-4 py-2 text-sm font-medium transition-colors',
-            mode === 'asi'
-              ? 'bg-accent-blue-bg text-accent-blue-text'
-              : 'bg-surface-raised text-muted hover:text-heading'
-          )}
         >
-          Ability Scores
-        </button>
-        <button
+          Ability scores
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          selected={mode === 'feat'}
+          aria-pressed={mode === 'feat'}
           onClick={() => handleModeChange('feat')}
-          className={cn(
-            'border-divider flex-1 border-l px-4 py-2 text-sm font-medium transition-colors',
-            mode === 'feat'
-              ? 'bg-accent-purple-bg text-accent-purple-text'
-              : 'bg-surface-raised text-muted hover:text-heading'
-          )}
         >
-          Take a Feat
-        </button>
+          Take a feat
+        </Button>
       </div>
-
       {mode === 'asi' ? (
         <ASIPanel
           abilities={abilities}

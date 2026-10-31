@@ -1,12 +1,13 @@
 'use client';
 
-import { Sparkles, BookOpen, Check, AlertTriangle } from 'lucide-react';
-import { cn } from '@/utils/cn';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import type { ProcessedSubclass } from '@/types/classes';
 import type {
   MissedSubclassFeature,
   SubclassSpellGrant,
 } from '../LevelUpWizard.types';
+import { WizardChoiceRow } from '../WizardChoiceRow';
+import { RadioGroup } from '@/components/ui/forms/radio-group';
 
 interface SubclassMigrationStepProps {
   className: string;
@@ -30,151 +31,80 @@ export default function SubclassMigrationStep({
   onToggleFeature,
 }: SubclassMigrationStepProps) {
   return (
-    <div className="space-y-4">
-      <div className="text-center">
-        <div className="bg-accent-amber-bg text-accent-amber-text mx-auto mb-2 flex w-fit items-center gap-2 rounded-full px-3 py-1 text-xs font-medium">
-          <AlertTriangle size={12} />
-          Subclass not set
-        </div>
-        <h3 className="text-heading text-lg font-semibold">
+    <div className="space-y-5">
+      <div>
+        <p className="type-caption text-ember-text mb-2">Subclass not set</p>
+        <h3 className="type-subheading text-heading">
           Choose your {className} subclass
         </h3>
-        <p className="text-muted mt-1 text-sm">
+        <p className="type-body text-muted mt-1">
           Your character is level {currentLevel} but has no subclass. Select one
           now to continue.
         </p>
       </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {subclasses.map(sc => {
-          const isSelected = selectedSubclass?.id === sc.id;
-          return (
-            <button
-              key={sc.id}
-              onClick={() => onSelectSubclass(sc)}
-              className={cn(
-                'rounded-lg border p-3 text-left transition-all',
-                isSelected
-                  ? 'border-accent-purple-border bg-accent-purple-bg'
-                  : 'border-divider bg-surface-raised hover:bg-surface-secondary'
-              )}
-            >
-              <div className="flex items-start gap-2">
-                <Sparkles
-                  size={16}
-                  className={cn(
-                    'mt-0.5 flex-shrink-0',
-                    isSelected ? 'text-accent-purple-text' : 'text-muted'
-                  )}
-                />
-                <div className="min-w-0">
-                  <p
-                    className={cn(
-                      'text-sm font-semibold',
-                      isSelected ? 'text-accent-purple-text' : 'text-heading'
-                    )}
-                  >
-                    {sc.name}
-                  </p>
-                  <p className="text-faint mt-0.5 text-xs">{sc.source}</p>
-                </div>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
+      <RadioGroup
+        value={selectedSubclass?.id}
+        onValueChange={value => {
+          const subclass = subclasses.find(item => item.id === value);
+          if (subclass) onSelectSubclass(subclass);
+        }}
+        aria-label="Subclass"
+        className="border-divider gap-0 border-t"
+      >
+        {subclasses.map(sc => (
+          <WizardChoiceRow
+            key={sc.id}
+            value={sc.id}
+            title={sc.name}
+            meta={sc.source}
+          />
+        ))}
+      </RadioGroup>
       {selectedSubclass && missedFeatures.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-heading text-sm font-semibold">
+        <div>
+          <h4 className="type-label-heading text-heading">
             Missed subclass features
           </h4>
-          <p className="text-muted text-xs">
+          <p className="type-caption text-muted mt-1">
             These features were available at earlier levels. Toggle on any you
             haven&apos;t already added manually.
           </p>
-          <div className="space-y-1">
+          <ul className="divide-divider mt-2 divide-y">
             {missedFeatures.map(mf => {
               const key = `${mf.feature.name}-${mf.level}`;
               return (
-                <button
-                  key={key}
-                  onClick={() => onToggleFeature(key)}
-                  className={cn(
-                    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-all',
-                    mf.adopted
-                      ? 'border-accent-emerald-border bg-accent-emerald-bg'
-                      : 'border-divider bg-surface-raised hover:bg-surface-secondary'
-                  )}
-                >
-                  <div
-                    className={cn(
-                      'flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border',
-                      mf.adopted
-                        ? 'border-accent-emerald-border bg-accent-emerald-bg'
-                        : 'border-divider'
-                    )}
-                  >
-                    {mf.adopted && (
-                      <Check size={12} className="text-accent-emerald-text" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <BookOpen
-                        size={12}
-                        className="text-accent-amber-text flex-shrink-0"
-                      />
-                      <span
-                        className={cn(
-                          'text-sm font-medium',
-                          mf.adopted
-                            ? 'text-accent-emerald-text'
-                            : 'text-heading'
-                        )}
-                      >
-                        {mf.feature.name}
-                      </span>
-                      <span className="text-faint text-xs">Lv {mf.level}</span>
-                    </div>
-                    {mf.feature.entries && mf.feature.entries.length > 0 && (
-                      <p
-                        className="text-muted mt-0.5 line-clamp-2 text-xs"
-                        dangerouslySetInnerHTML={{
-                          __html: mf.feature.entries[0],
-                        }}
-                      />
-                    )}
-                  </div>
-                </button>
+                <li key={key} className="py-2">
+                  <Checkbox
+                    checked={mf.adopted}
+                    onCheckedChange={() => onToggleFeature(key)}
+                    label={mf.feature.name}
+                    description={`Level ${mf.level}`}
+                  />
+                </li>
               );
             })}
-          </div>
+          </ul>
         </div>
       )}
-
       {selectedSubclass && missedSpellGrants.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-heading flex items-center gap-2 text-sm font-semibold">
-            <Sparkles size={14} className="text-accent-purple-text" />
+        <div>
+          <h4 className="type-label-heading text-heading">
             Missed subclass spells
           </h4>
-          <p className="text-muted text-xs">
+          <p className="type-caption text-muted mt-1">
             These spells will be added automatically.
           </p>
-          <div className="border-divider bg-surface-raised space-y-1 rounded-lg border p-3">
-            {missedSpellGrants.map((grant, i) => (
-              <div
-                key={i}
-                className="flex items-center justify-between text-sm"
+          <ul className="divide-divider mt-2 divide-y">
+            {missedSpellGrants.map(grant => (
+              <li
+                key={grant.spellName}
+                className="type-ui text-heading flex flex-wrap items-center justify-between gap-2 py-2"
               >
-                <span className="text-heading">{grant.spellName}</span>
-                <span className="bg-accent-emerald-bg text-accent-emerald-text rounded-full px-2 py-0.5 text-xs font-medium">
-                  Always Prepared
-                </span>
-              </div>
+                <span>{grant.spellName}</span>
+                <span className="type-caption text-muted">Always prepared</span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
       )}
     </div>
