@@ -149,4 +149,61 @@ describe('equipment rows', () => {
     fireEvent.click(screen.getByRole('button', { name: /Attack/ }));
     expect(onUse).toHaveBeenCalledWith('cost-weapon');
   });
+
+  it('shows charge names without decorative Sparkles', () => {
+    const charge = {
+      id: 'charge-a',
+      name: 'Moonbeam',
+      maxCharges: 3,
+      usedCharges: 1,
+      restType: 'long',
+    };
+    const weapon = {
+      id: 'weapon-c',
+      name: 'Charged blade',
+      category: 'martial',
+      damage: [],
+      enhancementBonus: 0,
+      isEquipped: false,
+      properties: [],
+      charges: [charge],
+    } as unknown as Weapon;
+    const item = {
+      id: 'magic-c',
+      name: 'Charged ring',
+      category: 'ring',
+      rarity: 'rare',
+      requiresAttunement: false,
+      isAttuned: false,
+      charges: [charge],
+    } as unknown as MagicItem;
+    const { container } = render(
+      <>
+        <WeaponRow
+          weapon={weapon}
+          characterLevel={5}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onToggleEquip={vi.fn()}
+        />
+        <MagicItemRow
+          item={item}
+          characterLevel={5}
+          onEdit={vi.fn()}
+          onDelete={vi.fn()}
+          onToggleAttunement={vi.fn()}
+          onExpendCharge={vi.fn()}
+          onRestoreCharge={vi.fn()}
+        />
+      </>
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Details: Charged blade' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Details: Charged ring' })
+    );
+    expect(screen.getAllByText('Moonbeam')).toHaveLength(2);
+    expect(container.querySelector('.lucide-sparkles')).toBeNull();
+  });
 });

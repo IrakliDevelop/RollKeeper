@@ -4,6 +4,8 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Input } from '@/components/ui/forms/input';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { formatRarity } from '@/utils/formatRarity';
 import type { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 
 export type CompendiumItem =
@@ -62,7 +64,9 @@ export function AllItemsAutocomplete({
         disabled={loading}
       />
       {query && (
-        <div className="border-divider bg-surface-raised absolute z-50 max-h-72 w-full overflow-y-auto rounded-lg border">
+        <div
+          className={`${OVERLAY_SURFACE} absolute z-50 max-h-72 w-full overflow-y-auto`}
+        >
           {results.length === 0 ? (
             <p className="text-muted p-4 text-sm">No matching items.</p>
           ) : (
@@ -85,7 +89,9 @@ export function AllItemsAutocomplete({
                   </p>
                 </div>
                 <Badge variant="neutral" size="sm">
-                  {result.kind === 'magic' ? result.item.rarity : 'Mundane'}
+                  {result.kind === 'magic'
+                    ? formatRarity(result.item.rarity)
+                    : 'Mundane'}
                 </Badge>
               </button>
             ))

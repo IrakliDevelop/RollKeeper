@@ -5,6 +5,8 @@ import { ProcessedWeapon } from '@/types/items';
 import { Search, X, Loader2 } from 'lucide-react';
 import { AppIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface WeaponAutocompleteProps {
   items: ProcessedWeapon[];
@@ -169,7 +171,7 @@ export function WeaponAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border"
+            className={`${OVERLAY_SURFACE} absolute z-50 mt-1 max-h-96 w-full overflow-y-auto`}
           >
             {filteredItems.length > 0 ? (
               <ul className="py-1">
@@ -196,8 +198,7 @@ export function WeaponAutocomplete({
                           <div className="flex flex-wrap items-center gap-2">
                             {item.rarity !== 'none' && (
                               <Badge variant="neutral" size="sm">
-                                {item.rarity.charAt(0).toUpperCase() +
-                                  item.rarity.slice(1)}
+                                {formatRarity(item.rarity)}
                               </Badge>
                             )}
                             <span className="text-muted text-xs">

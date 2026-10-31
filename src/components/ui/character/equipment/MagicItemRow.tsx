@@ -7,7 +7,6 @@ import {
   ChevronRight,
   Edit2,
   Trash2,
-  Sparkles,
   Minus,
   Plus,
 } from 'lucide-react';
@@ -15,6 +14,7 @@ import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { ChargePoolDisplay } from './ChargePoolDisplay';
 import { calculateMagicItemChargeMax } from '@/utils/calculations';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface MagicItemRowProps {
   item: MagicItem;
@@ -62,9 +62,7 @@ export function MagicItemRow({
             {item.name}
           </span>
           <div className="text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-            <span>
-              {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
-            </span>
+            <span>{formatRarity(item.rarity)}</span>
             <span className="capitalize">{item.category}</span>
             {item.isEquipped && (
               <Badge variant="neutral" size="sm">
@@ -200,7 +198,6 @@ function IndividualChargeChip({
 
   return (
     <div className="border-divider inline-flex min-w-0 flex-wrap items-center gap-1.5 border px-2 py-1.5">
-      <Sparkles size={14} aria-hidden="true" className="text-muted" />
       <span className="text-heading text-sm font-medium break-words">
         {charge.name}
       </span>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { InventoryItem } from '@/types/character';
 import { Plus, X, List, Grid3X3 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
@@ -107,6 +107,19 @@ export function InventoryManager({
   const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(
     new Set()
   );
+  const [pendingDeleteFocusId, setPendingDeleteFocusId] = useState<
+    string | null
+  >(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (
+      pendingDeleteFocusId &&
+      !items.some(item => item.id === pendingDeleteFocusId)
+    ) {
+      addButtonRef.current?.focus();
+      setPendingDeleteFocusId(null);
+    }
+  }, [items, pendingDeleteFocusId]);
 
   const allLocations = useMemo(
     () =>
@@ -245,7 +258,10 @@ export function InventoryManager({
                 cancelLabel: 'Cancel',
                 tone: 'danger',
               }).then(confirmed => {
-                if (confirmed) onDeleteItem(item.id);
+                if (confirmed) {
+                  setPendingDeleteFocusId(item.id);
+                  onDeleteItem(item.id);
+                }
               });
             }
       }
@@ -288,6 +304,7 @@ export function InventoryManager({
           )}
           {!readonly && !hideAddButton && onAddItem && (
             <Button
+              ref={addButtonRef}
               type="button"
               onClick={() => {
                 setEditingItem(null);
@@ -458,7 +475,7 @@ export function InventoryManager({
             <p className="text-heading font-medium">
               {activeFilterCount
                 ? filterLocation !== 'all' || filterCategory !== 'all'
-                  ? 'No items match your filters.'
+                  ? 'No items match your search or filters.'
                   : `No items match “${searchQuery.trim()}”.`
                 : 'Add your first item'}
             </p>

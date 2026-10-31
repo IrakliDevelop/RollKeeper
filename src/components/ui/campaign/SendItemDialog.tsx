@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
 import type { InventoryItem } from '@/types/character';
+import { formatRarity } from '@/utils/formatRarity';
 
 export interface SendItemTarget {
   playerId: string;
@@ -70,7 +71,7 @@ export function SendItemDialog({
               )}
               {item.rarity && (
                 <p className="text-muted mt-1 text-sm">
-                  {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+                  {formatRarity(item.rarity)}
                 </p>
               )}
             </div>

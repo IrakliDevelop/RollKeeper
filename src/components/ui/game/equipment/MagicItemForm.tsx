@@ -24,6 +24,7 @@ export interface MagicItemChargeFormData {
 }
 
 import type { ChargePoolFormData } from '@/utils/magicItemConversion';
+import { formatRarity } from '@/utils/formatRarity';
 
 export interface MagicItemFormData {
   name: string;
@@ -211,7 +212,7 @@ export function MagicItemForm({
             >
               {MAGIC_ITEM_RARITIES.map(rarity => (
                 <SelectItem key={rarity} value={rarity}>
-                  {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                  {formatRarity(rarity)}
                 </SelectItem>
               ))}
             </SelectField>

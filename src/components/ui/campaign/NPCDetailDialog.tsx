@@ -66,6 +66,7 @@ import { NPCShopTab } from './NPCShopTab';
 import { useNPCStore } from '@/store/npcStore';
 import { NPCCurrencyStrip } from './NPCCurrencyStrip';
 import type { Currency } from '@/types/character';
+import { formatRarity } from '@/utils/formatRarity';
 
 type DetailTab = 'stats' | 'spells' | 'inventory' | 'lore' | 'shop';
 
@@ -466,7 +467,7 @@ function NPCItemViewModal({
                   variant={RARITY_VARIANTS[item.rarity] || 'neutral'}
                   size="md"
                 >
-                  {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+                  {formatRarity(item.rarity)}
                 </Badge>
               )}
               {item.type && (

@@ -6,6 +6,7 @@ import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface ItemCardProps {
   item: InventoryItem;
@@ -60,11 +61,7 @@ export function ItemCard({
           </span>
           <span className="text-muted mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm">
             <span className="capitalize">{item.category}</span>
-            {item.rarity && (
-              <span>
-                {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
-              </span>
-            )}
+            {item.rarity && <span>{formatRarity(item.rarity)}</span>}
             {item.type && <span>{item.type}</span>}
             {item.quantity === 0 && (
               <Badge variant="neutral" size="sm">

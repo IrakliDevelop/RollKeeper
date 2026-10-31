@@ -121,4 +121,32 @@ describe('populated inventory form controls', () => {
       expect.objectContaining({ tags: [] })
     );
   });
+
+  it('names the item form tag and custom location inputs', () => {
+    render(
+      <ItemForm
+        isOpen
+        onClose={vi.fn()}
+        onSubmit={vi.fn()}
+        initialData={{ ...initialInventoryFormData, name: 'Rope' }}
+        availableLocations={['Backpack']}
+        isEditing
+      />
+    );
+    expect(screen.getByRole('textbox', { name: 'Add a tag' })).toHaveAttribute(
+      'placeholder',
+      'Quest item'
+    );
+    fireEvent.click(screen.getByRole('combobox', { name: 'Location' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Custom location…' }));
+    expect(
+      screen.getByRole('textbox', { name: 'Custom location' })
+    ).toHaveAttribute('placeholder', 'Saddlebags');
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Cancel custom location' })
+    );
+    expect(
+      screen.queryByRole('textbox', { name: 'Custom location' })
+    ).toBeNull();
+  });
 });

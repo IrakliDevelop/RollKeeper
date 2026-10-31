@@ -20,6 +20,7 @@ import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 import { ItemAutocomplete } from '@/components/ui/forms/ItemAutocomplete';
 import { convertProcessedItemToFormData } from '@/utils/itemConversion';
+import { formatRarity } from '@/utils/formatRarity';
 
 const ITEM_CATEGORIES = [
   'weapon',
@@ -255,7 +256,7 @@ export function ItemForm({
                     <SelectItem value="none">None</SelectItem>
                     {ITEM_RARITIES.map(rarity => (
                       <SelectItem key={rarity} value={rarity}>
-                        {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                        {formatRarity(rarity)}
                       </SelectItem>
                     ))}
                   </SelectField>
@@ -322,7 +323,8 @@ export function ItemForm({
                     <Input
                       value={customLocation}
                       onChange={e => setCustomLocation(e.target.value)}
-                      placeholder="Custom location"
+                      aria-label="Custom location"
+                      placeholder="Saddlebags"
                       wrapperClassName="min-w-0 flex-1"
                     />
                     <Button
@@ -333,8 +335,9 @@ export function ItemForm({
                       }}
                       variant="outline"
                       size="md"
+                      aria-label="Cancel custom location"
                     >
-                      <X size={16} />
+                      <X size={16} aria-hidden="true" />
                     </Button>
                   </div>
                 )}
@@ -402,7 +405,8 @@ export function ItemForm({
                 <Input
                   value={tagInput}
                   onChange={e => setTagInput(e.target.value)}
-                  placeholder="Add a tag"
+                  aria-label="Add a tag"
+                  placeholder="Quest item"
                   wrapperClassName="min-w-0 flex-[1_1_12rem]"
                   onKeyPress={e =>
                     e.key === 'Enter' && (e.preventDefault(), addTag())

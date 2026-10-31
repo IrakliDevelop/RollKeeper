@@ -58,6 +58,30 @@ describe('EquipmentFilterBar', () => {
   });
 });
 
+describe('equipment filter layout', () => {
+  it('gives every filter select room for its full approved label', () => {
+    const { container } = render(
+      <EquipmentFilterBar
+        filters={emptyFilters}
+        onFilterChange={vi.fn()}
+        onReset={vi.fn()}
+        hasActiveFilters={false}
+        config={{
+          showAttuned: true,
+          showCategory: true,
+          showRarity: true,
+          showHasCharges: true,
+          categoryOptions: ['all', 'simple'],
+        }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    const fields = container.querySelector('[data-equipment-filter-fields]');
+    expect(fields).toHaveClass('grid', 'grid-cols-1', 'sm:grid-cols-2');
+    expect(container.innerHTML).not.toMatch(/w-\[1[34]0px\]/);
+  });
+});
+
 describe('equipment no-match copy', () => {
   it('names a search-only query and uses filter copy when any field is active', () => {
     expect(
@@ -71,13 +95,13 @@ describe('equipment no-match copy', () => {
         ...emptyFilters,
         category: 'ring',
       })
-    ).toBe('No magic items match your filters.');
+    ).toBe('No magic items match your search or filters.');
     expect(
       getEquipmentEmptyText('armor', {
         ...emptyFilters,
         search: 'plate',
         equipped: 'equipped',
       })
-    ).toBe('No armor matches your filters.');
+    ).toBe('No armor matches your search or filters.');
   });
 });

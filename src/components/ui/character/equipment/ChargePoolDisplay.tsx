@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import type { ChargePool } from '@/types/character';
-import { Zap, Minus, Plus, Sparkles } from 'lucide-react';
+import { Zap, Minus, Plus } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/layout/badge';
 
 interface ChargePoolDisplayProps {
@@ -128,7 +129,11 @@ export function ChargePoolDisplay({
               >
                 <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   {ability.isSpell && (
-                    <Sparkles size={10} className="text-muted shrink-0" />
+                    <AppIcon
+                      name="spell"
+                      aria-hidden="true"
+                      className="text-muted size-3 shrink-0"
+                    />
                   )}
                   <span className="text-heading font-medium break-words">
                     {ability.name}

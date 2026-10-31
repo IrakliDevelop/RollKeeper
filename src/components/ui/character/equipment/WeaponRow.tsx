@@ -9,7 +9,6 @@ import {
   Trash2,
   Swords,
   Zap,
-  Sparkles,
   Minus,
   Plus,
 } from 'lucide-react';
@@ -263,7 +262,6 @@ function IndividualChargeChip({
 
   return (
     <div className="border-divider inline-flex min-w-0 flex-wrap items-center gap-1.5 border px-2 py-1.5">
-      <Sparkles size={14} aria-hidden="true" className="text-muted" />
       <span className="text-heading text-sm font-medium break-words">
         {charge.name}
       </span>

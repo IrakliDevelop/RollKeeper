@@ -4,7 +4,9 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedArmor } from '@/types/items';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { AppIcon } from '@/components/ui/icons';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface ArmorAutocompleteProps {
   items: ProcessedArmor[];
@@ -168,7 +170,7 @@ export function ArmorAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border"
+            className={`${OVERLAY_SURFACE} absolute z-50 mt-1 max-h-96 w-full overflow-y-auto`}
           >
             {filteredItems.length > 0 ? (
               <ul className="py-1">
@@ -192,8 +194,7 @@ export function ArmorAutocomplete({
                           <div className="flex flex-wrap items-center gap-2">
                             {item.rarity !== 'none' && (
                               <Badge variant="neutral" size="sm">
-                                {item.rarity.charAt(0).toUpperCase() +
-                                  item.rarity.slice(1)}
+                                {formatRarity(item.rarity)}
                               </Badge>
                             )}
                             <span className="text-muted text-xs">
@@ -220,7 +221,7 @@ export function ArmorAutocomplete({
               </ul>
             ) : (
               <div className="text-muted px-4 py-8 text-center text-sm">
-                <p>No armor match “{query}”.</p>
+                <p>No armor matches “{query}”.</p>
               </div>
             )}
           </div>

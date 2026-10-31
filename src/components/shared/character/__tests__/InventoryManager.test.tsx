@@ -1,3 +1,4 @@
+import React from 'react';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import {
   render,
@@ -146,7 +147,9 @@ describe('InventoryManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
     fireEvent.click(screen.getByRole('option', { name: 'Consumable' }));
-    expect(screen.getByText('No items match your filters.')).toBeVisible();
+    expect(
+      screen.getByText('No items match your search or filters.')
+    ).toBeVisible();
   });
 
   it('shows Add item button when not readonly', () => {
@@ -180,6 +183,38 @@ describe('InventoryManager', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Delete Rope' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
     await waitFor(() => expect(onDeleteItem).toHaveBeenCalledWith('i1'));
+  });
+
+  it('focuses Add item after a confirmed delete removes the row', async () => {
+    function Harness() {
+      const [items, setItems] = React.useState(mockItems);
+      return (
+        <InventoryManager
+          items={items}
+          onAddItem={vi.fn()}
+          onDeleteItem={id =>
+            setItems(previous => previous.filter(item => item.id !== id))
+          }
+        />
+      );
+    }
+    render(
+      <>
+        <ConfirmDialogHost />
+        <Harness />
+      </>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Details: Rope' }));
+    const deleteButton = screen.getByRole('button', { name: 'Delete Rope' });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
+    fireEvent.click(screen.getByRole('button', { name: 'Delete item' }));
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: 'Details: Rope' })).toBeNull()
+    );
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Add item' })).toHaveFocus()
+    );
   });
 
   it('calls onQuantityChange when plus button clicked', () => {

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ProcessedItem, ProcessedMagicItem } from '@/types/items';
 import { Search, X, Loader2 } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import {
   AppIcon,
@@ -253,7 +254,7 @@ export function ItemAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border"
+            className={`${OVERLAY_SURFACE} absolute z-50 mt-1 max-h-96 w-full overflow-y-auto`}
           >
             {filteredItems.length > 0 ? (
               <ul className="py-1">

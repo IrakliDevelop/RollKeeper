@@ -14,6 +14,7 @@ import {
   DialogBody,
   DialogFooter,
 } from '@/components/ui/feedback/dialog';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface ItemViewModalProps {
   item: InventoryItem | null;
@@ -53,7 +54,7 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
             <div className="flex flex-wrap gap-2">
               {item.rarity && (
                 <Badge variant="neutral" size="md">
-                  {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+                  {formatRarity(item.rarity)}
                 </Badge>
               )}
               {item.type && (

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Button } from '@/components/ui/forms/button';
 import { SlidersHorizontal, X } from 'lucide-react';
+import { formatRarity } from '@/utils/formatRarity';
 
 export interface FilterConfig {
   showAttuned?: boolean;
@@ -47,7 +48,7 @@ export function getEquipmentEmptyText(
     filters.rarity !== 'all' ||
     filters.hasCharges !== 'all';
   const verb = kind === 'armor' ? 'matches' : 'match';
-  if (hasFieldFilter) return `No ${kind} ${verb} your filters.`;
+  if (hasFieldFilter) return `No ${kind} ${verb} your search or filters.`;
   return `No ${kind} ${verb} “${filters.search.trim()}”.`;
 }
 
@@ -102,8 +103,11 @@ export function EquipmentFilterBar({
       </div>
 
       {expanded && (
-        <div className="flex flex-wrap items-end gap-2">
-          <div className="w-[130px]">
+        <div
+          data-equipment-filter-fields
+          className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0"
+        >
+          <div>
             <SelectField
               triggerProps={{ 'aria-label': 'Equipped' }}
               value={filters.equipped}
@@ -118,7 +122,7 @@ export function EquipmentFilterBar({
           </div>
 
           {config.showAttuned && (
-            <div className="w-[130px]">
+            <div>
               <SelectField
                 triggerProps={{ 'aria-label': 'Attunement' }}
                 value={filters.attuned}
@@ -134,7 +138,7 @@ export function EquipmentFilterBar({
           )}
 
           {config.showCategory && config.categoryOptions && (
-            <div className="w-[130px]">
+            <div>
               <SelectField
                 triggerProps={{ 'aria-label': 'Category' }}
                 value={filters.category}
@@ -152,7 +156,7 @@ export function EquipmentFilterBar({
           )}
 
           {config.showRarity && (
-            <div className="w-[130px]">
+            <div>
               <SelectField
                 triggerProps={{ 'aria-label': 'Rarity' }}
                 value={filters.rarity}
@@ -160,9 +164,7 @@ export function EquipmentFilterBar({
               >
                 {RARITY_OPTIONS.map(opt => (
                   <SelectItem key={opt} value={opt}>
-                    {opt === 'all'
-                      ? 'All rarities'
-                      : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    {opt === 'all' ? 'All rarities' : formatRarity(opt)}
                   </SelectItem>
                 ))}
               </SelectField>
@@ -170,7 +172,7 @@ export function EquipmentFilterBar({
           )}
 
           {config.showHasCharges && (
-            <div className="w-[140px]">
+            <div>
               <SelectField
                 triggerProps={{ 'aria-label': 'Charges' }}
                 value={filters.hasCharges}
