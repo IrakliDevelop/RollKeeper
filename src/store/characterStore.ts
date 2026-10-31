@@ -676,11 +676,7 @@ interface CharacterStore {
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
-  reorderExtendedFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  reorderExtendedFeatures: (sourceId: string, targetId: string) => void;
   toggleFavoriteFeature: (id: string) => void;
   setSheetFavorite: (
     kind: SheetFavoriteKind,
@@ -3298,74 +3294,33 @@ export const useCharacterStore = create<CharacterStore>()(
           });
         },
 
-        reorderExtendedFeatures: (
-          sourceIndex,
-          destinationIndex,
-          sourceType
-        ) => {
+        reorderExtendedFeatures: (sourceId, targetId) => {
           set(state => {
-            const features = [...(state.character.extendedFeatures || [])];
+            const current = state.character.extendedFeatures || [];
+            const sourceIndex = current.findIndex(f => f.id === sourceId);
+            const targetIndex = current.findIndex(f => f.id === targetId);
+            if (
+              sourceIndex < 0 ||
+              targetIndex < 0 ||
+              sourceIndex === targetIndex
+            )
+              return state;
 
-            if (sourceType) {
-              // Reorder within a specific source type
-              const filteredFeatures = features.filter(
-                f => f.sourceType === sourceType
-              );
-              const otherFeatures = features.filter(
-                f => f.sourceType !== sourceType
-              );
+            const reordered = [...current];
+            const [movedFeature] = reordered.splice(sourceIndex, 1);
+            reordered.splice(targetIndex, 0, movedFeature);
+            const updatedAt = new Date().toISOString();
+            const features = reordered.map((feature, index) =>
+              feature.displayOrder === index
+                ? feature
+                : { ...feature, displayOrder: index, updatedAt }
+            );
 
-              if (
-                sourceIndex >= filteredFeatures.length ||
-                destinationIndex >= filteredFeatures.length
-              ) {
-                return state;
-              }
-
-              const [movedFeature] = filteredFeatures.splice(sourceIndex, 1);
-              filteredFeatures.splice(destinationIndex, 0, movedFeature);
-
-              // Update display orders
-              filteredFeatures.forEach((feature, index) => {
-                feature.displayOrder = index;
-                feature.updatedAt = new Date().toISOString();
-              });
-
-              return {
-                character: {
-                  ...state.character,
-                  extendedFeatures: [...otherFeatures, ...filteredFeatures],
-                },
-                hasUnsavedChanges: true,
-                saveStatus: 'saving',
-              };
-            } else {
-              // Reorder all features
-              if (
-                sourceIndex >= features.length ||
-                destinationIndex >= features.length
-              ) {
-                return state;
-              }
-
-              const [movedFeature] = features.splice(sourceIndex, 1);
-              features.splice(destinationIndex, 0, movedFeature);
-
-              // Update display orders
-              features.forEach((feature, index) => {
-                feature.displayOrder = index;
-                feature.updatedAt = new Date().toISOString();
-              });
-
-              return {
-                character: {
-                  ...state.character,
-                  extendedFeatures: features,
-                },
-                hasUnsavedChanges: true,
-                saveStatus: 'saving',
-              };
-            }
+            return {
+              character: { ...state.character, extendedFeatures: features },
+              hasUnsavedChanges: true,
+              saveStatus: 'saving',
+            };
           });
         },
 

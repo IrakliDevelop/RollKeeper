@@ -2,7 +2,6 @@ import { Section } from '@/components/ui/layout/section';
 import { SubTabs } from '@/components/ui/layout/SubTabs';
 import { SheetLoadError } from './SheetLoadError';
 import React, { useState, useEffect } from 'react';
-import { Angry } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { AppIcon } from '@/components/ui/icons';
 import LevelUpWizard from '@/components/ui/character/LevelUpWizard';
@@ -37,7 +36,6 @@ import HitDiceTracker from '@/components/ui/character/HitDiceTracker';
 import { WeaponProficiencies } from '@/components/WeaponProficiencies';
 import { ExtendedFeaturesSection } from '@/components/ui/character/ExtendedFeatures';
 import ToolProficienciesSection from '@/components/ui/character/ToolProficienciesSection';
-import TraitTracker from '@/components/ui/character/TraitTracker';
 import HeroicInspirationTracker from '@/components/ui/character/HeroicInspirationTracker';
 import Languages from '@/components/ui/character/LanguagesAndProficiencies';
 import { SummonsSubTab } from '@/components/ui/character/summons';
@@ -207,11 +205,7 @@ export interface TabbedSheetConfigParams {
   deleteExtendedFeature: (id: string) => void;
   useExtendedFeature: (id: string) => void;
   resetExtendedFeatures: (restType: 'short' | 'long') => void;
-  reorderExtendedFeatures: (
-    sourceIndex: number,
-    destinationIndex: number,
-    sourceType?: string
-  ) => void;
+  reorderExtendedFeatures: (sourceId: string, targetId: string) => void;
   addSpellsFromFeat?: (spells: Spell[]) => void;
   toggleFavoriteFeature: (id: string) => void;
 
@@ -498,14 +492,13 @@ export function createTabbedSheetConfig(
       icon: <AppIcon name="features" className="h-4 w-4" />,
       badge:
         (character.extendedFeatures?.length || 0) > 0 ? (
-          <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-1.5 py-0.5 text-[10px] font-medium">
+          <span className="text-muted text-xs font-medium">
             {character.extendedFeatures?.length}
           </span>
         ) : undefined,
       content: (
         <FeaturesTabContent
           character={character}
-          totalLevel={totalLevel}
           proficiencyBonus={proficiencyBonus}
           params={params}
           customCounter={params.customCounter}
@@ -975,13 +968,6 @@ function CombatTabContent({
                     onRollInitiative={params.rollInitiative}
                   />
                 </Section>
-                <div className="lg:col-span-2">
-                  <ErrorBoundary
-                    fallback={<SheetLoadError thing="Weapon proficiencies" />}
-                  >
-                    <WeaponProficiencies editing={params.editing} />
-                  </ErrorBoundary>
-                </div>
               </div>
 
               <div
@@ -1039,42 +1025,13 @@ function DmCustomCounterDisplay({
   value: number;
 }) {
   return (
-    <div className="from-accent-purple-bg to-accent-purple-bg-strong border-accent-purple-border-strong rounded-lg border-2 bg-linear-to-br p-4">
-      {/* Header */}
-      <div className="mb-3 flex items-center gap-2">
-        <Angry className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-        <h3 className="text-accent-purple-text text-lg font-bold">{label}</h3>
-      </div>
-
-      {/* Count */}
-      <div className="mb-4 text-center">
-        <div className="text-accent-purple-text text-3xl font-bold">
-          {value}
-        </div>
-        <div className="text-accent-purple-text-muted text-sm">
-          {value === 1 ? '1 point' : `${value} points`}
-        </div>
-      </div>
-
-      {/* Visual boxes — one per point, no empty placeholders */}
-      <div className="mb-4 flex flex-wrap justify-center gap-2">
-        {Array.from({ length: value }, (_, i) => (
-          <div
-            key={i}
-            className="border-accent-purple-border-strong bg-accent-purple-bg-strong text-accent-purple-text flex h-10 w-10 scale-110 transform items-center justify-center rounded-lg border-2 shadow-lg"
-          >
-            <Angry size={16} />
-          </div>
-        ))}
-      </div>
-
-      {/* Helper text */}
-      <div className="bg-accent-purple-bg-strong text-accent-purple-text-muted rounded p-2 text-center text-xs">
-        <p>
-          <strong>{label}</strong> are assigned by your DM.
-        </p>
-      </div>
-    </div>
+    <Section heading={label}>
+      <div className="type-num-lg text-heading">{value}</div>
+      <p className="text-muted text-sm">
+        {value === 1 ? '1 point' : `${value} points`}
+      </p>
+      <p className="text-muted mt-2 text-sm">Set by your DM.</p>
+    </Section>
   );
 }
 
@@ -1100,13 +1057,11 @@ type FeaturesSubTab = (typeof FEATURES_SUB_TABS)[number]['id'];
 
 function FeaturesTabContent({
   character,
-  totalLevel,
   proficiencyBonus,
   params,
   customCounter,
 }: {
   character: CharacterState;
-  totalLevel: number;
   proficiencyBonus: number;
   params: TabbedSheetConfigParams;
   customCounter?: { label: string; value: number } | null;
@@ -1125,19 +1080,6 @@ function FeaturesTabContent({
         content: {
           abilities: (
             <div className="space-y-6">
-              <TraitTracker<ExtendedFeature>
-                traits={(character.extendedFeatures || []).filter(
-                  t => !t.isPassive
-                )}
-                characterLevel={totalLevel}
-                onUpdateTrait={params.updateExtendedFeature}
-                onDeleteTrait={params.deleteExtendedFeature}
-                onUseTrait={params.useExtendedFeature}
-                onResetTraits={params.resetExtendedFeatures}
-                readonly={false}
-                hideControls={true}
-                enableViewModal={true}
-              />
               <ExtendedFeaturesSection
                 features={character.extendedFeatures || []}
                 character={character}
@@ -1150,11 +1092,14 @@ function FeaturesTabContent({
                 onAddSpells={params.addSpellsFromFeat}
                 favoriteFeatureIds={character.favoriteFeatureIds || []}
                 onToggleFavoriteFeature={params.toggleFavoriteFeature}
+                editing={params.editing}
               />
             </div>
           ),
           inspiration: (
-            <div className="space-y-6">
+            <div
+              className={`grid grid-cols-1 gap-6 ${customCounter && customCounter.value > 0 ? 'md:grid-cols-2' : ''}`}
+            >
               <HeroicInspirationTracker
                 inspiration={character.heroicInspiration}
                 onAddInspiration={params.addHeroicInspiration}
@@ -1167,6 +1112,7 @@ function FeaturesTabContent({
                 }
                 dmControlled={Boolean(params.inCampaign)}
                 onToggleStackable={params.setStackableInspiration}
+                editing={params.editing}
               />
               {customCounter && customCounter.value > 0 && (
                 <DmCustomCounterDisplay
@@ -1178,18 +1124,27 @@ function FeaturesTabContent({
           ),
           proficiencies: (
             <div className="space-y-6">
-              <ToolProficienciesSection
-                toolProficiencies={character.toolProficiencies || []}
-                proficiencyBonus={proficiencyBonus}
-                onAddToolProficiency={params.addToolProficiency}
-                onUpdateToolProficiency={params.updateToolProficiency}
-                onDeleteToolProficiency={params.deleteToolProficiency}
-              />
-              <Languages
-                languages={character.languages || []}
-                onAddLanguage={params.addLanguage}
-                onDeleteLanguage={params.deleteLanguage}
-              />
+              <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                <ToolProficienciesSection
+                  toolProficiencies={character.toolProficiencies || []}
+                  proficiencyBonus={proficiencyBonus}
+                  onAddToolProficiency={params.addToolProficiency}
+                  onUpdateToolProficiency={params.updateToolProficiency}
+                  onDeleteToolProficiency={params.deleteToolProficiency}
+                  editing={params.editing}
+                />
+                <Languages
+                  languages={character.languages || []}
+                  onAddLanguage={params.addLanguage}
+                  onDeleteLanguage={params.deleteLanguage}
+                  editing={params.editing}
+                />
+              </div>
+              <ErrorBoundary
+                fallback={<SheetLoadError thing="Weapon proficiencies" />}
+              >
+                <WeaponProficiencies editing={params.editing} />
+              </ErrorBoundary>
             </div>
           ),
         }[tab.id],

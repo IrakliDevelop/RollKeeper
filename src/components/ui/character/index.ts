@@ -12,5 +12,4 @@ export { default as HitDiceManager } from './HitDiceManager';
 export { default as HitPointManager } from './HitPointManager';
 export { default as QuickStats } from './QuickStats';
 export { default as SpellSlotTracker } from './SpellSlotTracker';
-export { default as TraitTracker } from './TraitTracker';
 export { default as XPTracker } from './XPTracker';

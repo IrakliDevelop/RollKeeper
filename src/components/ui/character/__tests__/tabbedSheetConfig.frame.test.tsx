@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -35,7 +36,7 @@ afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
 });
-function config() {
+function config(overrides: Partial<TabbedSheetConfigParams> = {}) {
   const known = {
     character: makeCharacter(),
     hasHydrated: true,
@@ -47,6 +48,7 @@ function config() {
     getSkillModifier: () => 2,
     getSavingThrowModifier: () => 1,
     getClassDisplayString: () => 'Fighter 1',
+    ...overrides,
   };
   return createTabbedSheetConfig(
     new Proxy(known, {
@@ -187,14 +189,13 @@ it('keeps the conditions aligned while they load, until the player takes over', 
   scroll.mockRestore();
 });
 
-it('pairs the Player panel sections in rows, with proficiencies spanning both columns', () => {
+it('pairs the Player panel sections in rows and moves weapon proficiencies to Features', () => {
   render(<>{config().find(t => t.id === 'combat')!.content}</>);
   const wanted = [
     'Hit points',
     'Armor class',
     'Hit dice',
     'Initiative and speed',
-    'Weapon proficiencies',
   ];
   const headings = screen.getAllByRole('heading');
   const seen = headings
@@ -213,10 +214,61 @@ it('pairs the Player panel sections in rows, with proficiencies spanning both co
     while (node.parentElement !== grid) node = node.parentElement!;
     return node;
   };
-  expect(itemOf('Weapon proficiencies').className).toContain('lg:col-span-2');
-  for (const name of wanted.slice(0, 4))
+  for (const name of wanted)
     expect(itemOf(name).className).not.toContain('col-span-2');
+  expect(
+    screen.queryByRole('heading', { name: 'Weapon proficiencies' })
+  ).not.toBeInTheDocument();
   expect(screen.getByRole('switch', { name: 'Shield' })).toBeInTheDocument();
   expect(screen.getByRole('switch', { name: 'Temp AC' })).toBeInTheDocument();
   expect(screen.queryByText('Armor and Dexterity')).not.toBeInTheDocument();
+});
+
+it('places Tools and Languages side by side with Weapon proficiencies below', async () => {
+  render(<>{config().find(t => t.id === 'features')!.content}</>);
+  await userEvent.click(screen.getByRole('tab', { name: 'Proficiencies' }));
+  const tools = screen.getByRole('heading', { name: 'Tools' });
+  const languages = screen.getByRole('heading', { name: 'Languages' });
+  const grid = tools.closest('.md\\:grid-cols-2')!;
+  expect(grid).toContainElement(languages);
+  expect(
+    screen.getByRole('heading', { name: 'Weapon proficiencies' })
+  ).toBeInTheDocument();
+  expect(grid).not.toContainElement(
+    screen.getByRole('heading', { name: 'Weapon proficiencies' })
+  );
+});
+
+it('pairs a positive DM counter with Inspiration and omits a zero counter', async () => {
+  const positive = render(
+    <>
+      {
+        config({ customCounter: { label: 'DM boon', value: 2 } }).find(
+          t => t.id === 'features'
+        )!.content
+      }
+    </>
+  );
+  await userEvent.click(screen.getByRole('tab', { name: 'Inspiration' }));
+  const dmHeading = screen.getByRole('heading', { name: 'DM boon' });
+  expect(dmHeading.closest('.md\\:grid-cols-2')).toContainElement(
+    screen.getByRole('heading', { name: 'Heroic Inspiration' })
+  );
+  expect(dmHeading.closest('section')).toHaveTextContent('Set by your DM.');
+  expect(
+    within(dmHeading.closest('section') as HTMLElement).getByText('2')
+  ).toHaveClass('type-num-lg');
+
+  positive.unmount();
+  render(
+    <>
+      {
+        config({ customCounter: { label: 'DM boon', value: 0 } }).find(
+          t => t.id === 'features'
+        )!.content
+      }
+    </>
+  );
+  await userEvent.click(screen.getByRole('tab', { name: 'Inspiration' }));
+  expect(screen.queryByRole('heading', { name: 'DM boon' })).toBeNull();
 });
