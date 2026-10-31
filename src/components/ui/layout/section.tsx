@@ -37,6 +37,9 @@ export interface SectionProps
   contentClassName?: string;
   /** Stable per-device preference key. Omit for an always-open section. */
   collapsible?: string;
+  /** Controlled local disclosure when no stable preference key is available. */
+  collapsed?: boolean;
+  onCollapsedChange?: (collapsed: boolean) => void;
 }
 
 const HEADING_CLASS: Record<SectionHeadingLevel, string> = {
@@ -141,9 +144,18 @@ const CollapsibleSection = React.forwardRef<
 CollapsibleSection.displayName = 'CollapsibleSection';
 
 const Section = React.forwardRef<HTMLElement, SectionProps>(
-  ({ collapsible, ...props }, ref) =>
+  ({ collapsible, collapsed, onCollapsedChange, ...props }, ref) =>
     collapsible ? (
       <CollapsibleSection ref={ref} collapsible={collapsible} {...props} />
+    ) : collapsed !== undefined && onCollapsedChange ? (
+      <SectionView
+        ref={ref}
+        {...props}
+        toggle={{
+          collapsed,
+          onToggle: () => onCollapsedChange(!collapsed),
+        }}
+      />
     ) : (
       <SectionView ref={ref} {...props} />
     )

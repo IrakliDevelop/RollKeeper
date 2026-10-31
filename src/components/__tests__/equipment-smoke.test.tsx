@@ -1,11 +1,13 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeaponCard } from '@/components/ui/game/equipment/WeaponCard';
 import { WeaponRow } from '@/components/ui/character/equipment/WeaponRow';
 import { MagicItemRow } from '@/components/ui/character/equipment/MagicItemRow';
 import { ItemCard } from '@/components/ui/game/inventory/ItemCard';
 import { ChargePoolDisplay } from '@/components/ui/character/equipment/ChargePoolDisplay';
+
+afterEach(cleanup);
 import { MagicItemCard } from '@/components/ui/game/equipment/MagicItemCard';
 import type {
   Weapon,
@@ -176,7 +178,10 @@ describe('ItemCard', () => {
 
   it('shows weight and category', () => {
     render(<ItemCard item={mockInventoryItem} />);
-    expect(screen.getAllByText('10 lbs').length).toBeGreaterThan(0);
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Details: Rope (50 ft)' })
+    );
+    expect(screen.getAllByText('10 lb').length).toBeGreaterThan(0);
     expect(screen.getAllByText('misc').length).toBeGreaterThan(0);
   });
 });

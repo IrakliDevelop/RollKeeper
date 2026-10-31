@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { InventoryItem, MagicItemRarity } from '@/types/character';
+import { InventoryItem } from '@/types/character';
 import { Package, MapPin, Scale, Coins, Edit2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
@@ -21,28 +21,6 @@ interface ItemViewModalProps {
   onEdit?: (item: InventoryItem) => void;
 }
 
-const getRarityVariant = (
-  rarity?: MagicItemRarity
-): 'secondary' | 'success' | 'info' | 'primary' | 'warning' | 'danger' => {
-  if (!rarity) return 'secondary';
-  switch (rarity) {
-    case 'common':
-      return 'secondary';
-    case 'uncommon':
-      return 'success';
-    case 'rare':
-      return 'info';
-    case 'very rare':
-      return 'primary';
-    case 'legendary':
-      return 'warning';
-    case 'artifact':
-      return 'danger';
-    default:
-      return 'secondary';
-  }
-};
-
 export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
   if (!item) return null;
 
@@ -59,7 +37,7 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Package className="h-5 w-5 text-purple-600" />
+            <Package className="text-muted h-5 w-5" />
             {item.name}
             {isDepleted && (
               <Badge variant="neutral" size="sm">
@@ -74,12 +52,12 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
           {(item.rarity || item.type) && (
             <div className="flex flex-wrap gap-2">
               {item.rarity && (
-                <Badge variant={getRarityVariant(item.rarity)} size="md">
+                <Badge variant="neutral" size="md">
                   {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
                 </Badge>
               )}
               {item.type && (
-                <Badge variant="info" size="md">
+                <Badge variant="neutral" size="md">
                   {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
                 </Badge>
               )}
@@ -87,12 +65,10 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
           )}
 
           {/* Details Grid */}
-          <div className="bg-surface-secondary rounded-lg p-4">
-            <div className="grid grid-cols-2 gap-3 text-sm">
+          <div className="border-divider border-y py-3">
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
               <div>
-                <span className="text-muted text-xs font-medium uppercase">
-                  Category
-                </span>
+                <span className="text-muted text-sm font-medium">Category</span>
                 <p className="text-heading mt-0.5 font-medium capitalize">
                   {item.category}
                 </p>
@@ -100,7 +76,7 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
 
               {item.location && (
                 <div>
-                  <span className="text-muted text-xs font-medium uppercase">
+                  <span className="text-muted text-sm font-medium">
                     Location
                   </span>
                   <p className="text-heading mt-0.5 flex items-center gap-1 font-medium">
@@ -111,27 +87,21 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
               )}
 
               <div>
-                <span className="text-muted text-xs font-medium uppercase">
-                  Quantity
-                </span>
-                <p
-                  className={`mt-0.5 font-bold ${isDepleted ? 'text-red-500' : 'text-heading'}`}
-                >
+                <span className="text-muted text-sm font-medium">Quantity</span>
+                <p className="text-heading mt-0.5 font-semibold">
                   {item.quantity}
                 </p>
               </div>
 
               {item.weight !== undefined && (
                 <div>
-                  <span className="text-muted text-xs font-medium uppercase">
-                    Weight
-                  </span>
+                  <span className="text-muted text-sm font-medium">Weight</span>
                   <p className="text-heading mt-0.5 flex items-center gap-1 font-medium">
                     <Scale className="h-3 w-3" />
-                    {item.weight} lbs each
+                    {item.weight} lb each
                     {item.quantity > 1 && totalWeight !== undefined && (
                       <span className="text-muted">
-                        ({totalWeight} lbs total)
+                        ({totalWeight} lb total)
                       </span>
                     )}
                   </p>
@@ -140,9 +110,7 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
 
               {item.value !== undefined && (
                 <div>
-                  <span className="text-muted text-xs font-medium uppercase">
-                    Value
-                  </span>
+                  <span className="text-muted text-sm font-medium">Value</span>
                   <p className="text-heading mt-0.5 flex items-center gap-1 font-medium">
                     <Coins className="h-3 w-3" />
                     {formatCurrencyFromCopper(item.value)} each
@@ -170,14 +138,14 @@ export function ItemViewModal({ item, onClose, onEdit }: ItemViewModalProps) {
           )}
 
           {/* Tags */}
-          {item.tags.length > 0 && (
+          {(item.tags ?? []).length > 0 && (
             <div>
               <h4 className="text-heading mb-1.5 text-sm font-semibold">
                 Tags
               </h4>
               <div className="flex flex-wrap gap-1.5">
-                {item.tags.map((tag, index) => (
-                  <Badge key={index} variant="secondary" size="sm">
+                {(item.tags ?? []).map((tag, index) => (
+                  <Badge key={index} variant="neutral" size="sm">
                     {tag}
                   </Badge>
                 ))}

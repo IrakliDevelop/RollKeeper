@@ -1,5 +1,5 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Section } from './section';
 
@@ -101,6 +101,36 @@ describe('collapsible Section', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Spells' }));
     expect(screen.getByText('Prepared spells')).toBeVisible();
+  });
+
+  it('supports a local controlled disclosure without writing a shared preference', () => {
+    const onCollapsedChange = vi.fn();
+    const { rerender } = render(
+      <Section
+        heading="Backpack"
+        collapsed={false}
+        onCollapsedChange={onCollapsedChange}
+      >
+        Rope
+      </Section>
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Backpack' }));
+    expect(onCollapsedChange).toHaveBeenCalledWith(true);
+    rerender(
+      <Section
+        heading="Backpack"
+        collapsed
+        onCollapsedChange={onCollapsedChange}
+      >
+        Rope
+      </Section>
+    );
+    expect(screen.getByRole('button', { name: 'Backpack' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
+    expect(screen.queryByText('Rope')).toBeNull();
+    expect(localStorage.getItem('rollkeeper-ui-prefs')).toBeNull();
   });
 });
 

@@ -522,8 +522,8 @@ test('DM opens a shop, a player buys, coins move, and the DM copy reconciles', a
     await player1Page.getByRole('tab', { name: 'Items', exact: true }).click();
 
     const itemCard = player1Page
-      .getByRole('heading', { name: ITEM_NAME, level: 5 })
-      .locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]');
+      .getByRole('button', { name: `Details: ${ITEM_NAME}` })
+      .locator('xpath=ancestor::article[1]');
     await expect(itemCard).toBeVisible({ timeout: 15_000 });
     const quantityValue = itemCard
       .getByText('Quantity:', { exact: true })
