@@ -152,14 +152,14 @@ export function MagicItemLibraryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[92vh] max-w-4xl min-w-0 overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {item ? 'Edit Custom Magic Item' : 'Create Custom Magic Item'}
           </DialogTitle>
         </DialogHeader>
         <DialogBody className="space-y-5">
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
             <Input
               label="Group (optional)"
               value={group}

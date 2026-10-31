@@ -638,14 +638,12 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     await waitForCharacterLoaded(playerPage, characterId);
 
     await playerPage.getByRole('tab', { name: 'Inventory' }).click();
-    // The Inventory sub-tabs (Weapons/Magic Items/Armor/Items/Currency,
-    // `tabbedSheetConfig.tsx`'s `InventoryTabContent`) are plain `<button>`s,
-    // not `role="tab"`.
+    // Inventory sub-tabs expose tab roles in InventoryTabContent.
     await playerPage.getByRole('tab', { name: 'Items', exact: true }).click();
 
     const itemCard = playerPage
-      .getByRole('heading', { name: ITEM_NAME, level: 5 })
-      .locator('xpath=ancestor::div[contains(@class,"rounded-lg")][1]');
+      .getByRole('button', { name: `Details: ${ITEM_NAME}` })
+      .locator('xpath=ancestor::article[1]');
     await expect(itemCard).toBeVisible({ timeout: 15_000 });
     const quantityValue = itemCard
       .getByText('Quantity:', { exact: true })

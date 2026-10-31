@@ -1,24 +1,15 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
-import { InventoryItem } from '@/types/character';
-import {
-  Plus,
-  Package,
-  Filter,
-  MapPin,
-  X,
-  Search,
-  ChevronDown,
-  ChevronRight,
-  List,
-  Grid3X3,
-} from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { InventoryItem } from '@/types/character';
+import { Plus, X, List, Grid3X3 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import DragDropList from '@/components/ui/layout/DragDropList';
+import { Section } from '@/components/ui/layout/section';
 import { Button } from '@/components/ui/forms/button';
-import { Badge } from '@/components/ui/layout/badge';
+import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import {
   ItemCard,
   ItemForm,
@@ -37,7 +28,6 @@ const ITEM_CATEGORIES = [
   'treasure',
   'misc',
 ];
-
 const DEFAULT_LOCATIONS = [
   'Backpack',
   'Belt',
@@ -50,6 +40,10 @@ const DEFAULT_LOCATIONS = [
   'Left Behind',
 ];
 
+export function inventoryLocationKey(scopeId: string, location: string) {
+  return `inventory-location:${encodeURIComponent(scopeId)}:${encodeURIComponent(location)}`;
+}
+
 interface InventoryManagerProps {
   items: InventoryItem[];
   onAddItem?: (
@@ -60,12 +54,12 @@ interface InventoryManagerProps {
   onQuantityChange?: (id: string, quantity: number) => void;
   onReorderItems?: (sourceIndex: number, destinationIndex: number) => void;
   onSendItem?: (item: InventoryItem) => void;
-
-  // When provided, overrides internal weight/value calculation in Quick Stats
   overrideTotalWeight?: number;
   overrideTotalValue?: number;
-
-  // Display options
+  /** Show sheet-wide totals semantics only when the sheet supplies totals. */
+  sheetSummary?: boolean;
+  /** Stable entity ID for persisted per-device location disclosure. */
+  locationScopeId?: string;
   readonly?: boolean;
   compact?: boolean;
   hideAddButton?: boolean;
@@ -73,7 +67,6 @@ interface InventoryManagerProps {
   hideLocations?: boolean;
   showOnlyLocation?: string;
   maxItemsToShow?: number;
-
   className?: string;
 }
 
@@ -87,6 +80,8 @@ export function InventoryManager({
   onSendItem,
   overrideTotalWeight,
   overrideTotalValue,
+  sheetSummary = false,
+  locationScopeId,
   readonly = false,
   compact = false,
   hideAddButton = false,
@@ -104,66 +99,68 @@ export function InventoryManager({
   const [formData, setFormData] = useState<InventoryFormData>(
     initialInventoryFormData
   );
-  const [filterLocation, setFilterLocation] = useState<string>('all');
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterLocation, setFilterLocation] = useState('all');
+  const [filterCategory, setFilterCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [compactView, setCompactView] = useState(true);
   const [collapsedLocations, setCollapsedLocations] = useState<Set<string>>(
     new Set()
   );
+  const [pendingDeleteFocusId, setPendingDeleteFocusId] = useState<
+    string | null
+  >(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (
+      pendingDeleteFocusId &&
+      !items.some(item => item.id === pendingDeleteFocusId)
+    ) {
+      addButtonRef.current?.focus();
+      setPendingDeleteFocusId(null);
+    }
+  }, [items, pendingDeleteFocusId]);
 
-  const effectiveCompact = compact || compactView;
+  const allLocations = useMemo(
+    () =>
+      [
+        ...new Set([
+          ...DEFAULT_LOCATIONS,
+          ...items
+            .map(item => item.location)
+            .filter((loc): loc is string => Boolean(loc)),
+        ]),
+      ].sort(),
+    [items]
+  );
 
-  // Get all unique locations from items
-  const allLocations = useMemo(() => {
-    return [
-      ...new Set([
-        ...DEFAULT_LOCATIONS,
-        ...items
-          .map(item => item.location)
-          .filter((loc): loc is string => Boolean(loc)),
-      ]),
-    ].sort();
-  }, [items]);
-
-  // Filter items based on selected filters and display options
   const filteredItems = useMemo(() => {
     let result = items;
-
     if (showOnlyLocation) {
       result = result.filter(item =>
         showOnlyLocation === 'Unassigned'
-          ? !item.location || item.location === null
+          ? !item.location
           : item.location === showOnlyLocation
       );
     } else {
-      result = result.filter(item => {
-        const locationMatch =
-          filterLocation === 'all' ||
-          (filterLocation === 'Unassigned' &&
-            (!item.location || item.location === null)) ||
-          item.location === filterLocation;
-
-        const categoryMatch =
-          filterCategory === 'all' || item.category === filterCategory;
-
-        const searchMatch =
-          !searchQuery ||
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.tags.some(tag =>
-            tag.toLowerCase().includes(searchQuery.toLowerCase())
-          );
-
-        return locationMatch && categoryMatch && searchMatch;
-      });
+      result = result.filter(
+        item =>
+          (filterLocation === 'all' ||
+            (filterLocation === 'Unassigned' && !item.location) ||
+            item.location === filterLocation) &&
+          (filterCategory === 'all' || item.category === filterCategory) &&
+          (!searchQuery ||
+            item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+            item.description
+              ?.toLowerCase()
+              .includes(searchQuery.toLowerCase()) ||
+            (item.tags ?? []).some(tag =>
+              tag.toLowerCase().includes(searchQuery.toLowerCase())
+            ))
+      );
     }
-
-    if (maxItemsToShow && result.length > maxItemsToShow) {
+    if (maxItemsToShow && result.length > maxItemsToShow)
       result = result.slice(0, maxItemsToShow);
-    }
-
     return result;
   }, [
     items,
@@ -174,43 +171,48 @@ export function InventoryManager({
     maxItemsToShow,
   ]);
 
-  // Group items by location
   const itemsByLocation = useMemo(() => {
     const grouped: Record<string, InventoryItem[]> = {};
-
-    filteredItems.forEach(item => {
+    for (const item of filteredItems) {
       const location = item.location || 'Unassigned';
-      if (!grouped[location]) {
-        grouped[location] = [];
-      }
-      grouped[location].push(item);
-    });
-
+      (grouped[location] ??= []).push(item);
+    }
     return grouped;
   }, [filteredItems]);
 
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const totalItems = filteredItems.reduce(
-      (sum, item) => sum + item.quantity,
-      0
-    );
-    const totalWeight =
-      overrideTotalWeight ??
-      filteredItems.reduce(
-        (sum, item) => sum + (item.weight || 0) * item.quantity,
-        0
-      );
-    const totalValue =
-      overrideTotalValue ??
-      filteredItems.reduce(
-        (sum, item) => sum + (item.value || 0) * item.quantity,
-        0
-      );
+  const stats = useMemo(
+    () => ({
+      totalItems: filteredItems.reduce((sum, item) => sum + item.quantity, 0),
+      totalWeight:
+        overrideTotalWeight ??
+        filteredItems.reduce(
+          (sum, item) => sum + (item.weight || 0) * item.quantity,
+          0
+        ),
+      totalValue:
+        overrideTotalValue ??
+        filteredItems.reduce(
+          (sum, item) => sum + (item.value || 0) * item.quantity,
+          0
+        ),
+    }),
+    [filteredItems, overrideTotalWeight, overrideTotalValue]
+  );
 
-    return { totalItems, totalWeight, totalValue };
-  }, [filteredItems, overrideTotalWeight, overrideTotalValue]);
-
+  const activeFilterCount =
+    Number(Boolean(searchQuery)) +
+    Number(filterLocation !== 'all') +
+    Number(filterCategory !== 'all');
+  const clearFilters = () => {
+    setSearchQuery('');
+    setFilterLocation('all');
+    setFilterCategory('all');
+  };
+  const resetForm = () => {
+    setShowItemForm(false);
+    setEditingItem(null);
+    setFormData(initialInventoryFormData);
+  };
   const handleEditItem = (item: InventoryItem) => {
     setViewingItem(null);
     setEditingItem(item);
@@ -224,55 +226,49 @@ export function InventoryManager({
       weight: item.weight,
       value: item.value,
       description: item.description || '',
-      tags: item.tags,
+      tags: item.tags ?? [],
     });
     setShowItemForm(true);
   };
-
   const handleFormSubmit = (data: InventoryFormData) => {
-    if (editingItem && onUpdateItem) {
-      onUpdateItem(editingItem.id, data);
-    } else if (onAddItem) {
-      onAddItem(data);
-    }
+    if (editingItem && onUpdateItem) onUpdateItem(editingItem.id, data);
+    else if (onAddItem) onAddItem(data);
     resetForm();
   };
-
-  const resetForm = () => {
-    setShowItemForm(false);
-    setEditingItem(null);
-    setFormData(initialInventoryFormData);
-  };
-
-  const toggleLocationCollapse = (location: string) => {
-    setCollapsedLocations(prev => {
-      const next = new Set(prev);
-      if (next.has(location)) {
-        next.delete(location);
-      } else {
-        next.add(location);
-      }
+  const toggleLocalLocation = (location: string, collapsed: boolean) => {
+    setCollapsedLocations(previous => {
+      const next = new Set(previous);
+      if (collapsed) next.add(location);
+      else next.delete(location);
       return next;
     });
   };
-
-  const advancedFilterCount = [
-    filterLocation !== 'all' ? 1 : 0,
-    filterCategory !== 'all' ? 1 : 0,
-  ].reduce((a, b) => a + b, 0);
-
-  const renderItemCard = (item: InventoryItem) => (
+  const renderItem = (item: InventoryItem) => (
     <ItemCard
       item={item}
       onView={setViewingItem}
       onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
       onDelete={
-        readonly || !onDeleteItem ? undefined : () => onDeleteItem(item.id)
+        readonly || !onDeleteItem
+          ? undefined
+          : () => {
+              void confirmDialog({
+                title: `Delete ${item.name}?`,
+                confirmLabel: 'Delete item',
+                cancelLabel: 'Cancel',
+                tone: 'danger',
+              }).then(confirmed => {
+                if (confirmed) {
+                  setPendingDeleteFocusId(item.id);
+                  onDeleteItem(item.id);
+                }
+              });
+            }
       }
       onQuantityChange={
         readonly || !onQuantityChange
           ? undefined
-          : (quantity: number) => onQuantityChange(item.id, quantity)
+          : quantity => onQuantityChange(item.id, quantity)
       }
       onSend={onSendItem}
       onUse={
@@ -280,260 +276,223 @@ export function InventoryManager({
           ? undefined
           : () => onQuantityChange(item.id, Math.max(0, item.quantity - 1))
       }
-      compact={effectiveCompact}
+      compact={compact || compactView}
     />
   );
 
   return (
-    <div
-      className={`border-divider bg-surface-raised rounded-lg border-2 shadow-sm ${className}`}
-    >
-      {/* Header */}
-      <div className="border-divider from-surface-secondary to-surface-inset border-b-2 bg-gradient-to-r p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-heading flex items-center gap-2 text-xl font-bold">
-            <Package className="h-6 w-6 text-purple-600" />
-            {effectiveCompact ? 'Inventory' : 'Inventory & Equipment'}
-          </h2>
-          <div className="flex items-center gap-2">
-            <Badge variant="primary" size="md">
-              {filteredItems.length} items
-            </Badge>
-            {!compact && (
-              <Button
-                onClick={() => setCompactView(!compactView)}
-                variant={compactView ? 'primary' : 'ghost'}
-                size="sm"
-                title={
-                  compactView
-                    ? 'Switch to detailed view'
-                    : 'Switch to compact view'
-                }
-              >
-                {compactView ? <List size={18} /> : <Grid3X3 size={18} />}
-              </Button>
-            )}
-            {!readonly && !hideAddButton && onAddItem && (
-              <Button
-                onClick={() => setShowItemForm(true)}
-                variant="primary"
-                size="sm"
-                leftIcon={<Plus size={16} />}
-              >
-                Add Item
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Statistics */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong rounded-lg border-2 bg-gradient-to-r p-3 text-center">
-            <div className="text-accent-purple-text text-2xl font-bold">
-              {stats.totalItems}
-            </div>
-            <div className="text-accent-purple-text-muted text-xs font-medium">
-              Total Items
-            </div>
-          </div>
-          <div className="border-accent-blue-border from-accent-blue-bg to-accent-indigo-bg rounded-lg border-2 bg-gradient-to-r p-3 text-center">
-            <div className="text-accent-blue-text text-2xl font-bold">
-              {stats.totalWeight.toFixed(1)}
-            </div>
-            <div className="text-accent-blue-text-muted text-xs font-medium">
-              lbs
-            </div>
-          </div>
-          <div className="border-accent-amber-border from-accent-amber-bg to-accent-amber-bg-strong rounded-lg border-2 bg-gradient-to-r p-3 text-center">
-            <div className="text-accent-amber-text text-xl font-bold">
-              {formatCurrencyFromCopper(stats.totalValue)}
-            </div>
-            <div className="text-accent-amber-text-muted text-xs font-medium">
-              Total Value
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Search + Filters */}
-      {!hideFilters && !showOnlyLocation && (
-        <div className="border-divider bg-surface-secondary border-b-2 p-4">
-          {/* Always-visible search */}
-          <div className="relative">
-            <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search items..."
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="border-divider bg-surface-raised text-heading focus:border-accent-purple-border focus:ring-accent-purple-bg w-full rounded-lg border-2 py-2 pr-10 pl-10 text-sm transition-colors focus:ring-2 focus:outline-none"
-            />
-            {searchQuery && (
-              <button
-                onClick={() => setSearchQuery('')}
-                className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
-                title="Clear search"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          {/* Advanced filters toggle */}
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="text-heading hover:text-accent-purple-text mt-3 flex w-full items-center gap-2 text-sm font-bold tracking-wide uppercase transition-colors"
-          >
-            <Filter className="h-4 w-4" />
-            Advanced Filters
-            {advancedFilterCount > 0 && (
-              <Badge variant="primary" size="sm">
-                {advancedFilterCount}
-              </Badge>
-            )}
-            {showFilters ? (
-              <ChevronDown className="ml-auto h-4 w-4" />
-            ) : (
-              <ChevronRight className="ml-auto h-4 w-4" />
-            )}
-          </button>
-
-          {showFilters && (
-            <>
-              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
-                    <MapPin className="h-3 w-3" />
-                    Location
-                  </label>
-                  <SelectField
-                    value={filterLocation}
-                    onValueChange={setFilterLocation}
-                  >
-                    <SelectItem value="all">All Locations</SelectItem>
-                    {allLocations.map(location => (
-                      <SelectItem key={location} value={location}>
-                        {location}
-                      </SelectItem>
-                    ))}
-                    <SelectItem value="Unassigned">Unassigned</SelectItem>
-                  </SelectField>
-                </div>
-
-                <div>
-                  <label className="text-body mb-2 flex items-center gap-1 text-sm font-medium">
-                    <Package className="h-3 w-3" />
-                    Category
-                  </label>
-                  <SelectField
-                    value={filterCategory}
-                    onValueChange={setFilterCategory}
-                  >
-                    <SelectItem value="all">All Categories</SelectItem>
-                    {ITEM_CATEGORIES.map(category => (
-                      <SelectItem key={category} value={category}>
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </SelectField>
-                </div>
-              </div>
-
-              {advancedFilterCount > 0 && (
-                <Button
-                  onClick={() => {
-                    setFilterLocation('all');
-                    setFilterCategory('all');
-                  }}
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<X size={14} />}
-                  className="mt-3"
-                >
-                  Clear Filters
-                </Button>
+    <Section
+      heading="Items"
+      className={className}
+      trailing={
+        <div className="flex items-center gap-2">
+          {!compact && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              aria-label="Show item details"
+              aria-pressed={!compactView}
+              onClick={() => setCompactView(value => !value)}
+            >
+              {compactView ? (
+                <List size={18} aria-hidden="true" />
+              ) : (
+                <Grid3X3 size={18} aria-hidden="true" />
               )}
-            </>
+            </Button>
+          )}
+          {!readonly && !hideAddButton && onAddItem && (
+            <Button
+              ref={addButtonRef}
+              type="button"
+              onClick={() => {
+                setEditingItem(null);
+                setFormData(initialInventoryFormData);
+                setShowItemForm(true);
+              }}
+              variant="primary"
+              size="sm"
+              leftIcon={<Plus size={16} />}
+            >
+              Add item
+            </Button>
           )}
         </div>
-      )}
+      }
+    >
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div>
+            <p className="text-heading type-subheading">{stats.totalItems}</p>
+            <p className="text-muted type-small">
+              {activeFilterCount ? 'Matching quantity' : 'Total quantity'}
+            </p>
+          </div>
+          <div>
+            <p className="text-heading type-subheading">
+              {stats.totalWeight.toFixed(1)}
+            </p>
+            <p className="text-muted type-small">Weight (lb)</p>
+          </div>
+          <div>
+            <p className="text-heading type-subheading">
+              {formatCurrencyFromCopper(stats.totalValue)}
+            </p>
+            <p className="text-muted type-small">Value</p>
+          </div>
+        </div>
+        {sheetSummary && (
+          <p className="text-muted type-small">
+            Weight and value include all weapons, armor and items, regardless of
+            filters. Weight also includes coins.
+          </p>
+        )}
 
-      {/* Items Display */}
-      <div className="p-6">
+        {!hideFilters && !showOnlyLocation && (
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Input
+                type="search"
+                placeholder="Search items"
+                aria-label="Search items"
+                value={searchQuery}
+                onChange={event => setSearchQuery(event.target.value)}
+                className="min-h-10 text-sm"
+                wrapperClassName="min-w-0 flex-[1_1_12rem]"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label="Filters"
+                aria-expanded={showFilters}
+                onClick={() => setShowFilters(value => !value)}
+              >
+                Filters{' '}
+                {activeFilterCount > 0 && (
+                  <span aria-hidden="true" className="text-muted">
+                    {activeFilterCount}
+                  </span>
+                )}
+              </Button>
+              {activeFilterCount > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearFilters}
+                >
+                  <X size={14} aria-hidden="true" />
+                  Clear filters
+                </Button>
+              )}
+            </div>
+            {showFilters && (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <SelectField
+                  value={filterLocation}
+                  onValueChange={setFilterLocation}
+                  triggerProps={{ 'aria-label': 'Location' }}
+                >
+                  <SelectItem value="all">All locations</SelectItem>
+                  {allLocations.map(location => (
+                    <SelectItem key={location} value={location}>
+                      {location}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="Unassigned">Unassigned</SelectItem>
+                </SelectField>
+                <SelectField
+                  value={filterCategory}
+                  onValueChange={setFilterCategory}
+                  triggerProps={{ 'aria-label': 'Category' }}
+                >
+                  <SelectItem value="all">All categories</SelectItem>
+                  {ITEM_CATEGORIES.map(category => (
+                    <SelectItem key={category} value={category}>
+                      {category.charAt(0).toUpperCase() + category.slice(1)}
+                    </SelectItem>
+                  ))}
+                </SelectField>
+              </div>
+            )}
+          </div>
+        )}
+
         {filteredItems.length > 0 ? (
           hideLocations ? (
             <DragDropList
               items={filteredItems}
               onReorder={onReorderItems || (() => {})}
               keyExtractor={item => item.id}
-              className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-4"
+              className="space-y-1"
               showDragHandle={!readonly && !!onReorderItems}
               dragHandlePosition="left"
-              renderItem={item => renderItemCard(item)}
+              renderItem={item => renderItem(item)}
             />
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               {Object.entries(itemsByLocation).map(
-                ([location, locationItems]) => {
-                  const isCollapsed = collapsedLocations.has(location);
-
-                  return (
-                    <div
-                      key={location}
-                      className="border-divider bg-surface-raised rounded-lg border-2"
-                    >
-                      <button
-                        onClick={() => toggleLocationCollapse(location)}
-                        className="hover:bg-surface-hover flex w-full items-center justify-between p-4 text-left transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          {isCollapsed ? (
-                            <ChevronRight className="h-4 w-4 text-purple-600" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-purple-600" />
-                          )}
-                          <MapPin className="h-4 w-4 text-purple-600" />
-                          <h4 className="text-heading font-bold">{location}</h4>
-                          <Badge variant="secondary" size="sm">
-                            {locationItems.length}
-                          </Badge>
-                        </div>
-                        <div className="text-muted text-xs">
-                          {isCollapsed
-                            ? 'Click to expand'
-                            : 'Click to collapse'}
-                        </div>
-                      </button>
-
-                      {!isCollapsed && (
-                        <div className="grid grid-cols-2 gap-3 p-4 pt-0 lg:grid-cols-3 xl:grid-cols-4">
-                          {locationItems.map(item => (
-                            <React.Fragment key={item.id}>
-                              {renderItemCard(item)}
-                            </React.Fragment>
-                          ))}
-                        </div>
-                      )}
+                ([location, locationItems]) => (
+                  <Section
+                    key={location}
+                    heading={location}
+                    level={3}
+                    collapsible={
+                      locationScopeId
+                        ? inventoryLocationKey(locationScopeId, location)
+                        : undefined
+                    }
+                    collapsed={
+                      !locationScopeId
+                        ? collapsedLocations.has(location)
+                        : undefined
+                    }
+                    onCollapsedChange={
+                      !locationScopeId
+                        ? collapsed => toggleLocalLocation(location, collapsed)
+                        : undefined
+                    }
+                    trailing={
+                      <span className="text-muted text-sm">
+                        {locationItems.length}
+                      </span>
+                    }
+                  >
+                    <div className="space-y-1">
+                      {locationItems.map(item => (
+                        <div key={item.id}>{renderItem(item)}</div>
+                      ))}
                     </div>
-                  );
-                }
+                  </Section>
+                )
               )}
             </div>
           )
         ) : (
-          <div className="border-border-secondary bg-surface-inset rounded-lg border-2 border-dashed py-12 text-center">
-            <Package className="text-muted mx-auto mb-3 h-12 w-12" />
-            <p className="text-body font-medium">No items found</p>
-            <p className="text-muted mt-1 text-sm">
-              {advancedFilterCount > 0 || searchQuery
-                ? 'Try adjusting your filters or add new items'
-                : 'Add items to track your equipment and supplies'}
+          <div className="text-muted py-10 text-center">
+            <p className="text-heading font-medium">
+              {activeFilterCount
+                ? filterLocation !== 'all' || filterCategory !== 'all'
+                  ? 'No items match your search or filters.'
+                  : `No items match “${searchQuery.trim()}”.`
+                : 'Add your first item'}
             </p>
+            {activeFilterCount > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearFilters}
+              >
+                Clear filters
+              </Button>
+            )}
           </div>
         )}
       </div>
 
-      {/* Item Form Modal */}
       <ItemForm
         isOpen={showItemForm}
         onClose={resetForm}
@@ -545,13 +504,11 @@ export function InventoryManager({
         databaseMagicItems={databaseMagicItems}
         itemsLoading={itemsLoading}
       />
-
-      {/* Item View Modal */}
       <ItemViewModal
         item={viewingItem}
         onClose={() => setViewingItem(null)}
         onEdit={readonly || !onUpdateItem ? undefined : handleEditItem}
       />
-    </div>
+    </Section>
   );
 }

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { MagicItemCategory, MagicItemRarity } from '@/types/character';
-import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
@@ -24,6 +24,7 @@ export interface MagicItemChargeFormData {
 }
 
 import type { ChargePoolFormData } from '@/utils/magicItemConversion';
+import { formatRarity } from '@/utils/formatRarity';
 
 export interface MagicItemFormData {
   name: string;
@@ -160,10 +161,10 @@ export function MagicItemForm({
         <div className="space-y-4">{autocompleteSlot}</div>
       )}
 
-      {/* Section: Basic Information */}
+      {/* Section: Basic information */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-          Basic Information
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
+          Basic information
         </h4>
 
         <Input
@@ -174,7 +175,7 @@ export function MagicItemForm({
           required
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
           <div>
             <label className="text-body mb-2 block text-sm font-medium">
               Category
@@ -211,7 +212,7 @@ export function MagicItemForm({
             >
               {MAGIC_ITEM_RARITIES.map(rarity => (
                 <SelectItem key={rarity} value={rarity}>
-                  {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
+                  {formatRarity(rarity)}
                 </SelectItem>
               ))}
             </SelectField>
@@ -221,13 +222,13 @@ export function MagicItemForm({
 
       {/* Section: Description */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
           Description
         </h4>
 
         <div>
           <label className="text-body mb-1 block text-sm font-medium">
-            Item Properties
+            Properties
           </label>
           <RichTextEditor
             content={formData.description}
@@ -245,38 +246,31 @@ export function MagicItemForm({
 
       {/* Section: Charges */}
       <div className="space-y-4">
-        <div className="border-divider flex items-center justify-between border-b-2 pb-2">
-          <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
-            <Sparkles size={16} className="text-accent-purple-text-muted" />
-            Charges & Abilities (Optional)
+        <div className="border-divider flex items-center justify-between border-b pb-2">
+          <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
+            Charges and abilities (optional)
           </h4>
           <Button
             type="button"
             onClick={addCharge}
-            variant="primary"
+            variant="outline"
             size="sm"
             leftIcon={<Plus size={14} />}
           >
-            Add Charge Ability
+            Add charge ability
           </Button>
         </div>
 
         {!formData.charges || formData.charges.length === 0 ? (
           <p className="text-muted text-sm italic">
-            No charge abilities configured. Add charge abilities for magic items
-            that can cast spells or activate special powers a limited number of
-            times.
+            No charge abilities. Add one if this item has limited uses.
           </p>
         ) : (
           <div className="space-y-4">
             {formData.charges.map((charge, index) => (
-              <div
-                key={index}
-                className="border-accent-purple-border bg-accent-purple-bg rounded-lg border-2 p-4"
-              >
+              <div key={index} className="border-divider min-w-0 border-t pt-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <h5 className="text-accent-purple-text-muted flex items-center gap-2 text-sm font-semibold">
-                    <Sparkles size={14} />
+                  <h5 className="text-muted flex items-center gap-2 text-sm font-semibold">
                     {charge.name || `Charge Ability ${index + 1}`}
                   </h5>
                   <Button
@@ -284,7 +278,8 @@ export function MagicItemForm({
                     onClick={() => removeCharge(index)}
                     variant="ghost"
                     size="xs"
-                    className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
+                    aria-label={`Remove charge ability ${charge.name || index + 1}`}
+                    className="text-muted hover:text-body pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -293,7 +288,7 @@ export function MagicItemForm({
                 {/* Ability Name */}
                 <div className="mb-3">
                   <Input
-                    label="Ability Name"
+                    label="Name"
                     value={charge.name}
                     onChange={e =>
                       updateCharge(index, { name: e.target.value })
@@ -306,7 +301,7 @@ export function MagicItemForm({
                 {/* Description with WYSIWYG */}
                 <div className="mb-3">
                   <label className="text-body mb-1 block text-sm font-medium">
-                    Description (Optional)
+                    Description (optional)
                   </label>
                   <RichTextEditor
                     content={charge.description || ''}
@@ -318,10 +313,10 @@ export function MagicItemForm({
                   />
                 </div>
 
-                {/* Max Charges and Rest Type */}
-                <div className="mb-3 grid grid-cols-2 gap-3">
+                {/* Max charges and Rest Type */}
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
                   <NumberInput
-                    label="Max Charges"
+                    label="Max charges"
                     min={1}
                     value={charge.maxCharges}
                     onChange={v =>
@@ -333,7 +328,7 @@ export function MagicItemForm({
                   />
                   <div>
                     <label className="text-body mb-2 block text-sm font-medium">
-                      Recharges On
+                      Recharges on
                     </label>
                     <SelectField
                       value={charge.restType}
@@ -343,15 +338,15 @@ export function MagicItemForm({
                         })
                       }
                     >
-                      <SelectItem value="dawn">At Dawn</SelectItem>
-                      <SelectItem value="short">Short Rest</SelectItem>
-                      <SelectItem value="long">Long Rest</SelectItem>
+                      <SelectItem value="dawn">At dawn</SelectItem>
+                      <SelectItem value="short">Short rest</SelectItem>
+                      <SelectItem value="long">Long rest</SelectItem>
                     </SelectField>
                   </div>
                 </div>
 
                 {/* Proficiency Scaling */}
-                <div className="border-accent-purple-border border-t pt-3">
+                <div className="border-divider border-t pt-3">
                   <label className="flex cursor-pointer items-center gap-2">
                     <Checkbox
                       checked={charge.scaleWithProficiency || false}
@@ -372,7 +367,7 @@ export function MagicItemForm({
                   {charge.scaleWithProficiency && (
                     <div className="mt-2 pl-6">
                       <NumberInput
-                        label="Proficiency Multiplier"
+                        label="Proficiency multiplier"
                         integer={false}
                         min={0.5}
                         step={0.5}
@@ -397,17 +392,16 @@ export function MagicItemForm({
       {/* Section: Charge Pool (from item database) */}
       {formData.chargePool && (
         <div className="space-y-4">
-          <div className="border-divider flex items-center justify-between border-b-2 pb-2">
-            <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
-              <Zap size={16} className="text-accent-amber-text" />
-              Shared Charge Pool
+          <div className="border-divider flex items-center justify-between border-b pb-2">
+            <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
+              Shared charge pool
             </h4>
           </div>
 
-          <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
-            <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="border-divider min-w-0 border-t pt-4">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
               <NumberInput
-                label="Max Charges"
+                label="Max charges"
                 min={0}
                 value={formData.chargePool.maxCharges}
                 onChange={v =>
@@ -441,16 +435,16 @@ export function MagicItemForm({
                     }))
                   }
                 >
-                  <SelectItem value="dawn">At Dawn</SelectItem>
-                  <SelectItem value="dusk">At Dusk</SelectItem>
-                  <SelectItem value="short">Short Rest</SelectItem>
-                  <SelectItem value="long">Long Rest</SelectItem>
+                  <SelectItem value="dawn">At dawn</SelectItem>
+                  <SelectItem value="dusk">At dusk</SelectItem>
+                  <SelectItem value="short">Short rest</SelectItem>
+                  <SelectItem value="long">Long rest</SelectItem>
                   <SelectItem value="midnight">Midnight</SelectItem>
                   <SelectItem value="special">Special</SelectItem>
                 </SelectField>
               </div>
               <Input
-                label="Recharge Amount"
+                label="Recharge amount"
                 value={formData.chargePool.rechargeAmount || ''}
                 onChange={e =>
                   setFormData(prev => ({
@@ -469,18 +463,13 @@ export function MagicItemForm({
 
             {formData.chargePool.abilities.length > 0 && (
               <div className="space-y-2">
-                <p className="text-body text-xs font-semibold uppercase">
-                  Abilities
-                </p>
+                <p className="text-body text-sm font-semibold">Abilities</p>
                 {formData.chargePool.abilities.map((ability, idx) => (
                   <div
                     key={ability.id || idx}
-                    className="bg-surface-raised flex items-center gap-3 rounded-lg px-3 py-2"
+                    className="border-divider flex min-w-0 flex-wrap items-center gap-3 border-b py-2"
                   >
-                    <Badge
-                      variant={ability.cost === 0 ? 'success' : 'warning'}
-                      size="sm"
-                    >
+                    <Badge variant="neutral" size="sm">
                       {ability.cost === 0
                         ? ability.description === 'Ritual only'
                           ? 'Ritual'
@@ -493,12 +482,13 @@ export function MagicItemForm({
                         updatePoolAbility(idx, { name: e.target.value })
                       }
                       className="flex-1 text-sm"
-                      wrapperClassName="flex-1"
+                      wrapperClassName="min-w-0 flex-[1_1_12rem]"
                     />
                     <button
                       type="button"
+                      aria-label={`Remove shared charge ability ${ability.name || idx + 1}`}
                       onClick={() => removePoolAbility(idx)}
-                      className="text-muted hover:text-accent-red-text shrink-0 p-1"
+                      className="text-muted hover:bg-surface-hover hover:text-body inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -510,18 +500,17 @@ export function MagicItemForm({
         </div>
       )}
 
-      {/* Section: Spell Bonuses */}
+      {/* Section: Spell bonuses */}
       {(formData.bonusSpellAttack !== undefined ||
         formData.bonusSpellSaveDc !== undefined ||
         formData.chargePool) && (
         <div className="space-y-4">
-          <h4 className="border-divider text-heading flex items-center gap-2 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            <Shield size={16} className="text-accent-indigo-text" />
-            Spell Bonuses
+          <h4 className="border-divider text-heading flex items-center gap-2 border-b pb-2 text-sm font-bold">
+            Spell bonuses
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
             <NumberInput
-              label="Bonus to Spell Attack"
+              label="Spell attack bonus"
               min={0}
               max={5}
               allowEmpty
@@ -536,7 +525,7 @@ export function MagicItemForm({
               helperText="Added to spell attack rolls"
             />
             <NumberInput
-              label="Bonus to Spell Save DC"
+              label="Spell save DC bonus"
               min={0}
               max={5}
               allowEmpty
@@ -556,7 +545,7 @@ export function MagicItemForm({
 
       {/* Section: Properties */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
           Properties
         </h4>
 
@@ -573,7 +562,7 @@ export function MagicItemForm({
               }
             />
             <span className="text-heading text-sm font-medium">
-              Requires Attunement
+              Requires attunement
             </span>
           </label>
 
@@ -588,9 +577,7 @@ export function MagicItemForm({
                   })
                 }
               />
-              <span className="text-heading text-sm font-medium">
-                Currently Attuned
-              </span>
+              <span className="text-heading text-sm font-medium">Attuned</span>
             </label>
           )}
         </div>
@@ -607,7 +594,7 @@ export function MagicItemForm({
           size="md"
           disabled={!formData.name.trim()}
         >
-          {isEditing ? 'Update' : 'Add'} Item
+          {isEditing ? 'Save magic item' : 'Add magic item'}
         </Button>
       </div>
     </form>

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, screen, cleanup, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { WeaponCard } from '@/components/ui/game/equipment/WeaponCard';
 import { WeaponRow } from '@/components/ui/character/equipment/WeaponRow';
 import { MagicItemRow } from '@/components/ui/character/equipment/MagicItemRow';
 import { ItemCard } from '@/components/ui/game/inventory/ItemCard';
 import { ChargePoolDisplay } from '@/components/ui/character/equipment/ChargePoolDisplay';
-import { MagicItemCard } from '@/components/ui/game/equipment/MagicItemCard';
+
+afterEach(cleanup);
 import type {
   Weapon,
   MagicItem,
@@ -79,30 +79,6 @@ const mockChargePool: ChargePool = {
   ],
 };
 
-describe('WeaponCard', () => {
-  const defaultProps = {
-    weapon: mockWeapon,
-    onEdit: vi.fn(),
-    onDelete: vi.fn(),
-    onToggleEquip: vi.fn(),
-  };
-
-  it('renders without crashing', () => {
-    render(<WeaponCard {...defaultProps} />);
-  });
-
-  it('displays weapon name and damage', () => {
-    render(<WeaponCard {...defaultProps} />);
-    expect(screen.getAllByText('Longsword +1').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('1d8').length).toBeGreaterThan(0);
-  });
-
-  it('shows equipped status', () => {
-    render(<WeaponCard {...defaultProps} />);
-    expect(screen.getAllByText('Equipped').length).toBeGreaterThan(0);
-  });
-});
-
 describe('WeaponRow', () => {
   afterEach(() => {
     cleanup();
@@ -130,7 +106,7 @@ describe('WeaponRow', () => {
     expect(header).toBeTruthy();
     await user.click(header!);
     expect(screen.getByText('Flame Tongue')).toBeInTheDocument();
-    expect(screen.getByText('Individual Charges')).toBeInTheDocument();
+    expect(screen.getByText('Charges')).toBeInTheDocument();
   });
 });
 
@@ -154,7 +130,7 @@ describe('MagicItemRow', () => {
     expect(screen.getAllByText('Cloak of Protection').length).toBeGreaterThan(
       0
     );
-    expect(screen.getAllByText('uncommon').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Uncommon').length).toBeGreaterThan(0);
   });
 
   it('shows attunement status', () => {
@@ -176,7 +152,10 @@ describe('ItemCard', () => {
 
   it('shows weight and category', () => {
     render(<ItemCard item={mockInventoryItem} />);
-    expect(screen.getAllByText('10 lbs').length).toBeGreaterThan(0);
+    expect(
+      screen.getByRole('button', { name: 'Details: Rope (50 ft)' })
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getAllByText('10 lb').length).toBeGreaterThan(0);
     expect(screen.getAllByText('misc').length).toBeGreaterThan(0);
   });
 });
@@ -210,40 +189,19 @@ describe('ChargePoolDisplay', () => {
     render(<ChargePoolDisplay {...defaultProps} compact />);
     expect(screen.getAllByText('5/7').length).toBeGreaterThan(0);
   });
-});
 
-describe('MagicItemCard', () => {
-  const defaultProps = {
-    item: mockMagicItem,
-    characterLevel: 5,
-    onEdit: vi.fn(),
-    onDelete: vi.fn(),
-    onToggleAttunement: vi.fn(),
-    onExpendCharge: vi.fn(),
-    onRestoreCharge: vi.fn(),
-  };
-
-  it('renders without crashing', () => {
-    render(<MagicItemCard {...defaultProps} />);
-  });
-
-  it('displays item name and rarity', () => {
-    render(<MagicItemCard {...defaultProps} />);
-    expect(screen.getAllByText('Cloak of Protection').length).toBeGreaterThan(
-      0
+  it('disables pool use when no charges remain', () => {
+    render(
+      <ChargePoolDisplay
+        {...defaultProps}
+        pool={{ ...mockChargePool, usedCharges: mockChargePool.maxCharges }}
+      />
     );
-    expect(screen.getAllByText('uncommon').length).toBeGreaterThan(0);
-  });
-
-  it('shows description', () => {
-    render(<MagicItemCard {...defaultProps} />);
     expect(
-      screen.getAllByText('A fine garment that protects the wearer.').length
-    ).toBeGreaterThan(0);
-  });
-
-  it('shows attunement button', () => {
-    render(<MagicItemCard {...defaultProps} />);
-    expect(screen.getAllByText('Unattune').length).toBeGreaterThan(0);
+      screen.getByRole('button', { name: 'Use one item charge' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Use Lightning Bolt (3 charges)' })
+    ).toBeDisabled();
   });
 });

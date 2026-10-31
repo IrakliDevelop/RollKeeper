@@ -66,7 +66,7 @@ describe('EquippedWeapons actions', () => {
     expect(moveDown).toHaveAccessibleDescription('Sun Blade');
     expect(moveDown).toHaveClass('pointer-coarse:min-h-11');
     fireEvent.click(moveDown);
-    expect(reorderWeapons).toHaveBeenCalledWith(0, 1);
+    expect(reorderWeapons).toHaveBeenCalledWith('sun-blade', 'moon-blade');
   });
 
   it('keeps charge and roll actions usable as secondary coarse targets', () => {

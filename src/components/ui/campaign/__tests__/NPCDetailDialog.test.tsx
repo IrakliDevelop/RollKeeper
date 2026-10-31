@@ -112,6 +112,28 @@ describe('NPCDetailDialog — Shop tab wiring', () => {
     expect(screen.queryByRole('button', { name: /Add Spell/ })).toBeNull();
   });
 
+  it('opens the shared inventory form from an NPC inventory', () => {
+    const npc = makeNpc();
+    seedNpc(npc);
+    render(
+      <NPCDetailDialog
+        npc={npc}
+        open={true}
+        onOpenChange={() => {}}
+        onUpdateInventory={() => {}}
+        initialTab="inventory"
+      />
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add Item' }));
+
+    expect(
+      screen.getByRole('dialog', { name: 'Add item' })
+    ).toBeInTheDocument();
+    expect(screen.getByText('Basic information')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add item' })).toBeDisabled();
+  });
+
   describe('header "Open" badge (artboard 1a, Task 13b)', () => {
     it('does not show an Open badge when the NPC has no shop', () => {
       const npc = makeNpc();

@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import type { ChargePool } from '@/types/character';
-import { Zap, Minus, Plus, Sparkles } from 'lucide-react';
+import { Zap, Minus, Plus } from 'lucide-react';
+import { AppIcon } from '@/components/ui/icons';
 import { Badge } from '@/components/ui/layout/badge';
 
 interface ChargePoolDisplayProps {
@@ -11,6 +12,7 @@ interface ChargePoolDisplayProps {
   onRestorePool: (amount: number) => void;
   onSetPoolUsed: (usedCount: number) => void;
   compact?: boolean;
+  itemName?: string;
 }
 
 const RECHARGE_LABELS: Record<string, string> = {
@@ -27,6 +29,7 @@ export function ChargePoolDisplay({
   onRestorePool,
   onSetPoolUsed,
   compact = false,
+  itemName = 'item',
 }: ChargePoolDisplayProps) {
   const [localUsed, setLocalUsed] = useState<number | null>(null);
   const used = localUsed ?? pool.usedCharges;
@@ -54,17 +57,9 @@ export function ChargePoolDisplay({
 
   if (compact) {
     return (
-      <div className="flex items-center gap-1.5">
-        <Zap size={12} className="text-accent-amber-text" />
-        <span
-          className={`text-xs font-bold ${
-            remaining <= 0
-              ? 'text-accent-red-text-muted'
-              : remaining <= Math.ceil(pool.maxCharges * 0.25)
-                ? 'text-accent-orange-text-muted'
-                : 'text-accent-amber-text'
-          }`}
-        >
+      <div className="text-muted inline-flex items-center gap-1.5 text-sm">
+        <Zap size={12} aria-hidden="true" />
+        <span>
           {remaining}/{pool.maxCharges}
         </span>
       </div>
@@ -74,47 +69,33 @@ export function ChargePoolDisplay({
   const rechargeLabel = RECHARGE_LABELS[pool.rechargeType] || pool.rechargeType;
 
   return (
-    <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-3">
+    <div className="border-divider border-t pt-3">
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Zap size={14} className="text-accent-amber-text" />
-          <span className="text-heading text-xs font-bold tracking-wider uppercase">
-            Charges
+          <Zap size={14} aria-hidden="true" className="text-muted" />
+          <span className="text-heading text-sm font-semibold">
+            Shared charges
           </span>
         </div>
         <div className="flex items-center gap-1">
           <button
+            type="button"
             onClick={handleRestoreOne}
             disabled={used <= 0}
-            className={`rounded p-0.5 ${
-              used <= 0
-                ? 'text-faint cursor-not-allowed'
-                : 'text-accent-green-text-muted hover:bg-accent-green-bg'
-            }`}
-            title="Restore 1 charge"
+            className="text-body disabled:text-faint inline-flex min-h-9 min-w-9 items-center justify-center rounded pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            aria-label={`Restore one ${itemName} charge`}
           >
             <Plus size={14} />
           </button>
-          <span
-            className={`min-w-[36px] text-center text-sm font-bold ${
-              remaining <= 0
-                ? 'text-accent-red-text-muted'
-                : remaining <= Math.ceil(pool.maxCharges * 0.25)
-                  ? 'text-accent-orange-text-muted'
-                  : 'text-accent-amber-text'
-            }`}
-          >
+          <span className="text-heading min-w-9 text-center text-sm font-semibold">
             {remaining}/{pool.maxCharges}
           </span>
           <button
+            type="button"
             onClick={handleUseOne}
             disabled={remaining <= 0}
-            className={`rounded p-0.5 ${
-              remaining <= 0
-                ? 'text-faint cursor-not-allowed'
-                : 'text-accent-red-text-muted hover:bg-accent-red-bg'
-            }`}
-            title="Use 1 charge"
+            className="text-body disabled:text-faint inline-flex min-h-9 min-w-9 items-center justify-center rounded pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            aria-label={`Use one ${itemName} charge`}
           >
             <Minus size={14} />
           </button>
@@ -124,13 +105,7 @@ export function ChargePoolDisplay({
       {pool.maxCharges > 0 && (
         <div className="bg-surface-hover mb-2 h-1.5 w-full rounded-full">
           <div
-            className={`h-1.5 rounded-full transition-all duration-300 ${
-              remaining <= 0
-                ? 'bg-accent-red-bg-strong'
-                : remaining <= Math.ceil(pool.maxCharges * 0.25)
-                  ? 'bg-accent-orange-bg-strong'
-                  : 'bg-accent-amber-bg-strong'
-            }`}
+            className="bg-divider-strong h-1.5 rounded-full transition-all duration-300"
             style={{
               width: `${pool.maxCharges > 0 ? (remaining / pool.maxCharges) * 100 : 0}%`,
             }}
@@ -138,7 +113,7 @@ export function ChargePoolDisplay({
         </div>
       )}
 
-      <div className="text-muted mb-2 text-[10px]">
+      <div className="text-muted mb-2 text-sm">
         Regains {pool.rechargeAmount || 'all charges'} at {rechargeLabel}
       </div>
 
@@ -150,43 +125,40 @@ export function ChargePoolDisplay({
             return (
               <div
                 key={ability.id}
-                className={`flex items-center justify-between gap-2 rounded px-2 py-1 text-xs ${
-                  canUse ? 'bg-surface-raised' : 'bg-surface-inset opacity-50'
-                }`}
+                className="border-divider flex min-w-0 items-center justify-between gap-2 border-t py-2 text-sm"
               >
-                <div className="flex items-center gap-1.5 overflow-hidden">
+                <div className="flex min-w-0 flex-wrap items-center gap-1.5">
                   {ability.isSpell && (
-                    <Sparkles
-                      size={10}
-                      className="text-accent-purple-text-muted shrink-0"
+                    <AppIcon
+                      name="spell"
+                      aria-hidden="true"
+                      className="text-muted size-3 shrink-0"
                     />
                   )}
-                  <span className="text-heading truncate font-medium">
+                  <span className="text-heading font-medium break-words">
                     {ability.name}
                   </span>
                   {ability.description && (
-                    <span className="text-faint shrink-0 text-[10px]">
+                    <span className="text-muted text-xs">
                       ({ability.description})
                     </span>
                   )}
                 </div>
                 {ability.cost > 0 ? (
                   <button
+                    type="button"
                     onClick={() =>
                       handleExpendAbility(ability.id, ability.cost)
                     }
                     disabled={!canUse}
-                    className={`shrink-0 rounded px-2 py-0.5 text-[10px] font-bold transition-colors ${
-                      canUse
-                        ? 'bg-accent-amber-bg-strong text-accent-amber-text hover:bg-accent-amber-border cursor-pointer'
-                        : 'text-faint cursor-not-allowed'
-                    }`}
-                    title={`Use ${ability.cost} charge${ability.cost !== 1 ? 's' : ''}`}
+                    className="border-divider text-body disabled:text-faint shrink-0 rounded border px-2 py-1.5 text-sm pointer-coarse:min-h-11"
+                    aria-label={`Use ${ability.name} (${ability.cost} ${ability.cost === 1 ? 'charge' : 'charges'})`}
                   >
-                    {ability.cost} chg
+                    Use ({ability.cost}{' '}
+                    {ability.cost === 1 ? 'charge' : 'charges'})
                   </button>
                 ) : (
-                  <Badge variant="success" size="sm">
+                  <Badge variant="neutral" size="sm">
                     {ability.description === 'Ritual only' ? 'Ritual' : 'Free'}
                   </Badge>
                 )}

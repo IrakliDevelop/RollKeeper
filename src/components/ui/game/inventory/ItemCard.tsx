@@ -1,20 +1,12 @@
 'use client';
 
-import React from 'react';
-import { InventoryItem, MagicItemRarity } from '@/types/character';
-import {
-  Edit2,
-  Trash2,
-  Plus,
-  Minus,
-  Package,
-  Zap,
-  Eye,
-  Send,
-} from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import type { InventoryItem } from '@/types/character';
+import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Badge } from '@/components/ui/layout/badge';
 import { formatCurrencyFromCopper } from '@/utils/currency';
+import { formatRarity } from '@/utils/formatRarity';
 
 interface ItemCardProps {
   item: InventoryItem;
@@ -27,29 +19,6 @@ interface ItemCardProps {
   compact?: boolean;
 }
 
-const getRarityVariant = (
-  rarity?: MagicItemRarity
-): 'secondary' | 'success' | 'info' | 'primary' | 'warning' | 'danger' => {
-  if (!rarity) return 'secondary';
-
-  switch (rarity) {
-    case 'common':
-      return 'secondary';
-    case 'uncommon':
-      return 'success';
-    case 'rare':
-      return 'info';
-    case 'very rare':
-      return 'primary';
-    case 'legendary':
-      return 'warning';
-    case 'artifact':
-      return 'danger';
-    default:
-      return 'secondary';
-  }
-};
-
 export function ItemCard({
   item,
   onEdit,
@@ -60,191 +29,176 @@ export function ItemCard({
   onSend,
   compact = false,
 }: ItemCardProps) {
+  const [expanded, setExpanded] = useState(!compact);
+  const previousCompact = useRef(compact);
+  useEffect(() => {
+    if (previousCompact.current !== compact) {
+      setExpanded(!compact);
+      previousCompact.current = compact;
+    }
+  }, [compact]);
   const totalWeight = item.weight ? item.weight * item.quantity : undefined;
   const totalValue = item.value ? item.value * item.quantity : undefined;
-  const isDepleted = item.quantity === 0;
 
   return (
-    <div
-      className={`group rounded-lg border-2 transition-all ${
-        compact ? 'p-2' : 'p-4'
-      } ${
-        isDepleted
-          ? 'border-divider-strong bg-surface-secondary border-dashed opacity-60'
-          : 'border-divider bg-surface-raised hover:border-divider-strong hover:shadow-md'
-      }`}
+    <article
+      className="border-divider min-w-0 border-b py-2"
+      data-inventory-row={item.id}
     >
-      <div
-        className={`flex items-start justify-between gap-3 ${compact ? 'mb-1' : 'mb-3'}`}
+      <button
+        type="button"
+        aria-label={`Details: ${item.name}`}
+        aria-expanded={expanded}
+        onClick={() => setExpanded(value => !value)}
+        className="flex w-full min-w-0 items-start gap-2 px-3 py-2 text-left pointer-coarse:min-h-11"
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <Package
-            className={`text-accent-blue-text-muted shrink-0 ${compact ? 'h-3 w-3' : 'h-4 w-4'}`}
-          />
-          <h5
-            className={`text-heading truncate font-bold ${compact ? 'text-xs' : 'text-sm'}`}
-          >
-            {item.name}
-          </h5>
-          {isDepleted && (
-            <Badge variant="neutral" size="sm">
-              Depleted
-            </Badge>
-          )}
-        </div>
-
-        {/* Action Buttons */}
-        <div className="flex items-center gap-1">
-          {onSend && (
-            <Button
-              onClick={() => onSend(item)}
-              variant="ghost"
-              size="xs"
-              title="Send to player"
-              className="text-accent-amber-text-muted hover:bg-accent-amber-bg hover:text-accent-amber-text h-6 w-6 p-0"
-            >
-              <Send size={14} />
-            </Button>
-          )}
-          {onUse && item.category === 'consumable' && !isDepleted && (
-            <Button
-              onClick={onUse}
-              variant="ghost"
-              size="xs"
-              title="Use item"
-              className="text-accent-indigo-text-muted hover:bg-accent-indigo-bg hover:text-accent-indigo-text h-6 w-6 p-0"
-            >
-              <Zap size={14} />
-            </Button>
-          )}
-          {onView && (
-            <Button
-              onClick={() => onView(item)}
-              variant="ghost"
-              size="xs"
-              title="View details"
-              className="text-muted hover:bg-surface-hover hover:text-body h-6 w-6 p-0"
-            >
-              <Eye size={14} />
-            </Button>
-          )}
-          {onEdit && (
-            <Button
-              onClick={() => onEdit(item)}
-              variant="ghost"
-              size="xs"
-              title="Edit item"
-              className="text-accent-blue-text-muted hover:bg-accent-blue-bg hover:text-accent-blue-text h-6 w-6 p-0"
-            >
-              <Edit2 size={14} />
-            </Button>
-          )}
-          {onDelete && (
-            <Button
-              onClick={onDelete}
-              variant="ghost"
-              size="xs"
-              title="Delete item"
-              className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0"
-            >
-              <Trash2 size={14} />
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {/* Rarity and Type Badges */}
-      {(item.rarity || item.type) && !compact && (
-        <div className="mb-3 flex flex-wrap gap-2">
-          {item.rarity && (
-            <Badge variant={getRarityVariant(item.rarity)} size="sm">
-              {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
-            </Badge>
-          )}
-          {item.type && (
-            <Badge variant="info" size="sm">
-              {item.type.charAt(0).toUpperCase() + item.type.slice(1)}
-            </Badge>
-          )}
-        </div>
-      )}
-
-      {/* Item Details */}
-      <div
-        className={`text-body grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 ${compact ? 'text-xs' : 'text-sm'}`}
-      >
-        <span className="text-muted">Category:</span>
-        <span className="text-heading font-medium capitalize">
-          {item.category}
+        <span className="text-muted mt-1 shrink-0" aria-hidden="true">
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
+        <span className="min-w-0 flex-1">
+          <span className="text-heading block font-semibold break-words">
+            {item.name}
+          </span>
+          <span className="text-muted mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm">
+            <span className="capitalize">{item.category}</span>
+            {item.rarity && <span>{formatRarity(item.rarity)}</span>}
+            {item.type && <span>{item.type}</span>}
+            {item.quantity === 0 && (
+              <Badge variant="neutral" size="sm">
+                Depleted
+              </Badge>
+            )}
+          </span>
+        </span>
+      </button>
 
-        <span className="text-muted">Quantity:</span>
+      <div className="flex flex-wrap items-center gap-2 px-3 pb-2">
+        <span className="text-muted text-sm">Quantity:</span>
         {onQuantityChange ? (
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button
-              onClick={() => onQuantityChange(Math.max(0, item.quantity - 1))}
+              type="button"
               variant="ghost"
               size="xs"
+              onClick={() => onQuantityChange(Math.max(0, item.quantity - 1))}
               disabled={item.quantity <= 0}
-              className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text h-6 w-6 p-0 disabled:opacity-30"
+              aria-label={`Decrease quantity: ${item.name}`}
+              className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
-              <Minus size={12} />
+              <Minus size={14} aria-hidden="true" />
             </Button>
-            <span className="text-heading min-w-[2rem] text-center font-bold">
+            <span className="text-heading min-w-8 text-center font-semibold">
               {item.quantity}
             </span>
             <Button
-              onClick={() => onQuantityChange(item.quantity + 1)}
+              type="button"
               variant="ghost"
               size="xs"
-              className="text-accent-green-text-muted hover:bg-accent-green-bg hover:text-accent-green-text h-6 w-6 p-0"
+              onClick={() => onQuantityChange(item.quantity + 1)}
+              aria-label={`Increase quantity: ${item.name}`}
+              className="pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             >
-              <Plus size={12} />
+              <Plus size={14} aria-hidden="true" />
             </Button>
           </div>
         ) : (
-          <span className="text-heading font-bold">{item.quantity}</span>
+          <span className="text-heading font-semibold">{item.quantity}</span>
         )}
-
-        {totalWeight !== undefined && !compact && (
-          <>
-            <span className="text-muted">Weight:</span>
-            <span className="text-heading font-medium">{totalWeight} lbs</span>
-          </>
-        )}
-
-        {totalValue !== undefined && !compact && (
-          <>
-            <span className="text-muted">Value:</span>
-            <span className="text-heading font-medium">
-              {formatCurrencyFromCopper(totalValue)}
-            </span>
-          </>
+        {onUse && item.category === 'consumable' && item.quantity > 0 && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={onUse}
+            aria-label={`Use ${item.name}`}
+          >
+            Use item
+          </Button>
         )}
       </div>
 
-      {/* Tags */}
-      {item.tags.length > 0 && !compact && (
-        <div className="mt-3 flex flex-wrap gap-1">
-          {item.tags.slice(0, 3).map((tag, index) => (
-            <Badge key={index} variant="secondary" size="sm">
-              {tag}
-            </Badge>
-          ))}
-          {item.tags.length > 3 && (
-            <Badge variant="secondary" size="sm">
-              +{item.tags.length - 3}
-            </Badge>
+      {expanded && (
+        <div className="border-divider space-y-3 border-t px-3 pt-3 pb-4">
+          <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
+            <dt className="text-muted">Category:</dt>
+            <dd className="text-heading capitalize">{item.category}</dd>
+            <dt className="text-muted">Quantity:</dt>
+            <dd className="text-heading">{item.quantity}</dd>
+            {totalWeight !== undefined && (
+              <>
+                <dt className="text-muted">Weight:</dt>
+                <dd className="text-heading">{totalWeight} lb</dd>
+              </>
+            )}
+            {totalValue !== undefined && (
+              <>
+                <dt className="text-muted">Value:</dt>
+                <dd className="text-heading">
+                  {formatCurrencyFromCopper(totalValue)}
+                </dd>
+              </>
+            )}
+          </dl>
+          {(item.tags ?? []).length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {(item.tags ?? []).map((tag, index) => (
+                <Badge key={`${tag}-${index}`} variant="neutral" size="sm">
+                  {tag}
+                </Badge>
+              ))}
+            </div>
           )}
+          {item.description && (
+            <p className="text-body text-sm break-words">{item.description}</p>
+          )}
+          <div className="border-divider flex flex-wrap gap-2 border-t pt-3">
+            {onView && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onView(item)}
+                aria-label={`View ${item.name}`}
+              >
+                View details
+              </Button>
+            )}
+            {onEdit && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onEdit(item)}
+                aria-label={`Edit ${item.name}`}
+              >
+                Edit
+              </Button>
+            )}
+            {onSend && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => onSend(item)}
+                aria-label={`Send ${item.name} to a player`}
+              >
+                Send to a player
+              </Button>
+            )}
+            {onDelete && (
+              <Button
+                type="button"
+                variant="danger"
+                size="sm"
+                onClick={onDelete}
+                aria-label={`Delete ${item.name}`}
+              >
+                Delete item
+              </Button>
+            )}
+          </div>
         </div>
       )}
-
-      {/* Description */}
-      {item.description && !compact && (
-        <p className="text-body border-divider mt-3 line-clamp-2 border-t-2 pt-3 text-xs">
-          {item.description}
-        </p>
-      )}
-    </div>
+    </article>
   );
 }

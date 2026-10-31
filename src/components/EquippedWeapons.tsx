@@ -253,17 +253,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
     const sourceWeaponId = equippedWeapons[sourceIndex].id;
     const destinationWeaponId = equippedWeapons[destinationIndex].id;
 
-    // Find the indices in the main weapons array
-    const sourceGlobalIndex = character.weapons.findIndex(
-      weapon => weapon.id === sourceWeaponId
-    );
-    const destinationGlobalIndex = character.weapons.findIndex(
-      weapon => weapon.id === destinationWeaponId
-    );
-
-    if (sourceGlobalIndex !== -1 && destinationGlobalIndex !== -1) {
-      reorderWeapons(sourceGlobalIndex, destinationGlobalIndex);
-    }
+    reorderWeapons(sourceWeaponId, destinationWeaponId);
   };
 
   if (equippedWeapons.length === 0) {
