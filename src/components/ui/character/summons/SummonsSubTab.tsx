@@ -1,15 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
-import {
-  Sparkles,
-  Plus,
-  Wand2,
-  Trash2,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
-import type { SavedCreature } from '@/types/summon';
+import React, { useState, useRef, useLayoutEffect } from 'react';
+import { Plus, Wand2, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
+import type { SavedCreature, Summon } from '@/types/summon';
 import { useCharacterStore } from '@/store/characterStore';
 import { SummonCard } from './SummonCard';
 import { CreatureCreatorForm } from './CreatureCreatorForm';
@@ -20,8 +13,10 @@ import {
   DialogTitle,
 } from '@/components/ui/feedback/dialog';
 import { Button } from '@/components/ui/forms/button';
+import { Section } from '@/components/ui/layout/section';
 
 const EMPTY_SAVED_CREATURES: SavedCreature[] = [];
+const EMPTY_SUMMONS: Summon[] = [];
 
 export function SummonsSubTab() {
   const character = useCharacterStore(state => state.character);
@@ -43,10 +38,69 @@ export function SummonsSubTab() {
     state => state.removeSavedCreature
   );
 
-  const summons = character.summons || [];
+  const summons = character.summons || EMPTY_SUMMONS;
   const savedCreatures = character.savedCreatures ?? EMPTY_SAVED_CREATURES;
+  const familiars = summons.filter(s => s.type === 'familiar');
+  const concentrationSummons = summons.filter(
+    s => s.type === 'summon' && s.requiresConcentration
+  );
+  const otherSummons = summons.filter(
+    s => s.type === 'summon' && !s.requiresConcentration
+  );
+  const displayedSummons = [
+    ...familiars,
+    ...concentrationSummons,
+    ...otherSummons,
+  ];
 
   const [showSaved, setShowSaved] = useState(false);
+  const savedToggleRef = useRef<HTMLButtonElement>(null);
+  const createRef = useRef<HTMLButtonElement>(null);
+  const editRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const summonRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const focusAfterDismiss = useRef<string | 'saved' | null>(null);
+  const focusAfterRemoval = useRef<string | 'create' | null>(null);
+
+  useLayoutEffect(() => {
+    const target = focusAfterRemoval.current;
+    if (!target) return;
+    (target === 'create'
+      ? createRef.current
+      : editRefs.current[target]
+    )?.focus();
+    focusAfterRemoval.current = null;
+  }, [savedCreatures]);
+
+  useLayoutEffect(() => {
+    const target = focusAfterDismiss.current;
+    if (!target) return;
+    const targetButton =
+      target === 'saved'
+        ? savedToggleRef.current
+        : summonRefs.current[target]?.querySelector<HTMLButtonElement>(
+            'button[data-summon-dismiss]'
+          );
+    (targetButton ?? savedToggleRef.current)?.focus();
+    focusAfterDismiss.current = null;
+  }, [summons]);
+
+  const handleDismiss = (id: string) => {
+    const index = displayedSummons.findIndex(summon => summon.id === id);
+    focusAfterDismiss.current =
+      displayedSummons[index + 1]?.id ??
+      displayedSummons[index - 1]?.id ??
+      'saved';
+    removeSummon(id);
+  };
+
+  const handleDeleteSaved = (id: string) => {
+    const index = savedCreatures.findIndex(creature => creature.id === id);
+    focusAfterRemoval.current =
+      savedCreatures[index + 1]?.id ??
+      savedCreatures[index - 1]?.id ??
+      'create';
+    removeSavedCreature(id);
+  };
   const [creatorOpen, setCreatorOpen] = useState(false);
   const [editingCreature, setEditingCreature] = useState<SavedCreature | null>(
     null
@@ -62,98 +116,72 @@ export function SummonsSubTab() {
     setEditingCreature(null);
   };
 
-  const familiars = summons.filter(s => s.type === 'familiar');
-  const concentrationSummons = summons.filter(
-    s => s.type === 'summon' && s.requiresConcentration
-  );
-  const otherSummons = summons.filter(
-    s => s.type === 'summon' && !s.requiresConcentration
+  const renderSummon = (s: (typeof summons)[number]) => (
+    <div
+      key={s.id}
+      ref={element => {
+        summonRefs.current[s.id] = element;
+      }}
+    >
+      <SummonCard
+        summon={s}
+        onDamage={damageSummon}
+        onHeal={healSummon}
+        onAddTempHp={addSummonTempHp}
+        onAddCondition={addSummonCondition}
+        onRemoveCondition={removeSummonCondition}
+        onDismiss={handleDismiss}
+      />
+    </div>
   );
 
   return (
     <div className="space-y-3">
       {summons.length === 0 && (
-        <div className="border-divider bg-surface-raised rounded-lg border p-8 text-center">
-          <Sparkles className="text-muted mx-auto mb-3 h-10 w-10" />
+        <div className="py-8 text-center">
           <h3 className="text-heading mb-1 text-sm font-semibold">
-            No Active Summons
+            No summons
           </h3>
           <p className="text-muted text-xs">
-            Cast a summoning spell (like Find Familiar or Summon Beast) from the
-            Spells tab to summon a creature here.
+            Cast a summoning spell, such as Find Familiar, from the Spells tab.
           </p>
         </div>
       )}
 
       {familiars.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-muted text-xs font-medium tracking-wider uppercase">
-            Familiars
-          </h4>
-          {familiars.map(s => (
-            <SummonCard
-              key={s.id}
-              summon={s}
-              onDamage={damageSummon}
-              onHeal={healSummon}
-              onAddTempHp={addSummonTempHp}
-              onAddCondition={addSummonCondition}
-              onRemoveCondition={removeSummonCondition}
-              onDismiss={removeSummon}
-            />
-          ))}
-        </div>
+        <Section heading="Familiars" level={3} contentClassName="space-y-2">
+          {familiars.map(renderSummon)}
+        </Section>
       )}
 
       {concentrationSummons.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-muted text-xs font-medium tracking-wider uppercase">
-            Concentration Summons
-          </h4>
-          {concentrationSummons.map(s => (
-            <SummonCard
-              key={s.id}
-              summon={s}
-              onDamage={damageSummon}
-              onHeal={healSummon}
-              onAddTempHp={addSummonTempHp}
-              onAddCondition={addSummonCondition}
-              onRemoveCondition={removeSummonCondition}
-              onDismiss={removeSummon}
-            />
-          ))}
-        </div>
+        <Section
+          heading="Concentration summons"
+          level={3}
+          contentClassName="space-y-2"
+        >
+          {concentrationSummons.map(renderSummon)}
+        </Section>
       )}
 
       {otherSummons.length > 0 && (
-        <div className="space-y-2">
-          <h4 className="text-muted text-xs font-medium tracking-wider uppercase">
-            Other Summons
-          </h4>
-          {otherSummons.map(s => (
-            <SummonCard
-              key={s.id}
-              summon={s}
-              onDamage={damageSummon}
-              onHeal={healSummon}
-              onAddTempHp={addSummonTempHp}
-              onAddCondition={addSummonCondition}
-              onRemoveCondition={removeSummonCondition}
-              onDismiss={removeSummon}
-            />
-          ))}
-        </div>
+        <Section heading="Other summons" level={3} contentClassName="space-y-2">
+          {otherSummons.map(renderSummon)}
+        </Section>
       )}
 
-      {/* Saved Creatures Section */}
+      {/* Saved creatures Section */}
       <div className="border-divider border-t pt-3">
         <button
+          ref={savedToggleRef}
+          type="button"
+          aria-expanded={showSaved}
           onClick={() => setShowSaved(!showSaved)}
-          className="text-heading hover:text-accent-purple-text flex w-full items-center justify-between text-sm font-medium transition-colors"
+          className="text-heading hover:text-body focus-visible:outline-ring flex w-full items-center justify-between text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 pointer-coarse:min-h-11"
         >
           <span className="flex items-center gap-1.5">
             <Wand2 size={14} />
-            Saved Creatures
+            Saved creatures
             {savedCreatures.length > 0 && (
               <span className="text-muted text-xs">
                 ({savedCreatures.length})
@@ -166,6 +194,7 @@ export function SummonsSubTab() {
         {showSaved && (
           <div className="mt-2 space-y-2">
             <Button
+              ref={createRef}
               variant="outline"
               size="sm"
               onClick={() => {
@@ -175,7 +204,7 @@ export function SummonsSubTab() {
               leftIcon={<Plus size={14} />}
               fullWidth
             >
-              Create Custom Creature
+              Create creature
             </Button>
 
             {savedCreatures.length === 0 ? (
@@ -186,11 +215,11 @@ export function SummonsSubTab() {
               savedCreatures.map(creature => (
                 <div
                   key={creature.id}
-                  className="border-divider bg-surface-raised group rounded-lg border px-3 py-2"
+                  className="border-divider border-b px-1 py-2"
                 >
                   <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-heading text-sm font-semibold">
+                    <div className="min-w-0">
+                      <span className="text-heading text-sm font-semibold break-words">
                         {creature.name}
                       </span>
                       <div className="text-muted text-xs">
@@ -202,24 +231,33 @@ export function SummonsSubTab() {
                         {creature.cr ? ` · CR ${creature.cr}` : ''}
                       </div>
                     </div>
-                    <div className="flex gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                      <button
+                    <div className="flex shrink-0 gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="px-2"
+                        ref={element => {
+                          editRefs.current[creature.id] = element;
+                        }}
+                        type="button"
+                        aria-label={`Edit ${creature.name}`}
                         onClick={() => {
                           setEditingCreature(creature);
                           setCreatorOpen(true);
                         }}
-                        className="text-muted hover:text-body rounded p-1 transition-colors"
-                        title="Edit"
                       >
                         <Wand2 size={14} />
-                      </button>
-                      <button
-                        onClick={() => removeSavedCreature(creature.id)}
-                        className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
-                        title="Delete"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="px-2"
+                        type="button"
+                        aria-label={`Delete ${creature.name}`}
+                        onClick={() => handleDeleteSaved(creature.id)}
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 </div>
@@ -239,12 +277,15 @@ export function SummonsSubTab() {
           }
         }}
       >
-        <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-xl">
+        <DialogContent
+          aria-describedby={undefined}
+          className="max-h-[85vh] overflow-y-auto sm:max-w-xl"
+        >
           <DialogHeader>
             <DialogTitle>
               {editingCreature
-                ? `Edit: ${editingCreature.name}`
-                : 'Create Custom Creature'}
+                ? `Edit ${editingCreature.name}`
+                : 'Create creature'}
             </DialogTitle>
           </DialogHeader>
           <CreatureCreatorForm

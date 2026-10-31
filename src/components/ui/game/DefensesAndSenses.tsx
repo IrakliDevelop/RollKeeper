@@ -1,21 +1,18 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
-import {
-  ShieldCheck,
-  ShieldAlert,
-  ShieldOff,
-  Eye,
-  Plus,
-  X,
-  Search,
-  Info,
-  ChevronDown,
-  ChevronUp,
-} from 'lucide-react';
+import React, {
+  useState,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useEffect,
+} from 'react';
+import { Plus, X, Search, Info, ChevronUp } from 'lucide-react';
 import { Badge } from '@/components/ui/layout/badge';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
+import { NumberInput } from '@/components/ui/forms/NumberInput';
+import { Section } from '@/components/ui/layout/section';
 import {
   Select,
   SelectTrigger,
@@ -25,6 +22,9 @@ import {
 } from '@/components/ui/forms/select';
 import { useCharacterStore } from '@/store/characterStore';
 import { useSensesData } from '@/hooks/useSensesData';
+import type { CharacterSense } from '@/types/character';
+
+const EMPTY_SENSES: CharacterSense[] = [];
 
 const DAMAGE_TYPES = [
   'Acid',
@@ -62,25 +62,43 @@ const CONDITION_TYPES = [
 
 function TagSelector({
   label,
-  icon,
   items,
   options,
-  colorClass,
+  editing,
   onAdd,
   onRemove,
   allowCustom = false,
 }: {
   label: string;
-  icon: React.ReactNode;
   items: string[];
   options: readonly string[];
-  colorClass: string;
+  editing: boolean;
   onAdd: (item: string) => void;
   onRemove: (item: string) => void;
   allowCustom?: boolean;
 }) {
   const [isAdding, setIsAdding] = useState(false);
   const [search, setSearch] = useState('');
+  const addRef = useRef<HTMLButtonElement>(null);
+  const removeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const focusAfterRemoval = useRef<string | 'add' | null>(null);
+
+  useEffect(() => {
+    if (!editing) setIsAdding(false);
+  }, [editing]);
+
+  useLayoutEffect(() => {
+    const target = focusAfterRemoval.current;
+    if (!target) return;
+    (target === 'add' ? addRef.current : removeRefs.current[target])?.focus();
+    focusAfterRemoval.current = null;
+  }, [items]);
+
+  const handleRemove = (item: string) => {
+    const index = items.indexOf(item);
+    focusAfterRemoval.current = items[index + 1] ?? items[index - 1] ?? 'add';
+    onRemove(item);
+  };
 
   const filteredOptions = options.filter(
     opt =>
@@ -104,39 +122,44 @@ function TagSelector({
     <div>
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-body flex items-center gap-1.5 text-sm font-semibold">
-          {icon}
           {label}
         </h4>
-        <Button
-          variant="ghost"
-          size="sm"
-          leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-          onClick={() => {
-            setIsAdding(!isAdding);
-            setSearch('');
-          }}
-        >
-          {isAdding ? 'Close' : 'Add'}
-        </Button>
+        {editing && (
+          <Button
+            ref={addRef}
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
+            aria-label={`${isAdding ? 'Done' : 'Add'} ${label}`}
+            onClick={() => {
+              setIsAdding(!isAdding);
+              setSearch('');
+            }}
+          >
+            {isAdding ? 'Done' : 'Add'}
+          </Button>
+        )}
       </div>
 
       {items.length > 0 && (
-        <div className="mb-2 flex flex-wrap gap-1.5">
+        <div className="mb-2 flex flex-wrap gap-1.5 pointer-coarse:gap-x-3 pointer-coarse:gap-y-6">
           {items.map(item => (
-            <Badge
-              key={item}
-              variant="neutral"
-              size="sm"
-              className={colorClass}
-            >
+            <Badge key={item} variant="neutral" size="sm">
               {item}
-              <button
-                onClick={() => onRemove(item)}
-                className="ml-1 inline-flex items-center rounded-full p-0.5 transition-colors hover:bg-black/10 dark:hover:bg-white/10"
-                aria-label={`Remove ${item}`}
-              >
-                <X size={10} />
-              </button>
+              {editing && (
+                <button
+                  ref={element => {
+                    removeRefs.current[item] = element;
+                  }}
+                  type="button"
+                  onClick={() => handleRemove(item)}
+                  className="hover:bg-surface-hover relative ml-1 inline-flex size-4 items-center justify-center rounded-sm transition-colors after:absolute after:top-1/2 after:left-1/2 after:size-6 after:-translate-1/2 pointer-coarse:after:size-11"
+                  aria-label={`Remove ${item}`}
+                >
+                  <X size={10} />
+                </button>
+              )}
             </Badge>
           ))}
         </div>
@@ -146,12 +169,13 @@ function TagSelector({
         <p className="text-muted mb-2 text-xs italic">None</p>
       )}
 
-      {isAdding && (
-        <div className="bg-surface-secondary space-y-2 rounded-lg p-3">
+      {editing && isAdding && (
+        <div className="space-y-2">
           <Input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={`Search ${label.toLowerCase()}...`}
+            placeholder="Search"
+            aria-label={`Search ${label.toLowerCase()}`}
             leftIcon={<Search size={14} />}
             size="sm"
             onKeyDown={e => {
@@ -165,7 +189,7 @@ function TagSelector({
               <button
                 key={opt}
                 onClick={() => handleAdd(opt)}
-                className="text-body bg-surface hover:bg-surface-raised hover:border-divider rounded-md border border-transparent px-2 py-1 text-xs transition-colors"
+                className="text-body bg-surface hover:bg-surface-raised hover:border-divider rounded-sm border border-transparent px-2 py-1 text-xs transition-colors pointer-coarse:min-h-11"
               >
                 {opt}
               </button>
@@ -176,7 +200,7 @@ function TagSelector({
               !items.includes(search.trim()) && (
                 <button
                   onClick={handleCustomAdd}
-                  className="border-accent-blue-border text-accent-blue-text bg-accent-blue-bg rounded-md border px-2 py-1 text-xs"
+                  className="border-divider text-body bg-surface rounded-sm border px-2 py-1 text-xs pointer-coarse:min-h-11"
                 >
                   + &quot;{search.trim()}&quot;
                 </button>
@@ -195,7 +219,7 @@ function TagSelector({
   );
 }
 
-function SensesSection() {
+function SensesSection({ editing }: { editing: boolean }) {
   const character = useCharacterStore(s => s.character);
   const addSense = useCharacterStore(s => s.addSense);
   const removeSense = useCharacterStore(s => s.removeSense);
@@ -204,30 +228,48 @@ function SensesSection() {
   const [isAdding, setIsAdding] = useState(false);
   const [selectedSense, setSelectedSense] = useState('');
   const [customSenseName, setCustomSenseName] = useState('');
-  const [senseRange, setSenseRange] = useState('60');
+  const [senseRange, setSenseRange] = useState<number | undefined>(60);
   const [senseSource, setSenseSource] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const addRef = useRef<HTMLButtonElement>(null);
+  const removeRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const focusAfterRemoval = useRef<string | 'add' | null>(null);
 
-  const characterSenses = character.senses || [];
+  useEffect(() => {
+    if (!editing) setIsAdding(false);
+  }, [editing]);
+
+  const characterSenses = character.senses ?? EMPTY_SENSES;
+  useLayoutEffect(() => {
+    const target = focusAfterRemoval.current;
+    if (!target) return;
+    (target === 'add' ? addRef.current : removeRefs.current[target])?.focus();
+    focusAfterRemoval.current = null;
+  }, [characterSenses]);
+
+  const handleRemove = (id: string) => {
+    const index = characterSenses.findIndex(sense => sense.id === id);
+    focusAfterRemoval.current =
+      characterSenses[index + 1]?.id ?? characterSenses[index - 1]?.id ?? 'add';
+    removeSense(id);
+  };
   const uniqueSenseNames = [...new Set(senseOptions.map(s => s.name))];
 
   const resolvedSenseName =
     selectedSense === '__custom' ? customSenseName.trim() : selectedSense;
 
   const handleAddSense = useCallback(() => {
-    if (!resolvedSenseName || !senseRange) return;
-    const rangeNum = parseInt(senseRange, 10);
-    if (isNaN(rangeNum) || rangeNum <= 0) return;
+    if (!resolvedSenseName || !senseRange || senseRange <= 0) return;
 
     addSense({
       name: resolvedSenseName,
-      range: rangeNum,
+      range: senseRange,
       source: senseSource || undefined,
     });
 
     setSelectedSense('');
     setCustomSenseName('');
-    setSenseRange('60');
+    setSenseRange(60);
     setSenseSource('');
     setIsAdding(false);
   }, [resolvedSenseName, senseRange, senseSource, addSense]);
@@ -246,32 +288,33 @@ function SensesSection() {
     <div>
       <div className="mb-2 flex items-center justify-between">
         <h4 className="text-body flex items-center gap-1.5 text-sm font-semibold">
-          <Eye size={14} className="text-accent-blue-text" />
           Senses
         </h4>
-        <Button
-          variant="ghost"
-          size="sm"
-          leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-          onClick={() => setIsAdding(!isAdding)}
-        >
-          {isAdding ? 'Close' : 'Add'}
-        </Button>
+        {editing && (
+          <Button
+            ref={addRef}
+            type="button"
+            variant="ghost"
+            size="sm"
+            leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
+            aria-label={isAdding ? 'Done Senses' : 'Add Senses'}
+            onClick={() => setIsAdding(!isAdding)}
+          >
+            {isAdding ? 'Done' : 'Add'}
+          </Button>
+        )}
       </div>
 
       {characterSenses.length > 0 && (
         <div className="mb-2 space-y-1.5">
           {characterSenses.map(sense => (
-            <div
-              key={sense.id}
-              className="bg-surface-secondary rounded-lg px-3 py-2"
-            >
+            <div key={sense.id} className="border-divider border-b px-1 py-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
                   <span className="text-heading text-sm font-medium">
                     {sense.name}
                   </span>
-                  <Badge variant="info" size="sm">
+                  <Badge variant="neutral" size="sm">
                     {sense.range} ft.
                   </Badge>
                   {sense.source && (
@@ -284,19 +327,26 @@ function SensesSection() {
                       onClick={() =>
                         setExpandedId(expandedId === sense.id ? null : sense.id)
                       }
-                      className="text-muted hover:text-body rounded p-1 transition-colors"
-                      aria-label="Toggle description"
+                      className="text-muted hover:text-body rounded p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                      aria-label={`Show ${sense.name} description`}
+                      aria-expanded={expandedId === sense.id}
                     >
                       <Info size={14} />
                     </button>
                   )}
-                  <button
-                    onClick={() => removeSense(sense.id)}
-                    className="text-muted hover:text-accent-red-text rounded p-1 transition-colors"
-                    aria-label={`Remove ${sense.name}`}
-                  >
-                    <X size={14} />
-                  </button>
+                  {editing && (
+                    <button
+                      ref={element => {
+                        removeRefs.current[sense.id] = element;
+                      }}
+                      type="button"
+                      onClick={() => handleRemove(sense.id)}
+                      className="text-muted hover:text-body rounded p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                      aria-label={`Remove ${sense.name}`}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
                 </div>
               </div>
               {expandedId === sense.id && getDescription(sense.name) && (
@@ -313,8 +363,8 @@ function SensesSection() {
         <p className="text-muted mb-2 text-xs italic">None</p>
       )}
 
-      {isAdding && (
-        <div className="bg-surface-secondary space-y-3 rounded-lg p-3">
+      {editing && isAdding && (
+        <div className="space-y-3">
           <div className="grid grid-cols-2 gap-2">
             <div>
               {loading ? (
@@ -339,7 +389,7 @@ function SensesSection() {
                       setSelectedSense('');
                       setCustomSenseName('');
                     }}
-                    className="text-accent-blue-text mt-1 text-xs hover:underline"
+                    className="text-body mt-1 text-xs hover:underline pointer-coarse:min-h-11"
                   >
                     ← Back to list
                   </button>
@@ -369,13 +419,11 @@ function SensesSection() {
               )}
             </div>
             <div>
-              <label className="text-muted mb-1 block text-xs font-medium">
-                Range (ft.)
-              </label>
-              <Input
-                type="number"
+              <NumberInput
+                label="Range (ft.)"
                 value={senseRange}
-                onChange={e => setSenseRange(e.target.value)}
+                onChange={setSenseRange}
+                allowEmpty
                 placeholder="60"
                 size="sm"
                 min={0}
@@ -383,10 +431,8 @@ function SensesSection() {
             </div>
           </div>
           <div>
-            <label className="text-muted mb-1 block text-xs font-medium">
-              Source (optional)
-            </label>
             <Input
+              label="Source (optional)"
               value={senseSource}
               onChange={e => setSenseSource(e.target.value)}
               placeholder="e.g., Racial, Class Feature, Spell"
@@ -394,12 +440,12 @@ function SensesSection() {
             />
           </div>
           <Button
-            variant="primary"
+            variant="secondary"
             size="sm"
             onClick={handleAddSense}
-            disabled={!resolvedSenseName || !senseRange}
+            disabled={!resolvedSenseName || !senseRange || senseRange <= 0}
           >
-            Add Sense
+            Add sense
           </Button>
         </div>
       )}
@@ -407,7 +453,11 @@ function SensesSection() {
   );
 }
 
-export default function DefensesAndSenses() {
+export default function DefensesAndSenses({
+  editing = true,
+}: {
+  editing?: boolean;
+}) {
   const character = useCharacterStore(s => s.character);
   const addDamageImmunity = useCharacterStore(s => s.addDamageImmunity);
   const removeDamageImmunity = useCharacterStore(s => s.removeDamageImmunity);
@@ -420,13 +470,10 @@ export default function DefensesAndSenses() {
     s => s.removeConditionImmunity
   );
 
-  const [isCollapsed, setIsCollapsed] = useState(false);
-
   const damageImmunities = character.damageImmunities || [];
   const damageResistances = character.damageResistances || [];
   const conditionImmunities = character.conditionImmunities || [];
   const senses = character.senses || [];
-
   const totalCount =
     damageImmunities.length +
     damageResistances.length +
@@ -434,69 +481,47 @@ export default function DefensesAndSenses() {
     senses.length;
 
   return (
-    <div className="border-divider bg-surface-raised rounded-lg border p-6 shadow-lg">
-      <div className="flex items-center justify-between">
-        <h2 className="border-divider text-heading flex items-center gap-2 text-lg font-bold">
-          <ShieldCheck size={20} className="text-accent-emerald-text" />
-          Defenses & Senses
-          {totalCount > 0 && (
-            <Badge variant="neutral" size="sm">
-              {totalCount}
-            </Badge>
-          )}
-        </h2>
-        <button
-          onClick={() => setIsCollapsed(!isCollapsed)}
-          className="text-muted hover:text-body rounded p-1 transition-colors"
-          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
-        >
-          {isCollapsed ? <ChevronDown size={18} /> : <ChevronUp size={18} />}
-        </button>
-      </div>
-
-      {!isCollapsed && (
-        <div className="mt-4 grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div className="space-y-4">
-            <TagSelector
-              label="Damage Resistances"
-              icon={
-                <ShieldAlert size={14} className="text-accent-amber-text" />
-              }
-              items={damageResistances}
-              options={DAMAGE_TYPES}
-              colorClass="border-accent-amber-border bg-accent-amber-bg text-accent-amber-text"
-              onAdd={addDamageResistance}
-              onRemove={removeDamageResistance}
-              allowCustom
-            />
-            <TagSelector
-              label="Damage Immunities"
-              icon={
-                <ShieldCheck size={14} className="text-accent-emerald-text" />
-              }
-              items={damageImmunities}
-              options={DAMAGE_TYPES}
-              colorClass="border-accent-emerald-border bg-accent-emerald-bg text-accent-emerald-text"
-              onAdd={addDamageImmunity}
-              onRemove={removeDamageImmunity}
-              allowCustom
-            />
-            <TagSelector
-              label="Condition Immunities"
-              icon={<ShieldOff size={14} className="text-accent-purple-text" />}
-              items={conditionImmunities}
-              options={CONDITION_TYPES}
-              colorClass="border-accent-purple-border bg-accent-purple-bg text-accent-purple-text"
-              onAdd={addConditionImmunity}
-              onRemove={removeConditionImmunity}
-              allowCustom
-            />
-          </div>
-          <div>
-            <SensesSection />
-          </div>
-        </div>
-      )}
-    </div>
+    <Section
+      heading="Defenses and senses"
+      level={3}
+      collapsible="combat-defenses-senses"
+      contentClassName="space-y-6"
+      trailing={
+        totalCount > 0 ? (
+          <Badge variant="neutral" size="sm">
+            {totalCount}
+          </Badge>
+        ) : null
+      }
+    >
+      <TagSelector
+        label="Damage resistances"
+        items={damageResistances}
+        options={DAMAGE_TYPES}
+        editing={editing}
+        onAdd={addDamageResistance}
+        onRemove={removeDamageResistance}
+        allowCustom
+      />
+      <TagSelector
+        label="Damage immunities"
+        items={damageImmunities}
+        options={DAMAGE_TYPES}
+        editing={editing}
+        onAdd={addDamageImmunity}
+        onRemove={removeDamageImmunity}
+        allowCustom
+      />
+      <TagSelector
+        label="Condition immunities"
+        items={conditionImmunities}
+        options={CONDITION_TYPES}
+        editing={editing}
+        onAdd={addConditionImmunity}
+        onRemove={removeConditionImmunity}
+        allowCustom
+      />
+      <SensesSection editing={editing} />
+    </Section>
   );
 }

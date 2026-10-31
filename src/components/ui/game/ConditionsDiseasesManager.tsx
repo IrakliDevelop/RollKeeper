@@ -1,40 +1,41 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import {
-  Plus,
-  Minus,
-  AlertTriangle,
-  Shield,
-  Search,
-  Trash2,
-  Activity,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Minus, Plus, Search } from 'lucide-react';
 import { useCharacterStore } from '@/store/characterStore';
 import { useExhaustionStepper } from '@/hooks/useExhaustionStepper';
 import {
   loadAllConditions,
   loadAllDiseases,
 } from '@/utils/conditionsDiseasesLoader';
-import {
-  ProcessedCondition,
-  ProcessedDisease,
+import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
+import type {
   ActiveCondition,
   ActiveDisease,
   ExhaustionVariant,
+  ProcessedCondition,
+  ProcessedDisease,
 } from '@/types/character';
-import { SPELL_SOURCE_BOOKS } from '@/utils/constants';
-import ConditionDetailsModal from './ConditionDetailsModal';
-import { ConditionCard, DiseaseCard } from './conditions';
 import { Button } from '@/components/ui/forms/button';
-import { AppIcon } from '@/components/ui/icons';
-import { Badge } from '@/components/ui/layout/badge';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
+import {
+  Dialog,
+  DialogBody,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/feedback/dialog';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
+import { Badge } from '@/components/ui/layout/badge';
+import { Section } from '@/components/ui/layout/section';
+import { SubTabs } from '@/components/ui/layout/SubTabs';
+import { ConditionChip } from '@/components/ui/game/ConditionChip';
+import ConditionDetailsModal from './ConditionDetailsModal';
+import { ConditionCard, DiseaseCard } from './conditions';
 
 type TabType = 'conditions' | 'buffs' | 'diseases';
+type Effect = ActiveCondition | ActiveDisease;
 
 export default function ConditionsDiseasesManager() {
   const {
@@ -46,9 +47,9 @@ export default function ConditionsDiseasesManager() {
     updateDisease,
     removeDisease,
     setExhaustionVariant,
+    clearNonBuffConditions,
     clearAllDiseases,
   } = useCharacterStore();
-
   const [availableConditions, setAvailableConditions] = useState<
     ProcessedCondition[]
   >([]);
@@ -56,581 +57,390 @@ export default function ConditionsDiseasesManager() {
     ProcessedDisease[]
   >([]);
   const [activeTab, setActiveTab] = useState<TabType>('conditions');
-  const [conditionSearch, setConditionSearch] = useState('');
-  const [diseaseSearch, setDiseaseSearch] = useState('');
+  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [selectedCondition, setSelectedCondition] =
     useState<ActiveCondition | null>(null);
   const [selectedDisease, setSelectedDisease] = useState<ActiveDisease | null>(
     null
   );
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showAddPanel, setShowAddPanel] = useState(false);
-
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const listRef = useRef<HTMLDivElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<string | 'add' | null>(null);
   const exhaustion = useExhaustionStepper();
 
-  // Load conditions and diseases data
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      try {
-        const [conditions, diseases] = await Promise.all([
-          loadAllConditions(),
-          loadAllDiseases(),
-        ]);
+    let alive = true;
+    Promise.all([loadAllConditions(), loadAllDiseases()])
+      .then(([conditions, diseases]) => {
+        if (!alive) return;
         setAvailableConditions(conditions);
         setAvailableDiseases(diseases);
-      } catch (error) {
-        console.error('Failed to load conditions/diseases:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      })
+      .catch(error =>
+        console.error('Failed to load conditions/diseases:', error)
+      )
+      .finally(() => {
+        if (alive) setIsLoading(false);
+      });
+    return () => {
+      alive = false;
     };
-    loadData();
   }, []);
 
   const { activeConditions, activeDiseases, exhaustionVariant } =
-    character.conditionsAndDiseases || {
-      activeConditions: [],
-      activeDiseases: [],
-      exhaustionVariant: '2024' as const,
-    };
+    character.conditionsAndDiseases;
   const activeBuffs = activeConditions.filter(
     condition => condition.kind === 'buff'
   );
   const activeDebuffs = activeConditions.filter(
     condition => condition.kind !== 'buff'
   );
+  const currentList: Effect[] =
+    activeTab === 'conditions'
+      ? activeDebuffs
+      : activeTab === 'buffs'
+        ? activeBuffs
+        : activeDiseases;
 
-  // Filter conditions and diseases based on search
-  const filteredConditions = availableConditions.filter(
-    condition =>
-      condition.name.toLowerCase().includes(conditionSearch.toLowerCase()) ||
-      condition.description
-        .toLowerCase()
-        .includes(conditionSearch.toLowerCase())
-  );
+  useLayoutEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = null;
+    const row = Array.from(
+      listRef.current?.querySelectorAll<HTMLElement>('[data-effect-row]') ?? []
+    ).find(element => element.dataset.effectRow === target);
+    const next =
+      row?.querySelector<HTMLElement>('[data-effect-action="details"]') ??
+      addButtonRef.current ??
+      document.getElementById(`effects-${activeTab}`);
+    next?.focus({ preventScroll: true });
+  }, [activeConditions, activeDiseases, activeTab]);
 
-  const filteredDiseases = availableDiseases.filter(
-    disease =>
-      disease.name.toLowerCase().includes(diseaseSearch.toLowerCase()) ||
-      disease.description.toLowerCase().includes(diseaseSearch.toLowerCase())
-  );
-
-  // Get exhaustion level for current variant
-  const exhaustionCondition = activeConditions.find(
-    c => c.name.toLowerCase() === 'exhaustion'
-  );
-  const exhaustionLevel = exhaustionCondition?.count || 0;
-
-  // Modal management
-  const openConditionModal = (condition: ActiveCondition) => {
-    setSelectedCondition(condition);
-    setSelectedDisease(null);
-    setIsModalOpen(true);
+  const handleRemove = (id: string) => {
+    const index = currentList.findIndex(effect => effect.id === id);
+    pendingFocus.current =
+      currentList[index + 1]?.id ?? currentList[index - 1]?.id ?? 'add';
+    if (activeTab === 'diseases') removeDisease(id);
+    else removeCondition(id);
   };
 
-  const openDiseaseModal = (disease: ActiveDisease) => {
-    setSelectedDisease(disease);
-    setSelectedCondition(null);
-    setIsModalOpen(true);
+  const handleClear = async () => {
+    const diseases = activeTab === 'diseases';
+    const confirmed = await confirmDialog({
+      title: diseases ? 'Remove all diseases?' : 'Remove all conditions?',
+      confirmLabel: 'Remove all',
+      tone: 'danger',
+    });
+    if (!confirmed) return;
+    pendingFocus.current = 'add';
+    if (diseases) clearAllDiseases();
+    else clearNonBuffConditions();
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setSelectedCondition(null);
-    setSelectedDisease(null);
-  };
-
-  const handleUpdateConditionNotes = (notes: string) => {
-    if (selectedCondition) {
-      updateCondition(selectedCondition.id, { notes });
-      setSelectedCondition({ ...selectedCondition, notes });
-    }
-  };
-
-  const handleUpdateDiseaseNotes = (notes: string) => {
-    if (selectedDisease) {
-      updateDisease(selectedDisease.id, { notes });
-      setSelectedDisease({ ...selectedDisease, notes });
-    }
-  };
-
-  const handleUpdateDiseaseOnsetTime = (onsetTime: string) => {
-    if (selectedDisease) {
-      updateDisease(selectedDisease.id, { onsetTime });
-      setSelectedDisease({ ...selectedDisease, onsetTime });
-    }
-  };
-
-  const handleAddCondition = (condition: ProcessedCondition) => {
-    // For exhaustion, check if we already have it and update count instead
-    if (condition.isExhaustion) {
-      const existing = activeConditions.find(
-        c => c.name.toLowerCase() === 'exhaustion'
-      );
-      if (existing) {
-        updateCondition(existing.id, {
-          count: Math.min(existing.count + 1, 6),
-        });
-        return;
+  const handleAdd = (effect: ProcessedCondition | ProcessedDisease) => {
+    if (activeTab === 'diseases') {
+      addDisease(effect.name, effect.source, effect.description);
+    } else {
+      const condition = effect as ProcessedCondition;
+      if (condition.isExhaustion) {
+        const current = activeConditions.find(
+          item => item.name.toLowerCase() === 'exhaustion'
+        );
+        if (current)
+          updateCondition(current.id, {
+            count: Math.min(current.count + 1, 6),
+          });
+        else
+          addCondition(
+            condition.name,
+            condition.source,
+            condition.description,
+            1
+          );
+      } else {
+        addCondition(
+          condition.name,
+          condition.source,
+          condition.description,
+          1
+        );
       }
     }
-
-    addCondition(
-      condition.name,
-      condition.source,
-      condition.description,
-      condition.stackable ? 1 : 1
-    );
-    setShowAddPanel(false);
-    setConditionSearch('');
+    setPickerOpen(false);
+    setSearch('');
   };
 
-  const handleExhaustionChange = (delta: number) => {
-    if (delta > 0) {
-      void exhaustion.increment();
+  const openDetails = (effect: Effect) => {
+    if (activeTab === 'diseases') {
+      setSelectedDisease(effect as ActiveDisease);
+      setSelectedCondition(null);
     } else {
-      exhaustion.decrement();
+      setSelectedCondition(effect as ActiveCondition);
+      setSelectedDisease(null);
     }
+    setDetailsOpen(true);
   };
 
-  const handleAddDisease = (disease: ProcessedDisease) => {
-    addDisease(disease.name, disease.source, disease.description);
-    setShowAddPanel(false);
-    setDiseaseSearch('');
-  };
-
-  if (isLoading) {
+  const renderPanel = (tab: TabType) => {
+    const effects: Effect[] =
+      tab === 'conditions'
+        ? activeDebuffs
+        : tab === 'buffs'
+          ? activeBuffs
+          : activeDiseases;
     return (
-      <div className="border-divider bg-surface rounded-lg border-2 p-6 shadow-sm">
-        <div className="flex flex-col items-center justify-center py-12">
-          <div className="border-divider border-t-accent-blue-border-strong h-12 w-12 animate-spin rounded-full border-4"></div>
-          <p className="text-muted mt-4 font-medium">
-            Loading conditions and diseases...
-          </p>
+      <div>
+        {tab !== 'buffs' && (
+          <div className="mb-2 flex flex-wrap justify-end gap-2">
+            {effects.length > 0 && (
+              <Button variant="danger" size="sm" onClick={handleClear}>
+                Clear all
+              </Button>
+            )}
+            <Button
+              ref={tab === activeTab ? addButtonRef : undefined}
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setSearch('');
+                setPickerOpen(true);
+              }}
+            >
+              {tab === 'diseases' ? 'Add disease' : 'Add condition'}
+            </Button>
+          </div>
+        )}
+        <div
+          ref={tab === activeTab ? listRef : undefined}
+          role="list"
+          className="divide-divider divide-y"
+        >
+          {effects.map(effect =>
+            tab === 'diseases' ? (
+              <DiseaseCard
+                key={effect.id}
+                disease={effect as ActiveDisease}
+                onView={openDetails}
+                onRemove={handleRemove}
+              />
+            ) : (
+              <ConditionCard
+                key={effect.id}
+                condition={effect as ActiveCondition}
+                onView={openDetails}
+                onRemove={handleRemove}
+                onUpdateCount={(id, count) => updateCondition(id, { count })}
+              />
+            )
+          )}
         </div>
+        {effects.length === 0 && (
+          <p className="type-body text-muted py-8 text-center">
+            {tab === 'conditions'
+              ? 'No conditions.'
+              : tab === 'buffs'
+                ? 'Buffs such as Bless appear here when applied.'
+                : 'No diseases.'}
+          </p>
+        )}
       </div>
     );
-  }
+  };
+
+  if (isLoading)
+    return (
+      <p className="type-body text-muted py-8 text-center">
+        Loading conditions and diseases...
+      </p>
+    );
+
+  const pickerOptions = (
+    activeTab === 'diseases' ? availableDiseases : availableConditions
+  ).filter(
+    effect =>
+      effect.name.toLowerCase().includes(search.toLowerCase()) ||
+      effect.description.toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
-    <div className="border-divider bg-surface rounded-lg border-2 shadow-sm">
-      {/* Header */}
-      <div className="border-divider from-surface-secondary to-surface-hover border-b-2 bg-linear-to-r p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-heading flex items-center gap-2 text-xl font-bold">
-            <Activity className="text-accent-red-text-muted h-6 w-6" />
-            Conditions & Effects
-          </h3>
-          <div className="flex items-center gap-2">
-            <label className="text-body text-sm font-medium">
-              Exhaustion Rules:
-            </label>
-            <SelectField
-              value={exhaustionVariant}
-              onValueChange={value =>
-                setExhaustionVariant(value as ExhaustionVariant)
-              }
-            >
-              <SelectItem value="2014">2014 PHB</SelectItem>
-              <SelectItem value="2024">2024 PHB</SelectItem>
-            </SelectField>
-          </div>
+    <Section
+      heading="Conditions and effects"
+      level={3}
+      trailing={
+        <div className="w-28 sm:w-32">
+          <SelectField
+            triggerProps={{ 'aria-label': 'Exhaustion rules' }}
+            value={exhaustionVariant}
+            onValueChange={value =>
+              setExhaustionVariant(value as ExhaustionVariant)
+            }
+          >
+            <SelectItem value="2014">2014 PHB</SelectItem>
+            <SelectItem value="2024">2024 PHB</SelectItem>
+          </SelectField>
         </div>
-
-        {/* Exhaustion Quick Controls */}
-        <div className="border-accent-red-border from-accent-red-bg to-accent-orange-bg rounded-lg border-2 bg-linear-to-r p-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="text-accent-red-text-muted h-5 w-5" />
-              <div>
-                <h4 className="text-accent-red-text font-bold">
-                  Exhaustion Level
-                </h4>
-                <p className="text-accent-red-text-muted text-xs">
-                  Using {exhaustionVariant === '2014' ? '2014' : '2024'} rules
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={() => handleExhaustionChange(-1)}
-                variant="ghost"
-                size="sm"
-                disabled={exhaustionLevel === 0}
-                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text disabled:opacity-30"
-              >
-                <Minus className="h-4 w-4" />
-              </Button>
-              <div className="min-w-[4rem] text-center">
-                <div className="text-heading text-2xl font-bold">
-                  {exhaustionLevel}
-                </div>
-                <div className="text-muted text-xs">/ 6</div>
-              </div>
-              <Button
-                onClick={() => handleExhaustionChange(1)}
-                variant="ghost"
-                size="sm"
-                disabled={exhaustionLevel >= 6}
-                className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text disabled:opacity-30"
-              >
-                <Plus className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-          {exhaustionLevel > 0 && (
+      }
+    >
+      <div className="border-divider flex flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b pb-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {exhaustion.level > 0 ? (
+            <ConditionChip name="Exhaustion" />
+          ) : (
+            <span className="type-ui text-heading">Exhaustion</span>
+          )}
+          <span className="type-small text-muted">
+            Using {exhaustionVariant} rules
+          </span>
+          {exhaustion.level > 0 && (
             <Badge
-              variant={exhaustionLevel >= 6 ? 'danger' : 'warning'}
-              size="md"
-              className="mt-3"
+              variant={exhaustion.level >= 6 ? 'danger' : 'warning'}
+              size="sm"
             >
-              {exhaustionLevel === 6 ? (
-                <span className="flex items-center gap-1">
-                  <AppIcon name="monster" className="h-3.5 w-3.5" /> Death!
-                </span>
-              ) : (
-                `Level ${exhaustionLevel} Effects Active`
-              )}
+              {exhaustion.level >= 6
+                ? 'Dead'
+                : `Level ${exhaustion.level} effects`}
             </Badge>
           )}
         </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="border-divider bg-surface-secondary border-b-2 px-6">
-        <div className="grid grid-cols-3 gap-1">
-          <button
-            onClick={() => {
-              setActiveTab('conditions');
-              setShowAddPanel(false);
-            }}
-            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
-              activeTab === 'conditions'
-                ? 'border-accent-red-border-strong text-accent-red-text bg-surface border-b-4'
-                : 'text-muted hover:text-accent-red-text-muted hover:bg-surface-hover'
-            }`}
+        <div
+          role="group"
+          aria-label="Exhaustion level"
+          className="flex items-center gap-1"
+        >
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Lower Exhaustion level"
+            disabled={exhaustion.level === 0}
+            onClick={() => exhaustion.decrement()}
+            className="min-w-6 px-2 pointer-coarse:min-w-11"
           >
-            <AlertTriangle className="hidden h-4 w-4 sm:block" />
-            Conditions
-            <Badge
-              variant={activeTab === 'conditions' ? 'danger' : 'secondary'}
-              size="sm"
-            >
-              {activeDebuffs.length}
-            </Badge>
-          </button>
-          <button
+            <Minus aria-hidden="true" className="size-4" />
+          </Button>
+          <span className="type-num-md text-heading min-w-6 text-center">
+            {exhaustion.level}
+          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label="Raise Exhaustion level"
+            disabled={exhaustion.level >= 6}
             onClick={() => {
-              setActiveTab('buffs');
-              setShowAddPanel(false);
+              void exhaustion.increment();
             }}
-            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
-              activeTab === 'buffs'
-                ? 'border-accent-emerald-border text-accent-emerald-text bg-surface border-b-4'
-                : 'text-muted hover:text-accent-emerald-text hover:bg-surface-hover'
-            }`}
+            className="min-w-6 px-2 pointer-coarse:min-w-11"
           >
-            <Sparkles className="hidden h-4 w-4 sm:block" />
-            Buffs
-            <Badge
-              variant={activeTab === 'buffs' ? 'success' : 'secondary'}
-              size="sm"
-            >
-              {activeBuffs.length}
-            </Badge>
-          </button>
-          <button
-            onClick={() => {
-              setActiveTab('diseases');
-              setShowAddPanel(false);
-            }}
-            className={`flex min-w-0 items-center justify-center gap-1 px-2 py-3 font-semibold transition-all sm:gap-2 sm:px-6 ${
-              activeTab === 'diseases'
-                ? 'border-accent-purple-border-strong text-accent-purple-text bg-surface border-b-4'
-                : 'text-muted hover:text-accent-purple-text-muted hover:bg-surface-hover'
-            }`}
-          >
-            <Shield className="hidden h-4 w-4 sm:block" />
-            Diseases
-            <Badge
-              variant={activeTab === 'diseases' ? 'primary' : 'secondary'}
-              size="sm"
-            >
-              {activeDiseases.length}
-            </Badge>
-          </button>
+            <Plus aria-hidden="true" className="size-4" />
+          </Button>
+          <span className="type-small text-muted">/ 6</span>
         </div>
       </div>
 
-      {/* Content */}
-      <div className="p-6">
-        {activeTab === 'conditions' ? (
-          <div className="space-y-4">
-            {/* Active Conditions Header */}
-            <div className="flex items-center justify-between">
-              <h4 className="text-heading text-lg font-bold">
-                Active Conditions
-              </h4>
-              <div className="flex gap-2">
-                {activeDebuffs.length > 0 && (
-                  <Button
-                    onClick={() =>
-                      activeDebuffs.forEach(condition =>
-                        removeCondition(condition.id)
-                      )
-                    }
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Trash2 className="h-4 w-4" />}
-                    className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
-                  >
-                    Clear All
-                  </Button>
-                )}
-                <Button
-                  onClick={() => setShowAddPanel(!showAddPanel)}
-                  variant={showAddPanel ? 'outline' : 'primary'}
-                  size="sm"
-                  leftIcon={
-                    showAddPanel ? (
-                      <X className="h-4 w-4" />
-                    ) : (
-                      <Plus className="h-4 w-4" />
-                    )
-                  }
-                >
-                  {showAddPanel ? 'Cancel' : 'Add Condition'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Add Condition Panel */}
-            {showAddPanel && (
-              <div className="border-accent-red-border from-accent-red-bg to-accent-orange-bg rounded-lg border-2 bg-linear-to-r p-4">
-                <h5 className="text-accent-red-text mb-3 font-bold">
-                  Add New Condition
-                </h5>
-                <Input
-                  leftIcon={<Search className="h-4 w-4" />}
-                  placeholder="Search conditions by name or description..."
-                  value={conditionSearch}
-                  onChange={e => setConditionSearch(e.target.value)}
-                  className="mb-3"
-                />
-                <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {filteredConditions.map(condition => {
-                    const fullSourceName =
-                      SPELL_SOURCE_BOOKS[condition.source] || condition.source;
-                    return (
-                      <button
-                        key={condition.id}
-                        onClick={() => handleAddCondition(condition)}
-                        className="border-divider bg-surface-raised hover:border-accent-red-border w-full rounded-lg border-2 p-3 text-left transition-all hover:shadow-md"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1">
-                            <div className="text-heading font-semibold">
-                              {condition.name}
-                            </div>
-                            <div className="text-muted mt-1 flex items-center gap-2 text-xs">
-                              <span>{fullSourceName}</span>
-                              {condition.variant && (
-                                <Badge variant="info" size="sm">
-                                  {condition.variant === '2014'
-                                    ? '2014 PHB'
-                                    : '2024 PHB'}
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-                          <Plus className="text-accent-red-text-muted h-5 w-5" />
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {filteredConditions.length === 0 && conditionSearch && (
-                    <p className="text-muted py-8 text-center">
-                      No conditions found matching &quot;{conditionSearch}&quot;
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Active Conditions List */}
-            <div className="space-y-3">
-              {activeDebuffs.map(condition => (
-                <ConditionCard
-                  key={condition.id}
-                  condition={condition}
-                  onView={openConditionModal}
-                  onRemove={removeCondition}
-                  onUpdateCount={(id, count) => updateCondition(id, { count })}
-                />
-              ))}
-              {activeDebuffs.length === 0 && (
-                <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
-                  <AlertTriangle className="text-faint mx-auto mb-3 h-12 w-12" />
-                  <p className="text-muted font-medium">No active conditions</p>
-                  <p className="text-muted mt-1 text-sm">
-                    Click &quot;Add Condition&quot; to get started
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : activeTab === 'buffs' ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-heading text-lg font-bold">Active Buffs</h4>
-                <p className="text-muted text-sm">
-                  Beneficial effects applied by you or the DM.
-                </p>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {activeBuffs.map(buff => (
-                <ConditionCard
-                  key={buff.id}
-                  condition={buff}
-                  onView={openConditionModal}
-                  onRemove={removeCondition}
-                  onUpdateCount={(id, count) => updateCondition(id, { count })}
-                />
-              ))}
-              {activeBuffs.length === 0 && (
-                <div className="border-accent-emerald-border bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
-                  <Sparkles className="text-accent-emerald-text-muted mx-auto mb-3 h-12 w-12" />
-                  <p className="text-muted font-medium">No active buffs</p>
-                  <p className="text-muted mt-1 text-sm">
-                    Buffs such as Bless appear here when applied.
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Active Diseases Header */}
-            <div className="flex items-center justify-between">
-              <h4 className="text-heading text-lg font-bold">
-                Active Diseases
-              </h4>
-              <div className="flex gap-2">
-                {activeDiseases.length > 0 && (
-                  <Button
-                    onClick={clearAllDiseases}
-                    variant="ghost"
-                    size="sm"
-                    leftIcon={<Trash2 className="h-4 w-4" />}
-                    className="text-accent-purple-text-muted hover:bg-accent-purple-bg hover:text-accent-purple-text"
-                  >
-                    Clear All
-                  </Button>
-                )}
-                <Button
-                  onClick={() => setShowAddPanel(!showAddPanel)}
-                  variant={showAddPanel ? 'outline' : 'primary'}
-                  size="sm"
-                  leftIcon={<Plus className="h-4 w-4" />}
-                >
-                  {showAddPanel ? 'Cancel' : 'Add Disease'}
-                </Button>
-              </div>
-            </div>
-
-            {/* Add Disease Panel */}
-            {showAddPanel && (
-              <div className="border-accent-purple-border from-accent-purple-bg to-accent-purple-bg-strong rounded-lg border-2 bg-linear-to-r p-4">
-                <h5 className="text-accent-purple-text mb-3 font-bold">
-                  Add New Disease
-                </h5>
-                <Input
-                  leftIcon={<Search className="h-4 w-4" />}
-                  placeholder="Search diseases by name or description..."
-                  value={diseaseSearch}
-                  onChange={e => setDiseaseSearch(e.target.value)}
-                  className="mb-3"
-                />
-                <div className="max-h-64 space-y-2 overflow-y-auto">
-                  {filteredDiseases.map(disease => {
-                    const fullSourceName =
-                      SPELL_SOURCE_BOOKS[disease.source] || disease.source;
-                    return (
-                      <button
-                        key={disease.id}
-                        onClick={() => handleAddDisease(disease)}
-                        className="border-divider bg-surface-raised hover:border-accent-purple-border w-full rounded-lg border-2 p-3 text-left transition-all hover:shadow-md"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1">
-                            <div className="text-heading font-semibold">
-                              {disease.name}
-                            </div>
-                            <div className="text-muted mt-1 text-xs">
-                              {fullSourceName}
-                              {disease.type && (
-                                <span className="text-accent-purple-text-muted font-medium">
-                                  {' '}
-                                  • {disease.type}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <Plus className="text-accent-purple-text-muted h-5 w-5" />
-                        </div>
-                      </button>
-                    );
-                  })}
-                  {filteredDiseases.length === 0 && diseaseSearch && (
-                    <p className="text-muted py-8 text-center">
-                      No diseases found matching &quot;{diseaseSearch}&quot;
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Active Diseases List */}
-            <div className="space-y-3">
-              {activeDiseases.map(disease => (
-                <DiseaseCard
-                  key={disease.id}
-                  disease={disease}
-                  onView={openDiseaseModal}
-                  onRemove={removeDisease}
-                />
-              ))}
-              {activeDiseases.length === 0 && (
-                <div className="border-divider-strong bg-surface-secondary rounded-lg border-2 border-dashed py-12 text-center">
-                  <Shield className="text-faint mx-auto mb-3 h-12 w-12" />
-                  <p className="text-muted font-medium">No active diseases</p>
-                  <p className="text-muted mt-1 text-sm">
-                    Click &quot;Add Disease&quot; to get started
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Details Modal */}
-      <ConditionDetailsModal
-        isOpen={isModalOpen}
-        onClose={closeModal}
-        condition={selectedCondition || undefined}
-        disease={selectedDisease || undefined}
-        onUpdateNotes={
-          selectedCondition
-            ? handleUpdateConditionNotes
-            : handleUpdateDiseaseNotes
-        }
-        onUpdateOnsetTime={handleUpdateDiseaseOnsetTime}
+      <SubTabs
+        label="Conditions and effects"
+        value={activeTab}
+        onValueChange={value => {
+          setActiveTab(value as TabType);
+          setPickerOpen(false);
+        }}
+        tabs={(
+          [
+            ['conditions', 'Conditions', activeDebuffs.length],
+            ['buffs', 'Buffs', activeBuffs.length],
+            ['diseases', 'Diseases', activeDiseases.length],
+          ] as const
+        ).map(([value, label, count]) => ({
+          id: `effects-${value}`,
+          value,
+          label: (
+            <span className="inline-flex items-center gap-1">
+              {label}
+              <Badge variant="neutral" size="sm">
+                {count}
+              </Badge>
+            </span>
+          ),
+          content: renderPanel(value),
+        }))}
       />
-    </div>
+
+      <Dialog open={pickerOpen} onOpenChange={setPickerOpen}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>
+              {activeTab === 'diseases' ? 'Add disease' : 'Add condition'}
+            </DialogTitle>
+          </DialogHeader>
+          <DialogBody>
+            <Input
+              leftIcon={<Search aria-hidden="true" className="size-4" />}
+              aria-label={
+                activeTab === 'diseases'
+                  ? 'Search diseases'
+                  : 'Search conditions'
+              }
+              value={search}
+              onChange={event => setSearch(event.target.value)}
+            />
+            <div className="divide-divider mt-4 max-h-72 divide-y overflow-y-auto">
+              {pickerOptions.map(effect => (
+                <button
+                  key={effect.id}
+                  type="button"
+                  onClick={() => handleAdd(effect)}
+                  className="hover:bg-surface-hover focus-visible:outline-ring flex w-full min-w-0 items-center justify-between gap-3 py-3 text-left focus-visible:outline-2 pointer-coarse:min-h-11"
+                >
+                  <span className="type-ui text-heading min-w-0 break-words">
+                    {effect.name}
+                  </span>
+                  <span className="type-small text-muted shrink-0 text-right">
+                    {SPELL_SOURCE_BOOKS[effect.source] || effect.source}
+                    {activeTab === 'diseases' &&
+                      'type' in effect &&
+                      effect.type && <> · {effect.type}</>}
+                  </span>
+                </button>
+              ))}
+              {pickerOptions.length === 0 && search && (
+                <p className="type-body text-muted py-8 text-center">
+                  No {activeTab === 'diseases' ? 'diseases' : 'conditions'}{' '}
+                  found matching &quot;{search}&quot;
+                </p>
+              )}
+            </div>
+          </DialogBody>
+        </DialogContent>
+      </Dialog>
+
+      <ConditionDetailsModal
+        isOpen={detailsOpen}
+        onClose={() => {
+          setDetailsOpen(false);
+          setSelectedCondition(null);
+          setSelectedDisease(null);
+        }}
+        condition={selectedCondition ?? undefined}
+        disease={selectedDisease ?? undefined}
+        onUpdateNotes={notes => {
+          if (selectedCondition) {
+            updateCondition(selectedCondition.id, { notes });
+            setSelectedCondition({ ...selectedCondition, notes });
+          }
+          if (selectedDisease) {
+            updateDisease(selectedDisease.id, { notes });
+            setSelectedDisease({ ...selectedDisease, notes });
+          }
+        }}
+        onUpdateOnsetTime={onsetTime => {
+          if (selectedDisease) {
+            updateDisease(selectedDisease.id, { onsetTime });
+            setSelectedDisease({ ...selectedDisease, onsetTime });
+          }
+        }}
+      />
+    </Section>
   );
 }

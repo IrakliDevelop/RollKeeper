@@ -49,8 +49,6 @@ export function CreatureCreatorForm({
   onSave,
   onCancel,
 }: CreatureCreatorFormProps) {
-  const isEditing = !!initialCreature;
-
   // Core
   const [name, setName] = useState(initialCreature?.name ?? '');
   const [size, setSize] = useState(initialCreature?.size ?? 'Tiny');
@@ -163,7 +161,7 @@ export function CreatureCreatorForm({
         className="text-muted hover:text-body flex items-center gap-1 text-sm transition-colors"
       >
         <ArrowLeft size={14} />
-        Back
+        Cancel
       </button>
 
       {/* Name & Core Info */}
@@ -171,7 +169,7 @@ export function CreatureCreatorForm({
         <Input
           value={name}
           onChange={e => setName(e.target.value)}
-          label="Creature Name"
+          label="Creature name"
           placeholder="e.g. Shadow Sprite"
           required
           autoFocus
@@ -222,7 +220,7 @@ export function CreatureCreatorForm({
           <Input
             value={hpFormula}
             onChange={e => setHpFormula(e.target.value)}
-            label="HP Formula"
+            label="HP formula"
             placeholder="1d4+1"
           />
         </div>
@@ -235,10 +233,10 @@ export function CreatureCreatorForm({
         />
       </div>
 
-      {/* Ability Scores */}
+      {/* Ability scores */}
       <div>
         <label className="text-heading mb-1.5 block text-sm font-medium">
-          Ability Scores
+          Ability scores
         </label>
         <div className="grid grid-cols-6 gap-2">
           {(
@@ -252,7 +250,7 @@ export function CreatureCreatorForm({
             ] as const
           ).map(([label, value, setter]) => (
             <div key={label} className="text-center">
-              <span className="text-muted block text-[10px] font-medium uppercase">
+              <span className="text-muted block text-[10px] font-medium">
                 {label}
               </span>
               <NumberField
@@ -284,7 +282,7 @@ export function CreatureCreatorForm({
           <Input
             value={saves}
             onChange={e => setSaves(e.target.value)}
-            label="Saving Throws"
+            label="Saving throws"
             placeholder="Dex +4, Wis +2"
           />
           <Input
@@ -314,7 +312,7 @@ export function CreatureCreatorForm({
           <Input
             value={conditionImmunities}
             onChange={e => setConditionImmunities(e.target.value)}
-            label="Condition Immunities"
+            label="Condition immunities"
             placeholder="poisoned, charmed"
           />
           <Input
@@ -348,7 +346,7 @@ export function CreatureCreatorForm({
         onChange={setActions}
       />
       <AbilityListEditor
-        label="Bonus Actions"
+        label="Bonus actions"
         items={bonusActions}
         onChange={setBonusActions}
       />
@@ -358,7 +356,7 @@ export function CreatureCreatorForm({
         onChange={setReactions}
       />
       <AbilityListEditor
-        label="Lair Actions"
+        label="Lair actions"
         items={lairActions}
         onChange={setLairActions}
       />
@@ -370,7 +368,7 @@ export function CreatureCreatorForm({
         fullWidth
         disabled={!name.trim()}
       >
-        {isEditing ? 'Save Changes' : 'Save Creature'}
+        Save creature
       </Button>
     </div>
   );
@@ -418,7 +416,7 @@ function AbilityListEditor({
         <label className="text-heading text-sm font-medium">{label}</label>
         <button
           onClick={handleAdd}
-          className="text-accent-purple-text hover:text-accent-purple-text flex items-center gap-1 text-xs font-medium opacity-80 hover:opacity-100"
+          className="text-body hover:text-heading flex items-center gap-1 text-xs font-medium"
         >
           <Plus size={12} />
           Add
@@ -431,7 +429,7 @@ function AbilityListEditor({
           {items.map((item, index) => (
             <div
               key={index}
-              className="border-divider bg-surface-raised rounded-lg border p-2"
+              className="border-divider bg-surface-raised rounded-sm border p-2"
             >
               <div className="mb-1 flex items-center gap-2">
                 <Input
@@ -451,7 +449,7 @@ function AbilityListEditor({
                 />
                 <button
                   onClick={() => handleRemove(index)}
-                  className="text-muted hover:text-accent-red-text p-1 transition-colors"
+                  className="text-muted hover:text-body p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                 >
                   <Trash2 size={14} />
                 </button>
@@ -459,7 +457,7 @@ function AbilityListEditor({
               <CompactRichTextEditor
                 content={item.text}
                 onChange={value => handleUpdate(index, 'text', value)}
-                placeholder="Description..."
+                placeholder=""
               />
             </div>
           ))}
