@@ -173,10 +173,10 @@ export function WeaponForm({
         <div className="space-y-4">{autocompleteSlot}</div>
       )}
 
-      {/* Section: Basic Information */}
+      {/* Section: Basic information */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-          Basic Information
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
+          Basic information
         </h4>
 
         <Input
@@ -187,7 +187,7 @@ export function WeaponForm({
           required
         />
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
           <div>
             <label className="text-body mb-2 block text-sm font-medium">
               Category
@@ -210,7 +210,7 @@ export function WeaponForm({
           </div>
 
           <NumberInput
-            label="Enhancement Bonus"
+            label="Enhancement bonus"
             value={formData.enhancementBonus}
             onChange={v =>
               setFormData({
@@ -252,10 +252,8 @@ export function WeaponForm({
 
       {/* Section: Damage */}
       <div className="space-y-4">
-        <div className="border-divider flex items-center justify-between border-b-2 pb-2">
-          <h4 className="text-heading text-sm font-bold tracking-wide uppercase">
-            Damage Entries
-          </h4>
+        <div className="border-divider flex items-center justify-between border-b pb-2">
+          <h4 className="text-heading text-sm font-bold">Damage</h4>
           <Button
             type="button"
             onClick={() => {
@@ -269,11 +267,11 @@ export function WeaponForm({
                 damage: [...formData.damage, newDamage],
               });
             }}
-            variant="primary"
+            variant="outline"
             size="sm"
             leftIcon={<Plus size={14} />}
           >
-            Add Damage Type
+            Add damage
           </Button>
         </div>
 
@@ -307,7 +305,7 @@ export function WeaponForm({
               )}
             </div>
 
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 [&>*]:min-w-0">
               <Input
                 label="Label"
                 value={damage.label || ''}
@@ -392,13 +390,13 @@ export function WeaponForm({
         ))}
       </div>
 
-      {/* Section: Weapon Types */}
+      {/* Section: Weapon types */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-          Weapon Types
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
+          Weapon types
         </h4>
 
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
           {WEAPON_TYPES.map(type => (
             <label
               key={type}
@@ -418,7 +416,7 @@ export function WeaponForm({
         {/* Ability Override */}
         <div>
           <label className="text-body mb-2 block text-sm font-medium">
-            Ability Score Override
+            Attack ability
           </label>
           <SelectField
             value={formData.abilityOverride || 'default'}
@@ -431,7 +429,7 @@ export function WeaponForm({
             }
           >
             <SelectItem value="default">
-              Default (STR / DEX / Finesse)
+              Default (Strength, or Dexterity if finesse)
             </SelectItem>
             <SelectItem value="strength">Strength</SelectItem>
             <SelectItem value="dexterity">Dexterity</SelectItem>
@@ -449,13 +447,13 @@ export function WeaponForm({
 
       {/* Section: Description */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
           Description
         </h4>
 
         <div>
           <label className="text-body mb-2 block text-sm font-medium">
-            Special Properties
+            Special properties
           </label>
           <RichTextEditor
             content={formData.description || ''}
@@ -469,19 +467,19 @@ export function WeaponForm({
 
       {/* Section: Charges */}
       <div className="space-y-4">
-        <div className="border-divider flex items-center justify-between border-b-2 pb-2">
-          <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
-            <Sparkles size={16} className="text-accent-indigo-text-muted" />
-            Charges & Abilities (Optional)
+        <div className="border-divider flex items-center justify-between border-b pb-2">
+          <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
+            <Sparkles size={16} className="text-muted" />
+            Charges and abilities (optional)
           </h4>
           <Button
             type="button"
             onClick={addCharge}
-            variant="primary"
+            variant="outline"
             size="sm"
             leftIcon={<Plus size={14} />}
           >
-            Add Charge Ability
+            Add charge ability
           </Button>
         </div>
 
@@ -494,12 +492,9 @@ export function WeaponForm({
         ) : (
           <div className="space-y-4">
             {formData.charges.map((charge, index) => (
-              <div
-                key={index}
-                className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border-2 p-4"
-              >
+              <div key={index} className="border-divider min-w-0 border-t pt-4">
                 <div className="mb-3 flex items-center justify-between">
-                  <h5 className="text-accent-indigo-text-muted flex items-center gap-2 text-sm font-semibold">
+                  <h5 className="text-muted flex items-center gap-2 text-sm font-semibold">
                     <Sparkles size={14} />
                     {charge.name || `Charge Ability ${index + 1}`}
                   </h5>
@@ -530,7 +525,7 @@ export function WeaponForm({
                 {/* Description with WYSIWYG */}
                 <div className="mb-3">
                   <label className="text-body mb-1 block text-sm font-medium">
-                    Description (Optional)
+                    Description (optional)
                   </label>
                   <RichTextEditor
                     content={charge.description || ''}
@@ -542,10 +537,10 @@ export function WeaponForm({
                   />
                 </div>
 
-                {/* Max Charges and Rest Type */}
-                <div className="mb-3 grid grid-cols-2 gap-3">
+                {/* Max charges and Rest Type */}
+                <div className="mb-3 grid grid-cols-1 gap-3 sm:grid-cols-2 [&>*]:min-w-0">
                   <NumberInput
-                    label="Max Charges"
+                    label="Max charges"
                     min={1}
                     value={charge.maxCharges}
                     onChange={v =>
@@ -557,7 +552,7 @@ export function WeaponForm({
                   />
                   <div>
                     <label className="text-body mb-2 block text-sm font-medium">
-                      Recharges On
+                      Recharges on
                     </label>
                     <SelectField
                       value={charge.restType}
@@ -574,7 +569,7 @@ export function WeaponForm({
                 </div>
 
                 {/* Proficiency Scaling */}
-                <div className="border-accent-indigo-border border-t pt-3">
+                <div className="border-divider border-t pt-3">
                   <label className="flex cursor-pointer items-center gap-2">
                     <Checkbox
                       checked={charge.scaleWithProficiency || false}
@@ -595,7 +590,7 @@ export function WeaponForm({
                   {charge.scaleWithProficiency && (
                     <div className="mt-2 pl-6">
                       <NumberInput
-                        label="Proficiency Multiplier"
+                        label="Proficiency multiplier"
                         integer={false}
                         min={0.5}
                         step={0.5}
@@ -620,17 +615,17 @@ export function WeaponForm({
       {/* Section: Charge Pool (from weapon database) */}
       {formData.chargePool && (
         <div className="space-y-4">
-          <div className="border-divider flex items-center justify-between border-b-2 pb-2">
-            <h4 className="text-heading flex items-center gap-2 text-sm font-bold tracking-wide uppercase">
-              <Zap size={16} className="text-accent-amber-text" />
-              Shared Charge Pool
+          <div className="border-divider flex items-center justify-between border-b pb-2">
+            <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
+              <Zap size={16} className="text-muted" />
+              Shared charge pool
             </h4>
           </div>
 
-          <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
-            <div className="mb-4 grid grid-cols-3 gap-3">
+          <div className="border-divider min-w-0 border-t pt-4">
+            <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 [&>*]:min-w-0">
               <NumberInput
-                label="Max Charges"
+                label="Max charges"
                 min={0}
                 value={formData.chargePool.maxCharges}
                 onChange={v =>
@@ -673,7 +668,7 @@ export function WeaponForm({
                 </SelectField>
               </div>
               <Input
-                label="Recharge Amount"
+                label="Recharge amount"
                 value={formData.chargePool.rechargeAmount || ''}
                 onChange={e =>
                   setFormData(prev => ({
@@ -692,9 +687,7 @@ export function WeaponForm({
 
             {formData.chargePool.abilities.length > 0 && (
               <div className="space-y-2">
-                <p className="text-body text-xs font-semibold uppercase">
-                  Abilities
-                </p>
+                <p className="text-body text-sm font-semibold">Abilities</p>
                 {formData.chargePool.abilities.map((ability, idx) => (
                   <div
                     key={ability.id || idx}
@@ -758,18 +751,18 @@ export function WeaponForm({
         </div>
       )}
 
-      {/* Section: Spell Bonuses */}
+      {/* Section: Spell bonuses */}
       {(formData.bonusSpellAttack !== undefined ||
         formData.bonusSpellSaveDc !== undefined ||
         formData.chargePool) && (
         <div className="space-y-4">
-          <h4 className="border-divider text-heading flex items-center gap-2 border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-            <Shield size={16} className="text-accent-indigo-text" />
-            Spell Bonuses
+          <h4 className="border-divider text-heading flex items-center gap-2 border-b pb-2 text-sm font-bold">
+            <Shield size={16} className="text-muted" />
+            Spell bonuses
           </h4>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
             <NumberInput
-              label="Bonus to Spell Attack"
+              label="Spell attack bonus"
               min={0}
               max={5}
               allowEmpty
@@ -781,7 +774,7 @@ export function WeaponForm({
               helperText="Added to spell attack rolls"
             />
             <NumberInput
-              label="Bonus to Spell Save DC"
+              label="Spell save DC bonus"
               min={0}
               max={5}
               allowEmpty
@@ -798,7 +791,7 @@ export function WeaponForm({
 
       {/* Section: Properties */}
       <div className="space-y-4">
-        <h4 className="border-divider text-heading border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+        <h4 className="border-divider text-heading border-b pb-2 text-sm font-bold">
           Properties
         </h4>
 
@@ -813,9 +806,7 @@ export function WeaponForm({
                 })
               }
             />
-            <span className="text-heading text-sm font-medium">
-              Currently Equipped
-            </span>
+            <span className="text-heading text-sm font-medium">Equipped</span>
           </label>
 
           <label className="flex cursor-pointer items-center gap-2">
@@ -830,7 +821,7 @@ export function WeaponForm({
               }
             />
             <span className="text-heading text-sm font-medium">
-              Requires Attunement
+              Requires attunement
             </span>
           </label>
 
@@ -845,9 +836,7 @@ export function WeaponForm({
                   })
                 }
               />
-              <span className="text-heading text-sm font-medium">
-                Currently Attuned
-              </span>
+              <span className="text-heading text-sm font-medium">Attuned</span>
             </label>
           )}
         </div>
@@ -872,7 +861,7 @@ export function WeaponForm({
           size="md"
           disabled={!formData.name.trim()}
         >
-          {isEditing ? 'Update' : 'Add'} Weapon
+          {isEditing ? 'Save weapon' : 'Add weapon'}
         </Button>
       </div>
     </form>

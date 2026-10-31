@@ -162,27 +162,27 @@ export function ItemForm({
     >
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Item' : 'Add Item'}</DialogTitle>
+          <DialogTitle>{isEditing ? 'Edit item' : 'Add item'}</DialogTitle>
         </DialogHeader>
         <DialogBody>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Autocomplete Section */}
             {databaseItems.length > 0 && (
-              <div className="border-accent-purple-border bg-accent-purple-bg/30 rounded-lg border-2 p-4">
+              <div className="border-divider min-w-0 border-t pt-4">
                 <ItemAutocomplete
                   items={databaseItems}
                   magicItems={databaseMagicItems}
                   onSelect={handleItemSelect}
                   loading={itemsLoading}
-                  placeholder="Search D&D items to auto-fill..."
+                  placeholder="Search items to fill in…"
                 />
               </div>
             )}
 
-            {/* Section: Basic Information */}
+            {/* Section: Basic information */}
             <div className="space-y-4">
-              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                Basic Information
+              <h4 className="text-heading border-divider border-b pb-2 text-sm font-bold">
+                Basic information
               </h4>
 
               <Input
@@ -191,11 +191,11 @@ export function ItemForm({
                 onChange={e =>
                   setFormData({ ...formData, name: e.target.value })
                 }
-                placeholder="e.g., Rope (50 feet), Healing Potion"
+                placeholder="Rope (50 feet)"
                 required
               />
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <div>
                   <label className="text-body mb-2 block text-sm font-medium">
                     Category
@@ -229,13 +229,13 @@ export function ItemForm({
               </div>
             </div>
 
-            {/* Section: Item Classification */}
+            {/* Section: Classification */}
             <div className="space-y-4">
-              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                Item Classification
+              <h4 className="text-heading border-divider border-b pb-2 text-sm font-bold">
+                Classification
               </h4>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <div>
                   <label className="text-body mb-2 block text-sm font-medium">
                     Rarity
@@ -252,7 +252,7 @@ export function ItemForm({
                       })
                     }
                   >
-                    <SelectItem value="none">None/Standard</SelectItem>
+                    <SelectItem value="none">None</SelectItem>
                     {ITEM_RARITIES.map(rarity => (
                       <SelectItem key={rarity} value={rarity}>
                         {rarity.charAt(0).toUpperCase() + rarity.slice(1)}
@@ -277,7 +277,7 @@ export function ItemForm({
                       })
                     }
                   >
-                    <SelectItem value="none">Standard Item</SelectItem>
+                    <SelectItem value="none">Standard</SelectItem>
                     {ITEM_TYPES.map(type => (
                       <SelectItem key={type} value={type}>
                         {type.charAt(0).toUpperCase() + type.slice(1)}
@@ -290,16 +290,14 @@ export function ItemForm({
 
             {/* Section: Location */}
             <div className="space-y-4">
-              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+              <h4 className="text-heading border-divider border-b pb-2 text-sm font-bold">
                 Location
               </h4>
 
               <div className="space-y-3">
                 <div>
-                  <label className="text-body mb-2 block text-sm font-medium">
-                    Where is this item stored?
-                  </label>
                   <SelectField
+                    triggerProps={{ 'aria-label': 'Location' }}
                     value={showCustomLocation ? 'custom' : formData.location}
                     onValueChange={value => {
                       if (value === 'custom') {
@@ -315,7 +313,7 @@ export function ItemForm({
                         {location}
                       </SelectItem>
                     ))}
-                    <SelectItem value="custom">Custom Location...</SelectItem>
+                    <SelectItem value="custom">Custom location…</SelectItem>
                   </SelectField>
                 </div>
 
@@ -324,8 +322,8 @@ export function ItemForm({
                     <Input
                       value={customLocation}
                       onChange={e => setCustomLocation(e.target.value)}
-                      placeholder="Enter custom location..."
-                      className="flex-1"
+                      placeholder="Custom location"
+                      wrapperClassName="min-w-0 flex-1"
                     />
                     <Button
                       type="button"
@@ -343,15 +341,15 @@ export function ItemForm({
               </div>
             </div>
 
-            {/* Section: Item Details */}
+            {/* Section: Details */}
             <div className="space-y-4">
-              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
-                Item Details
+              <h4 className="text-heading border-divider border-b pb-2 text-sm font-bold">
+                Details
               </h4>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">
                 <NumberInput
-                  label="Weight (lbs)"
+                  label="Weight (lb)"
                   integer={false}
                   allowEmpty
                   step="0.001"
@@ -390,23 +388,22 @@ export function ItemForm({
                   onChange={value =>
                     setFormData({ ...formData, description: value })
                   }
-                  placeholder="Item description, properties, or notes..."
                 />
               </div>
             </div>
 
             {/* Section: Tags */}
             <div className="space-y-4">
-              <h4 className="text-heading border-divider border-b-2 pb-2 text-sm font-bold tracking-wide uppercase">
+              <h4 className="text-heading border-divider border-b pb-2 text-sm font-bold">
                 Tags
               </h4>
 
-              <div className="flex gap-2">
+              <div className="flex min-w-0 flex-wrap gap-2">
                 <Input
                   value={tagInput}
                   onChange={e => setTagInput(e.target.value)}
-                  placeholder="Add tag..."
-                  className="flex-1"
+                  placeholder="Add a tag"
+                  wrapperClassName="min-w-0 flex-[1_1_12rem]"
                   onKeyPress={e =>
                     e.key === 'Enter' && (e.preventDefault(), addTag())
                   }
@@ -414,10 +411,10 @@ export function ItemForm({
                 <Button
                   type="button"
                   onClick={addTag}
-                  variant="primary"
+                  variant="outline"
                   size="md"
                 >
-                  Add
+                  Add tag
                 </Button>
               </div>
 
@@ -426,7 +423,7 @@ export function ItemForm({
                   {formData.tags.map((tag, index) => (
                     <Badge
                       key={index}
-                      variant="primary"
+                      variant="neutral"
                       size="md"
                       className="group"
                     >
@@ -434,7 +431,7 @@ export function ItemForm({
                       <button
                         type="button"
                         onClick={() => removeTag(index)}
-                        className="text-accent-purple-text-muted hover:text-accent-purple-text ml-1"
+                        className="text-muted hover:text-accent-purple-text ml-1"
                       >
                         ×
                       </button>
@@ -459,7 +456,7 @@ export function ItemForm({
                 size="md"
                 disabled={!formData.name.trim()}
               >
-                {isEditing ? 'Update' : 'Add'} Item
+                {isEditing ? 'Save item' : 'Add item'}
               </Button>
             </DialogFooter>
           </form>
