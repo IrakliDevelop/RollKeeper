@@ -442,7 +442,7 @@ export function ItemForm({
               )}
             </div>
 
-            <DialogFooter className="bg-surface-raised border-divider sticky -bottom-6 -mx-6 -mb-6 flex justify-end gap-3 border-t-2 px-6 py-4">
+            <DialogFooter className="bg-surface-raised border-divider sticky -bottom-6 -mb-6 flex justify-end gap-3 border-t-2 py-4">
               <Button
                 type="button"
                 onClick={onClose}

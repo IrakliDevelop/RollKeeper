@@ -50,7 +50,7 @@ function InventoryFormsPreview({
   const [magic, setMagic] = useState(initialMagic);
   if (kind === 'weapon') {
     return (
-      <div style={{ width: 390 }}>
+      <div style={{ width: '100%', maxWidth: 390 }}>
         <WeaponForm
           formData={weapon}
           setFormData={setWeapon}
@@ -63,7 +63,7 @@ function InventoryFormsPreview({
   }
   if (kind === 'magic') {
     return (
-      <div style={{ width: 390 }}>
+      <div style={{ width: '100%', maxWidth: 390 }}>
         <MagicItemForm
           formData={magic}
           setFormData={setMagic}

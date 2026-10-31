@@ -93,7 +93,7 @@ type Story = StoryObj<typeof meta>;
 export const LongNames390: Story = {
   decorators: [
     Story => (
-      <div style={{ width: 390 }}>
+      <div style={{ width: '100%', maxWidth: 390 }}>
         <Story />
       </div>
     ),
@@ -103,7 +103,7 @@ export const LongNames390: Story = {
 export const LongNames430: Story = {
   decorators: [
     Story => (
-      <div style={{ width: 430 }}>
+      <div style={{ width: '100%', maxWidth: 430 }}>
         <Story />
       </div>
     ),
@@ -114,7 +114,7 @@ export const LongNames500Dark: Story = {
   globals: { theme: 'dark' },
   decorators: [
     Story => (
-      <div style={{ width: 500 }}>
+      <div style={{ width: '100%', maxWidth: 500 }}>
         <Story />
       </div>
     ),
