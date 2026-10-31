@@ -44,7 +44,11 @@ describe('DefensesAndSenses effects', () => {
     ).toBeTruthy();
     expect(screen.getByText('Fire')).toBeTruthy();
     expect(screen.getByText('Darkvision')).toBeTruthy();
-    expect(screen.queryAllByRole('button', { name: 'Add' })).toHaveLength(0);
+    expect(
+      screen.queryAllByRole('button', {
+        name: /^Add (Damage|Condition|Senses)/,
+      })
+    ).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Remove Fire' })).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Remove Darkvision' })
@@ -64,7 +68,7 @@ describe('DefensesAndSenses effects', () => {
     await user.click(screen.getByRole('button', { name: 'Remove Cold' }));
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getAllByRole('button', { name: 'Add' })[0]
+        screen.getByRole('button', { name: 'Add Damage resistances' })
       )
     );
     await user.click(screen.getByRole('button', { name: 'Remove Darkvision' }));
@@ -78,7 +82,7 @@ describe('DefensesAndSenses effects', () => {
   it('keeps the add range clearable and validates it before adding', async () => {
     const user = userEvent.setup();
     render(<DefensesAndSenses editing />);
-    await user.click(screen.getAllByRole('button', { name: 'Add' })[3]);
+    await user.click(screen.getByRole('button', { name: 'Add Senses' }));
     const range = screen.getByRole('textbox', { name: 'Range (ft.)' });
     expect(range.getAttribute('type')).toBe('text');
     await user.clear(range);
@@ -91,14 +95,26 @@ describe('DefensesAndSenses effects', () => {
   it('closes an open selector on edit-to-play and resets collapse on remount', async () => {
     const user = userEvent.setup();
     const view = render(<DefensesAndSenses editing />);
-    await user.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+    await user.click(
+      screen.getByRole('button', { name: 'Add Damage resistances' })
+    );
+    expect(
+      screen.getByRole('button', { name: 'Done Damage resistances' })
+    ).toBeTruthy();
     expect(screen.getByPlaceholderText('Search')).toBeTruthy();
     view.rerender(<DefensesAndSenses editing={false} />);
     expect(screen.queryByPlaceholderText('Search')).toBeNull();
-    expect(screen.queryAllByRole('button', { name: 'Add' })).toHaveLength(0);
+    expect(
+      screen.queryAllByRole('button', {
+        name: /^Add (Damage|Condition|Senses)/,
+      })
+    ).toHaveLength(0);
     view.rerender(<DefensesAndSenses editing />);
     expect(screen.queryByPlaceholderText('Search')).toBeNull();
-    await user.click(screen.getByRole('button', { name: 'Collapse' }));
+    await user.click(screen.getByRole('button', { name: 'Collapse defenses' }));
+    expect(
+      screen.getByRole('button', { name: 'Expand defenses' })
+    ).toBeTruthy();
     expect(screen.queryByText('Fire')).toBeNull();
     view.unmount();
     render(<DefensesAndSenses editing />);

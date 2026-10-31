@@ -128,6 +128,7 @@ function TagSelector({
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
+            aria-label={`${isAdding ? 'Done' : 'Add'} ${label}`}
             onClick={() => {
               setIsAdding(!isAdding);
               setSearch('');
@@ -292,6 +293,7 @@ function SensesSection({ editing }: { editing: boolean }) {
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
+            aria-label={isAdding ? 'Done Senses' : 'Add Senses'}
             onClick={() => setIsAdding(!isAdding)}
           >
             {isAdding ? 'Done' : 'Add'}
@@ -495,7 +497,7 @@ export default function DefensesAndSenses({
           variant="ghost"
           size="sm"
           className="px-2"
-          aria-label={isCollapsed ? 'Expand' : 'Collapse'}
+          aria-label={isCollapsed ? 'Expand defenses' : 'Collapse defenses'}
           aria-expanded={!isCollapsed}
           aria-controls={contentId}
           onClick={() => setIsCollapsed(!isCollapsed)}

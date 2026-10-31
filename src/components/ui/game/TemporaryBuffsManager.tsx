@@ -787,7 +787,7 @@ function BuffForm({
                   variant="ghost"
                   size="sm"
                   onClick={() => removeEffectRow(idx)}
-                  aria-label="Remove"
+                  aria-label="Remove effect"
                   className="text-muted"
                 >
                   <X className="h-4 w-4" />

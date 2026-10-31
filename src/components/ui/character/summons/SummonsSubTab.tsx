@@ -78,7 +78,7 @@ export function SummonsSubTab() {
       target === 'saved'
         ? savedToggleRef.current
         : summonRefs.current[target]?.querySelector<HTMLButtonElement>(
-            'button[aria-label="Dismiss summon"]'
+            'button[data-summon-dismiss]'
           );
     (targetButton ?? savedToggleRef.current)?.focus();
     focusAfterDismiss.current = null;

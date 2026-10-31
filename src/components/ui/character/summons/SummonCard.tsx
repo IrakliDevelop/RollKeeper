@@ -137,7 +137,8 @@ export function SummonCard({
           variant="ghost"
           onClick={() => onDismiss(summon.id)}
           className="h-7 w-7 p-0"
-          aria-label="Dismiss summon"
+          data-summon-dismiss
+          aria-label={`Dismiss ${summon.customName || entity.name}`}
         >
           <Trash2 className="h-3.5 w-3.5" />
         </Button>

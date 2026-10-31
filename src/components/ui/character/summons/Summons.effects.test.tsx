@@ -150,12 +150,10 @@ describe('Summons combat effects', () => {
       character: { ...state.character, summons: [summon, second] },
     }));
     render(<SummonsSubTab />);
-    await user.click(
-      screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
-    );
+    await user.click(screen.getAllByRole('button', { name: /^Dismiss / })[0]);
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getByRole('button', { name: 'Dismiss summon' })
+        screen.getByRole('button', { name: 'Dismiss Second summon' })
       )
     );
   });
@@ -188,26 +186,30 @@ describe('Summons combat effects', () => {
       },
     }));
     render(<SummonsSubTab />);
-    expect(
-      screen.getAllByRole('button', { name: 'Dismiss summon' })
-    ).toHaveLength(3);
-    await user.click(
-      screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+    expect(screen.getAllByRole('button', { name: /^Dismiss / })).toHaveLength(
+      3
     );
+    await user.click(screen.getAllByRole('button', { name: /^Dismiss / })[0]);
     await waitFor(() =>
       expect(document.activeElement).toBe(
-        screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+        screen.getByRole('button', {
+          name: 'Dismiss Very long summoned creature name',
+        })
+      )
+    );
+    await user.click(screen.getAllByRole('button', { name: /^Dismiss / })[0]);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole('button', {
+          name: 'Dismiss Other summon',
+        })
       )
     );
     await user.click(
-      screen.getAllByRole('button', { name: 'Dismiss summon' })[0]
+      screen.getByRole('button', {
+        name: 'Dismiss Other summon',
+      })
     );
-    await waitFor(() =>
-      expect(document.activeElement).toBe(
-        screen.getByRole('button', { name: 'Dismiss summon' })
-      )
-    );
-    await user.click(screen.getByRole('button', { name: 'Dismiss summon' }));
     await waitFor(() =>
       expect(document.activeElement).toBe(
         screen.getByRole('button', { name: /Saved creatures/ })

@@ -76,6 +76,10 @@ describe('TemporaryBuffsManager effects', () => {
     expect(
       screen.getByRole('textbox', { name: 'Value' }).getAttribute('type')
     ).toBe('text');
+    await user.click(screen.getByRole('button', { name: 'Add effect' }));
+    expect(
+      screen.getAllByRole('button', { name: 'Remove effect' })
+    ).toHaveLength(2);
   });
 
   it('treats an empty value as incomplete and preserves a signed numeric edit', async () => {
