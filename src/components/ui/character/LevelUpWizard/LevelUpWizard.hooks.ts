@@ -19,7 +19,6 @@ import type { ProcessedSpell } from '@/types/spells';
 import {
   calculateCharacterSpellSlots,
   calculateCharacterPactMagic,
-  calculateModifier,
 } from '@/utils/calculations';
 import { calculateHitDicePools, migrateToMulticlass } from '@/utils/multiclass';
 import { detectSpellAoe } from '@/utils/spellAoeDetection';
@@ -35,6 +34,9 @@ import {
   computeWizardSteps,
   getSpellsKnownDelta,
   getCantripsKnownDelta,
+  shouldShowEditionStep,
+  isValidASIChoice,
+  calculateLevelUpHp,
 } from './LevelUpWizard.utils';
 import type {
   LevelUpWizardState,
@@ -193,6 +195,21 @@ export function useLevelUpWizard(character: CharacterState) {
     Set<string>
   >(new Set());
 
+  const selectTargetClass = useCallback(
+    (index: number) => {
+      if (index === targetClassIndex) return;
+      setTargetClassIndex(index);
+      setSelectedEdition(undefined);
+      setSelectedSubclass(undefined);
+      setASIChoice(undefined);
+      setFeatureChoices({});
+      setHPRollResult(undefined);
+      setMigrationSubclass(undefined);
+      setMigrationAdoptedFeatures(new Set());
+    },
+    [targetClassIndex]
+  );
+
   const targetClass: MulticlassInfo | null =
     targetClassIndex >= 0 ? classes[targetClassIndex] : null;
 
@@ -211,9 +228,7 @@ export function useLevelUpWizard(character: CharacterState) {
   const needsEditionPicker =
     !!targetClass &&
     !targetClass.isCustom &&
-    !targetClass.classSource &&
-    !selectedEdition &&
-    editionOptions.length > 1;
+    shouldShowEditionStep(targetClass.classSource, editionOptions.length);
 
   const newClassLevel = targetClass ? targetClass.level + 1 : 1;
   const newTotalLevel = totalLevel + 1;
@@ -384,7 +399,7 @@ export function useLevelUpWizard(character: CharacterState) {
         return allChoiceFeatures.every(f => featureChoices[f.name]);
       }
       case 'asi':
-        return !!asiChoice;
+        return isValidASIChoice(asiChoice, character.abilities);
       case 'hp':
         return hpRollResult !== undefined && hpRollResult > 0;
       case 'confirm':
@@ -399,6 +414,7 @@ export function useLevelUpWizard(character: CharacterState) {
     migrationSubclass,
     selectedSubclass,
     asiChoice,
+    character.abilities,
     hpRollResult,
     classFeatures,
     subclassFeatures,
@@ -430,8 +446,30 @@ export function useLevelUpWizard(character: CharacterState) {
     [migrated.spells, totalLevel, newTotalLevel]
   );
 
+  const prospectiveConstitution =
+    character.abilities.constitution +
+    (asiChoice?.type === 'asi'
+      ? (asiChoice.increases.find(i => i.ability === 'constitution')?.amount ??
+        0)
+      : 0);
+  const hpPreview =
+    needsHPInput && hpRollResult !== undefined
+      ? calculateLevelUpHp({
+          max: migrated.hitPoints.max || 0,
+          current: migrated.hitPoints.current || 0,
+          previousLevel: totalLevel,
+          oldConstitution: migrated.abilities.constitution,
+          newConstitution: prospectiveConstitution,
+          roll: hpRollResult,
+        })
+      : undefined;
+
   const applyLevelUp = useCallback(() => {
-    if (!targetClass) return;
+    if (
+      !targetClass ||
+      (requiresASI && !isValidASIChoice(asiChoice, migrated.abilities))
+    )
+      return false;
     const classIdx = targetClassIndex;
 
     const updatedClasses = [...classes];
@@ -498,13 +536,9 @@ export function useLevelUpWizard(character: CharacterState) {
       newSpells = [...newSpells, ...asiChoice.grantedSpells];
     }
 
-    const hpUpdates: Partial<CharacterState['hitPoints']> = {};
-    if (needsHPInput && hpRollResult !== undefined) {
-      const conMod = calculateModifier(abilities.constitution);
-      hpUpdates.max = (migrated.hitPoints.max || 0) + hpRollResult + conMod;
-      hpUpdates.current =
-        (migrated.hitPoints.current || 0) + hpRollResult + conMod;
-    }
+    const hpUpdates: Partial<CharacterState['hitPoints']> = hpPreview
+      ? { max: hpPreview.max, current: hpPreview.current }
+      : {};
 
     updateCharacter({
       classes: updatedClasses,
@@ -576,6 +610,7 @@ export function useLevelUpWizard(character: CharacterState) {
     }
     classFeatureEntries.forEach(f => addExtendedFeature(f));
     subFeatureEntries.forEach(f => addExtendedFeature(f));
+    return true;
   }, [
     targetClass,
     targetClassIndex,
@@ -596,6 +631,8 @@ export function useLevelUpWizard(character: CharacterState) {
     featureChoices,
     needsHPInput,
     hpRollResult,
+    hpPreview,
+    requiresASI,
     updateCharacter,
     addExtendedFeature,
   ]);
@@ -634,12 +671,14 @@ export function useLevelUpWizard(character: CharacterState) {
     spellsKnownDelta,
     cantripsKnownDelta,
     cantripUpgrades,
+    hpPreview,
+    prospectiveConstitution,
     currentStep,
     canGoNext: canGoNext(),
     goNext,
     goBack,
     setSelectedEdition,
-    setTargetClassIndex,
+    setTargetClassIndex: selectTargetClass,
     setSelectedSubclass,
     setASIChoice,
     setFeatureChoices,
