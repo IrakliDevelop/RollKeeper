@@ -7,15 +7,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { FeatureAutocompleteItem, FeatureSourceFilter } from '@/types/features';
-import {
-  Search,
-  X,
-  Loader2,
-  Sparkles,
-  Shield,
-  Star,
-  Swords,
-} from 'lucide-react';
+import { Search, X, Loader2, Shield, Star, Swords } from 'lucide-react';
+import { Input } from '@/components/ui/forms/input';
+import { Button } from '@/components/ui/forms/button';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 interface FeatureAutocompleteProps {
   features: FeatureAutocompleteItem[];
@@ -33,19 +28,7 @@ const SOURCE_ICONS: Record<FeatureSourceFilter, React.ReactElement> = {
   subclass: <Shield className="h-4 w-4" />,
   background: <Star className="h-4 w-4" />,
   feat: <Swords className="h-4 w-4" />,
-  all: <Sparkles className="h-4 w-4" />,
-};
-
-// Source type colors
-const SOURCE_COLORS: Record<FeatureSourceFilter, string> = {
-  class:
-    'text-accent-blue-text-muted bg-accent-blue-bg border-accent-blue-border-strong',
-  subclass:
-    'text-accent-purple-text-muted bg-accent-purple-bg border-accent-purple-border-strong',
-  background:
-    'text-accent-green-text-muted bg-accent-green-bg border-accent-green-border-strong',
-  feat: 'text-accent-orange-text-muted bg-accent-orange-bg border-accent-orange-border-strong',
-  all: 'text-muted bg-surface-inset border-divider-strong',
+  all: <Search className="h-4 w-4" />,
 };
 
 export function FeatureAutocomplete({
@@ -194,29 +177,15 @@ export function FeatureAutocomplete({
     setSelectedFeature(null);
   };
 
-  // Get source color classes
-  const getSourceColor = (sourceType: FeatureSourceFilter) => {
-    return SOURCE_COLORS[sourceType] || SOURCE_COLORS.all;
-  };
-
   return (
     <div className={`relative ${className}`}>
-      {/* Header with icon */}
       <div className="mb-2 flex items-center gap-2">
-        <Sparkles className="text-accent-indigo-text-muted h-5 w-5" />
-        <h4 className="text-body text-sm font-semibold">
-          Search Feature Database
-        </h4>
-        {loading && (
-          <Loader2 className="text-accent-indigo-text-muted h-4 w-4 animate-spin" />
-        )}
+        {loading && <Loader2 className="text-muted h-4 w-4 animate-spin" />}
       </div>
 
       {/* Selected feature display */}
       {selectedFeature && (
-        <div
-          className={`mb-2 flex items-center justify-between rounded-lg border-2 px-3 py-2 ${getSourceColor(selectedFeature.sourceType)}`}
-        >
+        <div className="border-divider mb-2 flex items-center justify-between gap-2 border-b py-2">
           <div className="flex items-center gap-2">
             <span className="text-lg">
               {SOURCE_ICONS[selectedFeature.sourceType]}
@@ -235,39 +204,44 @@ export function FeatureAutocomplete({
               </p>
             </div>
           </div>
-          <button
+          <Button
             onClick={handleClear}
-            className="rounded p-1 opacity-70 hover:opacity-100"
+            variant="ghost"
+            size="sm"
+            aria-label="Clear selected feature"
             type="button"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
       )}
 
       {/* Search input */}
       <div className="relative">
         <div className="relative">
-          <Search className="text-muted absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
-          <input
+          <Input
             ref={inputRef}
             type="text"
+            aria-label="Search features"
+            leftIcon={<Search className="size-4" />}
             value={query}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             onFocus={() => query && setIsOpen(true)}
             placeholder={placeholder}
             disabled={disabled || loading}
-            className="border-divider-strong bg-surface-raised text-heading focus:border-accent-indigo-border-strong focus:ring-accent-indigo-bg disabled:bg-surface-inset w-full rounded-lg border py-2 pr-10 pl-10 text-sm focus:ring-2 focus:outline-none disabled:cursor-not-allowed"
           />
           {query && (
-            <button
+            <Button
               onClick={handleClear}
-              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+              className="absolute top-1/2 right-1 -translate-y-1/2"
+              variant="ghost"
+              size="sm"
+              aria-label="Clear search"
               type="button"
             >
               <X className="h-4 w-4" />
-            </button>
+            </Button>
           )}
         </div>
 
@@ -275,18 +249,18 @@ export function FeatureAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border shadow-lg"
+            className={`absolute z-50 mt-1 max-h-96 w-full overflow-y-auto ${OVERLAY_SURFACE}`}
           >
             {filteredFeatures.length > 0 ? (
               <ul className="py-1">
                 {filteredFeatures.map((feature, index) => (
-                  <li key={`${feature.id}-${index}`}>
+                  <li key={feature.id}>
                     <button
                       type="button"
                       onClick={() => handleSelect(feature)}
                       className={`w-full px-4 py-2 text-left transition-colors ${
                         index === selectedIndex
-                          ? 'bg-accent-indigo-bg-strong'
+                          ? 'bg-surface-hover'
                           : 'hover:bg-surface-hover'
                       }`}
                     >
@@ -295,13 +269,11 @@ export function FeatureAutocomplete({
                           {SOURCE_ICONS[feature.sourceType]}
                         </span>
                         <div className="min-w-0 flex-1">
-                          <p className="text-heading truncate font-medium">
+                          <p className="text-heading font-medium break-words">
                             {feature.name}
                           </p>
                           <p className="text-muted text-xs">
-                            <span
-                              className={`capitalize ${getSourceColor(feature.sourceType).split(' ')[0]}`}
-                            >
+                            <span className="text-muted capitalize">
                               {feature.sourceType}
                             </span>
                             {feature.metadata.backgroundName &&
@@ -315,7 +287,7 @@ export function FeatureAutocomplete({
                           </p>
                           {feature.metadata.prerequisites &&
                             feature.metadata.prerequisites.length > 0 && (
-                              <p className="mt-1 text-xs text-amber-600 italic">
+                              <p className="text-muted mt-1 text-xs italic">
                                 Requires:{' '}
                                 {feature.metadata.prerequisites.join(', ')}
                               </p>

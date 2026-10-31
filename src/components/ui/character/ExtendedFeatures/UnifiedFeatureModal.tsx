@@ -26,6 +26,7 @@ import {
 import { useFeatureSourcesData } from '@/hooks/useFeatureSourcesData';
 import { useSpellsData } from '@/hooks/useSpellsData';
 import { Button } from '@/components/ui/forms/button';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import { FeatureAutocomplete } from '@/components/ui/forms/FeatureAutocomplete';
 import RichTextEditor from '@/components/ui/forms/RichTextEditor';
 import { Input } from '@/components/ui/forms/input';
@@ -37,23 +38,15 @@ import {
   DialogHeader,
   DialogTitle,
   DialogBody,
+  DialogFooter,
 } from '@/components/ui/feedback/dialog';
+import { Section } from '@/components/ui/layout/section';
 import GrantedSpellPicker from './GrantedSpellPicker';
 import {
   parseAdditionalSpells,
   ParsedAdditionalSpells,
 } from '@/utils/additionalSpellsParser';
-import {
-  Plus,
-  Save,
-  Trash2,
-  Zap,
-  Clock,
-  Settings,
-  AlertTriangle,
-  Edit3,
-  Filter,
-} from 'lucide-react';
+import { Trash2, Clock } from 'lucide-react';
 
 interface UnifiedFeatureModalProps {
   isOpen: boolean;
@@ -68,6 +61,7 @@ interface UnifiedFeatureModalProps {
   feature?: ExtendedFeature; // If provided, opens in edit mode
   character: CharacterState;
   readonly?: boolean;
+  initialMode?: 'view' | 'edit';
 }
 
 export default function UnifiedFeatureModal({
@@ -81,12 +75,12 @@ export default function UnifiedFeatureModal({
   feature: existingFeature,
   character,
   readonly = false,
+  initialMode = 'view',
 }: UnifiedFeatureModalProps) {
   const isEditMode = !!existingFeature;
   const [mode, setMode] = useState<'view' | 'edit'>(
-    isEditMode && !readonly ? 'view' : 'edit'
+    isEditMode ? (readonly ? 'view' : initialMode) : 'edit'
   );
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Spell picker state for feats that grant spells
   const [showSpellPicker, setShowSpellPicker] = useState(false);
@@ -180,12 +174,11 @@ export default function UnifiedFeatureModal({
     if (isOpen) {
       if (existingFeature) {
         setFormData(partialFeatureToFormData(existingFeature));
-        setMode(readonly ? 'view' : 'view');
+        setMode(readonly ? 'view' : initialMode);
       } else {
         setFormData(partialFeatureToFormData(createDefaultExtendedFeature()));
         setMode('edit');
       }
-      setShowDeleteConfirm(false);
       setShowSpellPicker(false);
       setPendingParsedSpells(null);
       setPendingFeatName('');
@@ -193,7 +186,7 @@ export default function UnifiedFeatureModal({
       setClassFilter('all');
       setSubclassFilter('all');
     }
-  }, [isOpen, existingFeature, readonly]);
+  }, [isOpen, existingFeature, readonly, initialMode]);
 
   // Handle autocomplete selection
   const handleFeatureSelect = (selectedFeature: FeatureAutocompleteItem) => {
@@ -271,14 +264,7 @@ export default function UnifiedFeatureModal({
     // Calculate display order for new features
     let displayOrder = 0;
     if (!isEditMode) {
-      const featuresOfSameType = existingFeatures.filter(
-        f => f.sourceType === formData.sourceType
-      );
-      const maxOrder =
-        featuresOfSameType.length > 0
-          ? Math.max(...featuresOfSameType.map(f => f.displayOrder))
-          : -1;
-      displayOrder = maxOrder + 1;
+      displayOrder = existingFeatures.length;
     } else {
       displayOrder = existingFeature.displayOrder;
     }
@@ -303,14 +289,6 @@ export default function UnifiedFeatureModal({
     }
 
     onClose();
-  };
-
-  // Handle delete
-  const handleDelete = () => {
-    if (onDelete) {
-      onDelete();
-      onClose();
-    }
   };
 
   // Handle cancel
@@ -365,50 +343,47 @@ export default function UnifiedFeatureModal({
           <DialogHeader>
             <DialogTitle>
               {mode === 'view'
-                ? existingFeature?.name || 'Feature Details'
+                ? existingFeature?.name || 'Details'
                 : isEditMode
-                  ? 'Edit Feature'
-                  : 'Add New Feature'}
+                  ? existingFeature?.name
+                  : 'Add feature'}
             </DialogTitle>
           </DialogHeader>
           <DialogBody>
             <div className="space-y-6">
               {/* View Mode - Header with Actions */}
               {isEditMode && mode === 'view' && (
-                <div className="border-divider flex items-center justify-between border-b pb-4">
-                  <div className="flex items-center gap-3">
-                    <span className="bg-accent-indigo-bg-strong text-accent-indigo-text rounded-lg px-3 py-1.5 text-sm font-semibold">
+                <div className="border-divider flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="text-muted text-sm font-medium">
                       {FEATURE_SOURCE_LABELS[existingFeature!.sourceType]}
                     </span>
                     {existingFeature!.sourceDetail && (
-                      <span className="bg-surface-inset text-muted rounded px-2 py-1 text-sm font-medium">
+                      <span className="text-muted text-sm">
                         {existingFeature!.sourceDetail}
                       </span>
                     )}
                   </div>
 
                   {!readonly && (
-                    <div className="flex gap-3">
+                    <div className="flex flex-wrap gap-2">
                       {hasUses && !isExhausted && onUse && (
-                        <button
-                          onClick={onUse}
-                          className="bg-accent-indigo-text text-inverse hover:bg-accent-indigo-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
-                        >
-                          <Zap className="h-4 w-4" />
+                        <Button onClick={onUse} variant="primary" size="sm">
                           Use Feature
-                        </button>
+                        </Button>
                       )}
-                      <button
+                      <Button
                         onClick={() => setMode('edit')}
-                        className="bg-accent-blue-text text-inverse hover:bg-accent-blue-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium shadow-sm transition-colors"
+                        variant="outline"
+                        size="sm"
                       >
-                        <Edit3 className="h-4 w-4" />
                         Edit
-                      </button>
+                      </Button>
                       {onDelete && (
                         <Button
                           variant="danger"
-                          onClick={() => setShowDeleteConfirm(true)}
+                          size="sm"
+                          onClick={onDelete}
                           leftIcon={<Trash2 className="h-4 w-4" />}
                         >
                           Delete
@@ -423,28 +398,19 @@ export default function UnifiedFeatureModal({
               {isEditMode && mode === 'view' && existingFeature && (
                 <div className="space-y-6">
                   {/* Usage Info */}
-                  <div className="border-accent-blue-border from-accent-blue-bg to-accent-indigo-bg rounded-xl border bg-gradient-to-br p-6">
+                  <Section heading="Usage Information" level={3}>
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="text-heading mb-2 text-lg font-semibold">
-                          Usage Information
-                        </h4>
                         {existingFeature.isPassive ? (
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-blue-500"></div>
-                            <p className="text-accent-blue-text-muted text-sm font-medium">
+                            <p className="text-muted text-sm font-medium">
                               Passive ability - always active
                             </p>
                           </div>
                         ) : hasUses ? (
                           <div className="flex items-center gap-2">
-                            <div
-                              className={`h-2 w-2 rounded-full ${isExhausted ? 'bg-red-500' : usesRemaining <= 1 ? 'bg-orange-500' : 'bg-green-500'}`}
-                            ></div>
                             <p className="text-body text-sm font-medium">
-                              <span
-                                className={`${isExhausted ? 'text-accent-red-text-muted' : usesRemaining <= 1 ? 'text-accent-orange-text-muted' : 'text-accent-green-text-muted'}`}
-                              >
+                              <span className="text-heading">
                                 {usesRemaining}
                               </span>{' '}
                               of {maxUses} uses remaining
@@ -452,15 +418,14 @@ export default function UnifiedFeatureModal({
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <div className="h-2 w-2 rounded-full bg-green-500"></div>
-                            <p className="text-accent-green-text-muted text-sm font-medium">
+                            <p className="text-muted text-sm font-medium">
                               Unlimited uses
                             </p>
                           </div>
                         )}
                       </div>
                       {hasUses && (
-                        <div className="border-divider bg-surface-raised text-muted flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium">
+                        <div className="text-muted flex items-center gap-2 text-sm">
                           <Clock className="h-4 w-4" />
                           <span className="capitalize">
                             {existingFeature.restType} rest
@@ -468,34 +433,27 @@ export default function UnifiedFeatureModal({
                         </div>
                       )}
                     </div>
-                  </div>
+                  </Section>
 
                   {/* Description */}
                   {existingFeature.description && (
-                    <div className="border-divider bg-surface-raised rounded-lg border p-6">
-                      <h4 className="text-heading mb-4 text-lg font-semibold">
-                        Description
-                      </h4>
+                    <Section heading="Description" level={3}>
                       <div
                         className="prose prose-sm text-body max-w-none leading-relaxed"
                         dangerouslySetInnerHTML={{
                           __html: existingFeature.description,
                         }}
                       />
-                    </div>
+                    </Section>
                   )}
 
                   {/* Additional Info */}
                   {(existingFeature.scaleWithProficiency ||
                     existingFeature.category) && (
-                    <div className="border-divider bg-surface-inset rounded-lg border p-6">
-                      <h4 className="text-heading mb-4 text-lg font-semibold">
-                        Additional Details
-                      </h4>
+                    <Section heading="Additional Details" level={3}>
                       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         {existingFeature.scaleWithProficiency && (
-                          <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3">
-                            <div className="bg-accent-purple-text-muted h-2 w-2 shrink-0 rounded-full"></div>
+                          <div className="flex items-center gap-3">
                             <div>
                               <span className="text-body text-sm font-medium">
                                 Scaling:
@@ -508,8 +466,7 @@ export default function UnifiedFeatureModal({
                           </div>
                         )}
                         {existingFeature.category && (
-                          <div className="border-divider bg-surface-raised flex items-center gap-3 rounded-lg border p-3">
-                            <div className="bg-accent-green-text-muted h-2 w-2 shrink-0 rounded-full"></div>
+                          <div className="flex items-center gap-3">
                             <div>
                               <span className="text-body text-sm font-medium">
                                 Category:
@@ -521,7 +478,7 @@ export default function UnifiedFeatureModal({
                           </div>
                         )}
                       </div>
-                    </div>
+                    </Section>
                   )}
                 </div>
               )}
@@ -531,12 +488,7 @@ export default function UnifiedFeatureModal({
                 <div className="space-y-6">
                   {/* Autocomplete Section - Only show for new features */}
                   {!isEditMode && (
-                    <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border-2 p-6">
-                      <h3 className="text-heading mb-4 flex items-center gap-2 text-lg font-semibold">
-                        <Filter className="h-5 w-5" />
-                        Search Feature Database
-                      </h3>
-
+                    <Section heading="Search Feature Database" level={3}>
                       {/* Filter Dropdowns */}
                       <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
                         <SelectField
@@ -609,17 +561,13 @@ export default function UnifiedFeatureModal({
                         sourceFilter={sourceFilter}
                         placeholder="Type to search features, backgrounds, or feats..."
                       />
-                    </div>
+                    </Section>
                   )}
 
                   {/* Form Fields */}
                   <div className="space-y-6">
                     {/* Basic Information */}
-                    <div className="border-divider bg-surface-raised rounded-lg border p-6">
-                      <h4 className="text-heading mb-4 text-lg font-semibold">
-                        Basic Information
-                      </h4>
-
+                    <Section heading="Basic Information" level={3}>
                       <div className="space-y-4">
                         <Input
                           label="Feature Name"
@@ -631,7 +579,7 @@ export default function UnifiedFeatureModal({
                           required
                         />
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                           <SelectField
                             label="Source Type"
                             value={formData.sourceType}
@@ -691,36 +639,22 @@ export default function UnifiedFeatureModal({
                           />
                         </div>
                       </div>
-                    </div>
+                    </Section>
 
                     {/* Usage Configuration */}
-                    <div className="border-divider rounded-lg border p-4">
-                      <h4 className="text-heading mb-3 flex items-center gap-2 font-medium">
-                        <Settings className="h-4 w-4" />
-                        Usage Configuration
-                      </h4>
-
+                    <Section heading="Usage Configuration" level={3}>
                       <div className="space-y-4">
-                        <label className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={formData.isPassive || false}
-                            onChange={e =>
-                              setFormData({
-                                ...formData,
-                                isPassive: e.target.checked,
-                              })
-                            }
-                            className="border-divider-strong rounded"
-                          />
-                          <span className="text-body text-sm">
-                            Passive ability (always active, no usage tracking)
-                          </span>
-                        </label>
+                        <Checkbox
+                          label="Passive ability (always active, no usage tracking)"
+                          checked={formData.isPassive || false}
+                          onCheckedChange={checked =>
+                            setFormData({ ...formData, isPassive: checked })
+                          }
+                        />
 
                         {!formData.isPassive && (
-                          <div className="border-divider space-y-3 border-l-2 pl-6">
-                            <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                               <NumberInput
                                 label="Maximum Uses"
                                 min="0"
@@ -752,24 +686,16 @@ export default function UnifiedFeatureModal({
                             </div>
 
                             <div>
-                              <label className="mb-2 flex items-center gap-2">
-                                <input
-                                  type="checkbox"
-                                  checked={
-                                    formData.scaleWithProficiency || false
-                                  }
-                                  onChange={e =>
-                                    setFormData({
-                                      ...formData,
-                                      scaleWithProficiency: e.target.checked,
-                                    })
-                                  }
-                                  className="border-divider-strong rounded"
-                                />
-                                <span className="text-body text-sm">
-                                  Scale uses with proficiency bonus
-                                </span>
-                              </label>
+                              <Checkbox
+                                label="Scale uses with proficiency bonus"
+                                checked={formData.scaleWithProficiency || false}
+                                onCheckedChange={checked =>
+                                  setFormData({
+                                    ...formData,
+                                    scaleWithProficiency: checked,
+                                  })
+                                }
+                              />
 
                               {formData.scaleWithProficiency && (
                                 <div className="pl-6">
@@ -794,73 +720,27 @@ export default function UnifiedFeatureModal({
                           </div>
                         )}
                       </div>
-                    </div>
+                    </Section>
                   </div>
 
                   {/* Action Buttons */}
-                  <div className="border-divider flex justify-end gap-3 border-t pt-4">
-                    <button
+                  <DialogFooter>
+                    <Button
                       type="button"
                       onClick={handleCancel}
-                      className="border-divider-strong bg-surface-raised text-body hover:bg-surface-hover rounded-lg border px-4 py-2 text-sm font-medium"
+                      variant="outline"
                     >
                       Cancel
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       onClick={handleSave}
                       disabled={!formData.name.trim()}
-                      className="bg-accent-indigo-text text-inverse hover:bg-accent-indigo-text-muted flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-50"
+                      variant="primary"
                     >
-                      {isEditMode ? (
-                        <>
-                          <Save className="h-4 w-4" />
-                          Save Changes
-                        </>
-                      ) : (
-                        <>
-                          <Plus className="h-4 w-4" />
-                          Add Feature
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Delete Confirmation */}
-              {showDeleteConfirm && (
-                <div className="border-accent-red-border bg-accent-red-bg rounded-lg border-2 p-6">
-                  <div className="flex items-start gap-4">
-                    <div className="shrink-0">
-                      <AlertTriangle className="text-accent-red-text-muted h-6 w-6" />
-                    </div>
-                    <div className="flex-1">
-                      <h4 className="text-heading mb-2 text-lg font-semibold">
-                        Delete this feature?
-                      </h4>
-                      <p className="text-body mb-4 text-sm">
-                        This action cannot be undone. The feature &quot;
-                        {existingFeature?.name}
-                        &quot; will be permanently removed.
-                      </p>
-                      <div className="flex gap-3">
-                        <Button
-                          variant="danger-solid"
-                          onClick={handleDelete}
-                          leftIcon={<Trash2 className="h-4 w-4" />}
-                        >
-                          Delete Feature
-                        </Button>
-                        <Button
-                          variant="outline"
-                          onClick={() => setShowDeleteConfirm(false)}
-                        >
-                          Cancel
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                      {isEditMode ? 'Save Changes' : 'Add feature'}
+                    </Button>
+                  </DialogFooter>
                 </div>
               )}
             </div>
