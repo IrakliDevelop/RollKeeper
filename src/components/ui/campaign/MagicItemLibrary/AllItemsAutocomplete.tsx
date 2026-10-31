@@ -62,7 +62,7 @@ export function AllItemsAutocomplete({
         disabled={loading}
       />
       {query && (
-        <div className="border-divider bg-surface-raised shadow-overlay absolute z-50 max-h-72 w-full overflow-y-auto rounded-lg border">
+        <div className="border-divider bg-surface-raised absolute z-50 max-h-72 w-full overflow-y-auto rounded-lg border">
           {results.length === 0 ? (
             <p className="text-muted p-4 text-sm">No matching items.</p>
           ) : (

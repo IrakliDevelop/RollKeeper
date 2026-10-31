@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { InventoryItem } from '@/types/character';
 import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -28,7 +28,14 @@ export function ItemCard({
   onSend,
   compact = false,
 }: ItemCardProps) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(!compact);
+  const previousCompact = useRef(compact);
+  useEffect(() => {
+    if (previousCompact.current !== compact) {
+      setExpanded(!compact);
+      previousCompact.current = compact;
+    }
+  }, [compact]);
   const totalWeight = item.weight ? item.weight * item.quantity : undefined;
   const totalValue = item.value ? item.value * item.quantity : undefined;
 
@@ -114,9 +121,7 @@ export function ItemCard({
       </div>
 
       {expanded && (
-        <div
-          className={`border-divider space-y-3 border-t px-3 pt-3 pb-4 ${compact ? 'text-sm' : ''}`}
-        >
+        <div className="border-divider space-y-3 border-t px-3 pt-3 pb-4">
           <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
             <dt className="text-muted">Category:</dt>
             <dd className="text-heading capitalize">{item.category}</dd>

@@ -152,9 +152,9 @@ describe('ItemCard', () => {
 
   it('shows weight and category', () => {
     render(<ItemCard item={mockInventoryItem} />);
-    fireEvent.click(
+    expect(
       screen.getByRole('button', { name: 'Details: Rope (50 ft)' })
-    );
+    ).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getAllByText('10 lb').length).toBeGreaterThan(0);
     expect(screen.getAllByText('misc').length).toBeGreaterThan(0);
   });
@@ -188,5 +188,20 @@ describe('ChargePoolDisplay', () => {
   it('renders compact mode', () => {
     render(<ChargePoolDisplay {...defaultProps} compact />);
     expect(screen.getAllByText('5/7').length).toBeGreaterThan(0);
+  });
+
+  it('disables pool use when no charges remain', () => {
+    render(
+      <ChargePoolDisplay
+        {...defaultProps}
+        pool={{ ...mockChargePool, usedCharges: mockChargePool.maxCharges }}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Use one item charge' })
+    ).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Use Lightning Bolt (3 charges)' })
+    ).toBeDisabled();
   });
 });

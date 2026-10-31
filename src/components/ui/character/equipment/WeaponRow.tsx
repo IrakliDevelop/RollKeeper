@@ -183,7 +183,7 @@ export function WeaponRow({
 
           {weapon.bonusSpellSaveDc != null && weapon.bonusSpellSaveDc > 0 && (
             <div className="flex gap-2">
-              <Badge variant="info" size="sm">
+              <Badge variant="neutral" size="sm">
                 Spell save DC +{weapon.bonusSpellSaveDc}
               </Badge>
             </div>

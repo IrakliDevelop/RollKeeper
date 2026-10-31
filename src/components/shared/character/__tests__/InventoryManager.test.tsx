@@ -103,6 +103,31 @@ describe('InventoryManager', () => {
     expect(screen.getAllByText('2 gp, 5 cp').length).toBeGreaterThan(0);
   });
 
+  it('shows and hides row details with the manager detail toggle', () => {
+    render(<InventoryManager items={mockItems} />);
+    expect(screen.queryByText('10 lb')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    expect(screen.getByText('10 lb')).toBeVisible();
+    expect(
+      screen.getByRole('button', { name: 'Details: Rope' })
+    ).toHaveAttribute('aria-expanded', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    expect(screen.queryByText('10 lb')).toBeNull();
+  });
+
+  it('keeps manager details visible when a filtered row remounts', () => {
+    render(<InventoryManager items={mockItems} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Show item details' }));
+    const search = screen.getByRole('searchbox', { name: 'Search items' });
+    fireEvent.change(search, { target: { value: 'Torch' } });
+    expect(screen.queryByRole('button', { name: 'Details: Rope' })).toBeNull();
+    fireEvent.change(search, { target: { value: '' } });
+    expect(
+      screen.getByRole('button', { name: 'Details: Rope' })
+    ).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByText('10 lb')).toBeVisible();
+  });
+
   it('filters items by search query', () => {
     render(<InventoryManager items={mockItems} />);
     const searchInput = screen.getByPlaceholderText('Search items');
@@ -110,6 +135,18 @@ describe('InventoryManager', () => {
     expect(screen.getAllByText('Rope').length).toBeGreaterThan(0);
     expect(screen.queryByText('Torch')).toBeNull();
     expect(screen.queryByText('Health Potion')).toBeNull();
+  });
+
+  it('uses search-only and field-filter no-match messages', () => {
+    render(<InventoryManager items={mockItems} />);
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search items' }), {
+      target: { value: 'missing' },
+    });
+    expect(screen.getByText('No items match “missing”.')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Filters' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Category' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Consumable' }));
+    expect(screen.getByText('No items match your filters.')).toBeVisible();
   });
 
   it('shows Add item button when not readonly', () => {

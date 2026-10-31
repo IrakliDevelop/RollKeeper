@@ -20,7 +20,7 @@ export function ArmorAutocomplete({
   onSelect,
   loading = false,
   disabled = false,
-  placeholder = 'Search armor…',
+  placeholder = 'Search armor',
   className = '',
 }: ArmorAutocompleteProps) {
   const searchId = React.useId();
@@ -156,7 +156,8 @@ export function ArmorAutocomplete({
           {query && (
             <button
               onClick={handleClear}
-              className="text-muted hover:text-body absolute top-1/2 right-3 -translate-y-1/2"
+              aria-label="Clear armor search"
+              className="text-muted hover:bg-surface-hover hover:text-body absolute top-1/2 right-1 inline-flex min-h-6 min-w-6 -translate-y-1/2 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
               type="button"
             >
               <X className="h-4 w-4" />
@@ -167,7 +168,7 @@ export function ArmorAutocomplete({
         {isOpen && query && (
           <div
             ref={dropdownRef}
-            className="border-divider bg-surface-raised shadow-overlay absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border"
+            className="border-divider bg-surface-raised absolute z-50 mt-1 max-h-96 w-full overflow-y-auto rounded-lg border"
           >
             {filteredItems.length > 0 ? (
               <ul className="py-1">
@@ -228,7 +229,7 @@ export function ArmorAutocomplete({
 
       <p className="text-muted mt-2 text-xs">
         {selectedName
-          ? 'Filled in from the database. Edit anything below.'
+          ? `Filled in from ${selectedName}. Change anything below.`
           : 'Pick one to fill in the form, or fill it in yourself.'}
       </p>
     </div>

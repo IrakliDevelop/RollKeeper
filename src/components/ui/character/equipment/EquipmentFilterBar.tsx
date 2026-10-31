@@ -36,6 +36,21 @@ const RARITY_OPTIONS = [
   'artifact',
 ];
 
+export function getEquipmentEmptyText(
+  kind: 'weapons' | 'magic items' | 'armor',
+  filters: EquipmentFilters
+): string {
+  const hasFieldFilter =
+    filters.equipped !== 'all' ||
+    filters.attuned !== 'all' ||
+    filters.category !== 'all' ||
+    filters.rarity !== 'all' ||
+    filters.hasCharges !== 'all';
+  const verb = kind === 'armor' ? 'matches' : 'match';
+  if (hasFieldFilter) return `No ${kind} ${verb} your filters.`;
+  return `No ${kind} ${verb} “${filters.search.trim()}”.`;
+}
+
 export function EquipmentFilterBar({
   filters,
   onFilterChange,
@@ -56,6 +71,7 @@ export function EquipmentFilterBar({
             value={filters.search}
             onChange={e => onFilterChange('search', e.target.value)}
             placeholder="Search by name"
+            aria-label="Search by name"
             className="h-9 text-sm"
           />
         </div>

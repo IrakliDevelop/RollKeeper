@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import type { InventoryItem } from '@/types/character';
-import { Plus, Package, X, List, Grid3X3 } from 'lucide-react';
+import { Plus, X, List, Grid3X3 } from 'lucide-react';
 import { formatCurrencyFromCopper } from '@/utils/currency';
 import DragDropList from '@/components/ui/layout/DragDropList';
 import { Section } from '@/components/ui/layout/section';
 import { Button } from '@/components/ui/forms/button';
+import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import {
@@ -334,13 +335,14 @@ export function InventoryManager({
         {!hideFilters && !showOnlyLocation && (
           <div className="space-y-3">
             <div className="flex flex-wrap gap-2">
-              <input
+              <Input
                 type="search"
                 placeholder="Search items"
                 aria-label="Search items"
                 value={searchQuery}
                 onChange={event => setSearchQuery(event.target.value)}
-                className="border-divider bg-surface-raised text-heading focus-visible:outline-ring min-h-10 min-w-0 flex-[1_1_12rem] rounded-sm border px-3 text-sm focus-visible:outline-2"
+                className="min-h-10 text-sm"
+                wrapperClassName="min-w-0 flex-[1_1_12rem]"
               />
               <Button
                 type="button"
@@ -453,13 +455,11 @@ export function InventoryManager({
           )
         ) : (
           <div className="text-muted py-10 text-center">
-            <Package
-              className="text-faint mx-auto mb-3 size-10"
-              aria-hidden="true"
-            />
             <p className="text-heading font-medium">
               {activeFilterCount
-                ? 'No items match your search or filters'
+                ? filterLocation !== 'all' || filterCategory !== 'all'
+                  ? 'No items match your filters.'
+                  : `No items match “${searchQuery.trim()}”.`
                 : 'Add your first item'}
             </p>
             {activeFilterCount > 0 && (

@@ -54,3 +54,22 @@ export const CompactDark: Story = {
   ...Compact,
   globals: { theme: 'dark' },
 };
+
+export const LargeBalances390: Story = {
+  args: {
+    currency: {
+      platinum: 123456789,
+      gold: 987654321,
+      electrum: 123456789,
+      silver: 987654321,
+      copper: 123456789,
+    },
+  },
+  decorators: [
+    Story => (
+      <div style={{ width: 390 }}>
+        <Story />
+      </div>
+    ),
+  ],
+};

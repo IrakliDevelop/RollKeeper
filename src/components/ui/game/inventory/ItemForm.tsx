@@ -174,7 +174,7 @@ export function ItemForm({
                   magicItems={databaseMagicItems}
                   onSelect={handleItemSelect}
                   loading={itemsLoading}
-                  placeholder="Search items to fill in…"
+                  placeholder="Search items"
                 />
               </div>
             )}
@@ -431,7 +431,8 @@ export function ItemForm({
                       <button
                         type="button"
                         onClick={() => removeTag(index)}
-                        className="text-muted hover:text-accent-purple-text ml-1"
+                        aria-label={`Remove tag ${tag}`}
+                        className="text-muted hover:bg-surface-hover hover:text-body ml-1 inline-flex min-h-6 min-w-6 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       >
                         ×
                       </button>

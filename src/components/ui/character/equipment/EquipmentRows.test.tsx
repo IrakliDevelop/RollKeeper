@@ -55,6 +55,7 @@ describe('equipment rows', () => {
       name: longName,
       category: 'ring',
       rarity: 'very rare',
+      isEquipped: true,
       requiresAttunement: true,
       isAttuned: true,
       properties: [],
@@ -72,6 +73,7 @@ describe('equipment rows', () => {
     );
     expect(screen.getByText(longName)).not.toHaveClass('truncate');
     expect(screen.getByText('Very rare')).toBeVisible();
+    expect(screen.getByText('Equipped')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'End attunement' }));
     expect(onToggleAttunement).toHaveBeenCalledWith(item, false);
     expect(
@@ -101,5 +103,50 @@ describe('equipment rows', () => {
     expect(screen.getByText('AC 18')).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Unequip' }));
     expect(onToggleEquip).toHaveBeenCalledWith('armor-a', false);
+  });
+
+  it('shows Attack only with a linked inventory cost and blocks it when stock is short', () => {
+    const onUse = vi.fn();
+    const weapon = {
+      id: 'cost-weapon',
+      name: 'Crossbow',
+      category: 'martial',
+      damage: [],
+      enhancementBonus: 0,
+      isEquipped: true,
+      properties: [],
+    } as unknown as Weapon;
+    const props = {
+      weapon,
+      characterLevel: 5,
+      onEdit: vi.fn(),
+      onDelete: vi.fn(),
+      onToggleEquip: vi.fn(),
+      onUse,
+      inventoryItems: [{ id: 'bolts', name: 'Bolt', quantity: 1 }],
+    };
+    const { rerender } = render(<WeaponRow {...props} />);
+    expect(screen.queryByRole('button', { name: /Attack/ })).toBeNull();
+    rerender(
+      <WeaponRow
+        {...props}
+        weapon={{
+          ...weapon,
+          inventoryCost: { inventoryItemId: 'bolts', quantity: 2 },
+        }}
+      />
+    );
+    expect(screen.getByRole('button', { name: /Attack/ })).toBeDisabled();
+    rerender(
+      <WeaponRow
+        {...props}
+        weapon={{
+          ...weapon,
+          inventoryCost: { inventoryItemId: 'bolts', quantity: 1 },
+        }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /Attack/ }));
+    expect(onUse).toHaveBeenCalledWith('cost-weapon');
   });
 });

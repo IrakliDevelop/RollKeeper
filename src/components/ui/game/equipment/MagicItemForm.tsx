@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { MagicItemCategory, MagicItemRarity } from '@/types/character';
-import { Plus, Trash2, Sparkles, Zap, Shield } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
 import { NumberInput } from '@/components/ui/forms/NumberInput';
@@ -247,7 +247,6 @@ export function MagicItemForm({
       <div className="space-y-4">
         <div className="border-divider flex items-center justify-between border-b pb-2">
           <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
-            <Sparkles size={16} className="text-muted" />
             Charges and abilities (optional)
           </h4>
           <Button
@@ -263,9 +262,7 @@ export function MagicItemForm({
 
         {!formData.charges || formData.charges.length === 0 ? (
           <p className="text-muted text-sm italic">
-            No charge abilities configured. Add charge abilities for magic items
-            that can cast spells or activate special powers a limited number of
-            times.
+            No charge abilities. Add one if this item has limited uses.
           </p>
         ) : (
           <div className="space-y-4">
@@ -273,7 +270,6 @@ export function MagicItemForm({
               <div key={index} className="border-divider min-w-0 border-t pt-4">
                 <div className="mb-3 flex items-center justify-between">
                   <h5 className="text-muted flex items-center gap-2 text-sm font-semibold">
-                    <Sparkles size={14} />
                     {charge.name || `Charge Ability ${index + 1}`}
                   </h5>
                   <Button
@@ -281,7 +277,8 @@ export function MagicItemForm({
                     onClick={() => removeCharge(index)}
                     variant="ghost"
                     size="xs"
-                    className="text-accent-red-text-muted hover:bg-accent-red-bg hover:text-accent-red-text"
+                    aria-label={`Remove charge ability ${charge.name || index + 1}`}
+                    className="text-muted hover:text-body pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                   >
                     <Trash2 size={16} />
                   </Button>
@@ -290,7 +287,7 @@ export function MagicItemForm({
                 {/* Ability Name */}
                 <div className="mb-3">
                   <Input
-                    label="Ability Name"
+                    label="Name"
                     value={charge.name}
                     onChange={e =>
                       updateCharge(index, { name: e.target.value })
@@ -340,9 +337,9 @@ export function MagicItemForm({
                         })
                       }
                     >
-                      <SelectItem value="dawn">At Dawn</SelectItem>
-                      <SelectItem value="short">Short Rest</SelectItem>
-                      <SelectItem value="long">Long Rest</SelectItem>
+                      <SelectItem value="dawn">At dawn</SelectItem>
+                      <SelectItem value="short">Short rest</SelectItem>
+                      <SelectItem value="long">Long rest</SelectItem>
                     </SelectField>
                   </div>
                 </div>
@@ -396,7 +393,6 @@ export function MagicItemForm({
         <div className="space-y-4">
           <div className="border-divider flex items-center justify-between border-b pb-2">
             <h4 className="text-heading flex items-center gap-2 text-sm font-bold">
-              <Zap size={16} className="text-muted" />
               Shared charge pool
             </h4>
           </div>
@@ -438,10 +434,10 @@ export function MagicItemForm({
                     }))
                   }
                 >
-                  <SelectItem value="dawn">At Dawn</SelectItem>
-                  <SelectItem value="dusk">At Dusk</SelectItem>
-                  <SelectItem value="short">Short Rest</SelectItem>
-                  <SelectItem value="long">Long Rest</SelectItem>
+                  <SelectItem value="dawn">At dawn</SelectItem>
+                  <SelectItem value="dusk">At dusk</SelectItem>
+                  <SelectItem value="short">Short rest</SelectItem>
+                  <SelectItem value="long">Long rest</SelectItem>
                   <SelectItem value="midnight">Midnight</SelectItem>
                   <SelectItem value="special">Special</SelectItem>
                 </SelectField>
@@ -470,12 +466,9 @@ export function MagicItemForm({
                 {formData.chargePool.abilities.map((ability, idx) => (
                   <div
                     key={ability.id || idx}
-                    className="bg-surface-raised flex items-center gap-3 rounded-lg px-3 py-2"
+                    className="border-divider flex min-w-0 flex-wrap items-center gap-3 border-b py-2"
                   >
-                    <Badge
-                      variant={ability.cost === 0 ? 'success' : 'warning'}
-                      size="sm"
-                    >
+                    <Badge variant="neutral" size="sm">
                       {ability.cost === 0
                         ? ability.description === 'Ritual only'
                           ? 'Ritual'
@@ -488,12 +481,13 @@ export function MagicItemForm({
                         updatePoolAbility(idx, { name: e.target.value })
                       }
                       className="flex-1 text-sm"
-                      wrapperClassName="flex-1"
+                      wrapperClassName="min-w-0 flex-[1_1_12rem]"
                     />
                     <button
                       type="button"
+                      aria-label={`Remove shared charge ability ${ability.name || idx + 1}`}
                       onClick={() => removePoolAbility(idx)}
-                      className="text-muted hover:text-accent-red-text shrink-0 p-1"
+                      className="text-muted hover:bg-surface-hover hover:text-body inline-flex min-h-6 min-w-6 shrink-0 items-center justify-center rounded-sm pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -511,7 +505,6 @@ export function MagicItemForm({
         formData.chargePool) && (
         <div className="space-y-4">
           <h4 className="border-divider text-heading flex items-center gap-2 border-b pb-2 text-sm font-bold">
-            <Shield size={16} className="text-muted" />
             Spell bonuses
           </h4>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 [&>*]:min-w-0">

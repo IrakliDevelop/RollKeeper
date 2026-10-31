@@ -66,6 +66,11 @@ export function MagicItemRow({
               {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
             </span>
             <span className="capitalize">{item.category}</span>
+            {item.isEquipped && (
+              <Badge variant="neutral" size="sm">
+                Equipped
+              </Badge>
+            )}
             {item.requiresAttunement && (
               <Badge variant="neutral" size="sm">
                 {item.isAttuned ? 'Attuned' : 'Not attuned'}
@@ -113,7 +118,7 @@ export function MagicItemRow({
 
           {item.bonusSpellSaveDc != null && item.bonusSpellSaveDc > 0 && (
             <div className="flex gap-2">
-              <Badge variant="info" size="sm">
+              <Badge variant="neutral" size="sm">
                 Spell save DC +{item.bonusSpellSaveDc}
               </Badge>
             </div>

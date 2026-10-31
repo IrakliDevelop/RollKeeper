@@ -143,6 +143,61 @@ describe('inventory costs', () => {
 });
 
 describe('identity-based equipment reorder', () => {
+  const cases = [
+    {
+      label: 'weapons',
+      key: 'weapons',
+      action: 'reorderWeapons',
+      sample: sword,
+    },
+    {
+      label: 'magic items',
+      key: 'magicItems',
+      action: 'reorderMagicItems',
+      sample: ringOfProtection,
+    },
+    {
+      label: 'armor',
+      key: 'armorItems',
+      action: 'reorderArmorItems',
+      sample: chainmail,
+    },
+  ] as const;
+
+  it.each(cases)(
+    'moves $label in both directions and ignores missing or identical IDs',
+    ({ key, action, sample }) => {
+      resetStore({
+        [key]: [
+          { ...sample, id: 'first' },
+          { ...sample, id: 'middle' },
+          { ...sample, id: 'last' },
+        ],
+      });
+      const reorder = useCharacterStore.getState()[action];
+      reorder('first', 'last');
+      expect(
+        useCharacterStore.getState().character[key].map(i => i.id)
+      ).toEqual(['middle', 'last', 'first']);
+      reorder('first', 'middle');
+      expect(
+        useCharacterStore.getState().character[key].map(i => i.id)
+      ).toEqual(['first', 'middle', 'last']);
+
+      for (const [source, target] of [
+        ['missing', 'first'],
+        ['first', 'missing'],
+        ['first', 'first'],
+      ]) {
+        const before = useCharacterStore.getState().character;
+        const revision = before.revision;
+        reorder(source, target);
+        expect(useCharacterStore.getState().character).toBe(before);
+        expect(useCharacterStore.getState().character.revision).toBe(revision);
+      }
+    }
+  );
+
   it('moves a magic item across interleaved hidden items', () => {
     resetStore({
       magicItems: [

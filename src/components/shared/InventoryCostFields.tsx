@@ -28,7 +28,7 @@ export function InventoryCostFields({
       <div>
         <p className="text-heading text-sm font-medium">Inventory cost</p>
         <p className="text-muted text-xs">
-          Automatically consume an inventory item when this is used.
+          Uses up an inventory item each time.
         </p>
       </div>
       <div className="grid min-w-0 grid-cols-1 items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto] [&>*]:min-w-0">

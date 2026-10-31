@@ -64,16 +64,43 @@ describe('canonical mutation middleware', () => {
     expect(state.character.revision).toBe(10);
   });
 
-  it('replays a stale equipment reorder intent without changing the canonical character', () => {
-    const before = useCharacterStore.getState().character;
-    withIntentContext({ tabId: 'follower-reorder', seq: 3 }, () => {
-      useCharacterStore.getState().reorderWeapons('missing', 'also-missing');
-    });
-    const state = useCharacterStore.getState();
-    expect(state.character).toBe(before);
-    expect(state.character.revision).toBe(10);
-    expect(state.intentWatermarks['follower-reorder']?.seq).toBe(3);
-  });
+  it.each([
+    ['weapons', 'reorderWeapons'],
+    ['magicItems', 'reorderMagicItems'],
+    ['armorItems', 'reorderArmorItems'],
+  ] as const)(
+    'replays valid and stale %s reorder intents with canonical revision and watermark semantics',
+    (key, action) => {
+      const character = freshCharacter();
+      useCharacterStore.getState().loadCharacterState({
+        ...character,
+        [key]: [{ id: 'first' }, { id: 'second' }],
+      } as CharacterState);
+      const reorder = useCharacterStore.getState()[action];
+      withIntentContext({ tabId: 'follower-reorder', seq: 1 }, () => {
+        reorder('first', 'second');
+      });
+      const valid = useCharacterStore.getState();
+      expect(valid.character[key].map(i => i.id)).toEqual(['second', 'first']);
+      expect(valid.character.revision).toBe(11);
+      expect(valid.intentWatermarks['follower-reorder']?.seq).toBe(1);
+
+      for (const [seq, source, target] of [
+        [2, 'missing', 'first'],
+        [3, 'first', 'missing'],
+        [4, 'first', 'first'],
+      ] as const) {
+        const before = useCharacterStore.getState().character;
+        withIntentContext({ tabId: 'follower-reorder', seq }, () => {
+          reorder(source, target);
+        });
+        const state = useCharacterStore.getState();
+        expect(state.character).toBe(before);
+        expect(state.character.revision).toBe(11);
+        expect(state.intentWatermarks['follower-reorder']?.seq).toBe(seq);
+      }
+    }
+  );
 
   it('noteIntentApplied advances the watermark standalone', () => {
     useCharacterStore.getState().noteIntentApplied('sender-3', 4);

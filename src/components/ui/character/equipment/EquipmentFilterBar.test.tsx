@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { EquipmentFilterBar } from './EquipmentFilterBar';
+import {
+  EquipmentFilterBar,
+  getEquipmentEmptyText,
+} from './EquipmentFilterBar';
 import type { EquipmentFilters } from '@/hooks/useEquipmentFilters';
 
 afterEach(cleanup);
@@ -26,6 +29,9 @@ describe('EquipmentFilterBar', () => {
       />
     );
     expect(screen.getByPlaceholderText('Search by name')).toBeVisible();
+    expect(
+      screen.getByRole('textbox', { name: 'Search by name' })
+    ).toBeVisible();
     const trigger = screen.getByRole('button', { name: 'Filters' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(screen.queryByText('All Categories')).toBeNull();
@@ -49,5 +55,29 @@ describe('EquipmentFilterBar', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
     expect(onReset).toHaveBeenCalledOnce();
+  });
+});
+
+describe('equipment no-match copy', () => {
+  it('names a search-only query and uses filter copy when any field is active', () => {
+    expect(
+      getEquipmentEmptyText('weapons', {
+        ...emptyFilters,
+        search: 'sword',
+      })
+    ).toBe('No weapons match “sword”.');
+    expect(
+      getEquipmentEmptyText('magic items', {
+        ...emptyFilters,
+        category: 'ring',
+      })
+    ).toBe('No magic items match your filters.');
+    expect(
+      getEquipmentEmptyText('armor', {
+        ...emptyFilters,
+        search: 'plate',
+        equipped: 'equipped',
+      })
+    ).toBe('No armor matches your filters.');
   });
 });

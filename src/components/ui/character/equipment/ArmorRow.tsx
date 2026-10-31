@@ -84,22 +84,22 @@ export function ArmorRow({
 
           <div className="flex flex-wrap gap-2">
             {armor.stealthDisadvantage && (
-              <Badge variant="danger" size="sm">
-                Stealth Disadvantage
+              <Badge variant="warning" size="sm">
+                Stealth disadvantage
               </Badge>
             )}
             {armor.strengthRequirement && (
-              <Badge variant="warning" size="sm">
+              <Badge variant="neutral" size="sm">
                 Str {armor.strengthRequirement}
               </Badge>
             )}
             {armor.maxDexBonus !== undefined && armor.maxDexBonus !== null && (
-              <Badge variant="info" size="sm">
+              <Badge variant="neutral" size="sm">
                 Max Dex +{armor.maxDexBonus}
               </Badge>
             )}
             {armor.weight && (
-              <Badge variant="secondary" size="sm">
+              <Badge variant="neutral" size="sm">
                 {armor.weight} lb
               </Badge>
             )}
