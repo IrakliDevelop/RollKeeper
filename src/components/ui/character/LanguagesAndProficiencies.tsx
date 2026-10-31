@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 import { Section } from '@/components/ui/layout/section';
@@ -21,6 +21,7 @@ export default function Languages({
   onDeleteLanguage,
   editing = false,
 }: LanguagesProps) {
+  const rowIdPrefix = useId();
   const [isAddingLanguage, setIsAddingLanguage] = useState(false);
   const [newLanguageName, setNewLanguageName] = useState('');
 
@@ -41,11 +42,10 @@ export default function Languages({
             type="button"
             variant="ghost"
             size="sm"
-            aria-label="Add language"
             leftIcon={<Plus className="size-4" />}
             onClick={() => setIsAddingLanguage(true)}
           >
-            Add
+            Add language
           </Button>
         )
       }
@@ -97,7 +97,10 @@ export default function Languages({
               key={language.id}
               className="flex min-h-11 items-center justify-between gap-3 py-2"
             >
-              <span className="text-body min-w-0 text-sm break-words">
+              <span
+                id={`${rowIdPrefix}-${language.id}`}
+                className="text-body min-w-0 text-sm break-words"
+              >
                 {language.name}
               </span>
               {editing && (
@@ -106,6 +109,7 @@ export default function Languages({
                   variant="danger"
                   size="sm"
                   aria-label="Remove language"
+                  aria-describedby={`${rowIdPrefix}-${language.id}`}
                   onClick={() => onDeleteLanguage(language.id)}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />

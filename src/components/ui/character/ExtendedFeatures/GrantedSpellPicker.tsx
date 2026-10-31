@@ -403,6 +403,8 @@ function ResolvedSpellRow({
   return (
     <button
       type="button"
+      role="checkbox"
+      aria-checked={!excluded}
       onClick={onToggle}
       className={`border-divider hover:bg-surface-hover flex min-h-11 w-full items-center gap-3 border-b py-3 text-left transition-colors ${
         excluded ? 'opacity-50' : ''
@@ -650,11 +652,11 @@ function SpellBrowseDropdown({
               <Input
                 ref={inputRef}
                 type="text"
-                aria-label="Filter spells..."
+                aria-label="Filter spells"
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Filter spells..."
+                placeholder="Filter spells"
                 autoComplete="off"
               />
             </div>

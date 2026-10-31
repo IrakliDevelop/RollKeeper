@@ -62,7 +62,6 @@ export function HeroicInspirationTracker({
             type="button"
             variant="ghost"
             size="sm"
-            title="Reset to 0"
             onClick={onResetInspiration}
           >
             Clear inspiration
@@ -72,7 +71,7 @@ export function HeroicInspirationTracker({
     >
       <div className="space-y-4">
         <div className="text-center">
-          <div className="num-lg text-heading">
+          <div className="type-num-lg text-heading">
             {inspiration.count}
             {stackable && inspiration.maxCount != null && (
               <span className="text-muted text-base">

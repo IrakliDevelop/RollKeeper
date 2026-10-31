@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useId, useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 import { Section } from '@/components/ui/layout/section';
@@ -42,6 +42,7 @@ export default function ToolProficienciesSection({
   editing = false,
 }: Props) {
   const { categories, loading } = useToolsData();
+  const rowIdPrefix = useId();
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [addingCustom, setAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
@@ -94,6 +95,7 @@ export default function ToolProficienciesSection({
     removeLabel?: string
   ) => {
     const level = tool?.proficiencyLevel ?? 'none';
+    const nameId = `${rowIdPrefix}-${tool?.id ?? name}`;
     const nextLevel: ToolProficiencyLevel =
       level === 'none'
         ? 'proficient'
@@ -115,7 +117,10 @@ export default function ToolProficienciesSection({
               onUpdateToolProficiency(tool.id, { proficiencyLevel: nextLevel });
           }}
         />
-        <span className="text-body min-w-0 flex-1 text-sm break-words">
+        <span
+          id={nameId}
+          className="text-body min-w-0 flex-1 text-sm break-words"
+        >
           {name}
         </span>
         {tool && level !== 'none' && (
@@ -126,6 +131,7 @@ export default function ToolProficienciesSection({
               size="sm"
               selected={Boolean(tool.isTemporary)}
               aria-pressed={Boolean(tool.isTemporary)}
+              aria-describedby={nameId}
               onClick={() =>
                 onUpdateToolProficiency(tool.id, {
                   isTemporary: !tool.isTemporary,
@@ -144,6 +150,7 @@ export default function ToolProficienciesSection({
                 variant="danger"
                 size="sm"
                 aria-label={removeLabel}
+                aria-describedby={nameId}
                 onClick={() => onDeleteToolProficiency(tool.id)}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
@@ -179,10 +186,7 @@ export default function ToolProficienciesSection({
               key={tool.id}
               className="flex min-h-11 items-center gap-3 py-2"
             >
-              <ProficiencyDot
-                level={tool.proficiencyLevel}
-                label={`${tool.name}: ${tool.proficiencyLevel}`}
-              />
+              <ProficiencyDot level={tool.proficiencyLevel} />
               <span className="text-body min-w-0 flex-1 text-sm break-words">
                 {tool.name}
               </span>

@@ -4,6 +4,7 @@ import {
   fireEvent,
   render,
   screen,
+  within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
@@ -254,6 +255,9 @@ it('pairs a positive DM counter with Inspiration and omits a zero counter', asyn
     screen.getByRole('heading', { name: 'Heroic Inspiration' })
   );
   expect(dmHeading.closest('section')).toHaveTextContent('Set by your DM.');
+  expect(
+    within(dmHeading.closest('section') as HTMLElement).getByText('2')
+  ).toHaveClass('type-num-lg');
 
   positive.unmount();
   render(

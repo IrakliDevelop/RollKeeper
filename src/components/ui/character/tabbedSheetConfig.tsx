@@ -1026,7 +1026,7 @@ function DmCustomCounterDisplay({
 }) {
   return (
     <Section heading={label}>
-      <div className="num-lg text-heading">{value}</div>
+      <div className="type-num-lg text-heading">{value}</div>
       <p className="text-muted text-sm">
         {value === 1 ? '1 point' : `${value} points`}
       </p>

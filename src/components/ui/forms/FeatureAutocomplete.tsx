@@ -300,8 +300,7 @@ export function FeatureAutocomplete({
               </ul>
             ) : (
               <div className="text-muted px-4 py-8 text-center text-sm">
-                <p>No features found</p>
-                <p className="mt-1 text-xs">Try a different search term</p>
+                <p>No features match “{query.trim()}”.</p>
               </div>
             )}
           </div>
@@ -311,7 +310,7 @@ export function FeatureAutocomplete({
       {/* Helper text */}
       <p className="text-muted mt-2 text-xs">
         {selectedFeature
-          ? 'Feature details loaded. You can edit any field below.'
+          ? `Filled in from ${selectedFeature.name}. Change anything below.`
           : 'Search and select a feature to auto-fill the form, or fill manually.'}
       </p>
     </div>

@@ -134,14 +134,14 @@ export default function ExtendedFeaturesSection({
         <div className="space-y-4">
           <Input
             type="search"
-            aria-label="Search abilities"
-            placeholder="Search abilities"
+            aria-label="Search features"
+            placeholder="Search features"
             value={query}
             onChange={event => setQuery(event.target.value)}
           />
           {visibleFeatures.length === 0 && (
             <p className="text-muted py-6 text-center text-sm">
-              No abilities match your search
+              No features match “{query.trim()}”.
             </p>
           )}
           {visibleFeatures.length > 0 && (
@@ -155,6 +155,7 @@ export default function ExtendedFeaturesSection({
               }}
               disabled={readonly || Boolean(query)}
               showDragHandle={!readonly && !query}
+              dragHandlePosition="right"
               className="divide-divider border-divider divide-y border-y"
               renderItem={(feature, index) => {
                 const maxUses = calculateTraitMaxUses(feature, character.level);
@@ -190,9 +191,9 @@ export default function ExtendedFeaturesSection({
                       </span>
                     )}
                     {!feature.isPassive && maxUses > 0 && (
-                      <div className="flex shrink-0 items-center gap-1">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1">
                         {Array.from({ length: maxUses }, (_, pipIndex) => {
-                          const spent = pipIndex < usedUses;
+                          const spent = pipIndex >= maxUses - usedUses;
                           return (
                             <button
                               key={pipIndex}
@@ -216,7 +217,7 @@ export default function ExtendedFeaturesSection({
                       </div>
                     )}
                     {!feature.isPassive && maxUses > 0 && (
-                      <span className="text-muted text-sm">
+                      <span className="text-muted text-sm capitalize">
                         {feature.restType}
                       </span>
                     )}
@@ -235,11 +236,7 @@ export default function ExtendedFeaturesSection({
                           type="button"
                           variant="ghost"
                           size="sm"
-                          aria-label={
-                            favoriteFeatureIds.includes(feature.id)
-                              ? 'Remove from quick actions'
-                              : 'Add to quick actions'
-                          }
+                          aria-label="Add to quick actions"
                           aria-describedby={`feature-name-${feature.id}`}
                           aria-pressed={favoriteFeatureIds.includes(feature.id)}
                           onClick={() => onToggleFavoriteFeature(feature.id)}

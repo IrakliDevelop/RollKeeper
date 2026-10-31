@@ -30,7 +30,9 @@ vi.mock('@/components/ui/layout/DragDropList', () => ({
     items,
     onReorder,
     renderItem,
+    dragHandlePosition,
   }: {
+    dragHandlePosition?: string;
     items: ExtendedFeature[];
     onReorder: (source: number, target: number) => void;
     renderItem: (
@@ -39,7 +41,7 @@ vi.mock('@/components/ui/layout/DragDropList', () => ({
       dragging: boolean
     ) => React.ReactNode;
   }) => (
-    <div>
+    <div data-handle-position={dragHandlePosition}>
       {items.map((feature, index) => (
         <div key={feature.id}>{renderItem(feature, index, false)}</div>
       ))}
@@ -143,7 +145,7 @@ describe('03h1 Abilities list', () => {
       feature('two', 'Action Surge', { sourceDetail: 'Fighter 9' }),
       feature('three', 'Fey Ancestry', { source: 'Elf' }),
     ]);
-    const search = screen.getByRole('searchbox', { name: 'Search abilities' });
+    const search = screen.getByRole('searchbox', { name: 'Search features' });
     fireEvent.change(search, { target: { value: 'Regain' } });
     expect(document.querySelectorAll('[data-feature-row]')).toHaveLength(1);
     expect(screen.getByText('Second Wind')).toBeInTheDocument();
@@ -153,7 +155,7 @@ describe('03h1 Abilities list', () => {
     expect(screen.getByText('Action Surge')).toBeInTheDocument();
     fireEvent.change(search, { target: { value: 'No match' } });
     expect(
-      screen.getByText('No abilities match your search')
+      screen.getByText('No features match “No match”.')
     ).toBeInTheDocument();
   });
 
@@ -171,6 +173,49 @@ describe('03h1 Abilities list', () => {
     expect(callbacks.onUpdateFeature).toHaveBeenCalledWith('one', {
       usedUses: 0,
     });
+  });
+
+  it('fills available pips first and wraps long use pools', () => {
+    renderSection([
+      feature('one', 'Lay on Hands', { maxUses: 20, usedUses: 3 }),
+    ]);
+    const pips = screen.getAllByRole('button', {
+      name: /a use of Lay on Hands$/,
+    });
+    expect(pips).toHaveLength(20);
+    expect(pips.slice(0, 17).map(p => p.getAttribute('aria-label'))).toEqual(
+      Array(17).fill('Spend a use of Lay on Hands')
+    );
+    expect(pips.slice(17).map(p => p.getAttribute('aria-label'))).toEqual(
+      Array(3).fill('Restore a use of Lay on Hands')
+    );
+    const group = pips[0].parentElement as HTMLElement;
+    expect(group).toHaveClass('flex-wrap', 'min-w-0');
+    expect(group).not.toHaveClass('shrink-0');
+  });
+
+  it('names the rest type and keeps one favorite name with pressed state', () => {
+    renderSection([feature('one', 'Second Wind')]);
+    const row = document.querySelector(
+      '[data-feature-row="one"]'
+    ) as HTMLElement;
+    expect(within(row).getByText('short')).toHaveClass('capitalize');
+    const favorite = within(row).getByRole('button', {
+      name: 'Add to quick actions',
+    });
+    expect(favorite).toHaveAttribute('aria-pressed', 'false');
+    expect(favorite).toHaveAccessibleDescription('Second Wind');
+  });
+
+  it('puts the drag handle in the right gutter the row reserves', () => {
+    renderSection([feature('one', 'Second Wind')]);
+    expect(document.querySelector('[data-feature-row="one"]')).toHaveClass(
+      'pr-7'
+    );
+    expect(document.querySelector('[data-handle-position]')).toHaveAttribute(
+      'data-handle-position',
+      'right'
+    );
   });
 
   it('changes only one use even when a later pip is chosen', () => {

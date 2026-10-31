@@ -107,3 +107,51 @@ describe('Features proficiencies', () => {
     expect(actions.onAddLanguage).toHaveBeenCalledWith({ name: 'Draconic' });
   });
 });
+
+describe('proficiency remove buttons', () => {
+  it('describe each remove button with the row name', () => {
+    render(
+      <>
+        <ToolProficienciesSection
+          toolProficiencies={[tool]}
+          proficiencyBonus={3}
+          onAddToolProficiency={vi.fn()}
+          onUpdateToolProficiency={vi.fn()}
+          onDeleteToolProficiency={vi.fn()}
+          editing
+        />
+        <Languages
+          languages={[language]}
+          onAddLanguage={vi.fn()}
+          onDeleteLanguage={vi.fn()}
+          editing
+        />
+      </>
+    );
+    expect(
+      screen.getByRole('button', { name: 'Remove proficiency' })
+    ).toHaveAccessibleDescription("Thieves' Tools");
+    expect(
+      screen.getByRole('button', { name: 'Remove language' })
+    ).toHaveAccessibleDescription('Elvish');
+    expect(
+      screen.getByRole('button', { name: 'Temporary' })
+    ).toHaveAccessibleDescription("Thieves' Tools");
+    expect(
+      screen.getByRole('button', { name: 'Add language' })
+    ).toHaveTextContent('Add language');
+  });
+
+  it('labels the play-mode tool dot with its level only', () => {
+    render(
+      <ToolProficienciesSection
+        toolProficiencies={[tool]}
+        proficiencyBonus={3}
+        onAddToolProficiency={vi.fn()}
+        onUpdateToolProficiency={vi.fn()}
+        onDeleteToolProficiency={vi.fn()}
+      />
+    );
+    expect(screen.getByRole('img', { name: 'Proficient' })).toBeInTheDocument();
+  });
+});

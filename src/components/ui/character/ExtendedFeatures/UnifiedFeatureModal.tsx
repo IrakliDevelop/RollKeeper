@@ -426,9 +426,9 @@ export default function UnifiedFeatureModal({
                       </div>
                       {hasUses && (
                         <div className="text-muted flex items-center gap-2 text-sm">
-                          <Clock className="h-4 w-4" />
-                          <span className="capitalize">
-                            {existingFeature.restType} rest
+                          <Clock className="h-4 w-4" aria-hidden="true" />
+                          <span>
+                            Recharges on a {existingFeature.restType} rest
                           </span>
                         </div>
                       )}
@@ -634,7 +634,7 @@ export default function UnifiedFeatureModal({
                             onChange={content =>
                               setFormData({ ...formData, description: content })
                             }
-                            placeholder="Describe what this feature does, how it works, and any important details..."
+                            placeholder=""
                             minHeight="150px"
                           />
                         </div>

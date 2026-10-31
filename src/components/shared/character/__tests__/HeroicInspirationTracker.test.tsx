@@ -148,4 +148,30 @@ describe('Heroic Inspiration in the Features tab', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Use inspiration' }));
     expect(actions.onUseInspiration).toHaveBeenCalledOnce();
   });
+
+  it('shows the count in the large number style', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 3 }}
+        stackable
+        editing={false}
+        {...callbacks()}
+      />
+    );
+    expect(screen.getByText('3')).toHaveClass('type-num-lg');
+  });
+
+  it('has no tooltip that disagrees with Clear inspiration', () => {
+    render(
+      <HeroicInspirationTracker
+        inspiration={{ count: 1 }}
+        stackable
+        editing
+        {...callbacks()}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Clear inspiration' })
+    ).not.toHaveAttribute('title');
+  });
 });

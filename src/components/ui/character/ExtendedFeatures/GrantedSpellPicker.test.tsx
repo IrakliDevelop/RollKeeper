@@ -26,14 +26,56 @@ describe('GrantedSpellPicker', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Feat Grants Spells' });
     const filter = await screen.findByRole('textbox', {
-      name: 'Filter spells...',
+      name: 'Filter spells',
     });
     expect(dialog).toContainElement(filter);
 
     fireEvent.mouseDown(filter);
     fireEvent.click(filter);
     expect(
-      screen.getByRole('textbox', { name: 'Filter spells...' })
+      screen.getByRole('textbox', { name: 'Filter spells' })
     ).toBeVisible();
+  });
+
+  it('exposes each granted spell row as a checkbox', () => {
+    render(
+      <GrantedSpellPicker
+        isOpen
+        onClose={vi.fn()}
+        onConfirm={vi.fn()}
+        featName="Synthetic feat"
+        parsed={{
+          concrete: [
+            { spellName: 'Shield', sourceRef: 'shield', grantType: 'known' },
+          ],
+          choices: [],
+        }}
+        allSpells={
+          [
+            {
+              id: 'shield',
+              name: 'Shield',
+              level: 1,
+              school: 'A',
+              schoolName: 'Abjuration',
+              castingTime: '1 reaction',
+              range: 'Self',
+              components: { verbal: true, somatic: true, material: false },
+              duration: '1 round',
+              description: 'An invisible barrier of magical force appears.',
+              source: 'PHB',
+            },
+          ] as never
+        }
+        spellsLoading={false}
+      />
+    );
+    const row = screen.getByRole('checkbox', { name: /Shield/ });
+    expect(row).toHaveAttribute('aria-checked', 'true');
+    fireEvent.click(row);
+    expect(screen.getByRole('checkbox', { name: /Shield/ })).toHaveAttribute(
+      'aria-checked',
+      'false'
+    );
   });
 });
