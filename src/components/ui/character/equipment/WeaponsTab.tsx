@@ -10,6 +10,9 @@ import { WeaponRow } from './WeaponRow';
 import { WeaponFormDialog } from './WeaponFormDialog';
 import { EquipmentFilterBar, type FilterConfig } from './EquipmentFilterBar';
 import { useEquipmentFilters } from '@/hooks/useEquipmentFilters';
+import { useSheetMode } from '@/components/ui/character/SheetMode';
+import { EquipmentReorderControls } from './EquipmentReorderControls';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 import type {
   WeaponFormData,
   WeaponChargeFormData,
@@ -24,6 +27,7 @@ const FILTER_CONFIG: FilterConfig = {
 };
 
 export function WeaponsTab() {
+  const { editing } = useSheetMode();
   const {
     character,
     addWeapon,
@@ -132,7 +136,7 @@ export function WeaponsTab() {
           size="sm"
           leftIcon={<Plus size={16} />}
         >
-          Add Weapon
+          Add weapon
         </Button>
       </div>
 
@@ -157,21 +161,43 @@ export function WeaponsTab() {
           className="space-y-2"
           showDragHandle
           dragHandlePosition="left"
-          renderItem={weapon => (
-            <WeaponRow
-              weapon={weapon}
-              characterLevel={character.level}
-              onEdit={handleEdit}
-              onDelete={id => deleteWeapon(id)}
-              onToggleEquip={(id, eq) => equipWeapon(id, eq)}
-              onExpendCharge={expendWeaponCharge}
-              onRestoreCharge={restoreWeaponCharge}
-              onExpendChargePoolAbility={expendWeaponChargePoolAbility}
-              onRestoreChargePool={restoreWeaponChargePool}
-              onSetChargePoolUsed={setWeaponChargePoolUsed}
-              onUse={useWeapon}
-              inventoryItems={character.inventoryItems}
-            />
+          renderItem={(weapon, index) => (
+            <div>
+              <WeaponRow
+                weapon={weapon}
+                characterLevel={character.level}
+                onEdit={handleEdit}
+                onDelete={id => {
+                  void confirmDialog({
+                    title: `Delete ${weapon.name}?`,
+                    confirmLabel: 'Delete item',
+                    cancelLabel: 'Cancel',
+                    tone: 'danger',
+                  }).then(confirmed => {
+                    if (confirmed) deleteWeapon(id);
+                  });
+                }}
+                onToggleEquip={(id, eq) => equipWeapon(id, eq)}
+                onExpendCharge={expendWeaponCharge}
+                onRestoreCharge={restoreWeaponCharge}
+                onExpendChargePoolAbility={expendWeaponChargePoolAbility}
+                onRestoreChargePool={restoreWeaponChargePool}
+                onSetChargePoolUsed={setWeaponChargePoolUsed}
+                onUse={useWeapon}
+                inventoryItems={character.inventoryItems}
+              />
+              {editing && (
+                <EquipmentReorderControls
+                  name={weapon.name}
+                  index={index}
+                  count={filteredItems.length}
+                  onMove={destinationIndex => {
+                    const destination = filteredItems[destinationIndex];
+                    if (destination) reorderWeapons(weapon.id, destination.id);
+                  }}
+                />
+              )}
+            </div>
           )}
         />
       ) : (
@@ -179,14 +205,14 @@ export function WeaponsTab() {
           <Swords className="text-faint mx-auto mb-3 h-12 w-12" />
           <p className="text-heading font-medium">
             {hasActiveFilters
-              ? 'No weapons match your filters'
-              : 'No weapons added yet'}
+              ? 'No weapons match your search or filters'
+              : 'Add your first weapon'}
           </p>
-          <p className="mt-1 text-sm">
-            {hasActiveFilters
-              ? 'Try adjusting your filters.'
-              : 'Add weapons to manage your arsenal.'}
-          </p>
+          {hasActiveFilters && (
+            <Button onClick={resetFilters} variant="ghost" size="sm">
+              Clear filters
+            </Button>
+          )}
         </div>
       )}
 

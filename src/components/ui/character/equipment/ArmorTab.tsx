@@ -10,6 +10,9 @@ import { ArmorRow } from './ArmorRow';
 import { ArmorFormDialog, type ArmorFormData } from './ArmorFormDialog';
 import { EquipmentFilterBar, type FilterConfig } from './EquipmentFilterBar';
 import { useEquipmentFilters } from '@/hooks/useEquipmentFilters';
+import { useSheetMode } from '@/components/ui/character/SheetMode';
+import { EquipmentReorderControls } from './EquipmentReorderControls';
+import { confirmDialog } from '@/components/ui/feedback/confirm-dialog';
 
 const FILTER_CONFIG: FilterConfig = {
   showAttuned: false,
@@ -20,6 +23,7 @@ const FILTER_CONFIG: FilterConfig = {
 };
 
 export function ArmorTab() {
+  const { editing } = useSheetMode();
   const {
     character,
     addArmorItem,
@@ -79,7 +83,7 @@ export function ArmorTab() {
           size="sm"
           leftIcon={<Plus size={16} />}
         >
-          Add Armor
+          Add armor
         </Button>
       </div>
 
@@ -104,13 +108,36 @@ export function ArmorTab() {
           className="space-y-2"
           showDragHandle
           dragHandlePosition="left"
-          renderItem={armor => (
-            <ArmorRow
-              armor={armor}
-              onEdit={handleEdit}
-              onDelete={id => deleteArmorItem(id)}
-              onToggleEquip={(id, eq) => equipArmorItem(id, eq)}
-            />
+          renderItem={(armor, index) => (
+            <div>
+              <ArmorRow
+                armor={armor}
+                onEdit={handleEdit}
+                onDelete={id => {
+                  void confirmDialog({
+                    title: `Delete ${armor.name}?`,
+                    confirmLabel: 'Delete item',
+                    cancelLabel: 'Cancel',
+                    tone: 'danger',
+                  }).then(confirmed => {
+                    if (confirmed) deleteArmorItem(id);
+                  });
+                }}
+                onToggleEquip={(id, eq) => equipArmorItem(id, eq)}
+              />
+              {editing && (
+                <EquipmentReorderControls
+                  name={armor.name}
+                  index={index}
+                  count={filteredItems.length}
+                  onMove={destinationIndex => {
+                    const destination = filteredItems[destinationIndex];
+                    if (destination)
+                      reorderArmorItems(armor.id, destination.id);
+                  }}
+                />
+              )}
+            </div>
           )}
         />
       ) : (
@@ -118,14 +145,14 @@ export function ArmorTab() {
           <Shield className="text-faint mx-auto mb-3 h-12 w-12" />
           <p className="text-heading font-medium">
             {hasActiveFilters
-              ? 'No armor matches your filters'
-              : 'No armor added yet'}
+              ? 'No armor matches your search or filters'
+              : "Add your character's armor"}
           </p>
-          <p className="mt-1 text-sm">
-            {hasActiveFilters
-              ? 'Try adjusting your filters.'
-              : 'Add armor pieces to manage your defenses.'}
-          </p>
+          {hasActiveFilters && (
+            <Button onClick={resetFilters} variant="ghost" size="sm">
+              Clear filters
+            </Button>
+          )}
         </div>
       )}
 

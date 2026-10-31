@@ -1,11 +1,11 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { EquipmentFilters } from '@/hooks/useEquipmentFilters';
 import { Input } from '@/components/ui/forms/input';
 import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Button } from '@/components/ui/forms/button';
-import { X } from 'lucide-react';
+import { SlidersHorizontal, X } from 'lucide-react';
 
 export interface FilterConfig {
   showAttuned?: boolean;
@@ -43,99 +43,135 @@ export function EquipmentFilterBar({
   hasActiveFilters,
   config,
 }: EquipmentFilterBarProps) {
+  const [expanded, setExpanded] = useState(false);
+  const activeCount = Object.entries(filters).filter(
+    ([key, value]) => value !== (key === 'search' ? '' : 'all')
+  ).length;
+
   return (
-    <div className="flex flex-wrap items-end gap-2">
-      <div className="min-w-[140px] flex-1">
-        <Input
-          value={filters.search}
-          onChange={e => onFilterChange('search', e.target.value)}
-          placeholder="Search by name..."
-          className="h-9 text-sm"
-        />
-      </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-end gap-2">
+        <div className="min-w-0 flex-[1_1_12rem]">
+          <Input
+            value={filters.search}
+            onChange={e => onFilterChange('search', e.target.value)}
+            placeholder="Search by name"
+            className="h-9 text-sm"
+          />
+        </div>
 
-      <div className="w-[130px]">
-        <SelectField
-          value={filters.equipped}
-          onValueChange={v =>
-            onFilterChange('equipped', v as EquipmentFilters['equipped'])
-          }
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label="Filters"
+          aria-expanded={expanded}
+          onClick={() => setExpanded(value => !value)}
+          className="h-9"
         >
-          <SelectItem value="all">All</SelectItem>
-          <SelectItem value="equipped">Equipped</SelectItem>
-          <SelectItem value="unequipped">Unequipped</SelectItem>
-        </SelectField>
+          <SlidersHorizontal size={14} aria-hidden="true" className="mr-1" />
+          Filters
+          {activeCount > 0 && (
+            <span aria-hidden="true" className="text-muted ml-1">
+              {activeCount}
+            </span>
+          )}
+        </Button>
+        {hasActiveFilters && (
+          <Button onClick={onReset} variant="ghost" size="sm" className="h-9">
+            <X size={14} aria-hidden="true" className="mr-1" />
+            Clear filters
+          </Button>
+        )}
       </div>
 
-      {config.showAttuned && (
-        <div className="w-[130px]">
-          <SelectField
-            value={filters.attuned}
-            onValueChange={v =>
-              onFilterChange('attuned', v as EquipmentFilters['attuned'])
-            }
-          >
-            <SelectItem value="all">All</SelectItem>
-            <SelectItem value="attuned">Attuned</SelectItem>
-            <SelectItem value="unattuned">Unattuned</SelectItem>
-          </SelectField>
-        </div>
-      )}
+      {expanded && (
+        <div className="flex flex-wrap items-end gap-2">
+          <div className="w-[130px]">
+            <SelectField
+              triggerProps={{ 'aria-label': 'Equipped' }}
+              value={filters.equipped}
+              onValueChange={v =>
+                onFilterChange('equipped', v as EquipmentFilters['equipped'])
+              }
+            >
+              <SelectItem value="all">Equipped or not</SelectItem>
+              <SelectItem value="equipped">Equipped</SelectItem>
+              <SelectItem value="unequipped">Not equipped</SelectItem>
+            </SelectField>
+          </div>
 
-      {config.showCategory && config.categoryOptions && (
-        <div className="w-[130px]">
-          <SelectField
-            value={filters.category}
-            onValueChange={v => onFilterChange('category', v)}
-          >
-            {config.categoryOptions.map(opt => (
-              <SelectItem key={opt} value={opt}>
-                {opt === 'all'
-                  ? 'All Categories'
-                  : opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectField>
-        </div>
-      )}
+          {config.showAttuned && (
+            <div className="w-[130px]">
+              <SelectField
+                triggerProps={{ 'aria-label': 'Attunement' }}
+                value={filters.attuned}
+                onValueChange={v =>
+                  onFilterChange('attuned', v as EquipmentFilters['attuned'])
+                }
+              >
+                <SelectItem value="all">Attuned or not</SelectItem>
+                <SelectItem value="attuned">Attuned</SelectItem>
+                <SelectItem value="unattuned">Not attuned</SelectItem>
+              </SelectField>
+            </div>
+          )}
 
-      {config.showRarity && (
-        <div className="w-[130px]">
-          <SelectField
-            value={filters.rarity}
-            onValueChange={v => onFilterChange('rarity', v)}
-          >
-            {RARITY_OPTIONS.map(opt => (
-              <SelectItem key={opt} value={opt}>
-                {opt === 'all'
-                  ? 'All Rarities'
-                  : opt.charAt(0).toUpperCase() + opt.slice(1)}
-              </SelectItem>
-            ))}
-          </SelectField>
-        </div>
-      )}
+          {config.showCategory && config.categoryOptions && (
+            <div className="w-[130px]">
+              <SelectField
+                triggerProps={{ 'aria-label': 'Category' }}
+                value={filters.category}
+                onValueChange={v => onFilterChange('category', v)}
+              >
+                {config.categoryOptions.map(opt => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt === 'all'
+                      ? 'All categories'
+                      : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectField>
+            </div>
+          )}
 
-      {config.showHasCharges && (
-        <div className="w-[140px]">
-          <SelectField
-            value={filters.hasCharges}
-            onValueChange={v =>
-              onFilterChange('hasCharges', v as EquipmentFilters['hasCharges'])
-            }
-          >
-            <SelectItem value="all">All Charges</SelectItem>
-            <SelectItem value="with">With Charges</SelectItem>
-            <SelectItem value="without">Without Charges</SelectItem>
-          </SelectField>
-        </div>
-      )}
+          {config.showRarity && (
+            <div className="w-[130px]">
+              <SelectField
+                triggerProps={{ 'aria-label': 'Rarity' }}
+                value={filters.rarity}
+                onValueChange={v => onFilterChange('rarity', v)}
+              >
+                {RARITY_OPTIONS.map(opt => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt === 'all'
+                      ? 'All rarities'
+                      : opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  </SelectItem>
+                ))}
+              </SelectField>
+            </div>
+          )}
 
-      {hasActiveFilters && (
-        <Button onClick={onReset} variant="ghost" size="sm" className="h-9">
-          <X size={14} className="mr-1" />
-          Clear
-        </Button>
+          {config.showHasCharges && (
+            <div className="w-[140px]">
+              <SelectField
+                triggerProps={{ 'aria-label': 'Charges' }}
+                value={filters.hasCharges}
+                onValueChange={v =>
+                  onFilterChange(
+                    'hasCharges',
+                    v as EquipmentFilters['hasCharges']
+                  )
+                }
+              >
+                <SelectItem value="all">With or without charges</SelectItem>
+                <SelectItem value="with">With charges</SelectItem>
+                <SelectItem value="without">Without charges</SelectItem>
+              </SelectField>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

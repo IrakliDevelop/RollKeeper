@@ -1,19 +1,13 @@
 'use client';
 
 import React, { useState } from 'react';
-import type {
-  MagicItem,
-  MagicItemCharge,
-  MagicItemRarity,
-} from '@/types/character';
+import type { MagicItem, MagicItemCharge } from '@/types/character';
 import {
   ChevronDown,
   ChevronRight,
   Edit2,
   Trash2,
   Sparkles,
-  Clock,
-  Sun,
   Minus,
   Plus,
 } from 'lucide-react';
@@ -35,18 +29,6 @@ interface MagicItemRowProps {
   onSetChargePoolUsed?: (itemId: string, usedCount: number) => void;
 }
 
-const RARITY_VARIANT: Record<
-  MagicItemRarity,
-  'secondary' | 'success' | 'info' | 'primary' | 'warning' | 'danger'
-> = {
-  common: 'secondary',
-  uncommon: 'success',
-  rare: 'info',
-  'very rare': 'primary',
-  legendary: 'warning',
-  artifact: 'danger',
-};
-
 export function MagicItemRow({
   item,
   characterLevel,
@@ -63,66 +45,63 @@ export function MagicItemRow({
 
   const hasCharges = item.charges && item.charges.length > 0;
   const hasPool = !!item.chargePool;
-  const poolRemaining = hasPool
-    ? item.chargePool!.maxCharges - item.chargePool!.usedCharges
-    : null;
-
   return (
-    <div
-      className={`rounded-lg border-2 transition-all ${
-        item.isEquipped
-          ? 'border-accent-purple-border-strong bg-surface-raised'
-          : 'border-divider bg-surface-raised hover:border-divider-strong'
-      }`}
-    >
-      {/* Collapsed summary */}
+    <div className="border-divider border-b py-2" data-inventory-row={item.id}>
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="flex w-full items-center gap-3 p-3 text-left"
+        aria-label={`Details: ${item.name}`}
+        aria-expanded={isExpanded}
+        className="flex w-full min-w-0 items-start gap-2 px-3 py-2 text-left pointer-coarse:min-h-11"
       >
-        <div className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="text-muted shrink-0">
-            {isExpanded ? (
-              <ChevronDown size={16} />
-            ) : (
-              <ChevronRight size={16} />
+        <span className="text-muted mt-1 shrink-0" aria-hidden="true">
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <span className="text-heading block font-semibold break-words">
+            {item.name}
+          </span>
+          <div className="text-muted mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <span>
+              {item.rarity.charAt(0).toUpperCase() + item.rarity.slice(1)}
+            </span>
+            <span className="capitalize">{item.category}</span>
+            {item.requiresAttunement && (
+              <Badge variant="neutral" size="sm">
+                {item.isAttuned ? 'Attuned' : 'Not attuned'}
+              </Badge>
             )}
-          </span>
-          <h4 className="text-heading truncate font-semibold">{item.name}</h4>
-          <Badge variant={RARITY_VARIANT[item.rarity] || 'secondary'} size="sm">
-            {item.rarity}
-          </Badge>
-          {item.requiresAttunement && (
-            <Badge variant={item.isAttuned ? 'primary' : 'secondary'} size="sm">
-              {item.isAttuned ? 'Attuned' : 'Attune'}
-            </Badge>
-          )}
-          {item.bonusSpellAttack != null && item.bonusSpellAttack > 0 && (
-            <Badge variant="info" size="sm">
-              Spell +{item.bonusSpellAttack}
-            </Badge>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-3">
-          <span className="text-muted hidden text-xs capitalize sm:inline">
-            {item.category}
-          </span>
-          {hasPool && item.chargePool && (
-            <ChargePoolDisplay
-              pool={item.chargePool}
-              onExpendAbility={() => {}}
-              onRestorePool={() => {}}
-              onSetPoolUsed={() => {}}
-              compact
-            />
-          )}
+            {item.bonusSpellAttack != null && item.bonusSpellAttack > 0 && (
+              <span>Spell +{item.bonusSpellAttack}</span>
+            )}
+            {hasPool && item.chargePool && (
+              <ChargePoolDisplay
+                pool={item.chargePool}
+                itemName={item.name}
+                onExpendAbility={() => {}}
+                onRestorePool={() => {}}
+                onSetPoolUsed={() => {}}
+                compact
+              />
+            )}
+          </div>
         </div>
       </button>
 
-      {/* Expanded detail */}
+      {item.requiresAttunement && (
+        <div className="px-3 pb-2">
+          <Button
+            onClick={() => onToggleAttunement(item, !item.isAttuned)}
+            variant="outline"
+            size="sm"
+          >
+            {item.isAttuned ? 'End attunement' : 'Attune'}
+          </Button>
+        </div>
+      )}
+
       {isExpanded && (
-        <div className="border-divider space-y-3 border-t px-4 pt-3 pb-4">
+        <div className="border-divider space-y-3 border-t px-3 pt-3 pb-4">
           <div className="text-muted text-sm capitalize">{item.category}</div>
 
           {item.description && (
@@ -135,7 +114,7 @@ export function MagicItemRow({
           {item.bonusSpellSaveDc != null && item.bonusSpellSaveDc > 0 && (
             <div className="flex gap-2">
               <Badge variant="info" size="sm">
-                Spell Save DC +{item.bonusSpellSaveDc}
+                Spell save DC +{item.bonusSpellSaveDc}
               </Badge>
             </div>
           )}
@@ -143,9 +122,7 @@ export function MagicItemRow({
           {/* Individual charges */}
           {hasCharges && (
             <div className="space-y-1.5">
-              <span className="text-body text-xs font-semibold uppercase">
-                Individual Charges
-              </span>
+              <span className="text-body text-sm font-semibold">Charges</span>
               <div className="flex flex-wrap gap-2">
                 {item.charges!.map(charge => (
                   <IndividualChargeChip
@@ -164,6 +141,7 @@ export function MagicItemRow({
           {hasPool && item.chargePool && (
             <ChargePoolDisplay
               pool={item.chargePool}
+              itemName={item.name}
               onExpendAbility={abilityId =>
                 onExpendChargePoolAbility?.(item.id, abilityId)
               }
@@ -173,17 +151,12 @@ export function MagicItemRow({
           )}
 
           <div className="border-divider flex flex-wrap items-center gap-2 border-t pt-3">
-            {item.requiresAttunement && (
-              <Button
-                onClick={() => onToggleAttunement(item, !item.isAttuned)}
-                variant={item.isAttuned ? 'primary' : 'outline'}
-                size="sm"
-              >
-                <Sparkles size={14} className="mr-1" />
-                {item.isAttuned ? 'Attuned' : 'Attune'}
-              </Button>
-            )}
-            <Button onClick={() => onEdit(item)} variant="outline" size="sm">
+            <Button
+              onClick={() => onEdit(item)}
+              variant="outline"
+              size="sm"
+              aria-label={`Edit ${item.name}`}
+            >
               <Edit2 size={14} className="mr-1" />
               Edit
             </Button>
@@ -191,9 +164,10 @@ export function MagicItemRow({
               onClick={() => onDelete(item.id)}
               variant="danger"
               size="sm"
+              aria-label={`Delete ${item.name}`}
             >
               <Trash2 size={14} className="mr-1" />
-              Delete
+              Delete item
             </Button>
           </div>
         </div>
@@ -220,47 +194,36 @@ function IndividualChargeChip({
   const isFull = used <= 0;
 
   return (
-    <div
-      className={`inline-flex items-center gap-1.5 rounded-lg border px-2 py-1.5 ${
-        isExhausted
-          ? 'border-accent-red-border bg-accent-red-bg'
-          : 'border-accent-purple-border bg-accent-purple-bg'
-      }`}
-    >
-      <Sparkles
-        size={10}
-        className={
-          isExhausted
-            ? 'text-accent-red-text-muted'
-            : 'text-accent-purple-text-muted'
-        }
-      />
-      <span className="text-heading max-w-[100px] truncate text-xs font-medium">
+    <div className="border-divider inline-flex min-w-0 flex-wrap items-center gap-1.5 border px-2 py-1.5">
+      <Sparkles size={14} aria-hidden="true" className="text-muted" />
+      <span className="text-heading text-sm font-medium break-words">
         {charge.name}
       </span>
       <button
+        type="button"
         onClick={onRestore}
         disabled={isFull}
-        className={`rounded p-0.5 ${isFull ? 'text-faint cursor-not-allowed' : 'text-accent-green-text-muted hover:bg-accent-green-bg'}`}
-        title="Restore 1"
+        className="text-body disabled:text-faint inline-flex min-h-9 min-w-9 items-center justify-center rounded pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        aria-label={`Restore one ${charge.name} charge`}
       >
-        <Plus size={10} />
+        <Plus size={14} />
       </button>
-      <span
-        className={`text-xs font-bold ${isExhausted ? 'text-accent-red-text' : 'text-heading'}`}
-      >
+      <span className="text-heading text-sm font-semibold">
         {remaining}/{maxCharges}
       </span>
       <button
+        type="button"
         onClick={onExpend}
         disabled={isExhausted}
-        className={`rounded p-0.5 ${isExhausted ? 'text-faint cursor-not-allowed' : 'text-accent-red-text-muted hover:bg-accent-red-bg'}`}
-        title="Use 1"
+        className="text-body disabled:text-faint inline-flex min-h-9 min-w-9 items-center justify-center rounded pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+        aria-label={`Use one ${charge.name} charge`}
       >
-        <Minus size={10} />
+        <Minus size={14} />
       </button>
-      <span className="text-faint text-[10px]">
-        {charge.restType === 'dawn' ? <Sun size={10} /> : <Clock size={10} />}
+      <span className="text-muted text-xs">
+        {charge.restType === 'dawn'
+          ? 'Recharges at dawn'
+          : `Recharges on a ${charge.restType} rest`}
       </span>
     </div>
   );

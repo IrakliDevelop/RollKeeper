@@ -130,7 +130,7 @@ describe('WeaponRow', () => {
     expect(header).toBeTruthy();
     await user.click(header!);
     expect(screen.getByText('Flame Tongue')).toBeInTheDocument();
-    expect(screen.getByText('Individual Charges')).toBeInTheDocument();
+    expect(screen.getByText('Charges')).toBeInTheDocument();
   });
 });
 
@@ -154,7 +154,7 @@ describe('MagicItemRow', () => {
     expect(screen.getAllByText('Cloak of Protection').length).toBeGreaterThan(
       0
     );
-    expect(screen.getAllByText('uncommon').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Uncommon').length).toBeGreaterThan(0);
   });
 
   it('shows attunement status', () => {

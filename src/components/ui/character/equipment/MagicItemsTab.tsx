@@ -11,8 +11,13 @@ import { MagicItemRow } from './MagicItemRow';
 import { MagicItemFormDialog } from './MagicItemFormDialog';
 import { EquipmentFilterBar, type FilterConfig } from './EquipmentFilterBar';
 import { useEquipmentFilters } from '@/hooks/useEquipmentFilters';
+import { useSheetMode } from '@/components/ui/character/SheetMode';
+import { EquipmentReorderControls } from './EquipmentReorderControls';
 import type { MagicItemFormData } from '@/components/ui/game/equipment/MagicItemForm';
-import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
+import {
+  alertDialog,
+  confirmDialog,
+} from '@/components/ui/feedback/confirm-dialog';
 
 const FILTER_CONFIG: FilterConfig = {
   showAttuned: true,
@@ -35,6 +40,7 @@ const FILTER_CONFIG: FilterConfig = {
 };
 
 export function MagicItemsTab() {
+  const { editing } = useSheetMode();
   const {
     character,
     addMagicItem,
@@ -140,11 +146,11 @@ export function MagicItemsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h3 className="text-heading text-lg font-semibold">Magic Items</h3>
+          <h3 className="text-heading text-lg font-semibold">Magic items</h3>
           <span className="text-muted text-sm">
             ({character.magicItems.length})
           </span>
-          <Badge variant="primary" size="sm">
+          <Badge variant="neutral" size="sm">
             {totalAttuned}/{character.attunementSlots.max} attuned
           </Badge>
         </div>
@@ -154,7 +160,7 @@ export function MagicItemsTab() {
           size="sm"
           leftIcon={<Plus size={16} />}
         >
-          Add Item
+          Add magic item
         </Button>
       </div>
 
@@ -179,19 +185,41 @@ export function MagicItemsTab() {
           className="space-y-2"
           showDragHandle
           dragHandlePosition="left"
-          renderItem={item => (
-            <MagicItemRow
-              item={item}
-              characterLevel={character.level}
-              onEdit={handleEdit}
-              onDelete={id => deleteMagicItem(id)}
-              onToggleAttunement={handleAttunement}
-              onExpendCharge={expendMagicItemCharge}
-              onRestoreCharge={restoreMagicItemCharge}
-              onExpendChargePoolAbility={expendChargePoolAbility}
-              onRestoreChargePool={restoreChargePool}
-              onSetChargePoolUsed={setChargePoolUsed}
-            />
+          renderItem={(item, index) => (
+            <div>
+              <MagicItemRow
+                item={item}
+                characterLevel={character.level}
+                onEdit={handleEdit}
+                onDelete={id => {
+                  void confirmDialog({
+                    title: `Delete ${item.name}?`,
+                    confirmLabel: 'Delete item',
+                    cancelLabel: 'Cancel',
+                    tone: 'danger',
+                  }).then(confirmed => {
+                    if (confirmed) deleteMagicItem(id);
+                  });
+                }}
+                onToggleAttunement={handleAttunement}
+                onExpendCharge={expendMagicItemCharge}
+                onRestoreCharge={restoreMagicItemCharge}
+                onExpendChargePoolAbility={expendChargePoolAbility}
+                onRestoreChargePool={restoreChargePool}
+                onSetChargePoolUsed={setChargePoolUsed}
+              />
+              {editing && (
+                <EquipmentReorderControls
+                  name={item.name}
+                  index={index}
+                  count={filteredItems.length}
+                  onMove={destinationIndex => {
+                    const destination = filteredItems[destinationIndex];
+                    if (destination) reorderMagicItems(item.id, destination.id);
+                  }}
+                />
+              )}
+            </div>
           )}
         />
       ) : (
@@ -199,14 +227,14 @@ export function MagicItemsTab() {
           <Sparkles className="text-faint mx-auto mb-3 h-12 w-12" />
           <p className="text-heading font-medium">
             {hasActiveFilters
-              ? 'No magic items match your filters'
-              : 'No magic items added yet'}
+              ? 'No magic items match your search or filters'
+              : 'Add your first magic item'}
           </p>
-          <p className="mt-1 text-sm">
-            {hasActiveFilters
-              ? 'Try adjusting your filters.'
-              : 'Add magic items to manage your collection.'}
-          </p>
+          {hasActiveFilters && (
+            <Button onClick={resetFilters} variant="ghost" size="sm">
+              Clear filters
+            </Button>
+          )}
         </div>
       )}
 
