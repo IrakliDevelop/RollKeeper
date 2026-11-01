@@ -1,6 +1,12 @@
 import type { ReactNode } from 'react';
 import type { EditorMode } from './DmLocationEditor.types';
 import type { BattleMapConnectionStatus } from '@/lib/battlemapSync';
+import type {
+  MarkerToolControls,
+  MeasureSharingControl,
+  MovementControls,
+} from './DmLocationToolOptions';
+import type { FogPresetControls } from './fog';
 import type { DmFogControls } from './fog';
 
 export interface DmLocationToolbarProps {
@@ -58,6 +64,10 @@ export interface DmLocationToolbarProps {
   presenceControl?: ReactNode;
   /** Fog authoring controls for battle maps and campaign locations. */
   fogControls?: DmFogControls;
+  fogPresetControls?: FogPresetControls;
+  markerControls?: MarkerToolControls;
+  measureSharing?: MeasureSharingControl;
+  movementControls?: MovementControls;
   /** The relay is configured, so location mode gets the live controls
    *  (presence tools now; presence control, sync chip and hidden placement are
    *  wired by the editor). Ignored in battlemap mode. */

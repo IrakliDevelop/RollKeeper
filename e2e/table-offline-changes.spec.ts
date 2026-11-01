@@ -346,9 +346,11 @@ async function offlineChangesFlow(
     // 2. Reconnect: the live room wins and the toast points at Details.
     await setRelayOffline(page, false);
     await expect(
-      page.getByText(
-        'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
-      )
+      page
+        .locator('[data-toast-type]')
+        .getByText(
+          'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
+        )
     ).toBeVisible({ timeout: 60_000 });
     await expect.poll(() => boxX(page), { timeout: 20_000 }).toBe(START_X);
 
@@ -463,9 +465,11 @@ test('edits made while the relay is down at page load are kept and reapplied onc
     // points at Details (it used to revert silently).
     await setRelayOffline(page, false);
     await expect(
-      page.getByText(
-        'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
-      )
+      page
+        .locator('[data-toast-type]')
+        .getByText(
+          'Map edits made while offline were not sent. To send them, open Details and choose Reapply offline changes.'
+        )
     ).toBeVisible({ timeout: 60_000 });
     await expect.poll(() => boxX(page), { timeout: 20_000 }).toBe(START_X);
 

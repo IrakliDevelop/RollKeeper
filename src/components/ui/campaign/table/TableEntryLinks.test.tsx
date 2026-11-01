@@ -24,6 +24,7 @@ vi.mock('next/navigation', () => ({
 }));
 
 import { EncounterBattleMapButton } from '@/components/ui/encounter/EncounterBattleMapButton';
+import { DmVttTopBar } from '@/components/ui/campaign/dm-vtt/DmVttTopBar';
 import { EncounterList } from '@/components/ui/encounter/EncounterList';
 
 import {
@@ -127,7 +128,12 @@ describe('A6 Table entry points', () => {
     ).toHaveAttribute('href', '/dm/campaign/CAMP/table?panel=scenes');
   });
 
-  it('the original map route renders the affordance', () => {
+  it('the original map route delegates its Table affordance to the shared header', async () => {
+    lookup.scene = {
+      sceneId: 'scene-9',
+      localWorkspaceId: 'workspace-1',
+      defaultWorkspace: true,
+    };
     const source = fs.readFileSync(
       path.resolve(
         __dirname,
@@ -135,8 +141,22 @@ describe('A6 Table entry points', () => {
       ),
       'utf8'
     );
-    expect(source).toContain(
-      '<TableMapEntryLink campaignCode={code} mapId={id} compact />'
+    expect(source).toMatch(
+      /<DmVttTopBar\s+campaignCode=\{code\}\s+battleMapId=\{id\}/
     );
+    render(
+      <DmVttTopBar
+        campaignCode="CAMP"
+        battleMapId="map-1"
+        dmId="synthetic-dm"
+        mapName="Map"
+        mode="setup"
+        onModeChange={() => {}}
+        showDisplay={false}
+      />
+    );
+    expect(
+      await screen.findByRole('link', { name: 'Open in Table' })
+    ).toHaveAttribute('href', '/dm/campaign/CAMP/table?scene=scene-9');
   });
 });

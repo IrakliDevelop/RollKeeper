@@ -117,17 +117,17 @@ export function TableMapEntryLinkView(props: {
   const label = target.kind === 'open' ? 'Open in Table' : 'Use in Table';
   if (props.compact)
     return (
-      <Link href={target.href} className="shrink-0">
-        <Button
-          variant="ghost"
-          size="lg"
-          leftIcon={<LayoutDashboard size={16} />}
-          aria-label={label}
-          className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
-        >
+      <Button
+        asChild
+        variant="ghost"
+        size="sm"
+        leftIcon={<LayoutDashboard size={16} />}
+        className="min-h-11 min-w-11 shrink-0 px-2 text-xs lg:px-3"
+      >
+        <Link href={target.href} aria-label={label}>
           <span className="hidden lg:inline">{label}</span>
-        </Button>
-      </Link>
+        </Link>
+      </Button>
     );
   return (
     <Link href={target.href}>

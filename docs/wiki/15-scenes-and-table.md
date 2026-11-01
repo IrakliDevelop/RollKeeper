@@ -29,6 +29,20 @@ the workspace shell measures its own header for the same flyout position.
 These layout rules do not change control leases, presentation commands,
 checkpoint recovery or calibration eligibility.
 
+The DM's map tools sit below the session controls. Select/Pan, movement and
+measurement, Fog, Drawing, and Laser/Ping form separate groups. Drawing opens
+the annotation picker; Map controls expands an inline row for history, token
+information, views, viewers, export and map-wide actions. Selected-element
+visibility stays beside the current tool's controls. Annotation and selection
+editing also keep Undo/Redo one tap away. Tool options are inline on desktop
+and open in a scrollable dialog below `lg`. Closing Map controls hides its
+overlays while preserving drafts and export jobs.
+
+The original battle map's Setup and Play views share this grouping. Setup
+retains image upload, Add map, Arrange maps, Grid and Fit map to screen;
+Setup/Play and the Table entry remain outside the scrolling tool strip.
+Player and ordinary location-map toolbars are unchanged.
+
 ## Routes and auth model
 
 Pages:

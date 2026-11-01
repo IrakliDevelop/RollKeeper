@@ -110,7 +110,7 @@ const ROUTES = [
   },
 ];
 
-for (const theme of ['parchment', 'dark', 'light'])
+for (const theme of ['light', 'dark', 'blue'])
   for (const width of [390, 360])
     for (const route of ROUTES)
       test(`${route.path} fits ${width} px (${theme})`, async ({ page }) => {
@@ -120,16 +120,7 @@ for (const theme of ['parchment', 'dark', 'light'])
         await seed(page, theme);
         await page.goto(route.path, { waitUntil: 'domcontentloaded' });
         await route.ready(page);
-        if (theme === 'light')
-          await expect(page.locator('html')).not.toHaveAttribute(
-            'data-theme',
-            /.+/u
-          );
-        else
-          await expect(page.locator('html')).toHaveAttribute(
-            'data-theme',
-            theme
-          );
+        await expectTheme(page, theme);
         const box = await measure(page);
         expect(box.clientWidth).toBe(width);
         expect(box.scrollWidth).toBeLessThanOrEqual(box.clientWidth);
@@ -139,7 +130,7 @@ for (const theme of ['parchment', 'dark', 'light'])
 
 test('narrow headers keep accessible names at 360 px', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 720 });
-  await seed(page, 'parchment');
+  await seed(page, 'light');
   await page.goto(`/dm/campaign/${CODE}/battlemaps`);
   await expect(
     page.getByRole('button', { name: 'New Battle Map' })
@@ -149,7 +140,7 @@ test('narrow headers keep accessible names at 360 px', async ({ page }) => {
   ).toBeVisible();
   await page.goto(`/dm/campaign/${CODE}/battlemaps/${MAP_ID}`);
   await expect(
-    page.getByRole('link', { name: 'Back to Battle Maps' })
+    page.getByRole('link', { name: 'Back to battle maps' })
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: 'Setup', exact: true })
@@ -233,22 +224,33 @@ async function editorTopBar(
     expect(box.right, name).toBeLessThanOrEqual(box.innerWidth);
     expect(box.hit, name).toBe(true);
   }
-  // The rest of the bar still scrolls, and its controls stay reachable.
-  const off = page.getByRole('button', { name: 'Off', exact: true });
-  const scroller = await off.evaluate(element => {
-    const area = element.closest('.overflow-x-auto')!;
-    return { clientWidth: area.clientWidth, scrollWidth: area.scrollWidth };
-  });
-  expect(scroller.clientWidth).toBeGreaterThan(0);
-  if (options.width === 360)
-    expect(scroller.scrollWidth).toBeGreaterThan(scroller.clientWidth);
-  await off.scrollIntoViewIfNeeded();
-  const offBox = await reachable(page, 'Off', 'button');
-  expect(offBox.right).toBeLessThanOrEqual(offBox.innerWidth);
-  expect(offBox.hit).toBe(true);
+  // Grid choices are disclosed from the second row, rather than placed
+  // in a horizontal tool strip. Both the trigger and its options are tappable.
+  const gridBox = await reachable(page, 'Grid settings', 'button');
+  expect(gridBox.left).toBeGreaterThanOrEqual(0);
+  expect(gridBox.right).toBeLessThanOrEqual(gridBox.innerWidth);
+  expect(gridBox.hit).toBe(true);
+  await expect(
+    page.getByRole('button', { name: 'Off', exact: true })
+  ).toHaveCount(0);
+  await page
+    .getByRole('button', { name: 'Grid settings', exact: true })
+    .click();
+  for (const name of ['Hex', 'Square', 'Off']) {
+    const box = await reachable(page, name, 'button');
+    expect(box.left, name).toBeGreaterThanOrEqual(0);
+    expect(box.right, name).toBeLessThanOrEqual(box.innerWidth);
+    expect(box.hit, name).toBe(true);
+  }
+  await page.keyboard.press('Escape');
+  // Radix restores trigger focus after closing. Finish that restoration before
+  // a caller starts a separate keyboard-order check.
+  await expect(
+    page.getByRole('button', { name: 'Grid settings', exact: true })
+  ).toBeFocused();
 }
 
-for (const theme of ['parchment', 'dark', 'light'])
+for (const theme of ['light', 'dark', 'blue'])
   for (const width of [390, 360])
     test(`editor top bar pins Open in Table and Setup/Play at ${width} px (${theme})`, async ({
       page,
@@ -259,35 +261,60 @@ for (const theme of ['parchment', 'dark', 'light'])
 test('editor top bar pins Use in Table and Setup/Play at 360 px (not on the Table)', async ({
   page,
 }) => {
-  await editorTopBar(page, { width: 360, theme: 'parchment', adopted: false });
+  await editorTopBar(page, { width: 360, theme: 'light', adopted: false });
 });
 
-test('FR8: Tab walks the editor top bar in order, pinned controls last (390 px)', async ({
+test('FR8: Tab follows the editor header rows through mode, grid and display controls (390 px)', async ({
   page,
 }) => {
-  await editorTopBar(page, { width: 390, theme: 'parchment', adopted: true });
-  await page.getByRole('button', { name: 'Back to battle maps' }).focus();
+  await editorTopBar(page, { width: 390, theme: 'light', adopted: true });
+  await page
+    .getByRole('link', { name: 'Back to battle maps', exact: true })
+    .focus();
   const names: string[] = [];
-  for (let step = 0; step < 14 && names.at(-1) !== 'Play'; step += 1) {
+  for (let step = 0; step < 20 && names.at(-1) !== 'Open display'; step += 1) {
     await page.keyboard.press('Tab');
     const name = await page.evaluate(() => {
       const active = document.activeElement as HTMLElement | null;
       if (!active) return '';
-      const labelled =
-        active.getAttribute('aria-label') ??
-        active.querySelector('[aria-label]')?.getAttribute('aria-label');
-      return (labelled ?? active.textContent ?? '').trim();
+      const labelled = active.getAttribute('aria-label');
+      const text = active.cloneNode(true) as HTMLElement;
+      text
+        .querySelectorAll('[aria-hidden="true"], svg')
+        .forEach(node => node.remove());
+      return (labelled ?? text.textContent ?? '').trim();
     });
-    // A link wrapping a button is two stops with one name (pre-existing).
-    if (names.at(-1) !== name) names.push(name);
+    // Account/theme controls may appear between the rows. Verify the
+    // relative order of the map controls without prescribing account state.
+    if (
+      [
+        'Open in Table',
+        'Setup',
+        'Play',
+        'Grid settings',
+        'Open display',
+      ].includes(name)
+    )
+      names.push(name);
   }
   expect(names).toEqual([
-    'Hex',
-    'Square',
-    'Off',
-    'Open display',
     'Open in Table',
     'Setup',
     'Play',
+    'Grid settings',
+    'Open display',
   ]);
+});
+
+test('retired parchment preferences migrate to light even with a dark system preference', async ({
+  page,
+}) => {
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await seed(page, 'parchment');
+  await page.goto(`/dm/campaign/${CODE}/battlemaps`);
+  await heading('Battle Maps')(page);
+  await expectTheme(page, 'light');
+  expect(
+    await page.evaluate(() => localStorage.getItem('rollkeeper-theme'))
+  ).toBe('light');
 });

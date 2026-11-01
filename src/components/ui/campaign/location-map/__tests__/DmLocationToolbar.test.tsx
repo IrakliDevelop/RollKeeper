@@ -13,7 +13,10 @@ import {
 
 import type { DmLocationToolbarProps } from '@/components/ui/campaign/location-map/DmLocationToolbar.types';
 
+vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => true }));
 vi.mock('@fieldnotes/react', () => ({
+  useSelectionOps: () => ({ selectedCount: 0 }),
+  useToolOptions: () => [undefined, vi.fn()],
   useActiveTool: () => ['select', vi.fn()] as const,
   useHistory: () => ({
     canUndo: false,
@@ -80,7 +83,7 @@ describe('DmLocationToolbar', () => {
     );
     const button = screen.getByRole('button', { name: 'Fog of war' });
     expect(button).toBeDisabled();
-    expect(button).toHaveAttribute('title', fogControls.disabledReason);
+    expect(button).toHaveAccessibleDescription(fogControls.disabledReason);
 
     rerender(
       <DmLocationToolbar
@@ -114,14 +117,16 @@ describe('DmLocationToolbar', () => {
 
   it('wraps instead of clipping (flex-wrap on the container)', () => {
     const { container } = render(<DmLocationToolbar {...baseProps} />);
-    expect(container.firstElementChild?.className).toContain('flex-wrap');
+    expect(container.firstElementChild?.className).toContain('flex-col');
   });
 
   it('offers an eraser tool separately from clearing the canvas', () => {
     render(<DmLocationToolbar {...baseProps} />);
 
-    expect(screen.getByTitle('Eraser')).toBeInTheDocument();
-    expect(screen.getByTitle('Clear canvas')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Drawing' }));
+    expect(screen.getByRole('button', { name: 'Eraser' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
+    expect(screen.getByRole('button', { name: 'Clear canvas' })).toBeVisible();
   });
 
   it('renders viewsControl next to exportControl in battlemap mode', () => {
@@ -228,10 +233,15 @@ describe('DmLocationToolbar', () => {
       />
     );
 
-    const placement = screen.getByRole('button', { name: 'Placing hidden' });
+    const placement = screen.getByRole('button', {
+      name: 'Place hidden elements',
+    });
     expect(placement).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(placement);
-    fireEvent.click(screen.getByRole('button', { name: 'Reveal all (3)' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Reveal all hidden elements (3)' })
+    );
     expect(onToggle).toHaveBeenCalledOnce();
     expect(onRevealAll).toHaveBeenCalledOnce();
   });
@@ -288,7 +298,8 @@ describe('DmLocationToolbar marker chrome', () => {
 
   it('offers a Marker tool in both battlemap and location mode', () => {
     const { unmount } = render(<DmLocationToolbar {...baseProps} />);
-    expect(screen.getByTitle('Marker')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Drawing' }));
+    expect(screen.getByRole('button', { name: 'Marker' })).toBeVisible();
     unmount();
 
     render(<DmLocationToolbar {...baseProps} mode="location" />);
@@ -332,7 +343,7 @@ describe('DmLocationToolbar marker chrome', () => {
       />
     );
 
-    const toggle = screen.getByTestId('dm-only-toggle');
+    const toggle = screen.getByTestId('dm-vtt-dm-only-toggle');
     expect(toggle.getAttribute('title')).toContain(
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
@@ -344,8 +355,11 @@ describe('DmLocationToolbar marker chrome', () => {
   it('a non-marker selection keeps the plain visibility copy', () => {
     render(<DmLocationToolbar {...baseProps} selectedElementId="shape-1" />);
 
-    const toggle = screen.getByTestId('dm-only-toggle');
-    expect(toggle.getAttribute('title')).toBe('Visible to players');
+    const toggle = screen.getByTestId('dm-vtt-dm-only-toggle');
+    expect(toggle).toHaveTextContent('Hide selected');
+    expect(toggle.getAttribute('title')).toBe(
+      'Hide selected element from players'
+    );
     expect(toggle.getAttribute('title')).not.toContain(
       MARKER_SHARE_REVEALS_CLASSIFICATION
     );
@@ -353,6 +367,7 @@ describe('DmLocationToolbar marker chrome', () => {
 
   it('PR04 Table v1: "Share with players" is disabled with the Table-managed reason', () => {
     render(<DmLocationToolbar {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
     const share = screen.getByRole('button', { name: 'Share with players' });
     expect(share).toBeDisabled();
     expect(
@@ -372,6 +387,7 @@ describe('DmLocationToolbar marker chrome', () => {
     render(
       <DmLocationToolbar {...baseProps} onOpenTvDisplay={onOpenTvDisplay} />
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
     fireEvent.click(screen.getByRole('button', { name: /Open TV Display/u }));
     expect(onOpenTvDisplay).toHaveBeenCalledTimes(1);
     expect(

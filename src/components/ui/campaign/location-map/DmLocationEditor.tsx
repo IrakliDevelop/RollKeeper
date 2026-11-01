@@ -199,6 +199,16 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
             arrangeMapsActive={arrangeMapsActive}
             onToggleArrangeMaps={handleToggleArrangeMaps}
             fogControls={fogControls}
+            fogPresetControls={fogPresetControls}
+            markerControls={markerControls}
+            measureSharing={{
+              enabled: measureSharing,
+              onChange: handleSetMeasureSharing,
+            }}
+            movementControls={{
+              sharing: { enabled: pathSharing, onChange: handleSetPathSharing },
+              dash: { enabled: movementDash, onChange: handleSetMovementDash },
+            }}
             exportControl={
               <BattleMapExportControl
                 getViewport={getViewport}
@@ -268,7 +278,7 @@ export default function DmLocationEditor(props: DmLocationEditorProps) {
           </div>
         )}
 
-        {viewport && (
+        {viewport && mode !== 'battlemap' && (
           <DmLocationToolOptions
             mode={mode}
             liveSyncConfigured={liveSyncConfigured}

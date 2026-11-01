@@ -1,5 +1,7 @@
 'use client';
 
+import { DmBattleMapSetupToolbar } from '@/components/ui/campaign/dm-vtt/DmBattleMapSetupToolbar';
+
 import {
   Hand,
   MousePointer2,
@@ -97,7 +99,15 @@ function formatSyncTime(iso: string): string {
   return date.toLocaleDateString();
 }
 
-export default function DmLocationToolbar({
+export default function DmLocationToolbar(props: DmLocationToolbarProps) {
+  return props.mode === 'battlemap' ? (
+    <DmBattleMapSetupToolbar {...props} />
+  ) : (
+    <LegacyDmLocationToolbar {...props} />
+  );
+}
+
+function LegacyDmLocationToolbar({
   onPickImage,
   onPickMapImage,
   onClear,

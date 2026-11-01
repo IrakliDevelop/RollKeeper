@@ -1,6 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import {
+  useMapControlsVisible,
+  isMapControlsToggle,
+} from '../MapControlsVisibility';
 import { captureCameraView, type CameraView } from '@fieldnotes/core';
 
 /** The minimum viewport surface `captureCameraView` needs. */
@@ -30,6 +34,7 @@ export function useBattleMapViewsControl({
   onRenameView,
   onDeleteView,
 }: UseBattleMapViewsControlArgs) {
+  const visible = useMapControlsVisible();
   const [open, setOpen] = useState(false);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
@@ -62,8 +67,9 @@ export function useBattleMapViewsControl({
   };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !visible) return;
     const onPointerDown = (e: PointerEvent) => {
+      if (isMapControlsToggle(e.target)) return;
       const target = e.target as Node;
       if (
         rootRef.current &&
@@ -83,7 +89,7 @@ export function useBattleMapViewsControl({
       document.removeEventListener('keydown', onKeyDown);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+  }, [open, visible]);
 
   const captureCurrentView = (): CameraView | null => {
     const vp = getViewport();

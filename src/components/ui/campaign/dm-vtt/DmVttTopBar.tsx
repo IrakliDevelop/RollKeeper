@@ -1,7 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowLeft, Monitor } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { ArrowLeft, Monitor, Grid3x3, ChevronDown } from 'lucide-react';
+import * as Popover from '@radix-ui/react-popover';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 import { Button } from '@/components/ui/forms/button';
 import { useDisplayLauncher } from '@/components/ui/campaign/table/display/useDisplayLauncher';
@@ -19,8 +22,10 @@ interface DmVttTopBarProps {
   battleMapId: string;
   dmId: string;
   mapName: string;
-  gridMode: DmVttGridMode;
-  onSetGridMode: (mode: DmVttGridMode) => void;
+  gridMode?: DmVttGridMode;
+  onSetGridMode?: (mode: DmVttGridMode) => void;
+  showDisplay?: boolean;
+  trailing?: ReactNode;
   mode: DmVttMode;
   onModeChange: (mode: DmVttMode) => void;
 }
@@ -49,6 +54,8 @@ export function DmVttTopBar({
   dmId,
   mapName,
   gridMode,
+  showDisplay = true,
+  trailing,
   onSetGridMode,
   mode,
   onModeChange,
@@ -58,78 +65,120 @@ export function DmVttTopBar({
   // One lookup feeds both the Table link and the privacy label (CC3).
   const tableEntry = useTableMapEntry(campaignCode, battleMapId);
   return (
-    <div className="flex min-h-[52px] min-w-0 items-center gap-2 px-1 sm:gap-3 sm:px-2">
-      {/* PR08 D1: everything but the Table link and Setup/Play scrolls. */}
-      <div className="scrollbar-thin flex min-w-0 flex-initial items-center justify-start gap-2 overflow-x-auto overscroll-x-contain p-1 sm:gap-3">
-        <Link
-          href={`/dm/campaign/${campaignCode}/battlemaps`}
-          className="shrink-0"
-        >
-          <Button variant="ghost" size="lg" aria-label="Back to battle maps">
-            <ArrowLeft size={18} />
-          </Button>
-        </Link>
-        <span className="text-heading min-w-[5rem] flex-1 truncate text-sm font-semibold sm:max-w-[160px] sm:flex-none">
-          {mapName}
-        </span>
-        <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-          {GRID_OPTIONS.map(({ key, label }) => (
-            <Button
-              key={key}
-              variant={gridMode === key ? 'primary' : 'ghost'}
-              onClick={() => onSetGridMode(key)}
-              className="min-h-[44px] px-2 text-xs"
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
+    <div className="flex min-w-0 flex-col gap-1 p-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <Button
+          asChild
           variant="ghost"
-          size="lg"
-          leftIcon={<Monitor size={16} />}
-          onClick={() =>
-            display.launch(() => openTvDisplay(campaignCode, dmId))
-          }
-          className="min-h-[44px] min-w-[44px] px-2 text-xs lg:px-3"
-          aria-label="Open display"
+          size="sm"
+          className="min-h-11 min-w-11 p-0"
         >
-          <span className="hidden lg:inline">Open Display</span>
-        </Button>
-        {display.message && (
-          <span
-            role="status"
-            className="text-accent-amber-text max-w-[16rem] shrink-0 text-xs break-words"
+          <Link
+            href={`/dm/campaign/${campaignCode}/battlemaps`}
+            aria-label="Back to battle maps"
           >
-            {display.message}
-          </span>
-        )}
-        {/* PR08 repair 07: the original editor has no live room under Table
-            v1 (players see maps only through the Table), so a plain privacy
-            label replaces the relay status chip. */}
-        <span className="text-muted shrink-0 text-xs">
+            <ArrowLeft size={18} aria-hidden />
+          </Link>
+        </Button>
+        <h1
+          className="type-ui text-heading min-w-0 flex-1 break-words max-[360px]:line-clamp-2"
+          title={mapName}
+        >
+          {mapName}
+        </h1>
+        <div className="flex shrink-0 flex-wrap items-center gap-1 max-[360px]:w-full max-[360px]:justify-end">
+          <TableMapEntryLinkView target={tableEntry} compact />
+          <div
+            role="group"
+            aria-label="Map mode"
+            className="flex shrink-0 items-center gap-0.5"
+          >
+            {MODE_OPTIONS.map(({ key, label }) => (
+              <Button
+                key={key}
+                variant="ghost"
+                size="sm"
+                selected={mode === key}
+                aria-pressed={mode === key}
+                onClick={() => onModeChange(key)}
+                className="min-h-11 px-2"
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
+          {trailing}
+        </div>
+      </div>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        <p className="type-small text-muted min-w-0 flex-1 basis-64">
           {tableEntry?.kind === 'open'
             ? 'Private copy. Players see the Table scene, not edits here.'
             : "Private. Players don't see this map."}
-        </span>
-      </div>
-      {/* Pinned at the right edge, never scrolled off (360 px included). */}
-      <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-        {/* PR06 FU-8: same Table entry as the Setup header (flag-gated). */}
-        <TableMapEntryLinkView target={tableEntry} compact />
-        <div className="border-divider flex shrink-0 items-center gap-0.5 rounded-lg border p-0.5">
-          {MODE_OPTIONS.map(({ key, label }) => (
+        </p>
+        <div className="flex flex-wrap items-center gap-1">
+          {gridMode && onSetGridMode && (
+            <Popover.Root>
+              <Popover.Trigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="min-h-11 px-2"
+                  aria-label="Grid settings"
+                >
+                  <Grid3x3 size={16} aria-hidden />
+                  Grid:{' '}
+                  {GRID_OPTIONS.find(option => option.key === gridMode)?.label}
+                  <ChevronDown size={14} aria-hidden />
+                </Button>
+              </Popover.Trigger>
+              <Popover.Portal>
+                <Popover.Content
+                  sideOffset={8}
+                  collisionPadding={8}
+                  aria-label="Grid settings"
+                  className={`${OVERLAY_SURFACE} z-50 max-w-[calc(100vw-1rem)] p-3`}
+                >
+                  <p className="type-label-heading text-heading mb-2">Grid</p>
+                  <div className="flex flex-wrap gap-1">
+                    {GRID_OPTIONS.map(({ key, label }) => (
+                      <Button
+                        key={key}
+                        variant="ghost"
+                        size="sm"
+                        selected={gridMode === key}
+                        aria-pressed={gridMode === key}
+                        onClick={() => onSetGridMode(key)}
+                        className="min-h-11 px-3"
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </Popover.Content>
+              </Popover.Portal>
+            </Popover.Root>
+          )}
+          {showDisplay && (
             <Button
-              key={key}
-              variant={mode === key ? 'primary' : 'ghost'}
-              onClick={() => onModeChange(key)}
-              className="min-h-[44px] px-2 text-xs"
+              variant="ghost"
+              size="sm"
+              leftIcon={<Monitor size={16} />}
+              onClick={() =>
+                display.launch(() => openTvDisplay(campaignCode, dmId))
+              }
+              className="min-h-11 px-2"
             >
-              {label}
+              Open display
             </Button>
-          ))}
+          )}
         </div>
       </div>
+      {display.message && (
+        <p role="status" className="type-small text-ember-text">
+          {display.message}
+        </p>
+      )}
     </div>
   );
 }

@@ -3,6 +3,11 @@
 import { useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { CameraView, FocusAudience } from '@fieldnotes/core';
+import {
+  useMapControlsVisible,
+  useMapControlsDock,
+} from '../MapControlsVisibility';
+import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import { Check, ChevronDown, MapPin, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -55,6 +60,8 @@ export function BattleMapViewsControl({
   onSharingChange,
   canShare = true,
 }: BattleMapViewsControlProps) {
+  const visible = useMapControlsVisible();
+  const dock = useMapControlsDock();
   const [audience, setAudience] = useState<FocusAudience>('all');
   const {
     rootRef,
@@ -87,12 +94,14 @@ export function BattleMapViewsControl({
   const [popoverPosition, setPopoverPosition] = useState({ top: 0, right: 8 });
 
   useLayoutEffect(() => {
-    if (!open) return;
+    if (!open || !visible) return;
     const updatePosition = () => {
       const rect = rootRef.current?.getBoundingClientRect();
       if (!rect) return;
       setPopoverPosition({
-        top: rect.bottom + 8,
+        top: dock
+          ? Math.min(rect.bottom + 8, Math.max(8, window.innerHeight - 480))
+          : rect.bottom + 8,
         right: Math.max(8, window.innerWidth - rect.right),
       });
     };
@@ -103,7 +112,7 @@ export function BattleMapViewsControl({
       window.removeEventListener('resize', updatePosition);
       window.removeEventListener('scroll', updatePosition, true);
     };
-  }, [open, rootRef]);
+  }, [open, visible, dock, rootRef]);
 
   const handleBringToMyView = () => {
     if (!sharingEnabled) return;
@@ -114,7 +123,8 @@ export function BattleMapViewsControl({
   return (
     <div ref={rootRef} className="relative">
       <Button
-        variant={open ? 'primary' : 'ghost'}
+        variant={dock ? 'ghost' : open ? 'primary' : 'ghost'}
+        selected={dock && open}
         onClick={toggleOpen}
         aria-expanded={open}
         className="flex h-11 items-center gap-1.5 px-3 text-xs"
@@ -124,12 +134,22 @@ export function BattleMapViewsControl({
       </Button>
 
       {open &&
+        visible &&
         createPortal(
           <div
             ref={popoverRef}
             data-testid="battle-map-views-popover"
-            className="bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl"
-            style={popoverPosition}
+            className={
+              dock
+                ? `${OVERLAY_SURFACE} fixed z-50 w-72 max-w-[calc(100vw-1rem)] overflow-y-auto p-3`
+                : 'bg-surface-raised border-divider fixed z-50 w-72 rounded-xl border p-3 shadow-xl'
+            }
+            style={{
+              ...popoverPosition,
+              maxHeight: dock
+                ? `calc(100dvh - ${popoverPosition.top}px - 8px)`
+                : undefined,
+            }}
           >
             {savingView ? (
               <div className="flex items-center gap-1">

@@ -222,7 +222,10 @@ export async function openTableSceneLive(
   await expect(
     dmPage.getByText("Players' view updated", { exact: true })
   ).toBeVisible({ timeout: 20_000 });
-  await expect(dmPage.getByRole('button', { name: 'Marker' })).toBeVisible({
+  // Marker is disclosed under Drawing; Select is the always-visible ready tool.
+  await expect(
+    dmPage.getByRole('button', { name: 'Select', exact: true })
+  ).toBeVisible({
     timeout: 15_000,
   });
   await dmPage.waitForFunction(() => !!window.__rkStores?.viewport, undefined, {

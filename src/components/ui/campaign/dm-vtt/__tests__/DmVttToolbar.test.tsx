@@ -1,15 +1,27 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, cleanup, fireEvent, screen } from '@testing-library/react';
 
-import { DmVttToolbar } from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
+import {
+  DmVttToolbar,
+  DM_VTT_TOOL_NAMES,
+} from '@/components/ui/campaign/dm-vtt/DmVttToolbar';
 import DmLocationToolOptions from '@/components/ui/campaign/location-map/DmLocationToolOptions';
 import {
   MARKER_MIXED_AUDIENCE_MESSAGE,
   MARKER_SHARE_REVEALS_CLASSIFICATION,
 } from '@/components/ui/campaign/location-map/markerAudienceCopy';
 
+vi.mock('@/hooks/useMediaQuery', () => ({ useMediaQuery: () => true }));
+const sdk = vi.hoisted(() => ({ activeTool: 'select', setTool: vi.fn() }));
 vi.mock('@fieldnotes/react', () => ({
-  useActiveTool: () => ['select', vi.fn()] as const,
+  useActiveTool: () => [sdk.activeTool, sdk.setTool] as const,
+  useSelectionOps: () => ({ selectedCount: 1 }),
+  useHistory: () => ({
+    canUndo: false,
+    canRedo: false,
+    undo: vi.fn(),
+    redo: vi.fn(),
+  }),
   useToolOptions: () => [undefined, vi.fn()] as const,
 }));
 
@@ -21,9 +33,74 @@ vi.mock('@/components/ui/campaign/location-map/DmLocationToolOptions', () => ({
   default: vi.fn(() => null),
 }));
 
+const baseProps = {
+  onClearDrawings: vi.fn(),
+  hiddenPlacementActive: false,
+  onToggleHiddenPlacement: vi.fn(),
+  hiddenElementCount: 0,
+  onRevealAll: vi.fn(),
+  selectedElementId: null,
+  selectedElementIsDmOnly: false,
+  onToggleSelectedDmOnly: vi.fn(),
+};
+const toolLabels: Record<string, string> = {
+  select: 'Select',
+  hand: 'Pan',
+  path: 'Move',
+  measure: 'Measure',
+  template: 'Template',
+  laser: 'Laser pointer',
+  ping: 'Ping (look here)',
+  pencil: 'Draw',
+  arrow: 'Arrow',
+  shape: 'Shape',
+  text: 'Text',
+  note: 'Sticky note',
+  marker: 'Marker',
+  eraser: 'Eraser',
+};
+const drawingNames = [
+  'pencil',
+  'arrow',
+  'shape',
+  'text',
+  'note',
+  'marker',
+  'eraser',
+];
 describe('DmVttToolbar', () => {
+  beforeEach(() => {
+    sdk.activeTool = 'select';
+    sdk.setTool.mockClear();
+  });
   afterEach(() => cleanup());
 
+  it.each(DM_VTT_TOOL_NAMES)(
+    'activates the registered %s tool through its labelled control',
+    name => {
+      render(<DmVttToolbar {...baseProps} />);
+      if (drawingNames.includes(name))
+        fireEvent.click(screen.getByRole('button', { name: 'Drawing' }));
+      fireEvent.click(screen.getByRole('button', { name: toolLabels[name] }));
+      expect(sdk.setTool).toHaveBeenCalledExactlyOnceWith(name);
+    }
+  );
+  it('filters private-editor tools from the strip and Drawing picker without changing the active tool', () => {
+    sdk.activeTool = 'shape';
+    render(<DmVttToolbar {...baseProps} hiddenTools={['ping', 'eraser']} />);
+    expect(
+      screen.queryByRole('button', { name: 'Ping (look here)' })
+    ).toBeNull();
+    const drawing = screen.getByRole('button', { name: 'Drawing: Shape' });
+    expect(drawing).toHaveAttribute('data-selected', 'true');
+    fireEvent.click(drawing);
+    expect(screen.queryByRole('button', { name: 'Eraser' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Shape' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    expect(sdk.setTool).not.toHaveBeenCalled();
+  });
   it('threads the shared fog controller into the button and options bar', () => {
     const requestActivate = vi.fn();
     const fogControls = {
@@ -83,7 +160,9 @@ describe('DmVttToolbar', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Drawing' }));
     expect(screen.getByRole('button', { name: 'Eraser' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
     expect(
       screen.getByRole('button', { name: 'Clear drawings' })
     ).toBeInTheDocument();
@@ -108,7 +187,7 @@ describe('DmVttToolbar', () => {
     expect(dock.className).toContain('flex-col');
     expect(dock.className).toContain('inset-x-0');
     expect(dock.className).toContain('w-full');
-    expect(dock.className).toContain('2xl:flex-row');
+    expect(dock.className).not.toContain('2xl:flex-row');
     expect(dock.querySelector('.overflow-x-auto')).toBeInTheDocument();
   });
 
@@ -157,6 +236,7 @@ describe('DmVttToolbar', () => {
     });
     expect(placement).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(placement);
+    fireEvent.click(screen.getByRole('button', { name: 'Map controls' }));
     fireEvent.click(
       screen.getByRole('button', { name: 'Reveal all hidden elements (2)' })
     );
@@ -245,10 +325,12 @@ describe('DmVttToolbar', () => {
       />
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Drawing' }));
     const marker = screen.getByRole('button', { name: 'Marker' });
     expect(marker).toBeInTheDocument();
-    expect(marker.className).toContain('min-h-[44px]');
-    expect(marker.className).toContain('min-w-[44px]');
+    expect(marker).toBeVisible();
+    fireEvent.click(marker);
+    expect(sdk.setTool).toHaveBeenCalledWith('marker');
   });
 
   it('threads markerControls through to the shared tool options bar', () => {

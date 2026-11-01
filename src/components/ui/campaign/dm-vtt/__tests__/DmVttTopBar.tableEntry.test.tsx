@@ -79,10 +79,9 @@ describe('Play mode Table entry (FU-8)', () => {
       lookup.scene = scene;
       renderBar();
       const link = await screen.findByRole('link', { name: label });
-      const button = link.querySelector('button')!;
-      expect(button).toHaveAttribute('aria-label', label);
-      expect(button.querySelector('svg')).not.toBeNull();
-      const text = Array.from(button.querySelectorAll('span')).find(
+      expect(link).toHaveAttribute('aria-label', label);
+      expect(link.querySelector('svg')).not.toBeNull();
+      const text = Array.from(link.querySelectorAll('span')).find(
         span => span.textContent === label
       );
       expect(text).toHaveClass('hidden', 'lg:inline');

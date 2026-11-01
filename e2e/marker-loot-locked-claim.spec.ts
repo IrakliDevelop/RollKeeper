@@ -456,7 +456,11 @@ test('DM locks a loot container, publishes, and the player claims a partial gran
     console.log('[test] player relay live');
 
     // ---- DM: place a loot marker ----
-    await dmPage.getByRole('button', { name: 'Marker' }).click();
+    await dmPage.getByRole('button', { name: /^Drawing(?:$|:)/u }).click();
+    await dmPage
+      .getByRole('dialog', { name: 'Drawing tools' })
+      .getByRole('button', { name: 'Marker', exact: true })
+      .click();
     await dmPage.getByRole('button', { name: 'Marker kind: loot' }).click();
     const canvas = dmPage.locator('canvas').first();
     const box = await canvas.boundingBox();
@@ -726,7 +730,11 @@ test('DM locks a shared container while the player has it open — the open pane
     console.log('[live-update test] player relay live');
 
     // ---- DM: place a loot marker, add one open unit, share it ----
-    await dmPage.getByRole('button', { name: 'Marker' }).click();
+    await dmPage.getByRole('button', { name: /^Drawing(?:$|:)/u }).click();
+    await dmPage
+      .getByRole('dialog', { name: 'Drawing tools' })
+      .getByRole('button', { name: 'Marker', exact: true })
+      .click();
     await dmPage.getByRole('button', { name: 'Marker kind: loot' }).click();
     const canvas = dmPage.locator('canvas').first();
     const box = await canvas.boundingBox();
