@@ -1,11 +1,7 @@
 'use client';
 
-import React from 'react';
-import type {
-  EncounterEntity,
-  EntityType,
-  PlayerDisposition,
-} from '@/types/encounter';
+import { Button } from '@/components/ui/forms/button';
+import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
 import { TokenChip } from './TokenChip';
 import { RowBadges } from './RowBadges';
@@ -29,28 +25,6 @@ export interface CombatantRowProps {
   onSelect: () => void;
 }
 
-function getStripeClass(
-  disposition: PlayerDisposition | undefined,
-  type: EntityType
-): string {
-  const d = disposition ?? (type === 'player' ? 'ally' : 'enemy');
-  if (d === 'ally') return 'bg-accent-blue-border-strong';
-  if (d === 'neutral') return 'bg-divider-strong';
-  return 'bg-accent-red-border-strong';
-}
-
-function getRowClass(
-  isActive: boolean,
-  isSelected: boolean,
-  isOnDeck: boolean
-): string {
-  if (isActive)
-    return 'border-accent-amber-border-strong bg-accent-amber-bg shadow-lg';
-  if (isSelected) return 'border-accent-blue-border-strong bg-accent-blue-bg';
-  if (isOnDeck) return 'border-accent-amber-border bg-accent-amber-bg/50';
-  return 'border-divider bg-surface-raised';
-}
-
 function getIsDead(entity: EncounterEntity): boolean {
   const isDown = entity.currentHp <= 0 && entity.type !== 'lair';
   const hasDeathSaves =
@@ -71,28 +45,21 @@ export function CombatantRow({
   actions,
   onSelect,
 }: CombatantRowProps): React.JSX.Element {
-  const isDead = getIsDead(entity);
   const isRail = density === 'rail';
-  const stripeClass = getStripeClass(entity.playerDisposition, entity.type);
-  const rowClass = getRowClass(isActive, isSelected, isOnDeck);
+  const isDead = getIsDead(entity);
+  const selectable = isRail || !isActive;
 
   return (
     <div
-      className={`relative rounded-lg border transition-all ${rowClass} ${isDead ? 'opacity-60' : ''}`}
-      onClick={onSelect}
+      className={`border-divider border-b py-2 ${isActive ? 'bg-surface-secondary border-l-brass-border border-l-2 pl-1' : ''} ${isSelected ? 'bg-surface-secondary' : ''} ${isOnDeck ? 'border-b-divider-strong' : ''}`}
     >
-      <div
-        className={`absolute top-2 bottom-2 left-0 w-1 rounded-r ${stripeClass}`}
-      />
-
-      <div className="flex items-center gap-2.5 px-3 py-2 pl-4">
+      <div className="flex min-w-0 flex-wrap items-start gap-2 px-2">
         <InitiativeCell
           entity={entity}
           isRail={isRail}
           isActive={isActive}
           onSetInitiative={actions.onSetInitiative}
         />
-
         <TokenChip
           entity={entity}
           size={isRail ? 'md' : 'sm'}
@@ -101,21 +68,33 @@ export function CombatantRow({
             onChangePlayerColor: actions.onChangePlayerColor,
           }}
         />
-
-        <div className="min-w-0 flex-1">
-          <div className="mb-0.5 flex flex-wrap items-center gap-1.5">
-            <span
-              className={`font-display text-heading truncate text-sm font-bold ${isDead ? 'line-through' : ''}`}
-            >
-              {entity.name}
-            </span>
+        <div className="min-w-24 flex-1">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            {selectable ? (
+              <Button
+                variant="ghost"
+                size="xs"
+                selected={isSelected}
+                aria-pressed={isRail ? isSelected : undefined}
+                onClick={onSelect}
+                className={`max-w-full min-w-0 justify-start px-1 text-left ${isDead ? 'line-through' : ''}`}
+              >
+                <span className="truncate">{entity.name}</span>{' '}
+                <span className="sr-only"> details</span>
+              </Button>
+            ) : (
+              <span
+                className={`type-ui text-heading ${isDead ? 'line-through' : ''}`}
+              >
+                {entity.name}
+              </span>
+            )}
             <RowBadges
               entity={entity}
               isOnDeck={isOnDeck}
               lastSynced={lastSynced}
             />
           </div>
-
           <RowVitals
             entity={entity}
             hidePlayerHp={hidePlayerHp}
@@ -123,7 +102,6 @@ export function CombatantRow({
             onRemoveCondition={actions.onRemoveCondition}
           />
         </div>
-
         <RowControls
           entity={entity}
           isRail={isRail}

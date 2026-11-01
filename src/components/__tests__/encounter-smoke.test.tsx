@@ -162,7 +162,9 @@ describe('CombatScreen', () => {
       isActive: false,
     };
     render(<CombatScreen {...makeProps({ encounter: emptyEncounter })} />);
-    expect(screen.getByText(/No combatants yet/i)).toBeInTheDocument();
+    expect(
+      screen.getByText('Add combatants to set initiative.')
+    ).toBeInTheDocument();
   });
 
   it('switching detail entity resets speed input (key prevents stale defaultValue)', () => {
@@ -218,9 +220,10 @@ describe('CombatScreen', () => {
     const speedInput = screen.getByRole('textbox', { name: /speed/i });
     expect(speedInput).toHaveValue('30 ft.');
 
-    // Click Fast Dragon's HP display to trigger row onSelect
-    // (clicking the name span stops propagation for monsters, so use HP text)
-    fireEvent.click(screen.getByText('120/120'));
+    // The named row control selects Fast Dragon without nesting the other controls.
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Fast Dragon details' })
+    );
 
     // Detail pane must now show Fast Dragon's speed (not the stale '30 ft.')
     expect(screen.getByRole('textbox', { name: /speed/i })).toHaveValue(

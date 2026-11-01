@@ -116,16 +116,15 @@ export function CombatScreen({
         {appBar}
         {turnBar}
         <div className="flex min-h-0 flex-1">
-          <div className="border-divider w-[420px] shrink-0 overflow-y-auto border-r">
+          <div className="border-divider w-[min(40vw,420px)] min-w-80 shrink-0 overflow-y-auto border-r">
             {entities.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-16 text-center">
-                <p className="text-muted mb-2">No combatants yet</p>
-                <p className="text-faint text-sm">
-                  Use &quot;+ Add&quot; to add combatants
+              <div className="py-12 text-center">
+                <p className="type-subheading text-heading">
+                  Add combatants to set initiative.
                 </p>
               </div>
             ) : (
-              <div className="space-y-2 p-3">
+              <div className="p-3">
                 {entities.map((entity, index) => {
                   const pcId = entity.playerCharacterId;
                   const syncId = pcId ?? entity.summonOwnerId;

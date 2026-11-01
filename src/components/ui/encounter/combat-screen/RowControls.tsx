@@ -1,7 +1,7 @@
 'use client';
 
-import React from 'react';
-import { Shield, Eye, Minus, Plus, Angry } from 'lucide-react';
+import { Shield, Eye, Minus, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
 import { effectiveAc } from '@/utils/calculations';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
@@ -16,7 +16,6 @@ interface RowControlsProps {
 
 export function RowControls({
   entity,
-  isRail,
   counterLabel,
   counterValue,
   actions,
@@ -27,90 +26,73 @@ export function RowControls({
     entity.type === 'player' &&
     pcId !== undefined &&
     !!actions.onAdjustCounter;
+
   return (
-    <div
-      className={
-        hasCounter
-          ? 'flex shrink-0 flex-col items-end gap-1'
-          : 'flex shrink-0 items-center gap-1.5'
-      }
-    >
-      <div className="flex items-center gap-1.5">
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      <div className="flex items-center gap-2">
         {entity.type !== 'lair' && (
           <div
             data-testid="ac-section"
-            className="bg-surface-raised flex items-center gap-1 rounded-md px-1.5 py-0.5 shadow-sm"
+            className="text-body flex items-center gap-1 text-sm"
           >
-            <Shield size={13} className="text-muted" />
-            <span className="font-display text-heading text-sm font-bold tabular-nums">
+            <Shield size={14} className="text-muted" aria-hidden="true" />
+            <span className="tabular-nums">
               {effectiveAc(entity.armorClass, entity.tempAc)}
             </span>
-            {isRail && (
-              <span className="text-faint text-[8px] font-semibold tracking-widest">
-                AC
-              </span>
-            )}
+            <span className="text-muted">AC</span>
           </div>
         )}
-
         {entity.type === 'player' &&
           pcId !== undefined &&
           actions.onViewPlayer && (
-            <button
-              onClick={e => {
-                e.stopPropagation();
-                actions.onViewPlayer?.(pcId);
-              }}
-              className="text-muted hover:text-accent-blue-text rounded p-1 transition-colors"
-              title="View character sheet"
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => actions.onViewPlayer?.(pcId)}
+              aria-label={`View ${entity.name} sheet`}
             >
-              <Eye size={14} />
-            </button>
+              <Eye size={16} aria-hidden="true" />
+            </Button>
           )}
-
         {entity.npcSourceId && actions.onViewNPC && (
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              actions.onViewNPC?.(entity.npcSourceId ?? '', entity.id);
-            }}
-            className="text-muted hover:text-accent-amber-text rounded p-1 transition-colors"
-            title="View NPC details"
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() =>
+              actions.onViewNPC?.(entity.npcSourceId ?? '', entity.id)
+            }
+            aria-label={`View ${entity.name} details`}
           >
-            <Eye size={14} />
-          </button>
+            <Eye size={16} aria-hidden="true" />
+          </Button>
         )}
       </div>
-
       {hasCounter && pcId !== undefined && (
         <div
-          className="bg-accent-purple-bg flex items-center gap-1 rounded-full px-1.5 py-0.5"
-          title={counterLabel}
-          onClick={e => e.stopPropagation()}
+          role="group"
+          aria-label={`${counterLabel} for ${entity.name}`}
+          className="flex items-center gap-1"
         >
-          <Angry size={10} className="text-accent-purple-text" />
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              actions.onAdjustCounter?.(pcId, -1);
-            }}
-            className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => actions.onAdjustCounter?.(pcId, -1)}
             disabled={counterValue <= 0}
+            aria-label={`Decrease ${counterLabel} for ${entity.name}`}
           >
-            <Minus size={10} />
-          </button>
-          <span className="text-accent-purple-text min-w-[1rem] text-center text-[11px] font-bold tabular-nums">
-            {counterValue}
+            <Minus size={14} aria-hidden="true" />
+          </Button>
+          <span className="text-body min-w-10 text-center text-xs tabular-nums">
+            {counterValue} {counterLabel}
           </span>
-          <button
-            onClick={e => {
-              e.stopPropagation();
-              actions.onAdjustCounter?.(pcId, 1);
-            }}
-            className="text-accent-purple-text hover:bg-surface-secondary rounded p-0.5 transition-colors"
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={() => actions.onAdjustCounter?.(pcId, 1)}
+            aria-label={`Increase ${counterLabel} for ${entity.name}`}
           >
-            <Plus size={10} />
-          </button>
+            <Plus size={14} aria-hidden="true" />
+          </Button>
         </div>
       )}
     </div>
