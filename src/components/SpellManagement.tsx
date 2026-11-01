@@ -70,7 +70,7 @@ import {
   confirmDialog,
 } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
-import { SlotPips } from '@/components/ui/game/SlotPips';
+import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
 import { Section } from '@/components/ui/layout/section';
 
 interface SpellFilters {
@@ -440,6 +440,7 @@ const LevelSection: React.FC<{
   showMoveControls: boolean;
   slotMax?: number;
   slotUsed?: number;
+  onSlotChange?: (delta: number) => void;
 }> = ({
   level,
   spells,
@@ -458,6 +459,7 @@ const LevelSection: React.FC<{
   showMoveControls,
   slotMax,
   slotUsed,
+  onSlotChange,
 }) => {
   const levelId = useId();
   const isCantrip = level === 0;
@@ -503,7 +505,13 @@ const LevelSection: React.FC<{
         {/* Inline slot dots */}
         {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
-            <SlotPips total={slotMax!} available={remaining} level={level} />
+            <SlotPipsButtons
+              total={slotMax!}
+              available={remaining}
+              level={level}
+              onSpend={onSlotChange ? () => onSlotChange(1) : undefined}
+              onRestore={onSlotChange ? () => onSlotChange(-1) : undefined}
+            />
             <span className="text-muted text-xs">
               {remaining}/{slotMax}
             </span>
@@ -582,6 +590,7 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
     reorderSpells,
     toggleSpellFavorite,
     spendSpellSlot,
+    restoreSpellSlot,
     spendPactMagicSlot,
     startConcentration,
     stopConcentration,
@@ -1301,6 +1310,16 @@ export const SpellManagement: React.FC<{ editing?: boolean }> = ({
                   ? character.spellSlots[
                       level as keyof typeof character.spellSlots
                     ]?.used
+                  : undefined
+              }
+              onSlotChange={
+                level > 0
+                  ? delta => {
+                      const slotLevel =
+                        level as keyof typeof character.spellSlots;
+                      if (delta > 0) spendSpellSlot(slotLevel, delta);
+                      else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
+                    }
                   : undefined
               }
             />
