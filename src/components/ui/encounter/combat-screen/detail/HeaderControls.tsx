@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Eye, EyeOff, HeartPulse, Pencil } from 'lucide-react';
 import type { PlayerDisposition } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
@@ -31,6 +31,7 @@ const DISPOSITIONS: Array<{
 export function HeaderControls({ entity, actions }: DetailSectionProps) {
   const [isEditingAlias, setIsEditingAlias] = useState(false);
   const [aliasInput, setAliasInput] = useState('');
+  const cancelAlias = useRef(false);
 
   if (entity.type === 'player') return null;
 
@@ -48,7 +49,9 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
     <div className="flex flex-wrap items-center gap-2">
       <div className="bg-surface-secondary flex items-center rounded-md p-0.5">
         {DISPOSITIONS.map(({ value, label, activeClass }) => {
-          const active = (entity.playerDisposition ?? 'enemy') === value;
+          const active =
+            (entity.playerDisposition ??
+              (entity.summonOwnerId ? 'ally' : 'enemy')) === value;
           return (
             <button
               key={value}
@@ -106,10 +109,19 @@ export function HeaderControls({ entity, actions }: DetailSectionProps) {
           type="text"
           value={aliasInput}
           onChange={e => setAliasInput(e.target.value)}
-          onBlur={() => commitAlias(aliasInput)}
+          data-in-place-dirty=""
+          onBlur={() => {
+            if (!cancelAlias.current) commitAlias(aliasInput);
+            cancelAlias.current = false;
+          }}
           onKeyDown={e => {
             if (e.key === 'Enter') commitAlias(aliasInput);
-            if (e.key === 'Escape') setIsEditingAlias(false);
+            if (e.key === 'Escape') {
+              e.preventDefault();
+              e.stopPropagation();
+              cancelAlias.current = true;
+              setIsEditingAlias(false);
+            }
           }}
           placeholder="Alias…"
           className="bg-surface-raised text-body placeholder:text-faint w-28 rounded px-2 py-1 text-xs shadow-sm"

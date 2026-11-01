@@ -129,6 +129,20 @@ describe('CombatScreen', () => {
     // currentTurn=0 → Goblin is active → appears in both row and detail pane
     render(<CombatScreen {...makeProps()} />);
     expect(screen.getAllByText('Goblin').length).toBeGreaterThanOrEqual(2);
+    expect(
+      screen.getByRole('button', { name: 'Goblin details' })
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('marks the fallback detail row selected before combat starts', () => {
+    render(
+      <CombatScreen
+        {...makeProps({ encounter: { ...activeEncounter, isActive: false } })}
+      />
+    );
+    expect(
+      screen.getByRole('button', { name: 'Goblin details' })
+    ).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('clicking a row shows entity name in the detail pane', () => {

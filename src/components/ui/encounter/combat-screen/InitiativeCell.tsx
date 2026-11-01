@@ -24,6 +24,7 @@ export function InitiativeCell({
       }}
       integer={false}
       allowEmpty
+      cancelEmpty
       live={false}
       aria-label={`${entity.name} initiative`}
       placeholder="—"

@@ -197,7 +197,7 @@ export function CombatConfigDialog({
       id: 'combat-config-visibility',
       label: 'Player visibility',
       content: (
-        <>
+        <div className="space-y-6">
           {/* Enemy HP display picker */}
           <RadioGroupField
             label="Enemy HP display"
@@ -310,7 +310,7 @@ export function CombatConfigDialog({
               wrapperClassName="gap-4"
             />
           </div>
-        </>
+        </div>
       ),
     },
     {

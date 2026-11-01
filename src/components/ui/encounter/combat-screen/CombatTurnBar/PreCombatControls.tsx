@@ -58,7 +58,7 @@ export function PreCombatControls({
       )}
       {canRequestRolls && requestActive && (
         <span className="text-muted text-xs">
-          Request again to ask players who already answered.
+          Re-requesting asks players who already rolled to roll again.
         </span>
       )}
       {canRequestRolls && requestActive && waitingNames.length > 0 && (

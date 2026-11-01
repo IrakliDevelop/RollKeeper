@@ -168,6 +168,75 @@ describe('CombatantRow', () => {
     expect(input).toHaveFocus();
   });
 
+  it('restores initiative on Escape without saving', async () => {
+    const actions = makeMockActions();
+    const user = userEvent.setup();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={mockEntity}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Goblin initiative' });
+    await user.clear(input);
+    await user.type(input, '19');
+    await user.keyboard('{Escape}');
+    expect(input).toHaveValue('15');
+    expect(input).toHaveFocus();
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
+  });
+
+  it('restores initiative when an empty edit is committed or blurred', async () => {
+    const actions = makeMockActions();
+    const user = userEvent.setup();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={mockEntity}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    const input = screen.getByRole('textbox', { name: 'Goblin initiative' });
+    await user.clear(input);
+    await user.tab();
+    expect(input).toHaveValue('15');
+    await user.click(input);
+    await user.clear(input);
+    await user.keyboard('{Enter}');
+    expect(input).toHaveValue('15');
+    expect(actions.onSetInitiative).not.toHaveBeenCalled();
+  });
+
+  it('names non-player allegiance and dead state without color', () => {
+    const actions = makeMockActions();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, playerDisposition: 'ally', currentHp: 0 }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Ally')).toBeVisible();
+    expect(screen.getByText('Dead')).toBeVisible();
+  });
+
+  it('shows a synced player summon as an ally when no disposition was stored', () => {
+    const actions = makeMockActions();
+    render(
+      <CombatantRow
+        {...defaultProps}
+        entity={{ ...mockEntity, summonOwnerId: 'pc-9' }}
+        actions={actions}
+        onSelect={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Ally')).toBeVisible();
+  });
+
   it('remove condition chip calls onRemoveCondition', async () => {
     const actions = makeMockActions();
     const user = userEvent.setup();

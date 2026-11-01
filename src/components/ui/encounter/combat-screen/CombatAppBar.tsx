@@ -117,6 +117,7 @@ export function CombatAppBar({
           variant={addPrimary ? 'primary' : 'secondary'}
           size="sm"
           onClick={onOpenAdd}
+          data-combat-add
           leftIcon={<Plus size={16} />}
         >
           Add combatant

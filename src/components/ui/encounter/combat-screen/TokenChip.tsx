@@ -11,7 +11,6 @@ import {
   Milk,
 } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
-import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 import type { ChessPiece, EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
 
@@ -55,6 +54,7 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const firstOptionRef = useRef<HTMLButtonElement>(null);
   const returnFocus = useRef(false);
+  const panelRef = useRef<HTMLDivElement>(null);
   const isPlayer = entity.type === 'player';
   const Icon = CHESS_PIECES.find(p => p.piece === entity.chessPiece)?.Icon;
   const color = entity.color;
@@ -62,9 +62,36 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
   useEffect(() => {
     if (open) firstOptionRef.current?.focus();
     else if (returnFocus.current) {
-      triggerRef.current?.focus();
+      const timer = setTimeout(() => triggerRef.current?.focus(), 0);
       returnFocus.current = false;
+      return () => clearTimeout(timer);
     }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (event: PointerEvent) => {
+      if (
+        event.target instanceof Node &&
+        !panelRef.current?.contains(event.target)
+      ) {
+        returnFocus.current = true;
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        returnFocus.current = true;
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
   }, [open]);
 
   const handleClose = () => {
@@ -115,7 +142,8 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
 
   return (
     <div
-      className={`${OVERLAY_SURFACE} z-10 flex max-w-full flex-col gap-2 p-2`}
+      ref={panelRef}
+      className="border-divider bg-surface-elevated z-10 flex max-w-full flex-col gap-2 rounded-md border p-2"
       role="group"
       aria-label={`${entity.name} token appearance`}
     >
@@ -138,7 +166,7 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
                   piece === entity.chessPiece ? undefined : piece
                 )
               }
-              aria-label={`${piece} for ${entity.name}`}
+              aria-label={`${piece.charAt(0).toUpperCase()}${piece.slice(1)} for ${entity.name}`}
               className="px-2"
             >
               <PieceIcon

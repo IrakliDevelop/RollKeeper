@@ -1,6 +1,7 @@
 'use client';
 
 import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from './types';
 import { TokenChip } from './TokenChip';
@@ -51,7 +52,7 @@ export function CombatantRow({
 
   return (
     <div
-      className={`border-divider border-b py-2 ${isActive ? 'bg-surface-secondary border-l-brass-border border-l-2 pl-1' : ''} ${isSelected ? 'bg-surface-secondary' : ''} ${isOnDeck ? 'border-b-divider-strong' : ''}`}
+      className={`border-divider border-b py-2 pointer-coarse:min-h-11 ${isActive ? 'bg-surface-secondary border-l-brass-border border-l-2 pl-1' : ''} ${isSelected ? 'bg-surface-secondary' : ''} ${isOnDeck ? 'border-b-divider-strong' : ''}`}
     >
       <div className="flex min-w-0 flex-wrap items-start gap-2 px-2">
         <InitiativeCell
@@ -76,11 +77,14 @@ export function CombatantRow({
                 size="xs"
                 selected={isSelected}
                 aria-pressed={isRail ? isSelected : undefined}
+                data-combatant-select={entity.id}
                 onClick={onSelect}
-                className={`max-w-full min-w-0 justify-start px-1 text-left ${isDead ? 'line-through' : ''}`}
+                className={`max-w-full min-w-0 justify-start px-2 text-left pointer-coarse:min-h-11 ${isDead ? 'line-through' : ''}`}
               >
-                <span className="truncate">{entity.name}</span>{' '}
-                <span className="sr-only"> details</span>
+                <span aria-hidden="true" className="truncate">
+                  {entity.name}
+                </span>
+                <span className="sr-only">{entity.name} details</span>
               </Button>
             ) : (
               <span
@@ -94,6 +98,7 @@ export function CombatantRow({
               isOnDeck={isOnDeck}
               lastSynced={lastSynced}
             />
+            {isDead && <Badge variant="neutral">Dead</Badge>}
           </div>
           <RowVitals
             entity={entity}

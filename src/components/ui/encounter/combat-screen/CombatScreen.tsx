@@ -138,7 +138,7 @@ export function CombatScreen({
                       entity={entity}
                       density="rail"
                       isActive={isActive && index === currentTurn}
-                      isSelected={entity.id === railSelectionId}
+                      isSelected={entity.id === detailEntity?.id}
                       isOnDeck={onDeckEntity?.id === entity.id}
                       hidePlayerHp={hidePlayerHp}
                       lastSynced={

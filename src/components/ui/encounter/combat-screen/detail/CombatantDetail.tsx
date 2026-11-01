@@ -14,6 +14,7 @@ export interface CombatantDetailProps {
   entity: EncounterEntity;
   actions: EntityActions;
   onOpenSheet?: () => void;
+  hideNameHeading?: boolean;
 }
 
 export function RegionalEffects({ effects }: { effects: string[] }) {
@@ -38,6 +39,7 @@ export function CombatantDetail({
   entity,
   actions,
   onOpenSheet,
+  hideNameHeading = false,
 }: CombatantDetailProps) {
   const isLair = entity.type === 'lair';
 
@@ -48,6 +50,7 @@ export function CombatantDetail({
           entity={entity}
           actions={actions}
           onOpenSheet={onOpenSheet}
+          hideNameHeading={hideNameHeading}
         />
         <DetailActions entity={entity} actions={actions} />
         {entity.regionalEffects && (
@@ -63,6 +66,7 @@ export function CombatantDetail({
         entity={entity}
         actions={actions}
         onOpenSheet={onOpenSheet}
+        hideNameHeading={hideNameHeading}
       />
       <DetailVitals entity={entity} actions={actions} />
       <DetailAbilityScores entity={entity} actions={actions} />

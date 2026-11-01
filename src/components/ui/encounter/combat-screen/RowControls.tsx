@@ -61,7 +61,7 @@ export function RowControls({
             onClick={() =>
               actions.onViewNPC?.(entity.npcSourceId ?? '', entity.id)
             }
-            aria-label={`View ${entity.name} details`}
+            aria-label={`View ${entity.name} in NPC library`}
           >
             <Eye size={16} aria-hidden="true" />
           </Button>

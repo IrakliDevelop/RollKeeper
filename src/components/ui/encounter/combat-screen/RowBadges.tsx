@@ -16,7 +16,7 @@ function SyncStatus({ lastSynced }: { lastSynced?: string }) {
   if (elapsed < 30000) return <Badge variant="success">Sheet synced</Badge>;
   return (
     <Badge variant="warning">
-      {elapsed < 120000 ? 'Sheet sync delayed' : 'Sheet sync stale'}
+      {elapsed < 120000 ? 'Sheet sync delayed' : 'Sheet out of date'}
     </Badge>
   );
 }
@@ -28,10 +28,17 @@ export function RowBadges({ entity, isOnDeck, lastSynced }: RowBadgesProps) {
       ? 'NPC'
       : entity.type.charAt(0).toUpperCase() + entity.type.slice(1);
   const showSync = entity.type === 'player' || !!entity.summonOwnerId;
+  const disposition =
+    entity.playerDisposition ?? (entity.summonOwnerId ? 'ally' : 'enemy');
 
   return (
     <>
       <Badge variant="neutral">{typeLabel}</Badge>
+      {entity.type !== 'player' && (
+        <Badge variant="neutral">
+          {disposition.charAt(0).toUpperCase() + disposition.slice(1)}
+        </Badge>
+      )}
       {isOnDeck && <Badge variant="primary">On deck</Badge>}
       {entity.concentrationSpell && (
         <Badge variant="magic">
@@ -49,7 +56,7 @@ export function RowBadges({ entity, isOnDeck, lastSynced }: RowBadgesProps) {
       )}
       {(entity.type === 'npc' || entity.npcSourceId) && entity.hitDice && (
         <Badge variant="neutral">
-          {entity.hitDice.current}/{entity.hitDice.max} hit dice
+          {entity.hitDice.current} of {entity.hitDice.max} hit dice
         </Badge>
       )}
       {showSync && <SyncStatus lastSynced={lastSynced} />}

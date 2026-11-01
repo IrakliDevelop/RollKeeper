@@ -70,7 +70,6 @@ export function FocusActiveControls({
         <Button
           variant="ghost"
           selected={hidePlayerHp}
-          aria-pressed={hidePlayerHp}
           size="sm"
           onClick={onToggleHidePlayerHp}
           aria-label={hidePlayerHp ? 'Show player HP' : 'Hide player HP'}
