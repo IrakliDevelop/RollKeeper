@@ -71,6 +71,9 @@ export function LevelUpButton({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [showWizard, setShowWizard] = useState(false);
+  // Each open gets a fresh wizard, even when the previous one is still
+  // fading out, so no earlier choices carry over.
+  const [wizardSession, setWizardSession] = useState(0);
   useEffect(() => {
     if (isOpen || !showWizard) return;
     const timer = window.setTimeout(() => setShowWizard(false), 200);
@@ -82,6 +85,7 @@ export function LevelUpButton({
         variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
         onClick={() => {
+          setWizardSession(session => session + 1);
           setShowWizard(true);
           setIsOpen(true);
         }}
@@ -90,7 +94,11 @@ export function LevelUpButton({
         Level up
       </Button>
       {showWizard && (
-        <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
+        <LevelUpWizard
+          key={wizardSession}
+          isOpen={isOpen}
+          onClose={() => setIsOpen(false)}
+        />
       )}
     </>
   );

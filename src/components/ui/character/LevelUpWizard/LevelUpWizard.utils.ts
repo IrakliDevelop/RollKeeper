@@ -4,11 +4,28 @@ import type {
   ProcessedSubclass,
 } from '@/types/classes';
 import type { WizardStepConfig } from './LevelUpWizard.types';
-import type { ASIChoice } from './LevelUpWizard.types';
+import type { ASIChoice, SubclassSpellGrant } from './LevelUpWizard.types';
 import type { CharacterAbilities } from '@/types/character';
 import { calculateModifier } from '@/utils/calculations';
 
 /** A selection changes the edition's data, not the wizard's navigation shape. */
+/** The granted spells apply will actually add: not expanded-list entries,
+ * not spells the character already has, and only spells found in the data. */
+export function grantsThatWillBeAdded(
+  grants: SubclassSpellGrant[],
+  allSpells: { name: string }[],
+  existingSpells: { name: string }[]
+): SubclassSpellGrant[] {
+  const existing = new Set(existingSpells.map(s => s.name.toLowerCase()));
+  const known = new Set(allSpells.map(s => s.name.toLowerCase()));
+  return grants.filter(grant => {
+    const name = grant.spellName.toLowerCase();
+    return (
+      grant.grantType !== 'expanded' && !existing.has(name) && known.has(name)
+    );
+  });
+}
+
 export function shouldShowEditionStep(
   classSource: string | undefined,
   optionCount: number

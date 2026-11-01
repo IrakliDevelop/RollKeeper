@@ -4,6 +4,7 @@ import {
   isValidASIChoice,
   shouldShowEditionStep,
   computeWizardSteps,
+  grantsThatWillBeAdded,
 } from './LevelUpWizard.utils';
 import type { CharacterAbilities } from '@/types/character';
 
@@ -126,5 +127,24 @@ describe('level-up HP', () => {
       retroactiveGain: -16,
       minimumAdjustment: 13,
     });
+  });
+});
+
+describe('level-up spell grants', () => {
+  it('lists only grants that apply will add', () => {
+    const grant = (spellName: string, grantType = 'prepared') =>
+      ({ spellName, grantType }) as never;
+    expect(
+      grantsThatWillBeAdded(
+        [
+          grant('Shield'),
+          grant('Bless'),
+          grant('Unknown Spell'),
+          grant('Guidance', 'expanded'),
+        ],
+        [{ name: 'Shield' }, { name: 'Bless' }, { name: 'Guidance' }] as never,
+        [{ name: 'shield' }] as never
+      ).map(g => g.spellName)
+    ).toEqual(['Bless']);
   });
 });

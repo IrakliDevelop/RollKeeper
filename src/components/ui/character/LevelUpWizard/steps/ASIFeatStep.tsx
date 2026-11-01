@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { Plus, Minus, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { Input } from '@/components/ui/forms/input';
@@ -133,12 +133,20 @@ function FeatPanel({
     null
   );
   const selectedFeat = asiChoice?.type === 'feat' ? asiChoice.feat : null;
-  const eligible = feats.filter(
-    f => !f.levelRequirement || f.levelRequirement <= newTotalLevel
+  const deferredSearch = useDeferredValue(search);
+  const eligible = useMemo(
+    () =>
+      feats.filter(
+        f => !f.levelRequirement || f.levelRequirement <= newTotalLevel
+      ),
+    [feats, newTotalLevel]
   );
-  const filtered = search.trim()
-    ? eligible.filter(f => f.name.toLowerCase().includes(search.toLowerCase()))
-    : eligible;
+  const filtered = useMemo(() => {
+    const query = deferredSearch.trim().toLowerCase();
+    return query
+      ? eligible.filter(f => f.name.toLowerCase().includes(query))
+      : eligible;
+  }, [eligible, deferredSearch]);
 
   const handleSelectFeat = useCallback(
     (feat: ProcessedFeat) => {
