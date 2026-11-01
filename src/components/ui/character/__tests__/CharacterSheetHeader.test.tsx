@@ -39,7 +39,6 @@ function Harness({ name = 'Brin' }: { name?: string } = {}) {
         onExport={vi.fn()}
         onShowResetModal={vi.fn()}
         onUpdateName={updateName}
-        onAddToast={vi.fn()}
       />
     </SheetModeProvider>
   );
@@ -149,7 +148,7 @@ it('keeps the name local until blur and cancels with Escape', () => {
   fireEvent.blur(field);
   expect(updateName).toHaveBeenCalledExactlyOnceWith('Thalia');
 });
-it('puts the four character actions in the header menu', async () => {
+it('keeps sheet actions in the header and leaves import on the dashboard', async () => {
   render(<Harness />);
   const trigger = screen.getByRole('button', { name: 'Character' });
   expect(trigger.closest('header')).toBeTruthy();
@@ -158,9 +157,11 @@ it('puts the four character actions in the header menu', async () => {
     'Export character',
     'Share with QR code',
     'Reset character',
-    'Import',
   ])
     expect(await screen.findByRole('button', { name })).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Import' })
+  ).not.toBeInTheDocument();
 });
 
 it('preserves the approved unnamed fallback without inserting it into the editable name', () => {

@@ -24,12 +24,7 @@ it('returns focus to its persistent trigger before opening Share or Reset', asyn
     )
   );
   render(
-    <CharacterActions
-      onExport={vi.fn()}
-      onShare={onShare}
-      onReset={onReset}
-      onAddToast={vi.fn()}
-    />
+    <CharacterActions onExport={vi.fn()} onShare={onShare} onReset={onReset} />
   );
   for (const [label, callback] of [
     ['Share with QR code', onShare],
@@ -40,37 +35,16 @@ it('returns focus to its persistent trigger before opening Share or Reset', asyn
     await waitFor(() => expect(callback).toHaveBeenCalledOnce());
   }
 });
-it('keeps the file input mounted after Import closes and resets it after malformed-file retries', async () => {
-  vi.spyOn(console, 'error').mockImplementation(() => {});
-  const toast = vi.fn();
+it('leaves import on the player dashboard', async () => {
   const { container } = render(
-    <CharacterActions
-      onExport={vi.fn()}
-      onShare={vi.fn()}
-      onReset={vi.fn()}
-      onAddToast={toast}
-    />
+    <CharacterActions onExport={vi.fn()} onShare={vi.fn()} onReset={vi.fn()} />
   );
-  const input =
-    container.querySelector<HTMLInputElement>('input[type="file"]')!;
-  const choose = vi
-    .spyOn(input as HTMLInputElement, 'click')
-    .mockImplementation(() => {});
   fireEvent.click(screen.getByRole('button', { name: 'Character' }));
-  fireEvent.click(await screen.findByRole('button', { name: 'Import' }));
-  expect(choose).toHaveBeenCalledOnce();
-  expect(document.body).toContainElement(input);
-  for (let attempt = 0; attempt < 2; attempt++) {
-    fireEvent.change(input, {
-      target: { files: [{ text: async () => 'invalid json' }] },
-    });
-    await waitFor(() => expect(toast).toHaveBeenCalledTimes(attempt + 1));
-    expect(input).toHaveValue('');
-  }
-  expect(toast).toHaveBeenLastCalledWith({
-    type: 'error',
-    title: "Couldn't import that file",
-    message:
-      'Choose a character .json file exported from RollKeeper and try again.',
-  });
+  expect(
+    await screen.findByRole('button', { name: 'Export character' })
+  ).toBeVisible();
+  expect(
+    screen.queryByRole('button', { name: 'Import' })
+  ).not.toBeInTheDocument();
+  expect(container.querySelector('input[type="file"]')).toBeNull();
 });

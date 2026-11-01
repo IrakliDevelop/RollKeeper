@@ -31,11 +31,6 @@ interface CharacterSheetHeaderProps {
   onExport: () => void;
   onShowResetModal: () => void;
   onUpdateName: (name: string) => void;
-  onAddToast: (toast: {
-    type: 'error' | 'damage' | 'attack' | 'save' | 'info' | 'success';
-    title: string;
-    message: string;
-  }) => void;
   extraHeaderContent?: React.ReactNode;
 }
 
@@ -53,7 +48,6 @@ export default function CharacterSheetHeader({
   onExport,
   onShowResetModal,
   onUpdateName,
-  onAddToast,
   extraHeaderContent,
 }: CharacterSheetHeaderProps) {
   const { exportCharacter, updateCharacter } = useCharacterStore();
@@ -134,7 +128,6 @@ export default function CharacterSheetHeader({
               onExport={onExport}
               onShare={() => setShareOpen(true)}
               onReset={onShowResetModal}
-              onAddToast={onAddToast}
             />
           </>
         }

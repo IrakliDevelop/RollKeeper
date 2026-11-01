@@ -52,7 +52,7 @@ export function ManagementPanel({ view, actions }: ManagementPanelProps) {
         </div>
       </div>
 
-      <div className="border-divider overflow-hidden rounded-lg border">
+      <div className="border-divider divide-divider divide-y border-y">
         {management.rows.map(row => (
           <div
             key={row.id}
@@ -88,7 +88,7 @@ export function ManagementPanel({ view, actions }: ManagementPanelProps) {
         ))}
       </div>
 
-      <div className="border-divider rounded-lg border p-4">
+      <div className="border-divider border-b py-4">
         <Switch
           checked={management.futureDefaultOn}
           disabled={!management.futureDefaultEnabled}

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Save, Dice6, Info, Shield } from 'lucide-react';
+import { ArrowLeft, Save, Info } from 'lucide-react';
 import { usePlayerStore } from '@/store/playerStore';
 import {
   COMMON_CLASSES,
@@ -22,6 +22,7 @@ import {
   SelectItem,
 } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout/badge';
+import { AppHeader } from '@/components/ui/layout/AppHeader';
 import {
   Dialog,
   DialogContent,
@@ -174,49 +175,32 @@ export default function NewCharacterPage() {
   };
 
   return (
-    <div className="bg-background min-h-screen">
-      {/* Header */}
-      <header className="border-divider from-background to-accent-blue-bg border-b bg-linear-to-r shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href="/player">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
-                  Back to Characters
-                </Button>
-              </Link>
-              <h1 className="text-heading ml-6 text-xl font-bold">
-                Create New Character
-              </h1>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="bg-surface min-h-screen">
+      <AppHeader
+        leading={
+          <Button
+            asChild
+            variant="ghost"
+            size="sm"
+            leftIcon={<ArrowLeft size={18} aria-hidden />}
+          >
+            <Link href="/player">Characters</Link>
+          </Button>
+        }
+        title={<h1 className="type-heading text-heading">New character</h1>}
+      />
       <main className="mx-auto max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-        <div className="border-accent-blue-border from-surface-raised to-surface-secondary rounded-lg border-2 bg-linear-to-br p-8 shadow-lg">
-          <div className="mb-8 text-center">
-            <Dice6 className="text-accent-blue-text mx-auto mb-4 h-16 w-16" />
-            <h1 className="text-heading mb-2 text-3xl font-bold">
-              Create Your Character
-            </h1>
-            <p className="text-body">
-              Fill in the basic information to get started. You can customize
-              everything else in the character sheet.
-            </p>
-          </div>
-
+        <p className="type-body text-muted mb-8">
+          Pick a name, race and class. You can change the rest on the sheet.
+        </p>
+        <div>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Avatar Upload */}
             <div className="flex justify-center">
               <AvatarUpload
                 avatar={avatar}
                 characterId={tempCharacterId}
-                characterName={characterName || 'New Character'}
+                characterName={characterName || 'your character'}
                 onAvatarChange={setAvatar}
                 size="xl"
                 editable={true}
@@ -224,13 +208,13 @@ export default function NewCharacterPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* Character Name */}
+              {/* Character name */}
               <div className="md:col-span-2">
                 <label
                   htmlFor="characterName"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
-                  Character Name *
+                  Character name
                 </label>
                 <Input
                   type="text"
@@ -238,7 +222,7 @@ export default function NewCharacterPage() {
                   required
                   value={characterName}
                   onChange={e => setCharacterName(e.target.value)}
-                  placeholder="e.g., Thorin Ironbeard"
+                  placeholder="Thalia Vane"
                 />
               </div>
 
@@ -246,26 +230,27 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="race"
+                  id="race-label"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
                   Race
                 </label>
-                <div className="flex gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   <Autocomplete
+                    inputId="race"
                     options={raceOptions}
                     value={selectedRace}
                     onChange={setSelectedRace}
-                    placeholder={
-                      isLoadingRaces ? 'Loading races...' : 'Search races...'
-                    }
+                    placeholder={isLoadingRaces ? 'Loading races…' : 'Elf'}
                     disabled={isLoadingRaces}
-                    className="flex-1"
+                    className="min-w-40 flex-1"
                   />
                   {selectedRaceData && (
                     <Dialog>
                       <DialogTrigger asChild>
                         <Button
                           type="button"
+                          aria-describedby="race-label"
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
@@ -277,11 +262,10 @@ export default function NewCharacterPage() {
                       <DialogContent size="lg">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
-                            <Dice6 className="text-accent-blue-text h-5 w-5" />
                             {selectedRaceData.name}
                           </DialogTitle>
                           <DialogDescription>
-                            Comprehensive racial traits and abilities
+                            Traits and abilities
                           </DialogDescription>
                         </DialogHeader>
                         <DialogBody className="max-h-[70vh] overflow-y-auto">
@@ -289,7 +273,7 @@ export default function NewCharacterPage() {
                             {/* Basic Info Grid */}
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
                               {selectedRaceData.size && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <div className="border-divider border-b py-3">
                                   <span className="text-muted text-xs font-medium">
                                     Size
                                   </span>
@@ -299,7 +283,7 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
                               {selectedRaceData.darkvision && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <div className="border-divider border-b py-3">
                                   <span className="text-muted text-xs font-medium">
                                     Darkvision
                                   </span>
@@ -309,7 +293,7 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
                               {selectedRaceData.age && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <div className="border-divider border-b py-3">
                                   <span className="text-muted text-xs font-medium">
                                     Lifespan
                                   </span>
@@ -326,23 +310,23 @@ export default function NewCharacterPage() {
 
                             {/* Speed */}
                             {selectedRaceData.speed && (
-                              <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border p-4">
+                              <div className="border-divider border-b py-4">
                                 <h4 className="text-heading mb-2 text-sm font-semibold">
                                   Speed
                                 </h4>
                                 <div className="flex flex-wrap gap-2">
                                   {selectedRaceData.speed.walk && (
-                                    <Badge variant="info" size="md">
+                                    <Badge variant="neutral" size="md">
                                       Walk: {selectedRaceData.speed.walk} ft.
                                     </Badge>
                                   )}
                                   {selectedRaceData.speed.fly && (
-                                    <Badge variant="secondary" size="md">
+                                    <Badge variant="neutral" size="md">
                                       Fly: {selectedRaceData.speed.fly} ft.
                                     </Badge>
                                   )}
                                   {selectedRaceData.speed.swim && (
-                                    <Badge variant="primary" size="md">
+                                    <Badge variant="neutral" size="md">
                                       Swim: {selectedRaceData.speed.swim} ft.
                                     </Badge>
                                   )}
@@ -350,19 +334,19 @@ export default function NewCharacterPage() {
                               </div>
                             )}
 
-                            {/* Ability Score Increases */}
+                            {/* Ability score increases */}
                             {selectedRaceData.abilityScores &&
                               selectedRaceData.abilityScores.length > 0 && (
-                                <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Ability Score Increase
+                                    Ability score increase
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {selectedRaceData.abilityScores.map(
                                       (score, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="success"
+                                          key={`${score}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           {score}
@@ -376,7 +360,7 @@ export default function NewCharacterPage() {
                             {/* Languages */}
                             {selectedRaceData.languages &&
                               selectedRaceData.languages.length > 0 && (
-                                <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Languages
                                   </h4>
@@ -384,8 +368,8 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.languages.map(
                                       (lang, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="primary"
+                                          key={`${lang}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           {lang}
@@ -396,20 +380,20 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
 
-                            {/* Skill Proficiencies */}
+                            {/* Skill proficiencies */}
                             {selectedRaceData.skillProficiencies &&
                               selectedRaceData.skillProficiencies.length >
                                 0 && (
-                                <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Skill Proficiencies
+                                    Skill proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {selectedRaceData.skillProficiencies.map(
                                       (skill, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="warning"
+                                          key={`${skill}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           {skill}
@@ -425,7 +409,7 @@ export default function NewCharacterPage() {
                               selectedRaceData.resistances.length > 0) ||
                               (selectedRaceData.immunities &&
                                 selectedRaceData.immunities.length > 0)) && (
-                              <div className="border-accent-red-border bg-accent-red-bg rounded-lg border p-4">
+                              <div className="border-divider border-b py-4">
                                 <h4 className="text-heading mb-2 text-sm font-semibold">
                                   Defenses
                                 </h4>
@@ -440,8 +424,8 @@ export default function NewCharacterPage() {
                                           {selectedRaceData.resistances.map(
                                             (res, idx) => (
                                               <Badge
-                                                key={idx}
-                                                variant="danger"
+                                                key={`${res}-${idx}`}
+                                                variant="neutral"
                                                 size="sm"
                                               >
                                                 {res}
@@ -461,8 +445,8 @@ export default function NewCharacterPage() {
                                           {selectedRaceData.immunities.map(
                                             (imm, idx) => (
                                               <Badge
-                                                key={idx}
-                                                variant="danger"
+                                                key={`${imm}-${idx}`}
+                                                variant="neutral"
                                                 size="sm"
                                               >
                                                 {imm}
@@ -476,20 +460,20 @@ export default function NewCharacterPage() {
                               </div>
                             )}
 
-                            {/* Racial Features */}
+                            {/* Racial features */}
                             {selectedRaceData.features &&
                               selectedRaceData.features.length > 0 && (
                                 <div className="space-y-3">
                                   <h4 className="text-heading text-sm font-semibold">
-                                    Racial Features
+                                    Racial features
                                   </h4>
                                   {selectedRaceData.features.map(
                                     (feature, idx) => (
                                       <div
-                                        key={idx}
-                                        className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-4"
+                                        key={`${feature.name}-${idx}`}
+                                        className="border-divider border-b py-4"
                                       >
-                                        <h5 className="text-accent-purple-text mb-2 text-sm font-semibold">
+                                        <h5 className="text-heading mb-2 text-sm font-semibold">
                                           {feature.name}
                                         </h5>
                                         <p className="text-body text-sm leading-relaxed">
@@ -504,7 +488,7 @@ export default function NewCharacterPage() {
                             {/* Trait Tags */}
                             {selectedRaceData.traits &&
                               selectedRaceData.traits.length > 0 && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
                                     Tags
                                   </h4>
@@ -512,7 +496,7 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.traits.map(
                                       (trait, idx) => (
                                         <Badge
-                                          key={idx}
+                                          key={`${trait}-${idx}`}
                                           variant="neutral"
                                           size="sm"
                                         >
@@ -543,17 +527,18 @@ export default function NewCharacterPage() {
               <div>
                 <label
                   htmlFor="class"
+                  id="class-label"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
                   Class
                 </label>
-                <div className="flex gap-2">
+                <div className="flex min-w-0 flex-wrap gap-2">
                   <Select
                     value={selectedClass}
                     onValueChange={setSelectedClass}
                   >
-                    <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select a class..." />
+                    <SelectTrigger id="class" className="min-w-40 flex-1">
+                      <SelectValue placeholder="Choose a class" />
                     </SelectTrigger>
                     <SelectContent>
                       {COMMON_CLASSES.map(classData => (
@@ -570,7 +555,7 @@ export default function NewCharacterPage() {
                                       : classData.spellcaster === 'third'
                                         ? '1/3'
                                         : 'Pact'
-                                } Caster`
+                                } caster`
                               : 'Non-spellcaster'
                           }
                         >
@@ -584,6 +569,7 @@ export default function NewCharacterPage() {
                       <DialogTrigger asChild>
                         <Button
                           type="button"
+                          aria-describedby="class-label"
                           variant="outline"
                           size="md"
                           leftIcon={<Info size={16} />}
@@ -595,7 +581,6 @@ export default function NewCharacterPage() {
                       <DialogContent size="lg">
                         <DialogHeader>
                           <DialogTitle className="flex items-center gap-2">
-                            <Shield className="text-accent-blue-text h-5 w-5" />
                             {selectedClassData.name}
                           </DialogTitle>
                           <DialogDescription>
@@ -606,15 +591,15 @@ export default function NewCharacterPage() {
                           <div className="space-y-4">
                             {/* Basic Info Grid */}
                             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                              <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                              <div className="border-divider border-b py-3">
                                 <span className="text-muted text-xs font-medium">
-                                  Hit Die
+                                  Hit die
                                 </span>
                                 <p className="text-heading mt-1 text-sm font-semibold">
                                   {selectedClassData.hitDie}
                                 </p>
                               </div>
-                              <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                              <div className="border-divider border-b py-3">
                                 <span className="text-muted text-xs font-medium">
                                   Spellcasting
                                 </span>
@@ -625,9 +610,9 @@ export default function NewCharacterPage() {
                                 </p>
                               </div>
                               {selectedClassData.spellcasting.ability && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-3">
+                                <div className="border-divider border-b py-3">
                                   <span className="text-muted text-xs font-medium">
-                                    Spellcasting Ability
+                                    Spellcasting ability
                                   </span>
                                   <p className="text-heading mt-1 text-sm font-semibold">
                                     {selectedClassData.spellcasting.ability.toUpperCase()}
@@ -636,20 +621,20 @@ export default function NewCharacterPage() {
                               )}
                             </div>
 
-                            {/* Saving Throw Proficiencies */}
+                            {/* Saving throw proficiencies */}
                             {selectedClassData.proficiencies.savingThrows &&
                               selectedClassData.proficiencies.savingThrows
                                 .length > 0 && (
-                                <div className="border-accent-green-border bg-accent-green-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Saving Throw Proficiencies
+                                    Saving throw proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {selectedClassData.proficiencies.savingThrows.map(
                                       (save, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="success"
+                                          key={`${save}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           {formatProficiencyType(save)}
@@ -660,20 +645,20 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
 
-                            {/* Armor Proficiencies */}
+                            {/* Armor proficiencies */}
                             {selectedClassData.proficiencies.armor &&
                               selectedClassData.proficiencies.armor.length >
                                 0 && (
-                                <div className="border-accent-blue-border bg-accent-blue-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Armor Proficiencies
+                                    Armor proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {selectedClassData.proficiencies.armor.map(
                                       (armor, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="info"
+                                          key={`${armor}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           <span
@@ -688,20 +673,20 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
 
-                            {/* Weapon Proficiencies */}
+                            {/* Weapon proficiencies */}
                             {selectedClassData.proficiencies.weapons &&
                               selectedClassData.proficiencies.weapons.length >
                                 0 && (
-                                <div className="border-accent-indigo-border bg-accent-indigo-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Weapon Proficiencies
+                                    Weapon proficiencies
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {selectedClassData.proficiencies.weapons.map(
                                       (weapon, idx) => (
                                         <Badge
-                                          key={idx}
-                                          variant="primary"
+                                          key={`${weapon}-${idx}`}
+                                          variant="neutral"
                                           size="md"
                                         >
                                           <span
@@ -718,9 +703,9 @@ export default function NewCharacterPage() {
 
                             {/* Skill Choices */}
                             {selectedClassData.proficiencies.skillChoices && (
-                              <div className="border-accent-amber-border bg-accent-amber-bg rounded-lg border p-4">
+                              <div className="border-divider border-b py-4">
                                 <h4 className="text-heading mb-2 text-sm font-semibold">
-                                  Skill Proficiencies (Choose{' '}
+                                  Skill proficiencies (choose{' '}
                                   {
                                     selectedClassData.proficiencies.skillChoices
                                       .count
@@ -731,8 +716,8 @@ export default function NewCharacterPage() {
                                   {selectedClassData.proficiencies.skillChoices.from.map(
                                     (skill, idx) => (
                                       <Badge
-                                        key={idx}
-                                        variant="warning"
+                                        key={`${skill}-${idx}`}
+                                        variant="neutral"
                                         size="md"
                                       >
                                         {skill}
@@ -743,14 +728,14 @@ export default function NewCharacterPage() {
                               </div>
                             )}
 
-                            {/* Multiclassing Requirements */}
+                            {/* Multiclassing requirements */}
                             {selectedClassData.multiclassing &&
                               Object.keys(
                                 selectedClassData.multiclassing.requirements
                               ).length > 0 && (
-                                <div className="border-accent-purple-border bg-accent-purple-bg rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Multiclassing Requirements
+                                    Multiclassing requirements
                                   </h4>
                                   <div className="flex flex-wrap gap-2">
                                     {Object.entries(
@@ -759,7 +744,7 @@ export default function NewCharacterPage() {
                                     ).map(([ability, score]) => (
                                       <Badge
                                         key={ability}
-                                        variant="primary"
+                                        variant="neutral"
                                         size="md"
                                       >
                                         {ability.toUpperCase()} {score}+
@@ -769,20 +754,20 @@ export default function NewCharacterPage() {
                                 </div>
                               )}
 
-                            {/* Starting Equipment */}
+                            {/* Starting equipment */}
                             {selectedClassData.startingEquipment &&
                               selectedClassData.startingEquipment.length >
                                 0 && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Starting Equipment
+                                    Starting equipment
                                   </h4>
                                   <ul className="text-body space-y-1 text-sm">
                                     {selectedClassData.startingEquipment
                                       .slice(0, 5)
                                       .map((item, idx) => (
                                         <li
-                                          key={idx}
+                                          key={`${item}-${idx}`}
                                           className="flex items-start gap-2"
                                         >
                                           <span className="bg-faint mt-1.5 h-1 w-1 shrink-0 rounded-full"></span>
@@ -811,7 +796,7 @@ export default function NewCharacterPage() {
                               selectedClassData.features.length > 0 && (
                                 <div className="space-y-3">
                                   <h4 className="text-heading text-sm font-semibold">
-                                    Class Features (First 3 Levels)
+                                    Class features (first 3 levels)
                                   </h4>
                                   {selectedClassData.features
                                     .filter(
@@ -822,14 +807,14 @@ export default function NewCharacterPage() {
                                     .slice(0, 5)
                                     .map((feature, idx) => (
                                       <div
-                                        key={idx}
-                                        className="border-accent-emerald-border bg-accent-emerald-bg rounded-lg border p-4"
+                                        key={`${feature.name}-${idx}`}
+                                        className="border-divider border-b py-4"
                                       >
                                         <div className="mb-1 flex items-center justify-between">
-                                          <h5 className="text-accent-emerald-text text-sm font-semibold">
+                                          <h5 className="text-heading text-sm font-semibold">
                                             {feature.name}
                                           </h5>
-                                          <Badge variant="success" size="sm">
+                                          <Badge variant="neutral" size="sm">
                                             Level {feature.level}
                                           </Badge>
                                         </div>
@@ -858,9 +843,9 @@ export default function NewCharacterPage() {
                             {/* Subclasses Count */}
                             {selectedClassData.subclasses &&
                               selectedClassData.subclasses.length > 0 && (
-                                <div className="border-divider bg-surface-secondary rounded-lg border p-4">
+                                <div className="border-divider border-b py-4">
                                   <h4 className="text-heading mb-2 text-sm font-semibold">
-                                    Available Subclasses
+                                    Available subclasses
                                   </h4>
                                   <p className="text-body text-sm">
                                     This class has{' '}
@@ -893,34 +878,33 @@ export default function NewCharacterPage() {
                 </div>
               </div>
 
-              {/* Player Name */}
+              {/* Player name */}
               <div className="md:col-span-2">
                 <label
                   htmlFor="playerName"
                   className="text-heading mb-2 block text-sm font-medium"
                 >
-                  Player Name
+                  Player name
                 </label>
                 <Input
                   type="text"
                   id="playerName"
                   value={playerName}
                   onChange={e => setPlayerName(e.target.value)}
-                  placeholder="Your name"
                 />
               </div>
             </div>
 
-            {/* Character Preview */}
-            <div className="border-divider bg-surface-secondary rounded-lg border-2 p-6">
-              <h3 className="text-heading mb-4 text-lg font-medium">
-                Character Preview
-              </h3>
+            {/* Character preview */}
+            <div className="border-divider border-t pt-6">
+              <h2 className="text-heading mb-4 text-lg font-medium">
+                Character preview
+              </h2>
               <div className="grid grid-cols-2 gap-4 text-sm md:grid-cols-4">
                 <div>
                   <span className="text-muted">Name:</span>
                   <p className="text-heading font-medium">
-                    {characterName || 'Character Name'}
+                    {characterName || 'Unnamed'}
                   </p>
                 </div>
                 <div>
@@ -940,16 +924,16 @@ export default function NewCharacterPage() {
 
             {/* Action Buttons */}
             <div className="border-divider flex items-center justify-end gap-4 border-t pt-6">
-              <Link href="/player">
-                <Button variant="ghost">Cancel</Button>
-              </Link>
+              <Button asChild variant="ghost">
+                <Link href="/player">Cancel</Link>
+              </Button>
               <Button
                 type="submit"
-                variant="secondary"
+                variant="primary"
                 disabled={isCreating || !characterName.trim()}
                 leftIcon={<Save size={16} />}
               >
-                {isCreating ? 'Creating...' : 'Create Character'}
+                {isCreating ? 'Creating…' : 'Create character'}
               </Button>
             </div>
           </form>

@@ -78,7 +78,6 @@ function Harness({
         onExport={fn()}
         onShowResetModal={fn()}
         onUpdateName={fn()}
-        onAddToast={fn()}
         extraHeaderContent={
           campaign ? (
             <SyncIndicator

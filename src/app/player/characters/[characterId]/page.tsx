@@ -948,7 +948,6 @@ export default function CharacterSheet() {
                   resetCharacter();
               }}
               onUpdateName={name => updateCharacter({ name })}
-              onAddToast={addToast}
               extraHeaderContent={
                 <SyncIndicator
                   syncStatus={playerSync.syncStatus}

@@ -341,7 +341,7 @@ test.describe('rewind-after-receipt rows', () => {
           .click();
         await activationReload;
         await expect(
-          page.getByRole('heading', { name: /your characters/i }).first()
+          page.getByRole('heading', { name: 'Characters', exact: true }).first()
         ).toBeVisible();
 
         const durable = await page.evaluate(async () => {
@@ -435,7 +435,7 @@ test.describe('cold-interrupt rows', () => {
       // authority: 'indexedDB', which migrationEngine.ts's result() helper
       // never does before an actual cutover activation.
       await expect(
-        page.getByRole('heading', { name: /your characters/i })
+        page.getByRole('heading', { name: 'Characters', exact: true })
       ).toBeVisible();
 
       const after = await legacyBytes(page);
@@ -541,7 +541,7 @@ test('IDB_PRIMARY hydration: app hydrates from IndexedDB with the character pres
   await page.reload();
 
   await expect(
-    page.getByRole('heading', { name: /your characters/i })
+    page.getByRole('heading', { name: 'Characters', exact: true })
   ).toBeVisible();
   await expect(page.getByText('Checkpoint Hero')).toBeVisible();
   await expect(page.getByText('Stale Mirror')).toHaveCount(0);

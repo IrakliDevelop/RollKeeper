@@ -106,7 +106,7 @@ test('manual backup restores empty profiles, preserves collisions, and uses soft
   );
   await page.reload();
 
-  await page.getByRole('button', { name: 'Back up Aria now' }).click();
+  await page.getByRole('button', { name: 'Back up now Aria' }).click();
   await page
     .getByRole('dialog', { name: 'Back up Aria?' })
     .getByRole('button', { name: 'Back up character' })
@@ -118,7 +118,7 @@ test('manual backup restores empty profiles, preserves collisions, and uses soft
     await page.evaluate(() => localStorage.getItem('rollkeeper-player-data'))
   ).toBe(originalRoster);
 
-  await page.getByRole('button', { name: 'Archive Aria cloud copy' }).click();
+  await page.getByRole('button', { name: 'Archive cloud copy Aria' }).click();
   await expect(page.getByText(/archived without deletion/i)).toBeVisible();
   await expect(
     page.getByText('Archived', { exact: true }).first()
@@ -173,7 +173,7 @@ test('manual backup restores empty profiles, preserves collisions, and uses soft
   ).toEqual({ count: 2, localName: 'Local Diverged' });
 
   const downloadPromise = page.waitForEvent('download');
-  await page.getByRole('button', { name: 'Download Aria recovery' }).click();
+  await page.getByRole('button', { name: 'Download recovery Aria' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toContain(
     'rollkeeper-character-recovery'
