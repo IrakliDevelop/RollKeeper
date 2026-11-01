@@ -83,6 +83,9 @@ function DayPopover({
   onClose: () => void;
 }) {
   const popoverRef = useRef<HTMLDivElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const confirmPendingRef = useRef(false);
+  const pendingDeleteFocus = useRef(false);
   const monthName =
     config.months[selectedDay.month]?.name ?? `Month ${selectedDay.month + 1}`;
 
@@ -96,19 +99,30 @@ function DayPopover({
   const top = anchorRect.bottom - containerRect.top + 4;
 
   const handleDelete = async (event: CalendarEvent) => {
-    if (
-      await confirmDialog({
-        title: `Delete ${event.title}?`,
-        confirmLabel: 'Delete event',
-        cancelLabel: 'Cancel',
-        tone: 'danger',
-      })
-    )
+    confirmPendingRef.current = true;
+    const confirmed = await confirmDialog({
+      title: `Delete ${event.title}?`,
+      confirmLabel: 'Delete event',
+      cancelLabel: 'Cancel',
+      tone: 'danger',
+    });
+    confirmPendingRef.current = false;
+    if (confirmed) {
+      pendingDeleteFocus.current = true;
       onDeleteEvent(event.id);
+    }
   };
 
   useEffect(() => {
+    if (pendingDeleteFocus.current) {
+      pendingDeleteFocus.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [events]);
+
+  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
+      if (confirmPendingRef.current) return;
       if (
         popoverRef.current &&
         !popoverRef.current.contains(e.target as Node)
@@ -138,6 +152,7 @@ function DayPopover({
           {selectedDay.day + 1} {monthName}
         </span>
         <Button
+          ref={addButtonRef}
           variant="ghost"
           size="sm"
           leftIcon={<Plus size={12} />}
@@ -175,7 +190,7 @@ function DayPopover({
                         aria-label={`Move ${event.title} earlier`}
                         disabled={index === 0}
                         onClick={() => onMoveEvent(event.id, 'up')}
-                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       >
                         <ChevronUp size={10} />
                       </button>
@@ -184,7 +199,7 @@ function DayPopover({
                         aria-label={`Move ${event.title} later`}
                         disabled={index === events.length - 1}
                         onClick={() => onMoveEvent(event.id, 'down')}
-                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                        className="text-muted hover:text-heading rounded p-0.5 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                       >
                         <ChevronDown size={10} />
                       </button>

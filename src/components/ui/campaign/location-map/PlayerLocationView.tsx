@@ -29,6 +29,12 @@ function MapLightbox({
 }) {
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 });
   const containerRef = useRef<HTMLDivElement>(null);
+  const [containerElement, setContainerElement] =
+    useState<HTMLDivElement | null>(null);
+  const attachContainer = useCallback((element: HTMLDivElement | null) => {
+    containerRef.current = element;
+    setContainerElement(element);
+  }, []);
 
   // Track active pointers for pan + pinch-to-zoom
   const pointersRef = useRef<Map<number, { x: number; y: number }>>(new Map());
@@ -43,7 +49,7 @@ function MapLightbox({
 
   // Wheel zoom (desktop)
   useEffect(() => {
-    const el = containerRef.current;
+    const el = containerElement;
     if (!el) return;
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
@@ -56,18 +62,18 @@ function MapLightbox({
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [containerElement]);
 
   // Prevent iOS Safari bounce / pull-to-refresh inside the lightbox
   useEffect(() => {
-    const el = containerRef.current;
+    const el = containerElement;
     if (!el) return;
     const prevent = (e: TouchEvent) => {
       if (e.touches.length > 1) e.preventDefault();
     };
     el.addEventListener('touchmove', prevent, { passive: false });
     return () => el.removeEventListener('touchmove', prevent);
-  }, []);
+  }, [containerElement]);
 
   const getMidpoint = useCallback(
     (pointers: Map<number, { x: number; y: number }>) => {
@@ -172,6 +178,7 @@ function MapLightbox({
       <DialogContent
         size="full"
         showCloseButton={false}
+        aria-describedby={undefined}
         className="h-[95vh] max-h-[95vh] overflow-hidden p-0"
       >
         <DialogTitle className="sr-only">{alt}</DialogTitle>
@@ -180,7 +187,7 @@ function MapLightbox({
           variant="ghost"
           size="sm"
           onClick={onClose}
-          className="absolute top-4 right-4 z-10"
+          className="bg-surface-elevated border-input-border text-heading absolute top-4 right-4 z-10 rounded-sm border"
           aria-label="Close map"
         >
           <X size={22} />
@@ -191,14 +198,14 @@ function MapLightbox({
           variant="secondary"
           size="sm"
           onClick={() => setTransform({ x: 0, y: 0, scale: 1 })}
-          className="absolute right-4 bottom-4 z-10"
+          className="bg-surface-elevated border-input-border absolute right-4 bottom-4 z-10 border"
         >
           Reset zoom
         </Button>
 
         {/* Pannable / zoomable image */}
         <div
-          ref={containerRef}
+          ref={attachContainer}
           className="h-full w-full cursor-grab touch-none overflow-hidden active:cursor-grabbing"
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
@@ -318,7 +325,8 @@ export default function PlayerLocationView({
               variant="ghost"
               className="h-8 w-8 p-0"
               onClick={handleBack}
-              title="Back to map list"
+              title="Back to maps"
+              aria-label="Back to maps"
             >
               <ArrowLeft size={15} />
             </Button>
@@ -347,7 +355,7 @@ export default function PlayerLocationView({
               {/* Fitted preview image */}
               <button
                 type="button"
-                aria-label={`Expand ${selectedLocation.name} map`}
+                aria-label={`Expand map of ${selectedLocation.name}`}
                 className="group relative block w-full cursor-pointer"
                 onClick={() => setLightboxOpen(true)}
               >
@@ -358,8 +366,8 @@ export default function PlayerLocationView({
                   style={{ maxHeight: '60vh' }}
                 />
                 {/* Expand overlay */}
-                <div className="absolute inset-0 flex items-center justify-center rounded-b-lg">
-                  <span className="bg-surface-raised text-body flex items-center gap-1.5 rounded-sm px-3 py-1.5 text-xs">
+                <div className="absolute right-3 bottom-3">
+                  <span className="bg-surface-elevated border-input-border text-body flex items-center gap-1.5 rounded-sm border px-3 py-1.5 text-xs">
                     <Maximize2 size={13} />
                     Expand map
                   </span>

@@ -231,17 +231,13 @@ export function EventListView({
                     key={event.id}
                     className="hover:bg-surface-elevated border-divider group flex w-full items-center gap-2 border-b px-3 py-2.5 transition-colors duration-150 last:border-b-0"
                   >
-                    <EventMarker
-                      event={event}
-                      size="row"
-                      className="transition-transform duration-150 group-hover:scale-125"
-                    />
+                    <EventMarker event={event} size="row" />
                     <button
                       type="button"
                       onClick={() => handleEditEvent(event)}
                       className="min-w-0 flex-1 text-left"
                     >
-                      <span className="text-heading truncate text-sm font-medium transition-transform duration-150 group-hover:translate-x-0.5">
+                      <span className="text-heading truncate text-sm font-medium">
                         {event.title}
                       </span>
                     </button>
@@ -253,7 +249,7 @@ export function EventListView({
                             aria-label={`Move ${event.title} earlier`}
                             disabled={index === 0}
                             onClick={() => onMoveEvent?.(event.id, 'up')}
-                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                           >
                             <ChevronUp size={12} />
                           </button>
@@ -262,7 +258,7 @@ export function EventListView({
                             aria-label={`Move ${event.title} later`}
                             disabled={index === group.events.length - 1}
                             onClick={() => onMoveEvent?.(event.id, 'down')}
-                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30"
+                            className="text-muted hover:text-heading rounded p-1 transition-colors disabled:pointer-events-none disabled:opacity-30 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                           >
                             <ChevronDown size={12} />
                           </button>
