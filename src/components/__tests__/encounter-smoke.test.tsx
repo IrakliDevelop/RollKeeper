@@ -417,8 +417,8 @@ describe('MonsterStatBlockPanel', () => {
 
   it('displays ability scores', () => {
     render(<MonsterStatBlockPanel statBlock={mockStatBlock} />);
-    expect(screen.getAllByText('str').length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByText('dex').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('STR').length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText('DEX').length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText('14').length).toBeGreaterThanOrEqual(1);
   });
 

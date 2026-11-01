@@ -61,6 +61,32 @@ const LINKED: StatBlockEntry = {
   resourceCost: { resourceId: 'res-1', amount: 1 },
 };
 
+describe('MonsterStatBlockPanel frame and legacy data', () => {
+  it('guards missing persisted section arrays', () => {
+    const legacy = {
+      ...statBlock([]),
+      conditionImmunities: undefined,
+      traits: undefined,
+      actions: undefined,
+      bonusActions: undefined,
+      reactions: undefined,
+      lairActions: undefined,
+    } as unknown as MonsterStatBlock;
+    render(<MonsterStatBlockPanel statBlock={legacy} />);
+    expect(screen.getByText('Speed')).toBeVisible();
+  });
+
+  it('uses a neutral frame by default and no frame in bare mode', () => {
+    const { container, rerender } = render(
+      <MonsterStatBlockPanel statBlock={statBlock([])} />
+    );
+    expect(container.firstElementChild).toHaveClass('border-divider');
+    rerender(<MonsterStatBlockPanel statBlock={statBlock([])} bare />);
+    expect(container.firstElementChild).not.toHaveClass('border-divider');
+    expect(container.firstElementChild).not.toHaveClass('bg-surface');
+  });
+});
+
 describe('MonsterStatBlockPanel — resource costs', () => {
   it('without new props renders read-only with no Use button (bestiary regression guard)', async () => {
     render(<MonsterStatBlockPanel statBlock={statBlock([LINKED])} />);

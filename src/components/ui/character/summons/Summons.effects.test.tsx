@@ -7,6 +7,7 @@ import { SummonsSubTab } from './SummonsSubTab';
 import { useCharacterStore } from '@/store/characterStore';
 import { makeCharacter } from '@/utils/__tests__/test-utils';
 import type { SavedCreature, Summon } from '@/types/summon';
+import type { MonsterStatBlock } from '@/types/encounter';
 
 const creature = (id: string): SavedCreature => ({
   id,
@@ -47,6 +48,35 @@ const summon: Summon = {
       { id: 'prone', name: 'Prone' },
     ],
   },
+};
+
+const compactBlock: MonsterStatBlock = {
+  str: 10,
+  dex: 10,
+  con: 10,
+  int: 10,
+  wis: 10,
+  cha: 10,
+  saves: '',
+  skills: '',
+  speed: '30 ft.',
+  resistances: '',
+  immunities: '',
+  vulnerabilities: '',
+  conditionImmunities: [],
+  senses: '',
+  passivePerception: 10,
+  traits: [],
+  actions: [],
+  reactions: [],
+  bonusActions: [],
+  lairActions: [],
+  cr: '1',
+  type: 'Beast',
+  size: 'Medium',
+  languages: '',
+  alignment: '',
+  hpFormula: '',
 };
 
 describe('Summons combat effects', () => {
@@ -99,6 +129,28 @@ describe('Summons combat effects', () => {
     await user.type(amount, '5');
     await user.clear(amount);
     expect(amount.getAttribute('value')).toBe('');
+  });
+
+  it('opens a stat block without a second panel frame inside the summon card', async () => {
+    const user = userEvent.setup();
+    const { container } = render(
+      <SummonCard
+        summon={{
+          ...summon,
+          entity: { ...summon.entity, monsterStatBlock: compactBlock },
+        }}
+        onDamage={vi.fn()}
+        onHeal={vi.fn()}
+        onAddTempHp={vi.fn()}
+        onAddCondition={vi.fn()}
+        onRemoveCondition={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+    await user.click(screen.getByRole('button', { name: 'Stat block' }));
+    expect(container.querySelector('[data-stat-block-panel]')).not.toHaveClass(
+      'border-divider'
+    );
   });
 
   it('keeps saved creature actions visible and returns focus after removal', async () => {
