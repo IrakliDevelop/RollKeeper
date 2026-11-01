@@ -201,7 +201,7 @@ describe('ChargePoolDisplay', () => {
       screen.getByRole('button', { name: 'Use one item charge' })
     ).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Use Lightning Bolt (3 charges)' })
+      screen.getByRole('button', { name: 'Use (3 charges)' })
     ).toBeDisabled();
   });
 });

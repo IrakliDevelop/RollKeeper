@@ -197,7 +197,8 @@ export const HPReview: Story = {
     );
     expect(page.getByText('Total HP gained: +10')).toBeVisible();
     await userEvent.click(page.getByRole('button', { name: 'Next' }));
-    expect(page.getByText(/\+10 \(d10/)).toBeVisible();
+    expect(page.getByText('Total HP gained: +10')).toBeVisible();
+    expect(page.getByText('Earlier levels (CON): +3 HP')).toBeVisible();
     await userEvent.click(page.getByRole('button', { name: 'Level up' }));
     expect(useCharacterStore.getState().character.hitPoints.max).toBe(34);
     expect(useCharacterStore.getState().character.hitPoints.current).toBe(29);
