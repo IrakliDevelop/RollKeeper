@@ -2,81 +2,24 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoll, evaluate, PollyrollSyntaxError } from 'pollyroll';
-import { createDiceTray } from 'pollyroll/render';
-import type { DiceTray, SkinRef } from 'pollyroll/render';
+import type { SkinRef } from 'pollyroll/render';
 import type { RollSummary } from '@/types/dice';
 import { toRollSummary } from '@/utils/pollyrollSummary';
+import type { DicePreferences } from '@/types/dice';
 import { DEFAULT_DICE_SET } from '@/utils/diceSet';
-
-interface TrayEntry {
-  tray: DiceTray;
-  users: number;
-  skinKey: string;
-  dieScale: number;
-  rolling: boolean;
-  clearTimer: ReturnType<typeof setTimeout> | null;
-}
-
-const trays = new Map<string, TrayEntry>();
-
-function acquireTray(
-  containerId: string,
-  skin: SkinRef | undefined,
-  dieScale: number
-): DiceTray | null {
-  const existing = trays.get(containerId);
-  if (existing) {
-    existing.users += 1;
-    return existing.tray;
-  }
-  const element = document.getElementById(containerId);
-  if (!element) return null;
-  const tray = createDiceTray(element, { skin, dieScale });
-  trays.set(containerId, {
-    tray,
-    users: 1,
-    skinKey: JSON.stringify(skin ?? null),
-    dieScale,
-    rolling: false,
-    clearTimer: null,
-  });
-  return tray;
-}
-
-function releaseTray(containerId: string): void {
-  const entry = trays.get(containerId);
-  if (!entry) return;
-  entry.users -= 1;
-  if (entry.users > 0) return;
-  if (entry.clearTimer) clearTimeout(entry.clearTimer);
-  entry.tray.dispose();
-  trays.delete(containerId);
-}
-
-function applyAppearance(
-  containerId: string,
-  skin: SkinRef | undefined,
-  dieScale: number | undefined
-): void {
-  const entry = trays.get(containerId);
-  if (!entry) return;
-  if (skin !== undefined) {
-    const key = JSON.stringify(skin);
-    if (key !== entry.skinKey) {
-      entry.skinKey = key;
-      entry.tray.setSkin(skin);
-    }
-  }
-  if (dieScale !== undefined && dieScale !== entry.dieScale) {
-    entry.dieScale = dieScale;
-    entry.tray.setDieScale(dieScale);
-  }
-}
+import {
+  acquireDiceTray,
+  releaseDiceTray,
+  getDiceTrayEntry,
+  applyDiceAppearance,
+  diceTrayCreationKey,
+} from './diceTrayRegistry';
 
 export interface UseDiceRollerOptions {
   containerId: string;
   skin?: SkinRef;
   dieScale?: number;
+  trayOptions?: DicePreferences;
   autoClearDelay?: number;
   onRollComplete?: (summary: RollSummary) => void;
   onError?: (error: string) => void;
@@ -98,6 +41,7 @@ export function useDiceRoller({
   containerId,
   skin,
   dieScale,
+  trayOptions,
   autoClearDelay: initialAutoClearDelay = 10000,
   onRollComplete,
   onError,
@@ -110,10 +54,15 @@ export function useDiceRoller({
   const onLogRef = useRef(onLog);
   const onErrorRef = useRef(onError);
   const onCompleteRef = useRef(onRollComplete);
+  const optionsRef = useRef(trayOptions);
+  optionsRef.current = trayOptions;
+  // Sound has a live setter; the remaining options are read when the tray is created.
+  const creationKey = diceTrayCreationKey(trayOptions);
   const skinRef = useRef(skin);
   const dieScaleRef = useRef(dieScale);
   const delayRef = useRef(autoClearDelay);
   const mountedRef = useRef(true);
+  const rollVersionRef = useRef(0);
 
   useEffect(() => {
     onLogRef.current = onLog;
@@ -144,14 +93,18 @@ export function useDiceRoller({
 
     const attach = () => {
       if (acquired) return true;
-      const tray = acquireTray(
+      const tray = acquireDiceTray(
         containerId,
         skinRef.current,
-        dieScaleRef.current ?? DEFAULT_DICE_SET.dieScale
+        dieScaleRef.current ?? DEFAULT_DICE_SET.dieScale,
+        optionsRef.current
       );
       if (!tray) return false;
       acquired = true;
-      if (mountedRef.current) setIsInitialized(true);
+      if (mountedRef.current) {
+        setIsInitialized(true);
+        setIsRolling(false);
+      }
       return true;
     };
 
@@ -165,19 +118,26 @@ export function useDiceRoller({
     return () => {
       mountedRef.current = false;
       observer?.disconnect();
-      if (acquired) releaseTray(containerId);
+      if (acquired) releaseDiceTray(containerId);
       setIsInitialized(false);
     };
-  }, [containerId]);
+  }, [containerId, creationKey]);
 
   useEffect(() => {
     if (!isInitialized) return;
-    applyAppearance(containerId, skin, dieScale);
-  }, [containerId, skin, dieScale, isInitialized]);
+    applyDiceAppearance(containerId, skin, dieScale, optionsRef.current);
+  }, [
+    containerId,
+    skin,
+    dieScale,
+    trayOptions?.sound,
+    creationKey,
+    isInitialized,
+  ]);
 
   const roll = useCallback(
     async (notation: string): Promise<RollSummary | null> => {
-      const entry = trays.get(containerId);
+      const entry = getDiceTrayEntry(containerId);
       if (!entry) {
         reportError('Dice tray is not ready yet');
         return null;
@@ -187,6 +147,8 @@ export function useDiceRoller({
         return null;
       }
 
+      const version = ++rollVersionRef.current;
+      const playingTray = entry.tray;
       entry.rolling = true;
       if (mountedRef.current) setIsRolling(true);
       if (entry.clearTimer) {
@@ -199,7 +161,15 @@ export function useDiceRoller({
         const event = createRoll(notation, {
           skin: skinRef.current,
         });
-        await entry.tray.playRoll(event);
+        await playingTray.playRoll(event);
+        if (
+          getDiceTrayEntry(containerId) !== entry ||
+          entry.tray !== playingTray
+        ) {
+          if (mountedRef.current && version === rollVersionRef.current)
+            setIsRolling(false);
+          return null;
+        }
         const summary = toRollSummary(
           event,
           evaluate(event),
@@ -215,8 +185,9 @@ export function useDiceRoller({
           `Total: ${summary.finalTotal} (dice: ${summary.total}, modifier: ${summary.modifier})`
         );
         onCompleteRef.current?.(summary);
-        const delay = delayRef.current;
-        if (delay > 0 && trays.get(containerId) === entry) {
+        const delay =
+          optionsRef.current?.fadeAfterMs !== undefined ? 0 : delayRef.current;
+        if (delay > 0 && getDiceTrayEntry(containerId) === entry) {
           entry.clearTimer = setTimeout(() => {
             try {
               entry.tray.clear();
@@ -236,14 +207,14 @@ export function useDiceRoller({
         if (mountedRef.current) setIsRolling(false);
         return null;
       } finally {
-        entry.rolling = false;
+        if (entry.tray === playingTray) entry.rolling = false;
       }
     },
     [containerId, log, reportError]
   );
 
   const clearDice = useCallback(() => {
-    const entry = trays.get(containerId);
+    const entry = getDiceTrayEntry(containerId);
     if (!entry) {
       reportError('Cannot clear dice — tray is not ready');
       return;

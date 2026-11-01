@@ -6,6 +6,8 @@ import type {
 import type { DiceResult, RollSummary } from '@/types/dice';
 
 const DIE_SIDES: Record<DieType, number> = {
+  d2: 2,
+  dc: 2,
   d4: 4,
   d6: 6,
   d8: 8,

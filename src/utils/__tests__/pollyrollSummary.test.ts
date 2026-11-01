@@ -34,3 +34,11 @@ describe('toRollSummary', () => {
     expect(() => createRoll('1d200')).toThrow(PollyrollSyntaxError);
   });
 });
+
+it('supports coins and two-sided dice from the latest Pollyroll notation', () => {
+  const event = createRoll('2d2+3dc', { rng: () => 0 });
+  const summary = toRollSummary(event, evaluate(event));
+  expect(summary.individualValues).toEqual([1, 1, 0, 0, 0]);
+  expect(summary.diceResults.map(die => die.sides)).toEqual([2, 2, 2, 2, 2]);
+  expect(summary.finalTotal).toBe(2);
+});

@@ -54,7 +54,7 @@ afterEach(() => {
 });
 
 describe('spell level headers', () => {
-  it('shows static slot pips in QuickSpells', () => {
+  it('shows interactive slot pips in QuickSpells', () => {
     render(
       <QuickSpells
         showAttackRoll={vi.fn()}
@@ -63,14 +63,14 @@ describe('spell level headers', () => {
       />
     );
     expect(
-      screen.getByRole('img', { name: '3 of 4 level 1 slots available' })
+      screen.getByRole('group', { name: '3 of 4 level 1 slots available' })
     ).toBeInTheDocument();
   });
 
-  it('shows static slot pips in SpellManagement', () => {
+  it('shows interactive slot pips in SpellManagement', () => {
     render(<SpellManagement />);
     expect(
-      screen.getByRole('img', { name: '3 of 4 level 1 slots available' })
+      screen.getByRole('group', { name: '3 of 4 level 1 slots available' })
     ).toBeInTheDocument();
   });
 });
