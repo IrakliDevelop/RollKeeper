@@ -3,7 +3,7 @@
 import React from 'react';
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { ArrowLeft, Swords } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { HeaderTrailing } from '@/components/auth/HeaderTrailing';
 import { CombatLogArchiveSyncControls } from '@/components/ui/campaign/CombatLogArchiveSyncControls';
@@ -22,30 +22,28 @@ export default function CampaignEncountersPage() {
   if (!hasHydrated) {
     return (
       <div className="bg-surface flex min-h-screen items-center justify-center">
-        <div className="text-muted animate-pulse">Loading...</div>
+        <div className="text-muted">Loading encounters…</div>
       </div>
     );
   }
 
   return (
     <div className="bg-surface min-h-screen">
-      <header className="border-divider bg-surface-secondary border-b shadow-sm">
+      <header className="border-divider bg-surface-secondary border-b">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center">
-              <Link href={`/dm/campaign/${code}`}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  leftIcon={<ArrowLeft size={20} />}
-                >
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <div className="flex min-w-0 flex-wrap items-center gap-3">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                leftIcon={<ArrowLeft size={20} />}
+              >
+                <Link href={`/dm/campaign/${code}`}>
                   {campaign?.name ?? 'Campaign'}
-                </Button>
-              </Link>
-              <div className="ml-6 flex items-center">
-                <Swords className="text-accent-red-text mr-3 h-6 w-6" />
-                <h1 className="text-heading text-xl font-bold">Encounters</h1>
-              </div>
+                </Link>
+              </Button>
+              <h1 className="type-heading text-heading">Encounters</h1>
             </div>
             <HeaderTrailing showSystemOption />
           </div>
