@@ -100,7 +100,7 @@ describe('DefensesAndSenses effects', () => {
       screen.getByRole('button', { name: 'Add damage resistances' })
     );
     expect(
-      screen.getByRole('button', { name: 'Done damage resistances' })
+      screen.getByRole('button', { name: 'Done adding damage resistances' })
     ).toBeTruthy();
     expect(screen.getByPlaceholderText('Search')).toBeTruthy();
     view.rerender(<DefensesAndSenses editing={false} />);

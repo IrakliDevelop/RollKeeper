@@ -84,7 +84,9 @@ describe('Features proficiencies', () => {
         onDeleteToolProficiency={vi.fn()}
       />
     );
-    expect(screen.getByText('Swap on a long rest')).toBeInTheDocument();
+    expect(
+      screen.getByText('You can swap temporary tools on a long rest.')
+    ).toBeInTheDocument();
   });
 
   it('shows tools and languages as plain display in play', () => {

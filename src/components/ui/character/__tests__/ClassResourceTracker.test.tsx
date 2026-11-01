@@ -145,9 +145,9 @@ describe('ClassResourceTracker', () => {
     );
 
     for (const [label, key] of [
-      ['Ready Weapons', 'actions-ready-weapons'],
-      ['Quick Features', 'actions-quick-features'],
-      ['Quick Spells', 'actions-quick-spells'],
+      ['Ready weapons', 'actions-ready-weapons'],
+      ['Quick features', 'actions-quick-features'],
+      ['Quick spells', 'actions-quick-spells'],
     ]) {
       const disclosure = screen.getByRole('button', { name: label });
       fireEvent.click(disclosure);
@@ -163,10 +163,10 @@ describe('ClassResourceTracker', () => {
       heading => heading.textContent
     );
     expect(headings.indexOf('Class resources')).toBeGreaterThan(
-      headings.indexOf('Ready Weapons')
+      headings.indexOf('Ready weapons')
     );
     expect(headings.indexOf('Class resources')).toBeLessThan(
-      headings.indexOf('Quick Features')
+      headings.indexOf('Quick features')
     );
   });
 });

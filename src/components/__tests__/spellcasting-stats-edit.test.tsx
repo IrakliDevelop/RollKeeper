@@ -23,7 +23,7 @@ describe('SpellcastingStats edit gate', () => {
     expect(
       screen.getAllByText('wisdom', { exact: false }).length
     ).toBeGreaterThan(0);
-    expect(screen.queryByTitle('Toggle manual overrides')).toBeNull();
+    expect(screen.queryByTitle('Override spellcasting stats')).toBeNull();
     expect(screen.queryByRole('combobox')).toBeNull();
     expect(screen.queryByPlaceholderText('Auto')).toBeNull();
     expect(screen.getByText('+7')).toBeInTheDocument();
@@ -34,12 +34,12 @@ describe('SpellcastingStats edit gate', () => {
   it('closes the override editor on leaving edit mode without changing the values', () => {
     useCharacterStore.setState({ character: makeWizard() });
     const { rerender } = render(<SpellcastingStats editing />);
-    fireEvent.click(screen.getByTitle('Toggle manual overrides'));
+    fireEvent.click(screen.getByTitle('Override spellcasting stats'));
     expect(screen.getAllByPlaceholderText('Auto')).toHaveLength(2);
 
     rerender(<SpellcastingStats editing={false} />);
     expect(screen.queryByPlaceholderText('Auto')).toBeNull();
-    expect(screen.queryByTitle('Toggle manual overrides')).toBeNull();
+    expect(screen.queryByTitle('Override spellcasting stats')).toBeNull();
     expect(
       useCharacterStore.getState().character.spellcastingStats
         .isAbilityOverridden
@@ -59,7 +59,7 @@ describe('SpellcastingStats edit gate', () => {
   it('names the override inputs by their visible labels', () => {
     useCharacterStore.setState({ character: makeWizard() });
     render(<SpellcastingStats editing />);
-    fireEvent.click(screen.getByTitle('Toggle manual overrides'));
+    fireEvent.click(screen.getByTitle('Override spellcasting stats'));
 
     for (const name of ['Spell Attack', 'Spell Save DC']) {
       const input = screen.getByRole('textbox', { name });
