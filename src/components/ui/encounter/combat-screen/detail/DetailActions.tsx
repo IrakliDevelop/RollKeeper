@@ -15,8 +15,8 @@ export function LairActionsSection({ entity, actions }: DetailSectionProps) {
 
   return (
     <div className="space-y-1">
-      <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Lair Actions (1/round)
+      <h4 className="type-label-heading text-heading">
+        Lair actions (1/round)
       </h4>
       {lairActions.map(la => (
         <div

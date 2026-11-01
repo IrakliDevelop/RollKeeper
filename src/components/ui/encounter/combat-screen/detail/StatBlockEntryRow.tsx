@@ -125,7 +125,8 @@ export function StatBlockEntryRow({
                 return (
                   <span
                     key={i}
-                    aria-label={`${displayName} use ${i + 1} ${isUsed ? '(used)' : '(available)'}`}
+                    role="img"
+                    aria-label={`${displayName} use ${i + 1}, ${isUsed ? 'used' : 'available'}`}
                     className={pipClass}
                   />
                 );
@@ -141,7 +142,11 @@ export function StatBlockEntryRow({
                       : !useBlocked && onUseAbility?.(entry)
                   }
                   disabled={!isUsed && useBlocked}
-                  aria-label={`${displayName} use ${i + 1} ${isUsed ? '(used)' : '(available)'}`}
+                  aria-label={
+                    isUsed
+                      ? `Restore ${displayName} use ${i + 1}`
+                      : `Use ${displayName} (use ${i + 1} of ${max})`
+                  }
                   title={
                     isUsed
                       ? cost && resource
