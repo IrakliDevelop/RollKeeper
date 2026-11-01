@@ -18,6 +18,7 @@ export interface AutocompleteOption {
 
 export interface AutocompleteProps {
   options: AutocompleteOption[];
+  inputId?: string;
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
@@ -26,6 +27,7 @@ export interface AutocompleteProps {
 }
 
 export function Autocomplete({
+  inputId,
   options,
   value,
   onChange,
@@ -91,6 +93,7 @@ export function Autocomplete({
       <div className="relative">
         <input
           ref={inputRef}
+          id={inputId}
           type="text"
           className={cn(
             inputVariants({ variant: 'default', size: 'md' }),
