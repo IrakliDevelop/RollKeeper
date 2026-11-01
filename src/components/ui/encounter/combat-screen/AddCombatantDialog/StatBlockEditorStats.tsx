@@ -8,6 +8,7 @@ import {
 } from './monsterEditDraft';
 import { abilityModifier } from '@/utils/encounterConverter';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Input } from '@/components/ui/forms/input';
 import type { MonsterEditDraft } from './monsterEditDraft';
 import type { MonsterStatBlock } from '@/types/encounter';
 
@@ -36,7 +37,7 @@ type TextFieldKey =
 
 const TEXT_FIELDS: Array<{ key: TextFieldKey; label: string }> = [
   { key: 'speed', label: 'Speed' },
-  { key: 'saves', label: 'Saving Throws' },
+  { key: 'saves', label: 'Saving throws' },
   { key: 'skills', label: 'Skills' },
   { key: 'resistances', label: 'Resistances' },
   { key: 'immunities', label: 'Immunities' },
@@ -49,11 +50,9 @@ const TEXT_FIELDS: Array<{ key: TextFieldKey; label: string }> = [
   { key: 'alignment', label: 'Alignment' },
 ];
 
-const FIELD_CLASSES =
-  'border-divider bg-surface-secondary w-full rounded-[10px] border-[1.5px] px-3 py-2 text-sm focus:outline-none';
+const FIELD_CLASSES = 'w-full text-sm';
 
-const LABEL_CLASSES =
-  'text-muted mb-1 block text-[11px] font-extrabold tracking-wider uppercase';
+const LABEL_CLASSES = 'text-body mb-1 block text-sm font-medium';
 
 /** Stats sub-tab of `StatBlockEditor` — ability scores, initiative/PB/passive
  * perception, and the descriptive text fields. Split out of the parent to
@@ -106,7 +105,7 @@ export function StatBlockEditorStats({
         </div>
         <div>
           <label htmlFor="edit-pb" className={LABEL_CLASSES}>
-            Prof. Bonus
+            Proficiency bonus
           </label>
           <NumberField
             id="edit-pb"
@@ -118,7 +117,7 @@ export function StatBlockEditorStats({
         </div>
         <div>
           <label htmlFor="edit-pp" className={LABEL_CLASSES}>
-            Passive Perc.
+            Passive perception
           </label>
           <NumberField
             id="edit-pp"
@@ -137,7 +136,7 @@ export function StatBlockEditorStats({
             <label htmlFor={`edit-${f.key}`} className={LABEL_CLASSES}>
               {f.label}
             </label>
-            <input
+            <Input
               id={`edit-${f.key}`}
               aria-label={f.label}
               value={draft.statBlock[f.key]}
@@ -148,12 +147,12 @@ export function StatBlockEditorStats({
         ))}
         <div>
           <label htmlFor="edit-condimm" className={LABEL_CLASSES}>
-            Condition Immunities
+            Condition immunities
           </label>
-          <input
+          <Input
             id="edit-condimm"
             aria-label="Condition immunities"
-            value={draft.statBlock.conditionImmunities.join(', ')}
+            value={(draft.statBlock.conditionImmunities ?? []).join(', ')}
             onChange={e =>
               patchBlock({
                 conditionImmunities: e.target.value

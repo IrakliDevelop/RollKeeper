@@ -202,10 +202,9 @@ describe('AddCombatantDialog', () => {
     // Click Goblin result to enter detail view
     fireEvent.click(screen.getByText('Goblin'));
 
-    // Increment count twice (1 → 2 → 3)
-    const plusBtn = screen.getByRole('button', { name: /increase count/i });
-    fireEvent.click(plusBtn);
-    fireEvent.click(plusBtn);
+    fireEvent.change(screen.getByRole('textbox', { name: 'Count' }), {
+      target: { value: '3' },
+    });
 
     // Click Add button (now in anchored footer)
     fireEvent.click(screen.getByRole('button', { name: /add goblin/i }));
@@ -273,7 +272,10 @@ describe('AddCombatantDialog', () => {
     fireEvent.change(screen.getByRole('textbox', { name: /^type$/i }), {
       target: { value: 'construct' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /actions & traits/i }));
+    fireEvent.mouseDown(
+      screen.getByRole('tab', { name: /actions and traits/i }),
+      { button: 0, ctrlKey: false }
+    );
     fireEvent.click(screen.getByRole('button', { name: /add actions entry/i }));
     fireEvent.change(
       screen.getByRole('textbox', { name: /actions entry name/i }),

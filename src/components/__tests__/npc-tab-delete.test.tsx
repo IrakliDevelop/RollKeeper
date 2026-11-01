@@ -66,6 +66,32 @@ describe('NpcTab — deleting a saved NPC', () => {
     expect(screen.getByText('Forest Scout')).toBeInTheDocument();
   });
 
+  it('uses the current store version when props still hold an older NPC', () => {
+    render(
+      <NpcTab
+        npcs={[npc('npc1', 'Old Guard')]}
+        campaignCode="CAMP1"
+        onAdd={vi.fn()}
+      />
+    );
+    expect(screen.getByText('Town Guard')).toBeInTheDocument();
+    expect(screen.queryByText('Old Guard')).not.toBeInTheDocument();
+  });
+
+  it('returns focus to saved-creature search after a confirmed deletion', async () => {
+    renderConfirmDialogHost();
+    render(<NpcTabInEncounter />);
+    const deleteButton = screen.getByRole('button', {
+      name: 'Delete Town Guard',
+    });
+    deleteButton.focus();
+    fireEvent.click(deleteButton);
+    await clickConfirmDialogButton('Delete NPC');
+    expect(
+      screen.getByRole('textbox', { name: /search saved creatures/i })
+    ).toHaveFocus();
+  });
+
   it('shows an NPC created elsewhere while the tab is open', () => {
     render(<NpcTab npcs={[]} campaignCode="CAMP1" onAdd={vi.fn()} />);
 
