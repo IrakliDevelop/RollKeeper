@@ -91,7 +91,6 @@ export function CharacterAutomaticSyncControls(
           <Button
             variant="secondary"
             size="sm"
-            aria-label="Preview enable all eligible characters"
             onClick={handlePreview}
             disabled={!actions.indexedDbPrimary}
           >
@@ -127,13 +126,8 @@ export function CharacterAutomaticSyncControls(
             overrides still win.
           </p>
           <div className="mt-3 flex gap-2">
-            <Button
-              variant="success"
-              size="sm"
-              aria-label="Confirm current and future automatic sync"
-              onClick={handleConfirm}
-            >
-              Confirm
+            <Button variant="success" size="sm" onClick={handleConfirm}>
+              Enable automatic sync
             </Button>
             <Button
               variant="outline"
@@ -158,7 +152,10 @@ export function CharacterAutomaticSyncControls(
               className="border-divider flex flex-wrap items-center justify-between gap-3 border-b py-3"
             >
               <div>
-                <p className="text-heading text-sm font-medium">
+                <p
+                  id={`auto-sync-${character.id}-name`}
+                  className="text-heading text-sm font-medium"
+                >
                   {character.name}
                 </p>
                 <Badge variant={badgeVariant(status)} size="sm">
@@ -170,7 +167,7 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="secondary"
                     size="sm"
-                    aria-label={`Enable automatic sync for ${character.name}`}
+                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.enable(character)}
                     disabled={!actions.indexedDbPrimary}
                   >
@@ -180,7 +177,7 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={`Disable automatic sync for ${character.name}`}
+                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.disable(character.id)}
                   >
                     Turn off
@@ -200,7 +197,7 @@ export function CharacterAutomaticSyncControls(
                     <Button
                       variant="secondary"
                       size="sm"
-                      aria-label={`Keep my ${character.name}`}
+                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-mine')
                       }
@@ -208,9 +205,9 @@ export function CharacterAutomaticSyncControls(
                       Keep mine
                     </Button>
                     <Button
-                      variant="warning"
+                      variant="secondary"
                       size="sm"
-                      aria-label={`Use cloud ${character.name}`}
+                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'use-cloud')
                       }
@@ -220,7 +217,7 @@ export function CharacterAutomaticSyncControls(
                     <Button
                       variant="outline"
                       size="sm"
-                      aria-label={`Keep both ${character.name} versions`}
+                      aria-describedby={`auto-sync-${character.id}-name`}
                       onClick={() =>
                         actions.resolveConflict(character.id, 'keep-both')
                       }
@@ -233,7 +230,7 @@ export function CharacterAutomaticSyncControls(
                   <Button
                     variant="outline"
                     size="sm"
-                    aria-label={`Download quarantined ${character.name} candidate`}
+                    aria-describedby={`auto-sync-${character.id}-name`}
                     onClick={() => actions.downloadQuarantine(character.id)}
                   >
                     Download quarantined data

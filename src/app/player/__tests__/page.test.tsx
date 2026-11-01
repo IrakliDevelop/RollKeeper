@@ -155,6 +155,9 @@ describe('PlayerDashboardPage', () => {
       );
       await clickConfirmDialogButton('Archive character');
       expect(byId(id)?.isArchived).toBe(true);
+      expect(
+        screen.getByRole('heading', { name: 'Archived characters' })
+      ).toHaveFocus();
     });
 
     it('deletes an archived character after the destructive confirm', async () => {

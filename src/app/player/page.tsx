@@ -5,7 +5,6 @@ import Link from 'next/link';
 import {
   Plus,
   Archive,
-  Edit3,
   Trash2,
   Copy,
   Upload,
@@ -279,7 +278,10 @@ export default function PlayerDashboardPage() {
           editable={false}
         />
         <div className="min-w-0 flex-1">
-          <h3 className="type-subheading text-heading break-words">
+          <h3
+            id={`character-${character.id}-name`}
+            className="type-subheading text-heading break-words"
+          >
             {character.name || 'Unnamed character'}
           </h3>
           <p className="type-small text-body mt-1">
@@ -294,6 +296,17 @@ export default function PlayerDashboardPage() {
           {character.campaignCode && (
             <p className="type-small text-muted mt-1 break-words">
               {character.campaignName || character.campaignCode}
+            </p>
+          )}
+          {(character.createdAt || character.lastPlayed) && (
+            <p className="type-small text-muted mt-2">
+              {character.createdAt
+                ? `Created ${new Date(character.createdAt).toLocaleDateString()}`
+                : ''}
+              {character.createdAt && character.lastPlayed ? ' · ' : ''}
+              {character.lastPlayed
+                ? `Last played ${new Date(character.lastPlayed).toLocaleDateString()}`
+                : ''}
             </p>
           )}
           {(character.tags ?? []).length > 0 && (
@@ -313,17 +326,10 @@ export default function PlayerDashboardPage() {
             <Button asChild variant="secondary" size="sm">
               <Link
                 href={`/player/characters/${character.id}`}
+                aria-describedby={`character-${character.id}-name`}
                 onClick={() => handlePlayCharacter(character)}
               >
                 Open character
-              </Link>
-            </Button>
-            <Button asChild variant="ghost" size="sm">
-              <Link
-                href={`/player/characters/${character.id}/edit`}
-                aria-label={`Edit ${character.name || 'character'}`}
-              >
-                <Edit3 size={16} aria-hidden />
               </Link>
             </Button>
             <Button
@@ -348,6 +354,7 @@ export default function PlayerDashboardPage() {
             <Button
               variant="secondary"
               size="sm"
+              aria-describedby={`character-${character.id}-name`}
               onClick={() => {
                 restoreCharacter(character.id);
                 setFocusSection('archived');
@@ -386,13 +393,15 @@ export default function PlayerDashboardPage() {
       />
       <main className="mx-auto max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            asChild
-            variant="primary"
-            leftIcon={<Plus size={18} aria-hidden />}
-          >
-            <Link href="/player/characters/new">Create character</Link>
-          </Button>
+          {characters.length > 0 && (
+            <Button
+              asChild
+              variant="primary"
+              leftIcon={<Plus size={18} aria-hidden />}
+            >
+              <Link href="/player/characters/new">Create character</Link>
+            </Button>
+          )}
           <Button
             onClick={() => setJoinDialogOpen(true)}
             leftIcon={<Link2 size={18} aria-hidden />}
@@ -433,9 +442,14 @@ export default function PlayerDashboardPage() {
             <h2 className="type-subheading text-heading">
               Create your first character
             </h2>
-            <p className="type-body text-muted mt-2">
-              Create a character or import a RollKeeper character file.
-            </p>
+            <Button
+              asChild
+              variant="primary"
+              className="mt-4"
+              leftIcon={<Plus size={18} aria-hidden />}
+            >
+              <Link href="/player/characters/new">Create character</Link>
+            </Button>
           </div>
         ) : (
           <div className="space-y-8">

@@ -57,14 +57,17 @@ function EnabledCharacterCloudBackupControls(
             key={character.id}
             className="border-divider flex flex-wrap items-center justify-between gap-2 border-b py-3"
           >
-            <span className="text-heading text-sm font-medium">
+            <span
+              id={`local-backup-${character.id}-name`}
+              className="text-heading text-sm font-medium"
+            >
               {character.name}
             </span>
             <div className="flex flex-wrap gap-2">
               <Button
                 variant="secondary"
                 size="sm"
-                aria-label={`Back up ${character.name} now`}
+                aria-describedby={`local-backup-${character.id}-name`}
                 onClick={() => actions.backup(character)}
                 disabled={actions.busy !== null}
               >
@@ -73,7 +76,7 @@ function EnabledCharacterCloudBackupControls(
               <Button
                 variant="outline"
                 size="sm"
-                aria-label={`Verify ${character.name} cloud copy`}
+                aria-describedby={`local-backup-${character.id}-name`}
                 onClick={() => actions.verify(character)}
                 disabled={actions.busy !== null}
               >
@@ -89,7 +92,12 @@ function EnabledCharacterCloudBackupControls(
           {actions.rows.map(row => (
             <div key={row.id} className="border-divider border-b py-3">
               <div className="mb-2 flex items-center gap-2">
-                <span className="text-heading font-medium">{row.name}</span>
+                <span
+                  id={`cloud-backup-${row.id}-name`}
+                  className="text-heading font-medium"
+                >
+                  {row.name}
+                </span>
                 <Badge
                   variant={row.deleted_at ? 'warning' : 'success'}
                   size="sm"
@@ -99,9 +107,9 @@ function EnabledCharacterCloudBackupControls(
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button
-                  variant="success"
+                  variant="secondary"
                   size="sm"
-                  aria-label={`Restore ${row.name}`}
+                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.restore(row, false)}
                   disabled={actions.busy !== null}
                 >
@@ -110,7 +118,7 @@ function EnabledCharacterCloudBackupControls(
                 <Button
                   variant="outline"
                   size="sm"
-                  aria-label={`Restore ${row.name} as copy`}
+                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.restore(row, true)}
                   disabled={actions.busy !== null}
                 >
@@ -118,10 +126,10 @@ function EnabledCharacterCloudBackupControls(
                 </Button>
                 {!row.deleted_at && (
                   <Button
-                    variant="warning"
+                    variant="danger"
                     size="sm"
                     leftIcon={<Archive size={14} />}
-                    aria-label={`Archive ${row.name} cloud copy`}
+                    aria-describedby={`cloud-backup-${row.id}-name`}
                     onClick={() => actions.archive(row)}
                     disabled={actions.busy !== null}
                   >
@@ -132,7 +140,7 @@ function EnabledCharacterCloudBackupControls(
                   variant="outline"
                   size="sm"
                   leftIcon={<Download size={14} />}
-                  aria-label={`Download ${row.name} recovery`}
+                  aria-describedby={`cloud-backup-${row.id}-name`}
                   onClick={() => actions.download(row)}
                   disabled={actions.busy !== null}
                 >

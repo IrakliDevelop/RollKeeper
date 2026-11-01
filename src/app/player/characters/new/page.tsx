@@ -703,7 +703,7 @@ export default function NewCharacterPage() {
                             {selectedClassData.proficiencies.skillChoices && (
                               <div className="border-divider border-b py-4">
                                 <h4 className="text-heading mb-2 text-sm font-semibold">
-                                  Skill proficiencies (Choose{' '}
+                                  Skill proficiencies (choose{' '}
                                   {
                                     selectedClassData.proficiencies.skillChoices
                                       .count
@@ -889,7 +889,6 @@ export default function NewCharacterPage() {
                   id="playerName"
                   value={playerName}
                   onChange={e => setPlayerName(e.target.value)}
-                  placeholder="Player name"
                 />
               </div>
             </div>
