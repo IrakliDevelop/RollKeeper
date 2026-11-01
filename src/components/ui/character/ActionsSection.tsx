@@ -103,7 +103,7 @@ export default function ActionsSection({
   return (
     <div className="space-y-6">
       <Section
-        heading="Ready Weapons"
+        heading="Ready weapons"
         level={3}
         collapsible="actions-ready-weapons"
         trailing={
@@ -114,9 +114,7 @@ export default function ActionsSection({
           )
         }
       >
-        <ErrorBoundary
-          fallback={<ActionsLoadFallback thing="Equipped weapons" />}
-        >
+        <ErrorBoundary fallback={<ActionsLoadFallback thing="Ready weapons" />}>
           <EquippedWeapons
             editing={editing}
             showAttackRoll={showAttackRoll}
@@ -167,7 +165,7 @@ export default function ActionsSection({
 
       {(character.favoriteFeatureIds || []).length > 0 && (
         <Section
-          heading="Quick Features"
+          heading="Quick features"
           level={3}
           collapsible="actions-quick-features"
           trailing={
@@ -197,7 +195,7 @@ export default function ActionsSection({
       )}
 
       <Section
-        heading="Quick Spells"
+        heading="Quick spells"
         level={3}
         collapsible="actions-quick-spells"
         trailing={

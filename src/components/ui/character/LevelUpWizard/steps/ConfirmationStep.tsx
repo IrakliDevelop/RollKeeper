@@ -178,7 +178,7 @@ export default function ConfirmationStep({
                 </p>
               )}
               {minimumAdjustment !== 0 && (
-                <p>Minimum HP adjustment: +{minimumAdjustment}</p>
+                <p>Max HP can&apos;t go below 1: +{minimumAdjustment} HP</p>
               )}
               <p>
                 Total HP gained:{' '}
@@ -195,8 +195,8 @@ export default function ConfirmationStep({
             </dt>
             <dd>
               <ul className="type-body text-body mt-2 list-disc pl-5">
-                {cantripUpgrades.map(upgrade => (
-                  <li key={upgrade.name}>
+                {cantripUpgrades.map((upgrade, index) => (
+                  <li key={`${upgrade.name}-${index}`}>
                     {upgrade.name}: {upgrade.from} → {upgrade.to}
                   </li>
                 ))}

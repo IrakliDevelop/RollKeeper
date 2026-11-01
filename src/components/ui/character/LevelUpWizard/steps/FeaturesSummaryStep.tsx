@@ -63,9 +63,9 @@ function FeatureRow({
       </Button>
       {expanded && (
         <div className="space-y-3 pb-2">
-          {feature.entries?.map(entry => (
+          {feature.entries?.map((entry, index) => (
             <div
-              key={`${feature.name}-entry-${entry}`}
+              key={`${feature.name}-entry-${index}`}
               className="type-body text-body break-words"
               dangerouslySetInnerHTML={{ __html: entry }}
             />
@@ -80,9 +80,9 @@ function FeatureRow({
               {feature.choice.options.map(option => (
                 <div key={option.name}>
                   <WizardChoiceRow value={option.name} title={option.name} />
-                  {option.entries.map(entry => (
+                  {option.entries.map((entry, index) => (
                     <div
-                      key={`${option.name}-entry-${entry}`}
+                      key={`${option.name}-entry-${index}`}
                       className="type-caption text-muted pb-2 pl-3"
                       dangerouslySetInnerHTML={{ __html: entry }}
                     />

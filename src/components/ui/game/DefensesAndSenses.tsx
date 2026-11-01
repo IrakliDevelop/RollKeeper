@@ -131,7 +131,7 @@ function TagSelector({
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-            aria-label={`${isAdding ? 'Done' : 'Add'} ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
+            aria-label={`${isAdding ? 'Done adding' : 'Add'} ${label.charAt(0).toLowerCase()}${label.slice(1)}`}
             onClick={() => {
               setIsAdding(!isAdding);
               setSearch('');
@@ -297,7 +297,7 @@ function SensesSection({ editing }: { editing: boolean }) {
             variant="ghost"
             size="sm"
             leftIcon={isAdding ? <ChevronUp size={14} /> : <Plus size={14} />}
-            aria-label={isAdding ? 'Done senses' : 'Add senses'}
+            aria-label={isAdding ? 'Done adding senses' : 'Add senses'}
             onClick={() => setIsAdding(!isAdding)}
           >
             {isAdding ? 'Done' : 'Add'}

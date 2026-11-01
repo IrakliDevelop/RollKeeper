@@ -215,7 +215,9 @@ export default function ToolProficienciesSection({
             </div>
           ))}
           {activeTools.some(tool => tool.isTemporary) && (
-            <p className="text-muted py-2 text-sm">Swap on a long rest</p>
+            <p className="text-muted py-2 text-sm">
+              You can swap temporary tools on a long rest.
+            </p>
           )}
         </div>
       ) : (
@@ -226,7 +228,9 @@ export default function ToolProficienciesSection({
             )}
           </div>
           {activeTools.some(tool => tool.isTemporary) && (
-            <p className="text-muted text-sm">Swap on a long rest</p>
+            <p className="text-muted text-sm">
+              You can swap temporary tools on a long rest.
+            </p>
           )}
           {addingCustom && (
             <div className="flex flex-wrap items-end gap-2">

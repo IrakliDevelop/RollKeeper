@@ -33,7 +33,7 @@ export default function ClassPickerStep({
       >
         {classes.map((cls, index) => (
           <WizardChoiceRow
-            key={cls.className}
+            key={`${cls.className}-${index}`}
             value={String(index)}
             title={cls.className}
             description={cls.subclass || undefined}

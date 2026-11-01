@@ -97,8 +97,8 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
             onClick={() => setShowOverrides(!showOverrides)}
             variant="ghost"
             size="sm"
-            title="Toggle manual overrides"
-            aria-label="Toggle manual overrides"
+            title="Override spellcasting stats"
+            aria-label="Override spellcasting stats"
             aria-expanded={showOverrides}
           >
             {showOverrides ? <Calculator size={20} /> : <Edit3 size={20} />}

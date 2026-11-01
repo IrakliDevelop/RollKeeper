@@ -71,7 +71,7 @@ export default function HPStep({
             )}
             {minimumAdjustment !== 0 && (
               <p className="type-caption text-muted">
-                Minimum HP adjustment: +{minimumAdjustment}
+                Max HP can&apos;t go below 1: +{minimumAdjustment} HP
               </p>
             )}
             <p
