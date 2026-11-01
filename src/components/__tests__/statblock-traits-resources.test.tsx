@@ -167,7 +167,7 @@ describe('StatBlockTraits — resource costs', () => {
         onUseAbilityEntry={onUseAbilityEntry}
       />
     );
-    getByLabelText('Smite use 1 (available)').click();
+    getByLabelText('Use Smite (1 of 2)').click();
     expect(onUseAbilityEntry).toHaveBeenCalled();
   });
 });

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Checkbox } from '@/components/ui/forms/checkbox';
 import {
   ABILITY_KEYS,
   abilitySaveValue,
@@ -49,9 +50,7 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
 
   return (
     <div className="border-divider space-y-2 border-t p-4">
-      <h3 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Ability Scores
-      </h3>
+      <h3 className="type-label-heading text-heading">Ability scores</h3>
       <div className="grid grid-cols-6 gap-1">
         {ABILITY_KEYS.map((key, i) => {
           const score = sb[key];
@@ -67,9 +66,9 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
           return (
             <div
               key={key}
-              className="bg-surface border-divider flex flex-col items-center rounded-xl border p-2 text-center"
+              className="border-divider flex flex-col items-center border-r px-1 py-1 text-center last:border-r-0"
             >
-              <span className="text-muted text-[10px] font-bold uppercase">
+              <span className="text-muted text-xs font-semibold">
                 {ABILITY_LABELS[i]}
               </span>
               {isPlayer ? (
@@ -81,38 +80,47 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
                   value={score}
                   onChange={v => handleChange(key, v)}
                   aria-label={ABILITY_LABELS[i]}
-                  className="bg-surface-raised text-heading w-full rounded px-0.5 py-0.5 text-center text-sm font-bold tabular-nums"
+                  className="bg-surface border-divider text-heading w-full rounded-sm border px-0.5 py-1 text-center text-base font-bold tabular-nums pointer-coarse:min-h-11"
                 />
               )}
-              <span className="text-accent-emerald-text-muted text-[10px]">
+              <span className="text-muted text-xs">
                 {signedModifier(score)}
               </span>
               {!isPlayer && (
-                <label className="text-muted flex items-center gap-0.5 text-[9px] font-semibold">
-                  <input
-                    type="checkbox"
+                <div
+                  className="text-muted flex items-center gap-0.5 text-xs font-semibold"
+                  onClick={event => {
+                    if (
+                      event.target instanceof HTMLElement &&
+                      !event.target.closest('[role="checkbox"]')
+                    ) {
+                      setProficient(key, !proficient);
+                    }
+                  }}
+                >
+                  <Checkbox
+                    size="sm"
                     checked={proficient}
-                    onChange={event => setProficient(key, event.target.checked)}
-                    aria-label={`${ABILITY_LABELS[i]} saving throw proficiency`}
-                    className="text-accent-amber-text h-3 w-3 accent-current"
+                    onCheckedChange={checked => setProficient(key, checked)}
+                    aria-label={`Prof ${ABILITY_LABELS[i]} saving throw`}
+                    label="Prof"
                   />
-                  PROF
-                </label>
+                </div>
               )}
               {proficient ? (
-                <span className="text-accent-amber-text text-[10px] font-bold">
-                  SAVE {save}
+                <span className="text-brass-text text-xs font-bold">
+                  Save {save}
                 </span>
               ) : (
-                <span className="text-muted text-[10px] font-semibold">
-                  SAVE {save}
+                <span className="text-muted text-xs font-semibold">
+                  Save {save}
                 </span>
               )}
               {!isPlayer && override != null && (
                 <button
                   type="button"
                   onClick={() => resetSave(key)}
-                  className="text-faint hover:text-body text-[9px] underline"
+                  className="text-muted text-xs underline pointer-coarse:min-h-11"
                   aria-label={`Reset ${ABILITY_LABELS[i]} saving throw`}
                 >
                   Reset
@@ -123,7 +131,7 @@ export function DetailAbilityScores({ entity, actions }: DetailSectionProps) {
         })}
       </div>
       {isPlayer && (
-        <p className="text-faint text-[11px]">Synced from character sheet</p>
+        <p className="text-muted text-xs">Synced from character sheet</p>
       )}
     </div>
   );

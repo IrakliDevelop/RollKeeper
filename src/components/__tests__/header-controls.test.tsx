@@ -64,10 +64,10 @@ const SHOW_LABEL = 'Show exact HP to players';
 const HIDE_LABEL = 'Hide HP from players';
 
 describe('HeaderControls — HP visibility toggle', () => {
-  it('is off by default: unpressed "Show exact HP to players" button and no summary', () => {
+  it('is off by default: "Show exact HP to players" button and no summary', () => {
     render(<HeaderControls entity={monsterEntity} actions={makeActions()} />);
     const button = screen.getByRole('button', { name: SHOW_LABEL });
-    expect(button).toHaveAttribute('aria-pressed', 'false');
+    expect(button).not.toHaveAttribute('aria-pressed');
     expect(
       screen.queryByRole('button', { name: HIDE_LABEL })
     ).not.toBeInTheDocument();
@@ -84,7 +84,7 @@ describe('HeaderControls — HP visibility toggle', () => {
     });
   });
 
-  it('shows a pressed "Hide HP from players" button when on, and turns the flag off when clicked', async () => {
+  it('shows "Hide HP from players" when on, and turns the flag off when clicked', async () => {
     const actions = makeActions();
     render(
       <HeaderControls
@@ -93,7 +93,7 @@ describe('HeaderControls — HP visibility toggle', () => {
       />
     );
     const button = screen.getByRole('button', { name: HIDE_LABEL });
-    expect(button).toHaveAttribute('aria-pressed', 'true');
+    expect(button).not.toHaveAttribute('aria-pressed');
     await userEvent.click(button);
     expect(actions.onUpdate).toHaveBeenCalledWith('monster-1', {
       hpVisibleToPlayers: false,

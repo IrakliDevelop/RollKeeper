@@ -73,7 +73,7 @@ describe('CreatureHeader', () => {
   it('commits a trimmed rename on Enter and does not commit an unchanged name', () => {
     const actions = makeActions();
     render(<CreatureHeader {...baseProps({ actions })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Goblin Boss' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     fireEvent.change(input, { target: { value: '  Goblin Warlord  ' } });
     fireEvent.keyDown(input, { key: 'Enter' });
@@ -85,7 +85,7 @@ describe('CreatureHeader', () => {
   it('cancels rename on Escape without committing', () => {
     const actions = makeActions();
     render(<CreatureHeader {...baseProps({ actions })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Goblin Boss' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     fireEvent.change(input, { target: { value: 'Something Else' } });
     fireEvent.keyDown(input, { key: 'Escape' });
@@ -98,7 +98,7 @@ describe('CreatureHeader', () => {
   it('does not commit when the name is unchanged', () => {
     const actions = makeActions();
     render(<CreatureHeader {...baseProps({ actions })} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Rename Goblin Boss' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     fireEvent.blur(input);
     expect(actions.onUpdate).not.toHaveBeenCalled();
@@ -118,7 +118,7 @@ describe('CreatureHeader', () => {
     renderConfirmDialogHost();
     render(<CreatureHeader {...baseProps({ actions })} />);
     const removeButton = screen.getByRole('button', {
-      name: 'Remove from combat',
+      name: 'Remove Goblin Boss from combat',
     });
     fireEvent.click(removeButton);
     await clickConfirmDialogButton('Cancel');
@@ -142,14 +142,16 @@ describe('CreatureHeader', () => {
         })}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'View NPC details' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View Goblin Boss in NPC library' })
+    );
     expect(actions.onViewNPC).toHaveBeenCalledWith('npc-1', 'e1');
 
     rerender(
       <CreatureHeader {...baseProps({ actions, entity: makeEntity() })} />
     );
     expect(
-      screen.queryByRole('button', { name: 'View NPC details' })
+      screen.queryByRole('button', { name: 'View Goblin Boss in NPC library' })
     ).not.toBeInTheDocument();
   });
 
@@ -160,7 +162,7 @@ describe('CreatureHeader', () => {
       />
     );
     expect(
-      screen.queryByRole('button', { name: 'View NPC details' })
+      screen.queryByRole('button', { name: 'View Goblin Boss in NPC library' })
     ).not.toBeInTheDocument();
   });
 
@@ -212,7 +214,7 @@ describe('CreatureHeader', () => {
       screen.getByRole('button', { name: 'Close sheet' })
     ).toBeInTheDocument();
     expect(
-      screen.getByRole('button', { name: 'Remove from combat' })
+      screen.getByRole('button', { name: 'Remove Goblin Boss from combat' })
     ).toBeInTheDocument();
   });
 
@@ -226,7 +228,9 @@ describe('CreatureHeader', () => {
         })}
       />
     );
-    fireEvent.click(screen.getByRole('button', { name: 'View NPC details' }));
+    fireEvent.click(
+      screen.getByRole('button', { name: 'View Goblin Boss in NPC library' })
+    );
     expect(actions.onViewNPC).toHaveBeenCalledWith('npc-1', 'e1');
   });
 

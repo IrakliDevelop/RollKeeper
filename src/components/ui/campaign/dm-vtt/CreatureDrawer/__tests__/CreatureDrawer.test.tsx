@@ -107,7 +107,7 @@ describe('CreatureDrawer', () => {
     const user = userEvent.setup();
     const p = props();
     render(<CreatureDrawer {...p} />);
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByLabelText('Combatant name');
     await user.type(input, '{Escape}');
     expect(screen.queryByLabelText('Combatant name')).not.toBeInTheDocument();

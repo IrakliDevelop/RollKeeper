@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState } from 'react';
 import { DetailEffects } from '@/components/ui/encounter/combat-screen/detail/DetailEffects';
 import { useEncounterStore } from '@/store/encounterStore';
 import { createMockEncounter } from '@/test/helpers';
@@ -66,6 +67,46 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
     });
   });
 
+  it('uses keyboard tabs, visible descriptions, and survives missing legacy conditions', async () => {
+    const user = userEvent.setup();
+    render(
+      <DetailEffects
+        entity={{ ...entity, conditions: undefined as never }}
+        actions={makeActions()}
+      />
+    );
+    const conditionsTab = screen.getByRole('tab', { name: 'Conditions' });
+    conditionsTab.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('tab', { name: 'Buffs' })).toHaveFocus();
+    expect(screen.getByRole('tab', { name: 'Buffs' })).toHaveAttribute(
+      'aria-selected',
+      'true'
+    );
+    await user.keyboard('{ArrowLeft}');
+    expect(conditionsTab).toHaveFocus();
+  });
+
+  it('gives concurrent detail panes distinct tab and panel ids', () => {
+    render(
+      <>
+        <DetailEffects entity={entity} actions={makeActions()} />
+        <DetailEffects
+          entity={{ ...entity, id: 'npc-2' }}
+          actions={makeActions()}
+        />
+      </>
+    );
+    const tabs = screen.getAllByRole('tab', { name: 'Conditions' });
+    expect(tabs).toHaveLength(2);
+    expect(tabs[0].id).not.toBe(tabs[1].id);
+    for (const tab of tabs) {
+      expect(
+        document.getElementById(tab.getAttribute('aria-controls')!)
+      ).toBeInTheDocument();
+    }
+  });
+
   it('renders without an update loop when persisted combatConfig lacks customConditions (legacy data)', () => {
     // Pre-custom-statuses localStorage hydrates a combatConfig without the
     // field; the selector fallback must stay referentially stable or React's
@@ -102,6 +143,60 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
 
     render(<DetailEffects entity={entity} actions={makeActions()} />);
     expect(screen.getByText('Marked by Fate')).toBeTruthy();
+  });
+
+  it('shows a short plain summary instead of raw rules markup', () => {
+    useEncounterStore.setState({
+      combatConfig: {
+        ...DEFAULT_COMBAT_CONFIG,
+        customConditions: [
+          {
+            id: 'cc-markup',
+            name: 'Fogged',
+            icon: 'eye-off',
+            kind: 'debuff',
+            description:
+              "<strong>Can't See</strong> **Blinded.** A long rules paragraph.",
+          },
+        ],
+      },
+    });
+    render(<DetailEffects entity={entity} actions={makeActions()} />);
+    const summary = screen.getByText(/Can't See/);
+    expect(summary).toHaveClass('line-clamp-1');
+    expect(summary).not.toHaveTextContent(/<|\*\*/);
+  });
+
+  it('keeps focus on the applied effect when its button becomes an active badge', async () => {
+    const user = userEvent.setup();
+    useEncounterStore.setState({
+      combatConfig: {
+        ...DEFAULT_COMBAT_CONFIG,
+        customConditions: [
+          {
+            id: 'cc-web',
+            name: 'Webbed',
+            icon: 'link',
+            kind: 'debuff',
+            description: '',
+          },
+        ],
+      },
+    });
+    function Harness() {
+      const [active, setActive] = useState<EncounterEntity>(entity);
+      const actions = makeActions();
+      actions.onAddCondition = vi.fn((_id, condition) =>
+        setActive(previous => ({
+          ...previous,
+          conditions: [{ id: 'applied-web', ...condition }],
+        }))
+      );
+      return <DetailEffects entity={active} actions={actions} />;
+    }
+    render(<Harness />);
+    await user.click(screen.getByRole('button', { name: 'Webbed' }));
+    expect(screen.getByText('Webbed · Active').parentElement).toHaveFocus();
   });
 
   const webbed: CustomCondition = {
@@ -165,10 +260,10 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
 
     const chip = screen.getByRole('button', { name: 'Webbed' });
     expect(chip.querySelector('.lucide-link')).not.toBeNull();
-    expect(chip.getAttribute('title')).toBe('Restrained by sticky webbing.');
+    expect(screen.getByText('Restrained by sticky webbing.')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Warded' })).toBeNull();
 
-    await user.click(screen.getByRole('button', { name: 'Buffs' }));
+    await user.click(screen.getByRole('tab', { name: 'Buffs' }));
     expect(
       screen
         .getByRole('button', { name: 'Warded' })
@@ -208,7 +303,7 @@ describe('DetailEffects — combatConfig.customConditions selector', () => {
 
     expect(screen.getByText('From creatures')).toBeTruthy();
     const chips = screen.getAllByRole('button', {
-      name: 'Web Snare (from Giant Spider)',
+      name: 'Apply Web Snare (from Giant Spider)',
     });
     expect(chips).toHaveLength(1);
     await user.click(chips[0]);

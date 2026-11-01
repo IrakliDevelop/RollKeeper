@@ -275,7 +275,7 @@ test.describe('DM creature drawer', () => {
     await expect(decoration).toHaveAttribute('aria-valuenow', '100');
 
     await dialog.getByRole('textbox', { name: 'Amount' }).fill(String(DAMAGE));
-    await dialog.getByRole('button', { name: 'Damage' }).click();
+    await dialog.getByRole('button', { name: 'Damage', exact: true }).click();
 
     const expectedHp = STARTING_HP - DAMAGE;
     await expect(

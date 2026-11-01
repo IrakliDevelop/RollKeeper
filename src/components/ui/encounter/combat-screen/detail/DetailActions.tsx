@@ -1,7 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { FilePen } from 'lucide-react';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
 import type { DetailSectionProps } from './DetailHeader';
 import { LegendarySection } from './LegendarySection';
 import { StatBlockTraits } from './StatBlockTraits';
@@ -11,17 +13,29 @@ import { statBlockEntryHandlers } from './statBlockEntryHandlers';
 
 export function LairActionsSection({ entity, actions }: DetailSectionProps) {
   const lairActions = entity.lairActions;
+  const pendingFocus = useRef<string | null>(null);
+  const usedRefs = useRef(new Map<string, HTMLSpanElement>());
+  useEffect(() => {
+    const id = pendingFocus.current;
+    if (
+      id &&
+      lairActions?.some(action => action.id === id && action.usedThisRound)
+    ) {
+      usedRefs.current.get(id)?.focus();
+      pendingFocus.current = null;
+    }
+  }, [lairActions]);
   if (!lairActions || lairActions.length === 0) return null;
 
   return (
     <div className="space-y-1">
-      <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Lair Actions (1/round)
+      <h4 className="type-label-heading text-heading">
+        Lair actions (1/round)
       </h4>
       {lairActions.map(la => (
         <div
           key={la.id}
-          className="bg-surface-raised flex items-center justify-between rounded px-2 py-1.5 shadow-sm"
+          className="border-divider flex flex-wrap items-center justify-between gap-2 border-b py-2 last:border-b-0 pointer-coarse:min-h-11"
         >
           <div className="min-w-0 flex-1">
             <span className="text-body text-sm font-medium">{la.name}</span>
@@ -30,17 +44,30 @@ export function LairActionsSection({ entity, actions }: DetailSectionProps) {
               dangerouslySetInnerHTML={{ __html: la.description }}
             />
           </div>
-          <button
-            onClick={() => actions.onUseLairAction(entity.id, la.id)}
-            disabled={la.usedThisRound}
-            className={`ml-2 shrink-0 rounded px-2 py-0.5 text-xs font-medium transition-colors ${
-              la.usedThisRound
-                ? 'bg-surface-raised text-faint cursor-not-allowed'
-                : 'bg-accent-emerald-bg text-accent-emerald-text hover:opacity-80'
-            }`}
-          >
-            {la.usedThisRound ? 'Used' : 'Use'}
-          </button>
+          {la.usedThisRound ? (
+            <span
+              tabIndex={-1}
+              ref={node => {
+                if (node) usedRefs.current.set(la.id, node);
+                else usedRefs.current.delete(la.id);
+              }}
+            >
+              <Badge variant="neutral">Used this round</Badge>
+            </span>
+          ) : (
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
+              onClick={() => {
+                pendingFocus.current = la.id;
+                actions.onUseLairAction(entity.id, la.id);
+              }}
+              aria-label={`Use ${la.name}`}
+            >
+              Use
+            </Button>
+          )}
         </div>
       ))}
     </div>
@@ -81,13 +108,15 @@ export function DetailActions({ entity, actions }: DetailSectionProps) {
       {entity.monsterStatBlock && (
         <div className="space-y-3">
           {canEditBlock && (
-            <button
+            <Button
+              type="button"
+              variant="secondary"
+              size="xs"
               onClick={openEditor}
-              className="text-muted hover:text-heading flex items-center gap-1 text-xs font-semibold transition-colors"
             >
-              <FilePen size={12} />
+              <FilePen size={12} aria-hidden="true" />
               Edit stat block
-            </button>
+            </Button>
           )}
           <StatBlockTraits
             statBlock={entity.monsterStatBlock}

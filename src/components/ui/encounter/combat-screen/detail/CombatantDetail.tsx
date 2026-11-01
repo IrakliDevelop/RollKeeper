@@ -21,12 +21,10 @@ export function RegionalEffects({ effects }: { effects: string[] }) {
   if (effects.length === 0) return null;
   return (
     <div className="border-divider space-y-1 border-t p-4">
-      <h4 className="text-heading text-xs font-semibold tracking-wider uppercase">
-        Regional Effects
-      </h4>
+      <h4 className="type-label-heading text-heading">Regional effects</h4>
       <ul className="space-y-1">
         {effects.map((effect, i) => (
-          <li key={i} className="text-body text-xs">
+          <li key={`${effect}-${i}`} className="text-body text-xs">
             {effect}
           </li>
         ))}

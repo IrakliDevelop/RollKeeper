@@ -104,8 +104,8 @@ export function CreatureHeader({
                   setNameInput(entity.name);
                   setIsEditingName(true);
                 }}
-                aria-label="Rename"
-                title="Rename"
+                aria-label={`Rename ${entity.name}`}
+                title={`Rename ${entity.name}`}
                 className="text-faint hover:text-body hover:bg-surface-raised flex h-8 w-8 shrink-0 items-center justify-center rounded transition-colors"
               >
                 <Pencil size={14} />

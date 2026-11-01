@@ -48,11 +48,12 @@ export function NpcResourceList({
                         className={`size-2.5 rounded-full border-[1.5px] ${available ? CLASS_RESOURCE_STYLE.pipOn : CLASS_RESOURCE_STYLE.pipOff}`}
                       />
                     );
-                    const label = `${res.name} use ${index + 1} ${available ? '(available)' : '(spent)'}`;
+                    const label = `${res.name} use ${index + 1}`;
                     return readOnly ? (
                       <span
                         key={index}
-                        aria-label={label}
+                        role="img"
+                        aria-label={`${label}, ${available ? 'available' : 'spent'}`}
                         className="flex min-h-6 min-w-6 items-center justify-center"
                       >
                         {dot}
@@ -61,7 +62,7 @@ export function NpcResourceList({
                       <button
                         key={index}
                         type="button"
-                        aria-label={label}
+                        aria-label={`${available ? 'Spend' : 'Restore'} ${label}`}
                         title={
                           available
                             ? `Spend ${res.name} use`
