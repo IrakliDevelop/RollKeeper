@@ -87,7 +87,7 @@ describe('DetailCombatInfo', () => {
     const entity = makeEntity({ monsterStatBlock: makeStatBlock() });
     render(<DetailCombatInfo entity={entity} actions={makeActions()} />);
 
-    expect(screen.getByLabelText('Saving Throws')).toBeInstanceOf(
+    expect(screen.getByLabelText('Saving throws')).toBeInstanceOf(
       HTMLInputElement
     );
   });
@@ -101,7 +101,7 @@ describe('DetailCombatInfo', () => {
     );
 
     // No inputs at all — every row is static text.
-    expect(screen.queryByLabelText('Saving Throws')).not.toBeInstanceOf(
+    expect(screen.queryByLabelText('Saving throws')).not.toBeInstanceOf(
       HTMLInputElement
     );
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();

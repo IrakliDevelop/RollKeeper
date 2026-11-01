@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { NumberField } from '@/components/ui/forms/NumberInput';
+import { Input } from '@/components/ui/forms/input';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 
@@ -50,11 +51,12 @@ export function HeaderStatLine({ entity, actions }: HeaderStatLineProps) {
               {sb.speed}
             </span>
           ) : (
-            <input
+            <Input
               type="text"
               defaultValue={sb.speed ?? ''}
               onBlur={e => updateSpeed(e.target.value)}
-              className="bg-surface-raised border-divider text-body max-w-64 min-w-0 flex-1 rounded border px-2 py-0.5 text-xs"
+              size="sm"
+              className="max-w-64 min-w-0 flex-1"
               aria-label="Speed"
             />
           )}
@@ -73,13 +75,13 @@ export function HeaderStatLine({ entity, actions }: HeaderStatLineProps) {
               if (v !== undefined)
                 actions.onUpdate(entity.id, { initiativeModifier: v });
             }}
-            className="bg-surface-raised text-body w-12 rounded px-1 py-0.5 text-center text-xs shadow-sm"
-            aria-label="Initiative Mod"
+            className="bg-surface border-divider text-body w-12 rounded-sm border px-1 py-1 text-center text-base pointer-coarse:min-h-11"
+            aria-label="Initiative modifier"
           />
         )}
         {showPb && (
           <>
-            <span className="text-faint text-xs">·</span>
+            <span className="text-muted text-xs">·</span>
             <span className="text-muted text-xs font-semibold">PB</span>
             {isPlayer ? (
               <span className="text-body text-xs">
@@ -93,8 +95,8 @@ export function HeaderStatLine({ entity, actions }: HeaderStatLineProps) {
                     actions.onUpdate(entity.id, { proficiencyBonus: v });
                 }}
                 allowEmpty
-                className="bg-surface-raised text-body w-12 rounded px-1 py-0.5 text-center text-xs shadow-sm"
-                aria-label="Proficiency Bonus"
+                className="bg-surface border-divider text-body w-12 rounded-sm border px-1 py-1 text-center text-base pointer-coarse:min-h-11"
+                aria-label="Proficiency bonus"
               />
             )}
           </>

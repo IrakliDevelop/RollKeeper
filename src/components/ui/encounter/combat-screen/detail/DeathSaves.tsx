@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Skull } from 'lucide-react';
+import { Badge } from '@/components/ui/layout/badge';
 import type { EncounterEntity } from '@/types/encounter';
 import type { EntityActions } from '../types';
 
@@ -20,9 +21,7 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     return (
       <div className="flex items-center gap-2">
         <Skull size={14} className="text-heading shrink-0" />
-        <span className="bg-accent-amber-bg text-accent-amber-text rounded-full px-2.5 py-0.5 text-xs font-semibold">
-          Stabilized
-        </span>
+        <Badge variant="success">Stabilized</Badge>
       </div>
     );
   }
@@ -31,9 +30,7 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     return (
       <div className="flex items-center gap-2">
         <Skull size={14} className="text-heading shrink-0" />
-        <span className="bg-accent-red-bg text-accent-red-text rounded-full px-2.5 py-0.5 text-xs font-semibold">
-          Dead
-        </span>
+        <Badge variant="danger">Dead</Badge>
       </div>
     );
   }
@@ -64,41 +61,57 @@ export function DeathSaves({ entity, actions }: DeathSavesProps) {
     <div className="flex items-center gap-2">
       <Skull size={14} className="text-heading shrink-0" />
       <div className="flex items-center gap-1.5">
-        <span className="text-accent-emerald-text text-xs font-semibold">
-          S
-        </span>
+        <span className="text-verdigris-text text-xs font-semibold">S</span>
         {[1, 2, 3].map(i => {
           const filled = i <= ds.successes;
-          return (
+          return isNpc ? (
+            <button
+              key={`s-${i}`}
+              type="button"
+              aria-label={`${filled ? 'Clear' : 'Mark'} death save success ${i}`}
+              aria-pressed={filled}
+              onClick={() => handleSuccess(i)}
+              className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            >
+              <span
+                aria-hidden="true"
+                className={`size-3 rounded-full border-2 ${filled ? 'border-verdigris-border bg-verdigris-bg' : 'border-divider-strong bg-surface'}`}
+              />
+            </button>
+          ) : (
             <span
               key={`s-${i}`}
-              role={isNpc ? 'button' : undefined}
-              aria-label={isNpc ? `Death save success ${i}` : undefined}
-              onClick={() => handleSuccess(i)}
-              className={`h-3.5 w-3.5 rounded-full border-2 transition-colors ${
-                filled
-                  ? 'border-accent-emerald-border bg-accent-emerald-bg'
-                  : 'border-divider bg-surface-raised'
-              } ${isNpc ? 'hover:border-accent-emerald-border cursor-pointer' : ''}`}
+              role="img"
+              aria-label={`Death save success ${i}, ${filled ? 'marked' : 'unmarked'}`}
+              className={`size-3 rounded-full border-2 ${filled ? 'border-verdigris-border bg-verdigris-bg' : 'border-divider-strong bg-surface'}`}
             />
           );
         })}
       </div>
       <div className="flex items-center gap-1.5">
-        <span className="text-accent-red-text text-xs font-semibold">F</span>
+        <span className="text-blood-text text-xs font-semibold">F</span>
         {[1, 2, 3].map(i => {
           const filled = i <= ds.failures;
-          return (
+          return isNpc ? (
+            <button
+              key={`f-${i}`}
+              type="button"
+              aria-label={`${filled ? 'Clear' : 'Mark'} death save failure ${i}`}
+              aria-pressed={filled}
+              onClick={() => handleFailure(i)}
+              className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+            >
+              <span
+                aria-hidden="true"
+                className={`size-3 rounded-full border-2 ${filled ? 'border-blood-border bg-blood-bg' : 'border-divider-strong bg-surface'}`}
+              />
+            </button>
+          ) : (
             <span
               key={`f-${i}`}
-              role={isNpc ? 'button' : undefined}
-              aria-label={isNpc ? `Death save failure ${i}` : undefined}
-              onClick={() => handleFailure(i)}
-              className={`h-3.5 w-3.5 rounded-full border-2 transition-colors ${
-                filled
-                  ? 'border-accent-red-border bg-accent-red-bg'
-                  : 'border-divider bg-surface-raised'
-              } ${isNpc ? 'hover:border-accent-red-border cursor-pointer' : ''}`}
+              role="img"
+              aria-label={`Death save failure ${i}, ${filled ? 'marked' : 'unmarked'}`}
+              className={`size-3 rounded-full border-2 ${filled ? 'border-blood-border bg-blood-bg' : 'border-divider-strong bg-surface'}`}
             />
           );
         })}

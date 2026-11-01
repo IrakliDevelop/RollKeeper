@@ -1,6 +1,8 @@
 'use client';
 
 import React from 'react';
+import { Input } from '@/components/ui/forms/input';
+import { NumberField } from '@/components/ui/forms/NumberInput';
 import type { MonsterStatBlock } from '@/types/encounter';
 import type { DetailSectionProps } from './DetailHeader';
 
@@ -26,13 +28,26 @@ function InfoRow({
         {label}
       </span>
       {editable ? (
-        <input
-          type={type}
-          defaultValue={value ?? ''}
-          onBlur={e => onChange?.(e.target.value)}
-          className="bg-surface-raised border-divider text-body flex-1 rounded border px-2 py-0.5 text-xs"
-          aria-label={label}
-        />
+        type === 'number' ? (
+          <NumberField
+            value={value == null ? undefined : Number(value)}
+            onChange={v => {
+              if (v !== undefined) onChange?.(String(v));
+            }}
+            min={0}
+            live={false}
+            className="bg-surface border-divider text-body min-w-0 flex-1 rounded-sm border px-2 py-1 text-base pointer-coarse:min-h-11"
+            aria-label={label}
+          />
+        ) : (
+          <Input
+            defaultValue={value ?? ''}
+            onBlur={e => onChange?.(e.target.value)}
+            size="sm"
+            className="min-w-0 flex-1"
+            aria-label={label}
+          />
+        )
       ) : (
         <span className="text-body text-xs">{value}</span>
       )}
@@ -125,13 +140,11 @@ export function DetailCombatInfo({
 
   return (
     <div className="border-divider space-y-0 border-t p-4">
-      <h3 className="text-heading mb-1 text-xs font-semibold tracking-wider uppercase">
-        Combat Details
-      </h3>
+      <h3 className="type-label-heading text-heading mb-1">Combat details</h3>
       {canEdit ? (
         <>
           <InfoRow
-            label="Saving Throws"
+            label="Saving throws"
             value={sb?.saves}
             editable
             onChange={v => updateSb('saves', v)}
@@ -161,7 +174,7 @@ export function DetailCombatInfo({
             onChange={v => updateSb('vulnerabilities', v)}
           />
           <InfoRow
-            label="Condition Immunities"
+            label="Condition immunities"
             value={condImmunities}
             editable
             onChange={updateConditionImmunities}
@@ -179,7 +192,7 @@ export function DetailCombatInfo({
             onChange={v => updateSb('languages', v)}
           />
           <InfoRow
-            label="Passive Perception"
+            label="Passive perception"
             value={passivePerceptionValue}
             editable
             type="number"
@@ -188,16 +201,16 @@ export function DetailCombatInfo({
         </>
       ) : (
         <>
-          <StaticRow label="Saving Throws" value={sb?.saves} />
+          <StaticRow label="Saving throws" value={sb?.saves} />
           <StaticRow label="Skills" value={sb?.skills} />
           <StaticRow label="Resistances" value={resistances} />
           <StaticRow label="Immunities" value={immunities} />
           <StaticRow label="Vulnerabilities" value={sb?.vulnerabilities} />
-          <StaticRow label="Condition Immunities" value={condImmunities} />
+          <StaticRow label="Condition immunities" value={condImmunities} />
           <StaticRow label="Senses" value={senses} />
           <StaticRow label="Languages" value={sb?.languages} />
           <StaticRow
-            label="Passive Perception"
+            label="Passive perception"
             value={passivePerceptionValue}
           />
         </>
