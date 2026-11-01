@@ -208,7 +208,7 @@ export default function NewCharacterPage() {
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-              {/* Character name/}
+              {/* Character name */}
               <div className="md:col-span-2">
                 <label
                   htmlFor="characterName"
@@ -345,7 +345,7 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.abilityScores.map(
                                       (score, idx) => (
                                         <Badge
-                                          key={`score-${idx}`}
+                                          key={`${score}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -368,7 +368,7 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.languages.map(
                                       (lang, idx) => (
                                         <Badge
-                                          key={`lang-${idx}`}
+                                          key={`${lang}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -392,7 +392,7 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.skillProficiencies.map(
                                       (skill, idx) => (
                                         <Badge
-                                          key={`skill-${idx}`}
+                                          key={`${skill}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -424,7 +424,7 @@ export default function NewCharacterPage() {
                                           {selectedRaceData.resistances.map(
                                             (res, idx) => (
                                               <Badge
-                                                key={`res-${idx}`}
+                                                key={`${res}-${idx}`}
                                                 variant="neutral"
                                                 size="sm"
                                               >
@@ -445,7 +445,7 @@ export default function NewCharacterPage() {
                                           {selectedRaceData.immunities.map(
                                             (imm, idx) => (
                                               <Badge
-                                                key={`imm-${idx}`}
+                                                key={`${imm}-${idx}`}
                                                 variant="neutral"
                                                 size="sm"
                                               >
@@ -470,7 +470,7 @@ export default function NewCharacterPage() {
                                   {selectedRaceData.features.map(
                                     (feature, idx) => (
                                       <div
-                                        key={`feature.name-${idx}`}
+                                        key={`${feature.name}-${idx}`}
                                         className="border-divider border-b py-4"
                                       >
                                         <h5 className="text-heading mb-2 text-sm font-semibold">
@@ -496,7 +496,7 @@ export default function NewCharacterPage() {
                                     {selectedRaceData.traits.map(
                                       (trait, idx) => (
                                         <Badge
-                                          key={`trait-${idx}`}
+                                          key={`${trait}-${idx}`}
                                           variant="neutral"
                                           size="sm"
                                         >
@@ -631,7 +631,7 @@ export default function NewCharacterPage() {
                                     {selectedClassData.proficiencies.savingThrows.map(
                                       (save, idx) => (
                                         <Badge
-                                          key={`save-${idx}`}
+                                          key={`${save}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -655,7 +655,7 @@ export default function NewCharacterPage() {
                                     {selectedClassData.proficiencies.armor.map(
                                       (armor, idx) => (
                                         <Badge
-                                          key={`armor-${idx}`}
+                                          key={`${armor}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -683,7 +683,7 @@ export default function NewCharacterPage() {
                                     {selectedClassData.proficiencies.weapons.map(
                                       (weapon, idx) => (
                                         <Badge
-                                          key={`weapon-${idx}`}
+                                          key={`${weapon}-${idx}`}
                                           variant="neutral"
                                           size="md"
                                         >
@@ -714,7 +714,7 @@ export default function NewCharacterPage() {
                                   {selectedClassData.proficiencies.skillChoices.from.map(
                                     (skill, idx) => (
                                       <Badge
-                                        key={`skill-${idx}`}
+                                        key={`${skill}-${idx}`}
                                         variant="neutral"
                                         size="md"
                                       >
@@ -765,7 +765,7 @@ export default function NewCharacterPage() {
                                       .slice(0, 5)
                                       .map((item, idx) => (
                                         <li
-                                          key={`item-${idx}`}
+                                          key={`${item}-${idx}`}
                                           className="flex items-start gap-2"
                                         >
                                           <span className="bg-faint mt-1.5 h-1 w-1 shrink-0 rounded-full"></span>
@@ -805,7 +805,7 @@ export default function NewCharacterPage() {
                                     .slice(0, 5)
                                     .map((feature, idx) => (
                                       <div
-                                        key={`feature.name-${idx}`}
+                                        key={`${feature.name}-${idx}`}
                                         className="border-divider border-b py-4"
                                       >
                                         <div className="mb-1 flex items-center justify-between">
