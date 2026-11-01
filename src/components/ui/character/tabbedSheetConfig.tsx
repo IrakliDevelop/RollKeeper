@@ -64,23 +64,32 @@ import {
   InventoryItem,
 } from '@/types/character';
 
-function LevelUpButton({
+export function LevelUpButton({
   pendingLevelUp = false,
 }: {
   pendingLevelUp?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  useEffect(() => {
+    if (isOpen || !showWizard) return;
+    const timer = window.setTimeout(() => setShowWizard(false), 200);
+    return () => window.clearTimeout(timer);
+  }, [isOpen, showWizard]);
   return (
     <>
       <Button
         variant={pendingLevelUp ? 'primary' : 'secondary'}
         size="sm"
-        onClick={() => setIsOpen(true)}
+        onClick={() => {
+          setShowWizard(true);
+          setIsOpen(true);
+        }}
       >
         <AppIcon name="levelUp" size={14} />
         Level up
       </Button>
-      {isOpen && (
+      {showWizard && (
         <LevelUpWizard isOpen={isOpen} onClose={() => setIsOpen(false)} />
       )}
     </>
