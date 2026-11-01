@@ -24,9 +24,7 @@ describe('TokenChip', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     render(<TokenChip entity={entity} size="sm" actions={{ onUpdate }} />);
-    await user.click(
-      screen.getByRole('button', { name: 'Choose Goblin chess piece' })
-    );
+    await user.click(screen.getByRole('button', { name: 'Edit Goblin token' }));
     expect(
       screen.getByRole('button', { name: 'king for Goblin' })
     ).toHaveFocus();
@@ -34,7 +32,7 @@ describe('TokenChip', () => {
     expect(onUpdate).toHaveBeenCalledWith('goblin-1', { chessPiece: 'king' });
     await user.click(screen.getByRole('button', { name: 'Done' }));
     expect(
-      screen.getByRole('button', { name: 'Choose Goblin chess piece' })
+      screen.getByRole('button', { name: 'Edit Goblin token' })
     ).toHaveFocus();
   });
 });

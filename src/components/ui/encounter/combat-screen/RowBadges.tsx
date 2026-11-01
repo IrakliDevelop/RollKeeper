@@ -13,10 +13,10 @@ interface RowBadgesProps {
 function SyncStatus({ lastSynced }: { lastSynced?: string }) {
   if (!lastSynced) return null;
   const elapsed = Date.now() - new Date(lastSynced).getTime();
-  if (elapsed < 30000) return <Badge variant="success">Synced</Badge>;
+  if (elapsed < 30000) return <Badge variant="success">Sheet synced</Badge>;
   return (
     <Badge variant="warning">
-      {elapsed < 120000 ? 'Sync delayed' : 'Sync stale'}
+      {elapsed < 120000 ? 'Sheet sync delayed' : 'Sheet sync stale'}
     </Badge>
   );
 }

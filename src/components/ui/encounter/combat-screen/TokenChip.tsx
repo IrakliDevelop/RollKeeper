@@ -89,11 +89,7 @@ export function TokenChip({ entity, size, actions }: TokenChipProps) {
         variant="ghost"
         size="xs"
         onClick={() => setOpen(true)}
-        aria-label={
-          isPlayer
-            ? `Change ${entity.name} figurine color`
-            : `Choose ${entity.name} chess piece`
-        }
+        aria-label={`Edit ${entity.name} token`}
         className={size === 'sm' ? 'shrink-0 px-1' : 'shrink-0 px-2'}
       >
         {isPlayer ? (
