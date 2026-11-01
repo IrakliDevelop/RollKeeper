@@ -262,6 +262,9 @@ export interface EncounterEntity {
   chessPiece?: ChessPiece; // Chess piece icon for map correlation
   tokenSize?: TokenCellSize; // Battle-map token footprint; absent = 1 (no migration needed)
 
+  /** Effective walking speed from the latest player character sync, including buffs. */
+  walkingSpeed?: number;
+
   // Player sync reference
   playerCharacterId?: string; // Link to playerStore character
   campaignCode?: string; // Campaign for live sync

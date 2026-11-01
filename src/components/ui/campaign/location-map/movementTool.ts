@@ -1,3 +1,4 @@
+import { movementSpent } from './movementTracking';
 import { PathTool, footprintFromSize } from '@fieldnotes/vtt';
 
 import {
@@ -88,7 +89,12 @@ export function createMovementPathTool(config: MovementToolConfig): PathTool {
       const resolution = config.resolveMovement(identity);
       const walkFeet = resolution?.walkFeet ?? MOVEMENT_DEFAULT_WALK_FEET;
       tool.setOptions({
-        rangeBands: movementRangeBands(walkFeet, config.isDashActive()),
+        rangeBands: movementRangeBands(walkFeet, config.isDashActive()).map(
+          band => ({
+            ...band,
+            feet: Math.max(0, band.feet - movementSpent(vp, el.id)),
+          })
+        ),
       });
       const { cellSize } = gridConstraintInfo(ctx);
       return {

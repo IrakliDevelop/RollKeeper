@@ -129,6 +129,7 @@ export function PlayerVttScreen({
 
   return (
     <PlayerBattleMapCanvas
+      initiative={sharedState?.initiative}
       campaignCode={campaignCode}
       battleMapId={battleMapId}
       characterId={characterId}

@@ -7,7 +7,7 @@ import {
 } from '@fieldnotes/core';
 import { snapFootprintCenter, TemplateTool } from '@fieldnotes/vtt';
 import { cellUnit } from './cellUnit';
-import { TOKEN_ELEMENT_ZINDEX, TEMPLATE_ELEMENT_ZINDEX } from './tokenSnap';
+import { TOKEN_ELEMENT_INDEX, TEMPLATE_ELEMENT_INDEX } from './tokenSnap';
 import { uploadAsset } from '@/utils/uploadAsset';
 
 export const PLAYER_TOKEN_KIND = 'player';
@@ -173,7 +173,7 @@ export class PlayerTokenTool implements Tool {
           size: { w: size, h: size },
           src,
           layerId: ctx.activeLayerId ?? '',
-          zIndex: TOKEN_ELEMENT_ZINDEX,
+          index: TOKEN_ELEMENT_INDEX,
         })
       : createShape({
           position: { x: center.x - size / 2, y: center.y - size / 2 },
@@ -183,7 +183,7 @@ export class PlayerTokenTool implements Tool {
           strokeColor: '#1e293b',
           strokeWidth: 2,
           layerId: ctx.activeLayerId ?? '',
-          zIndex: TOKEN_ELEMENT_ZINDEX,
+          index: TOKEN_ELEMENT_INDEX,
         });
 
     const characterId = this.characterIdRef.current;
@@ -224,7 +224,7 @@ export class PlayerTemplateTool extends TemplateTool {
         el.type === 'extension' &&
         el.extensionType === 'vtt:template'
       ) {
-        ctx.store.update(el.id, { zIndex: TEMPLATE_ELEMENT_ZINDEX });
+        ctx.store.update(el.id, { index: TEMPLATE_ELEMENT_INDEX });
       }
     }
     ctx.switchTool?.('select');

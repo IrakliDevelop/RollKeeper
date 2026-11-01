@@ -1,3 +1,4 @@
+import { createCurrentCapabilities } from '@fieldnotes/sync';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   Camera,
@@ -44,7 +45,11 @@ import type { MarkerDetail } from '@/types/battlemap';
 
 /** Structurally valid element — the SDK validates snapshot elements. */
 const el = (id: string): CanvasElement => ({
-  ...createShape({ position: { x: 0, y: 0 }, size: { w: 1, h: 1 } }),
+  ...createShape({
+    index: 'a0',
+    position: { x: 0, y: 0 },
+    size: { w: 1, h: 1 },
+  }),
   id,
 });
 
@@ -57,6 +62,19 @@ class FakeTransport implements BattleMapTransport {
 
   send(message: string): void {
     this.sent.push(message);
+    const envelope = JSON.parse(message);
+    if (envelope.op.kind === 'capabilities')
+      queueMicrotask(() =>
+        this.emitMessage(
+          JSON.stringify({
+            from: 'hub',
+            op: {
+              kind: 'capabilities',
+              capabilities: createCurrentCapabilities(['fog']),
+            },
+          })
+        )
+      );
   }
   onMessage(handler: (message: string) => void): () => void {
     this.msgHandlers.add(handler);
@@ -78,6 +96,18 @@ class FakeTransport implements BattleMapTransport {
   }
 
   emitMessage(message: string): void {
+    const envelope = JSON.parse(message);
+    if (envelope.op.kind === 'snapshot') {
+      envelope.op.tombstones ??= [];
+      envelope.op.elements = envelope.op.elements.map(
+        (el: Record<string, unknown>) => ({
+          ...el,
+          index: el.index || 'a0',
+          version: el.version ?? 1,
+        })
+      );
+      message = JSON.stringify(envelope);
+    }
     for (const h of [...this.msgHandlers]) h(message);
   }
   emitReconnect(): void {
@@ -171,13 +201,16 @@ describe('createManagedBattleMapConnection', () => {
     ]);
     // The SyncClient announces its v4 capabilities, then requests the
     // authoritative snapshot. Both envelopes carry the stable clientId.
-    const initial = fakeTransport.sent.slice(0, 2).map(
-      message =>
-        JSON.parse(message) as {
-          from: string;
-          op: { kind: string };
-        }
-    );
+    const initial = fakeTransport.sent
+      .filter((m, i) => JSON.parse(m).op.kind !== 'capabilities' || i === 0)
+      .slice(0, 2)
+      .map(
+        message =>
+          JSON.parse(message) as {
+            from: string;
+            op: { kind: string };
+          }
+      );
     expect(initial.map(envelope => envelope.from)).toEqual(['dm-1', 'dm-1']);
     expect(initial.map(envelope => envelope.op.kind)).toEqual([
       'capabilities',
@@ -295,6 +328,7 @@ describe('createManagedBattleMapConnection', () => {
 
     // No deferred macrotask: live + seed happen inside the snapshot dispatch.
     expect(statuses).toEqual(['connecting', 'live']);
+    await flush();
     expect(sentUpsertIds(fakeTransport.sent).sort()).toEqual(['a', 'c']);
     expect(store.getById('a')).toBeDefined();
     expect(store.getById('b')).toBeDefined();
@@ -362,6 +396,7 @@ describe('createManagedBattleMapConnection', () => {
       expect(store.getById('a')).toBeDefined();
       expect(store.getById('b')).toBeUndefined(); // deleted-while-away — no zombie
       expect(store.getById('n')).toBeDefined(); // hub-unknown — preserved
+      await vi.advanceTimersByTimeAsync(60);
       expect(sentUpsertIds(fakeTransport.sent.slice(sentBefore))).toEqual([
         'n',
       ]);
@@ -1507,6 +1542,7 @@ describe('createManagedBattleMapConnection presence (laser)', () => {
 
     expect(markerUpsertCount()).toBe(0); // nothing yet
     store.add(marker);
+    await new Promise(resolve => setTimeout(resolve, 60));
     expect(markerUpsertCount()).toBe(1); // the marker's own upsert
     // Byte-identical baseline, deep-cloned so a later in-place mutation of the
     // stored element cannot silently update the expectation too.

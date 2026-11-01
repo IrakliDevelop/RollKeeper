@@ -1,3 +1,6 @@
+import { RemoteMovementOverlay, toMovementPresence } from '@fieldnotes/vtt';
+import { getMovementTracker } from './movementTracking';
+import type { Viewport } from '@fieldnotes/core';
 import { RemotePathOverlay, toPathPresence } from '@fieldnotes/vtt';
 
 import { movableTokenIdentity } from './tokenIdentity';
@@ -39,6 +42,7 @@ export function attachPathBroadcast(
   connection: Pick<PathPresenceConnection, 'sendPresence'>,
   options: {
     role: 'dm' | 'player';
+    viewport?: Viewport;
     /** Live reads against current product/store state, PER EMISSION. */
     isDmOnlyElement: (elementId: string) => boolean;
     getElement: (elementId: string) => CanvasElement | null;
@@ -46,6 +50,7 @@ export function attachPathBroadcast(
 ): PathBroadcastHandle {
   let sharing = options.role === 'player';
   let lastFrameActive = false;
+  let movementFrameActive = false;
   let disposed = false;
 
   const sendClearIfActive = () => {
@@ -69,6 +74,34 @@ export function attachPathBroadcast(
     return !options.isDmOnlyElement(key);
   };
 
+  const clearMovement = () => {
+    if (!movementFrameActive) return;
+    movementFrameActive = false;
+    connection.sendPresence({ kind: 'movement', cleared: true });
+  };
+  const stopMovement = options.viewport?.historyRecorder
+    ? getMovementTracker(options.viewport).onMovement(emission => {
+        const element = emission && options.getElement(emission.elementId);
+        if (
+          !sharing ||
+          !emission ||
+          !element ||
+          !movableTokenIdentity(element) ||
+          options.isDmOnlyElement(emission.elementId)
+        ) {
+          clearMovement();
+          return;
+        }
+        const payload = toMovementPresence(emission);
+        if (!payload) {
+          clearMovement();
+          return;
+        }
+        connection.sendPresence(payload);
+        movementFrameActive = true;
+      })
+    : () => {};
+
   const unsubscribe = tool.onPath((emission: PathEmission | null) => {
     if (disposed) return;
     const broadcastable =
@@ -85,12 +118,17 @@ export function attachPathBroadcast(
     setSharing(enabled: boolean) {
       if (disposed || sharing === enabled) return;
       sharing = enabled;
-      if (!enabled) sendClearIfActive();
+      if (!enabled) {
+        sendClearIfActive();
+        clearMovement();
+      }
     },
     dispose() {
       if (disposed) return;
       disposed = true;
       unsubscribe();
+      stopMovement();
+      clearMovement();
       sendClearIfActive();
     },
   };
@@ -114,17 +152,21 @@ export function attachRemotePaths(
   connection: Pick<PathPresenceConnection, 'onPresence' | 'onPresenceLeave'>
 ): RemotePathHandle {
   const overlay = new RemotePathOverlay(vp);
+  const movementOverlay = new RemoteMovementOverlay(vp);
   const unsubscribePresence = connection.onPresence((from, data) => {
     overlay.apply(from, data);
+    movementOverlay.apply(from, data);
   });
   const unsubscribeLeave = connection.onPresenceLeave(from => {
     overlay.remove(from);
+    movementOverlay.remove(from);
   });
   return {
     overlay,
     dispose: () => {
       unsubscribePresence();
       unsubscribeLeave();
+      movementOverlay.dispose();
       overlay.dispose();
     },
   };

@@ -1,3 +1,6 @@
+vi.mock('@/components/ui/campaign/location-map/BattleMapMovement', () => ({
+  BattleMapMovement: () => null,
+}));
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   act,

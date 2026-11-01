@@ -1,7 +1,8 @@
+import { createCurrentCapabilities } from '@fieldnotes/sync';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { InMemoryHubFanout, SyncHub } from '@fieldnotes/sync-server';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { pokeRoom, handlePokeRequest } from './poke.js';
 import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
@@ -16,6 +17,17 @@ function fakeHub(rooms: Record<string, { send: (m: string) => void }[]>) {
     for (const conn of list) {
       const id = `c${++counter}`;
       hub.addConnection({ id, room, send: conn.send });
+      void hub.handleMessage(
+        id,
+        JSON.stringify({
+          from: id,
+          op: {
+            kind: 'capabilities',
+            capabilities: createCurrentCapabilities([]),
+          },
+        })
+      );
+      vi.mocked(conn.send).mockClear();
     }
   }
   return hub;

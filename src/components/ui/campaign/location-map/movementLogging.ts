@@ -11,8 +11,7 @@ import type { MovableTokenIdentity } from './tokenIdentity';
 /**
  * DM-side speed + name lookup over the battle map's linked encounters.
  * Combatants resolve their stat-block walking speed; player tokens moved
- * by the DM resolve name only (DM-side character speed needs campaign-sync
- * plumbing — deferred; default applies). Live getState reads: a captured
+ * by the DM use the latest synced walking speed. Live getState reads: a captured
  * snapshot would go stale across encounter edits.
  */
 export function resolveDmMovement(
@@ -35,7 +34,7 @@ export function resolveDmMovement(
               ? walkFeetFromParsed(
                   parseWalkingSpeed(entity.monsterStatBlock?.speed)
                 )
-              : MOVEMENT_DEFAULT_WALK_FEET,
+              : (entity.walkingSpeed ?? MOVEMENT_DEFAULT_WALK_FEET),
           entityId: entity.id,
         };
       }

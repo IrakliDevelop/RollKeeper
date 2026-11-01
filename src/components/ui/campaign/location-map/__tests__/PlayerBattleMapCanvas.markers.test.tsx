@@ -1,3 +1,6 @@
+vi.mock('@/components/ui/campaign/location-map/BattleMapMovement', () => ({
+  BattleMapMovement: () => null,
+}));
 import React from 'react';
 import { describe, it, expect, vi, afterEach, beforeEach } from 'vitest';
 import { render, screen, within, cleanup, act } from '@testing-library/react';
@@ -187,7 +190,9 @@ describe('PlayerBattleMapCanvas: no marker placement, no edit affordance, no kin
     fireReady(vp);
 
     const toolsProp = vi.mocked(FieldNotesCanvas).mock.calls.at(-1)?.[0]?.tools;
-    const toolNames = (toolsProp ?? []).map(t => t.name);
+    const toolNames = (Array.isArray(toolsProp) ? toolsProp : []).map(
+      t => t.name
+    );
     expect(toolNames.length).toBeGreaterThan(0);
     expect(toolNames).toContain('select');
     expect(toolNames).not.toContain(MARKER_TOOL_NAME);

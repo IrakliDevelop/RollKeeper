@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { GridConstraintService } from '@fieldnotes/vtt';
 import {
   COMBATANT_TOKEN_KIND,
-  COMBATANT_TOKEN_ZINDEX,
+  COMBATANT_TOKEN_INDEX,
   isCombatantToken,
   dispositionColor,
   stampCombatantToken,
@@ -105,13 +105,13 @@ describe('stampCombatantToken', () => {
       entityId?: string;
       tokenKind?: string;
       size?: { w: number };
-      zIndex?: number;
+      index?: string;
     };
     expect(el.type).toBe('image');
     expect(el.entityId).toBe('e1');
     expect(el.tokenKind).toBe(COMBATANT_TOKEN_KIND);
     expect(el.size?.w).toBe(40); // one square cell
-    expect(el.zIndex).toBe(COMBATANT_TOKEN_ZINDEX);
+    expect(el.index).toBe(COMBATANT_TOKEN_INDEX);
     expect(isCombatantToken(el)).toBe(true);
   });
 
@@ -125,12 +125,12 @@ describe('stampCombatantToken', () => {
     const el = added[0] as unknown as CanvasElement & {
       shape?: string;
       fillColor?: string;
-      zIndex?: number;
+      index?: string;
     };
     expect(el.type).toBe('shape');
     expect(el.shape).toBe('ellipse');
     expect(el.fillColor).toBe('#6B7280');
-    expect(el.zIndex).toBe(COMBATANT_TOKEN_ZINDEX);
+    expect(el.index).toBe(COMBATANT_TOKEN_INDEX);
     expect(isCombatantToken(el as CanvasElement)).toBe(true);
   });
 
@@ -379,7 +379,7 @@ describe('restampCombatantTokens', () => {
       src: 'https://x/new.png',
       size: { w: 80, h: 80 },
       position: { x: 40, y: 40 },
-      zIndex: COMBATANT_TOKEN_ZINDEX,
+      index: COMBATANT_TOKEN_INDEX,
     });
   });
 
@@ -403,7 +403,7 @@ describe('restampCombatantTokens', () => {
     expect(el.entityId).toBe('ent-1');
     expect(el.tokenKind).toBe('combatant');
     expect(el.layerId).toBe('l1');
-    expect(el.zIndex).toBe(COMBATANT_TOKEN_ZINDEX);
+    expect(el.index).toBe(COMBATANT_TOKEN_INDEX);
   });
 
   it('uses entity.color for the fill (in place update) when set, overriding disposition color', () => {

@@ -1,3 +1,4 @@
+import { recordMovementPath } from './movementTracking';
 import { movableTokenMatch } from './movementTool';
 import { movableTokenIdentity } from './tokenIdentity';
 
@@ -66,6 +67,7 @@ export function applyMovementCommit(
   };
   ctx.viewport.transaction(() => {
     ctx.viewport.store.update(el.id, { position });
+    recordMovementPath(ctx.viewport, el.id, emission);
   });
 
   const resolution = ctx.resolveMovement(identity);

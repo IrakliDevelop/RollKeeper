@@ -1,7 +1,7 @@
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { createClient } from 'redis';
-import { createSyncServer } from '@fieldnotes/sync-server';
+import { createSyncServer, MemoryHubBackend } from '@fieldnotes/sync-server';
 import type {
   Authenticate,
   HubBackend,
@@ -10,7 +10,11 @@ import type {
   SyncHub,
 } from '@fieldnotes/sync-server';
 import { RedisHubFanout } from '@fieldnotes/sync-redis';
-import { createFogServerPlugin } from '@fieldnotes/vtt/server';
+import {
+  createFogServerPlugin,
+  withMovementAuthorize,
+  getMovementVisibility,
+} from '@fieldnotes/vtt/server';
 import { makePolicies } from './policies.js';
 import { BufferedRedisBackend } from './backend.js';
 import { EphemeralHubFanout } from './ephemeral-fanout.js';
@@ -121,12 +125,22 @@ export async function startRelay(
       }
     : policies.authenticate;
 
+  const backend = opts.backend ?? new MemoryHubBackend();
+  const authorizeMovement = withMovementAuthorize(policies.authorize, {
+    async getElement(room, id) {
+      const record = await backend.getRecord(room, id);
+      return record?.kind === 'element' ? record.element : undefined;
+    },
+  });
   const { hub, wss, close } = createSyncServer({
     server,
     ...policies,
+    authorize: authorizeMovement,
+    resolveAudience: ({ element }) =>
+      getMovementVisibility(element) === 'dm' ? 'dm' : element.audience,
     authenticate,
     plugins,
-    ...(opts.backend ? { backend: opts.backend } : {}),
+    backend,
     ...(opts.fanout ? { fanout: opts.fanout } : {}),
     ...(opts.presenceThrottleMs !== undefined
       ? { presenceThrottleMs: opts.presenceThrottleMs }

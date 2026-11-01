@@ -5,7 +5,10 @@ import {
 } from '@/types/encounter';
 import type { Summon } from '@/types/summon';
 import { CampaignPlayerData } from '@/types/campaign';
-import { calculateCharacterArmorClass } from '@/utils/calculations';
+import {
+  calculateCharacterArmorClass,
+  getBuffSpeedBonus,
+} from '@/utils/calculations';
 import { isConditionIconName } from '@/utils/conditionIconRegistry';
 import { useEncounterStore } from '@/store/encounterStore';
 
@@ -111,6 +114,9 @@ export function mergePlayerSyncData(
     hasUsedReaction,
     deathSaves,
     hpSharedWithParty: char.shareHpWithParty !== false,
+    walkingSpeed: Number.isFinite(char.speed)
+      ? Math.max(0, char.speed + getBuffSpeedBonus(char))
+      : entity.walkingSpeed,
     ...(avatarUrl !== undefined ? { avatarUrl } : {}),
     conditions: mergedConditions,
     suppressedConditions:
@@ -132,6 +138,7 @@ export function hasPlayerDataChanged(
   entity: EncounterEntity,
   updates: Partial<EncounterEntity>
 ): boolean {
+  if (updates.walkingSpeed !== entity.walkingSpeed) return true;
   if (updates.currentHp !== entity.currentHp) return true;
   if (updates.maxHp !== entity.maxHp) return true;
   if (updates.tempHp !== entity.tempHp) return true;

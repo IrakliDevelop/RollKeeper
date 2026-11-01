@@ -4,7 +4,7 @@ import { PLAYER_TOKEN_KIND } from './PlayerTokenTool';
 
 /**
  * Single source of truth for the combatant token kind. Lives here (not
- * dm-vtt) for the same reason TOKEN_ELEMENT_ZINDEX lives in tokenSnap.ts:
+ * dm-vtt) for the same reason TOKEN_ELEMENT_INDEX lives in tokenSnap.ts:
  * location-map must not import from dm-vtt, so dm-vtt/combatantToken.ts
  * re-exports this value instead of defining its own.
  */

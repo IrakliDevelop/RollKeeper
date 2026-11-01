@@ -331,3 +331,25 @@ describe('logDmMovement', () => {
     });
   });
 });
+
+it('uses synced player walking speed for the DM movement budget', () => {
+  useEncounterStore.setState({
+    encounters: [
+      createMockEncounter({
+        id: 'speed-enc',
+        entities: [
+          createMockEncounterEntity({
+            id: 'speed-entity',
+            type: 'player',
+            playerCharacterId: 'speed-pc',
+            walkingSpeed: 40,
+          }),
+        ],
+      }),
+    ],
+  });
+  expect(
+    resolveDmMovement({ key: 'speed-pc', kind: 'player' }, ['speed-enc'])
+      ?.walkFeet
+  ).toBe(40);
+});

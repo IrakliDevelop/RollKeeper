@@ -49,7 +49,7 @@ function addLockedMapImage(vp: ViewportLike): string {
     size: { w: 100, h: 100 },
     src: 'map.png',
     layerId: MAP_LAYER_ID,
-    zIndex: 0,
+    index: 'a0',
   });
   vp.store.add(el);
   vp.store.update(el.id, { locked: true });

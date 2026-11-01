@@ -1,4 +1,5 @@
 'use client';
+import { BattleMapMovement } from '../location-map/BattleMapMovement';
 
 import { useCallback, useEffect, useState } from 'react';
 import { FieldNotesCanvas, ViewportContext } from '@fieldnotes/react';
@@ -141,6 +142,17 @@ export function DmBattleMapCanvas(props: DmBattleMapCanvasProps) {
   return (
     <ViewportContext.Provider value={viewport}>
       <div className="bg-surface fixed inset-0">
+        {viewport && (
+          <div className="absolute bottom-16 left-3 z-20">
+            <BattleMapMovement
+              viewport={viewport}
+              campaignCode={campaignCode}
+              battleMapId={battleMapId}
+              dash={movementDash}
+              onDashChange={handleSetMovementDash}
+            />
+          </div>
+        )}
         <FieldNotesCanvas
           tools={tools}
           defaultTool="hand"

@@ -6,8 +6,8 @@ import {
   tokenAvatarUrl,
 } from '@/components/ui/campaign/location-map/PlayerTokenTool';
 import {
-  TOKEN_ELEMENT_ZINDEX,
-  TEMPLATE_ELEMENT_ZINDEX,
+  TOKEN_ELEMENT_INDEX,
+  TEMPLATE_ELEMENT_INDEX,
 } from '@/components/ui/campaign/location-map/tokenSnap';
 import { fieldnotesElementRegistry } from '@/lib/fieldnotesVtt';
 
@@ -170,7 +170,7 @@ describe('PlayerTokenTool sizing', () => {
     expect(el.position).toEqual({ x: 40, y: 40 });
   });
 
-  it('stamps TOKEN_ELEMENT_ZINDEX on the ellipse fallback (guarantees paint above the map background)', () => {
+  it('stamps TOKEN_ELEMENT_INDEX on the ellipse fallback (guarantees paint above the map background)', () => {
     const { ctx, added } = fakeCtx();
     const tool = new PlayerTokenTool(
       '#12855C',
@@ -178,11 +178,11 @@ describe('PlayerTokenTool sizing', () => {
       { current: 'char-1' }
     );
     tool.onPointerDown(down(0, 0), ctx);
-    const el = added[0] as CanvasElement & { zIndex?: number };
-    expect(el.zIndex).toBe(TOKEN_ELEMENT_ZINDEX);
+    const el = added[0] as CanvasElement & { index?: string };
+    expect(el.index).toBe(TOKEN_ELEMENT_INDEX);
   });
 
-  it('stamps TOKEN_ELEMENT_ZINDEX on avatar image tokens too', () => {
+  it('stamps TOKEN_ELEMENT_INDEX on avatar image tokens too', () => {
     const { ctx, added } = fakeCtx();
     const tool = new PlayerTokenTool(
       '#12855C',
@@ -190,8 +190,8 @@ describe('PlayerTokenTool sizing', () => {
       { current: 'char-1' }
     );
     tool.onPointerDown(down(0, 0), ctx);
-    const el = added[0] as CanvasElement & { zIndex?: number };
-    expect(el.zIndex).toBe(TOKEN_ELEMENT_ZINDEX);
+    const el = added[0] as CanvasElement & { index?: string };
+    expect(el.index).toBe(TOKEN_ELEMENT_INDEX);
   });
 
   it('places an unstamped token when no characterId is known', () => {
@@ -211,8 +211,8 @@ describe('PlayerTokenTool sizing', () => {
   });
 });
 
-describe('PlayerTemplateTool zIndex stamping', () => {
-  it('stamps TEMPLATE_ELEMENT_ZINDEX on the newly created template, leaving pre-existing elements untouched', () => {
+describe('PlayerTemplateTool index stamping', () => {
+  it('stamps TEMPLATE_ELEMENT_INDEX on the newly created template, leaving pre-existing elements untouched', () => {
     const { ctx, elements, updates } = fakeCtx();
     const preExisting = {
       id: 'existing-1',
@@ -236,7 +236,7 @@ describe('PlayerTemplateTool zIndex stamping', () => {
     tool.onPointerUp(down(10, 10), ctx);
 
     expect(updates).toEqual([
-      { id: 'new-template-1', patch: { zIndex: TEMPLATE_ELEMENT_ZINDEX } },
+      { id: 'new-template-1', patch: { index: TEMPLATE_ELEMENT_INDEX } },
     ]);
 
     spy.mockRestore();
@@ -259,11 +259,11 @@ describe('PlayerTemplateTool zIndex stamping', () => {
         type: 'extension',
         extensionType: 'vtt:template',
         data: { radius: 80 },
-        zIndex: TEMPLATE_ELEMENT_ZINDEX,
+        index: TEMPLATE_ELEMENT_INDEX,
       });
       expect(updates).toContainEqual({
         id: elements[0].id,
-        patch: { zIndex: TEMPLATE_ELEMENT_ZINDEX },
+        patch: { index: TEMPLATE_ELEMENT_INDEX },
       });
       expect(ctx.switchTool).toHaveBeenCalledWith('select');
     }
