@@ -116,7 +116,7 @@ export default function ToolProficienciesSection({
           : 'none';
     return (
       <div
-        key={tool?.id ?? name}
+        key={name}
         className="border-divider flex min-h-11 flex-wrap items-center gap-3 border-b py-2 last:border-b-0"
       >
         <ProficiencyDotButton
@@ -124,7 +124,7 @@ export default function ToolProficienciesSection({
           aria-label={skillDotLabel(name, level)}
           onClick={() => {
             if (!tool) add(name);
-            else if (nextLevel === 'none') removeTool(tool.id);
+            else if (nextLevel === 'none') onDeleteToolProficiency(tool.id);
             else
               onUpdateToolProficiency(tool.id, { proficiencyLevel: nextLevel });
           }}

@@ -13,17 +13,27 @@ export function EquipmentReorderControls({
   onMove: (destinationIndex: number) => void;
 }) {
   const descriptionId = useId();
-  const pendingMove = useRef<'up' | 'down' | null>(null);
+  const pendingMove = useRef<{ direction: 'up' | 'down' } | null>(null);
   const upRef = useRef<HTMLButtonElement>(null);
   const downRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const direction = pendingMove.current;
-    if (!direction) return;
+    const pending = pendingMove.current;
+    if (!pending) return;
     pendingMove.current = null;
-    const preferred = direction === 'up' ? upRef.current : downRef.current;
-    const fallback = direction === 'up' ? downRef.current : upRef.current;
+    const preferred =
+      pending.direction === 'up' ? upRef.current : downRef.current;
+    const fallback =
+      pending.direction === 'up' ? downRef.current : upRef.current;
     (preferred && !preferred.disabled ? preferred : fallback)?.focus();
   }, [index, count]);
+  const handleMove = (direction: 'up' | 'down', destination: number) => {
+    const pending = { direction };
+    pendingMove.current = pending;
+    onMove(destination);
+    window.setTimeout(() => {
+      if (pendingMove.current === pending) pendingMove.current = null;
+    }, 0);
+  };
   return (
     <div className="flex flex-wrap gap-1 pb-2 pl-3">
       <span id={descriptionId} className="sr-only">
@@ -37,10 +47,7 @@ export function EquipmentReorderControls({
         aria-describedby={descriptionId}
         disabled={index === 0}
         className="pointer-coarse:min-h-11"
-        onClick={() => {
-          pendingMove.current = 'up';
-          onMove(index - 1);
-        }}
+        onClick={() => handleMove('up', index - 1)}
       >
         Move up
       </Button>
@@ -52,10 +59,7 @@ export function EquipmentReorderControls({
         aria-describedby={descriptionId}
         disabled={index === count - 1}
         className="pointer-coarse:min-h-11"
-        onClick={() => {
-          pendingMove.current = 'down';
-          onMove(index + 1);
-        }}
+        onClick={() => handleMove('down', index + 1)}
       >
         Move down
       </Button>

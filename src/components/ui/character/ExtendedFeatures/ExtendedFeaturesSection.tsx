@@ -86,6 +86,18 @@ export default function ExtendedFeaturesSection({
     );
     (preferred && !preferred.disabled ? preferred : fallback)?.focus();
   }, [features]);
+  const handleMove = (
+    id: string,
+    direction: 'up' | 'down',
+    targetId: string
+  ) => {
+    const pending = { id, direction };
+    pendingMoveFocus.current = pending;
+    onReorderFeatures(id, targetId);
+    window.setTimeout(() => {
+      if (pendingMoveFocus.current === pending) pendingMoveFocus.current = null;
+    }, 0);
+  };
   const orderedFeatures = features;
   const normalizedQuery = query.trim().toLocaleLowerCase();
   const visibleFeatures = normalizedQuery
@@ -307,16 +319,13 @@ export default function ExtendedFeaturesSection({
                             aria-label="Move up"
                             aria-describedby={`feature-name-${feature.id}`}
                             disabled={index === 0}
-                            onClick={() => {
-                              pendingMoveFocus.current = {
-                                id: feature.id,
-                                direction: 'up',
-                              };
-                              onReorderFeatures(
+                            onClick={() =>
+                              handleMove(
                                 feature.id,
+                                'up',
                                 visibleFeatures[index - 1].id
-                              );
-                            }}
+                              )
+                            }
                           >
                             <ArrowUp className="size-4" aria-hidden="true" />
                           </Button>
@@ -327,16 +336,13 @@ export default function ExtendedFeaturesSection({
                             aria-label="Move down"
                             aria-describedby={`feature-name-${feature.id}`}
                             disabled={index === visibleFeatures.length - 1}
-                            onClick={() => {
-                              pendingMoveFocus.current = {
-                                id: feature.id,
-                                direction: 'down',
-                              };
-                              onReorderFeatures(
+                            onClick={() =>
+                              handleMove(
                                 feature.id,
+                                'down',
                                 visibleFeatures[index + 1].id
-                              );
-                            }}
+                              )
+                            }
                           >
                             <ArrowDown className="size-4" aria-hidden="true" />
                           </Button>

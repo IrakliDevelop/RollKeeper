@@ -25,11 +25,12 @@ export default function Languages({
   const [isAddingLanguage, setIsAddingLanguage] = useState(false);
   const [newLanguageName, setNewLanguageName] = useState('');
   const addButtonRef = useRef<HTMLButtonElement>(null);
+  const languageInputRef = useRef<HTMLInputElement>(null);
   const pendingDeleteFocus = useRef(false);
   useEffect(() => {
     if (pendingDeleteFocus.current) {
       pendingDeleteFocus.current = false;
-      addButtonRef.current?.focus();
+      (addButtonRef.current ?? languageInputRef.current)?.focus();
     }
   }, [languages]);
   const removeLanguage = (id: string) => {
@@ -66,6 +67,7 @@ export default function Languages({
       {editing && isAddingLanguage && (
         <div className="mb-4 flex flex-wrap items-end gap-2">
           <Input
+            ref={languageInputRef}
             label="Language"
             value={newLanguageName}
             onChange={event => setNewLanguageName(event.target.value)}
