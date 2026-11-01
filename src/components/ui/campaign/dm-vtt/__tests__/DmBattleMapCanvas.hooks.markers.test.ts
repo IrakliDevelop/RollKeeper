@@ -27,7 +27,7 @@ import {
   parseMarkerData,
 } from '@/components/ui/campaign/location-map/markerData';
 import type { MarkerElementDataV1 } from '@/components/ui/campaign/location-map/markerData';
-import { MARKER_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
+import { MARKER_ELEMENT_INDEX } from '@/components/ui/campaign/location-map/tokenSnap';
 import { ANNOTATIONS_LAYER_ID } from '@/components/ui/campaign/location-map/layerContract';
 import { useBattleMapStore } from '@/store/battleMapStore';
 import { useLocationStore } from '@/store/locationStore';
@@ -930,7 +930,7 @@ describe('useDmBattleMapCanvas — markers are created in their own zIndex band'
     vi.clearAllMocks();
   });
 
-  it('a placed pin carries MARKER_ELEMENT_ZINDEX, asserted against the literal 950', () => {
+  it('a placed pin carries MARKER_ELEMENT_INDEX, asserted against the literal 950', () => {
     const { vp, store, result } = setup();
 
     act(() => {
@@ -938,13 +938,13 @@ describe('useDmBattleMapCanvas — markers are created in their own zIndex band'
     });
 
     const pin = markerElements(store)[0] as HtmlElement;
-    expect(pin.zIndex).toBe(MARKER_ELEMENT_ZINDEX);
+    expect(pin.index).toBe(MARKER_ELEMENT_INDEX);
     // The literal too, mirroring PlayerTokenTool.test.ts: renaming the
     // constant must not be able to silently move the band.
-    expect(pin.zIndex).toBe(950);
+    expect(pin.index).toBe('bFK');
     // Never the `createHtmlElement` default, which is what ties with the map
     // background and lets a resync bury the pin.
-    expect(pin.zIndex).not.toBe(0);
+    expect(pin.index).not.toBe(0);
   });
 });
 
@@ -1064,7 +1064,7 @@ describe('useDmBattleMapCanvas — orphan GC runs after a successful canvas load
         htmlType: MARKER_HTML_TYPE,
         position: { x: 0, y: 0 },
         size: { w: 40, h: 40 },
-        zIndex: MARKER_ELEMENT_ZINDEX,
+        zIndex: MARKER_ELEMENT_INDEX,
         locked: false,
         layerId: ANNOTATIONS_LAYER_ID,
         data: { ...buildMarkerData({ kind: 'door', ref }) },

@@ -218,7 +218,7 @@ describe('DmMarkerTool placement', () => {
     });
     store.add(el);
     expect(addSpy).toHaveBeenCalledTimes(1);
-    store.update(el.id, { zIndex: 5 });
+    store.update(el.id, { index: 'a0' });
     expect(updateSpy).toHaveBeenCalledTimes(1);
     store.remove(el.id);
     expect(removeSpy).toHaveBeenCalledTimes(1);

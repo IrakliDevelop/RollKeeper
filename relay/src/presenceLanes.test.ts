@@ -1,6 +1,6 @@
 // relay/src/presenceLanes.test.ts
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { signBattleMapToken } from './token.js';
 import { startRelay, type RelayHandle } from './server.js';
 
@@ -46,7 +46,7 @@ async function waitUntilAdmitted(
   from: string
 ): Promise<void> {
   const messages: Envelope[] = [];
-  const onMessage = (data: WebSocket.RawData) => {
+  const onMessage = (data: import('ws').RawData) => {
     messages.push(JSON.parse(data.toString()) as Envelope);
   };
   socket.on('message', onMessage);

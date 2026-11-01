@@ -1,7 +1,7 @@
 import { createTemplate, templateElementTypeDefinition } from '@fieldnotes/vtt';
 
 import { cellUnit } from '@/components/ui/campaign/location-map/cellUnit';
-import { TEMPLATE_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
+import { TEMPLATE_ELEMENT_INDEX } from '@/components/ui/campaign/location-map/tokenSnap';
 
 import type { Point, PointerState, Tool, ToolContext } from '@fieldnotes/core';
 import type { AoeShape } from '@/types/spellAoe';
@@ -70,7 +70,7 @@ export class SpellTemplateTool implements Tool {
       radiusFeet: config.sizeFeet,
       renderStyle: 'geometric',
       layerId: ctx.activeLayerId ?? '',
-      zIndex: TEMPLATE_ELEMENT_ZINDEX,
+      index: TEMPLATE_ELEMENT_INDEX,
     });
     ctx.store.add(templateElementTypeDefinition.wrap(el));
     this.placedId = el.id;

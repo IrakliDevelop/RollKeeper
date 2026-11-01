@@ -33,7 +33,7 @@ import {
 import type { MarkerColorKey, MarkerKind } from './markerData';
 import { parseMarkerPortalTarget } from './markerPortal';
 import type { MarkerRemovalTracker } from './markerRemovalTracker';
-import { MARKER_ELEMENT_ZINDEX } from './tokenSnap';
+import { MARKER_ELEMENT_INDEX } from './tokenSnap';
 
 import type { MarkerDetail, MarkerPortalTargetV1 } from '@/types/battlemap';
 
@@ -212,8 +212,8 @@ export interface CreateMarkerInput {
   size: Size;
   layerId: string;
   /** Escape hatch for a caller that needs a different band. Omit it: the
-   *  default `MARKER_ELEMENT_ZINDEX` is what keeps a pin off the map floor. */
-  zIndex?: number;
+   *  default `MARKER_ELEMENT_INDEX` is what keeps a pin off the map floor. */
+  index?: string;
   title?: string;
   body?: string;
   dmNotes?: string;
@@ -303,7 +303,7 @@ export function createMarker(
     // map background element and the SDK breaks (layerOrder, zIndex) ties by
     // arrival order, so after a resync the pin can paint BENEATH the map.
     // Same hazard, same remedy as tokens — see tokenSnap.ts's band table.
-    zIndex: input.zIndex ?? MARKER_ELEMENT_ZINDEX,
+    index: input.index ?? MARKER_ELEMENT_INDEX,
     htmlType: MARKER_HTML_TYPE,
     data: {
       ...buildMarkerData({
@@ -637,7 +637,7 @@ export function cloneMarkerForMap(
     // The marker band, not `element.zIndex`: a source pin persisted before
     // the band existed sits at 0, and a clone must not inherit the "paints
     // under the map after a resync" hazard from it.
-    zIndex: MARKER_ELEMENT_ZINDEX,
+    index: MARKER_ELEMENT_INDEX,
     htmlType: MARKER_HTML_TYPE,
     data: {
       ...buildMarkerData({

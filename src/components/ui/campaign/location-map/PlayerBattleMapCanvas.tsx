@@ -1,4 +1,6 @@
 'use client';
+import { BattleMapMovement } from './BattleMapMovement';
+import type { SharedInitiativeState } from '@/types/sharedState';
 
 import React, {
   useCallback,
@@ -112,6 +114,7 @@ import {
 } from '@/lib/fieldnotesVtt';
 
 interface PlayerBattleMapCanvasProps {
+  initiative?: SharedInitiativeState | null;
   campaignCode: string;
   battleMapId: string;
   characterId: string;
@@ -307,6 +310,7 @@ export function PlayerBattleMapCanvas({
   characterName,
   characterAvatar,
   children,
+  initiative,
   onStatus: onStatusProp,
   onPoke,
   spellTemplateConfigRef,
@@ -773,6 +777,7 @@ export function PlayerBattleMapCanvas({
           scope.push(
             attachPathBroadcast(movementTool, connection, {
               role: 'player',
+              viewport: vp,
               // Players hold no dmOnlyElements state; DM-only elements never
               // reach them (relay canRead), so an own-token anchor cannot be
               // DM-only from this client's view.
@@ -856,6 +861,15 @@ export function PlayerBattleMapCanvas({
         <BattleMapBootstrapPrivacyCover status={status} />
         {viewport && (
           <PlayerMapToolControls>
+            <BattleMapMovement
+              viewport={viewport}
+              campaignCode={campaignCode}
+              battleMapId={battleMapId}
+              characterId={characterId}
+              initiative={initiative}
+              dash={movementDash}
+              onDashChange={handleSetMovementDash}
+            />
             <PlayerToolbar
               status={status}
               hasSelection={hasSelection}

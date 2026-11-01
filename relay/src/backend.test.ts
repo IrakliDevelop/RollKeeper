@@ -1,3 +1,4 @@
+import { createShape } from '@fieldnotes/core';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { SyncOp } from '@fieldnotes/sync';
 import { FogBackendServiceKey } from '@fieldnotes/vtt/redis';
@@ -43,7 +44,7 @@ describe('BufferedRedisBackend', () => {
   it('hydrates a room from redis once and serves reads from memory', async () => {
     const { redis, calls } = fakeRedis({ a: JSON.stringify(elem('a')) });
     const b = new BufferedRedisBackend(redis);
-    expect((await b.snapshot('r1')).map(e => e.id)).toEqual(['a']);
+    expect((await b.snapshot('r1')).elements.map(e => e.id)).toEqual(['a']);
     expect((await b.get('r1', 'a'))?.id).toBe('a');
     await b.snapshot('r1');
     expect(calls.filter(c => c.method === 'hGetAll')).toHaveLength(1);
@@ -65,7 +66,7 @@ describe('BufferedRedisBackend', () => {
     const second = b.get('r1', 'a');
     expect(calls.filter(call => call.method === 'hGetAll')).toHaveLength(0);
     release();
-    expect((await first).map(element => element.id)).toEqual(['a']);
+    expect((await first).elements.map(element => element.id)).toEqual(['a']);
     expect((await second)?.id).toBe('a');
     expect(calls.filter(call => call.method === 'hGetAll')).toHaveLength(1);
   });
@@ -87,7 +88,7 @@ describe('BufferedRedisBackend', () => {
 
     await expect(b.snapshot('r1')).rejects.toThrow('redis unavailable');
     // Second access retries hydration instead of serving a latched-empty room.
-    expect((await b.snapshot('r1')).map(e => e.id)).toEqual(['a']);
+    expect((await b.snapshot('r1')).elements.map(e => e.id)).toEqual(['a']);
     expect(calls.filter(c => c.method === 'hGetAll')).toHaveLength(2);
   });
 
@@ -157,7 +158,7 @@ describe('BufferedRedisBackend', () => {
     await b.apply('r1', up('a'));
     await b.apply('r1', { kind: 'clear' } as SyncOp);
     expect(calls.filter(c => c.method === 'del')).toHaveLength(1);
-    expect(await b.snapshot('r1')).toEqual([]);
+    expect(await b.snapshot('r1')).toEqual({ elements: [], tombstones: [] });
   });
 
   it('an upsert after a remove of the same id wins (no stale hDel)', async () => {
@@ -269,7 +270,7 @@ describe('BufferedRedisBackend', () => {
     const b = new BufferedRedisBackend(redis, { flushIntervalMs: 1000 });
     await b.apply('r1', up('a'));
     await b.apply('r1', { kind: 'clear' } as SyncOp); // del fails, swallowed
-    expect(await b.snapshot('r1')).toEqual([]); // memory still cleared
+    expect(await b.snapshot('r1')).toEqual({ elements: [], tombstones: [] }); // memory still cleared
     failDel = false;
     await b.apply('r1', up('b')); // element created after the clear
     await vi.advanceTimersByTimeAsync(1000);
@@ -391,5 +392,105 @@ describe('BufferedRedisBackend', () => {
     expect(Object.keys(hsets[1].args[1] as Record<string, string>)).toEqual([
       'b',
     ]);
+  });
+});
+
+describe('versioned movement record storage', () => {
+  it('accepts only one concurrent writer of the same version and editor', async () => {
+    const { redis } = fakeRedis();
+    const backend = new BufferedRedisBackend(redis);
+    const first = {
+      ...createShape({ index: 'a0' }),
+      version: 1,
+      editor: 'player',
+    };
+    expect(
+      await backend.applyElement(
+        'room',
+        { kind: 'upsert', element: first },
+        null
+      )
+    ).toEqual({ ok: true });
+    const expected = { version: 1, editor: 'player' };
+    const results = await Promise.all([
+      backend.applyElement(
+        'room',
+        { kind: 'upsert', element: { ...first, version: 2, editor: 'A' } },
+        expected
+      ),
+      backend.applyElement(
+        'room',
+        { kind: 'upsert', element: { ...first, version: 2, editor: 'B' } },
+        expected
+      ),
+    ]);
+    expect(results.map(result => result.ok)).toEqual([true, false]);
+    expect(await backend.getRecord('room', first.id)).toMatchObject({
+      kind: 'element',
+      element: { editor: 'A', version: 2 },
+    });
+    await backend.stopAndFlush();
+  });
+
+  it('persists delete tombstones and rejects stale resurrection after rehydration', async () => {
+    const { redis, calls } = fakeRedis();
+    const backend = new BufferedRedisBackend(redis);
+    const element = {
+      ...createShape({ index: 'a0' }),
+      version: 1,
+      editor: 'player',
+    };
+    await backend.applyElement('room', { kind: 'upsert', element }, null);
+    const tombstone = {
+      id: element.id,
+      version: 2,
+      editor: 'player',
+      removedAt: Date.now(),
+    };
+    expect(
+      await backend.applyElement(
+        'room',
+        { kind: 'remove', tombstone },
+        { version: 1, editor: 'player' }
+      )
+    ).toEqual({ ok: true });
+    await backend.stopAndFlush();
+    const written = calls.find(call => call.method === 'hSet')
+      ?.args[1] as Record<string, string>;
+    const restored = new BufferedRedisBackend(fakeRedis(written).redis);
+    expect(await restored.snapshot('room')).toEqual({
+      elements: [],
+      tombstones: [tombstone],
+    });
+    expect(
+      await restored.applyElement('room', { kind: 'upsert', element }, null)
+    ).toMatchObject({ ok: false, current: { kind: 'tombstone' } });
+    await restored.stopAndFlush();
+  });
+
+  it('upgrades persisted legacy ordering without changing identity, ownership, or privacy', async () => {
+    const legacy = {
+      ...createShape({}),
+      id: 'legacy-token',
+      ownerId: 'pc',
+      audience: 'dm',
+      zIndex: 1000,
+    };
+    const raw = { ...legacy } as Record<string, unknown>;
+    delete raw.index;
+    delete raw.version;
+    const backend = new BufferedRedisBackend(
+      fakeRedis({ 'legacy-token': JSON.stringify(raw) }).redis
+    );
+    const snapshot = await backend.snapshot('room');
+    expect(snapshot.elements[0]).toMatchObject({
+      id: 'legacy-token',
+      ownerId: 'pc',
+      audience: 'dm',
+      index: 'a0',
+      version: 1,
+    });
+    expect(snapshot.elements[0]).not.toHaveProperty('zIndex');
+    await backend.stopAndFlush();
   });
 });

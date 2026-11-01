@@ -1048,6 +1048,7 @@ export function useDmBattleMapCanvas({
                 connection,
                 {
                   role: 'dm',
+                  viewport: vp,
                   isDmOnlyElement: id =>
                     !!useBattleMapStore.getState().battleMaps[campaignCode]?.[
                       battleMapId

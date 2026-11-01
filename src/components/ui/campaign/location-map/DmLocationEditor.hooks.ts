@@ -1262,6 +1262,7 @@ export function useDmLocationEditor(
                   connection,
                   {
                     role: 'dm',
+                    viewport: vp,
                     isDmOnlyElement: id =>
                       isElementDmOnly(mode, campaignCode, location.id, id),
                     getElement: id => vp.store.getById(id) ?? null,

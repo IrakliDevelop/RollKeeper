@@ -4,6 +4,7 @@ import {
   FogManager,
   FogManagerKey,
   GridController,
+  movementRecordTypeDefinition,
   registerVttElementTypes,
   type CreateFogPluginOptions,
   type FogPlugin,
@@ -22,6 +23,9 @@ if (!hasGridAdapter && !hasTemplateAdapter) {
 } else if (hasGridAdapter !== hasTemplateAdapter) {
   throw new Error('Field Notes VTT element registration is incomplete');
 }
+
+if (!registry.getAdapter('vtt:movement'))
+  registry.register(movementRecordTypeDefinition);
 
 const fogPlugins = new WeakMap<FogManager, FogPlugin>();
 const gridControllers = new WeakMap<Viewport, GridController>();

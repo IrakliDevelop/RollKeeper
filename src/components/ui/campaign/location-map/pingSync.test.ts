@@ -41,6 +41,7 @@ function toolCtx(): ToolContext {
     } as unknown as Camera,
     store: {} as ToolContext['store'],
     requestRender: vi.fn(),
+    requestOverlayRender: vi.fn(),
   };
 }
 
@@ -118,6 +119,7 @@ describe('attachRemotePings', () => {
         };
       },
       requestRender: vi.fn(),
+      requestOverlayRender: vi.fn(),
     };
   }
 
@@ -181,10 +183,10 @@ describe('attachRemotePings', () => {
       points: [{ x: 0, y: 0 }],
     });
     expect(drawnPings(vp.overlays[0])).toBe(0);
-    expect(vp.requestRender).not.toHaveBeenCalled();
+    expect(vp.requestOverlayRender).not.toHaveBeenCalled();
 
     connection.emitPresence('conn-1', ping(0, 0));
-    expect(vp.requestRender).toHaveBeenCalled();
+    expect(vp.requestOverlayRender).toHaveBeenCalled();
     expect(drawnPings(vp.overlays[0])).toBe(1);
   });
 
@@ -257,6 +259,7 @@ describe('attachPingInput', () => {
         };
       },
       requestRender: vi.fn(),
+      requestOverlayRender: vi.fn(),
     };
   }
 

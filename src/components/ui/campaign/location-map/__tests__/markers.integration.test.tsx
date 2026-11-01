@@ -1,3 +1,4 @@
+import { createCurrentCapabilities } from '@fieldnotes/sync';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, cleanup } from '@testing-library/react';
 import {
@@ -171,6 +172,19 @@ class FakeTransport implements BattleMapTransport {
 
   send(message: string): void {
     this.sent.push(message);
+    const envelope = JSON.parse(message);
+    if (envelope.op.kind === 'capabilities')
+      queueMicrotask(() =>
+        this.emitMessage(
+          JSON.stringify({
+            from: 'hub',
+            op: {
+              kind: 'capabilities',
+              capabilities: createCurrentCapabilities(['fog']),
+            },
+          })
+        )
+      );
   }
   onMessage(handler: (message: string) => void): () => void {
     this.msgHandlers.add(handler);
@@ -192,13 +206,25 @@ class FakeTransport implements BattleMapTransport {
   }
 
   emitMessage(message: string): void {
+    const envelope = JSON.parse(message);
+    if (envelope.op.kind === 'snapshot') {
+      envelope.op.tombstones ??= [];
+      envelope.op.elements = envelope.op.elements.map(
+        (el: Record<string, unknown>) => ({
+          ...el,
+          index: el.index || 'a0',
+          version: el.version ?? 1,
+        })
+      );
+      message = JSON.stringify(envelope);
+    }
     for (const h of [...this.msgHandlers]) h(message);
   }
 }
 
 /** Flush the async token mint. */
 const flush = (): Promise<void> =>
-  new Promise(resolve => setTimeout(resolve, 0));
+  new Promise(resolve => setTimeout(resolve, 60));
 
 const snapshotEnvelope = (to: string): string =>
   JSON.stringify({ from: 'hub', op: { kind: 'snapshot', to, elements: [] } });
@@ -366,6 +392,7 @@ describe('markers over the real sync connection: the DM audience reaches the wir
       size: { w: 40, h: 40 },
     });
     store.add(plain);
+    await flush();
     const plainUpserts = upsertsFor(fakeTransport.sent, plain.id);
     expect(plainUpserts.length).toBeGreaterThan(0);
     expect(plainUpserts[0]?.audience).toBeUndefined();
@@ -383,6 +410,7 @@ describe('markers over the real sync connection: the DM audience reaches the wir
       dmNotes: 'never shared',
     });
 
+    await flush();
     const markerUpserts = upsertsFor(fakeTransport.sent, result.elementId);
     // The marker did reach the wire at all — otherwise "the first upsert is
     // stamped" would be vacuously true over an empty list, and index 0 really
@@ -443,6 +471,7 @@ describe('markers over the real sync connection: the DM audience reaches the wir
     clone.id = 'cloned-pin-1';
     store.add(clone);
 
+    await flush();
     const cloneUpserts = upsertsFor(fakeTransport.sent, clone.id);
     // The clone reached the wire at all, so index 0 below is not vacuous.
     expect(cloneUpserts.length).toBeGreaterThan(0);

@@ -60,8 +60,21 @@ export function AppHeader({
         sticky && 'sticky top-0'
       )}
     >
-      <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:px-8">
-        <div className="flex min-w-0 flex-[1_1_24rem] items-center gap-2">
+      <div
+        className={cn(
+          'mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 sm:px-6 lg:px-8',
+          wrapControls &&
+            'flex-col items-stretch min-[1100px]:flex-row min-[1100px]:items-center'
+        )}
+      >
+        <div
+          className={cn(
+            'flex min-w-0 items-center gap-2',
+            wrapControls
+              ? 'w-full max-w-full flex-1 min-[1100px]:w-auto min-[1100px]:basis-48'
+              : 'flex-[1_1_24rem]'
+          )}
+        >
           <Brand />
           {leading}
           <div className="min-w-0 flex-1">{title}</div>
@@ -70,7 +83,8 @@ export function AppHeader({
         <div
           className={cn(
             'ml-auto flex shrink-0 items-center justify-end gap-2 sm:gap-3',
-            wrapControls && 'max-w-full min-w-0 shrink flex-wrap'
+            wrapControls &&
+              'ml-0 w-full max-w-full min-w-0 shrink flex-wrap justify-between min-[1100px]:ml-auto min-[1100px]:w-auto min-[1100px]:justify-end'
           )}
         >
           {actions && (

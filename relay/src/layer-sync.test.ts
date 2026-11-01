@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { MemoryHubBackend } from '@fieldnotes/sync-server';
 import { startRelay, type RelayHandle } from './server.js';
 import { signBattleMapToken } from './token.js';
@@ -45,7 +45,9 @@ function connect(
     }
   });
   const opened = new Promise<void>((resolve, reject) => {
-    ws.once('open', () => resolve());
+    ws.on('message', data => {
+      if (JSON.parse(String(data)).op.kind === 'capabilities') resolve();
+    });
     ws.once('error', reject);
   });
   const waitFor = (

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import WebSocket from 'ws';
+import WebSocket from './testSocket.js';
 import { createShape } from '@fieldnotes/core';
 import { MemoryHubBackend } from '@fieldnotes/sync-server';
 import { startRelay, type RelayHandle } from './server.js';
@@ -192,7 +192,7 @@ async function runScenario(
   );
   expect(removeCorrection).toEqual({
     from: 'hub',
-    op: { kind: 'remove', id: HIDDEN_ID },
+    op: { kind: 'remove', id: HIDDEN_ID, version: 1, editor: 'hub' },
   });
 
   // 3. Sanity: the DM is never denied, and must not be over-filtered — a

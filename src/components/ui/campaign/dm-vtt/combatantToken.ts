@@ -6,7 +6,7 @@ import {
   buildCircularTokenUrl,
   tokenAvatarUrl,
 } from '@/components/ui/campaign/location-map/PlayerTokenTool';
-import { TOKEN_ELEMENT_ZINDEX } from '@/components/ui/campaign/location-map/tokenSnap';
+import { TOKEN_ELEMENT_INDEX } from '@/components/ui/campaign/location-map/tokenSnap';
 import { COMBATANT_TOKEN_KIND } from '@/components/ui/campaign/location-map/tokenIdentity';
 
 import type {
@@ -27,7 +27,7 @@ export { COMBATANT_TOKEN_KIND };
 /** Re-exported from tokenSnap.ts (single source of truth — location-map
  * must not import from dm-vtt, so the constant lives there and this file
  * imports it, not the reverse). */
-export const COMBATANT_TOKEN_ZINDEX = TOKEN_ELEMENT_ZINDEX;
+export const COMBATANT_TOKEN_INDEX = TOKEN_ELEMENT_INDEX;
 
 /** Extra top-level keys carried on token elements — they survive the
  * FieldNotes store, export, and sync round-trips (verified in the spec). */
@@ -106,7 +106,7 @@ export function stampCombatantToken(
         size: { w: size, h: size },
         src,
         layerId,
-        zIndex: COMBATANT_TOKEN_ZINDEX,
+        index: COMBATANT_TOKEN_INDEX,
       })
     : createShape({
         position,
@@ -116,7 +116,7 @@ export function stampCombatantToken(
         strokeColor: '#1e293b',
         strokeWidth: 2,
         layerId,
-        zIndex: COMBATANT_TOKEN_ZINDEX,
+        index: COMBATANT_TOKEN_INDEX,
       });
 
   const token: CanvasElement & CombatantTokenKeys = {
@@ -219,13 +219,13 @@ export function restampCombatantTokens(
               src: src as string,
               size: { w: size, h: size },
               position,
-              zIndex: COMBATANT_TOKEN_ZINDEX,
+              index: COMBATANT_TOKEN_INDEX,
             }
           : {
               fillColor: entity.color ?? dispositionColor(entity),
               size: { w: size, h: size },
               position,
-              zIndex: COMBATANT_TOKEN_ZINDEX,
+              index: COMBATANT_TOKEN_INDEX,
             }
       );
     } else {
@@ -236,7 +236,7 @@ export function restampCombatantTokens(
             size: { w: size, h: size },
             src: src as string,
             layerId,
-            zIndex: COMBATANT_TOKEN_ZINDEX,
+            index: COMBATANT_TOKEN_INDEX,
           })
         : createShape({
             position,
@@ -246,7 +246,7 @@ export function restampCombatantTokens(
             strokeColor: '#1e293b',
             strokeWidth: 2,
             layerId,
-            zIndex: COMBATANT_TOKEN_ZINDEX,
+            index: COMBATANT_TOKEN_INDEX,
           });
       const token: CanvasElement & CombatantTokenKeys = {
         ...base,
