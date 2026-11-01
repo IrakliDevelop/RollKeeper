@@ -91,6 +91,7 @@ describe('MonsterStatBlockPanel — resource costs', () => {
   it('without new props renders read-only with no Use button (bestiary regression guard)', async () => {
     render(<MonsterStatBlockPanel statBlock={statBlock([LINKED])} />);
     expect(screen.getByText('Turn Undead')).toBeVisible();
+    expect(screen.queryByText('Resource removed')).toBeNull();
     expect(
       screen.queryByRole('button', { name: 'Use' })
     ).not.toBeInTheDocument();

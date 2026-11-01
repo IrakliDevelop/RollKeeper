@@ -81,6 +81,7 @@ export function StatBlockEntryRow({
   const max = trackable ? (ability.maxUses ?? 1) : 0;
   const used = trackable ? ability.usedUses : 0;
   const useBlocked = costInsufficient || inventoryInsufficient;
+  const canSpend = trackable ? !!onUseAbility : !!onSpendCost;
   const blockedReason = costInsufficient
     ? resource
       ? `Not enough ${resource.name} uses`
@@ -171,7 +172,7 @@ export function StatBlockEntryRow({
             Use
           </Button>
         )}
-        {useBlocked && blockedReason && !readOnly && (
+        {useBlocked && blockedReason && canSpend && !readOnly && (
           <span className="text-muted text-xs">{blockedReason}</span>
         )}
         {cost && resource && used > 0 && !readOnly && (
