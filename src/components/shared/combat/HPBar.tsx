@@ -34,10 +34,11 @@ export function HPBar({
   return (
     <div className={`flex items-center gap-2 ${className}`}>
       <div
-        className={`bg-surface-raised flex-1 overflow-hidden rounded-full shadow-inner ${sizeMap[size]}`}
+        data-hp-track
+        className={`bg-surface-inset flex-1 overflow-hidden rounded-sm ${sizeMap[size]}`}
       >
         <div
-          className={`${sizeMap[size]} rounded-full transition-all duration-300 ${colorClass}`}
+          className={`${sizeMap[size]} rounded-sm transition-all duration-300 ${colorClass}`}
           style={{ width: `${clampedPercent}%` }}
         />
       </div>
@@ -45,7 +46,7 @@ export function HPBar({
         <span className="text-body min-w-fit text-xs font-medium tabular-nums">
           {current}/{max}
           {temp > 0 && (
-            <span className="text-accent-blue-text ml-0.5">+{temp}</span>
+            <span className="text-frost-text ml-1">+{temp} temp HP</span>
           )}
         </span>
       )}
