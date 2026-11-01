@@ -297,13 +297,13 @@ describe('CombatantRow', () => {
     expect(screen.getByText('Charmed')).toBeInTheDocument();
     expect(screen.queryByText('Deafened')).not.toBeInTheDocument();
     expect(screen.getByText('+1')).toBeInTheDocument();
-    // buff strip: both visible, emerald variant
+    // buff strip: both visible, verdigris badge
     expect(screen.getByText('Rage')).toBeInTheDocument();
     expect(screen.getByText('Shield of Faith')).toBeInTheDocument();
-    const buffBadge = screen
-      .getByText('Rage')
-      .closest('span[class*="accent-emerald"]');
-    expect(buffBadge).not.toBeNull();
+    expect(screen.getByText('Rage').closest('[data-variant]')).toHaveAttribute(
+      'data-variant',
+      'success'
+    );
   });
 
   it('clicking the name selects the row rather than starting a rename', () => {

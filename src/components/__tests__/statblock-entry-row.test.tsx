@@ -84,12 +84,87 @@ describe('StatBlockEntryRow', () => {
     );
     const availablePip = screen.getByLabelText('Smite use 2 (available)');
     expect((availablePip as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('Needs 2 Wild Shape, 1 left')).toBeVisible();
+    expect(availablePip.getAttribute('title')).toBe(
+      'Needs 2 Wild Shape, 1 left'
+    );
     availablePip.click();
     expect(onUse).not.toHaveBeenCalled();
     const usedPip = screen.getByLabelText('Smite use 1 (used)');
     expect(usedPip.getAttribute('title')).toContain('does not refund');
     usedPip.click();
     expect(onRestore).toHaveBeenCalled();
+  });
+
+  it('uses brass available pips, neutral spent pips and coarse pointer targets', () => {
+    const view = render(
+      <StatBlockEntryRow
+        entry={TRACKED_ENTRY}
+        ability={ability(1)}
+        onUseAbility={vi.fn()}
+        onRestoreAbility={vi.fn()}
+      />
+    );
+    const used = view.getByLabelText('Smite use 1 (used)');
+    const available = view.getByLabelText('Smite use 2 (available)');
+    expect(used).toHaveClass('pointer-coarse:min-h-11');
+    expect(available).toHaveClass('pointer-coarse:min-w-11');
+    expect(used.querySelector('span')).toHaveClass('border-divider-strong');
+    expect(available.querySelector('span')).toHaveClass('border-brass-border');
+  });
+
+  it('names the secondary Use action for its entry and shows the cost', () => {
+    const entry = {
+      ...TRACKED_ENTRY,
+      resourceCost: { resourceId: 'res-1', amount: 2 },
+    };
+    const view = render(
+      <StatBlockEntryRow
+        entry={entry}
+        resources={[RESOURCE]}
+        onSpendCost={vi.fn()}
+      />
+    );
+    expect(view.getByRole('button', { name: 'Use Smite' })).toHaveAttribute(
+      'data-variant',
+      'secondary'
+    );
+    expect(
+      view.getByText(/Wild Shape/).closest('[data-variant]')
+    ).toHaveAttribute('data-variant', 'neutral');
+  });
+
+  it('says how many items an inventory cost needs and how many are left', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-arrows',
+      name: 'Volley',
+      text: '',
+      inventoryCost: { inventoryItemId: 'arrows', quantity: 3 },
+    };
+    const view = render(
+      <StatBlockEntryRow
+        entry={entry}
+        inventory={[{ id: 'arrows', name: 'Arrows', quantity: 1 } as never]}
+        onSpendCost={vi.fn()}
+      />
+    );
+    expect(view.getByText('Needs 3 Arrows, 1 left')).toBeVisible();
+  });
+
+  it('names a missing inventory item instead of a generic shortage', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-missing',
+      name: 'Quaff potion',
+      text: '',
+      inventoryCost: { inventoryItemId: 'item-gone', quantity: 1 },
+    };
+    const view = render(
+      <StatBlockEntryRow entry={entry} inventory={[]} onSpendCost={vi.fn()} />
+    );
+    expect(view.getByText('Inventory item removed')).toBeVisible();
+    expect(
+      view.getByRole('button', { name: 'Use Quaff potion' })
+    ).toBeDisabled();
   });
 
   it('trackable + cost with sufficient resource: pip title names the spend', () => {
@@ -125,7 +200,7 @@ describe('StatBlockEntryRow', () => {
         onSpendCost={onSpendCost}
       />
     );
-    screen.getByRole('button', { name: 'Use' }).click();
+    screen.getByRole('button', { name: 'Use Rally' }).click();
     expect(onSpendCost).toHaveBeenCalledWith(entry);
 
     cleanup();
@@ -134,7 +209,7 @@ describe('StatBlockEntryRow', () => {
     );
     expect(dangling.getByText('Unknown resource')).toBeTruthy();
     expect(
-      (dangling.getByRole('button', { name: 'Use' }) as HTMLButtonElement)
+      (dangling.getByRole('button', { name: 'Use Rally' }) as HTMLButtonElement)
         .disabled
     ).toBe(true);
   });

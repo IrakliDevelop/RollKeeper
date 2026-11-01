@@ -52,3 +52,11 @@ export const WithTempHPDark: Story = {
   ...WithTempHP,
   globals: { theme: 'dark' },
 };
+
+export const Down: Story = {
+  args: { current: 0, max: 40, showLabel: true },
+};
+
+export const PercentageOnly: Story = {
+  args: { current: 45, max: 100, showLabel: false, size: 'sm' },
+};

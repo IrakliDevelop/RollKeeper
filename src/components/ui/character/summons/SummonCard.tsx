@@ -284,7 +284,7 @@ export function SummonCard({
       {/* Stat Block */}
       {showStatBlock && entity.monsterStatBlock && (
         <div className="border-divider border-t px-3 py-2">
-          <MonsterStatBlockPanel statBlock={entity.monsterStatBlock} />
+          <MonsterStatBlockPanel statBlock={entity.monsterStatBlock} bare />
         </div>
       )}
     </div>

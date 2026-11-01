@@ -366,12 +366,16 @@ describe('CreatureDrawer parity — Actions tab', () => {
     expect(actions.onRestoreAbility).toHaveBeenCalledWith(ID, 'act-volley');
 
     await user.click(
-      within(rowOf('Quaff Potion', 1)).getByRole('button', { name: 'Use' })
+      within(rowOf('Quaff Potion', 1)).getByRole('button', {
+        name: 'Use Quaff Potion',
+      })
     );
     expect(actions.onUseInventoryEntry).toHaveBeenCalledWith(ID, 'act-potion');
 
     await user.click(
-      within(rowOf('Battle Surge', 1)).getByRole('button', { name: 'Use' })
+      within(rowOf('Battle Surge', 1)).getByRole('button', {
+        name: 'Use Battle Surge',
+      })
     );
     expect(actions.onSpendResource).toHaveBeenCalledWith(ID, 'res-pool', 1);
   });
