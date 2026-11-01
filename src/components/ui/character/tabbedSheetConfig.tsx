@@ -927,7 +927,7 @@ function CombatTabContent({
         content: {
           player: (
             <div className="space-y-8">
-              <div className="grid grid-cols-1 items-start gap-x-10 gap-y-8 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-x-10 gap-y-8 lg:grid-cols-2">
                 <ErrorBoundary fallback={<SheetLoadError thing="Hit points" />}>
                   <HitPointManager
                     editing={params.editing}
@@ -1007,7 +1007,7 @@ function CombatTabContent({
             </div>
           ),
           defenses: (
-            <div className="grid items-start gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+            <div className="grid gap-6 md:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
               <ErrorBoundary fallback={<SheetLoadError thing="Buffs" />}>
                 <TemporaryBuffsManager />
               </ErrorBoundary>
