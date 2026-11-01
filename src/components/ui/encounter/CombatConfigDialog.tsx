@@ -276,7 +276,7 @@ export function CombatConfigDialog({
                         className="border-divider flex flex-wrap items-end gap-2 border-b pb-2"
                       >
                         <NumberInput
-                          label={`${band.label || `Band ${index + 1}`} threshold (%)`}
+                          label={`Band ${index + 1} threshold (%)`}
                           value={band.minPercent}
                           onChange={v =>
                             setBands(prev =>
@@ -296,7 +296,7 @@ export function CombatConfigDialog({
                           onChange={e =>
                             handleBandChange(index, 'label', e.target.value)
                           }
-                          placeholder="Healthy"
+                          placeholder="Wounded"
                           wrapperClassName="min-w-32 flex-1"
                         />
                         <Button

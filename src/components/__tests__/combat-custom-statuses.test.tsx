@@ -78,13 +78,14 @@ describe('custom combat statuses', () => {
     render(<CombatConfigDialog open onOpenChange={vi.fn()} />);
     await user.click(screen.getByRole('radio', { name: /State label/i }));
     expect(
-      screen.getByRole('textbox', { name: /Healthy threshold/i })
+      screen.getByRole('textbox', { name: 'Band 1 threshold (%)' })
     ).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Band 1 label' })).toHaveValue(
+      'Healthy'
+    );
     const remove = screen.getByRole('button', { name: 'Remove Healthy band' });
     await user.click(remove);
-    expect(
-      screen.queryByRole('textbox', { name: /Healthy threshold/i })
-    ).toBeNull();
+    expect(screen.queryByDisplayValue('Healthy')).toBeNull();
     expect(screen.getByRole('button', { name: 'Add band' })).toHaveFocus();
   });
 

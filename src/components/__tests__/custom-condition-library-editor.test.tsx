@@ -48,7 +48,11 @@ describe('CustomConditionLibraryEditor', () => {
   it('tells the DM descriptions are player-facing and shows an empty state', () => {
     render(<Harness initial={[]} onSnapshot={vi.fn()} />);
     expect(screen.getByText(/shown to players/i)).toBeTruthy();
-    expect(screen.getByText('Add a condition to use in combat.')).toBeTruthy();
+    expect(
+      screen.getByText(
+        'Add a condition, then attach it to the creatures that inflict it.'
+      )
+    ).toBeTruthy();
   });
 
   it('adds a row with debuff defaults and edits its name and description', async () => {

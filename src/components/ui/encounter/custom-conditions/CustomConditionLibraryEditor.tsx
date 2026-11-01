@@ -49,7 +49,9 @@ export function CustomConditionLibraryEditor({
       </div>
 
       {conditions.length === 0 ? (
-        <p className="text-muted text-sm">Add a condition to use in combat.</p>
+        <p className="text-muted text-sm">
+          Add a condition, then attach it to the creatures that inflict it.
+        </p>
       ) : (
         <div className="space-y-2">
           {conditions.map(condition => (
