@@ -36,7 +36,8 @@ interface DraggableY<T extends HTMLElement> {
  * until then. Attach `containerRef` to the panel and `startDrag` to its handle.
  */
 export function useDraggableY<T extends HTMLElement = HTMLDivElement>(
-  storageKey: string
+  storageKey: string,
+  bottomMargin = 120
 ): DraggableY<T> {
   const [topPx, setTopPx] = useState<number | null>(null);
   const containerRef = useRef<T | null>(null);
@@ -51,11 +52,16 @@ export function useDraggableY<T extends HTMLElement = HTMLDivElement>(
     }
   }, [storageKey]);
 
-  const handlePointerMove = useCallback((e: PointerEvent) => {
-    if (!dragRef.current) return;
-    const dy = e.clientY - dragRef.current.startY;
-    setTopPx(clampTop(dragRef.current.startTop, dy, window.innerHeight));
-  }, []);
+  const handlePointerMove = useCallback(
+    (e: PointerEvent) => {
+      if (!dragRef.current) return;
+      const dy = e.clientY - dragRef.current.startY;
+      setTopPx(
+        clampTop(dragRef.current.startTop, dy, window.innerHeight, bottomMargin)
+      );
+    },
+    [bottomMargin]
+  );
 
   const handlePointerUp = useCallback(() => {
     dragRef.current = null;
@@ -76,7 +82,7 @@ export function useDraggableY<T extends HTMLElement = HTMLDivElement>(
   const startDrag = useCallback(
     (e: ReactPointerEvent) => {
       const startTop =
-        topPx ?? containerRef.current?.getBoundingClientRect().top ?? 0;
+        containerRef.current?.getBoundingClientRect().top ?? topPx ?? 0;
       dragRef.current = { startY: e.clientY, startTop };
       document.addEventListener('pointermove', handlePointerMove);
       document.addEventListener('pointerup', handlePointerUp);

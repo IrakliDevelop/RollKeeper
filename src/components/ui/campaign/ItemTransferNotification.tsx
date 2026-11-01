@@ -61,7 +61,7 @@ export function ItemTransferNotification({
                 <Package size={16} className="text-muted mt-0.5 shrink-0" />
                 <div>
                   <p className="text-muted text-sm font-semibold">
-                    Item Received
+                    Item received
                   </p>
                   <p className="text-heading mt-1 text-base font-bold">
                     {transfer.item.name}
@@ -89,7 +89,7 @@ export function ItemTransferNotification({
                 leftIcon={<Package size={14} />}
                 onClick={() => handleClick(transfer.id)}
               >
-                View in Inventory
+                View in inventory
               </Button>
             </div>
           </div>

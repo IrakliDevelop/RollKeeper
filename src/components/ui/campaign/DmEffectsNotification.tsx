@@ -52,7 +52,7 @@ export function DmEffectsNotification({
             onClick={handleDismiss}
             className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             title="Dismiss"
-            aria-label="Dismiss DM effect notification"
+            aria-label={`Dismiss ${label} notice`}
           >
             <X size={16} />
           </button>

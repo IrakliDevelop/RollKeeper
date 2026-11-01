@@ -46,7 +46,7 @@ export function DmCounterNotification({
             onClick={handleDismiss}
             className="text-muted hover:text-heading shrink-0 rounded-sm p-1 transition-colors pointer-coarse:min-h-11 pointer-coarse:min-w-11"
             title="Dismiss"
-            aria-label="Dismiss DM counter notification"
+            aria-label={`Dismiss ${label} update`}
           >
             <X size={16} />
           </button>

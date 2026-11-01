@@ -96,17 +96,22 @@ export function DmMessageNotification({
             {/* Expandable content */}
             {msg.content && msg.content.length > 0 && (
               <>
-                <button
+                <Button
+                  variant="link"
+                  size="sm"
                   onClick={() => setExpandedId(isExpanded ? null : msg.id)}
-                  className="text-body hover:text-heading mt-2 flex items-center gap-1 text-xs transition-colors"
+                  aria-expanded={isExpanded}
+                  className="text-body hover:text-heading mt-2 h-auto px-0"
+                  leftIcon={
+                    isExpanded ? (
+                      <ChevronUp size={12} />
+                    ) : (
+                      <ChevronDown size={12} />
+                    )
+                  }
                 >
-                  {isExpanded ? (
-                    <ChevronUp size={12} />
-                  ) : (
-                    <ChevronDown size={12} />
-                  )}
                   {isExpanded ? 'Hide message' : 'Read message'}
-                </button>
+                </Button>
                 {isExpanded && (
                   <div className="bg-surface-secondary text-body mt-2 rounded-md p-3 text-sm">
                     <RichTextRenderer content={msg.content} />
@@ -123,7 +128,7 @@ export function DmMessageNotification({
                 leftIcon={<BookOpen size={12} />}
                 onClick={() => handleAccept(msg)}
               >
-                View in Notes
+                View in notes
               </Button>
             </div>
           </div>
