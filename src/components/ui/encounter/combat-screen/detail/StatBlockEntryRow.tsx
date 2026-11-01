@@ -87,7 +87,9 @@ export function StatBlockEntryRow({
       ? `Not enough ${resource.name} uses`
       : 'Resource removed'
     : inventoryInsufficient
-      ? `Not enough ${inventoryItem?.name ?? 'items'}`
+      ? inventoryItem
+        ? `Not enough ${inventoryItem.name}`
+        : 'Inventory item removed'
       : null;
 
   return (

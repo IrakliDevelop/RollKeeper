@@ -131,6 +131,22 @@ describe('StatBlockEntryRow', () => {
     ).toHaveAttribute('data-variant', 'neutral');
   });
 
+  it('names a missing inventory item instead of a generic shortage', () => {
+    const entry: StatBlockEntry = {
+      id: 'entry-missing',
+      name: 'Quaff potion',
+      text: '',
+      inventoryCost: { inventoryItemId: 'item-gone', quantity: 1 },
+    };
+    const view = render(
+      <StatBlockEntryRow entry={entry} inventory={[]} onSpendCost={vi.fn()} />
+    );
+    expect(view.getByText('Inventory item removed')).toBeVisible();
+    expect(
+      view.getByRole('button', { name: 'Use Quaff potion' })
+    ).toBeDisabled();
+  });
+
   it('trackable + cost with sufficient resource: pip title names the spend', () => {
     const entry = {
       ...TRACKED_ENTRY,
