@@ -153,8 +153,8 @@ describe('MonsterStatBlockPanel — ability tracking', () => {
         onUseAbilityEntry={onUseAbilityEntry}
       />
     );
-    expect(screen.getByLabelText('Smite use 1 (used)')).toBeTruthy();
-    await user.click(screen.getByLabelText('Smite use 2 (available)'));
+    expect(screen.getByLabelText('Restore Smite use 1')).toBeTruthy();
+    await user.click(screen.getByLabelText('Use Smite (use 2 of 3)'));
     expect(onUseAbilityEntry).toHaveBeenCalled();
   });
 
@@ -168,7 +168,7 @@ describe('MonsterStatBlockPanel — ability tracking', () => {
         readOnly
       />
     );
-    expect(screen.getByLabelText('Smite use 2 (used)')).toBeTruthy();
+    expect(screen.getByLabelText('Smite use 2, used')).toBeTruthy();
     expect(container.querySelectorAll('button')).toHaveLength(0);
   });
 });

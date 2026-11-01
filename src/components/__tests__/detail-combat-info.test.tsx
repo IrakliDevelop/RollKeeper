@@ -95,13 +95,13 @@ describe('DetailCombatInfo — field inventory', () => {
     const actions = makeActions();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    expect(screen.getByText('Combat Details')).toBeInTheDocument();
+    expect(screen.getByText('Combat details')).toBeInTheDocument();
     expect(screen.queryByLabelText('Initiative Mod')).not.toBeInTheDocument();
     expect(
       screen.queryByLabelText('Proficiency Bonus')
     ).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Speed')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Saving Throws')).toHaveValue(
+    expect(screen.getByLabelText('Saving throws')).toHaveValue(
       'Str +5, Con +4'
     );
     expect(screen.getByLabelText('Skills')).toHaveValue(
@@ -110,12 +110,12 @@ describe('DetailCombatInfo — field inventory', () => {
     expect(screen.getByLabelText('Resistances')).toHaveValue('fire');
     expect(screen.getByLabelText('Immunities')).toHaveValue('poison');
     expect(screen.getByLabelText('Vulnerabilities')).toHaveValue('cold');
-    expect(screen.getByLabelText('Condition Immunities')).toHaveValue(
+    expect(screen.getByLabelText('Condition immunities')).toHaveValue(
       'Charmed, Frightened'
     );
     expect(screen.getByLabelText('Senses')).toHaveValue('Darkvision 60 ft.');
     expect(screen.getByLabelText('Languages')).toHaveValue('Common');
-    expect(screen.getByLabelText('Passive Perception')).toHaveValue(13);
+    expect(screen.getByLabelText('Passive perception')).toHaveValue('13');
   });
 
   it('editing a stat-block field (Skills) patches monsterStatBlock via onUpdate', async () => {
@@ -141,7 +141,7 @@ describe('DetailCombatInfo — field inventory', () => {
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Saving Throws');
+    const input = screen.getByLabelText('Saving throws');
     await user.clear(input);
     await user.type(input, 'Dex +9');
     await user.tab();
@@ -159,7 +159,7 @@ describe('DetailCombatInfo — field inventory', () => {
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Condition Immunities');
+    const input = screen.getByLabelText('Condition immunities');
     await user.clear(input);
     await user.type(input, 'Poisoned,  Stunned ,Charmed');
     await user.tab();
@@ -179,7 +179,7 @@ describe('DetailCombatInfo — field inventory', () => {
     const user = userEvent.setup();
     render(<DetailCombatInfo entity={monsterEntity} actions={actions} />);
 
-    const input = screen.getByLabelText('Passive Perception');
+    const input = screen.getByLabelText('Passive perception');
     await user.clear(input);
     await user.type(input, '17');
     await user.tab();
@@ -215,9 +215,9 @@ describe('DetailCombatInfo — player entities stay read-only', () => {
     };
     render(<DetailCombatInfo entity={syncedPlayer} actions={actions} />);
 
-    expect(screen.getByText('Saving Throws')).toBeInTheDocument();
+    expect(screen.getByText('Saving throws')).toBeInTheDocument();
     expect(screen.getByText('Str +5, Con +4')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Saving Throws')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Saving throws')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Skills')).not.toBeInTheDocument();
   });
 });

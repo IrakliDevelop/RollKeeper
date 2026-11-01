@@ -157,9 +157,7 @@ describe('ActionsTab', () => {
 
     render(<ActionsTab entity={entity} actions={actions} editing={false} />);
 
-    await user.click(
-      screen.getByRole('button', { name: /fire breath use 1/i })
-    );
+    await user.click(screen.getByRole('button', { name: /use fire breath/i }));
     expect(actions.onUseAbility).toHaveBeenCalledWith('e1', 'breath');
   });
 
@@ -277,7 +275,7 @@ describe('EffectsTab', () => {
         editing={false}
       />
     );
-    expect(screen.getByText('Active Effects')).toBeInTheDocument();
+    expect(screen.getByText('Active effects')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Blinded' })).toBeInTheDocument();
   });
 });
@@ -301,7 +299,7 @@ describe('LairTab', () => {
 
     render(<LairTab entity={entity} actions={actions} editing={false} />);
 
-    await user.click(screen.getByRole('button', { name: 'Use' }));
+    await user.click(screen.getByRole('button', { name: 'Use Magma Fissure' }));
     expect(actions.onUseLairAction).toHaveBeenCalledWith('e1', 'la1');
     expect(screen.getByText('Water boils within 6 miles.')).toBeInTheDocument();
   });

@@ -87,7 +87,7 @@ describe('CreatureHpCard', () => {
     fireEvent.change(screen.getByLabelText('Amount'), {
       target: { value: '4' },
     });
-    fireEvent.click(screen.getByRole('button', { name: /damage/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^damage$/i }));
     expect(actions.onDamage).toHaveBeenCalledWith('e1', 4);
   });
 

@@ -81,7 +81,7 @@ describe('DetailVitals', () => {
     const amountInput = screen.getByPlaceholderText('Amount');
     await user.clear(amountInput);
     await user.type(amountInput, '7');
-    await user.click(screen.getByRole('button', { name: /damage/i }));
+    await user.click(screen.getByRole('button', { name: /^damage$/i }));
     expect(actions.onDamage).toHaveBeenCalledWith('npc-1', 7);
   });
 
@@ -93,7 +93,9 @@ describe('DetailVitals', () => {
     const amountInput = screen.getByPlaceholderText('Amount');
     await user.clear(amountInput);
     await user.type(amountInput, '10');
-    await user.click(screen.getByRole('button', { name: '½×' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Half damage (resistance)' })
+    );
     expect(amountInput).toHaveValue('5');
     expect(actions.onDamage).not.toHaveBeenCalled();
   });
@@ -106,7 +108,9 @@ describe('DetailVitals', () => {
     const amountInput = screen.getByPlaceholderText('Amount');
     await user.clear(amountInput);
     await user.type(amountInput, '6');
-    await user.click(screen.getByRole('button', { name: '2×' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Double damage (vulnerability)' })
+    );
     expect(amountInput).toHaveValue('12');
     expect(actions.onDamage).not.toHaveBeenCalled();
   });
@@ -141,7 +145,7 @@ describe('DetailVitals', () => {
 
     expect(screen.queryByPlaceholderText('Amount')).not.toBeInTheDocument();
     expect(
-      screen.queryByRole('button', { name: /damage/i })
+      screen.queryByRole('button', { name: /^damage$/i })
     ).not.toBeInTheDocument();
   });
 
@@ -177,7 +181,7 @@ describe('DetailVitals', () => {
     render(<DetailVitals entity={npcAtZeroHp} actions={actions} />);
 
     const failPip = screen.getByRole('button', {
-      name: 'Death save failure 1',
+      name: 'Mark death save failure 1',
     });
     await user.click(failPip);
     expect(actions.onUpdate).toHaveBeenCalledWith('npc-1', {
@@ -219,7 +223,9 @@ describe('DetailVitals', () => {
     const actions = makeActions();
     render(<DetailVitals entity={playerEntity} actions={actions} />);
 
-    expect(screen.queryByTitle('Edit max HP')).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Edit Aragorn max HP' })
+    ).not.toBeInTheDocument();
     expect(actions.onSetMaxHp).not.toHaveBeenCalled();
   });
 });
@@ -243,7 +249,7 @@ describe('DetailHeader', () => {
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: /remove from combat/i })
+      screen.getByRole('button', { name: /Remove Goblin from combat/i })
     );
     expect(await findConfirmDialog()).toHaveAccessibleName(
       `Remove ${npcEntity.name} from combat?`
@@ -260,7 +266,7 @@ describe('DetailHeader', () => {
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
     await user.click(
-      screen.getByRole('button', { name: /remove from combat/i })
+      screen.getByRole('button', { name: /Remove Goblin from combat/i })
     );
     await clickConfirmDialogButton('Cancel');
     expect(actions.onRemove).not.toHaveBeenCalled();
@@ -271,7 +277,7 @@ describe('DetailHeader', () => {
     const user = userEvent.setup();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     expect(input).toHaveValue('Goblin');
 
@@ -292,7 +298,7 @@ describe('DetailHeader', () => {
     const user = userEvent.setup();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     await user.clear(input);
     await user.type(input, 'Renamed Goblin');
@@ -308,7 +314,7 @@ describe('DetailHeader', () => {
     const user = userEvent.setup();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     await user.clear(input);
     await user.type(input, 'Should not save');
@@ -326,7 +332,7 @@ describe('DetailHeader', () => {
     const user = userEvent.setup();
     render(<DetailHeader entity={npcEntity} actions={actions} />);
 
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     await user.clear(input);
     await user.type(input, '   ');
@@ -341,7 +347,7 @@ describe('DetailHeader', () => {
     render(<DetailHeader entity={playerEntity} actions={actions} />);
 
     expect(
-      screen.queryByRole('button', { name: 'Rename' })
+      screen.queryByRole('button', { name: 'Rename Goblin' })
     ).not.toBeInTheDocument();
   });
 });

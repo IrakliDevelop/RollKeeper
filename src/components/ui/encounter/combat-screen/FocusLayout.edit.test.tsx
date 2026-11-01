@@ -85,7 +85,7 @@ describe('FocusLayout edit dialog', () => {
     const onUpdate = vi.fn();
     render(<Harness onUpdate={onUpdate} />);
     await user.click(screen.getByRole('button', { name: 'Goblin details' }));
-    await user.click(screen.getByRole('button', { name: 'Rename' }));
+    await user.click(screen.getByRole('button', { name: 'Rename Goblin' }));
     const input = screen.getByRole('textbox', { name: 'Combatant name' });
     await user.clear(input);
     await user.type(input, 'Changed');
@@ -103,7 +103,9 @@ describe('FocusLayout edit dialog', () => {
     const user = userEvent.setup();
     render(<Harness />);
     await user.click(screen.getByRole('button', { name: 'Goblin details' }));
-    await user.click(screen.getByTitle('Remove from combat'));
+    await user.click(
+      screen.getByRole('button', { name: 'Remove Goblin from combat' })
+    );
     await waitFor(() =>
       expect(
         screen.getByRole('button', { name: 'Skeleton details' })
@@ -117,7 +119,7 @@ describe('FocusLayout edit dialog', () => {
     render(<Harness onUpdate={onUpdate} />);
     await user.click(screen.getByRole('button', { name: 'Goblin details' }));
     await user.click(
-      screen.getByTitle('Set alias players see — click to edit')
+      screen.getByRole('button', { name: 'Set player alias for Goblin' })
     );
     await user.type(screen.getByPlaceholderText('Alias…'), 'Hidden');
     await user.keyboard('{Escape}');
@@ -125,7 +127,9 @@ describe('FocusLayout edit dialog', () => {
       screen.getByRole('dialog', { name: 'Goblin details' })
     ).toBeVisible();
     expect(onUpdate).not.toHaveBeenCalled();
-    await user.click(screen.getByTitle('Edit max HP'));
+    await user.click(
+      screen.getByRole('button', { name: 'Edit Goblin max HP' })
+    );
     const maxInput = screen.getByDisplayValue('7');
     await user.clear(maxInput);
     await user.type(maxInput, '12');
