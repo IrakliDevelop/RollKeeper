@@ -299,9 +299,9 @@ describe('CombatPanel', () => {
 
     expect(screen.queryByText('65%')).not.toBeInTheDocument();
     const rows = screen.getAllByRole('listitem');
-    expect(
-      rows[0].querySelector('.bg-surface-raised.rounded-full')
-    ).toBeInTheDocument();
+    expect(rows[0].querySelector('[data-hp-track]')).toHaveClass(
+      'bg-surface-inset'
+    );
   });
 
   it('applies defeated styling', () => {

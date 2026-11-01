@@ -74,7 +74,9 @@ describe('StatBlockTraits — resource costs', () => {
       />
     );
     expect(screen.getByText('2× Wild Shape')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Use' }));
+    await user.click(
+      screen.getByRole('button', { name: 'Use Elemental Form' })
+    );
     expect(onUseEntry).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Elemental Form' })
     );
@@ -102,7 +104,7 @@ describe('StatBlockTraits — resource costs', () => {
         onUseEntry={onUseEntry}
       />
     );
-    const btn = screen.getByRole('button', { name: 'Use' });
+    const btn = screen.getByRole('button', { name: 'Use Elemental Form' });
     expect(btn).toBeDisabled();
     expect(onUseEntry).not.toHaveBeenCalled();
   });
@@ -117,7 +119,9 @@ describe('StatBlockTraits — resource costs', () => {
       />
     );
     expect(screen.getByText('Unknown resource')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Use' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Use Elemental Form' })
+    ).toBeDisabled();
   });
 
   it('no resources/onUseEntry props: renders exactly as before (no badge, no button)', async () => {
