@@ -2,6 +2,9 @@ import { sb } from 'storybook/test';
 
 sb.mock(import('../src/lib/supabase/authConfig.ts'), { spy: true });
 sb.mock(import('../src/lib/supabase/browser.ts'), { spy: true });
+sb.mock(import('../src/hooks/useClassData.ts'), { spy: true });
+sb.mock(import('../src/hooks/useSpellsData.ts'), { spy: true });
+sb.mock(import('../src/hooks/useFeatsData.ts'), { spy: true });
 import type { Preview, Decorator } from '@storybook/nextjs-vite';
 import React, { useEffect, type ReactNode } from 'react';
 import '../src/app/globals.css';
