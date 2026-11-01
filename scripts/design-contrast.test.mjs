@@ -95,7 +95,7 @@ test('reports each pairing below its minimum', () => {
   );
 });
 
-test('the shipped felt and paper palettes pass WCAG AA', async () => {
+test('the shipped paper, felt and blue dark palettes pass WCAG AA', async () => {
   assert.deepEqual(checkContrast(await readGlobalsCss()), []);
 });
 
@@ -127,7 +127,10 @@ test('checks bridged accent backgrounds and inverse text on role text', () => {
     has('heading', 'bridge-verdigris-bg-strong', 4.5),
     'healthy HP number in the tinted HP box'
   );
-  assert.equal(PAIRS.length, 143);
+  for (const text of ['heading', 'body', 'muted']) {
+    assert.ok(has(text, 'brass-bg', 4.5), `${text} on prepared spell rows`);
+  }
+  assert.equal(PAIRS.length, 146);
 });
 
 test('checks selected and danger button text on the hover surface', () => {

@@ -13,6 +13,7 @@ import { cn } from '@/utils/cn';
 import { ABILITY_ABBREVIATIONS, SKILL_NAMES } from '@/utils/constants';
 import type { AbilityName, SkillName } from '@/types/character';
 import { BonusAbilityPicker } from './BonusAbilityPicker';
+import type { UiPrefs } from '@/hooks/useUiPrefs';
 
 export interface SkillRowProps {
   skill: SkillName;
@@ -23,6 +24,7 @@ export interface SkillRowProps {
   bonus: number;
   bonusAbilities: AbilityName[];
   editing: boolean;
+  layout?: UiPrefs['abilityLayout'];
   onRoll: (skill: SkillName) => void;
   onDotTap: (skill: SkillName, level: ProficiencyLevel) => void;
   onToggleBonusAbility?: (skill: SkillName, ability: AbilityName) => void;
@@ -40,11 +42,17 @@ export function SkillRow({
   bonus,
   bonusAbilities,
   editing,
+  layout = 'classic',
   onRoll,
   onDotTap,
   onToggleBonusAbility,
 }: SkillRowProps) {
   const name = SKILL_NAMES[skill];
+  const bonusValue = (
+    <span className="type-ui text-heading w-8 shrink-0 text-right tabular-nums">
+      {formatModifier(bonus)}
+    </span>
+  );
   return (
     <li
       data-skill={skill}
@@ -59,6 +67,7 @@ export function SkillRow({
       ) : (
         <ProficiencyDot level={level} />
       )}
+      {layout === '2024' && bonusValue}
       {editing ? (
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
           <span className="type-ui text-body">{name}</span>
@@ -89,9 +98,7 @@ export function SkillRow({
           onToggle={onToggleBonusAbility}
         />
       )}
-      <span className="type-ui text-heading w-8 shrink-0 text-right tabular-nums">
-        {formatModifier(bonus)}
-      </span>
+      {layout === 'classic' && bonusValue}
     </li>
   );
 }

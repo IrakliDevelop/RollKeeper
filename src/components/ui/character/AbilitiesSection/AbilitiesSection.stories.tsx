@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from '@storybook/nextjs-vite';
 import { useState } from 'react';
 import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { remountOnTheme } from '@/components/ui/foundations/remountOnTheme';
+import { SectionFramesProvider } from '@/components/ui/layout/section';
 import {
   emulateCoarsePointer,
   emulateReducedMotion,
@@ -209,17 +210,21 @@ async function expectNoSidewaysScroll(canvasElement: HTMLElement) {
   await expect(doc.scrollWidth).toBeLessThanOrEqual(doc.clientWidth);
 }
 
-/** The heading row: "Abilities" and the switch on one line. */
+/** The heading and both display switches stay within the section width. */
 async function expectHeadingRowOnOneLine(canvasElement: HTMLElement) {
   const canvas = within(canvasElement);
   const heading = canvas.getByRole('heading', { level: 2, name: 'Abilities' });
   const control = canvas.getByRole('switch', { name: 'Scores large' });
-  const h = heading.getBoundingClientRect();
-  const s = control.getBoundingClientRect();
-  // Same line: the switch's middle sits inside the heading's line box.
-  const middle = s.top + s.height / 2;
-  await expect(middle).toBeGreaterThan(h.top);
-  await expect(middle).toBeLessThan(h.bottom);
+  const section = heading.closest('section')!.getBoundingClientRect();
+  for (const element of [
+    heading,
+    control,
+    canvas.getByRole('switch', { name: '2024 sheet layout' }),
+  ]) {
+    const box = element.getBoundingClientRect();
+    await expect(box.left).toBeGreaterThanOrEqual(section.left);
+    await expect(box.right).toBeLessThanOrEqual(section.right);
+  }
 }
 
 async function expectHeadings(canvasElement: HTMLElement) {
@@ -299,6 +304,92 @@ export const Play: Story = {
 };
 
 export const PlayDark: Story = { ...Play, globals: DARK };
+
+export const PlayBlue: Story = { ...Play, globals: { theme: 'blue' } };
+
+const framed: NonNullable<Story['decorators']> = [
+  Story => (
+    <SectionFramesProvider value={true}>
+      <Story />
+    </SectionFramesProvider>
+  ),
+];
+
+async function use2024Layout(canvasElement: HTMLElement) {
+  const canvas = within(canvasElement);
+  await userEvent.click(
+    canvas.getByRole('switch', { name: '2024 sheet layout' })
+  );
+  await expect(
+    canvasElement.querySelector('[data-ability-layout]')
+  ).toHaveAttribute('data-ability-layout', '2024');
+  await expectHeadings(canvasElement);
+  await expectHeadingRowOnOneLine(canvasElement);
+  await expectNoSidewaysScroll(canvasElement);
+  for (const block of blocks(canvasElement)) {
+    await expect(getComputedStyle(block).borderTopStyle).toBe('solid');
+    await expect(block.scrollWidth).toBeLessThanOrEqual(block.clientWidth);
+  }
+}
+
+export const Sheet2024: Story = {
+  decorators: framed,
+  play: async ({ canvasElement }) => {
+    await use2024Layout(canvasElement);
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Roll Dexterity Save +6, proficient' })
+    );
+    await expect(onRollSavingThrow).toHaveBeenCalledWith('dexterity');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Roll Stealth check' })
+    );
+    await expect(onRollSkillCheck).toHaveBeenCalledWith('stealth');
+    await userEvent.click(canvas.getByRole('switch', { name: 'Scores large' }));
+    await expect(strengthNumbers(canvasElement).medallion).toHaveAttribute(
+      'data-display',
+      'score'
+    );
+  },
+};
+
+export const Sheet2024Dark: Story = { ...Sheet2024, globals: DARK };
+export const Sheet2024Blue: Story = {
+  ...Sheet2024,
+  globals: { theme: 'blue' },
+};
+export const Sheet2024Phone: Story = {
+  decorators: framed,
+  globals: PHONE,
+  play: async ({ canvasElement }) => {
+    await use2024Layout(canvasElement);
+    await expect(columns(canvasElement)).toBe(1);
+  },
+};
+export const Sheet2024EditBlue: Story = {
+  decorators: framed,
+  args: { editing: true },
+  globals: { ...PHONE, theme: 'blue' },
+  play: async ({ canvasElement }) => {
+    await use2024Layout(canvasElement);
+    const restore = emulateCoarsePointer();
+    try {
+      await expectTargets(canvasElement, 44);
+      const stealth = canvasElement.querySelector<HTMLElement>(
+        '[data-skill="stealth"]'
+      )!;
+      const dot = within(stealth).getAllByRole('button')[0];
+      await userEvent.click(dot);
+      await expect(dot).toHaveAttribute('data-level', 'half');
+      const row = canvasElement.querySelector<HTMLElement>(
+        '[data-skill="sleightOfHand"]'
+      )!;
+      await expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+    } finally {
+      restore();
+    }
+  },
+};
 
 /** Edit mode at 820 (iPad portrait): two columns, dots are controls. */
 export const Edit: Story = {

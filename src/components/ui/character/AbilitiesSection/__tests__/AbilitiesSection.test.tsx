@@ -439,6 +439,110 @@ describe('Scores large', () => {
   });
 });
 
+describe('2024 sheet layout', () => {
+  it('defaults to classic and remembers layout independently of number size', () => {
+    const { unmount } = setup({ editing: false });
+    const layout = screen.getByRole('switch', { name: '2024 sheet layout' });
+    expect(layout).not.toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: 'Scores large' }));
+    fireEvent.click(layout);
+    expect(block('strength')).toHaveClass('border');
+    expect(
+      screen.getByRole('img', { name: 'Strength: modifier +3, score 16' })
+    ).toHaveAttribute('data-display', 'score');
+    expect(JSON.parse(localStorage.getItem('rollkeeper-ui-prefs')!)).toEqual({
+      abilityDisplay: 'score',
+      abilityLayout: '2024',
+    });
+    unmount();
+    setup({ editing: false });
+    expect(
+      screen.getByRole('switch', { name: '2024 sheet layout' })
+    ).toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Scores large' })).toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: '2024 sheet layout' }));
+    expect(block('strength')).not.toHaveClass('border');
+    expect(screen.getByRole('switch', { name: 'Scores large' })).toBeChecked();
+  });
+
+  it('keeps totals, expertise, save state and roll handlers in play mode', () => {
+    localStorage.setItem('rollkeeper-ui-prefs', '{"abilityLayout":"2024"}');
+    const { handlers } = setup({ editing: false });
+    expect(screen.getAllByRole('listitem')).toHaveLength(18);
+    expect(within(block('constitution')).queryByText('No skills')).toBeNull();
+    expect(
+      screen.getByRole('img', { name: 'Strength: modifier +3, score 16' })
+    ).toHaveAttribute('data-save-proficient', 'true');
+    const stealth = document.querySelector<HTMLElement>(
+      '[data-skill="stealth"]'
+    )!;
+    expect(stealth).toHaveTextContent('+6');
+    expect(
+      within(stealth).getByRole('img', { name: 'Expertise' })
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll Strength check' })
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Roll Strength Save +5, proficient' })
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Roll Stealth check' }));
+    expect(handlers.onRollAbilityCheck).toHaveBeenCalledWith('strength');
+    expect(handlers.onRollSavingThrow).toHaveBeenCalledWith('strength');
+    expect(handlers.onRollSkillCheck).toHaveBeenCalledWith('stealth');
+    expect(
+      screen.queryByRole('button', { name: /save proficiency$/ })
+    ).toBeNull();
+    expect(
+      screen.queryByRole('button', { name: /^Strength: modifier/ })
+    ).toBeNull();
+  });
+
+  it('uses the same build controls and expertise actions in edit mode', async () => {
+    localStorage.setItem('rollkeeper-ui-prefs', '{"abilityLayout":"2024"}');
+    const { handlers } = setup({ editing: true, jackOfAllTrades: true });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Strength save proficiency' })
+    );
+    expect(handlers.onUpdateSavingThrowProficiency).toHaveBeenCalledWith(
+      'strength',
+      false
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Stealth: expertise. Remove proficiency.',
+      })
+    );
+    expect(handlers.onUpdateSkillExpertise).toHaveBeenCalledWith(
+      'stealth',
+      false
+    );
+    expect(handlers.onUpdateSkillProficiency).toHaveBeenCalledWith(
+      'stealth',
+      false
+    );
+    expect(
+      screen.getByRole('button', {
+        name: 'Acrobatics: Jack of All Trades. Make proficient.',
+      })
+    ).toBeVisible();
+    expect(
+      screen.getByRole('button', {
+        name: 'Choose ability modifiers for Sleight of Hand',
+      })
+    ).toBeVisible();
+    expect(screen.queryByRole('button', { name: /^Roll / })).toBeNull();
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Strength: modifier +3, score 16' })
+    );
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Increase Strength score' })
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(handlers.onUpdateAbilityScore).toHaveBeenCalledWith('strength', 17);
+  });
+});
+
 describe('AbilitiesSection with older data', () => {
   it('renders a save or a skill missing from the saved character', () => {
     const character = hero();

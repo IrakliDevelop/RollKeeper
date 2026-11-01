@@ -1,9 +1,9 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* Dark mode follows the app's theme toggle (<html data-theme="dark">),
+/* Dark palettes follow the app's theme toggle (<html data-theme="dark">),
    not the operating system setting. */
-@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *, [data-theme=blue], [data-theme=blue] *));
 
 /* ============================================================
    SEMANTIC DESIGN TOKENS
@@ -255,6 +255,68 @@
   --bridge-verdigris-border: #36554b;
   --bridge-blood-border: #543029;
   --bridge-lapis-border: #43515e;
+  --bridge-ember-border: #5c4c33;
+}
+
+/* Blue dark: the same semantic roles, with a blue primary action. */
+[data-theme='blue'] {
+  color-scheme: dark;
+
+  /* --- Neutrals --- */
+  --surface: #0f172a;
+  --surface-secondary: #1e293b;
+  --surface-raised: #1e293b;
+  --surface-elevated: #202c40;
+  --surface-inset: #020617;
+  --surface-hover: #29394f;
+  --surface-overlay: rgba(2, 6, 23, 0.65);
+  --overlay-shadow: 0 12px 32px rgb(0 0 0 / 0.5), 0 2px 8px rgb(0 0 0 / 0.35);
+
+  --heading: #f1f5f9;
+  --body: #cbd5e1;
+  --muted: #a4b3c8;
+  --faint: #64748b; /* decorative and disabled only */
+  --inverse: #0f172a;
+
+  --divider: #334155;
+  --divider-strong: #52657d;
+  --input-border: #7c8fa9;
+
+  /* --- Roles --- */
+  --brass-text: #93c5fd;
+  --brass-fill: #60a5fa;
+  --brass-border: #60a5fa;
+  --brass-bg: #172d49;
+  --on-brass: #071426;
+  --blood-text: #ed8d83;
+  --blood-fill: #c45147;
+  --blood-border: #c45147;
+  --blood-bg: #2a201b;
+  --on-blood: #ffffff;
+  --verdigris-text: #6fb3a0;
+  --verdigris-fill: #6fb3a0;
+  --verdigris-border: #6fb3a0;
+  --verdigris-bg: #1e2f28;
+  --lapis-text: #c4b5fd;
+  --lapis-fill: #c4b5fd;
+  --lapis-border: #c4b5fd;
+  --lapis-bg: #2b2342;
+  --ember-text: #d99a5b;
+  --ember-fill: #d99a5b;
+  --ember-border: #d99a5b;
+  --ember-bg: #2d2b1f;
+  --frost-text: #a5dbe6;
+  --frost-fill: #a5dbe6;
+  --frost-border: #a5dbe6;
+  --frost-bg: #1b303b;
+
+  --bridge-verdigris-bg-strong: #263b34;
+  --bridge-blood-bg-strong: #38241e;
+  --bridge-lapis-bg-strong: #342c4e;
+  --bridge-ember-bg-strong: #3d3524;
+  --bridge-verdigris-border: #36554b;
+  --bridge-blood-border: #543029;
+  --bridge-lapis-border: #574875;
   --bridge-ember-border: #5c4c33;
 }
 

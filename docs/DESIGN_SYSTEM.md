@@ -2,7 +2,10 @@
 
 The game table at night: green-black baize, bone-coloured text, brass for the
 one action that matters, blood red for harm. The light theme is pale
-green-grey map paper with ink text.
+green-grey map paper with ink text. Blue dark is an additional navy palette
+with a blue primary action and violet magic marks; the existing light and
+dark palettes retain their colours. The semantic `brass` tokens still name
+primary actions and on-states in every palette.
 
 This file states the rules. To see them, open Storybook → **Foundations**
 (Colour, Type scale, Shape and elevation, Motion, Touch), which renders the
@@ -94,7 +97,28 @@ Rules:
   out of scope.
 
 `npm run design:contrast` checks every role and neutral pairing against WCAG
-AA (4.5:1 text, 3:1 marks) in both themes.
+AA (4.5:1 text, 3:1 marks) in all three palettes.
+
+## Character sheet presentation
+
+The character sheet deliberately uses clear rectangular outlines around its
+sections and read-only character information. `TabbedCharacterSheet` opts
+into `SectionFramesProvider`; each Section resets that context for its
+children so nested sections keep a heading rule without a second frame.
+Outside the sheet, Section retains its usual unframed layout. Read-only
+information stays a semantic description list, without input roles or tab stops.
+
+The Stats tab offers an independent **2024 sheet layout** switch. It arranges
+abilities in outlined units with the score/modifier assembly above a saving
+throw band and ruled skill rows, inspired by the [official 2024 character
+sheet](https://media.dndbeyond.com/compendium-images/free-rules/downloads/2024-character-sheet.pdf). It changes presentation only: character rules, totals, proficiency
+and roll/edit handlers stay shared with the classic layout. **Scores large**
+continues to control number emphasis in either layout. Both choices persist
+per device in `rollkeeper-ui-prefs`, separately from character data.
+
+Prepared spell rows use a narrow primary-role rule and a subtle on-state
+wash, backed by visible Prepared or Always prepared text. Favorites,
+concentration and free casts keep their own indicators.
 
 ## Type
 

@@ -28,6 +28,7 @@ const COLOURS = readThemeColours(globalsCss);
 const THEMES = [
   { theme: 'light', label: 'Paper (light)' },
   { theme: 'dark', label: 'Felt (dark)' },
+  { theme: 'blue', label: 'Blue dark' },
 ] as const;
 
 function Swatch({ token, note }: { token: string; note?: string | null }) {
@@ -139,7 +140,7 @@ async function checkColours(canvasElement: HTMLElement) {
     COLOURS.roles.reduce((sum, r) => sum + r.tokens.length, 0);
   const values: Record<string, Record<string, string>> = {};
 
-  for (const { label } of THEMES) {
+  for (const { theme, label } of THEMES) {
     const panel = canvas
       .getByRole('heading', { name: label })
       .closest<HTMLElement>('[data-theme]')!;
@@ -156,9 +157,7 @@ async function checkColours(canvasElement: HTMLElement) {
     );
     const scheme = panel.querySelector('[data-color-scheme]')!;
     await waitFor(() =>
-      expect(scheme.textContent).toBe(
-        label.startsWith('Felt') ? 'dark' : 'light'
-      )
+      expect(scheme.textContent).toBe(theme === 'light' ? 'light' : 'dark')
     );
   }
   // Each panel reads its own theme.

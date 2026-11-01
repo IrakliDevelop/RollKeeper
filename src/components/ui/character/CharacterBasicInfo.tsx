@@ -85,11 +85,11 @@ export default function CharacterBasicInfo({
   return (
     <Section heading="Character information">
       {!editing ? (
-        <dl className="grid grid-cols-2 gap-x-6 gap-y-4">
+        <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {information.map(([label, value]) => (
             <div key={label} className="min-w-0">
-              <dt className="type-caption text-muted">{label}</dt>
-              <dd className="type-body text-heading break-words">
+              <dt className="type-caption text-muted mb-1.5">{label}</dt>
+              <dd className="type-body text-heading border-input-border min-h-10 border px-3 py-2 break-words">
                 {value || '—'}
               </dd>
             </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useId, useState, useMemo } from 'react';
+import { cn } from '@/utils/cn';
 import { Spell } from '@/types/character';
 import { useCharacterStore } from '@/store/characterStore';
 import {
@@ -134,9 +135,21 @@ const SpellCard: React.FC<{
     : 0;
   const displayDamage = getScaledSpellDamage(spell, totalLevel);
 
+  const prepared = isSpellPrepared(spell);
+  const preparationStyle = cn(
+    'border-l-2 px-3',
+    prepared ? 'border-brass-border bg-brass-bg' : 'border-transparent'
+  );
+
   if (compact) {
     return (
-      <div className="flex flex-wrap items-center justify-between gap-2 py-3">
+      <div
+        data-prepared={prepared}
+        className={cn(
+          'flex flex-wrap items-center justify-between gap-2 py-3',
+          preparationStyle
+        )}
+      >
         <div className="flex min-w-0 flex-auto flex-wrap items-center gap-2">
           <Button
             onClick={onToggleFavorite}
@@ -208,7 +221,9 @@ const SpellCard: React.FC<{
           <Button
             onClick={onTogglePrepared}
             variant="outline"
-            selected={isSpellPrepared(spell)}
+            selected={prepared}
+            aria-pressed={prepared}
+            aria-describedby={nameId}
             size="xs"
             disabled={spell.isAlwaysPrepared}
             title={
@@ -217,7 +232,11 @@ const SpellCard: React.FC<{
                 : undefined
             }
           >
-            {isSpellPrepared(spell) ? 'Prepared' : 'Prepare'}
+            {spell.isAlwaysPrepared
+              ? 'Always prepared'
+              : prepared
+                ? 'Prepared'
+                : 'Prepare'}
           </Button>
           <Button
             onClick={onView}
@@ -256,7 +275,7 @@ const SpellCard: React.FC<{
   }
 
   return (
-    <div className="py-3">
+    <div data-prepared={prepared} className={cn('py-3', preparationStyle)}>
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap items-center gap-2">
@@ -271,9 +290,9 @@ const SpellCard: React.FC<{
             >
               <Star size={18} fill={isFavorite ? 'currentColor' : 'none'} />
             </Button>
-            <h5 id={nameId} className="text-heading font-bold">
+            <h4 id={nameId} className="text-heading font-bold">
               {spell.name}
-            </h5>
+            </h4>
             <Badge variant="neutral" size="sm">
               {isCantrip ? 'Cantrip' : `Level ${spell.level}`}
             </Badge>
@@ -371,7 +390,9 @@ const SpellCard: React.FC<{
           <Button
             onClick={onTogglePrepared}
             variant="outline"
-            selected={isSpellPrepared(spell)}
+            selected={prepared}
+            aria-pressed={prepared}
+            aria-describedby={nameId}
             size="sm"
             disabled={spell.isAlwaysPrepared}
             title={
@@ -380,7 +401,11 @@ const SpellCard: React.FC<{
                 : undefined
             }
           >
-            {isSpellPrepared(spell) ? 'Prepared' : 'Prepare'}
+            {spell.isAlwaysPrepared
+              ? 'Always prepared'
+              : prepared
+                ? 'Prepared'
+                : 'Prepare'}
           </Button>
 
           <div className="flex gap-1">

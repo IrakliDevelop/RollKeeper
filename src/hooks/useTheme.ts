@@ -8,11 +8,11 @@ import {
   useSyncExternalStore,
 } from 'react';
 
-export type Theme = 'light' | 'dark' | 'system';
-export type ResolvedTheme = 'light' | 'dark';
+export type Theme = 'light' | 'dark' | 'blue' | 'system';
+export type ResolvedTheme = 'light' | 'dark' | 'blue';
 
 interface ThemeContextValue {
-  /** The user-chosen preference: 'light', 'dark', or 'system'. */
+  /** The user-chosen preference: 'light', 'dark', 'blue', or 'system'. */
   theme: Theme;
   /** The actual applied theme after resolving 'system'. */
   resolvedTheme: ResolvedTheme;
@@ -55,7 +55,12 @@ function getStoredTheme(): Theme {
     }
     return 'light';
   }
-  if (stored === 'light' || stored === 'dark' || stored === 'system') {
+  if (
+    stored === 'light' ||
+    stored === 'dark' ||
+    stored === 'blue' ||
+    stored === 'system'
+  ) {
     return stored;
   }
   return 'system';

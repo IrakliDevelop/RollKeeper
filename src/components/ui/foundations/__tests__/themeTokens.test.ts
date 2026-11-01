@@ -45,18 +45,23 @@ describe('readThemeColours', () => {
   });
 
   // A token only paper defines would show paper's value in the felt panel.
-  it('finds every neutral and role token in the felt block too', () => {
-    const felt = globalsCss.match(/\[data-theme='dark'\]\s*\{([^}]*)\}/);
-    expect(felt).not.toBeNull();
-    const names = new Set(
-      Array.from(felt![1].matchAll(/(--[\w-]+)\s*:/g), m => m[1])
-    );
-    const tokens = [
-      ...colours.neutrals.map(n => n.name),
-      ...colours.roles.flatMap(r => r.tokens),
-    ];
-    expect(tokens.filter(name => !names.has(name))).toEqual([]);
-  });
+  it.each(['dark', 'blue'])(
+    'finds every neutral and role token in the %s block too',
+    theme => {
+      const felt = globalsCss.match(
+        new RegExp(`\\[data-theme='${theme}'\\]\\s*\\{([^}]*)\\}`)
+      );
+      expect(felt).not.toBeNull();
+      const names = new Set(
+        Array.from(felt![1].matchAll(/(--[\w-]+)\s*:/g), m => m[1])
+      );
+      const tokens = [
+        ...colours.neutrals.map(n => n.name),
+        ...colours.roles.flatMap(r => r.tokens),
+      ];
+      expect(tokens.filter(name => !names.has(name))).toEqual([]);
+    }
+  );
 
   it('leaves out the overlay shadow and the deprecated bridge', () => {
     const names = colours.neutrals.map(n => n.name);

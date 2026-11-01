@@ -23,8 +23,9 @@ describe('ThemeToggle', () => {
 
   it.each([
     ['light', 'light', 'dark', 'Switch to dark mode'],
-    ['dark', 'dark', 'light', 'Switch to light mode'],
-    ['system', 'dark', 'light', 'Switch to light mode'],
+    ['dark', 'dark', 'blue', 'Switch to blue dark mode'],
+    ['blue', 'blue', 'light', 'Switch to light mode'],
+    ['system', 'dark', 'blue', 'Switch to blue dark mode'],
     ['system', 'light', 'dark', 'Switch to dark mode'],
   ] as const)(
     'toggles %s (showing %s) to %s',
@@ -42,7 +43,8 @@ describe('ThemeToggle', () => {
     ['light', 'light', 'system', 'Use system theme'],
     ['system', 'light', 'dark', 'Switch to dark mode'],
     ['system', 'dark', 'dark', 'Switch to dark mode'],
-    ['dark', 'dark', 'light', 'Switch to light mode'],
+    ['dark', 'dark', 'blue', 'Switch to blue dark mode'],
+    ['blue', 'blue', 'light', 'Switch to light mode'],
   ] as const)(
     'with the system option, cycles %s (showing %s) to %s',
     (theme, resolved, next, label) => {
@@ -55,7 +57,7 @@ describe('ThemeToggle', () => {
   );
 });
 
-it('defaults to the persisted three-state cycle and the shared ghost control', () => {
+it('defaults to the persisted four-state cycle and the shared ghost control', () => {
   const setTheme = vi.fn();
   render(
     <ThemeContext.Provider

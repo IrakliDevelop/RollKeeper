@@ -16,6 +16,10 @@ import { cn } from '@/utils/cn';
 
 export type SectionHeadingLevel = 2 | 3 | 4;
 
+/** Sheet sections opt into frames; nested sections keep their heading rule. */
+const SectionFrameContext = React.createContext(false);
+export const SectionFramesProvider = SectionFrameContext.Provider;
+
 export interface SectionProps
   extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   /**
@@ -37,6 +41,10 @@ export interface SectionProps
    * Class names for the content below the rule.
    */
   contentClassName?: string;
+  /** Override the surrounding sheet's section framing preference. */
+  framed?: boolean;
+  /** Allow a wide toolbar to move below its heading on narrow screens. */
+  wrapHeading?: boolean;
   /** Stable per-device preference key. Omit for an always-open section. */
   collapsible?: string;
   /** Controlled local disclosure when no stable preference key is available. */
@@ -65,6 +73,8 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
       trailing,
       className,
       contentClassName,
+      framed,
+      wrapHeading = false,
       children,
       ...props
     },
@@ -72,6 +82,8 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
   ) => {
     const headingId = React.useId();
     const contentId = React.useId();
+    const frameSections = React.useContext(SectionFrameContext);
+    const showFrame = framed ?? frameSections;
     const collapsed = toggle?.collapsed ?? false;
     const Heading = `h${level}` as const;
 
@@ -79,10 +91,18 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
       <section
         ref={ref}
         aria-labelledby={headingId}
-        className={className}
+        className={cn(
+          showFrame && 'border-input-border border p-4 sm:p-5',
+          className
+        )}
         {...props}
       >
-        <div className="border-divider flex items-center justify-between gap-3 border-b pb-2">
+        <div
+          className={cn(
+            'border-divider flex items-center justify-between gap-3 border-b pb-2',
+            (showFrame || wrapHeading) && 'flex-wrap'
+          )}
+        >
           <Heading
             ref={headingRef}
             tabIndex={headingRef ? -1 : undefined}
@@ -112,7 +132,16 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
             )}
           </Heading>
           {trailing != null && (
-            <div className="flex shrink-0 items-center gap-2">{trailing}</div>
+            <div
+              className={cn(
+                'flex items-center gap-2',
+                showFrame || wrapHeading
+                  ? 'max-w-full min-w-0 flex-wrap'
+                  : 'shrink-0'
+              )}
+            >
+              {trailing}
+            </div>
           )}
         </div>
         <div
@@ -120,7 +149,9 @@ const SectionView = React.forwardRef<HTMLElement, SectionViewProps>(
           hidden={collapsed}
           className={cn(!collapsed && 'pt-4', contentClassName)}
         >
-          {!collapsed && children}
+          <SectionFramesProvider value={false}>
+            {!collapsed && children}
+          </SectionFramesProvider>
         </div>
       </section>
     );

@@ -37,7 +37,7 @@ sibling of `forms/`/`layout/`/etc.
 
 ## Dark mode
 
-Theme is `data-theme="dark"` on `<html>`, set pre-hydration from `localStorage`
+Dark palettes use `data-theme="dark"` or `data-theme="blue"` on `<html>`, set pre-hydration from `localStorage`
 key `rollkeeper-theme`, toggled via `useTheme`. **Always use semantic tokens**
 (`bg-surface`, `text-heading`, `border-divider`, and the role
 tokens `text-brass-text`, `bg-blood-fill`, …) — never raw Tailwind color classes. Full token list is in `AGENTS.md` (which `CLAUDE.md` imports).
@@ -48,7 +48,22 @@ proficiency), blood (harm, destructive), verdigris (healing, success), lapis
 hue-named `accent-*` tokens and `--gradient-*` variables are deprecated
 aliases that point at the nearest role until the Phase 3 sweeps remove them.
 `npm run design:contrast` checks every role and neutral pairing against WCAG
-AA in both themes.
+AA in all three palettes. The blue palette maps the primary/on-state
+`brass` role to blue and the magic `lapis` role to violet. Light, dark and
+blue are explicit persisted choices; system resolves to light or dark.
+
+## Character sheet presentation preferences
+
+`TabbedCharacterSheet` opts into `SectionFramesProvider` from `layout/section`.
+Only outer sections receive neutral rectangular frames; each Section resets
+the context for descendants. This intentional sheet exception does not change
+the unframed Section default elsewhere. `CharacterBasicInfo` gives its
+read-only `dd` values clear borders while retaining description-list semantics.
+
+`AbilitiesSection` reads `abilityLayout: 'classic' | '2024'` from `useUiPrefs`
+(default classic), independently of `abilityDisplay`. The 2024 presentation
+reuses `AbilityBlock`, `Medallion`, `SkillRow`, proficiency controls and all
+existing character calculations and handlers. It does not select a rules edition.
 
 ## Type scale
 

@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { Section } from './section';
+import { Section, SectionFramesProvider } from './section';
 
 describe('Section', () => {
   afterEach(cleanup);
@@ -58,6 +58,23 @@ describe('Section', () => {
 
     const section = screen.getByTestId('section');
     expect(section.className).not.toMatch(/\b(bg-|border|rounded|shadow)/);
+  });
+
+  it('opts into sheet frames without framing nested sections', () => {
+    render(
+      <SectionFramesProvider value={true}>
+        <Section heading="Combat">
+          <Section heading="Defenses" />
+        </Section>
+      </SectionFramesProvider>
+    );
+    expect(screen.getByRole('region', { name: 'Combat' })).toHaveClass(
+      'border',
+      'border-input-border'
+    );
+    expect(screen.getByRole('region', { name: 'Defenses' })).not.toHaveClass(
+      'border'
+    );
   });
 });
 

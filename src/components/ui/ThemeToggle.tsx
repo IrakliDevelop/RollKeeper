@@ -1,28 +1,29 @@
 'use client';
 
-import { Sun, Moon, Monitor } from 'lucide-react';
+import { Sun, Moon, Monitor, Palette } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
 import { useTheme, type Theme } from '@/hooks/useTheme';
 
 export interface ThemeToggleProps {
-  /** Show the 3-way toggle (light / system / dark) instead of simple toggle. */
+  /** Include system preference alongside light, dark and blue dark themes. */
   showSystemOption?: boolean;
   className?: string;
 }
 
-const SIMPLE_CYCLE: Theme[] = ['light', 'dark'];
-const SYSTEM_CYCLE: Theme[] = ['light', 'system', 'dark'];
+const SIMPLE_CYCLE: Theme[] = ['light', 'dark', 'blue'];
+const SYSTEM_CYCLE: Theme[] = ['light', 'system', 'dark', 'blue'];
 
 /** Names what a tap does: the theme it switches to. */
 const NEXT_THEME_LABEL: Record<Theme, string> = {
   light: 'Switch to light mode',
   dark: 'Switch to dark mode',
+  blue: 'Switch to blue dark mode',
   system: 'Use system theme',
 };
 
 /**
- * A compact theme toggle button. By default cycles light → system → dark → light.
- * When `showSystemOption` is true, cycles light → system → dark → light.
+ * A compact theme toggle button. By default cycles light → system → dark → blue dark → light.
+ * With `showSystemOption` false, skips the system option.
  */
 export function ThemeToggle({
   showSystemOption = true,
@@ -39,6 +40,8 @@ export function ThemeToggle({
   const icon =
     theme === 'system' ? (
       <Monitor size={18} />
+    ) : resolvedTheme === 'blue' ? (
+      <Palette size={18} />
     ) : resolvedTheme === 'dark' ? (
       <Moon size={18} />
     ) : (

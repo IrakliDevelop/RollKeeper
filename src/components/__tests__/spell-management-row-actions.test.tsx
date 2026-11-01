@@ -26,6 +26,29 @@ const spell: Spell = {
 };
 
 describe('SpellManagement row actions', () => {
+  it('keeps always-prepared spells highlighted and labelled in both densities', () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify([]), {
+        headers: { 'Content-Type': 'application/json' },
+      })
+    );
+    useCharacterStore.setState({
+      character: makeWizard({
+        spells: [{ ...spell, isPrepared: false, isAlwaysPrepared: true }],
+      }),
+    });
+    render(<SpellManagement />);
+    for (const detailed of [false, true]) {
+      if (detailed)
+        fireEvent.click(screen.getByTitle('Switch to detailed view'));
+      const row = screen.getByText('Shield').closest('[data-prepared]');
+      expect(row).toHaveClass('border-brass-border', 'bg-brass-bg');
+      const prepared = screen.getByRole('button', { name: 'Always prepared' });
+      expect(prepared).toBeDisabled();
+      expect(prepared).toHaveAttribute('aria-pressed', 'true');
+    }
+  });
   it('moves spells in edit mode and preserves their level order after remount', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
@@ -108,15 +131,29 @@ describe('SpellManagement row actions', () => {
     render(<SpellManagement />);
 
     const favorite = screen.getByRole('button', { name: 'Favorite' });
+    const row = screen.getByText('Shield').closest('[data-prepared]');
+    expect(row).toHaveAttribute('data-prepared', 'false');
     expect(favorite).toHaveAttribute('aria-pressed', 'false');
     expect(favorite).toHaveClass('pointer-coarse:min-h-11');
     fireEvent.click(favorite);
     expect(favorite).toHaveAttribute('aria-pressed', 'true');
+    expect(row).not.toHaveClass('bg-brass-bg');
 
     fireEvent.click(screen.getByRole('button', { name: 'Prepare' }));
     expect(
       screen.getByRole('button', { name: 'Prepared' })
     ).toBeInTheDocument();
+    expect(row).toHaveClass('border-brass-border', 'bg-brass-bg');
+    expect(screen.getByRole('button', { name: 'Prepared' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    fireEvent.click(screen.getByTitle('Switch to detailed view'));
+    const detailed = screen.getByText('Shield').closest('[data-prepared]');
+    expect(detailed).toHaveClass('border-brass-border', 'bg-brass-bg');
+    fireEvent.click(screen.getByRole('button', { name: 'Prepared' }));
+    expect(detailed).not.toHaveClass('bg-brass-bg');
+    fireEvent.click(screen.getByTitle('Switch to compact view'));
     expect(screen.getByTitle('Cast spell')).toHaveAttribute(
       'data-variant',
       'secondary'

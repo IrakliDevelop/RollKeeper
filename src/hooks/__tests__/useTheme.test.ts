@@ -55,6 +55,22 @@ describe('useThemeInit', () => {
     vi.restoreAllMocks();
   });
 
+  it('persists blue, restores it on remount and ignores OS changes', async () => {
+    const mql = mockMatchMedia(false);
+    const { useThemeInit } = await import('@/hooks/useTheme');
+    const view = renderHook(() => useThemeInit());
+    act(() => view.result.current.setTheme('blue'));
+    expect(view.result.current.theme).toBe('blue');
+    expect(view.result.current.resolvedTheme).toBe('blue');
+    expect(localStorage.getItem(STORAGE_KEY)).toBe('blue');
+    act(() => mql._fireChange(true));
+    expect(document.documentElement.getAttribute('data-theme')).toBe('blue');
+    view.unmount();
+    const restored = renderHook(() => useThemeInit());
+    expect(restored.result.current.theme).toBe('blue');
+    expect(restored.result.current.resolvedTheme).toBe('blue');
+  });
+
   it('defaults to system theme when nothing is stored in localStorage', async () => {
     const { useThemeInit } = await import('@/hooks/useTheme');
 
