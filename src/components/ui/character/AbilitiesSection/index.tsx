@@ -1,9 +1,11 @@
 'use client';
 
+import { SelectField, SelectItem } from '@/components/ui/forms/select';
 import { Switch } from '@/components/ui/forms/switch';
 import { Section } from '@/components/ui/layout/section';
 import { useUiPrefs } from '@/hooks/useUiPrefs';
 import { cn } from '@/utils/cn';
+import { Abilities2014Layout } from './Abilities2014Layout';
 import { AbilityBlock } from './AbilityBlock';
 import { SkillRow } from './SkillRow';
 import {
@@ -26,24 +28,25 @@ export type { AbilitiesSectionProps } from './AbilitiesSection.types';
  * "Scores large" switch. Edit mode adds the Jack of All Trades switch at
  * the foot.
  */
-export function AbilitiesSection({
-  abilities,
-  savingThrows,
-  skills,
-  jackOfAllTrades,
-  getSavingThrowModifier,
-  getSkillModifier,
-  onUpdateAbilityScore,
-  onRollAbilityCheck,
-  onUpdateSavingThrowProficiency,
-  onRollSavingThrow,
-  onUpdateSkillProficiency,
-  onUpdateSkillExpertise,
-  onToggleJackOfAllTrades,
-  onRollSkillCheck,
-  onToggleSkillBonusAbility,
-  editing = true,
-}: AbilitiesSectionProps) {
+export function AbilitiesSection(props: AbilitiesSectionProps) {
+  const {
+    abilities,
+    savingThrows,
+    skills,
+    jackOfAllTrades,
+    getSavingThrowModifier,
+    getSkillModifier,
+    onUpdateAbilityScore,
+    onRollAbilityCheck,
+    onUpdateSavingThrowProficiency,
+    onRollSavingThrow,
+    onUpdateSkillProficiency,
+    onUpdateSkillExpertise,
+    onToggleJackOfAllTrades,
+    onRollSkillCheck,
+    onToggleSkillBonusAbility,
+    editing = true,
+  } = props;
   const { prefs, setPref, localChange } = useUiPrefs();
   const handleDotTap = (skill: SkillName, level: ProficiencyLevel) =>
     applySkillDotTap(skill, level, {
@@ -57,15 +60,20 @@ export function AbilitiesSection({
       level={2}
       wrapHeading
       trailing={
-        <div className="flex flex-wrap gap-x-5 gap-y-3">
-          <Switch
-            label="2024 sheet layout"
-            size="sm"
-            checked={prefs.abilityLayout === '2024'}
-            onCheckedChange={on =>
-              setPref('abilityLayout', on ? '2024' : 'classic')
-            }
-          />
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-3">
+          <SelectField
+            label="Layout"
+            value={prefs.abilityLayout}
+            onValueChange={value => {
+              if (value === 'classic' || value === '2014' || value === '2024')
+                setPref('abilityLayout', value);
+            }}
+            wrapperClassName="w-40"
+          >
+            <SelectItem value="classic">Compact</SelectItem>
+            <SelectItem value="2014">2014 sheet</SelectItem>
+            <SelectItem value="2024">2024 sheet</SelectItem>
+          </SelectField>
           <Switch
             label="Scores large"
             size="sm"
@@ -77,64 +85,74 @@ export function AbilitiesSection({
         </div>
       }
     >
-      <div
-        data-ability-layout={prefs.abilityLayout}
-        className={cn(
-          'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
-          prefs.abilityLayout === '2024' ? 'gap-4' : 'gap-x-6 gap-y-8'
-        )}
-      >
-        {ABILITY_ORDER.map(ability => {
-          const abilitySkills = SKILLS_BY_ABILITY[ability];
-          return (
-            <AbilityBlock
-              key={ability}
-              ability={ability}
-              score={abilities[ability]}
-              save={getSavingThrowModifier(ability)}
-              saveProficient={savingThrows[ability]?.proficient ?? false}
-              abilityDisplay={prefs.abilityDisplay}
-              layout={prefs.abilityLayout}
-              animateSwap={localChange}
-              editing={editing}
-              onScoreChange={onUpdateAbilityScore}
-              onToggleSaveProficiency={onUpdateSavingThrowProficiency}
-              onRollCheck={onRollAbilityCheck}
-              onRollSave={onRollSavingThrow}
-            >
-              {abilitySkills.length > 0 ? (
-                <ul
-                  className={cn(
-                    prefs.abilityLayout === '2024'
-                      ? 'divide-divider divide-y px-3 py-1'
-                      : 'mt-4'
-                  )}
-                >
-                  {abilitySkills.map(skill => (
-                    <SkillRow
-                      key={skill}
-                      skill={skill}
-                      ability={ability}
-                      level={skillLevel(skills[skill], jackOfAllTrades)}
-                      bonus={getSkillModifier(skill)}
-                      bonusAbilities={skills[skill]?.bonusAbilities ?? NONE}
-                      editing={editing}
-                      layout={prefs.abilityLayout}
-                      onRoll={onRollSkillCheck}
-                      onDotTap={handleDotTap}
-                      onToggleBonusAbility={onToggleSkillBonusAbility}
-                    />
-                  ))}
-                </ul>
-              ) : (
-                prefs.abilityLayout === 'classic' && (
-                  <p className="type-small text-muted mt-4">No skills</p>
-                )
-              )}
-            </AbilityBlock>
-          );
-        })}
-      </div>
+      {prefs.abilityLayout === '2014' ? (
+        <Abilities2014Layout
+          {...props}
+          editing={editing}
+          abilityDisplay={prefs.abilityDisplay}
+          animateSwap={localChange}
+          onDotTap={handleDotTap}
+        />
+      ) : (
+        <div
+          data-ability-layout={prefs.abilityLayout}
+          className={cn(
+            'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+            prefs.abilityLayout === '2024' ? 'gap-4' : 'gap-x-6 gap-y-8'
+          )}
+        >
+          {ABILITY_ORDER.map(ability => {
+            const abilitySkills = SKILLS_BY_ABILITY[ability];
+            return (
+              <AbilityBlock
+                key={ability}
+                ability={ability}
+                score={abilities[ability]}
+                save={getSavingThrowModifier(ability)}
+                saveProficient={savingThrows[ability]?.proficient ?? false}
+                abilityDisplay={prefs.abilityDisplay}
+                layout={prefs.abilityLayout}
+                animateSwap={localChange}
+                editing={editing}
+                onScoreChange={onUpdateAbilityScore}
+                onToggleSaveProficiency={onUpdateSavingThrowProficiency}
+                onRollCheck={onRollAbilityCheck}
+                onRollSave={onRollSavingThrow}
+              >
+                {abilitySkills.length > 0 ? (
+                  <ul
+                    className={cn(
+                      prefs.abilityLayout === '2024'
+                        ? 'divide-divider divide-y px-3 py-1'
+                        : 'mt-4'
+                    )}
+                  >
+                    {abilitySkills.map(skill => (
+                      <SkillRow
+                        key={skill}
+                        skill={skill}
+                        ability={ability}
+                        level={skillLevel(skills[skill], jackOfAllTrades)}
+                        bonus={getSkillModifier(skill)}
+                        bonusAbilities={skills[skill]?.bonusAbilities ?? NONE}
+                        editing={editing}
+                        layout={prefs.abilityLayout}
+                        onRoll={onRollSkillCheck}
+                        onDotTap={handleDotTap}
+                        onToggleBonusAbility={onToggleSkillBonusAbility}
+                      />
+                    ))}
+                  </ul>
+                ) : (
+                  prefs.abilityLayout === 'classic' && (
+                    <p className="type-small text-muted mt-4">No skills</p>
+                  )
+                )}
+              </AbilityBlock>
+            );
+          })}
+        </div>
+      )}
       {editing && (
         <Switch
           wrapperClassName="mt-6"

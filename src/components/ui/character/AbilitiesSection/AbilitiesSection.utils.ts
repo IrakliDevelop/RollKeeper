@@ -20,14 +20,19 @@ export const ABILITY_ORDER: AbilityName[] = [
   'charisma',
 ];
 
+/** One alphabetical list, independent of the declaration order of the labels. */
+export const ALPHABETICAL_SKILLS = (
+  Object.keys(SKILL_NAMES) as SkillName[]
+).sort((first, second) =>
+  SKILL_NAMES[first].localeCompare(SKILL_NAMES[second], 'en')
+);
+
 /** Each ability's skills, in the sheet's (alphabetical) skill order. */
 export const SKILLS_BY_ABILITY: Record<AbilityName, SkillName[]> =
   Object.fromEntries(
     ABILITY_ORDER.map(ability => [
       ability,
-      (Object.keys(SKILL_NAMES) as SkillName[]).filter(
-        skill => SKILL_ABILITY_MAP[skill] === ability
-      ),
+      ALPHABETICAL_SKILLS.filter(skill => SKILL_ABILITY_MAP[skill] === ability),
     ])
   ) as Record<AbilityName, SkillName[]>;
 

@@ -2,17 +2,10 @@
 
 import type { ReactNode } from 'react';
 import { Medallion } from '@/components/ui/game/Medallion';
-import {
-  ProficiencyDot,
-  ProficiencyDotButton,
-  saveDotLabel,
-} from '@/components/ui/game/ProficiencyDot';
-import {
-  ROLL_TARGET,
-  saveRollLabel,
-} from '@/components/ui/game/LedgerCellView';
+import { ROLL_TARGET } from '@/components/ui/game/LedgerCellView';
+import { SavingThrowRow } from './SavingThrowRow';
 import type { AbilityDisplay } from '@/components/ui/game/abilityNumbers';
-import { calculateModifier, formatModifier } from '@/utils/calculations';
+import { calculateModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
 import { ABILITY_NAMES } from '@/utils/constants';
 import type { AbilityName } from '@/types/character';
@@ -36,8 +29,6 @@ export interface AbilityBlockProps {
   children: ReactNode;
 }
 
-const SAVE_LINE = 'type-small text-body inline-flex items-center gap-1';
-
 /**
  * One ability: the medallion, the name over the save line, then its
  * skills. Play mode: the name rolls the check and the save line the save.
@@ -60,10 +51,6 @@ export function AbilityBlock({
   children,
 }: AbilityBlockProps) {
   const name = ABILITY_NAMES[ability];
-  const saveText = `Save ${formatModifier(save)}`;
-  const dot = (
-    <ProficiencyDot level={saveProficient ? 'proficient' : 'none'} decorative />
-  );
 
   const sheetLayout = layout === '2024';
   const heading = (
@@ -97,28 +84,15 @@ export function AbilityBlock({
       onScoreChange={next => onScoreChange(ability, next)}
     />
   );
-  const saveLine = editing ? (
-    <div className={SAVE_LINE}>
-      <ProficiencyDotButton
-        level={saveProficient ? 'proficient' : 'none'}
-        pressed={saveProficient}
-        aria-label={saveDotLabel(name)}
-        onClick={() => onToggleSaveProficiency(ability, !saveProficient)}
-      />
-      <span>{saveText}</span>
-    </div>
-  ) : (
-    <button
-      type="button"
-      onClick={() => onRollSave(ability)}
-      className={cn(SAVE_LINE, ROLL_TARGET)}
-    >
-      {dot}
-      <span aria-hidden="true">{saveText}</span>
-      <span className="sr-only">
-        {saveRollLabel(ability, save, saveProficient)}
-      </span>
-    </button>
+  const saveLine = (
+    <SavingThrowRow
+      ability={ability}
+      save={save}
+      proficient={saveProficient}
+      editing={editing}
+      onToggleProficiency={onToggleSaveProficiency}
+      onRoll={onRollSave}
+    />
   );
 
   return (

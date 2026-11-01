@@ -17,6 +17,11 @@ import { AbilitiesSection } from '.';
 
 /** The sizes a story picks with `globals: PHONE`, `IPAD_PORTRAIT`, `IPAD_LANDSCAPE` or `DESKTOP`. */
 const VIEWPORTS = {
+  narrowPhone: {
+    name: 'Narrow phone',
+    styles: { width: '320px', height: '800px' },
+    type: 'mobile',
+  },
   phone: {
     name: 'Phone',
     styles: { width: '390px', height: '844px' },
@@ -219,7 +224,7 @@ async function expectHeadingRowOnOneLine(canvasElement: HTMLElement) {
   for (const element of [
     heading,
     control,
-    canvas.getByRole('switch', { name: '2024 sheet layout' }),
+    canvas.getByRole('combobox', { name: 'Layout' }),
   ]) {
     const box = element.getBoundingClientRect();
     await expect(box.left).toBeGreaterThanOrEqual(section.left);
@@ -315,11 +320,22 @@ const framed: NonNullable<Story['decorators']> = [
   ),
 ];
 
-async function use2024Layout(canvasElement: HTMLElement) {
-  const canvas = within(canvasElement);
+async function selectLayout(
+  canvasElement: HTMLElement,
+  name: 'Compact' | '2014 sheet' | '2024 sheet'
+) {
   await userEvent.click(
-    canvas.getByRole('switch', { name: '2024 sheet layout' })
+    within(canvasElement).getByRole('combobox', { name: 'Layout' })
   );
+  await userEvent.click(
+    within(canvasElement.ownerDocument.body).getByRole('option', {
+      name,
+    })
+  );
+}
+
+async function use2024Layout(canvasElement: HTMLElement) {
+  await selectLayout(canvasElement, '2024 sheet');
   await expect(
     canvasElement.querySelector('[data-ability-layout]')
   ).toHaveAttribute('data-ability-layout', '2024');
@@ -388,6 +404,101 @@ export const Sheet2024EditBlue: Story = {
     } finally {
       restore();
     }
+  },
+};
+
+async function use2014Layout(canvasElement: HTMLElement) {
+  await selectLayout(canvasElement, '2014 sheet');
+  const canvas = within(canvasElement);
+  await expect(
+    canvasElement.querySelector('[data-ability-layout]')
+  ).toHaveAttribute('data-ability-layout', '2014');
+  for (const name of ['Ability scores', 'Saving throws', 'Skills']) {
+    await expect(canvas.getByRole('heading', { level: 3, name })).toBeVisible();
+  }
+  await expect(
+    canvasElement.querySelectorAll('[data-ability-score]')
+  ).toHaveLength(6);
+  await expect(
+    canvasElement.querySelectorAll('[data-saving-throw]')
+  ).toHaveLength(6);
+  const rows = Array.from(
+    canvasElement.querySelectorAll<HTMLElement>('[data-skill]')
+  );
+  await expect(rows).toHaveLength(18);
+  const first = rows[0].getBoundingClientRect();
+  for (const row of rows) {
+    const box = row.getBoundingClientRect();
+    await expect(Math.round(box.left)).toBe(Math.round(first.left));
+    await expect(row.scrollWidth).toBeLessThanOrEqual(row.clientWidth);
+  }
+  await expect(rows[0]).toHaveTextContent('Acrobatics (Dex)');
+  await expect(rows[17]).toHaveTextContent('Survival (Wis)');
+  await expectHeadingRowOnOneLine(canvasElement);
+  await expectNoSidewaysScroll(canvasElement);
+}
+
+export const Sheet2014: Story = {
+  decorators: framed,
+  play: async ({ canvasElement }) => {
+    await use2014Layout(canvasElement);
+    const canvas = within(canvasElement);
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Roll Dexterity Save +6, proficient' })
+    );
+    await expect(onRollSavingThrow).toHaveBeenCalledWith('dexterity');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Roll Stealth (Dex) check' })
+    );
+    await expect(onRollSkillCheck).toHaveBeenCalledWith('stealth');
+    await userEvent.click(canvas.getByRole('switch', { name: 'Scores large' }));
+    await expect(
+      canvasElement.querySelector(
+        '[data-ability-score="strength"] [data-medallion]'
+      )
+    ).toHaveAttribute('data-display', 'score');
+  },
+};
+export const Sheet2014Dark: Story = { ...Sheet2014, globals: DARK };
+export const Sheet2014Blue: Story = {
+  ...Sheet2014,
+  globals: { theme: 'blue' },
+};
+export const Sheet2014Phone: Story = {
+  decorators: framed,
+  globals: PHONE,
+  play: async ({ canvasElement }) => use2014Layout(canvasElement),
+};
+export const Sheet2014EditPortrait: Story = {
+  decorators: framed,
+  args: { editing: true },
+  globals: IPAD_PORTRAIT,
+  play: async ({ canvasElement }) => {
+    await use2014Layout(canvasElement);
+    const restore = emulateCoarsePointer();
+    try {
+      await expectTargets(canvasElement, 44);
+      const canvas = within(canvasElement);
+      const dot = canvas.getByRole('button', {
+        name: 'Stealth: expertise. Remove proficiency.',
+      });
+      await userEvent.click(dot);
+      await expect(dot).toHaveAttribute('data-level', 'half');
+      const row = canvasElement.querySelector<HTMLElement>(
+        '[data-skill="sleightOfHand"]'
+      )!;
+      await expect(within(row).getByText('+WIS')).toBeVisible();
+      await expect(within(row).getByText('+INT')).toBeVisible();
+    } finally {
+      restore();
+    }
+  },
+};
+export const Sheet2014EditPhoneBlue: Story = {
+  ...Sheet2014EditPortrait,
+  globals: {
+    theme: 'blue',
+    viewport: { value: 'narrowPhone', isRotated: false },
   },
 };
 
@@ -558,6 +669,7 @@ async function expectTargets(
   const canvas = within(canvasElement);
   const controls = canvas
     .getAllByRole('button')
+    .concat(canvas.getAllByRole('combobox'))
     .concat(switches ? canvas.getAllByRole('switch') : []);
   for (const control of controls) {
     const box = hitBox(control);

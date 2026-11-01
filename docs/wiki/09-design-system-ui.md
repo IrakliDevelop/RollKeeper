@@ -52,6 +52,23 @@ AA in all three palettes. The blue palette maps the primary/on-state
 `brass` role to blue and the magic `lapis` role to violet. Light, dark and
 blue are explicit persisted choices; system resolves to light or dark.
 
+Production builds disable Turbopack's persistent build compiler cache; the
+separate development cache remains enabled. `npm run build` also runs
+`scripts/verify-theme-css.mjs` after compilation. It follows the stylesheet
+links in the emitted app appearance HTML and checks representative light,
+dark and blue palette values. Correct orphaned CSS cannot satisfy the check.
+A failure stops the build: discard that build output, rebuild without restoring
+`.next/cache`, and rerun the verifier before deploying. Update the verifier's
+expected values when intentionally changing those palette tokens.
+
+This guards an observed deployment that offered Blue dark while its referenced
+stylesheet lacked the blue palette. A local warm rebuild regenerated the
+correct stylesheet, so persistent build cache reuse remains a suspected cause,
+not a reproduced one. A long-running local development server also served an
+older stylesheet until restarted; when the selected theme and colors disagree,
+inspect the emitted CSS and restart the development server before changing
+stored preferences.
+
 ## App and character appearance
 
 `/player/appearance` selects the app default. A character can override it at
@@ -77,10 +94,12 @@ the context for descendants. This intentional sheet exception does not change
 the unframed Section default elsewhere. `CharacterBasicInfo` gives its
 read-only `dd` values clear borders while retaining description-list semantics.
 
-`AbilitiesSection` reads `abilityLayout: 'classic' | '2024'` from `useUiPrefs`
-(default classic), independently of `abilityDisplay`. The 2024 presentation
-reuses `AbilityBlock`, `Medallion`, `SkillRow`, proficiency controls and all
-existing character calculations and handlers. It does not select a rules edition.
+`AbilitiesSection` reads `abilityLayout: 'classic' | '2014' | '2024'` from `useUiPrefs`
+(default classic), independently of `abilityDisplay`. The Layout selector labels
+these Compact, 2014 sheet and 2024 sheet. The 2014 presentation separates ability scores, saving throws and one alphabetical skill
+list; it reuses the same medallions, proficiency controls and computed bonuses.
+The 2024 presentation reuses `AbilityBlock`, `Medallion`, `SkillRow`,
+proficiency controls and all existing character calculations and handlers. It does not select a rules edition.
 
 ## Type scale
 

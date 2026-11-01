@@ -10,7 +10,11 @@ import {
 import { ROLL_TARGET } from '@/components/ui/game/LedgerCellView';
 import { formatModifier } from '@/utils/calculations';
 import { cn } from '@/utils/cn';
-import { ABILITY_ABBREVIATIONS, SKILL_NAMES } from '@/utils/constants';
+import {
+  ABILITY_ABBREVIATIONS,
+  ABILITY_NAMES,
+  SKILL_NAMES,
+} from '@/utils/constants';
 import type { AbilityName, SkillName } from '@/types/character';
 import { BonusAbilityPicker } from './BonusAbilityPicker';
 import type { UiPrefs } from '@/hooks/useUiPrefs';
@@ -48,6 +52,11 @@ export function SkillRow({
   onToggleBonusAbility,
 }: SkillRowProps) {
   const name = SKILL_NAMES[skill];
+  const displayName =
+    layout === '2014'
+      ? `${name} (${ABILITY_NAMES[ability].slice(0, 3)})`
+      : name;
+  const bonusFirst = layout !== 'classic';
   const bonusValue = (
     <span className="type-ui text-heading w-8 shrink-0 text-right tabular-nums">
       {formatModifier(bonus)}
@@ -67,10 +76,10 @@ export function SkillRow({
       ) : (
         <ProficiencyDot level={level} />
       )}
-      {layout === '2024' && bonusValue}
+      {bonusFirst && bonusValue}
       {editing ? (
         <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="type-ui text-body">{name}</span>
+          <span className="type-ui text-body">{displayName}</span>
           {bonusAbilities.map(bonusAbility => (
             <Badge key={bonusAbility} variant="neutral" size="sm">
               +{ABILITY_ABBREVIATIONS[bonusAbility]}
@@ -80,14 +89,14 @@ export function SkillRow({
       ) : (
         <button
           type="button"
-          aria-label={`Roll ${name} check`}
+          aria-label={`Roll ${displayName} check`}
           onClick={() => onRoll(skill)}
           className={cn(
             'type-ui text-body min-w-0 flex-1 text-left',
             ROLL_TARGET
           )}
         >
-          {name}
+          {displayName}
         </button>
       )}
       {editing && onToggleBonusAbility && (
@@ -98,7 +107,7 @@ export function SkillRow({
           onToggle={onToggleBonusAbility}
         />
       )}
-      {layout === 'classic' && bonusValue}
+      {!bonusFirst && bonusValue}
     </li>
   );
 }

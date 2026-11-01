@@ -40,6 +40,59 @@ describe('useCharacterRosterSync', () => {
     });
   });
 
+  it.each([false, true])(
+    'finishes initial loading after StrictMode effect replay (already loaded: %s)',
+    alreadyLoaded => {
+      const character = makeCharacter({ id: 'char-1', revision: 5 });
+      const loadCharacterState = vi.fn();
+      const props = makeProps({
+        playerCharacter: { characterData: character },
+        character: alreadyLoaded
+          ? character
+          : makeCharacter({ id: 'unloaded' }),
+        loadCharacterState,
+      });
+      const { result, unmount } = renderHook(p => useCharacterRosterSync(p), {
+        initialProps: props,
+        reactStrictMode: true,
+      });
+      expect(result.current.isInitialLoad).toBe(true);
+      act(() => vi.advanceTimersByTime(50));
+      expect(result.current.isInitialLoad).toBe(false);
+      expect(loadCharacterState).toHaveBeenCalledTimes(alreadyLoaded ? 0 : 1);
+      unmount();
+      expect(vi.getTimerCount()).toBe(0);
+    }
+  );
+
+  it('restarts the guard for a different character and clears it on unmount', () => {
+    const props = makeProps();
+    const { result, rerender, unmount } = renderHook(
+      p => useCharacterRosterSync(p),
+      { initialProps: props }
+    );
+    act(() => vi.advanceTimersByTime(30));
+    const second = makeCharacter({ id: 'char-2' });
+    rerender({
+      ...props,
+      characterId: second.id,
+      playerCharacter: { characterData: second },
+    });
+    act(() => vi.advanceTimersByTime(20));
+    expect(result.current.isInitialLoad).toBe(true);
+    act(() => vi.advanceTimersByTime(30));
+    expect(result.current.isInitialLoad).toBe(false);
+    expect(props.loadCharacterState).toHaveBeenCalledTimes(2);
+    rerender({
+      ...props,
+      characterId: 'char-3',
+      playerCharacter: { characterData: makeCharacter({ id: 'char-3' }) },
+    });
+    expect(vi.getTimerCount()).toBe(1);
+    unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
   it('loads the roster character into the store exactly once per characterId', () => {
     const rosterData = makeCharacter({ id: 'char-1' });
     const loadCharacterState = vi.fn();
