@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { createRoll } from 'pollyroll';
+import { createRoll, type RollEvent } from 'pollyroll';
 import { useDiceTray } from 'pollyroll/react';
 import { formatRoll } from 'pollyroll/format';
 import { diceClacks } from 'pollyroll/sounds';
@@ -26,16 +26,14 @@ const ROLLS = [
 
 function Scene({
   value,
-  notation,
+  event,
   animate,
   onResult,
-  rollToken,
 }: {
   value: CharacterDiceSet;
-  notation: string;
+  event: RollEvent;
   animate: boolean;
   onResult: (text: string) => void;
-  rollToken: number;
 }) {
   const target = useRef<HTMLDivElement>(null);
   const tray = useDiceTray(target, {
@@ -53,7 +51,6 @@ function Scene({
   useEffect(() => {
     if (!tray) return;
     let active = true;
-    const event = createRoll(notation, { skin: value.skin });
     tray
       .playRoll(event)
       .then(summary => {
@@ -66,7 +63,7 @@ function Scene({
     return () => {
       active = false;
     };
-  }, [tray, notation, value.skin, value.dieScale, rollToken, onResult]);
+  }, [tray, event, value.dieScale, onResult]);
   return (
     <>
       <div
@@ -88,7 +85,13 @@ export function DicePreview({ value }: { value: CharacterDiceSet }) {
   const [notation, setNotation] = useState<string>(ROLLS[0][0]);
   const [result, setResult] = useState('');
   const [busy, setBusy] = useState(false);
-  const [request, setRequest] = useState({ key: '', count: 0 });
+  // A roll belongs to the user's request, not to a tray effect. Appearance
+  // updates and autosave renders must not generate another set of outcomes.
+  // Leave the event's skin unset so the tray can restyle the same dice live.
+  const [request, setRequest] = useState(() => ({
+    key: '',
+    event: createRoll(ROLLS[0][0]),
+  }));
   const key = JSON.stringify(value);
   const animate = request.key === key;
   const sceneKey = `${JSON.stringify({ ...value.options, sound: undefined })}:${animate}`;
@@ -101,9 +104,8 @@ export function DicePreview({ value }: { value: CharacterDiceSet }) {
       <Scene
         key={sceneKey}
         value={value}
-        notation={notation}
+        event={request.event}
         animate={animate}
-        rollToken={request.count}
         onResult={handleResult}
       />
       <div className="flex flex-wrap items-end gap-3">
@@ -111,7 +113,12 @@ export function DicePreview({ value }: { value: CharacterDiceSet }) {
           <SelectField
             label="Preview dice"
             value={notation}
-            onValueChange={setNotation}
+            onValueChange={next => {
+              setNotation(next);
+              setResult('');
+              setBusy(false);
+              setRequest({ key: '', event: createRoll(next) });
+            }}
           >
             {ROLLS.map(([roll, label]) => (
               <SelectItem key={roll} value={roll}>
@@ -125,7 +132,8 @@ export function DicePreview({ value }: { value: CharacterDiceSet }) {
           disabled={busy}
           onClick={() => {
             setBusy(true);
-            setRequest(current => ({ key, count: current.count + 1 }));
+            setResult('');
+            setRequest({ key, event: createRoll(notation) });
           }}
         >
           {busy ? 'Rolling…' : 'Roll preview'}
