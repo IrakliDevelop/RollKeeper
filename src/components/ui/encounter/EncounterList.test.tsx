@@ -12,6 +12,7 @@ const encounter: Encounter = {
   name: 'Goblin ambush',
   campaignCode: 'SYNTH1',
   entities: [],
+  sortOrder: 'initiative',
   isActive: false,
   round: 0,
   currentTurn: 0,

@@ -276,7 +276,7 @@ export function CombatConfigDialog({
                         className="border-divider flex flex-wrap items-end gap-2 border-b pb-2"
                       >
                         <NumberInput
-                          label={`${band.label || `Band ${index + 1}`} threshold`}
+                          label={`${band.label || `Band ${index + 1}`} threshold (%)`}
                           value={band.minPercent}
                           onChange={v =>
                             setBands(prev =>
@@ -304,7 +304,11 @@ export function CombatConfigDialog({
                           size="sm"
                           onClick={() => handleRemoveBand(index)}
                           type="button"
-                          aria-label={`Remove ${band.label || `band ${index + 1}`} band`}
+                          aria-label={
+                            band.label
+                              ? `Remove ${band.label} band`
+                              : `Remove band ${index + 1}`
+                          }
                         >
                           <Trash2 size={14} className="text-muted" />
                         </Button>
