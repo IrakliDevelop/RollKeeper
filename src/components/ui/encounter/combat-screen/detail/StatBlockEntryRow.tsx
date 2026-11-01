@@ -1,6 +1,9 @@
 'use client';
 
 import React from 'react';
+import { Button } from '@/components/ui/forms/button';
+import { Badge } from '@/components/ui/layout/badge';
+import { CLASS_RESOURCE_STYLE } from '@/components/ui/character/classResourceStyles';
 import {
   formatUsesLabel,
   parseRechargeFromName,
@@ -12,11 +15,6 @@ import type {
   StatBlockEntry,
   NPCInventoryItem,
 } from '@/types/encounter';
-
-const USE_BUTTON_ENABLED =
-  'border-accent-amber-border bg-accent-amber-bg text-accent-amber-text hover:bg-accent-amber-bg-strong rounded-md border px-2.5 py-0.5 text-xs font-medium transition-colors';
-const USE_BUTTON_DISABLED =
-  'border-divider bg-surface-raised text-faint cursor-not-allowed rounded-md border px-2.5 py-0.5 text-xs font-medium';
 
 export interface StatBlockEntryRowProps {
   entry: StatBlockEntry;
@@ -83,6 +81,13 @@ export function StatBlockEntryRow({
   const max = trackable ? (ability.maxUses ?? 1) : 0;
   const used = trackable ? ability.usedUses : 0;
   const useBlocked = costInsufficient || inventoryInsufficient;
+  const blockedReason = costInsufficient
+    ? resource
+      ? `Not enough ${resource.name} uses`
+      : 'Resource removed'
+    : inventoryInsufficient
+      ? `Not enough ${inventoryItem?.name ?? 'items'}`
+      : null;
 
   return (
     <div className="text-sm">
@@ -93,25 +98,25 @@ export function StatBlockEntryRow({
           {usesLabel ? ` (${usesLabel})` : ''}
         </span>
         {costLabel && (
-          <span className="bg-accent-purple-bg text-accent-purple-text rounded px-1.5 py-0.5 text-[10px] font-semibold">
+          <Badge variant="neutral" size="sm">
             {costLabel}
-          </span>
+          </Badge>
         )}
         {inventoryCost && (
-          <span className="bg-accent-amber-bg text-accent-amber-text rounded px-1.5 py-0.5 text-[10px] font-semibold">
+          <Badge variant="neutral" size="sm">
             {inventoryCost.quantity > 1 ? `${inventoryCost.quantity}× ` : ''}
             {inventoryItem?.name ?? 'Missing item'} ·{' '}
             {inventoryItem?.quantity ?? 0}
-          </span>
+          </Badge>
         )}
         {trackable && (
-          <span className="inline-flex items-center gap-1">
+          <span className="inline-flex flex-wrap items-center gap-1">
             {Array.from({ length: max }).map((_, i) => {
               const isUsed = i < used;
-              const pipClass = `h-3.5 w-3.5 rounded-full border-2 transition-colors ${
+              const pipClass = `size-2.5 rounded-full border-[1.5px] ${
                 isUsed
-                  ? 'border-accent-red-border bg-accent-red-bg'
-                  : 'border-accent-emerald-border bg-accent-emerald-bg'
+                  ? CLASS_RESOURCE_STYLE.pipOff
+                  : CLASS_RESOURCE_STYLE.pipOn
               }`;
               if (readOnly) {
                 return (
@@ -125,6 +130,8 @@ export function StatBlockEntryRow({
               return (
                 <button
                   key={i}
+                  type="button"
+                  data-state={isUsed ? 'used' : 'available'}
                   onClick={() =>
                     isUsed
                       ? onRestoreAbility?.(entry)
@@ -145,27 +152,32 @@ export function StatBlockEntryRow({
                           ? `Use — spends ${cost.amount} ${resource.name}`
                           : 'Use'
                   }
-                  className={`${pipClass} ${!isUsed && useBlocked ? 'cursor-not-allowed opacity-50' : ''}`}
-                />
+                  className="focus-visible:outline-ring flex min-h-6 min-w-6 items-center justify-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 disabled:opacity-50 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
+                >
+                  <span aria-hidden="true" className={pipClass} />
+                </button>
               );
             })}
           </span>
         )}
         {!trackable && (cost || inventoryCost) && !readOnly && onSpendCost && (
-          <button
+          <Button
+            variant="secondary"
+            size="xs"
             onClick={() => onSpendCost(entry)}
             disabled={useBlocked}
-            title={
-              !resource
-                ? 'Resource removed'
-                : costInsufficient
-                  ? `Not enough ${resource.name} uses`
-                  : `Spend ${cost.amount} ${resource.name}`
-            }
-            className={useBlocked ? USE_BUTTON_DISABLED : USE_BUTTON_ENABLED}
+            aria-label={`Use ${displayName}`}
           >
             Use
-          </button>
+          </Button>
+        )}
+        {useBlocked && blockedReason && !readOnly && (
+          <span className="text-muted text-xs">{blockedReason}</span>
+        )}
+        {cost && resource && used > 0 && !readOnly && (
+          <span className="text-muted text-xs">
+            Restoring a use does not refund {resource.name}.
+          </span>
         )}
       </div>
       {/* Line 2: description — always its own block */}

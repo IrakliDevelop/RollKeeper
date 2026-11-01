@@ -107,7 +107,7 @@ describe('MonsterStatBlockPanel — resource costs', () => {
       />
     );
     expect(screen.getByText('Channel Divinity')).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Use' }));
+    await user.click(screen.getByRole('button', { name: 'Use Turn Undead' }));
     expect(onUseEntry).toHaveBeenCalledWith(
       expect.objectContaining({ name: 'Turn Undead' })
     );
@@ -122,7 +122,9 @@ describe('MonsterStatBlockPanel — resource costs', () => {
       />
     );
     expect(screen.getByText('Unknown resource')).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Use' })).toBeDisabled();
+    expect(
+      screen.getByRole('button', { name: 'Use Turn Undead' })
+    ).toBeDisabled();
   });
 });
 
