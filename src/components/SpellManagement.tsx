@@ -226,7 +226,14 @@ const SpellCard: React.FC<{
           >
             <Eye size={14} />
           </Button>
-          <Button onClick={onEdit} variant="ghost" size="xs" title="Edit spell">
+          <Button
+            onClick={onEdit}
+            variant="ghost"
+            size="xs"
+            title="Edit spell"
+            aria-label="Edit spell"
+            aria-describedby={nameId}
+          >
             <Edit2 size={14} />
           </Button>
           <Button
@@ -234,6 +241,8 @@ const SpellCard: React.FC<{
             variant="ghost"
             size="xs"
             title="Delete spell"
+            aria-label="Delete spell"
+            aria-describedby={nameId}
             className="text-blood-text"
           >
             <Trash2 size={14} />
@@ -385,6 +394,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Edit spell"
+              aria-label="Edit spell"
+              aria-describedby={nameId}
             >
               <Edit2 size={16} />
             </Button>
@@ -393,6 +404,8 @@ const SpellCard: React.FC<{
               variant="outline"
               size="sm"
               title="Delete spell"
+              aria-label="Delete spell"
+              aria-describedby={nameId}
               className="text-blood-text"
             >
               <Trash2 size={16} />

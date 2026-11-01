@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ToolProficienciesSection from './ToolProficienciesSection';
 import Languages from './LanguagesAndProficiencies';
 import type { ToolProficiency, Language } from '@/types/character';
+import { useState } from 'react';
 
 vi.mock('@/hooks/useToolsData', () => ({
   useToolsData: () => ({
@@ -109,6 +110,59 @@ describe('Features proficiencies', () => {
 });
 
 describe('proficiency remove buttons', () => {
+  it('returns focus to Add controls after deleting a focused tool or language', () => {
+    function Panels() {
+      const [tools, setTools] = useState([tool]);
+      const [languages, setLanguages] = useState([language]);
+      return (
+        <>
+          <ToolProficienciesSection
+            toolProficiencies={tools}
+            proficiencyBonus={3}
+            editing
+            onAddToolProficiency={vi.fn()}
+            onUpdateToolProficiency={vi.fn()}
+            onDeleteToolProficiency={id =>
+              setTools(current => current.filter(item => item.id !== id))
+            }
+          />
+          <Languages
+            languages={languages}
+            editing
+            onAddLanguage={vi.fn()}
+            onDeleteLanguage={id =>
+              setLanguages(current => current.filter(item => item.id !== id))
+            }
+          />
+        </>
+      );
+    }
+    render(<Panels />);
+    const toolRemove = screen.getByRole('button', {
+      name: 'Remove proficiency',
+    });
+    toolRemove.focus();
+    fireEvent.click(toolRemove);
+    expect(screen.getByRole('button', { name: 'Custom' })).toHaveFocus();
+    const languageRemove = screen.getByRole('button', {
+      name: 'Remove language',
+    });
+    languageRemove.focus();
+    fireEvent.click(languageRemove);
+    expect(screen.getByRole('button', { name: 'Add language' })).toHaveFocus();
+  });
+
+  it('keeps both inline Add actions secondary when both forms are open', () => {
+    renderPanels(true);
+    fireEvent.click(screen.getByRole('button', { name: 'Custom' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Add language' }));
+    expect(
+      screen
+        .getAllByRole('button', { name: 'Add' })
+        .every(button => button.getAttribute('data-variant') === 'secondary')
+    ).toBe(true);
+  });
+
   it('describe each remove button with the row name', () => {
     render(
       <>

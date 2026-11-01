@@ -376,6 +376,7 @@ export function SpellFormFields({
             Spell Description *
           </label>
           <RichTextEditor
+            ariaLabel="Spell Description"
             content={formData.description}
             onChange={setDescription}
             placeholder="Describe what the spell does..."
@@ -387,6 +388,7 @@ export function SpellFormFields({
             At Higher Levels
           </label>
           <RichTextEditor
+            ariaLabel="At Higher Levels"
             content={formData.higherLevel}
             onChange={content => set({ higherLevel: content })}
             placeholder="Describe what happens when cast at higher levels..."

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { InventoryItem } from '@/types/character';
 import { ChevronDown, ChevronRight, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/forms/button';
@@ -30,6 +30,7 @@ export function ItemCard({
   compact = false,
 }: ItemCardProps) {
   const [expanded, setExpanded] = useState(!compact);
+  const nameId = useId();
   const previousCompact = useRef(compact);
   useEffect(() => {
     if (previousCompact.current !== compact) {
@@ -56,7 +57,10 @@ export function ItemCard({
           {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
         </span>
         <span className="min-w-0 flex-1">
-          <span className="text-heading block font-semibold break-words">
+          <span
+            id={nameId}
+            className="text-heading block font-semibold break-words"
+          >
             {item.name}
           </span>
           <span className="text-muted mt-1 flex flex-wrap gap-x-2 gap-y-1 text-sm">
@@ -110,7 +114,8 @@ export function ItemCard({
             variant="outline"
             size="sm"
             onClick={onUse}
-            aria-label={`Use ${item.name}`}
+            aria-label="Use item"
+            aria-describedby={nameId}
           >
             Use item
           </Button>
@@ -158,7 +163,8 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onView(item)}
-                aria-label={`View ${item.name}`}
+                aria-label="View details"
+                aria-describedby={nameId}
               >
                 View details
               </Button>
@@ -169,7 +175,8 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onEdit(item)}
-                aria-label={`Edit ${item.name}`}
+                aria-label="Edit"
+                aria-describedby={nameId}
               >
                 Edit
               </Button>
@@ -180,7 +187,8 @@ export function ItemCard({
                 variant="outline"
                 size="sm"
                 onClick={() => onSend(item)}
-                aria-label={`Send ${item.name} to a player`}
+                aria-label="Send to a player"
+                aria-describedby={nameId}
               >
                 Send to a player
               </Button>
@@ -191,7 +199,8 @@ export function ItemCard({
                 variant="danger"
                 size="sm"
                 onClick={onDelete}
-                aria-label={`Delete ${item.name}`}
+                aria-label="Delete item"
+                aria-describedby={nameId}
               >
                 Delete item
               </Button>

@@ -98,6 +98,8 @@ export function SpellcastingStats({ editing = false }: { editing?: boolean }) {
             variant="ghost"
             size="sm"
             title="Toggle manual overrides"
+            aria-label="Toggle manual overrides"
+            aria-expanded={showOverrides}
           >
             {showOverrides ? <Calculator size={20} /> : <Edit3 size={20} />}
           </Button>

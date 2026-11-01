@@ -630,6 +630,7 @@ export default function UnifiedFeatureModal({
                             Description
                           </label>
                           <RichTextEditor
+                            ariaLabel="Description"
                             content={formData.description}
                             onChange={content =>
                               setFormData({ ...formData, description: content })

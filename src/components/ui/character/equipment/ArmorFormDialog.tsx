@@ -306,6 +306,7 @@ export function ArmorFormDialog({
                   Special properties
                 </label>
                 <RichTextEditor
+                  ariaLabel="Special properties"
                   content={formData.description}
                   onChange={content =>
                     setFormData(prev => ({ ...prev, description: content }))

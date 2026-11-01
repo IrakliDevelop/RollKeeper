@@ -208,6 +208,7 @@ export function EventDialog({
               Description
             </label>
             <RichTextEditor
+              ariaLabel="Description"
               content={description}
               onChange={setDescription}
               placeholder="Event details..."

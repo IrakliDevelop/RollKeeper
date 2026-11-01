@@ -132,6 +132,7 @@ export default function NoteModal({
 
           {/* Content */}
           <RichTextEditor
+            ariaLabel="Note content"
             content={editContent}
             onChange={setEditContent}
             placeholder="Write your note here..."

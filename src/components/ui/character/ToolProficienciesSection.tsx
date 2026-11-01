@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useMemo, useState } from 'react';
+import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 import { Section } from '@/components/ui/layout/section';
@@ -46,6 +46,18 @@ export default function ToolProficienciesSection({
   const [openCategories, setOpenCategories] = useState<Set<string>>(new Set());
   const [addingCustom, setAddingCustom] = useState(false);
   const [customName, setCustomName] = useState('');
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingDeleteFocus = useRef(false);
+  useEffect(() => {
+    if (pendingDeleteFocus.current) {
+      pendingDeleteFocus.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [toolProficiencies]);
+  const removeTool = (id: string) => {
+    pendingDeleteFocus.current = true;
+    onDeleteToolProficiency(id);
+  };
   const byName = useMemo(
     () =>
       new Map(
@@ -112,7 +124,7 @@ export default function ToolProficienciesSection({
           aria-label={skillDotLabel(name, level)}
           onClick={() => {
             if (!tool) add(name);
-            else if (nextLevel === 'none') onDeleteToolProficiency(tool.id);
+            else if (nextLevel === 'none') removeTool(tool.id);
             else
               onUpdateToolProficiency(tool.id, { proficiencyLevel: nextLevel });
           }}
@@ -151,7 +163,7 @@ export default function ToolProficienciesSection({
                 size="sm"
                 aria-label={removeLabel}
                 aria-describedby={nameId}
-                onClick={() => onDeleteToolProficiency(tool.id)}
+                onClick={() => removeTool(tool.id)}
               >
                 <Trash2 className="size-4" aria-hidden="true" />
               </Button>
@@ -168,6 +180,7 @@ export default function ToolProficienciesSection({
       trailing={
         editing && (
           <Button
+            ref={addButtonRef}
             type="button"
             variant="ghost"
             size="sm"
@@ -225,7 +238,7 @@ export default function ToolProficienciesSection({
               />
               <Button
                 type="button"
-                variant="primary"
+                variant="secondary"
                 size="sm"
                 onClick={saveCustom}
               >

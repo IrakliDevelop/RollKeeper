@@ -413,6 +413,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                               disabled={isFull}
                               className="min-h-6 min-w-6 p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                               title="Restore charge"
+                              aria-label={`Restore one ${charge.name || 'ability'} charge on ${weapon.name}`}
                             >
                               <Plus size={12} />
                             </Button>
@@ -430,6 +431,7 @@ export const EquippedWeapons: React.FC<EquippedWeaponsProps> = ({
                               disabled={isExhausted}
                               className="min-h-6 min-w-6 p-1 pointer-coarse:min-h-11 pointer-coarse:min-w-11"
                               title="Use charge"
+                              aria-label={`Use one ${charge.name || 'ability'} charge on ${weapon.name}`}
                             >
                               <Minus size={12} />
                             </Button>

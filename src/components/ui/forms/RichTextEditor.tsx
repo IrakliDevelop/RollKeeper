@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 
 interface RichTextEditorProps {
+  ariaLabel: string;
   content: string;
   onChange: (content: string) => void;
   placeholder?: string;
@@ -40,6 +41,7 @@ interface RichTextEditorProps {
 }
 
 export default function RichTextEditor({
+  ariaLabel,
   content,
   onChange,
   placeholder = 'Start writing...',
@@ -71,6 +73,7 @@ export default function RichTextEditor({
     },
     editorProps: {
       attributes: {
+        'aria-label': ariaLabel,
         class: 'focus:outline-none',
         style: `min-height: ${minHeight}; padding: 16px;`,
       },

@@ -52,8 +52,8 @@ export function useEquipmentFilters<T extends FilterableItem>(
   const filteredItems = useMemo(() => {
     return items.filter(item => {
       if (
-        filters.search &&
-        !item.name.toLowerCase().includes(filters.search.toLowerCase())
+        filters.search.trim() &&
+        !item.name.toLowerCase().includes(filters.search.trim().toLowerCase())
       ) {
         return false;
       }

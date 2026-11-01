@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useId, useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { Plus, Trash2 } from 'lucide-react';
 import { Button, Input } from '@/components/ui/forms';
 import { Section } from '@/components/ui/layout/section';
@@ -24,6 +24,18 @@ export default function Languages({
   const rowIdPrefix = useId();
   const [isAddingLanguage, setIsAddingLanguage] = useState(false);
   const [newLanguageName, setNewLanguageName] = useState('');
+  const addButtonRef = useRef<HTMLButtonElement>(null);
+  const pendingDeleteFocus = useRef(false);
+  useEffect(() => {
+    if (pendingDeleteFocus.current) {
+      pendingDeleteFocus.current = false;
+      addButtonRef.current?.focus();
+    }
+  }, [languages]);
+  const removeLanguage = (id: string) => {
+    pendingDeleteFocus.current = true;
+    onDeleteLanguage(id);
+  };
 
   const handleAddLanguage = () => {
     if (!newLanguageName.trim()) return;
@@ -39,6 +51,7 @@ export default function Languages({
         editing &&
         !isAddingLanguage && (
           <Button
+            ref={addButtonRef}
             type="button"
             variant="ghost"
             size="sm"
@@ -69,7 +82,7 @@ export default function Languages({
           />
           <Button
             type="button"
-            variant="primary"
+            variant="secondary"
             size="sm"
             onClick={handleAddLanguage}
           >
@@ -110,7 +123,7 @@ export default function Languages({
                   size="sm"
                   aria-label="Remove language"
                   aria-describedby={`${rowIdPrefix}-${language.id}`}
-                  onClick={() => onDeleteLanguage(language.id)}
+                  onClick={() => removeLanguage(language.id)}
                 >
                   <Trash2 className="size-4" aria-hidden="true" />
                 </Button>
