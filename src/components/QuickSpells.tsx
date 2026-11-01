@@ -35,7 +35,7 @@ import { Button } from '@/components/ui/forms';
 import { Badge } from '@/components/ui/layout';
 import { alertDialog } from '@/components/ui/feedback/confirm-dialog';
 import { castCostAlertTitle } from '@/utils/spellCastCost';
-import { SlotPips } from '@/components/ui/game/SlotPips';
+import { SlotPipsButtons } from '@/components/ui/game/SlotPipsButtons';
 
 const NO_SPELLCASTING_ABILITY = {
   title: "Can't cast spells",
@@ -84,6 +84,7 @@ interface LevelSectionProps {
   totalLevel: number;
   slotMax?: number;
   slotUsed?: number;
+  onSlotChange?: (delta: number) => void;
 }
 
 const SpellCard: React.FC<{
@@ -298,6 +299,7 @@ const LevelSection: React.FC<LevelSectionProps> = ({
   totalLevel,
   slotMax,
   slotUsed,
+  onSlotChange,
 }) => {
   const isCantrip = level === 0;
   const levelName = isCantrip ? 'Cantrips' : `Level ${level}`;
@@ -331,7 +333,13 @@ const LevelSection: React.FC<LevelSectionProps> = ({
         {/* Inline slot dots */}
         {hasSlots && (
           <div className="ml-auto flex items-center gap-1.5">
-            <SlotPips total={slotMax!} available={remaining} level={level} />
+            <SlotPipsButtons
+              total={slotMax!}
+              available={remaining}
+              level={level}
+              onSpend={onSlotChange ? () => onSlotChange(1) : undefined}
+              onRestore={onSlotChange ? () => onSlotChange(-1) : undefined}
+            />
             <span className="text-muted text-xs">
               {remaining}/{slotMax}
             </span>
@@ -367,8 +375,13 @@ export function QuickSpells({
   showDamageRoll,
   animateRoll,
 }: QuickSpellsProps) {
-  const { character, toggleSpellFavorite, toggleReaction } =
-    useCharacterStore();
+  const {
+    character,
+    toggleSpellFavorite,
+    toggleReaction,
+    spendSpellSlot,
+    restoreSpellSlot,
+  } = useCharacterStore();
   const { castSpell } = useCastSpell();
   const totalLevel = getTotalLevel(character);
 
@@ -737,6 +750,12 @@ export function QuickSpells({
                   totalLevel={totalLevel}
                   slotMax={slot?.max}
                   slotUsed={slot?.used}
+                  onSlotChange={delta => {
+                    const slotLevel =
+                      level as keyof typeof character.spellSlots;
+                    if (delta > 0) spendSpellSlot(slotLevel, delta);
+                    else if (delta < 0) restoreSpellSlot(slotLevel, -delta);
+                  }}
                 />
               );
             })}

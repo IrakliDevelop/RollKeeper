@@ -6,6 +6,7 @@ import { createDiceTray } from 'pollyroll/render';
 import type { DiceTray, SkinRef } from 'pollyroll/render';
 import type { RollSummary } from '@/types/dice';
 import { toRollSummary } from '@/utils/pollyrollSummary';
+import { DEFAULT_DICE_SET } from '@/utils/diceSet';
 
 interface TrayEntry {
   tray: DiceTray;
@@ -146,7 +147,7 @@ export function useDiceRoller({
       const tray = acquireTray(
         containerId,
         skinRef.current,
-        dieScaleRef.current ?? 2
+        dieScaleRef.current ?? DEFAULT_DICE_SET.dieScale
       );
       if (!tray) return false;
       acquired = true;
