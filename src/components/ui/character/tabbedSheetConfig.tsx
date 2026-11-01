@@ -791,13 +791,6 @@ function CharacterTabContent({
             <DiceSetEditor
               value={parseDiceSet(character.diceSet) ?? DEFAULT_DICE_SET}
               onChange={diceSet => params.updateCharacter({ diceSet })}
-              onPreview={
-                params.animateRoll
-                  ? () => {
-                      void params.animateRoll?.('1d20+1d8+1d6');
-                    }
-                  : undefined
-              }
             />
           ),
         }[tab.id],

@@ -125,6 +125,7 @@ export default function CharacterSheetHeader({
             />
             {extraHeaderContent}
             <CharacterActions
+              characterId={characterId}
               onExport={onExport}
               onShare={() => setShareOpen(true)}
               onReset={onShowResetModal}

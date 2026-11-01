@@ -1,4 +1,5 @@
 'use client';
+import Link from 'next/link';
 import { useRef, useState } from 'react';
 import * as Popover from '@radix-ui/react-popover';
 import { Download, RotateCcw, Share2, ChevronDown } from 'lucide-react';
@@ -6,11 +7,13 @@ import { Button } from '@/components/ui/forms/button';
 import { OVERLAY_SURFACE } from '@/components/ui/primitives/variants';
 
 interface CharacterActionsProps {
+  characterId?: string;
   onExport: () => void;
   onShare: () => void;
   onReset: () => void;
 }
 export function CharacterActions({
+  characterId,
   onExport,
   onShare,
   onReset,
@@ -74,6 +77,16 @@ export function CharacterActions({
             >
               Share with QR code
             </Button>
+            {characterId && (
+              <Button asChild variant="ghost" size="sm">
+                <Link
+                  href={`/player/characters/${encodeURIComponent(characterId)}/dice`}
+                  onClick={() => setOpen(false)}
+                >
+                  Configure dice
+                </Link>
+              </Button>
+            )}
             <Button
               type="button"
               variant="danger"
